@@ -12,8 +12,9 @@ import { AuditRiskController } from '../controllers/audit-risk.controller';
 import { ComplianceMonitoringController } from '../controllers/compliance-monitoring.controller';
 import { FraudDetectionController } from '../controllers/fraud-detection.controller';
 
-// Scheduler
+// Scheduler (registered only when AI_SCHEDULERS_ENABLED=true, see AC3 of #133)
 import { AiSecurityScheduler } from '../schedulers/ai-security.scheduler';
+import { aiSchedulerProviders } from '../schedulers/ai-schedulers.enabled';
 
 @Module({
   imports: [PrismaModule, AiCoreModule],
@@ -22,7 +23,7 @@ import { AiSecurityScheduler } from '../schedulers/ai-security.scheduler';
     FraudDetectionService,
     ComplianceMonitoringService,
     AuditRiskService,
-    AiSecurityScheduler,
+    ...aiSchedulerProviders([AiSecurityScheduler]),
   ],
   exports: [FraudDetectionService, ComplianceMonitoringService, AuditRiskService],
 })

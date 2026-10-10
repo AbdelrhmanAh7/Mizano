@@ -20,6 +20,8 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .npmrc ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/shared-types/package.json ./packages/shared-types/
+# apps/api still depends on @mizano/validators (workspace:*), so pnpm install
+# needs its manifest even though no source file imports it at runtime.
 COPY packages/validators/package.json ./packages/validators/
 
 # Install dependencies (HUSKY=0 disables the husky prepare hook)
@@ -34,7 +36,7 @@ COPY packages ./packages
 RUN cd apps/api && pnpm exec prisma generate
 
 # Build shared packages first
-RUN pnpm --filter @mizano/shared-types build && pnpm --filter @mizano/validators build
+RUN pnpm --filter @mizano/shared-types build
 
 # Build the application
 RUN pnpm --filter api build

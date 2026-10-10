@@ -93,8 +93,6 @@ Logs must never contain invoice/OCR text, LLM prompts or output, credentials, bo
 
 Error-log endpoints (`/api/logger/*`) and the `/logger` WebSocket require a signed-in user with the Admin-level `settings.edit` permission (`settings.delete` for clearing), see `LoggerController`. Entries are scoped to the caller's organization; entries without an organization (unauthenticated requests, schedulers) are never returned. The WebSocket handshake needs `auth: { token: <access token> }` (or an `Authorization: Bearer` header) and joins the caller's organization room only.
 
-The `ollama-proxy` container (`services/ollama-proxy`) has no default `WEBHOOK_SECRET`: it refuses to start when the variable is missing or a placeholder such as `change-me`. Set the same value as the API's `OLLAMA_WEBHOOK_SECRET`.
-
 ## Database
 
 - Schema: `apps/api/prisma/schema.prisma`; migrations in `apps/api/prisma/migrations/`; seed in `apps/api/prisma/seed.ts` (`prisma db seed`).

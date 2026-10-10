@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ChurnPredictionService } from '../services/churn-prediction.service';
 import { ClvAnalysisService } from '../services/clv-analysis.service';
@@ -13,6 +14,7 @@ const BATCH_SIZE = 5;
 @Injectable()
 export class AiSalesCrmScheduler {
   private readonly logger = new Logger(AiSalesCrmScheduler.name);
+  private readonly enabled: boolean;
 
   constructor(
     private prisma: PrismaService,
@@ -21,13 +23,30 @@ export class AiSalesCrmScheduler {
     private crossSellService: CrossSellService,
     private pricingService: DynamicPricingService,
     private pipelineService: PipelineForecastService,
-  ) {}
+    private config: ConfigService,
+  ) {
+    this.enabled = config.get('AI_SCHEDULERS_ENABLED') === 'true';
+    if (!this.enabled) {
+      this.logger.log(
+        'AI_SCHEDULERS_ENABLED is not set to true; AI Sales/CRM schedulers are disabled',
+      );
+    }
+  }
+
+  private guard(): boolean {
+    if (!this.enabled) {
+      this.logger.debug('AI scheduler skipped (AI_SCHEDULERS_ENABLED != true)');
+      return false;
+    }
+    return true;
+  }
 
   /**
    * Weekly churn prediction - runs every Sunday at 4 AM
    */
-  @Cron('0 4 * * 0')
+  @Cron('0 4 * * 0', { name: 'ai:sales:weekly-churn-prediction' })
   async runWeeklyChurnPrediction() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly churn prediction...');
 
     try {
@@ -69,8 +88,9 @@ export class AiSalesCrmScheduler {
   /**
    * Monthly CLV calculation - runs on the 1st at 3 AM
    */
-  @Cron('0 3 1 * *')
+  @Cron('0 3 1 * *', { name: 'ai:sales:monthly-clv-calculation' })
   async runMonthlyCLVCalculation() {
+    if (!this.guard()) return;
     this.logger.log('Starting monthly CLV calculation...');
 
     try {
@@ -108,8 +128,9 @@ export class AiSalesCrmScheduler {
   /**
    * Weekly cross-sell matrix rebuild - runs every Saturday at 2 AM
    */
-  @Cron('0 2 * * 6')
+  @Cron('0 2 * * 6', { name: 'ai:sales:weekly-cross-sell-rebuild' })
   async runWeeklyCrossSellRebuild() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly cross-sell matrix rebuild...');
 
     try {
@@ -151,8 +172,9 @@ export class AiSalesCrmScheduler {
   /**
    * Monthly pricing analysis - runs on the 1st at 4 AM
    */
-  @Cron('0 4 1 * *')
+  @Cron('0 4 1 * *', { name: 'ai:sales:monthly-pricing-analysis' })
   async runMonthlyPricingAnalysis() {
+    if (!this.guard()) return;
     this.logger.log('Starting monthly pricing analysis...');
 
     try {
@@ -194,8 +216,9 @@ export class AiSalesCrmScheduler {
   /**
    * Weekly pipeline forecast - runs every Monday at 6 AM
    */
-  @Cron('0 6 * * 1')
+  @Cron('0 6 * * 1', { name: 'ai:sales:weekly-pipeline-forecast' })
   async runWeeklyPipelineForecast() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly pipeline forecast...');
 
     try {

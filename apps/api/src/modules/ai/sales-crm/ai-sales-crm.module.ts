@@ -17,8 +17,9 @@ import { CrossSellController } from '../controllers/cross-sell.controller';
 import { DynamicPricingController } from '../controllers/dynamic-pricing.controller';
 import { LeadScoringController } from '../controllers/lead-scoring.controller';
 
-// Scheduler
+// Scheduler (registered only when AI_SCHEDULERS_ENABLED=true, see AC3 of #133)
 import { AiSalesCrmScheduler } from '../schedulers/ai-sales-crm.scheduler';
+import { aiSchedulerProviders } from '../schedulers/ai-schedulers.enabled';
 
 @Module({
   imports: [PrismaModule, AiCoreModule, AiForecastingModule],
@@ -35,7 +36,7 @@ import { AiSalesCrmScheduler } from '../schedulers/ai-sales-crm.scheduler';
     ClvAnalysisService,
     CrossSellService,
     DynamicPricingService,
-    AiSalesCrmScheduler,
+    ...aiSchedulerProviders([AiSalesCrmScheduler]),
   ],
   exports: [
     LeadScoringService,

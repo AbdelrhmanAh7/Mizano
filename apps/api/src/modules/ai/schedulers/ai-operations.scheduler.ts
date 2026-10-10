@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AnomalyDetectionService } from '../services/anomaly-detection.service';
 import { ReorderPointsService } from '../services/reorder-points.service';
@@ -17,6 +18,7 @@ const BATCH_SIZE = 5;
 @Injectable()
 export class AiOperationsScheduler {
   private readonly logger = new Logger(AiOperationsScheduler.name);
+  private readonly enabled: boolean;
 
   constructor(
     private prisma: PrismaService,
@@ -29,14 +31,31 @@ export class AiOperationsScheduler {
     private leadScoringService: LeadScoringService,
     private patternDetectionService: PatternDetectionService,
     private aiAlertsService: AiAlertsService,
-  ) {}
+    private config: ConfigService,
+  ) {
+    this.enabled = config.get('AI_SCHEDULERS_ENABLED') === 'true';
+    if (!this.enabled) {
+      this.logger.log(
+        'AI_SCHEDULERS_ENABLED is not set to true; AI Operations schedulers are disabled',
+      );
+    }
+  }
+
+  private guard(): boolean {
+    if (!this.enabled) {
+      this.logger.debug('AI scheduler skipped (AI_SCHEDULERS_ENABLED != true)');
+      return false;
+    }
+    return true;
+  }
 
   /**
    * Daily anomaly scan - runs at 2 AM
    * Scans all organizations for transaction anomalies
    */
-  @Cron('0 2 * * *')
+  @Cron('0 2 * * *', { name: 'ai:operations:daily-anomaly-scan' })
   async runDailyAnomalyScan() {
+    if (!this.guard()) return;
     this.logger.log('Starting daily anomaly scan...');
 
     try {
@@ -84,8 +103,9 @@ export class AiOperationsScheduler {
    * Weekly reorder points update - runs every Sunday at midnight
    * Recalculates reorder points and safety stock for all items
    */
-  @Cron('0 0 * * 0')
+  @Cron('0 0 * * 0', { name: 'ai:operations:weekly-reorder-update' })
   async runWeeklyReorderUpdate() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly reorder points update...');
 
     try {
@@ -126,8 +146,9 @@ export class AiOperationsScheduler {
    * Weekly demand forecasting update - runs every Sunday at 1 AM
    * Uses Holt-Winters Triple Exponential Smoothing for all inventory items
    */
-  @Cron('0 1 * * 0')
+  @Cron('0 1 * * 0', { name: 'ai:operations:weekly-demand-forecast' })
   async runWeeklyDemandForecast() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly demand forecast update...');
 
     try {
@@ -177,8 +198,9 @@ export class AiOperationsScheduler {
    * Daily cash flow prediction update - runs at 3 AM
    * Uses Monte Carlo simulation for probabilistic cash flow forecasting
    */
-  @Cron('0 3 * * *')
+  @Cron('0 3 * * *', { name: 'ai:operations:daily-cash-flow-prediction' })
   async runDailyCashFlowPrediction() {
+    if (!this.guard()) return;
     this.logger.log('Starting daily cash flow prediction update...');
 
     try {
@@ -222,8 +244,9 @@ export class AiOperationsScheduler {
    * Weekly lead scoring update - runs every Sunday at midnight
    * Rescores all leads and applies decay for inactivity
    */
-  @Cron('0 0 * * 0')
+  @Cron('0 0 * * 0', { name: 'ai:operations:weekly-lead-scoring-update' })
   async runWeeklyLeadScoringUpdate() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly lead scoring update...');
 
     try {
@@ -267,8 +290,9 @@ export class AiOperationsScheduler {
    * Payment predictions update - runs every Sunday at 2 AM
    * Recalculates payment predictions for all outstanding invoices
    */
-  @Cron('0 2 * * 0')
+  @Cron('0 2 * * 0', { name: 'ai:operations:weekly-payment-prediction-update' })
   async runWeeklyPaymentPredictionUpdate() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly payment prediction update...');
 
     try {
@@ -309,8 +333,9 @@ export class AiOperationsScheduler {
    * Monthly narrative generation - runs on the 1st of each month at 6 AM
    * Generates and stores monthly financial narratives for all organizations
    */
-  @Cron('0 6 1 * *')
+  @Cron('0 6 1 * *', { name: 'ai:operations:monthly-narrative-generation' })
   async runMonthlyNarrativeGeneration() {
+    if (!this.guard()) return;
     this.logger.log('Starting monthly narrative generation...');
 
     try {
@@ -380,8 +405,9 @@ export class AiOperationsScheduler {
    * Weekly pattern detection analysis - runs every Sunday at 3 AM
    * Detects recurring transaction patterns and generates suggestions
    */
-  @Cron('0 3 * * 0')
+  @Cron('0 3 * * 0', { name: 'ai:operations:weekly-pattern-detection' })
   async runWeeklyPatternDetection() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly pattern detection analysis...');
 
     try {
@@ -425,8 +451,9 @@ export class AiOperationsScheduler {
    * AI alerts aggregation - runs every 4 hours at :30
    * Collects alerts from all AI services and creates unified notifications
    */
-  @Cron('30 */4 * * *')
+  @Cron('30 */4 * * *', { name: 'ai:operations:hourly-alert-aggregation' })
   async runHourlyAlertAggregation() {
+    if (!this.guard()) return;
     this.logger.log('Starting hourly AI alerts aggregation...');
 
     try {
@@ -472,8 +499,9 @@ export class AiOperationsScheduler {
    * Daily AI alerts cleanup - runs at 4 AM
    * Removes expired alerts and old dismissed alerts
    */
-  @Cron('0 4 * * *')
+  @Cron('0 4 * * *', { name: 'ai:operations:daily-alert-cleanup' })
   async runDailyAlertCleanup() {
+    if (!this.guard()) return;
     this.logger.log('Starting daily AI alerts cleanup...');
 
     try {
@@ -516,8 +544,9 @@ export class AiOperationsScheduler {
    * Mark stale patterns - runs every Sunday at 5 AM
    * Marks patterns as stale if no new occurrences in 90+ days
    */
-  @Cron('0 5 * * 0')
+  @Cron('0 5 * * 0', { name: 'ai:operations:weekly-stale-pattern-check' })
   async runWeeklyStalePatternCheck() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly stale pattern check...');
 
     try {
@@ -546,8 +575,9 @@ export class AiOperationsScheduler {
    * Cleanup old AI data - runs weekly on Saturday at 4 AM
    * Removes old predictions and resolved anomalies
    */
-  @Cron('0 4 * * 6')
+  @Cron('0 4 * * 6', { name: 'ai:operations:weekly-cleanup' })
   async runWeeklyCleanup() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly AI data cleanup...');
 
     try {
@@ -584,8 +614,9 @@ export class AiOperationsScheduler {
    * Monthly ABC analysis - runs on the 1st of each month at 2 AM
    * Reclassifies items and adjusts service levels accordingly
    */
-  @Cron('0 2 1 * *')
+  @Cron('0 2 1 * *', { name: 'ai:operations:monthly-abc-analysis' })
   async runMonthlyAbcAnalysis() {
+    if (!this.guard()) return;
     this.logger.log('Starting monthly ABC analysis...');
 
     try {

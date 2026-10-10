@@ -4,13 +4,12 @@ How the Mizano monorepo is built today, the rules every change must respect, and
 
 ## System overview
 
-| Workspace               | Technology                      | Role                                                                        |
-| ----------------------- | ------------------------------- | --------------------------------------------------------------------------- |
-| `apps/web`              | Next.js 14 App Router, React 18 | Accountant UI on port **5001**, Arabic/English with RTL                     |
-| `apps/api`              | NestJS 10, Prisma 5             | REST + WebSocket API on port **6001**, global prefix `/api`                 |
-| `packages/shared-types` | TypeScript                      | Types shared by web and API (`@mizano/shared-types`)                        |
-| `packages/validators`   | Zod                             | Schemas shared by forms and API (`@mizano/validators`)                      |
-| `services/ollama-proxy` | Python                          | Legacy Colab tunnel proxy still referenced by the AI module; not in compose |
+| Workspace               | Technology                      | Role                                                        |
+| ----------------------- | ------------------------------- | ----------------------------------------------------------- |
+| `apps/web`              | Next.js 14 App Router, React 18 | Accountant UI on port **5001**, Arabic/English with RTL     |
+| `apps/api`              | NestJS 10, Prisma 5             | REST + WebSocket API on port **6001**, global prefix `/api` |
+| `packages/shared-types` | TypeScript                      | Types shared by web and API (`@mizano/shared-types`)        |
+| `packages/validators`   | Zod                             | Schemas shared by forms and API (`@mizano/validators`)      |
 
 ```
 Browser ──► Next.js (5001)              pages, next-intl, NextAuth session
@@ -18,7 +17,7 @@ Browser ──► Next.js (5001)              pages, next-intl, NextAuth session
    └──axios + Bearer JWT──► NestJS /api (6001) ──► PostgreSQL 16 (Prisma, Decimal(19,4))
                               │                 └─► Redis 7 (cache, throttling)
                               ├─ socket.io gateways (notifications, logger)
-                              └─ AI module ──► Ollama (OLLAMA_BASE_URL) / PaddleOCR / tesseract.js
+                              └─ AI module ──► CPU OCR (PaddleOCR/tesseract.js) + Rules / optional Ollama
 ```
 
 The browser calls NestJS directly (`NEXT_PUBLIC_API_URL`); there is no Next.js BFF proxy. The only Next.js API route is NextAuth (`app/api/auth/[...nextauth]`). In production, Nginx routes `/api/` and `/socket.io/` to the API and everything else to the web container (see [deployment](DEVELOPMENT.md#deployment)).
@@ -55,7 +54,6 @@ mizano/
 │       ├── messages/{en,ar}/           next-intl namespaces
 │       └── public/                     brand assets (svg, png, ico, pwa, social)
 ├── packages/{shared-types,validators}/
-├── services/ollama-proxy/
 ├── docs/                          this guide, DEVELOPMENT, DESIGN-SYSTEM, roadmap, strategy, planning, agents, archive
 ├── scripts/                       demo planning sync + offline tests (used by .github/workflows/demo-planning.yml)
 ├── nginx/nginx.conf               production reverse proxy (copied by deploy.yml)

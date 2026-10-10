@@ -226,50 +226,53 @@ All workflows are in `.agents/workflows/`. Use these commands for full project c
 | `/add-component` | Add shadcn/ui components                            |
 | `/debug-api`     | Debug API (Docker/ports/DB/logs/endpoints)          |
 
-## Historical AI Infrastructure — Ollama via Google Colab
+## AI Infrastructure — CPU-Only Extraction (Raspberry Pi 5)
 
-> Current runtime description only, not the target architecture. The CPU-only demo mandate in AGENTS.md supersedes the old Colab-only constraints in this section. Replace this dependency through the CPU runtime/extraction issues; paid cloud AI remains disabled in the demo. Do not mistake this documented migration plan for an implemented change.
+> The demo runs on CPU-only hardware (Raspberry Pi 5, 8GB ARM64). No GPU, no Colab, no paid cloud AI.
+> Extraction uses local OCR (Tesseract.js + PaddleOCR Python) and rule-based parsers.
+> LLM-based features (narratives, categorization) require `OLLAMA_ENABLED=true` and a reachable Ollama endpoint.
 
-Ollama does NOT run locally in production. It runs on a Google Colab notebook
-(T4 GPU, free tier) and is accessed through a reverse proxy.
-
-There is NO external AI API fallback. No Gemini, no OpenAI, no cloud AI.
-When Colab is down, AI features return 503 until the notebook is restarted.
-
-### Architecture
+### Architecture (current)
 
 ```
-services (Docker) → ollama-proxy:11434 → Cloudflare tunnel → Colab (Ollama + GPU)
-                         ↓ (if Colab down)
-                    503 "AI temporarily unavailable"
+Browser → API (6001) → Intake job (BullMQ/Redis) → extraction strategies in-process → Draft Bills/Invoices
+                                  ↓ (optional, when OLLAMA_ENABLED)
+                           Ollama Service (text model for structured extraction)
 ```
 
 ### How it works
 
-- `ollama-proxy` service listens on port 11434 (same as real Ollama)
-- Reads tunnel URL from `/data/ollama_tunnel_url` in its container volume
-- All services use `OLLAMA_BASE_URL=http://ollama-proxy:11434` — no code changes
-- When Colab disconnects, all AI features return 503
-- Colab notebook pushes new tunnel URLs via `POST /api/internal/tunnel-update`
-- Telegram bot alerts admin when Ollama goes down
+- Document intake goes through `IntakeQueueService` (BullMQ on Redis); a BullMQ `Worker` currently runs **inside the API process**
+- OCR: Tesseract.js (fallback) or PaddleOCR via Python subprocess (preferred)
+- Structured extraction: RulesStrategy (deterministic) or OcrLlmStrategy (optional Ollama), selected by `EXTRACTION_STRATEGY` / request mode
+- Results stored as validated drafts; `POST /confirm` approves and posts a draft Bill/Invoice to the ledger
+- No GPU, Colab, paid cloud AI or runtime model download is required
+
+> **Target (not implemented yet):** move the extraction worker out of the API process into its own container. The Pi compose file reserves a commented-out `worker` service (§`deploy/pi/docker-compose.pi.yml`). Land the CPU extraction runtime first (epic #45, issues #39/#42, branches `ai/39`/`ai/42`), then flip the worker profile on.
 
 ### Key env vars
 
-- `OLLAMA_WEBHOOK_SECRET` — shared secret for tunnel URL updates
-- `OLLAMA_MODEL` — model name on Colab (default: qwen3-vl:8b)
+- `OLLAMA_ENABLED` — set `true` to enable optional LLM extraction (default: `false`)
+- `OLLAMA_BASE_URL` — Ollama endpoint when enabled (e.g., `http://ollama:11434`)
+- `INTAKE_STORAGE_DIR` — path for original document storage (default: `/data/originals`)
+- `INTAKE_TESSDATA_DIR` — path to Tesseract traineddata files (required offline)
+- `AI_SCHEDULERS_ENABLED` — set `true` to register the AI cron schedulers (default: `false`, see issue #133 AC3)
 
 ### Endpoints
 
-- `GET http://ollama-proxy:11434/health` — proxy + Ollama status
-- `GET /api/internal/ollama-status` — same, via NestJS (admin only)
-- `POST /api/internal/tunnel-update` — webhook from Colab (secret required)
+- `POST /api/ai/document-intake/process` — upload document, create intake job
+- `GET /api/ai/document-intake/jobs` — list jobs with status
+- `GET /api/ai/document-intake/:jobId/result` — extraction result (owner-guarded)
+- `GET /api/ai/document-intake/:jobId/original` — original document
+- `POST /api/ai/document-intake/:jobId/retry` — re-run extraction
+- `POST /api/ai/document-intake/confirm` — approve extracted data and create a draft Bill/Invoice
 
 ### Never
 
-- Add local Ollama or GPU config to docker-compose.yml
-- Add any external AI API (Gemini, OpenAI, etc.) as fallback
-- Assume Ollama is always available — always handle 503 gracefully
-- Hardcode tunnel URLs — they change every Colab restart
+- Add GPU config, Colab tunnels or paid cloud AI (Gemini, OpenAI, etc.) — the demo is fully offline-capable
+- Call external AI APIs as a fallback
+- Assume Ollama is available — always handle it gracefully when disabled
+- Ship employed `ai/schedulers/*` crons on the Pi: `AI_SCHEDULERS_ENABLED=false` unless explicitly enabled
 
 ## Docs Reference
 

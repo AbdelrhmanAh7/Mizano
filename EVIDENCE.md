@@ -142,3 +142,54 @@
   Total: 4 suites passed, 104 tests passed
   Lint: 4 packages successful
   ```
+
+---
+
+# Issue #133 — gate AI schedulers, remove dead Colab wiring, bound notification crons
+
+- **Base (`master`)**: `615060e`
+- **Tested commit**: `c889201` (branch `ai/133`)
+- **Date**: 2026-10-08
+
+## Changes by acceptance criterion
+
+| AC   | Change                                                                                                                         |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------ |
+| AC1  | `NarrativeController` / `FinancialNarrativeService` no longer registered in `ai.module.ts`; the forecasting module keeps both  |
+| AC2  | Deleted `ollama-tunnel.controller.ts` (+ spec), its registration, and `services/ollama-proxy/`                                 |
+| AC3  | `ai/schedulers/*` providers only register when `AI_SCHEDULERS_ENABLED=true` (default false); 29 `@Cron` jobs carry `ai:` names |
+| AC4  | Notification cron checks page all orgs by cursor, scope every query by `organizationId` and bound it with `take`               |
+| Misc | `apps/api/Dockerfile` no longer builds `@mizano/validators`; worker merge is written up in `docs/follow-ups.md` (needs #42)    |
+
+## Commands run and results
+
+Run from the worktree at `c889201`.
+
+```text
+cd apps/api && pnpm lint
+(no warnings or errors printed; exit 0)
+lint: 0 warnings
+
+cd apps/api && pnpm type-check
+tsc --noEmit && tsc --noEmit -p test/tsconfig.e2e.json
+(no errors printed)
+
+node apps/api/_run_tests.js
+Test Suites: 1 failed, 134 passed, 135 total
+Tests:       4 failed, 2184 passed, 2188 total
+```
+
+The 4 failures are all in `modules/import-export/services/import.service.hardening.spec.ts` (`csv` call in
+`import.service.ts:87`). That is the `esModuleInterop` drift between `_jest.config.js` and `tsconfig.json` that #134
+removes; this branch does not touch those files. I did not run that spec on `master` in this session, so "fails on
+master" is not verified here.
+
+```text
+E2E: throwaway Postgres 16 on 127.0.0.1:56433, fresh database, prisma migrate deploy, REDIS_URL blank
+cd apps/api && npx jest --config ./test/jest-e2e.json --runInBand
+Test Suites: 12 passed, 12 total
+Tests:       266 passed, 266 total
+```
+
+`test/issue-133.e2e-spec.ts` passed in that run. The root `pnpm lint` / `pnpm ci:full` and `pnpm --filter api build`
+were not run in this session.
