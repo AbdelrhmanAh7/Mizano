@@ -49,6 +49,8 @@ Agent slash-command recipes for these live in [`.agents/workflows/`](../.agents/
 
 ## Environments
 
+Telegram development requires a dedicated bot and exactly one poller for that bot. `TELEGRAM_BOT_TOKEN` enables polling; all E2E tests explicitly disable it to avoid consuming real updates. See [Telegram setup and targeted validation](telegram-intake.md) for private-channel binding, the isolated `mizano_e2e_telegram` database and recovery behavior. Never share a live deployment's polling token with a development API.
+
 Four environment templates are tracked at the repository root. They hold placeholders (`__CHANGE_ME__`) or local-only defaults; real secrets are supplied outside source control.
 
 | File         | `APP_ENV` | `NODE_ENV`  | Purpose                    |
@@ -60,20 +62,21 @@ Four environment templates are tracked at the repository root. They hold placeho
 
 - **API** (`app.module.ts`): `ConfigModule` loads `.env.${APP_ENV || 'local'}`, then `.env`. Check with `pnpm env:check`.
 - **Web**: Next.js loads its own `.env*` files from `apps/web`. Only `NEXT_PUBLIC_*` reaches the browser and is fixed at build time. `NEXT_PUBLIC_API_URL` must include the `/api` prefix (default `http://localhost:6001/api`).
-- When adding a variable, add it to all four templates (secret placeholders as `__CHANGE_ME__`) and to the table below.
+- When adding a variable, add it to all four templates (secret placeholders as `__CHANGE_ME__`) and to the table below. The one exception is an opt-in switch whose mere presence enables a runtime integration, such as `TELEGRAM_BOT_TOKEN`: it stays empty in every template, because a placeholder would start a poller with a bogus token.
 
-| Group        | Variables                                                                                                                                                                                                                       |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Core         | `APP_ENV`, `NODE_ENV`, `API_PORT` (6001), `CORS_ORIGIN` (comma-separated; required in production), `FRONTEND_URL`                                                                                                               |
-| Database     | `DATABASE_URL`, `DATABASE_POOL_SIZE`, `DATABASE_POOL_TIMEOUT`, `READ_DATABASE_URL`, `DATABASE_READ_POOL_SIZE`, `SLOW_QUERY_THRESHOLD_MS`                                                                                        |
-| Redis        | `REDIS_URL`                                                                                                                                                                                                                     |
-| Auth         | `JWT_SECRET`, `JWT_REFRESH_SECRET`, `JWT_EXPIRATION` (15m), `JWT_REFRESH_EXPIRATION` (7d), `NEXTAUTH_SECRET`, `NEXTAUTH_URL`                                                                                                    |
-| Web          | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_NAME`, `NEXT_PUBLIC_APP_URL`, `API_INTERNAL_URL`                                                                                                                                        |
-| Limits       | `RATE_LIMIT_TTL`, `RATE_LIMIT_MAX`, `RATE_LIMIT_AUTH_MAX`                                                                                                                                                                       |
-| Logging      | `LOG_LEVEL`, `PRISMA_LOG_QUERIES` (default off)                                                                                                                                                                                 |
-| AI (current) | `OLLAMA_BASE_URL`, `OLLAMA_ENABLED`, `OLLAMA_{TEXT,VISION,FAST,SLOW}_MODEL`, `OLLAMA_TIMEOUT_MS`, `OLLAMA_MAX_CONCURRENT`, `OLLAMA_NUM_CTX`, `OLLAMA_NUM_THREAD`, `OLLAMA_WEBHOOK_SECRET`                                       |
-| Extraction   | `EXTRACTION_STRATEGY` (`vlm`/`ocr-llm`/`hybrid`), `EXTRACTION_OCR_CONFIDENCE_THRESHOLD`, `EXTRACTION_MAX_PDF_PAGES`, `PADDLE_OCR_{LANG,PKG_PATH,MODELS_DIR,TIMEOUT_MS}`, `PADDLE_OCR_API_{URL,TOKEN,TIMEOUT_MS}`, `PYTHON_PATH` |
-| Email        | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`                                                                                                                                     |
+| Group        | Variables                                                                                                                                                                                                                                                      |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Core         | `APP_ENV`, `NODE_ENV`, `API_PORT` (6001), `CORS_ORIGIN` (comma-separated; required in production), `FRONTEND_URL`                                                                                                                                              |
+| Database     | `DATABASE_URL`, `DATABASE_POOL_SIZE`, `DATABASE_POOL_TIMEOUT`, `READ_DATABASE_URL`, `DATABASE_READ_POOL_SIZE`, `SLOW_QUERY_THRESHOLD_MS`                                                                                                                       |
+| Redis        | `REDIS_URL`                                                                                                                                                                                                                                                    |
+| Auth         | `JWT_SECRET`, `JWT_REFRESH_SECRET`, `JWT_EXPIRATION` (15m), `JWT_REFRESH_EXPIRATION` (7d), `NEXTAUTH_SECRET`, `NEXTAUTH_URL`                                                                                                                                   |
+| Web          | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_NAME`, `NEXT_PUBLIC_APP_URL`, `API_INTERNAL_URL`                                                                                                                                                                       |
+| Limits       | `RATE_LIMIT_TTL`, `RATE_LIMIT_MAX`, `RATE_LIMIT_AUTH_MAX`                                                                                                                                                                                                      |
+| Logging      | `LOG_LEVEL`, `PRISMA_LOG_QUERIES` (default off)                                                                                                                                                                                                                |
+| AI (current) | `OLLAMA_BASE_URL`, `OLLAMA_ENABLED`, `OLLAMA_{TEXT,VISION,FAST,SLOW}_MODEL`, `OLLAMA_TIMEOUT_MS`, `OLLAMA_MAX_CONCURRENT`, `OLLAMA_NUM_CTX`, `OLLAMA_NUM_THREAD`, `OLLAMA_WEBHOOK_SECRET`                                                                      |
+| Extraction   | `EXTRACTION_STRATEGY` (`vlm`/`ocr-llm`/`hybrid`), `EXTRACTION_OCR_CONFIDENCE_THRESHOLD`, `EXTRACTION_MAX_PDF_PAGES`, `PADDLE_OCR_{LANG,PKG_PATH,MODELS_DIR,TIMEOUT_MS}`, `PADDLE_OCR_API_{URL,TOKEN,TIMEOUT_MS}`, `PYTHON_PATH`                                |
+| Telegram     | `TELEGRAM_BOT_TOKEN` (empty = intake poller disabled; set only for a dedicated bot with a single poller, see [telegram-intake.md](telegram-intake.md)). The Pi monitoring bot uses `TELEGRAM_ALERT_BOT_TOKEN`, read only by `deploy/pi/scripts/healthcheck.sh` |
+| Email        | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`                                                                                                                                                                    |
 
 `OCR_SERVICE_*` and `VLM_*` entries still present in `.env.local` belong to removed Python services and are not read by the code.
 

@@ -604,6 +604,10 @@ model Organization {
   onboardingCompleted Boolean                 @default(false)
   onboarding          OrganizationOnboarding?
 
+  telegramLinks      TelegramLink[]
+  telegramLinkCodes  TelegramLinkCode[]
+  telegramDeliveries TelegramDelivery[]
+
   @@map("organizations")
 }
 
@@ -3056,4 +3060,74 @@ model IntakeJob {
   @@index([organizationId, status])
   @@index([organizationId, createdAt])
   @@map("intake_jobs")
+}
+
+/// A Telegram chat linked to one organization (issue #20). A chat belongs to at most one tenant.
+model TelegramLink {
+  id             String   @id @default(cuid())
+  organizationId String
+  chatId         String   @unique
+  /// The admin who generated the code; owns jobs created from this chat.
+  linkedById     String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("telegram_links")
+}
+
+/// One-time link code. Only the SHA-256 of the code is stored.
+model TelegramLinkCode {
+  id             String    @id @default(cuid())
+  organizationId String
+  createdById    String
+  codeHash       String    @unique
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("telegram_link_codes")
+}
+
+/// Durable long-poll cursor: the next update_id to request. BigInt: ids are never bounded by int4.
+model TelegramPollState {
+  id         String   @id
+  nextOffset BigInt   @default(0)
+  updatedAt  DateTime @updatedAt
+
+  @@map("telegram_poll_state")
+}
+
+/// Immutable source identity before download; never rebound when a chat changes tenant.
+/// The file reference is stored so a delivery deferred by a rate limit or a full queue can be
+/// resumed after the cursor moved on (Telegram cannot redeliver an acknowledged update).
+model TelegramDelivery {
+  botKey         String
+  updateId       BigInt
+  organizationId String
+  linkId         String
+  messageId      Int
+  chatId         String
+  fileId         String
+  fileName       String
+  mimeType       String
+  fileSize       Int?
+  senderId       BigInt?
+  attempts       Int       @default(0)
+  intakeJobId    String?
+  /// Set while the delivery waits for its chat's rate window or the organization queue.
+  deferredUntil  DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([botKey, updateId])
+  @@index([organizationId, createdAt])
+  @@index([botKey, completedAt, deferredUntil])
+  @@map("telegram_deliveries")
 }

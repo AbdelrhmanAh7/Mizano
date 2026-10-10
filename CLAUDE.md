@@ -24,7 +24,7 @@ pnpm dev:api / dev:web
 pnpm build / lint / type-check
 pnpm db:generate / db:push / db:migrate / db:seed / db:studio
 pnpm test / test:api / test:web / test:cov / test:e2e
-pnpm ci:full          # lint + type-check + test + e2e (MUST pass)
+pnpm ci:full          # lint + type-check + unit tests; run E2E separately
 pnpm docker:up / docker:down / docker:prod
 pnpm env:check        # verify env file for current APP_ENV
 ```
