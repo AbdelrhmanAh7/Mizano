@@ -202,6 +202,25 @@ describe('Credential rotation (e2e) @issue-104', () => {
     }
   });
 
+  it('@e2e @flow:credential-rotation @issue-104 AC4: when every credential is ok the boot still logs one warn line, never a log line', async () => {
+    // All host tokens rotated today; every organization's SMTP password stamped today -> ok.
+    setEnv('TELEGRAM_BOT_TOKEN_CREDENTIAL_ROTATED_AT', '2026-10-08');
+    setEnv('CLOUDFLARE_TUNNEL_TOKEN_CREDENTIAL_ROTATED_AT', '2026-10-08');
+    await setRotatedAt(tenantA.organizationId, new Date('2026-10-08T09:00:00.000Z'));
+    await setRotatedAt(tenantB.organizationId, new Date('2026-10-08T09:00:00.000Z'));
+
+    const { level, entries } = await bootAndReadLine();
+
+    expect(level).toBe('warn');
+    expect(entries.get('TELEGRAM_BOT_TOKEN')).toBe('ok');
+    expect(entries.get('CLOUDFLARE_TUNNEL_TOKEN')).toBe('ok');
+    expect(entries.get(`SMTP_PASSWORD[org=${tenantA.organizationId}]`)).toBe('ok');
+    expect(entries.get(`SMTP_PASSWORD[org=${tenantB.organizationId}]`)).toBe('ok');
+    // Exactly one credential line for this boot, and none below the warn level.
+    expect(credentialLines).toHaveLength(1);
+    expect(credentialLines.every((line) => line.level === 'warn')).toBe(true);
+  });
+
   it('@e2e @flow:credential-rotation @issue-104 AC2: a malformed or missing host rotation date is unknown', async () => {
     setEnv('TELEGRAM_BOT_TOKEN_CREDENTIAL_ROTATED_AT', '2026-7-11');
     setEnv('CLOUDFLARE_TUNNEL_TOKEN_CREDENTIAL_ROTATED_AT', '');
