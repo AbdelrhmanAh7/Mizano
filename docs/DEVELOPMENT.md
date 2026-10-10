@@ -109,9 +109,12 @@ Troubleshooting: `docker ps` to confirm `mizano-postgres`/`mizano-redis`, `redis
 | -------------- | ---------------------------------------------------------- | ------------------------------------------------------- |
 | API unit       | `apps/api/src/**/*.spec.ts`                                | `node apps/api/_run_tests.js [--testPathPattern=…]`     |
 | Web unit       | `apps/web/**/*.spec.ts(x)` (Jest + Testing Library, jsdom) | `cd apps/web && npx jest [--testPathPattern=…]`         |
-| API E2E        | `apps/api/test/*.e2e-spec.ts` (supertest, `jest-e2e.json`) | `pnpm test:e2e` against a seeded database               |
-| Browser E2E    | not wired yet                                              | tracked by the seeded API/browser journey issue         |
-| Planning tools | `scripts/test_*.py`                                        | `python -m unittest discover -s scripts -p 'test_*.py'` |
+| API E2E        | `apps/api/test/*.e2e-spec.ts` (supertest, `jest-e2e.json`) | `pnpm test:e2e` against a seeded database; nightly CI   |
+| Browser E2E    | Thoth hub `e2e-army` (`ops/verify/e2e-army` in the hub)   | the main gate: required `e2e-army` status on every PR   |
+
+Nightly tier: `.github/workflows/nightly.yml` (cron 01:17 UTC, or Actions > Nightly > Run workflow) runs the 11 API e2e specs against Postgres + Redis (`db:push`, `db:seed`, `pnpm test:e2e`) and the ollama-proxy python tests. It is not a required check and does not run on pull requests; the PR gate stays mock-only and under 5 minutes.
+
+Test policy (owner rule): remove unit tests that are flaky, slow while an e2e feature test covers the same flow, duplicates of e2e UI flows, trivial or dead; move slow-but-useful suites to the nightly; always keep pure-logic and money/safety tests (ledger, VAT, auth, permissions, tenancy, parsers, AI scoring/forecast math). Mock-only page/component render tests of screens outside the pilot scope are not kept: the hub's `e2e-army` suite (staging suite `tests-dev/Mizano`, one or more tests per feature) is the browser gate for them. See [slimdown-plan.md](slimdown-plan.md).
 
 `_run_tests.js`, `_jest.config.js` and `_jest_resolver.js` make the API suite resolve pnpm's store on Windows/WSL; use them instead of calling Jest directly.
 
