@@ -142,3 +142,76 @@
   Total: 4 suites passed, 104 tests passed
   Lint: 4 packages successful
   ```
+
+---
+
+# EVIDENCE.md — Post-merge CI red after #98 (#113, MZ #102)
+
+| Item            | Value                                                                                    |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| Master SHA      | `615060ed6294e16375a1f1ea9385cb7e812cd24f` (merge of PR #98)                             |
+| Red check       | `Deploy to GCP`, workflow `Deploy to Production`, run 37540990404                        |
+| Observed cause  | TCP 22 connection to `DEPLOY_HOST` times out; the underlying reason is unknown           |
+| Caused by #98?  | No. The same error is on every deploy run since 2026-10-01                               |
+| Code fix        | `.github/workflows/deploy.yml` deleted in this PR (CTO decision: GCP server unreachable) |
+| Regression test | `apps/api/test/ci-health.e2e-spec.ts` (AC1: API boots and `/health` healthy)             |
+
+## What PR #98 changed
+
+`git diff --stat 615060e~1 615060e`: two markdown files (`EVIDENCE.md`, `docs/planning/MERGE-QUEUE.md`),
+230 insertions. No source, lockfile, compose, env or workflow file.
+
+## Same checks on the merge commit and its parent
+
+`gh api repos/AbdelrhmanAh7/Mizano/commits/615060e.../check-runs` (repo workflows only):
+
+```text
+Deploy to GCP              | failure | run 37540990404   <-- the only red check
+Build & Push Docker Images | success | run 37540990404
+Unit Tests / Build / Lint & Type Check / Install Dependencies | success | run 37540682498
+```
+
+Parent `b83d72b`, run 37403603742 (`gh run view 37403603742 --log-failed`):
+
+```text
+2026-10-06T02:29:27.0159571Z 2026/10/06 02:29:27 dial tcp ***:22: i/o timeout
+```
+
+Merge commit, run 37540990404, step `Clean up server disk and prepare directory` (first SSH step):
+
+```text
+2026-10-06T22:41:56.8152060Z 2026/10/06 22:41:56 dial tcp ***:22: i/o timeout
+```
+
+`gh run list --workflow deploy.yml`: failure on all 12 runs from 36854180434 (2026-10-01, first
+failure) to 37540990404; last success is 33939629464 (2026-09-05). MZ #102 compared the merge
+commit with "all green" instead of with its parent.
+
+## State of workflows
+
+`.github/workflows/deploy.yml` was removed in this PR (not as a follow-up): the GCP server is
+unreachable, so the deploy job cannot succeed, and the workflow was the only red check on master.
+`CI` and `Deploy to Production` were `disabled_manually` after the diagnosis; removing the file
+keeps the pipeline green even if the workflow is re-enabled. The deploy can be re-added when the
+GCP server is back (DEPLOY issue #25).
+
+## Regression test
+
+`apps/api/test/ci-health.e2e-spec.ts` checks that the API boots and `/health` is healthy. This
+test cannot detect the deploy SSH timeout; the canary for that failure class is the suggestion
+in `AI_QUESTIONS.md` (CI changes stop at the owner).
+
+Run 2026-10-09 on own Postgres 16 (local socket, fresh DB `mizano_113_e2e`, `prisma db push`),
+`REDIS_URL=` blank:
+
+```text
+PASS test/ci-health.e2e-spec.ts (8.436 s)
+  CI health after PR #98 (e2e)
+    ✓ @e2e @flow:ci-health @issue-113 AC1: API boots and /health reports healthy (11 ms)
+Tests: 1 passed, 1 total
+```
+
+## Tested commit
+
+`56cf184` (`fix(#113): remove failing deploy workflow to restore green ci`). The only commit
+after it edits this file.
