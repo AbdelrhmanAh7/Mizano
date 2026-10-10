@@ -67,9 +67,14 @@ and against the diffs of all open PRs, so nothing an open PR builds on is remove
 
 Filled in as each PR merges (before → after): LOC, test counts, CI minutes per PR, dependency count.
 
-| Measure | Before | After PR 1 |
+| Measure | Before | After PR 1 (#188) |
 | --- | --- | --- |
-| Code LOC | 248,035 | 239,654 |
-| Tracked files | 1,491 | 1,416 |
+| Code LOC | 248,035 | 239,677 |
+| Tracked files | 1,491 | 1,418 |
 | Direct dependencies | 178 | 164 |
 | Lockfile packages / lines | 1,845 / 16,135 | 1,615 / 13,999 |
+| PR CI wall (this PR's run) | 2.6 min median | 1.9 min |
+
+After PR 2 (#189): web unit tests 48 suites / 458 tests → 29 / 284; API unit tests unchanged (136 / 2,197); the 11 API
+e2e specs go from never run to nightly. After PR 3 (#190): Unit Tests job without service containers (1.8 → 1.5 min on
+its first run); Build reads the Next.js cache once master has saved one.
