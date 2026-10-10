@@ -16,6 +16,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 ## 2. Idempotency and retries
 
 - **Every state change is a guarded transition:** `updateMany({ where: { id, organizationId, status: FROM } })` plus a `count` check that throws `ConflictException`. Journal idempotency is the tenant-scoped unique key `(organizationId, sourceType, sourceId)`.
+- **Prove transaction serialization with concurrent seeded API requests, not unit mocks alone.** Assert one state transition and source journal, no extra allocations, exact Decimal balances, and a balanced trial balance. _(bill approval and competing payments)_
 - **An idempotency key must stay the same across retries of one action.** Generating a fresh random id on the server for each request defeats it. A client UUID created once per user action and reused on every retry is fine (`idempotencyKeyFor`); so are `profileId:YYYY-MM-DD` or a sha256 of file + row. _(manual recurring execute, import retries)_
 - **Store idempotency markers where users cannot edit them.** Notes, reason and reference text get edited; use an append-only store such as AuditLog `IMPORT_ROW`. _(import markers)_
 - **Bulk operations reuse the single-record command through `runBulk`** and report `{ processed, total, failures }`. Never write a bulk `updateMany` that skips the posting logic.

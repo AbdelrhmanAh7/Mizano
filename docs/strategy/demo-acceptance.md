@@ -12,7 +12,7 @@ Target: a tiny live deployment on a Raspberry Pi 5 (8GB, arm64), tracked by epic
 4. Show supplier matching and duplicate detection. Replay the Telegram update, double-click a web request and restart a worker. Each source must create at most one active draft/posting.
 5. Review sources and fields in one inbox. Correct only flagged values. Approve a selected valid batch in one action. Missing currency, totals mismatch and invalid tenant account references cannot pass.
 6. Demonstrate exact arithmetic: 2 × 100, 14% tax → net 200, tax 28, gross 228 through scan and manual entry. Include discount, decimal and mixed-tax cases; totals reconcile per declared rounding.
-7. Record a partial payment, inspect remaining AP, trial balance and journal. Reverse a posted transaction and show linked corrections without rewriting history. Try a locked-period single/bulk action and concurrent approval; both controls must hold.
+7. Record a partial payment, inspect remaining AP, trial balance and journal. Reverse a posted transaction and show linked corrections without rewriting history. Try a locked-period single/bulk action, two simultaneous approvals of one bill, and two simultaneous payments that together exceed one bill's balance; each bill must have at most one successful transition/posting and remain balanced.
 8. Use charts to drill through to the same posted records. Show drafts separately, correct date/as-of filters and EGP denomination.
 9. Restart the CPU instance/worker and recover a queued job; restore backup into an isolated database and verify original-to-ledger links. Display the deployed SHA/digest.
 
@@ -21,7 +21,7 @@ Target: a tiny live deployment on a Raspberry Pi 5 (8GB, arm64), tracked by epic
 | Gate                    | Required evidence                                                                                                                                                               |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Security/identity       | Seeded anonymous/two-tenant/API/SSE tests, cross-reference rejection and concurrent refresh tests; no invoice/auth payload in captured logs                                     |
-| Accounting              | Exact Decimal fixture totals, balanced journals, transactional failure injection, idempotency/concurrency, bulk/single parity, period locks and reversal tests                  |
+| Accounting              | Exact Decimal totals, balanced journals, failure injection, seeded API bill approval/payment concurrency, idempotency, bulk/single parity, locks and reversals                  |
 | Format completeness     | Every declared format and mixed-page test; no silent text/page truncation; explicit encrypted/corrupt/oversized behavior                                                        |
 | Automation and recovery | Zero clicks from configured Telegram channel to draft; <=1 batch approval action for ready invoices; bounded retries/dead-letter, 20-document batch and restart/replay evidence |
 | OCR quality             | Labelled dev/holdout corpus; >=95% critical-header exact-match target on readable holdout, numerator/denominator and slices; all uncertain monetary fields repairable           |
