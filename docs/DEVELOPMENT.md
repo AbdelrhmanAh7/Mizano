@@ -126,9 +126,7 @@ Rules:
 
 ## CI
 
-`.github/workflows/ci.yml` runs on pushes to `master` and on PRs to `master`/`develop`, on GitHub-hosted runners only (`ubuntu-latest`; free and unlimited because the repository is public; no self-hosted labels, no secrets beyond `GITHUB_TOKEN`). Four independent parallel jobs, each limited to 5 minutes (`timeout-minutes: 5`; split a job rather than raising the limit): **Install Dependencies** (pnpm 8, Node 20, `prisma generate`), **Lint & Type Check**, **Unit Tests** (PostgreSQL 16 and Redis 7 service containers, `db:push`) and **Build**. Their names are the check names the automerge gates wait for, so keep them stable. A newer push to a PR cancels its older run. The workflow uses `pull_request` (never `pull_request_target`); fork PRs run only after approval in the repository settings. E2E is not part of CI yet. `deploy.yml` stays disabled (it needs deployment secrets).
-
-`.github/workflows/demo-planning.yml` validates and syncs `docs/planning/` metadata with `scripts/sync-demo-planning.py`; see the [planning guide](planning/README.md).
+`.github/workflows/ci.yml` runs on pushes to `master` and on PRs to `master`/`develop`, on GitHub-hosted runners only (`ubuntu-latest`; free and unlimited because the repository is public; no self-hosted labels, no secrets beyond `GITHUB_TOKEN`). Four independent parallel jobs, each limited to 5 minutes (`timeout-minutes: 5`; split a job rather than raising the limit): **Install Dependencies** (pnpm 8, Node 20, `prisma generate`), **Lint & Type Check**, **Unit Tests** (PostgreSQL 16 and Redis 7 service containers, `db:push`) and **Build**. Their names are the check names the automerge gates wait for, so keep them stable. A newer push to a PR cancels its older run. The workflow uses `pull_request` (never `pull_request_target`); fork PRs run only after approval in the repository settings. Browser E2E runs outside GitHub Actions: the Thoth hub's `e2e-army` suite is the main gate (a required commit status on every PR). The old `deploy.yml` (GCP VM), `ai-implementers.yml` (replaced by the hub) and `demo-planning.yml` workflows were removed in the 2026-10 slim-down ([docs/slimdown-plan.md](slimdown-plan.md)); they remain in git history and in tag `archive/pre-slimdown-2026-10-10`.
 
 Zero-tolerance policy: `pnpm ci:full` must pass with no warnings or errors (no `any`, no unused symbols, no `console.log` in the API, explicit return types on exports, no unexplained `eslint-disable`/`@ts-ignore`, floating promises handled).
 
@@ -141,17 +139,7 @@ Zero-tolerance policy: `pnpm ci:full` must pass with no warnings or errors (no `
 
 ## Deployment
 
-**Production pipeline** (`.github/workflows/deploy.yml`): after CI succeeds on `master` (or on release/manual dispatch) it
-
-1. skips the rollout only for the reviewed planning-only paths in `docs/planning/rollout-exemption.json`;
-2. builds `apps/api/Dockerfile` and `apps/web/Dockerfile`, pushing `ghcr.io/abdelrhmanah7/mizano-{api,web}` tagged with the short SHA and `latest`;
-3. copies `docker-compose.production.yml`, `apps/api/prisma/` and `nginx/` to the VM, writes `~/mizano/.env` from repository secrets;
-4. starts PostgreSQL/Redis, syncs the DB password, restarts `api`, `web`, `nginx`, then runs `prisma migrate deploy` and the idempotent seed;
-5. checks `GET /api/health` over SSH.
-
-Required secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `PRODUCTION_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `NEXTAUTH_SECRET`.
-
-The workflow still pulls an Ollama vision model on the host; the CPU-only demo mandate replaces that through the deployment/runtime issues (immutable digest deploys, restore and rollback evidence). Never report a deployment as verified without health and acceptance evidence for the exact SHA.
+**Production today** is the Mac mini: the Thoth hub serves immutable release directories (web 5001 → tailnet :8446, API 6001) through launchd; deploys are the hub's release job, not a GitHub workflow. The former GCP pipeline (`deploy.yml`) and Raspberry Pi deployment (`deploy/pi/`) were retired (owner, 2026-10-10: all projects moved off the Pi) and live on in git history and tag `archive/pre-slimdown-2026-10-10`.
 
 **Production stack** (`docker-compose.production.yml`): `api` (6001), `web` (5001, standalone Next.js), `postgres` (5432), `redis` (6379, AOF), `nginx` (80/443 using `nginx/nginx.conf`) and optional `certbot` (`--profile with-nginx`). Manual equivalent: `pnpm docker:prod` with `.env.prod`; stop with `pnpm docker:prod:down`.
 
@@ -161,4 +149,3 @@ The workflow still pulls an Ollama vision model on the host; the CPU-only demo m
 
 Historical VPS sizing and provider notes: [archive/deployment-requirements-2026-03.md](archive/deployment-requirements-2026-03.md).
 
-**Raspberry Pi 5.** The tiny live deployment (compose, Cloudflare Tunnel, digest deploys, encrypted backups, monitoring) is documented in [deploy/pi/README.md](../deploy/pi/README.md).

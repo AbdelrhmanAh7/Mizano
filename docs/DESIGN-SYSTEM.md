@@ -12,7 +12,7 @@ Sources of truth:
 | Primitives                   | `apps/web/components/ui/` (shadcn, `components.json`)                          |
 | Cross-module building blocks | `apps/web/components/{shared,data-table,layout}/`                              |
 | Brand assets                 | `apps/web/public/{svg,png,ico,pwa,social}/`                                    |
-| Stories                      | `apps/web/components/ui/*.stories.tsx` (`pnpm --filter @mizano/web storybook`) |
+| Stories                      | removed in the 2026-10 slim-down (Storybook was never built in CI); see [slimdown-plan.md](slimdown-plan.md) |
 
 ## Tokens
 
