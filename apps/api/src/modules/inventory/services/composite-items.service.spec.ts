@@ -99,4 +99,20 @@ describe('CompositeItemsService', () => {
       await expect(service.findOne(ORG_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
   });
+  it('assembly writes positive OUT quantities and decrements component stock', async () => {
+    jest.spyOn(service, 'findOne').mockResolvedValue({
+      name: 'Bundle',
+      components: [{ itemId: 'item', quantity: 2, item: { name: 'Part' } }],
+    } as never);
+    jest.spyOn(service, 'checkAvailability').mockResolvedValue({ isAvailable: true } as never);
+    prisma.warehouse.findFirst.mockResolvedValue({ id: 'wh' } as never);
+    await service.assemble(ORG_ID, 'bundle', { quantity: 3, warehouseId: 'wh' });
+    const data = prisma.inventoryMovement.create.mock.calls[0][0].data;
+    expect(data.quantity.toString()).toBe('6');
+    expect(data.movementType).toBe('OUT');
+    expect(prisma.item.update).toHaveBeenCalledWith({
+      where: { id: 'item' },
+      data: { currentStock: { decrement: 6 } },
+    });
+  });
 });

@@ -33,8 +33,6 @@ concurrency:
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '8'
-  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-  TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
 
 jobs:
   # ==========================================
@@ -43,6 +41,7 @@ jobs:
   gate:
     name: CI Gate
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       should_run: ${{ steps.check.outputs.should_run }}
     steps:
@@ -68,6 +67,7 @@ jobs:
   filter:
     name: Path Filter
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: gate
     if: needs.gate.outputs.should_run == 'true'
     # paths-filter lists the changed files of a PR through the API.
@@ -85,7 +85,7 @@ jobs:
 
       - name: Determine changed files
         id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1d284f68b6a3a0 # v3.0.2
         with:
           filters: |
             docker-changed:
@@ -102,6 +102,7 @@ jobs:
   install:
     name: Install Dependencies
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: gate
     if: needs.gate.outputs.should_run == 'true'
     steps:
@@ -127,24 +128,18 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
 
-      - name: Cache node_modules
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            node_modules
-            apps/*/node_modules
-            packages/*/node_modules
-            apps/api/src/generated
-          key: modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
-
   # ==========================================
-  # Lint & Type Check (after install)
+  # Lint & Type Check
   # ==========================================
   lint:
     name: Lint & Type Check
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: [gate, install]
     if: needs.gate.outputs.should_run == 'true'
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -160,16 +155,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
 
-      - name: Restore node_modules
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            node_modules
-            apps/*/node_modules
-            packages/*/node_modules
-            apps/api/src/generated
-          key: modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
 
       # Restores here and saves after the job succeeds, so the cache holds what the Turbo
       # tasks below produced. Each job has its own key prefix: the tasks differ per job.
@@ -193,13 +185,17 @@ jobs:
         run: pnpm turbo run type-check
 
   # ==========================================
-  # Unit Tests (parallel with lint)
+  # Unit Tests (PostgreSQL and Redis service containers)
   # ==========================================
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: [gate, install]
     if: needs.gate.outputs.should_run == 'true'
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
     services:
       postgres:
         image: postgres:16-alpine
@@ -240,16 +236,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
 
-      - name: Restore node_modules
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            node_modules
-            apps/*/node_modules
-            packages/*/node_modules
-            apps/api/src/generated
-          key: modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
 
       - name: Cache turbo build cache
         uses: actions/cache@v4
@@ -274,13 +267,17 @@ jobs:
           NODE_ENV: test
 
   # ==========================================
-  # Build (parallel with lint and test)
+  # Build
   # ==========================================
   build:
     name: Build
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: [gate, install]
     if: needs.gate.outputs.should_run == 'true'
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -296,16 +293,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
 
-      - name: Restore node_modules
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            node_modules
-            apps/*/node_modules
-            packages/*/node_modules
-            apps/api/src/generated
-          key: modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
 
       - name: Cache turbo build cache
         uses: actions/cache@v4
@@ -361,12 +355,12 @@ jobs:
           persist-credentials: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.10.0
 
       # Every image and architecture has its own cache scope; a shared scope makes the
       # next build overwrite the cache of the previous one.
       - name: Build API image (${{ matrix.arch }}, not pushed)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.15.0
         with:
           context: .
           file: ./apps/api/Dockerfile
@@ -376,7 +370,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=api-${{ matrix.arch }}
 
       - name: Build Web image (${{ matrix.arch }}, not pushed)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.15.0
         with:
           context: .
           file: ./apps/web/Dockerfile

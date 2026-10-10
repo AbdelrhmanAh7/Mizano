@@ -306,7 +306,7 @@ export class CompositeItemsService {
           data: {
             itemId: comp.itemId,
             warehouseId,
-            quantity: new Decimal(-consumeQty),
+            quantity: new Decimal(consumeQty),
             type: 'assembly',
             movementType: 'OUT',
             referenceType: 'compositeItem',

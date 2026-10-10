@@ -493,7 +493,7 @@ export class DeliveryChallansService {
       data: {
         itemId,
         warehouseId: inventoryLevel.warehouseId,
-        quantity: new Decimal(-quantity),
+        quantity: new Decimal(quantity),
         type: 'delivery_challan',
         movementType: 'OUT',
         reference,

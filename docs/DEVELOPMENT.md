@@ -154,7 +154,7 @@ Rules:
 
 `turbo.json` declares no `inputs` for `build`, `lint`, `type-check` and `test`, so Turborepo hashes every file of a package that git tracks (or that is untracked and not ignored) and runs the task again when any of them changes. The old `src/**` globs matched nothing in `apps/web` (its code lives in `app/`, `components/`, `lib/`, `messages/` and `public/`), so web tasks hashed only `package.json`, `tsconfig.json` and the lint/jest config and replayed a cached result for any web change. Locally the replay crossed branches, because Turborepo shares `.turbo/cache` between git worktrees: the first result recorded on any branch replayed on every other branch, and `pnpm ci:full` never really checked web code. CI would have done the same as soon as the Turbo cache is restored there. The same globs also skipped `apps/api/test/` (lint and type-check), `apps/api/prisma/` (lint, type-check and test) and the Nest/SWC configs.
 
-`.prettierrc` and `.prettierignore` are `globalDependencies` because the API lint runs Prettier through ESLint. `scripts/test_turbo_config.py` (standard library only, run by the CI lint job) fails when a task declares `inputs` without `$TURBO_DEFAULT$`. If you add `inputs` to a task again, start from `$TURBO_DEFAULT$` and subtract, then check the result:
+`.prettierrc` and `.prettierignore` are `globalDependencies` because the API lint runs Prettier through ESLint. `scripts/test_turbo_config.py` (standard library only, run by the CI lint job) fails when a task declares `inputs` without `$TURBO_DEFAULT`. If you add `inputs` to a task again, start from `$TURBO_DEFAULT` and subtract, then check the result:
 
 ```bash
 # change a web file, then:
@@ -166,6 +166,8 @@ pnpm turbo run type-check --filter=@mizano/web --dry=json
 
 The `docker-build` job builds each architecture on a native runner and **never pushes** (`push: false`). The first version emulated arm64 with QEMU on `ubuntu-latest`; `pnpm install --frozen-lockfile` made no progress for the whole 60-minute timeout (the same step took 44 seconds for amd64), so the arm64 leg now runs on `ubuntu-24.04-arm`, which is free for public repositories (this repository is public). Each leg has a 30-minute timeout. Publishing belongs to `deploy.yml`, which tags the images with the short SHA: the web image bakes `NEXT_PUBLIC_API_URL` in at build time, so an image built in CI with a placeholder URL must not be pushed as `latest`. When registry names are built for a push elsewhere, lower-case the owner (GHCR rejects `ghcr.io/AbdelrhmanAh7/...`).
 
+**E2E (`pnpm test:e2e`) is not part of CI yet; run it locally against a seeded database.**
+
 `.github/workflows/demo-planning.yml` validates and syncs `docs/planning/` metadata with `scripts/sync-demo-planning.py`; see the [planning guide](planning/README.md).
 
 Zero-tolerance policy: `pnpm ci:full` must pass with no warnings or errors (no `any`, no unused symbols, no `console.log` in the API, explicit return types on exports, no unexplained `eslint-disable`/`@ts-ignore`, floating promises handled).
@@ -174,7 +176,7 @@ Zero-tolerance policy: `pnpm ci:full` must pass with no warnings or errors (no `
 
 - Branch from current `master`; one issue, branch and worktree per worker (`demo/<issue>-<topic>` during the sprint). Every change goes through a PR linked to an issue, using `.github/pull_request_template.md`, with independent review of the exact tested head.
 - Conventional commits enforced by commitlint (`commitlint.config.js`): types `feat fix docs style refactor perf test build ci chore revert`, lower-case subject, max 72 characters, no trailing period.
-- Hooks (husky): `pre-commit` runs `_lint_staged.js` (ESLint `--fix` + Prettier on staged files, Windows-safe replacement for lint-staged); `commit-msg` runs commitlint; `pre-push` runs `pnpm ci:full`.
+- Hooks (husky): `pre-commit` runs `_lint_staged.js` (ESLint `--fix` + Prettier on staged files, Windows-safe replacement for lint-staged); `commit-msg` runs commitlint; `pre-push` runs `turbo run type-check test --filter=...[<base>]` (type-check + unit tests for the changed packages and their dependents — every package when root config such as `package.json`/`pnpm-lock.yaml`/`turbo.json` changes, or when the pushed commit differs from checked-out HEAD; ~20–40 s, ≤ 2.5 min cold for all packages; no lint, build or E2E). Both hooks run under a watchdog: 60 s for pre-commit, 290 s for pre-push (the 5-minute rule). The full CI (`pnpm ci:full`, build, E2E) runs on CI / via the hub's `localci` job, which posts the GitHub commit statuses. Hooks work in linked worktrees and skip with a one-line note when that worktree has no `node_modules` (they never install); bypass deliberately with `HUSKY=0` (or `SKIP_LOCAL_CI=1` for pre-push).
 - Prettier: single quotes, semicolons, trailing commas, width 100 (`.prettierrc`).
 
 ## Deployment

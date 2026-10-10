@@ -1,0 +1,103 @@
+# .github/workflows/ai-implementers.yml
+# AI implementers on the Mac mini hub (self-hosted runner, local CLIs, no API tokens).
+# Managed from Notion: NileQuant Labs HQ -> Agent Team -> "Mac mini - Local Agent Stack".
+# Engines (free first, from providers.json): agy (Gemini) -> OpenRouter free via command-code -> claude -> codex.
+# Logic lives in AbdelrhmanAh7/nql-agents/bin (checked out at ~/agents/nql-agents on the Mac mini).
+#  - start   every 2 h, 24/7 (+ manual): oldest ai-ready issue -> branch ai/<n> -> ONE PR "Closes #n"
+#  - rescue  every 3h: re-run stalled handoffs; after 2 handoffs -> ai-stuck
+#  - automerge hourly: squash only if CodeRabbit APPROVED head + CI green + no risky paths, else needs-owner
+#  - mention: "@claude" comments by the repo OWNER only
+# Security: never runs fork PR code; every job is gated to owner/same-repo events.
+name: AI implementers (Claude <-> Codex)
+
+on:
+  schedule:
+    - cron: "0 */2 * * *"    # every 2 h, 24/7: start the next task (free engines first)
+    - cron: "30 */3 * * *"   # every 3h: rescue stalled handoffs (+ automerge)
+    - cron: "15 * * * *"     # hourly: automerge
+  workflow_dispatch:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+env:
+  HUB_BIN: /Users/abdelrahmanahmed/agents/nql-agents/bin
+
+jobs:
+  start:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 */2 * * *'
+    runs-on: [self-hosted, macmini]
+    timeout-minutes: 330
+    concurrency:
+      group: ai-implementer-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Ensure labels exist
+        run: source "$HUB_BIN/common.sh" && ensure_labels "$GITHUB_REPOSITORY"
+      - id: pick
+        name: Pick the oldest ai-ready issue
+        run: echo "issue=$("$HUB_BIN/pick.sh" "$GITHUB_REPOSITORY")" >> "$GITHUB_OUTPUT"
+      - name: Implement with local Claude (fallback Codex)
+        if: steps.pick.outputs.issue != ''
+        env:
+          ISSUE: ${{ steps.pick.outputs.issue }}
+        run: |
+          rc=0; "$HUB_BIN/implement.sh" "$GITHUB_REPOSITORY" "$ISSUE" start || rc=$?
+          if [ "$rc" = 2 ]; then echo "::warning::Both engines failed; handed off to the rescue job."; elif [ "$rc" != 0 ]; then exit "$rc"; fi
+      - name: Nothing to do
+        if: steps.pick.outputs.issue == ''
+        run: echo "No ai-ready issue to start."
+
+  rescue:
+    if: github.event.schedule == '30 */3 * * *'
+    runs-on: [self-hosted, macmini]
+    timeout-minutes: 330
+    concurrency:
+      group: ai-implementer-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Rescue one stalled handoff
+        run: |
+          rc=0; "$HUB_BIN/rescue.sh" "$GITHUB_REPOSITORY" || rc=$?
+          if [ "$rc" = 2 ]; then echo "::warning::Rescue did not finish; labels updated."; elif [ "$rc" != 0 ]; then exit "$rc"; fi
+      - name: Automerge
+        run: '"$HUB_BIN/automerge.sh" "$GITHUB_REPOSITORY"'
+
+  automerge:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '15 * * * *'
+    runs-on: [self-hosted, macmini]
+    timeout-minutes: 15
+    concurrency:
+      group: ai-automerge-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - name: Automerge approved, green, non-risky AI PRs
+        run: '"$HUB_BIN/automerge.sh" "$GITHUB_REPOSITORY"'
+
+  mention:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.comment.author_association == 'OWNER' &&
+      contains(github.event.comment.body, '@claude')
+    runs-on: [self-hosted, macmini]
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Answer with local Claude
+        env:
+          ISSUE: ${{ github.event.issue.number }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        run: '"$HUB_BIN/mention.sh" "$GITHUB_REPOSITORY" "$ISSUE" "$COMMENT_ID"'
