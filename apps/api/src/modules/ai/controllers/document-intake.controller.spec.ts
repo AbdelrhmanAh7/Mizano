@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { IntakeJob, IntakeJobStatus } from '@prisma/client';
 import { firstValueFrom, toArray } from 'rxjs';
+import { I18nContext } from 'nestjs-i18n';
 import { DocumentIntakeController } from './document-intake.controller';
 import { DocumentIntakeService } from '../services/document-intake.service';
 import { IntakeJobOwnerGuard } from '../intake/intake-job-owner.guard';
@@ -127,7 +128,6 @@ describe('DocumentIntakeController', () => {
 
     const res = await controller.processDocument(ORG_A, 'user-1', file, {
       forceType: 'BILL',
-      strategy: 'fast',
     });
 
     expect(res).toEqual({ data: { jobId: 'job-1', status: 'EXTRACTED', duplicate: false } });
@@ -137,7 +137,6 @@ describe('DocumentIntakeController', () => {
         userId: 'user-1',
         buffer: file.buffer,
         forceType: 'BILL',
-        strategy: 'fast',
       }),
     );
   });
@@ -193,6 +192,32 @@ describe('DocumentIntakeController', () => {
       expect(events).toHaveLength(1);
       expect(events[0].data).toMatchObject({ stage: 'complete', status: 'EXTRACTED' });
     });
+
+    it.each([
+      ['en', 'Document processing timed out. Retry or split the document.'],
+      ['ar', 'انتهت مهلة معالجة المستند. يمكنك إعادة المحاولة أو تقسيم المستند.'],
+    ])(
+      'sends a localized message (%s) instead of the raw code on failure',
+      async (lang, message) => {
+        jobs.getForOrg.mockResolvedValue(
+          makeJob({
+            status: IntakeJobStatus.DEAD_LETTER,
+            result: null,
+            lastError: 'INTAKE_TIMEOUT',
+          }),
+        );
+        const current = jest
+          .spyOn(I18nContext, 'current')
+          .mockReturnValue({ lang } as unknown as ReturnType<typeof I18nContext.current>);
+        try {
+          const stream = await controller.streamProgress(ORG_A, 'job-1');
+          const events = await firstValueFrom(stream.pipe(toArray()));
+          expect(events[0].data).toMatchObject({ stage: 'error', error: message });
+        } finally {
+          current.mockRestore();
+        }
+      },
+    );
   });
 
   describe('confirm', () => {

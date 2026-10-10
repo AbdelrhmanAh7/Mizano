@@ -26,6 +26,8 @@ check_service() { # name port path
 }
 check_service api 6001
 check_service web 5001 /robots.txt
+# The intake worker has no HTTP endpoint; its container healthcheck probes DB and Redis.
+check_service_health worker
 
 used="$(df --output=pcent "$DATA_DIR" | tail -n 1 | tr -dc '0-9')"
 [ "${used:-0}" -le 80 ] || problems+=("disk|disk ${used}% used")

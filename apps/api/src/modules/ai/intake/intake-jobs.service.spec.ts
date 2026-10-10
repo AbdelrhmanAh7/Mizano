@@ -1,3 +1,4 @@
+import { I18nContext } from 'nestjs-i18n';
 import { ConflictException, HttpException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IntakeJobStatus } from '@prisma/client';
@@ -265,6 +266,60 @@ describe('IntakeJobsService', () => {
     it('skips soft-deleted rows', async () => {
       await seedRows(2, IntakeJobStatus.QUEUED, { deletedAt: new Date() });
       expect(await service.recoverJobs()).toBe(0);
+    });
+  });
+
+  describe('runtime errors in the job view', () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it('exposes localized retryable errors while retaining the durable code', async () => {
+      const { job } = await upload(ORG_A);
+      job.lastError = 'INTAKE_TIMEOUT';
+      job.status = IntakeJobStatus.FAILED;
+      expect(service.toView(job, true)).toMatchObject({
+        errorCode: 'INTAKE_TIMEOUT',
+        retryable: true,
+        lastError: 'Document processing timed out. Retry or split the document.',
+      });
+      expect(job.lastError).toBe('INTAKE_TIMEOUT');
+    });
+
+    it.each(['INTAKE_TIMEOUT', 'INTAKE_RESOURCE_LIMIT', 'INTAKE_WORKER_FAILED'])(
+      'localizes %s to Arabic from the request language and never changes the stored code',
+      async (code) => {
+        jest
+          .spyOn(I18nContext, 'current')
+          .mockReturnValue({ lang: 'ar' } as unknown as I18nContext<unknown>);
+        const { job } = await upload(ORG_A);
+        job.lastError = code;
+        job.status = IntakeJobStatus.DEAD_LETTER;
+        const view = service.toView(job, false);
+        expect(view).toMatchObject({ errorCode: code, retryable: true });
+        expect(view.lastError).toContain('إعادة المحاولة');
+        expect(job.lastError).toBe(code);
+      },
+    );
+
+    it('a job that is not failed is not retryable and shows no error', async () => {
+      const { job } = await upload(ORG_A);
+      expect(service.toView(job, false)).toMatchObject({
+        errorCode: null,
+        lastError: null,
+        retryable: false,
+      });
+      job.status = IntakeJobStatus.NEEDS_REVIEW;
+      expect(service.toView(job, true).retryable).toBe(false);
+    });
+
+    it('passes a non-runtime error name through without inventing a translation', async () => {
+      const { job } = await upload(ORG_A);
+      job.lastError = 'PrismaClientKnownRequestError';
+      job.status = IntakeJobStatus.FAILED;
+      expect(service.toView(job, false)).toMatchObject({
+        errorCode: 'PrismaClientKnownRequestError',
+        lastError: 'PrismaClientKnownRequestError',
+        retryable: true,
+      });
     });
   });
 

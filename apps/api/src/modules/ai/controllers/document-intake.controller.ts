@@ -38,6 +38,8 @@ import {
   DocumentIntakeService,
   IntakeProgressEvent,
 } from '../services/document-intake.service';
+import { I18nContext } from 'nestjs-i18n';
+import { intakeErrorMessage } from '../intake/intake-runtime';
 import { IntakeJobOwnerGuard } from '../intake/intake-job-owner.guard';
 import {
   IntakeJobsService,
@@ -107,11 +109,6 @@ export class DocumentIntakeController {
           enum: ['BILL', 'INVOICE'],
           description: 'Force document type instead of auto-classification',
         },
-        strategy: {
-          type: 'string',
-          enum: ['fast', 'slow', 'ocr', 'hybrid', 'vlm', 'auto'],
-          description: 'Scan mode',
-        },
       },
       required: ['file'],
     },
@@ -139,7 +136,6 @@ export class DocumentIntakeController {
       mimeType: file.mimetype,
       fileName: file.originalname,
       forceType: dto.forceType,
-      strategy: dto.strategy,
       language: dto.language,
     });
 
@@ -176,6 +172,7 @@ export class DocumentIntakeController {
     @CurrentOrg() orgId: string,
     @Param('jobId') jobId: string,
   ): Promise<Observable<MessageEvent>> {
+    const lang = I18nContext.current()?.lang;
     // Ownership is enforced by IntakeJobOwnerGuard (404 before the stream opens).
     return new Observable<MessageEvent>((subscriber) => {
       let closed = false;
@@ -200,7 +197,10 @@ export class DocumentIntakeController {
                 terminal && job.result
                   ? (job.result as unknown as DocumentIntakeResult)
                   : undefined,
-              error: stage === 'error' ? (job.lastError ?? 'Processing failed') : undefined,
+              error:
+                stage === 'error'
+                  ? (intakeErrorMessage(job.lastError, lang) ?? 'Processing failed')
+                  : undefined,
             };
             subscriber.next({ data: event, id: `${job.progress}`, type: 'progress' });
           }

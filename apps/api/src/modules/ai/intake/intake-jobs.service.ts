@@ -10,16 +10,20 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IntakeJob, IntakeJobStatus, IntakeSource, Prisma } from '@prisma/client';
+import { I18nContext } from 'nestjs-i18n';
 import { describeError } from '../../../common/utils/redact';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { IntakeStage } from '../services/document-intake.service';
 import { IntakeQueueService } from './intake-queue.service';
+import { intakeErrorMessage } from './intake-runtime';
 import { buildIntakeStorageKey, IntakeStorage, sha256Hex } from './intake-storage';
 
 /** Never exposes `storageKey` or the deletion marker. */
 export type IntakeJobView = Omit<IntakeJob, 'storageKey' | 'deletedAt' | 'result'> & {
   result?: Prisma.JsonValue | null;
   stage: IntakeStage;
+  errorCode: string | null;
+  retryable: boolean;
 };
 
 export interface CreateIntakeUpload {
@@ -30,7 +34,6 @@ export interface CreateIntakeUpload {
   fileName: string;
   source?: IntakeSource;
   forceType?: 'BILL' | 'INVOICE';
-  strategy?: string;
   language?: string;
 }
 
@@ -165,7 +168,15 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
 
   toView(job: IntakeJob, includeResult: boolean): IntakeJobView {
     const { storageKey: _storageKey, deletedAt: _deletedAt, result, ...rest } = job;
-    return { ...rest, ...(includeResult ? { result } : {}), stage: stageFor(job) };
+    return {
+      ...rest,
+      ...(includeResult ? { result } : {}),
+      stage: stageFor(job),
+      errorCode: job.lastError,
+      lastError: intakeErrorMessage(job.lastError, I18nContext.current()?.lang),
+      retryable:
+        job.status === IntakeJobStatus.FAILED || job.status === IntakeJobStatus.DEAD_LETTER,
+    };
   }
 
   /** Create (or return the existing, deduplicated) job for an upload. */
@@ -211,7 +222,6 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
           sha256,
           storageKey,
           forceType: input.forceType ?? null,
-          strategy: input.strategy ?? null,
           language: input.language ?? null,
         },
       });

@@ -1,0 +1,6 @@
+SYNTHETIC FIXTURE - NOT A REAL INVOICE
+Nile Print House
+Invoice No: NP-404
+Invoice Date: 11/10/2024
+Business cards     500    1.20    600.00
+Thank you for your business.

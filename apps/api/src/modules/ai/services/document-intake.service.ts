@@ -1,7 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { AiFeature, AiFeedbackAction } from '@prisma/client';
+import { AiFeature, AiFeedbackAction, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { OllamaService, DocumentExtractionResult } from './ollama.service';
 import { DocumentClassificationService, DocumentCategory } from './document-classification.service';
@@ -52,10 +52,10 @@ export interface DocumentIntakeResult {
   extractedFields: {
     date: string | null;
     dueDate: string | null;
-    total: number | null;
-    subtotal: number | null;
-    tax: number | null;
-    discount: number | null;
+    total: string | null;
+    subtotal: string | null;
+    tax: string | null;
+    discount: string | null;
     documentNumber: string | null;
     vendorName: string | null;
     vendorAddress: string | null;
@@ -114,12 +114,16 @@ export interface DocumentIntakeResult {
 
   /** Which AI engine extracted the data */
   extractionMethod:
+    | 'cpu-ocr'
     | 'ollama-vision'
     | 'ollama-text'
     | 'ocr-llm'
     | 'hybrid-ocr'
     | 'hybrid-vlm'
     | 'rules';
+
+  /** CPU worker only: rules version and pinned OCR asset hash that produced this result. */
+  extractorVersion?: string;
 }
 
 /**
@@ -197,6 +201,41 @@ export interface IntakeProgressEvent {
 
 /** Truncate PDF raw text to this length before sending to Ollama (speeds up inference). */
 const PDF_TEXT_TRUNCATION_LIMIT = 4000;
+
+export async function buildExtractionContext(
+  fileBuffer: Buffer,
+  mimeType: string,
+  language: string,
+  filename?: string,
+  logger?: Logger,
+): Promise<{ context: ExtractionContext; rawText: string }> {
+  const isPdf = mimeType === 'application/pdf';
+  const context: ExtractionContext = { fileBuffer, mimeType, filename, language, isPdf };
+  let rawText = '';
+  if (isPdf) {
+    try {
+      const pdfResult = await extractTextFromPdf(fileBuffer);
+      logger?.log(
+        `PDF extraction: pages=${pdfResult.pageCount}, native=${pdfResult.isNativeText}, textLen=${pdfResult.text.length}`,
+      );
+      context.pdfText = pdfResult.text;
+      context.pdfIsNativeText = pdfResult.isNativeText;
+      context.pdfPageCount = pdfResult.pageCount;
+      if (pdfResult.text.length > 20) {
+        rawText = pdfResult.text;
+        if (rawText.length > PDF_TEXT_TRUNCATION_LIMIT) {
+          rawText = rawText.slice(0, PDF_TEXT_TRUNCATION_LIMIT);
+          context.pdfText = rawText;
+        }
+      }
+    } catch (error) {
+      logger?.warn(
+        `PDF text extraction failed: ${error instanceof Error ? error.name : 'unknown error'}`,
+      );
+    }
+  }
+  return { context, rawText };
+}
 
 function uniqueIds(values: Array<string | undefined>): string[] {
   return [...new Set(values.filter((v): v is string => typeof v === 'string' && v.length > 0))];
@@ -353,7 +392,7 @@ export class DocumentIntakeService {
         organizationId,
         matchedVendor.id,
         extraction.invoiceNumber,
-        extraction.total,
+        extraction.total?.toString() ?? null,
       );
     }
 
@@ -395,10 +434,10 @@ export class DocumentIntakeService {
       extractedFields: {
         date: extraction.date,
         dueDate,
-        total: extraction.total,
-        subtotal: extraction.subtotal,
-        tax: extraction.tax,
-        discount: extraction.discount,
+        total: extraction.total?.toString() ?? null,
+        subtotal: extraction.subtotal?.toString() ?? null,
+        tax: extraction.tax?.toString() ?? null,
+        discount: extraction.discount?.toString() ?? null,
         documentNumber: extraction.invoiceNumber,
         vendorName: extraction.vendorName,
         vendorAddress: extraction.vendorAddress,
@@ -783,7 +822,7 @@ export class DocumentIntakeService {
     organizationId: string,
     vendorId: string,
     invoiceNumber: string | null,
-    total: number | null,
+    total: string | null,
   ): Promise<DocumentIntakeResult['duplicateWarning']> {
     // Check exact invoice number match
     if (invoiceNumber) {
@@ -808,26 +847,28 @@ export class DocumentIntakeService {
     }
 
     // Check amount + recent date similarity
-    if (total && total > 0) {
-      const recentBills = await this.prisma.bill.findMany({
-        where: {
-          organizationId,
-          vendorId,
-          deletedAt: null,
-          createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-        },
-        select: { id: true, grandTotal: true },
-      });
+    if (typeof total === 'string' && total.trim() !== '') {
+      const amount = new Prisma.Decimal(total);
+      if (amount.gt(0)) {
+        const recentBills = await this.prisma.bill.findMany({
+          where: {
+            organizationId,
+            vendorId,
+            deletedAt: null,
+            createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+          },
+          select: { id: true, grandTotal: true },
+        });
 
-      for (const bill of recentBills) {
-        const billTotal = Number(bill.grandTotal);
-        if (Math.abs(billTotal - total) < 0.01) {
-          return {
-            isDuplicate: true,
-            existingId: bill.id,
-            matchType: 'amount_match',
-            similarity: 0.9,
-          };
+        for (const bill of recentBills) {
+          if (bill.grandTotal.sub(amount).abs().lt(0.01)) {
+            return {
+              isDuplicate: true,
+              existingId: bill.id,
+              matchType: 'amount_match',
+              similarity: 0.9,
+            };
+          }
         }
       }
     }

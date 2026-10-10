@@ -1,0 +1,12 @@
+SYNTHETIC FIXTURE - NOT A REAL INVOICE
+Najd Stationery Trading
+Tax Invoice
+Invoice No: NJ-2024-0310
+Invoice Date: 21/05/2024
+Due Date: 20/06/2024
+VAT Number: 310987654300003
+Description        Qty   Price   Total
+Toner cartridge    4     450.00  1,800.00
+Sub Total: SAR 1,800.00
+VAT 15%: SAR 270.00
+Total: SAR 2,070.00

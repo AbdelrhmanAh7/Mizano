@@ -142,3 +142,98 @@
   Total: 4 suites passed, 104 tests passed
   Lint: 4 packages successful
   ```
+
+---
+
+# Evidence for Issue #42: [Pi] CPU extraction runtime on the Pi 5 with pinned Arabic/English assets
+
+Part of the tiny live deployment on a Raspberry Pi 5 (Cortex-A76, 8GB). Complements #16 and #24.
+
+## Acceptance status
+
+| Acceptance item (issue #42)                                                           | Status                                                                                                                |
+| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Pinned `ara`+`eng` OCR assets in the worker image, no runtime downloads, no GPU/cloud | Implemented; offline initialization verified on the dev host (REQ-42-1). Image build verified in Dockerfile           |
+| Worker concurrency and memory capped; backlog never starves the API                   | Implemented (REQ-42-2, REQ-42-3). Linux `prlimit` suite skipped on macOS                                              |
+| Documents above the latency budget go to exceptions                                   | Implemented (REQ-42-4). Retries scheduled, non-retriable exceptions move to DEAD_LETTER                               |
+| p50/p95 latency and peak RAM per document type **on the Pi**, held-out corpus (#24)   | **Delegated to CI/CD runner.** Shared S3 bucket `mizano-qa-assets` and Pi runner protocol tracked in follow-up #158   |
+| API p95 under an agreed threshold while the worker processes a batch                  | **Threshold agreed at <500ms** (CTO decision, PR #93). Queue decoupling verified; on-Pi benchmark run tracked in #158 |
+
+Issue #42 scope for the CPU extraction runtime and worker isolation is implemented. PR #93
+references `Refs #42`. Physical on-Pi measurement run with the frozen #24 corpus is tracked
+in follow-up issue [#158](https://github.com/AbdelrhmanAh7/Mizano/issues/158).
+
+---
+
+## Requirements and verification
+
+### REQ-42-1: Pinned offline OCR assets
+
+- **Implementation**: `apps/api/ocr-assets.sha256` pins `eng.traineddata` and `ara.traineddata`;
+  `apps/api/src/modules/ai/extraction/offline-tesseract.ts` verifies the hashes and passes local
+  `langPath`/`cachePath`; `apps/api/Dockerfile` unpacks `@tesseract.js-data/{eng,ara}@1.0.0` on the
+  build host, checks `sha256sum -c` and copies the files to `/app/tessdata`.
+- **Verification**: `ocr-assets.spec.ts` and `cpu-extraction.ocr.spec.ts` pass.
+
+### REQ-42-2: Dedicated CPU extraction worker and process isolation
+
+- **Implementation**: `apps/api/src/intake-worker.ts` boots `IntakeWorkerModule` (no controllers,
+  schedulers or LLM providers); `intake-child.ts` runs rules/OCR in a child process;
+  `intake-executor.service.ts` supervises it (RSS polling, Linux `prlimit`, signal mapping);
+  `deploy/pi/docker-compose.pi.yml` adds an `intake-worker` service with `mem_limit: 2048m`.
+- **Verification**: `intake-child.spec.ts` and `intake-executor.service.spec.ts` pass.
+
+### REQ-42-3: Worker concurrency and queue backlog isolation
+
+- **Implementation**: `intake-queue.service.ts` is producer-only in the API; the BullMQ consumer
+  starts only in the worker. `INTAKE_CONCURRENCY` defaults to 1 and is capped at 2.
+- **Verification**: `intake-queue.service.spec.ts` passes (API never creates a Worker;
+  invalid concurrency falls back to 1; values above 2 are capped).
+
+### REQ-42-4: Latency budget and deadline exception routing
+
+- **Implementation**: `INTAKE_JOB_DEADLINE_MS` (default 120 s) is enforced by the executor's
+  wall-clock timer; `intake-runtime.ts` classifies `INTAKE_TIMEOUT`, `INTAKE_RESOURCE_LIMIT` and
+  `INTAKE_WORKER_FAILED`; `intake-processor.service.ts` records `FAILED`, schedules retries, and moves non-retriable exceptions to `DEAD_LETTER`.
+- **Verification**: `intake-runtime.spec.ts`, `intake-executor.service.spec.ts` and
+  `intake-processor.service.spec.ts` pass.
+
+### REQ-42-5: Benchmark harness and latency measurement
+
+- **Implementation**: `apps/api/src/modules/ai/extraction/benchmark/run-benchmark.ts` and
+  `scoring.ts` report per-field precision/recall/exact match, review share, latency percentiles and
+  peak RSS, with file names only.
+- **Verification**: `scoring.spec.ts` and `run-benchmark.spec.ts` pass (14/14 tests).
+
+### REQ-42-6: API responsiveness during worker batch processing
+
+- **Implementation**: Architecture decoupling: API process only enqueues to Redis queue;
+  worker processes in dedicated child processes with concurrency capped at 1–2.
+- **Verification**: `intake-queue.service.spec.ts` passes. `intake.e2e-spec.ts` verifies authenticated requests remain responsive (<500ms p95, agreed threshold per CTO decision) while a stubbed worker drains a batch. Physical on-Pi measurement run with the frozen #24 corpus is tracked in follow-up issue #158.
+
+### REQ-42-7: Worker healthcheck and Pi deployment topology
+
+- **Implementation**: `apps/api/src/intake-worker-healthcheck.ts` checks the heartbeat file without
+  booting NestJS; `deploy/pi/docker-compose.pi.yml` uses it as the `intake-worker` healthcheck.
+- **Verification**: `intake-worker-healthcheck.spec.ts` and `health/healthcheck.spec.ts` pass;
+  `bash deploy/pi/scripts/worker-health.test.sh` → `8 worker health checks passed`.
+
+---
+
+## Test execution summary
+
+| Command                                                                     | Result                                                                                       |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `pnpm ci:full`                                                              | Exit 0; 12 tasks successful, 0 errors, 0 warnings                                            |
+| ↳ API Jest (inside `ci:full`)                                               | 151 suites passed, 1 skipped; 2,469 tests passed, 9 skipped (the Linux-only `prlimit` suite) |
+| ↳ Web Jest (inside `ci:full`)                                               | 48 suites passed, 458 tests passed                                                           |
+| `bash deploy/pi/scripts/worker-health.test.sh`                              | 8 checks passed                                                                              |
+| Pi p50/p95 and peak RAM per document type; API p95 on the Pi during a batch | Delegated to CI runner with frozen corpus from S3; tracked in follow-up #158                 |
+
+### Review-round additions (PR #93)
+
+- **Unresolved vendor goes to review**: `needsReview` treats `matchedVendor === null` (no match, or a tie) as an exception; `undefined` (matching not run, e.g. the benchmark) is not. Verified in `intake-processor.service.spec.ts`.
+- **Extractor version**: every worker result carries `extractorVersion` (`cpu-rules/<n>+ocr:<12 hex of the pinned asset manifest>`), and `rawText` kept in the job row is bounded to 200,000 characters (`RAW_TEXT_TRUNCATED` warning; the original stays in private storage). Verified in `cpu-structured.spec.ts`.
+- **Scan mode selector removed** from the bill scan page: the worker runs one deterministic CPU extraction, so Fast/Accurate were indistinguishable.
+- **e2e-army natural-language test suite**: `e2e-army/42-cpu-intake-scan.e2e.ts` covers bill scan upload, Arabic RTL scan page, and unauthenticated intake rejection (`feat:mz-bill-scan`, `feat:mz-document-intake`).
+- **CTO decisions incorporated**: API p95 threshold gate agreed at 500ms (asserted in `intake.e2e-spec.ts`); PR #93 description updated to `Refs #42`; follow-up issue #158 created for the on-Pi measurement run.

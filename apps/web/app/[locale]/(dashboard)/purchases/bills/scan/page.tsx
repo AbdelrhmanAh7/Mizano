@@ -14,8 +14,6 @@ import {
   Sparkles,
   X,
   UserPlus,
-  Zap,
-  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -75,7 +73,6 @@ export default function ScanBillPage() {
   const [localResult, setLocalResult] = useState<DocumentIntakeResult | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [scanDefaults, setScanDefaults] = useState<BillFormDefaultValues | null>(null);
-  const [scanMode, setScanMode] = useState<'fast' | 'slow'>('fast');
   const [unresolvedTaxLines, setUnresolvedTaxLines] = useState<UnresolvedTaxLine[]>([]);
   const [taxReviewed, setTaxReviewed] = useState(false);
 
@@ -215,7 +212,6 @@ export default function ScanBillPage() {
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('forceType', 'BILL');
-    formData.append('strategy', scanMode);
 
     await intake.processDocument(formData);
   };
@@ -478,47 +474,12 @@ export default function ScanBillPage() {
               )}
             </div>
 
-            {/* Scan Mode Toggle */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-muted-foreground">{ts('scanMode')}</span>
-                <div className="flex rounded-lg border p-1 gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setScanMode('fast')}
-                    className={cn(
-                      'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                      scanMode === 'fast'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-                    )}
-                  >
-                    <Zap className="h-3.5 w-3.5" />
-                    {ts('fast')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setScanMode('slow')}
-                    className={cn(
-                      'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                      scanMode === 'slow'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-                    )}
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                    {ts('accurate')}
-                  </button>
-                </div>
-              </div>
+            <div className="flex items-center justify-end">
               <Button onClick={handleProcess} disabled={!selectedFile || converting} size="lg">
                 <Sparkles className="mr-2 h-4 w-4" />
                 {ts('processWithAi')}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {scanMode === 'fast' ? ts('fastHint') : ts('accurateHint')}
-            </p>
           </CardContent>
         </Card>
       )}
@@ -714,29 +675,33 @@ export default function ScanBillPage() {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">{ts('extractedSubtotal')}</span>
                       <span className="font-mono">
-                        {result.extractedFields.subtotal.toFixed(2)}
+                        {Number(result.extractedFields.subtotal).toFixed(2)}
                       </span>
                     </div>
                   )}
                   {result.extractedFields.tax != null && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">{ts('extractedTax')}</span>
-                      <span className="font-mono">{result.extractedFields.tax.toFixed(2)}</span>
+                      <span className="font-mono">
+                        {Number(result.extractedFields.tax).toFixed(2)}
+                      </span>
                     </div>
                   )}
                   {result.extractedFields.discount != null &&
-                    result.extractedFields.discount > 0 && (
+                    Number(result.extractedFields.discount) > 0 && (
                       <div className="flex justify-between text-yellow-600">
                         <span>{ts('extractedDiscount')}</span>
                         <span className="font-mono">
-                          -{result.extractedFields.discount.toFixed(2)}
+                          -{Number(result.extractedFields.discount).toFixed(2)}
                         </span>
                       </div>
                     )}
                   {result.extractedFields.total != null && (
                     <div className="flex justify-between font-medium border-t pt-1 mt-1">
                       <span>{ts('extractedTotal')}</span>
-                      <span className="font-mono">{result.extractedFields.total.toFixed(2)}</span>
+                      <span className="font-mono">
+                        {Number(result.extractedFields.total).toFixed(2)}
+                      </span>
                     </div>
                   )}
                 </div>

@@ -1,0 +1,10 @@
+SYNTHETIC FIXTURE - NOT A REAL INVOICE
+Open Source Hosting Inc.
+Invoice
+Invoice Number: OSH-2024-118
+Invoice Date: 2024-11-30
+Due Date: 2024-12-30
+Hosting plan (annual)   1   960.00   960.00
+Subtotal: USD 960.00
+Tax: USD 0.00
+Total: USD 960.00
