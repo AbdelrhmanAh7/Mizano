@@ -86,7 +86,7 @@ pnpm build
 pnpm test:e2e
 ```
 
-`pnpm ci:full` currently combines lint/type-check/unit tests; it does **not** run E2E. Browser acceptance also requires a configured test harness and seeded environment; the [acceptance contract](docs/strategy/demo-acceptance.md) decides readiness.
+`pnpm ci:full` currently combines lint/type-check/unit tests; it does **not** run E2E. Run `pnpm test:browser` separately using the [seeded browser gate instructions](apps/web/e2e/README.md). The [acceptance contract](docs/strategy/demo-acceptance.md) decides readiness.
 
 ## Repository layout
 

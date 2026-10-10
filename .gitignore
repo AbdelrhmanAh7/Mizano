@@ -112,3 +112,7 @@ services/vlm-service/models/
 **/*.pt
 **/*.pth
 .claude/worktrees/
+
+# Playwright output
+apps/web/test-results/
+apps/web/playwright-report/
