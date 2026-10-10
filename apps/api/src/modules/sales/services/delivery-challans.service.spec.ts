@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { ChallanStatus, ChallanType } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { DeliveryChallansService } from './delivery-challans.service';
@@ -81,12 +81,12 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
       expect(prisma.deliveryChallan.updateMany).toHaveBeenCalled();
     });
 
-    it('rejects with 400 and writes no lines when the challan is no longer DRAFT', async () => {
+    it('rejects with 409 and writes no lines when the challan is no longer DRAFT', async () => {
       prisma.item.findFirst.mockResolvedValue({ id: 'item-b' } as never);
       prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 0 } as never);
       await expect(
         service.update(ORG, 'dc-1', { lines: [{ itemId: 'item-b', quantity: 1 }] }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(ConflictException);
       expect(prisma.deliveryChallanLine.deleteMany).not.toHaveBeenCalled();
       expect(prisma.deliveryChallanLine.createMany).not.toHaveBeenCalled();
     });
@@ -106,10 +106,25 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
     ['issue', ChallanStatus.DRAFT],
     ['markReturned', ChallanStatus.ISSUED],
   ] as const)('%s', (method, status) => {
-    it('rejects a line item outside the org without moving inventory', async () => {
+    beforeEach(() => {
+      // Mock the initial findOne call (from the service's findOne method)
       prisma.deliveryChallan.findFirst.mockResolvedValue(
-        challan(status, { itemId: 'item-a', warehouseId: null }) as never,
+        challan(status, { itemId: 'item-b', warehouseId: null }) as never,
       );
+      // Mock the updateMany guard to succeed by default
+      prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 1 } as never);
+      // Mock the reload findFirst after updateMany
+      prisma.deliveryChallan.findFirst.mockResolvedValue(
+        challan(status, { itemId: 'item-b', warehouseId: null }) as never,
+      );
+    });
+
+    it('rejects a line item outside the org without moving inventory', async () => {
+      // Override the reload findFirst to return a challan with the foreign item
+      prisma.deliveryChallan.findFirst
+        .mockResolvedValueOnce(challan(status, { itemId: 'item-a', warehouseId: null }) as never) // initial findOne
+        .mockResolvedValueOnce({ count: 1 } as never) // updateMany
+        .mockResolvedValueOnce(challan(status, { itemId: 'item-a', warehouseId: null }) as never); // reload
       prisma.item.findFirst.mockResolvedValue(null);
       await expect(service[method](ORG, 'dc-1')).rejects.toThrow('Item item-a not found');
       expect(scopedTo(prisma.item.findFirst as jest.Mock)).toEqual([
@@ -117,25 +132,35 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
       ]);
       expect(prisma.inventoryLevel.update).not.toHaveBeenCalled();
       expect(prisma.inventoryMovement.create).not.toHaveBeenCalled();
-      expect(prisma.deliveryChallan.update).not.toHaveBeenCalled();
     });
 
     it('rejects a line warehouse outside the org without moving inventory', async () => {
-      prisma.deliveryChallan.findFirst.mockResolvedValue(
-        challan(status, { itemId: 'item-b', warehouseId: 'wh-a' }) as never,
-      );
+      prisma.deliveryChallan.findFirst
+        .mockResolvedValueOnce(challan(status, { itemId: 'item-b', warehouseId: 'wh-a' }) as never)
+        .mockResolvedValueOnce({ count: 1 } as never)
+        .mockResolvedValueOnce(challan(status, { itemId: 'item-b', warehouseId: 'wh-a' }) as never);
       prisma.item.findFirst.mockResolvedValue({ id: 'item-b', trackInventory: true } as never);
       prisma.warehouse.findFirst.mockResolvedValue(null);
       await expect(service[method](ORG, 'dc-1')).rejects.toThrow('Warehouse wh-a not found');
       expect(prisma.inventoryMovement.create).not.toHaveBeenCalled();
-      expect(prisma.deliveryChallan.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects with 409 when challan is not in expected status', async () => {
+      prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 0 } as never);
+      await expect(service[method](ORG, 'dc-1')).rejects.toThrow(ConflictException);
+      expect(prisma.inventoryMovement.create).not.toHaveBeenCalled();
     });
   });
 
   it('reads stock for the issue check within the org only', async () => {
-    prisma.deliveryChallan.findFirst.mockResolvedValue(
-      challan(ChallanStatus.DRAFT, { itemId: 'item-b', warehouseId: null }) as never,
-    );
+    prisma.deliveryChallan.findFirst
+      .mockResolvedValueOnce(
+        challan(ChallanStatus.DRAFT, { itemId: 'item-b', warehouseId: null }) as never,
+      )
+      .mockResolvedValueOnce(
+        challan(ChallanStatus.DRAFT, { itemId: 'item-b', warehouseId: null }) as never,
+      );
+    prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 1 } as never);
     prisma.item.findFirst.mockResolvedValue({ id: 'item-b', trackInventory: true } as never);
     prisma.inventoryLevel.aggregate.mockResolvedValue({ _sum: { quantity: null } } as never);
     await expect(service.issue(ORG, 'dc-1')).rejects.toThrow('Insufficient stock');

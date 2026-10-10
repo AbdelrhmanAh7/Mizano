@@ -1,5 +1,10 @@
 import { Prisma } from '@prisma/client';
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ChallanStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -158,7 +163,7 @@ export class DeliveryChallansService {
         },
       });
       if (res.count !== 1) {
-        throw new BadRequestException('Only draft challans can be updated');
+        throw new ConflictException('Only draft challans can be updated');
       }
 
       if (dto.lines) {
@@ -208,94 +213,139 @@ export class DeliveryChallansService {
   // ============ Issue Challan (Decreases Inventory) ============
 
   async issue(organizationId: string, id: string) {
-    const challan = await this.findOne(organizationId, id);
+    return this.prisma.$transaction(async (tx) => {
+      // Atomically guard: only DRAFT challans in this org can be issued
+      const res = await tx.deliveryChallan.updateMany({
+        where: { id, organizationId, deletedAt: null, status: ChallanStatus.DRAFT },
+        data: { status: ChallanStatus.ISSUED },
+      });
+      if (res.count !== 1) {
+        throw new ConflictException('Only draft challans can be issued');
+      }
 
-    if (challan.status !== ChallanStatus.DRAFT) {
-      throw new BadRequestException('Only draft challans can be issued');
-    }
+      // Reload challan with lines for inventory operations
+      const challan = await tx.deliveryChallan.findFirst({
+        where: { id, organizationId },
+        include: {
+          lines: {
+            include: {
+              item: { select: { id: true, name: true, trackInventory: true } },
+            },
+          },
+        },
+      });
+      if (!challan) {
+        throw new NotFoundException('Delivery challan not found');
+      }
 
-    const tracked = await this.trackedLineItems(organizationId, challan.lines);
+      const tracked = await this.trackedLineItems(organizationId, challan.lines);
 
-    // Check inventory availability for tracked items
-    for (const line of challan.lines) {
-      if (tracked.has(line.itemId)) {
-        const warehouseId = line.warehouseId;
-        const currentStock = await this.getItemStock(organizationId, line.itemId, warehouseId);
+      // Check inventory availability for tracked items
+      for (const line of challan.lines) {
+        if (tracked.has(line.itemId)) {
+          const warehouseId = line.warehouseId;
+          const currentStock = await this.getItemStock(
+            organizationId,
+            line.itemId,
+            warehouseId,
+            tx,
+          );
 
-        if (currentStock < parseFloat(line.quantity.toString())) {
-          throw new BadRequestException(
-            `Insufficient stock for item ${line.item?.name || line.itemId}. Available: ${currentStock}, Required: ${line.quantity}`,
+          if (currentStock < parseFloat(line.quantity.toString())) {
+            throw new BadRequestException(
+              `Insufficient stock for item ${line.item?.name || line.itemId}. Available: ${currentStock}, Required: ${line.quantity}`,
+            );
+          }
+        }
+      }
+
+      // Decrease inventory
+      for (const line of challan.lines) {
+        if (tracked.has(line.itemId)) {
+          await this.decreaseInventory(
+            organizationId,
+            line.itemId,
+            parseFloat(line.quantity.toString()),
+            line.warehouseId,
+            `Delivery Challan ${challan.challanNumber}`,
+            tx,
           );
         }
       }
-    }
 
-    // Decrease inventory
-    for (const line of challan.lines) {
-      if (tracked.has(line.itemId)) {
-        await this.decreaseInventory(
-          organizationId,
-          line.itemId,
-          parseFloat(line.quantity.toString()),
-          line.warehouseId,
-          `Delivery Challan ${challan.challanNumber}`,
-        );
-      }
-    }
-
-    // Update status
-    return this.prisma.deliveryChallan.update({
-      where: { id },
-      data: { status: ChallanStatus.ISSUED },
-      include: {
-        customer: { select: { id: true, name: true } },
-        invoice: { select: { id: true, invoiceNumber: true } },
-        lines: {
-          include: {
-            item: { select: { id: true, name: true, sku: true } },
+      // Return updated challan
+      return tx.deliveryChallan.findFirst({
+        where: { id, organizationId },
+        include: {
+          customer: { select: { id: true, name: true } },
+          invoice: { select: { id: true, invoiceNumber: true } },
+          lines: {
+            include: {
+              item: { select: { id: true, name: true, sku: true } },
+            },
           },
         },
-      },
+      });
     });
   }
 
   // ============ Mark as Returned (Reverses Inventory) ============
 
   async markReturned(organizationId: string, id: string) {
-    const challan = await this.findOne(organizationId, id);
-
-    if (challan.status !== ChallanStatus.ISSUED) {
-      throw new BadRequestException('Only issued challans can be marked as returned');
-    }
-
-    const tracked = await this.trackedLineItems(organizationId, challan.lines);
-
-    // Increase inventory (reverse the decrease)
-    for (const line of challan.lines) {
-      if (tracked.has(line.itemId)) {
-        await this.increaseInventory(
-          organizationId,
-          line.itemId,
-          parseFloat(line.quantity.toString()),
-          line.warehouseId,
-          `Return from Delivery Challan ${challan.challanNumber}`,
-        );
+    return this.prisma.$transaction(async (tx) => {
+      // Atomically guard: only ISSUED challans in this org can be returned
+      const res = await tx.deliveryChallan.updateMany({
+        where: { id, organizationId, deletedAt: null, status: ChallanStatus.ISSUED },
+        data: { status: ChallanStatus.RETURNED },
+      });
+      if (res.count !== 1) {
+        throw new ConflictException('Only issued challans can be marked as returned');
       }
-    }
 
-    // Update status
-    return this.prisma.deliveryChallan.update({
-      where: { id },
-      data: { status: ChallanStatus.RETURNED },
-      include: {
-        customer: { select: { id: true, name: true } },
-        invoice: { select: { id: true, invoiceNumber: true } },
-        lines: {
-          include: {
-            item: { select: { id: true, name: true, sku: true } },
+      // Reload challan with lines for inventory operations
+      const challan = await tx.deliveryChallan.findFirst({
+        where: { id, organizationId },
+        include: {
+          lines: {
+            include: {
+              item: { select: { id: true, name: true, trackInventory: true } },
+            },
           },
         },
-      },
+      });
+      if (!challan) {
+        throw new NotFoundException('Delivery challan not found');
+      }
+
+      const tracked = await this.trackedLineItems(organizationId, challan.lines);
+
+      // Increase inventory (reverse the decrease)
+      for (const line of challan.lines) {
+        if (tracked.has(line.itemId)) {
+          await this.increaseInventory(
+            organizationId,
+            line.itemId,
+            parseFloat(line.quantity.toString()),
+            line.warehouseId,
+            `Return from Delivery Challan ${challan.challanNumber}`,
+            tx,
+          );
+        }
+      }
+
+      // Return updated challan
+      return tx.deliveryChallan.findFirst({
+        where: { id, organizationId },
+        include: {
+          customer: { select: { id: true, name: true } },
+          invoice: { select: { id: true, invoiceNumber: true } },
+          lines: {
+            include: {
+              item: { select: { id: true, name: true, sku: true } },
+            },
+          },
+        },
+      });
     });
   }
 
@@ -438,18 +488,24 @@ export class DeliveryChallansService {
    */
   private async trackedLineItems(
     organizationId: string,
-    lines: Array<{ itemId: string; warehouseId: string | null }>,
+    lines: Array<{
+      itemId: string;
+      warehouseId: string | null;
+      item?: { trackInventory: boolean };
+    }>,
+    tx?: Prisma.TransactionClient,
   ): Promise<Set<string>> {
+    const client = tx ?? this.prisma;
     const tracked = new Set<string>();
     for (const line of lines) {
-      const item = await this.prisma.item.findFirst({
+      const item = await client.item.findFirst({
         where: { id: line.itemId, organizationId },
       });
       if (!item) {
         throw new NotFoundException(`Item ${line.itemId} not found`);
       }
       if (line.warehouseId) {
-        const warehouse = await this.prisma.warehouse.findFirst({
+        const warehouse = await client.warehouse.findFirst({
           where: { id: line.warehouseId, organizationId },
         });
         if (!warehouse) {
@@ -482,13 +538,15 @@ export class DeliveryChallansService {
     organizationId: string,
     itemId: string,
     warehouseId?: string | null,
+    tx?: Prisma.TransactionClient,
   ): Promise<number> {
+    const client = tx ?? this.prisma;
     const where: Prisma.InventoryLevelWhereInput = { itemId, organizationId };
     if (warehouseId) {
       where.warehouseId = warehouseId;
     }
 
-    const stock = await this.prisma.inventoryLevel.aggregate({
+    const stock = await client.inventoryLevel.aggregate({
       where,
       _sum: { quantity: true },
     });
@@ -502,22 +560,24 @@ export class DeliveryChallansService {
     quantity: number,
     warehouseId: string | null | undefined,
     reference: string,
+    tx?: Prisma.TransactionClient,
   ) {
+    const client = tx ?? this.prisma;
     // Find or create inventory level
     const where: Prisma.InventoryLevelWhereInput = { itemId, organizationId };
     if (warehouseId) {
       where.warehouseId = warehouseId;
     }
 
-    let inventoryLevel = await this.prisma.inventoryLevel.findFirst({ where });
+    let inventoryLevel = await client.inventoryLevel.findFirst({ where });
 
     if (!inventoryLevel) {
       // Get default warehouse
-      const defaultWarehouse = await this.prisma.warehouse.findFirst({
+      const defaultWarehouse = await client.warehouse.findFirst({
         where: { organizationId, isDefault: true },
       });
 
-      inventoryLevel = await this.prisma.inventoryLevel.create({
+      inventoryLevel = await client.inventoryLevel.create({
         data: {
           itemId,
           warehouseId: warehouseId || defaultWarehouse?.id || '',
@@ -528,7 +588,7 @@ export class DeliveryChallansService {
     }
 
     // Update inventory level
-    await this.prisma.inventoryLevel.update({
+    await client.inventoryLevel.update({
       where: { id: inventoryLevel.id },
       data: {
         quantity: {
@@ -538,7 +598,7 @@ export class DeliveryChallansService {
     });
 
     // Create movement record
-    await this.prisma.inventoryMovement.create({
+    await client.inventoryMovement.create({
       data: {
         itemId,
         warehouseId: inventoryLevel.warehouseId,
@@ -557,20 +617,22 @@ export class DeliveryChallansService {
     quantity: number,
     warehouseId: string | null | undefined,
     reference: string,
+    tx?: Prisma.TransactionClient,
   ) {
+    const client = tx ?? this.prisma;
     const where: Prisma.InventoryLevelWhereInput = { itemId, organizationId };
     if (warehouseId) {
       where.warehouseId = warehouseId;
     }
 
-    let inventoryLevel = await this.prisma.inventoryLevel.findFirst({ where });
+    let inventoryLevel = await client.inventoryLevel.findFirst({ where });
 
     if (!inventoryLevel) {
-      const defaultWarehouse = await this.prisma.warehouse.findFirst({
+      const defaultWarehouse = await client.warehouse.findFirst({
         where: { organizationId, isDefault: true },
       });
 
-      inventoryLevel = await this.prisma.inventoryLevel.create({
+      inventoryLevel = await client.inventoryLevel.create({
         data: {
           itemId,
           warehouseId: warehouseId || defaultWarehouse?.id || '',
@@ -580,7 +642,7 @@ export class DeliveryChallansService {
       });
     }
 
-    await this.prisma.inventoryLevel.update({
+    await client.inventoryLevel.update({
       where: { id: inventoryLevel.id },
       data: {
         quantity: {
@@ -589,7 +651,7 @@ export class DeliveryChallansService {
       },
     });
 
-    await this.prisma.inventoryMovement.create({
+    await client.inventoryMovement.create({
       data: {
         itemId,
         warehouseId: inventoryLevel.warehouseId,
