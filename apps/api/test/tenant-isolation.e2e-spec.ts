@@ -22,6 +22,8 @@ interface Seeded {
   billId: string;
   journalId: string;
   accountId: string;
+  vendorCreditIdA: string;
+  vendorCreditIdB: string;
 }
 
 const D = (v: unknown): Prisma.Decimal => new Prisma.Decimal(String(v));
@@ -68,11 +70,29 @@ describe('Tenant isolation of ledger and invoice reads (e2e) @issue-108', () => 
       ],
     });
     expect(journal.status).toBe(201);
+
+    // Seed distinct unapplied vendor credits for each tenant
+    const vendorCreditA = await api.post('/vendor-credits').send({
+      vendorId: vendor.body.id,
+      date: isoDay(-1),
+      amount: amount,
+    });
+    expect(vendorCreditA.status).toBe(201);
+
+    const vendorCreditB = await api.post('/vendor-credits').send({
+      vendorId: vendor.body.id,
+      date: isoDay(-1),
+      amount: new Prisma.Decimal('8888'),
+    });
+    expect(vendorCreditB.status).toBe(201);
+
     return {
       invoiceId: invoice.body.id,
       billId: bill.body.id,
       journalId: journal.body.id,
       accountId: chart.cash,
+      vendorCreditIdA: vendorCreditA.body.id,
+      vendorCreditIdB: vendorCreditB.body.id,
     };
   }
 
@@ -196,7 +216,7 @@ describe('Tenant isolation of ledger and invoice reads (e2e) @issue-108', () => 
       }
     });
 
-    it('@e2e @flow:tenant-isolation @issue-108 AC2: AP aging lists only own bills and totals', async () => {
+    it('@e2e @flow:tenant-isolation @issue-108 AC2: AP aging lists only own bills and credits', async () => {
       for (const [, tenant, own, foreign] of pairs()) {
         const res = await tenant.api.get('/reports/payables-aging');
         expect(res.status).toBe(200);
@@ -212,6 +232,22 @@ describe('Tenant isolation of ledger and invoice reads (e2e) @issue-108', () => 
         });
         expect(D(res.body.summary.netTotal).equals(bill.balanceDue)).toBe(true);
         expect(D(res.body.summary.total).equals(bill.balanceDue)).toBe(true);
+
+        // Assert vendor credit IDs and totals are tenant-scoped
+        const buckets = res.body.buckets as Record<string, Array<{ creditId: string }>>;
+        const vendorIds = Object.keys(buckets);
+        expect(vendorIds.length).toBeGreaterThan(0);
+        for (const vendorId of vendorIds) {
+          const credits = buckets[vendorId];
+          expect(credits.length).toBeGreaterThanOrEqual(1);
+          // All credit IDs must belong to this tenant
+          for (const credit of credits) {
+            const creditRec = await prisma.vendorCredit.findFirstOrThrow({
+              where: { id: credit.creditId, organizationId: tenant.organizationId },
+            });
+            expect(creditRec.amount).toBeGreaterThan(0);
+          }
+        }
       }
     });
 
@@ -248,6 +284,59 @@ describe('Tenant isolation of ledger and invoice reads (e2e) @issue-108', () => 
         for (const r of repRows) expect(ledger.has(r.accountId)).toBe(true);
         expect(D(rep.body.totals.debit).equals(expectedDebits)).toBe(true);
         expect(D(rep.body.totals.credit).equals(expectedDebits)).toBe(true);
+      }
+    });
+  });
+
+  describe('AC2b: cursor endpoints reject foreign IDs', () => {
+    it('@e2e @flow:tenant-isolation @issue-108 AC2b: foreign IDs as cursor return 404', async () => {
+      for (const [, tenant, own, foreign] of pairs()) {
+        for (const [path, foreignId] of [
+          ['/invoices/cursor', foreign.invoiceId],
+          ['/bills/cursor', foreign.billId],
+          ['/journals/cursor', foreign.journalId],
+        ] as const) {
+          const res = await tenant.api.get(path).query({ cursor: foreignId });
+          expect({ path, status: res.status }).toEqual({ path, status: 404 });
+        }
+      }
+    });
+  });
+
+  describe('AC2c: list endpoints assert scoped pagination totals', () => {
+    it('@e2e @flow:tenant-isolation @issue-108 AC2c: invoice list meta.total matches scoped count', async () => {
+      for (const [, tenant] of pairs()) {
+        const res = await tenant.api.get('/invoices');
+        expect(res.status).toBe(200);
+        expect(res.body.meta.total).toBe(1);
+        const dbCount = await prisma.invoice.count({
+          where: { organizationId: tenant.organizationId, deletedAt: null },
+        });
+        expect(res.body.meta.total).toBe(dbCount);
+      }
+    });
+
+    it('@e2e @flow:tenant-isolation @issue-108 AC2c: bill list meta.total matches scoped count', async () => {
+      for (const [, tenant] of pairs()) {
+        const res = await tenant.api.get('/bills');
+        expect(res.status).toBe(200);
+        expect(res.body.meta.total).toBe(1);
+        const dbCount = await prisma.bill.count({
+          where: { organizationId: tenant.organizationId, deletedAt: null },
+        });
+        expect(res.body.meta.total).toBe(dbCount);
+      }
+    });
+
+    it('@e2e @flow:tenant-isolation @issue-108 AC2c: journal list meta.total matches scoped count', async () => {
+      for (const [, tenant] of pairs()) {
+        const res = await tenant.api.get('/journals').query({ limit: 100 });
+        expect(res.status).toBe(200);
+        expect(res.body.meta.total).toBeGreaterThanOrEqual(3);
+        const dbCount = await prisma.journal.count({
+          where: { organizationId: tenant.organizationId, deletedAt: null },
+        });
+        expect(res.body.meta.total).toBe(dbCount);
       }
     });
   });
