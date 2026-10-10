@@ -16,7 +16,7 @@ browser gate; unused dependencies removed and the lockfile trimmed.
 | Code LOC (non-blank; ts/tsx/js/css/sql/sh/yml/py/prisma) | 248,035 in 1,491 tracked files. `apps/api/src` 113,010 (of which `modules/ai` 55,097), `apps/web` 99,173, `apps/api/prisma` 8,327, `packages` 4,589 |
 | Direct dependencies | 178 (root 9, api 90, web 74, packages 5); 1,845 packages in `pnpm-lock.yaml` (16,135 lines) |
 | Unit tests (run in PR CI) | api: 136 suites / 2,197 tests (13.6 s locally); web: 48 suites / 458 tests (5.6 s) |
-| API e2e-specs (`apps/api/test`, 11 files / 203 tests) | **never run anywhere**: jest `rootDir: src` excludes them and no workflow calls `test:e2e` |
+| API e2e-specs (`apps/api/test`, 11 files / 203 tests) | **not run in CI**: jest `rootDir: src` excludes them from `pnpm test`, and no workflow or hub gate calls `test:e2e` |
 | e2e-army | blocking suite 7 tests (`tests/Mizano.e2e.ts`); staging suite 147 tests over all 79 features (`tests-dev/Mizano`) |
 | CI (`ci.yml`, 14 days) | 256 runs: 225 success, 14 failure, 3 cancelled, 14 action_required. Wall median 2.6 min, p90 2.8 min (30 PR runs sampled); 7.0 runner-min per run (9 billed-min, rounded per job) |
 | CI jobs (median) | Build 2.6 min (`next build` 123 s, no build cache), Lint & Type Check 2.0 min (ESLint 38 s, tsc 51 s), Unit Tests 1.8 min (service containers 22 s + `db:push` 5 s + jest 53 s), Install Dependencies 0.6 min. No flaky job in the sample (0 failures in 23 completed PR runs) |
@@ -48,7 +48,7 @@ and against the diffs of all open PRs, so nothing an open PR builds on is remove
 | Item | Decision | Evidence |
 | --- | --- | --- |
 | #155's changes (`command.spec`, `use-bulk-action.spec`, the `transformJournal` copy in `journals/page.spec`) | remove | trivial library wiring, mock-only, tautology (tests a copy of production code) |
-| 11 API e2e-specs (203 tests) | move to a **nightly** workflow (Postgres + Redis, `db:push`, seed) | they guard money/ledger/tenancy end to end but never ran; nightly makes them run without slowing PRs |
+| 11 API e2e-specs (203 tests) | move to a **nightly** workflow (Postgres + Redis, `db:push`, seed) | they guard money/ledger/tenancy end to end but are not run in CI; nightly makes them run without slowing PRs |
 | Web page/component render specs for screens outside the pilot (HR ×6, assets ×2, manufacturing ×2, bank transactions/accounts ×2, AI insights detail, logger dashboard, sidebar, breadcrumbs, stat card) — 17 files | remove | mock-only rendering or styling assertions; each feature has `e2e-army` staging tests (`tests-dev/Mizano`: people, banking, inventory, platform, ai) |
 | API AI service specs (1,010 tests) | **keep** | they assert real scoring/forecast logic and run in seconds; the earlier rule "never remove a logic test whose feature has no passing e2e" still holds and no Mizano feature has a recorded e2e-army pass yet |
 | Accounting, sales, purchases, tax/VAT, banking, reconciliation, currency, reports, inventory valuation, intake/extraction, auth/tenancy guards, logger tenancy | **keep** | real domain logic; owner rule for Mizano |
@@ -76,5 +76,5 @@ Filled in as each PR merges (before → after): LOC, test counts, CI minutes per
 | PR CI wall (this PR's run) | 2.6 min median | 1.9 min |
 
 After PR 2 (#189): web unit tests 48 suites / 458 tests → 29 / 284; API unit tests unchanged (136 / 2,197); the 11 API
-e2e specs go from never run to nightly. After PR 3 (#190): Unit Tests job without service containers (1.8 → 1.5 min on
+e2e specs go from not run in CI to a nightly workflow. After PR 3 (#190): Unit Tests job without service containers (1.8 → 1.5 min on
 its first run); Build reads the Next.js cache once master has saved one.
