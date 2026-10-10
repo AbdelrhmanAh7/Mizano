@@ -1,3 +1,3 @@
-# Fast gate (<= 290 s): type-check + unit tests of packages changed vs origin/master.
+# Fast gate (<= 290 s, hard watchdog): type-check + unit tests of the packages affected by the refs being pushed.
 # Full lint/type-check/test/e2e runs through the hub's localci (see CONTRIBUTING.md).
-pnpm exec turbo type-check test --filter='...[origin/master]'
+node "$(git rev-parse --show-toplevel)/scripts/pre-push.mjs"
