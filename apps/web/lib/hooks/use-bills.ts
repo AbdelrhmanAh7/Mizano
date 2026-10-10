@@ -1,5 +1,6 @@
 'use client';
 
+import type { DuplicateCheckResult, PossibleDuplicateDraft } from '@mizano/shared-types';
 import { useToast } from '@/components/ui/use-toast';
 import { billsApi } from '@/lib/api';
 import { decimalToDisplayNumber } from '@/lib/decimal';
@@ -182,6 +183,31 @@ export function useBill(id: string | undefined) {
       return response.data as Bill;
     },
     enabled: !!id,
+  });
+}
+
+/** A stored bill (by ID) or unsaved bill fields such as a completed intake. */
+export type PossibleDuplicatesTarget = { billId: string } | { draft: PossibleDuplicateDraft };
+
+/**
+ * Possible duplicates: posted bills of the same vendor with the identical amount and currency
+ * within ±3 days. Advisory only; it never blocks approval.
+ */
+export function usePossibleDuplicates(target: PossibleDuplicatesTarget) {
+  return useQuery({
+    queryKey: ['bills', 'possible-duplicates', target],
+    queryFn: async (): Promise<DuplicateCheckResult> => {
+      const response =
+        'billId' in target
+          ? await billsApi.possibleDuplicates(target.billId)
+          : await billsApi.checkPossibleDuplicates(target.draft);
+      return response.data as DuplicateCheckResult;
+    },
+    // Another accountant can post a matching bill while this page stays open: the global defaults
+    // (5-minute staleTime, no focus refetch) would keep showing a stale "none" until approval.
+    staleTime: 0,
+    refetchOnWindowFocus: 'always',
+    refetchInterval: 30_000,
   });
 }
 

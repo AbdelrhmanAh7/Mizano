@@ -19,6 +19,7 @@ import { BillCursorQueryDto } from '../dto/bill-cursor-query.dto';
 import { BillQueryDto } from '../dto/bill-query.dto';
 import { BillLineDto, CreateBillDto } from '../dto/create-bill.dto';
 import { UpdateBillDto } from '../dto/update-bill.dto';
+import { DuplicateCheckResult } from '@mizano/shared-types';
 
 /** Bill statuses that carry an open AP balance and can receive payments. */
 export const PAYABLE_BILL_STATUSES: BillStatus[] = [
@@ -26,6 +27,53 @@ export const PAYABLE_BILL_STATUSES: BillStatus[] = [
   BillStatus.PARTIALLY_PAID,
   BillStatus.OVERDUE,
 ];
+
+/** Bills that have posted to the ledger (approved, paid or reversed). Excludes DRAFT and PENDING. */
+export const POSTED_BILL_STATUSES: BillStatus[] = [
+  BillStatus.OPEN,
+  BillStatus.PARTIALLY_PAID,
+  BillStatus.PAID,
+  BillStatus.OVERDUE,
+  BillStatus.VOID,
+];
+
+export interface PossibleDuplicateDraftInput {
+  vendorId?: string;
+  vendorName?: string;
+  /** Exact decimal string. */
+  amount?: string;
+  /** Calendar date, YYYY-MM-DD. */
+  date?: string;
+  currency?: string;
+  /** A stored bill to check: fills missing fields from it and excludes it from matches. */
+  billId?: string;
+}
+
+/** How far either side of the document date a posted bill counts as a possible duplicate. */
+const DUPLICATE_WINDOW_DAYS = 3;
+const DUPLICATE_MAX_MATCHES = 5;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function normalizeVendorName(name: string): string {
+  return name.normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function utcDay(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Parses a date-only `YYYY-MM-DD` value to UTC midnight. Timestamps are rejected: their
+ * calendar day depends on the offset. The message never echoes the input (it is logged).
+ */
+export function parseCalendarDate(value: string): Date {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  // The round trip rejects anything but YYYY-MM-DD as well as impossible days (2026-02-30).
+  if (Number.isNaN(date.getTime()) || utcDay(date) !== value) {
+    throw new BadRequestException('date must be a calendar date (YYYY-MM-DD)');
+  }
+  return date;
+}
 
 @Injectable()
 export class BillsService {
@@ -293,6 +341,116 @@ export class BillsService {
     }
 
     return { isDuplicate: false, existingBillId: null, similarity: 0, matchType: 'none' };
+  }
+
+  /**
+   * Read-only duplicate bill detection before posting: posted bills of the same tenant and
+   * vendor with the identical amount and currency dated within +/-3 calendar days. Missing
+   * inputs give `unknown`; nothing is locked or written.
+   */
+  async findPossibleDuplicateBills(
+    organizationId: string,
+    draft: PossibleDuplicateDraftInput,
+  ): Promise<DuplicateCheckResult> {
+    const input = { ...draft };
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { baseCurrency: true },
+    });
+    const baseCurrency = org?.baseCurrency || 'EGP';
+
+    if (input.billId) {
+      const target = await this.prisma.bill.findFirst({
+        where: { id: input.billId, organizationId, deletedAt: null },
+        select: { id: true, vendorId: true, date: true, grandTotal: true, currencyCode: true },
+      });
+      if (!target) {
+        throw new NotFoundException('Bill not found');
+      }
+      input.vendorId ??= target.vendorId;
+      input.amount ??= target.grandTotal.toFixed(4);
+      input.date ??= utcDay(target.date);
+      input.currency ??= target.currencyCode || baseCurrency;
+    }
+
+    const vendorId = input.vendorId?.trim();
+    const vendorName = input.vendorName?.trim();
+    const currency = input.currency?.trim().toUpperCase();
+    if (!input.amount?.trim() || !input.date?.trim() || !(vendorId || vendorName) || !currency) {
+      return { status: 'unknown', matches: [] };
+    }
+    const targetDate = parseCalendarDate(input.date.trim());
+    const targetAmount = new Decimal(input.amount.trim());
+
+    let vendorIds: string[];
+    if (vendorId) {
+      // A caller-supplied vendor must belong to this tenant; a stored bill's vendor already does.
+      if (draft.vendorId) {
+        const vendor = await this.prisma.vendor.findFirst({
+          where: { id: vendorId, organizationId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!vendor) {
+          throw new BadRequestException('Vendor not found');
+        }
+      }
+      vendorIds = [vendorId];
+    } else {
+      const wanted = normalizeVendorName(vendorName!);
+      const vendors = await this.prisma.vendor.findMany({
+        where: { organizationId, deletedAt: null },
+        select: { id: true, name: true, displayName: true },
+      });
+      vendorIds = vendors
+        .filter(
+          (v) =>
+            normalizeVendorName(v.name) === wanted ||
+            (v.displayName !== null && normalizeVendorName(v.displayName) === wanted),
+        )
+        .map((v) => v.id);
+      if (vendorIds.length === 0) {
+        return { status: 'none', matches: [] };
+      }
+    }
+
+    const candidates = await this.prisma.bill.findMany({
+      where: {
+        organizationId,
+        status: { in: POSTED_BILL_STATUSES },
+        vendorId: vendorIds.length === 1 ? vendorIds[0] : { in: vendorIds },
+        date: {
+          gte: new Date(targetDate.getTime() - DUPLICATE_WINDOW_DAYS * DAY_MS),
+          lt: new Date(targetDate.getTime() + (DUPLICATE_WINDOW_DAYS + 1) * DAY_MS),
+        },
+        ...(input.billId ? { id: { not: input.billId } } : {}),
+      },
+      select: { id: true, billNumber: true, date: true, grandTotal: true, currencyCode: true },
+    });
+
+    const matches = candidates
+      .map((c) => ({
+        billId: c.id,
+        billNumber: c.billNumber,
+        documentDate: utcDay(c.date),
+        amount: new Decimal(c.grandTotal),
+        currency: (c.currencyCode || baseCurrency).trim().toUpperCase(),
+      }))
+      .filter(
+        (m) =>
+          Math.abs(Date.parse(m.documentDate) - targetDate.getTime()) <=
+            DUPLICATE_WINDOW_DAYS * DAY_MS &&
+          m.currency === currency &&
+          m.amount.equals(targetAmount),
+      )
+      .sort((a, b) =>
+        a.documentDate === b.documentDate
+          ? b.billId.localeCompare(a.billId)
+          : b.documentDate.localeCompare(a.documentDate),
+      )
+      .slice(0, DUPLICATE_MAX_MATCHES)
+      .map((m) => ({ ...m, amount: m.amount.toFixed(4) }));
+
+    return { status: matches.length > 0 ? 'possible' : 'none', matches };
   }
 
   /** "Open" is the same accounting event as approval: it must post to the ledger. */

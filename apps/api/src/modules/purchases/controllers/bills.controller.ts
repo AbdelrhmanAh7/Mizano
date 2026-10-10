@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -11,6 +13,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { DuplicateCheckResult } from '@mizano/shared-types';
 import {
   CacheResponse,
   CacheTTL,
@@ -19,6 +22,7 @@ import {
   InvalidateCache,
   InvalidatesLedger,
   Permissions,
+  SkipAudit,
 } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -26,6 +30,7 @@ import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache
 import { BillCursorQueryDto } from '../dto/bill-cursor-query.dto';
 import { BillQueryDto } from '../dto/bill-query.dto';
 import { CheckDuplicateBillDto } from '../dto/check-duplicate-bill.dto';
+import { CheckPossibleDuplicateBillsDto } from '../dto/check-possible-duplicate-bills.dto';
 import { CreateBillDto } from '../dto/create-bill.dto';
 import { UpdateBillDto } from '../dto/update-bill.dto';
 import { BillsService } from '../services/bills.service';
@@ -74,6 +79,29 @@ export class BillsController {
   @ApiOperation({ summary: 'List bills with cursor-based pagination' })
   findAllCursor(@CurrentOrg() orgId: string, @Query() query: BillCursorQueryDto) {
     return this.billsService.findAllCursor(orgId, query);
+  }
+
+  /** A read-only query sent as POST so amounts and vendor names stay out of logged URLs. */
+  @Post('possible-duplicates')
+  @HttpCode(HttpStatus.OK)
+  @SkipAudit()
+  @Permissions('purchases.view')
+  @ApiOperation({ summary: 'Find possible duplicate bills for a draft bill or document' })
+  findPossibleDuplicates(
+    @CurrentOrg() orgId: string,
+    @Body() dto: CheckPossibleDuplicateBillsDto,
+  ): Promise<DuplicateCheckResult> {
+    return this.billsService.findPossibleDuplicateBills(orgId, dto);
+  }
+
+  @Get(':id/possible-duplicates')
+  @Permissions('purchases.view')
+  @ApiOperation({ summary: 'Find possible duplicate bills for an existing draft bill' })
+  findPossibleDuplicatesForBill(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+  ): Promise<DuplicateCheckResult> {
+    return this.billsService.findPossibleDuplicateBills(orgId, { billId: id });
   }
 
   @Get(':id')

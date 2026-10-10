@@ -30,6 +30,8 @@ import {
 import { useCreateVendor } from '@/lib/hooks/use-vendors';
 import { resolveScanLineTaxes, toDecimalString } from '@/lib/document-intake-tax';
 import { BillForm, type BillFormDefaultValues } from '@/components/purchases/bill-form';
+import { PossibleDuplicatesBanner } from '@/components/purchases/possible-duplicates-banner';
+import { scanDuplicateDraft } from '@/lib/scan-duplicate-draft';
 import { cn } from '@/lib/utils';
 import { getScanReviewErrorMessage } from '@/lib/scan-review-error';
 import { format } from 'date-fns';
@@ -621,6 +623,13 @@ export default function ScanBillPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Posted bills with the same vendor, amount and currency within ±3 days; advisory only */}
+          <PossibleDuplicatesBanner
+            target={{
+              draft: scanDuplicateDraft(result.extractedFields, scanDefaults.vendorId ?? ''),
+            }}
+          />
 
           {/* AI Vendor Intelligence */}
           <Card>

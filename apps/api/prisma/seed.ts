@@ -1303,6 +1303,25 @@ async function main() {
       status: BillStatus.OVERDUE,
       total: d(8000),
     },
+    // Duplicate-warning demo pair (issue #96): BILL-005 is an unposted draft
+    // with the same vendor, amount and currency as the posted BILL-004, dated
+    // one day apart — inside the ±3-day window the duplicate check matches.
+    {
+      id: 'bill-BILL-004',
+      num: 'BILL-004',
+      vend: 'vend-001',
+      daysAgo: 2,
+      status: BillStatus.OPEN,
+      total: d(2500),
+    },
+    {
+      id: 'bill-BILL-005',
+      num: 'BILL-005',
+      vend: 'vend-001',
+      daysAgo: 1,
+      status: BillStatus.DRAFT,
+      total: d(2500),
+    },
   ];
   const billMap: Record<string, string> = {};
   for (const b of billsData) {
@@ -1378,6 +1397,24 @@ async function main() {
       rate: d(800),
       amt: d(800),
       accountId: '6300',
+    },
+    {
+      id: 'bl-007',
+      billId: 'bill-BILL-004',
+      desc: 'Office chairs restock x5',
+      qty: d(5),
+      rate: d(500),
+      amt: d(2500),
+      accountId: '5000',
+    },
+    {
+      id: 'bl-008',
+      billId: 'bill-BILL-005',
+      desc: 'Office chairs restock x5 (second copy)',
+      qty: d(5),
+      rate: d(500),
+      amt: d(2500),
+      accountId: '5000',
     },
   ];
   for (const bl of billLines) {

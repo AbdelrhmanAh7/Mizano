@@ -262,3 +262,31 @@ export interface PaymentMadeQuery extends PaginationQuery {
   startDate?: string;
   endDate?: string;
 }
+
+// --- Duplicate Bill Check ---
+
+export interface DuplicateBillMatch {
+  billId: string;
+  billNumber: string;
+  /** YYYY-MM-DD */
+  documentDate: string;
+  /** Fixed 4-dp decimal string. */
+  amount: string;
+  currency: string;
+}
+
+export interface DuplicateCheckResult {
+  status: 'none' | 'possible' | 'unknown';
+  matches: DuplicateBillMatch[];
+}
+
+/** Unsaved bill fields to check, e.g. a completed intake; missing fields give "unknown". */
+export interface PossibleDuplicateDraft {
+  vendorId?: string;
+  vendorName?: string;
+  /** Exact decimal string. */
+  amount?: string;
+  /** YYYY-MM-DD */
+  date?: string;
+  currency?: string;
+}

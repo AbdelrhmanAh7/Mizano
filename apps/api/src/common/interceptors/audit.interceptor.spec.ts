@@ -1,7 +1,9 @@
 import { ExecutionContext } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { AuditAction, Prisma } from '@prisma/client';
 import { lastValueFrom, of } from 'rxjs';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SkipAudit } from '../decorators/skip-audit.decorator';
 import { AuditInterceptor } from './audit.interceptor';
 
 interface FakeRequest {
@@ -14,8 +16,28 @@ interface FakeRequest {
   user?: { id: string; organizationId?: string };
 }
 
-function makeContext(request: FakeRequest): ExecutionContext {
-  return { switchToHttp: () => ({ getRequest: () => request }) } as unknown as ExecutionContext;
+class FakeController {
+  write(): void {}
+
+  @SkipAudit()
+  readOnlyCheck(): void {}
+}
+
+@SkipAudit()
+class ClassMarkedController {
+  write(): void {}
+}
+
+function makeContext(
+  request: FakeRequest,
+  handler: () => void,
+  controller: new () => unknown = FakeController,
+): ExecutionContext {
+  return {
+    switchToHttp: () => ({ getRequest: () => request }),
+    getHandler: () => handler,
+    getClass: () => controller,
+  } as unknown as ExecutionContext;
 }
 
 const flush = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
@@ -34,9 +56,16 @@ describe('AuditInterceptor', () => {
     user: { id: 'user-1', organizationId: 'org-1' },
   });
 
-  const run = async (request: FakeRequest, response: unknown): Promise<unknown> => {
+  const run = async (
+    request: FakeRequest,
+    response: unknown,
+    handler: () => void = FakeController.prototype.write,
+    controller: new () => unknown = FakeController,
+  ): Promise<unknown> => {
     const result = await lastValueFrom(
-      interceptor.intercept(makeContext(request), { handle: () => of(response) }),
+      interceptor.intercept(makeContext(request, handler, controller), {
+        handle: () => of(response),
+      }),
     );
     await flush();
     return result;
@@ -44,7 +73,10 @@ describe('AuditInterceptor', () => {
 
   beforeEach(() => {
     create = jest.fn().mockResolvedValue({});
-    interceptor = new AuditInterceptor({ auditLog: { create } } as unknown as PrismaService);
+    interceptor = new AuditInterceptor(
+      { auditLog: { create } } as unknown as PrismaService,
+      new Reflector(),
+    );
   });
 
   it('does not touch the response it passes through', async () => {
@@ -145,6 +177,37 @@ describe('AuditInterceptor', () => {
     mutate(request);
     await run(request, { id: 'x' });
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it('does not audit read-only POST routes marked @SkipAudit()', async () => {
+    await run(baseRequest(), { status: 'none' }, FakeController.prototype.readOnlyCheck);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['POST', AuditAction.CREATE],
+    ['PUT', AuditAction.UPDATE],
+    ['PATCH', AuditAction.UPDATE],
+    ['DELETE', AuditAction.DELETE],
+  ])('still audits %s on a handler without @SkipAudit()', async (method, action) => {
+    const request = baseRequest();
+    request.method = method;
+    request.path = '/api/bills/b-1/approve';
+    request.params = { id: 'b-1' };
+    await run(request, { id: 'b-1', status: 'OPEN' }, FakeController.prototype.write);
+    expect(create).toHaveBeenCalledTimes(1);
+    const { data } = create.mock.calls[0][0] as { data: Record<string, unknown> };
+    expect(data).toMatchObject({ action, entityType: 'bills', entityId: 'b-1' });
+  });
+
+  it('ignores a class-level @SkipAudit() so a controller cannot silence its mutations', async () => {
+    await run(
+      baseRequest(),
+      { id: 'c-1' },
+      ClassMarkedController.prototype.write,
+      ClassMarkedController,
+    );
+    expect(create).toHaveBeenCalledTimes(1);
   });
 
   it('never fails the request and logs only a safe description when the audit write fails', async () => {

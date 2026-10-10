@@ -30,6 +30,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **A journal is dated on the document date.**
 - **A reversal or refund never precedes its source.** Default to `max(today, sourceDate)` and reject an earlier explicit date. _(JournalsService.reverse, vendor-credit refund)_
 - **A date-only end bound means end of day** (`endOfUtcDay`). A void at 10:00 on the end date belongs to that period.
+- **Accept a calendar date as `YYYY-MM-DD` only when the day is what you compare.** The calendar day of a timestamp with an offset is not its text prefix, so reject timestamps instead of slicing them. _(possible-duplicate bill check, #96)_
 - **Web defaults use the user's local calendar date** (`format(d, 'yyyy-MM-dd')`), never `toISOString()`, which gives yesterday in UTC+ zones such as Cairo.
 - **"Current" figures exclude future-dated entries.** Cash today means lines dated ≤ end of today.
 - **Side records carry the document date.** Inventory movements are dated on the adjustment date, not on `createdAt` = now.
@@ -48,6 +49,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Use Decimal end to end for money arithmetic and comparisons, and send fixed 4-dp strings.** No `parseFloat`, `Number()` or `toNumber()` in sums, balances or checks. Converting an exact API string to a number only at the display boundary (formatting, chart plotting via `moneyToNumber`) is allowed.
 - **Decimal precision must cover products before subtraction.** Two `Decimal(19,4)` factors can require 38 significant digits; the default 20 can lose 4-dp amounts when large valuations cancel. Use a locally cloned constructor with aggregation headroom, never change global precision, and test large products as well as fractional values. _(inventory value trend, PR #59)_
 - **Bound inputs to `Decimal(19,4)`:** at most 15 integer and 4 fraction digits, validated with `common/dto/decimal-string.ts`. Bound computed totals before writing.
+- **A decimal-string decorator alone does not reject JSON numbers.** The global `ValidationPipe` converts implicitly, so `100.1` becomes `"100.1"` before validation. Where a body field must arrive as a string, keep the raw value with `@Transform(({ obj }) => obj.field)` and test with `enableImplicitConversion: true`. _(possible-duplicate bill check, #96)_
 - **Allocate VAT cumulatively.** Each partial credit's VAT = `round(totalVAT × cumulative/total) − already allocated`, so the parts sum exactly to the whole.
 - **The web preview rounds per line exactly like the server** (`computeDocumentTotals`), otherwise the shown and stored totals differ.
 - **When storage changes (net vs. gross), update every view:** list, detail, PDF and report. _(tax-inclusive expenses)_
@@ -79,6 +81,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 ## 10. Logging, audit and secrets
 
 - **Never log or audit values:** no document text, amounts, tax ids, LLM output, query parameters or raw error objects. Log metadata instead (ids, counts, lengths, durations, field names, status), and use `describeError(error, { includeMessage: false })` wherever an error message could contain document or user data. `redactText` only masks credential-shaped strings, so it does not make document text safe to log.
+- **Send amounts, vendor names and other document values in a POST body, never a query string;** failed requests are logged with their URL. Mark such read-only POST queries `@SkipAudit()`, or the AuditInterceptor records a fictitious CREATE. _(possible-duplicate bill check, #96)_
 - **Clients can't claim trusted provenance.** HTTP log captures are forced to `FRONTEND`.
 - **Compare secrets in constant time, with no default secrets.** Re-apply file permissions on files that already exist.
 
