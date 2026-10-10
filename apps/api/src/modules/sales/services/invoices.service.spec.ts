@@ -910,6 +910,24 @@ describe('InvoicesService', () => {
       prisma.invoice.findFirst.mockResolvedValue(null);
       await expect(service.clone(ORG_ID, 'foreign')).rejects.toThrow(NotFoundException);
     });
+
+    it('clone keeps currencyCode', async () => {
+      prisma.invoice.findFirst.mockResolvedValue({
+        ...invoiceRow({ currencyCode: 'EUR' }),
+        lines: [],
+      } as any);
+      prisma.organization.update.mockResolvedValue({
+        invoicePrefix: 'INV-',
+        invoiceNextNumber: 3,
+      } as any);
+      prisma.invoice.count.mockResolvedValue(0);
+      prisma.invoice.create.mockResolvedValue(invoiceRow() as any);
+
+      await service.clone(ORG_ID, 'inv-1');
+
+      const data = prisma.invoice.create.mock.calls[0][0].data as any;
+      expect(data.currencyCode).toBe('EUR');
+    });
   });
 
   describe('taxRateOptions', () => {

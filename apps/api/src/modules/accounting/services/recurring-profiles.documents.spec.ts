@@ -37,7 +37,7 @@ describe('RecurringProfilesService (invoice, bill and expense profiles)', () => 
   let expenses: { create: jest.Mock };
 
   const run = (p: any, key?: string): Promise<any> =>
-    (service as any).executeRecurringProfile(p, key);
+    (service as any).executeRecurringProfile(p, key ? { key, userId: 'user-1' } : undefined);
 
   beforeEach(() => {
     prisma = createMockPrisma();
@@ -142,6 +142,15 @@ describe('RecurringProfilesService (invoice, bill and expense profiles)', () => 
       'nextRunDate',
     );
     expect(invoices.create.mock.calls[0][1].notes).toContain('[recurring prof-1:manual:key-1]');
+    // The occurrence is recorded append-only, attributed to the requesting user.
+    expect(prisma.auditLog.create.mock.calls[0][0].data).toEqual({
+      organizationId: ORG,
+      userId: 'user-1',
+      action: 'CREATE',
+      entityType: 'RECURRING_OCCURRENCE',
+      entityId: 'prof-1:manual:key-1',
+      newValues: { documentId: 'inv-1', kind: 'invoice' },
+    });
   });
 
   it('creates the bill through BillsService as a DRAFT with decimal strings and a marker reference', async () => {

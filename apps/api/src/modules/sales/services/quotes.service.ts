@@ -317,6 +317,7 @@ export class QuotesService {
             customerId: original.customerId,
             date: today,
             expiryDate,
+            currencyCode: original.currencyCode,
             subtotal: original.subtotal,
             taxAmount: original.taxAmount,
             grandTotal: original.grandTotal,
