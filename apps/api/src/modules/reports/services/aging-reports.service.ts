@@ -34,6 +34,8 @@ export interface AgingItem {
   balanceDue: number;
 }
 
+export type PayableAgingItem = Omit<AgingItem, 'balanceDue'> & { balanceDue: string };
+
 /** Receivables aging row: money is a fixed 4-dp decimal string. */
 export type ReceivableAgingItem = Omit<AgingItem, 'balanceDue'> & { balanceDue: string };
 
@@ -163,37 +165,84 @@ export class AgingReportsService {
   }
 
   async getPayablesAging(organizationId: string, asOfDate?: string) {
-    const date = asOfDate ? new Date(asOfDate) : new Date();
-    date.setHours(23, 59, 59, 999);
+    const { asOf, asOfDate: asOfIso } = resolveAsOf(asOfDate);
 
     const bills = await this.prisma.bill.findMany({
       where: {
         organizationId,
         deletedAt: null,
-        balanceDue: { gt: 0 },
-        // Only bills posted to AP; `date` is the accounting date (billDate is optional).
-        status: { in: ['OPEN', 'PARTIALLY_PAID', 'OVERDUE'] },
-        date: { lte: date },
+        status: { in: POSTED_BILL_STATUSES },
+        date: { lte: asOf },
       },
       include: {
         vendor: { select: { id: true, name: true } },
       },
     });
+    const billIds = bills.map((bill) => bill.id);
 
-    // Live, unapplied, unrefunded vendor credits already debited AP but reduced no bill: they are
-    // shown per vendor and netted in `summary.netTotal`, which reconciles to the AP control account.
-    const credits = await this.prisma.vendorCredit.findMany({
-      where: {
+    const [allocations, creditCandidates] = await Promise.all([
+      billIds.length
+        ? this.prisma.billAllocation.findMany({
+            where: {
+              billId: { in: billIds },
+              payment: { organizationId, date: { lte: asOf } },
+            },
+            select: {
+              billId: true,
+              amount: true,
+              payment: { select: { id: true, deletedAt: true } },
+            },
+          })
+        : Promise.resolve([]),
+      this.prisma.vendorCredit.findMany({
+        where: {
+          organizationId,
+          date: { lte: asOf },
+          OR: [{ refundedAt: null }, { refundedAt: { gt: asOf } }],
+        },
+        select: {
+          id: true,
+          vendorId: true,
+          amount: true,
+          appliedToBillId: true,
+          deletedAt: true,
+          vendor: { select: { id: true, name: true } },
+        },
+      }),
+    ]);
+    const [paymentVoidDates, creditVoidDates] = await Promise.all([
+      this.voidJournalDates(
         organizationId,
-        deletedAt: null,
-        appliedToBillId: null,
-        refundedAt: null,
-        date: { lte: date },
-      },
-      select: { vendorId: true, amount: true, vendor: { select: { id: true, name: true } } },
-    });
+        'PAYMENT_MADE_VOID',
+        allocations.flatMap((allocation) =>
+          allocation.payment.deletedAt ? [allocation.payment.id] : [],
+        ),
+      ),
+      this.voidJournalDates(
+        organizationId,
+        'VENDOR_CREDIT_VOID',
+        creditCandidates.flatMap((credit) => (credit.deletedAt ? [credit.id] : [])),
+      ),
+    ]);
+
+    const paymentsByBill = new Map<string, Decimal>();
+    for (const allocation of allocations) {
+      const voidDate = paymentVoidDates.get(allocation.payment.id) ?? allocation.payment.deletedAt;
+      if (allocation.payment.deletedAt && voidDate && voidDate <= asOf) continue;
+      const current = paymentsByBill.get(allocation.billId) ?? new Decimal(0);
+      paymentsByBill.set(allocation.billId, current.add(allocation.amount));
+    }
+
     const creditsByVendor = new Map<string, { vendorName: string; amount: Decimal }>();
-    for (const credit of credits) {
+    const appliedCreditsByBill = new Map<string, Decimal>();
+    for (const credit of creditCandidates) {
+      const voidDate = creditVoidDates.get(credit.id) ?? credit.deletedAt;
+      if (credit.deletedAt && voidDate && voidDate <= asOf) continue;
+      if (credit.appliedToBillId) {
+        const current = appliedCreditsByBill.get(credit.appliedToBillId) ?? new Decimal(0);
+        appliedCreditsByBill.set(credit.appliedToBillId, current.add(credit.amount));
+        continue;
+      }
       const row = creditsByVendor.get(credit.vendorId) ?? {
         vendorName: credit.vendor.name,
         amount: new Decimal(0),
@@ -201,72 +250,73 @@ export class AgingReportsService {
       row.amount = row.amount.add(credit.amount);
       creditsByVendor.set(credit.vendorId, row);
     }
-    const unappliedTotal = [...creditsByVendor.values()].reduce(
-      (sum, r) => sum.add(r.amount),
-      new Decimal(0),
-    );
-    const billsTotal = bills.reduce((sum, b) => sum.add(b.balanceDue), new Decimal(0));
+    const unappliedTotal = sumDecimals([...creditsByVendor.values()].map((row) => row.amount));
 
-    const buckets = {
-      current: [] as AgingItem[],
-      days1_30: [] as AgingItem[],
-      days31_60: [] as AgingItem[],
-      days61_90: [] as AgingItem[],
-      over90: [] as AgingItem[],
+    const buckets: Record<AgingBucketKey, PayableAgingItem[]> = {
+      current: [],
+      days1_30: [],
+      days31_60: [],
+      days61_90: [],
+      over90: [],
+    };
+    const bucketTotals: Record<AgingBucketKey, Decimal> = {
+      current: new Decimal(0),
+      days1_30: new Decimal(0),
+      days31_60: new Decimal(0),
+      days61_90: new Decimal(0),
+      over90: new Decimal(0),
     };
 
     for (const bill of bills) {
-      const dueDate = bill.dueDate;
-      const daysOverdue = Math.floor((date.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
-      const balanceDue = parseFloat(bill.balanceDue.toString());
+      const balanceDue = toDecimal(bill.total ?? bill.grandTotal)
+        .sub(paymentsByBill.get(bill.id) ?? 0)
+        .sub(appliedCreditsByBill.get(bill.id) ?? 0);
+      if (!balanceDue.greaterThan(0)) continue;
 
-      const item: AgingItem = {
+      const daysOverdue = daysPastDue(bill.dueDate, asOf);
+      const bucket = agingBucket(daysOverdue);
+      buckets[bucket].push({
         billId: bill.id,
         billNumber: bill.billNumber,
         vendorId: bill.vendor.id,
         vendorName: bill.vendor.name,
+        date: bill.date,
         billDate: bill.billDate,
         dueDate: bill.dueDate,
         daysOverdue: Math.max(0, daysOverdue),
-        balanceDue,
-      };
-
-      if (daysOverdue <= 0) buckets.current.push(item);
-      else if (daysOverdue <= 30) buckets.days1_30.push(item);
-      else if (daysOverdue <= 60) buckets.days31_60.push(item);
-      else if (daysOverdue <= 90) buckets.days61_90.push(item);
-      else buckets.over90.push(item);
+        balanceDue: money(balanceDue),
+      });
+      bucketTotals[bucket] = bucketTotals[bucket].add(balanceDue);
     }
-
-    const summary = {
-      current: buckets.current.reduce((sum, i) => sum + i.balanceDue, 0),
-      days1_30: buckets.days1_30.reduce((sum, i) => sum + i.balanceDue, 0),
-      days31_60: buckets.days31_60.reduce((sum, i) => sum + i.balanceDue, 0),
-      days61_90: buckets.days61_90.reduce((sum, i) => sum + i.balanceDue, 0),
-      over90: buckets.over90.reduce((sum, i) => sum + i.balanceDue, 0),
-      total: 0,
-    };
-    summary.total =
-      summary.current + summary.days1_30 + summary.days31_60 + summary.days61_90 + summary.over90;
+    const billsTotal = sumDecimals(Object.values(bucketTotals));
 
     return {
-      asOfDate: date,
+      asOfDate: asOfIso,
       buckets,
       summary: {
-        ...summary,
-        unappliedCredits: unappliedTotal.toFixed(4),
-        netTotal: billsTotal.sub(unappliedTotal).toFixed(4),
+        current: money(bucketTotals.current),
+        days1_30: money(bucketTotals.days1_30),
+        days31_60: money(bucketTotals.days31_60),
+        days61_90: money(bucketTotals.days61_90),
+        over90: money(bucketTotals.over90),
+        total: money(billsTotal),
+        unappliedCredits: money(unappliedTotal),
+        netTotal: money(billsTotal.sub(unappliedTotal)),
       },
       unappliedCredits: {
-        total: unappliedTotal.toFixed(4),
-        vendors: [...creditsByVendor.entries()].map(([vendorId, r]) => ({
+        total: money(unappliedTotal),
+        vendors: [...creditsByVendor.entries()].map(([vendorId, row]) => ({
           vendorId,
-          vendorName: r.vendorName,
-          amount: r.amount.toFixed(4),
+          vendorName: row.vendorName,
+          amount: money(row.amount),
         })),
       },
-      vendorCount: new Set(bills.map((b) => b.vendorId)).size,
-      billCount: bills.length,
+      vendorCount: new Set(
+        Object.values(buckets)
+          .flat()
+          .map((bill) => bill.vendorId),
+      ).size,
+      billCount: Object.values(buckets).reduce((count, items) => count + items.length, 0),
     };
   }
 
@@ -577,5 +627,28 @@ export class AgingReportsService {
       totalDebits: sum(transactions.map((t) => t.debit)).toFixed(4),
       totalCredits: sum(transactions.map((t) => t.credit)).toFixed(4),
     };
+  }
+
+  private async voidJournalDates(
+    organizationId: string,
+    sourceType: string,
+    sourceIds: string[],
+  ): Promise<Map<string, Date>> {
+    if (sourceIds.length === 0) return new Map();
+    const journals = await this.prisma.journal.findMany({
+      where: {
+        organizationId,
+        isPosted: true,
+        deletedAt: null,
+        sourceType,
+        sourceId: { in: sourceIds },
+      },
+      select: { sourceId: true, date: true },
+    });
+    return new Map(
+      journals.flatMap((journal) =>
+        journal.sourceId ? [[journal.sourceId, journal.date] as const] : [],
+      ),
+    );
   }
 }

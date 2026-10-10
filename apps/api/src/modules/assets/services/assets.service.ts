@@ -1,16 +1,27 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { AssetStatus, DepreciationMethod, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
+import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AssetQueryDto, CreateAssetDto, DisposeAssetDto, UpdateAssetDto } from '../dto/assets.dto';
+import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
 
 @Injectable()
 export class AssetsService {
   private readonly logger = new Logger(AssetsService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private journalsService: JournalsService,
+  ) {}
 
   /**
    * Create a new asset with depreciation schedule
@@ -210,6 +221,7 @@ export class AssetsService {
         await tx.depreciationSchedule.deleteMany({
           where: {
             assetId,
+            organizationId,
             executedAt: null,
           },
         });
@@ -228,39 +240,42 @@ export class AssetsService {
    * Dispose an asset (sell or write off)
    */
   async dispose(organizationId: string, assetId: string, dto: DisposeAssetDto): Promise<unknown> {
-    const asset = await this.prisma.asset.findFirst({
-      where: { id: assetId, organizationId, deletedAt: null },
-      include: {
-        assetAccount: true,
-        depreciationAccount: true,
-        accumulatedDeprAccount: true,
-      },
-    });
-
-    if (!asset) {
-      throw new NotFoundException('Asset not found');
-    }
-
-    if (asset.status !== AssetStatus.ACTIVE) {
-      throw new BadRequestException('Asset is already disposed');
-    }
-
-    // Calculate gain/loss on disposal
-    const disposalAmount = new Decimal(dto.disposalAmount);
-    const bookValue = asset.currentBookValue;
-    const gainLoss = disposalAmount.minus(bookValue);
-
-    // Create disposal in transaction
     const disposed = await this.prisma.$transaction(async (tx) => {
-      // Update asset status
-      const updatedAsset = await tx.asset.update({
-        where: { id: assetId },
+      await lockOrganizationLedger(tx, organizationId);
+      const asset = await tx.asset.findFirst({
+        where: { id: assetId, organizationId, deletedAt: null },
+        include: {
+          assetAccount: true,
+          depreciationAccount: true,
+          accumulatedDeprAccount: true,
+        },
+      });
+      if (!asset) throw new NotFoundException('Asset not found');
+      if (asset.status !== AssetStatus.ACTIVE) {
+        throw new BadRequestException('Asset is already disposed');
+      }
+
+      const disposalAmount = new Decimal(dto.disposalAmount);
+      const gainLoss = disposalAmount.minus(asset.currentBookValue);
+      const transition = await tx.asset.updateMany({
+        where: {
+          id: assetId,
+          organizationId,
+          deletedAt: null,
+          status: AssetStatus.ACTIVE,
+        },
         data: {
           status: AssetStatus.DISPOSED,
           disposalDate: new Date(dto.disposalDate),
           disposalAmount,
           disposalGainLoss: gainLoss,
         },
+      });
+      if (transition.count !== 1) {
+        throw new ConflictException('Asset was changed concurrently');
+      }
+      const updatedAsset = await tx.asset.findFirstOrThrow({
+        where: { id: assetId, organizationId },
       });
 
       // Delete future unposted depreciation schedules
@@ -281,7 +296,7 @@ export class AssetsService {
         gainLoss,
       );
 
-      return { ...updatedAsset, disposalJournalId: journal.id };
+      return { ...updatedAsset, disposalJournalId: journal };
     });
 
     return this.formatAssetResponse(disposed);
@@ -300,7 +315,7 @@ export class AssetsService {
     }
 
     const schedules = await this.prisma.depreciationSchedule.findMany({
-      where: { assetId },
+      where: { assetId, organizationId },
       orderBy: [{ year: 'asc' }, { month: 'asc' }],
       include: {
         journal: { select: { id: true, journalNumber: true } },
@@ -569,7 +584,7 @@ export class AssetsService {
     disposalDate: Date,
     disposalAmount: Decimal,
     gainLoss: Decimal,
-  ): Promise<{ id: string }> {
+  ): Promise<string> {
     // Get or create gain/loss account
     let gainLossAccount = await tx.account.findFirst({
       where: {
@@ -588,11 +603,13 @@ export class AssetsService {
       });
     }
 
-    // Generate journal number
-    const journalNumber = await this.generateJournalNumber(tx, organizationId);
-
     // Build journal lines
-    const lines: Prisma.JournalLineUncheckedCreateWithoutJournalInput[] = [];
+    const lines: Array<{
+      accountId: string;
+      debit: string;
+      credit: string;
+      description: string;
+    }> = [];
 
     // Debit: Cash/Bank (disposal amount received)
     if (disposalAmount.greaterThan(0)) {
@@ -602,26 +619,27 @@ export class AssetsService {
       if (cashAccount) {
         lines.push({
           accountId: cashAccount.id,
-          debit: disposalAmount,
-          credit: new Decimal(0),
+          debit: disposalAmount.toFixed(4),
+          credit: '0',
           description: `Asset disposal proceeds - ${asset.assetNumber}`,
         });
       }
     }
 
-    // Debit: Accumulated Depreciation
-    lines.push({
-      accountId: asset.accumulatedDeprAccountId,
-      debit: asset.accumulatedDepreciation,
-      credit: new Decimal(0),
-      description: `Remove accumulated depreciation - ${asset.assetNumber}`,
-    });
+    if (asset.accumulatedDepreciation.greaterThan(0)) {
+      lines.push({
+        accountId: asset.accumulatedDeprAccountId,
+        debit: asset.accumulatedDepreciation.toFixed(4),
+        credit: '0',
+        description: `Remove accumulated depreciation - ${asset.assetNumber}`,
+      });
+    }
 
     // Credit: Asset Account (original cost)
     lines.push({
       accountId: asset.assetAccountId,
-      debit: new Decimal(0),
-      credit: asset.purchasePrice,
+      debit: '0',
+      credit: asset.purchasePrice.toFixed(4),
       description: `Remove asset - ${asset.assetNumber}`,
     });
 
@@ -631,55 +649,37 @@ export class AssetsService {
         // Credit: Gain on disposal
         lines.push({
           accountId: gainLossAccount.id,
-          debit: new Decimal(0),
-          credit: gainLoss,
+          debit: '0',
+          credit: gainLoss.toFixed(4),
           description: `Gain on disposal - ${asset.assetNumber}`,
         });
       } else {
         // Debit: Loss on disposal
         lines.push({
           accountId: gainLossAccount.id,
-          debit: gainLoss.abs(),
-          credit: new Decimal(0),
+          debit: gainLoss.abs().toFixed(4),
+          credit: '0',
           description: `Loss on disposal - ${asset.assetNumber}`,
         });
       }
     }
 
     // Create journal
-    const journal = await tx.journal.create({
-      data: {
-        journalNumber,
-        date: disposalDate,
+    const journal = await this.journalsService.create(
+      organizationId,
+      {
+        date: disposalDate.toISOString(),
         reference: `DISPOSAL-${asset.assetNumber}`,
         notes: `Asset disposal: ${asset.name}`,
-        isPosted: true,
-        organizationId,
-        lines: {
-          create: lines,
-        },
+        lines,
       },
-    });
+      {
+        tx,
+        source: { type: JournalSourceType.ASSET_DISPOSAL, id: asset.id },
+      },
+    );
 
-    return journal;
-  }
-
-  private async generateJournalNumber(
-    tx: Prisma.TransactionClient,
-    organizationId: string,
-  ): Promise<string> {
-    const lastJournal = await tx.journal.findFirst({
-      where: { organizationId },
-      orderBy: { createdAt: 'desc' },
-      select: { journalNumber: true },
-    });
-
-    if (!lastJournal?.journalNumber) {
-      return 'JRN-001';
-    }
-
-    const lastNumber = parseInt(lastJournal.journalNumber.split('-')[1], 10);
-    return `JRN-${String(lastNumber + 1).padStart(3, '0')}`;
+    return journal.id;
   }
 
   private toNum(val: unknown): number | undefined {

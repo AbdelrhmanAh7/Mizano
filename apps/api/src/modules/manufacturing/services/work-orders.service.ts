@@ -3,6 +3,9 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Item, Prisma, WorkOrderStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
+import { runBulk } from '../../../common/utils/run-bulk';
+import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
 
 export interface CreateWorkOrderData {
   bomId: string;
@@ -41,7 +44,10 @@ interface WorkOrderWithBom {
 
 @Injectable()
 export class WorkOrdersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private journalsService: JournalsService,
+  ) {}
 
   async create(organizationId: string, dto: CreateWorkOrderData) {
     const bom = await this.prisma.bOM.findFirst({
@@ -223,37 +229,60 @@ export class WorkOrdersService {
   async completeWorkOrder(
     organizationId: string,
     id: string,
-    dto: { quantityProduced: number; notes?: string },
+    dto: { quantityProduced?: number; notes?: string },
   ) {
-    const workOrder = await this.findOne(organizationId, id);
-    if (workOrder.status !== WorkOrderStatus.IN_PROCESS) {
-      throw new BadRequestException('Work order is not in process');
+    if (
+      dto.quantityProduced !== undefined &&
+      (!Number.isFinite(dto.quantityProduced) || dto.quantityProduced < 0)
+    ) {
+      throw new BadRequestException('quantityProduced must be a non-negative number');
     }
 
-    const quantityProduced = dto.quantityProduced;
+    return this.prisma.$transaction(async (tx) => {
+      await lockOrganizationLedger(tx, organizationId);
+      const claimed = await tx.workOrder.updateMany({
+        where: { id, organizationId, deletedAt: null, status: WorkOrderStatus.IN_PROCESS },
+        data: { status: WorkOrderStatus.COMPLETED, completedDate: new Date() },
+      });
+      if (claimed.count !== 1) {
+        const current = await tx.workOrder.findFirst({
+          where: { id, organizationId, deletedAt: null },
+          select: { status: true },
+        });
+        if (!current) throw new NotFoundException('Work order not found');
+        throw new BadRequestException('Work order is not in process');
+      }
 
-    // Consume materials proportionally
-    await this.consumeMaterials(organizationId, workOrder, quantityProduced);
+      const workOrder = await tx.workOrder.findFirst({
+        where: { id, organizationId, deletedAt: null },
+        include: {
+          bom: { include: { outputItem: true, items: { include: { item: true } } } },
+        },
+      });
+      if (!workOrder) throw new NotFoundException('Work order not found');
+      const quantityProduced = dto.quantityProduced ?? workOrder.quantity;
+      if (!Number.isFinite(quantityProduced) || quantityProduced < 0) {
+        throw new BadRequestException('quantityProduced must be a non-negative number');
+      }
 
-    // Add finished goods to inventory
-    await this.addFinishedGoods(organizationId, workOrder, quantityProduced);
+      await this.consumeMaterials(tx, organizationId, workOrder, quantityProduced);
+      await this.addFinishedGoods(tx, organizationId, workOrder, quantityProduced);
+      const journalId = await this.createCOGMJournal(
+        tx,
+        organizationId,
+        workOrder,
+        quantityProduced,
+      );
 
-    // Create COGM journal entry
-    const journalId = await this.createCOGMJournal(organizationId, workOrder, quantityProduced);
-
-    // Update work order as completed
-    return this.prisma.workOrder.update({
-      where: { id },
-      data: {
-        status: WorkOrderStatus.COMPLETED,
-        completedDate: new Date(),
-        notes: dto.notes || workOrder.notes,
-        journalId,
-      },
+      return tx.workOrder.update({
+        where: { id, organizationId },
+        data: { notes: dto.notes || workOrder.notes, journalId },
+      });
     });
   }
 
   private async createCOGMJournal(
+    tx: Prisma.TransactionClient,
     organizationId: string,
     workOrder: WorkOrderWithBom,
     quantityProduced: number,
@@ -286,16 +315,16 @@ export class WorkOrdersService {
 
     // Find inventory accounts
     // Finished goods account (from output item or default ASSET inventory account)
-    const outputItem = await this.prisma.item.findFirst({
+    const outputItem = await tx.item.findFirst({
       where: { id: bom.outputItemId, organizationId },
       select: { inventoryAccountId: true },
     });
 
     const finishedGoodsAccount = outputItem?.inventoryAccountId
-      ? await this.prisma.account.findFirst({
+      ? await tx.account.findFirst({
           where: { id: outputItem.inventoryAccountId, organizationId },
         })
-      : await this.prisma.account.findFirst({
+      : await tx.account.findFirst({
           where: {
             organizationId,
             type: 'ASSET',
@@ -305,7 +334,7 @@ export class WorkOrdersService {
         });
 
     // Raw materials account (find a second inventory/asset account or use same)
-    const rawMaterialsAccount = await this.prisma.account.findFirst({
+    const rawMaterialsAccount = await tx.account.findFirst({
       where: {
         organizationId,
         type: 'ASSET',
@@ -322,96 +351,90 @@ export class WorkOrdersService {
       return null;
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const journalNumber = await this.generateJournalNumberTx(tx, organizationId);
+    const journalLines: Array<{
+      accountId: string;
+      debit: string;
+      credit: string;
+      description: string;
+    }> = [];
 
-      const journalLines: Array<{
-        accountId: string;
-        debit: Decimal;
-        credit: Decimal;
-        description: string;
-      }> = [];
+    // Debit: Finished Goods Inventory (total COGM)
+    journalLines.push({
+      accountId: finishedGoodsAccount.id,
+      debit: totalCOGM.toFixed(4),
+      credit: '0',
+      description: `Finished goods - WO ${workOrder.workOrderNumber}`,
+    });
 
-      // Debit: Finished Goods Inventory (total COGM)
+    // Credit: Raw Materials Inventory (material cost)
+    if (totalMaterialCost.greaterThan(0)) {
       journalLines.push({
-        accountId: finishedGoodsAccount.id,
-        debit: totalCOGM,
-        credit: new Decimal(0),
-        description: `Finished goods - WO ${workOrder.workOrderNumber}`,
+        accountId: rawMaterialsAccount.id,
+        debit: '0',
+        credit: totalMaterialCost.toFixed(4),
+        description: `Materials consumed - WO ${workOrder.workOrderNumber}`,
       });
+    }
 
-      // Credit: Raw Materials Inventory (material cost)
-      if (totalMaterialCost.greaterThan(0)) {
-        journalLines.push({
-          accountId: rawMaterialsAccount.id,
-          debit: new Decimal(0),
-          credit: totalMaterialCost,
-          description: `Materials consumed - WO ${workOrder.workOrderNumber}`,
-        });
-      }
-
-      // Credit: Manufacturing Overhead (operations cost) if > 0
-      if (operationsCost.greaterThan(0)) {
-        const overheadAccount = await tx.account.findFirst({
-          where: {
-            organizationId,
-            type: 'EXPENSE',
-            isActive: true,
-            OR: [
-              { name: { contains: 'Manufacturing', mode: 'insensitive' } },
-              { name: { contains: 'Overhead', mode: 'insensitive' } },
-            ],
-          },
-        });
-
-        if (overheadAccount) {
-          journalLines.push({
-            accountId: overheadAccount.id,
-            debit: new Decimal(0),
-            credit: operationsCost,
-            description: `Manufacturing overhead - WO ${workOrder.workOrderNumber}`,
-          });
-        } else {
-          // Credit operations cost to raw materials account as fallback
-          journalLines[1].credit = journalLines[1].credit.add(operationsCost);
-        }
-      }
-
-      const journal = await tx.journal.create({
-        data: {
-          journalNumber,
-          date: new Date(),
-          reference: `COGM-${workOrder.workOrderNumber}`,
-          notes: `Cost of Goods Manufactured - Work Order ${workOrder.workOrderNumber}`,
-          isPosted: true,
+    // Credit: Manufacturing Overhead (operations cost) if > 0
+    if (operationsCost.greaterThan(0)) {
+      const overheadAccount = await tx.account.findFirst({
+        where: {
           organizationId,
-          lines: { create: journalLines },
+          type: 'EXPENSE',
+          isActive: true,
+          OR: [
+            { name: { contains: 'Manufacturing', mode: 'insensitive' } },
+            { name: { contains: 'Overhead', mode: 'insensitive' } },
+          ],
         },
       });
 
-      return journal.id;
-    });
-  }
-
-  private async generateJournalNumberTx(
-    tx: Prisma.TransactionClient,
-    organizationId: string,
-  ): Promise<string> {
-    const lastJournal = await tx.journal.findFirst({
-      where: { organizationId },
-      orderBy: { createdAt: 'desc' },
-      select: { journalNumber: true },
-    });
-
-    if (!lastJournal?.journalNumber) {
-      return 'JRN-001';
+      if (overheadAccount) {
+        journalLines.push({
+          accountId: overheadAccount.id,
+          debit: '0',
+          credit: operationsCost.toFixed(4),
+          description: `Manufacturing overhead - WO ${workOrder.workOrderNumber}`,
+        });
+      } else {
+        // Credit operations cost to raw materials account as fallback
+        const rawMaterialsLine = journalLines.find(
+          (line) => line.accountId === rawMaterialsAccount.id,
+        );
+        if (rawMaterialsLine) {
+          rawMaterialsLine.credit = new Decimal(rawMaterialsLine.credit)
+            .add(operationsCost)
+            .toFixed(4);
+        } else {
+          journalLines.push({
+            accountId: rawMaterialsAccount.id,
+            debit: '0',
+            credit: operationsCost.toFixed(4),
+            description: `Manufacturing overhead - WO ${workOrder.workOrderNumber}`,
+          });
+        }
+      }
     }
 
-    const lastNumber = parseInt(lastJournal.journalNumber.split('-')[1], 10);
-    return `JRN-${String(lastNumber + 1).padStart(3, '0')}`;
+    const journal = await this.journalsService.create(
+      organizationId,
+      {
+        date: new Date().toISOString(),
+        reference: `COGM-${workOrder.workOrderNumber}`,
+        notes: `Cost of Goods Manufactured - Work Order ${workOrder.workOrderNumber}`,
+        lines: journalLines,
+      },
+      {
+        tx,
+        source: { type: JournalSourceType.WORK_ORDER_COMPLETION, id: workOrder.id },
+      },
+    );
+    return journal.id;
   }
 
   private async consumeMaterials(
+    tx: Prisma.TransactionClient | PrismaService,
     organizationId: string,
     workOrder: WorkOrderWithBom,
     quantityProduced: number,
@@ -421,7 +444,7 @@ export class WorkOrdersService {
     const multiplier = quantityProduced / outputQty;
 
     // Get default warehouse
-    const defaultWarehouse = await this.prisma.warehouse.findFirst({
+    const defaultWarehouse = await tx.warehouse.findFirst({
       where: { organizationId, isDefault: true },
     });
     const warehouseId = defaultWarehouse?.id;
@@ -435,7 +458,7 @@ export class WorkOrdersService {
       const consumeQty = Math.round(baseQty * multiplier);
 
       // Create OUT inventory movement (positive quantity, movementType carries direction)
-      await this.prisma.inventoryMovement.create({
+      await tx.inventoryMovement.create({
         data: {
           itemId: bomItem.itemId,
           warehouseId,
@@ -451,12 +474,13 @@ export class WorkOrdersService {
   }
 
   private async addFinishedGoods(
+    tx: Prisma.TransactionClient | PrismaService,
     organizationId: string,
     workOrder: WorkOrderWithBom,
     quantityProduced: number,
   ) {
     // Get default warehouse
-    const defaultWarehouse = await this.prisma.warehouse.findFirst({
+    const defaultWarehouse = await tx.warehouse.findFirst({
       where: { organizationId, isDefault: true },
     });
     const warehouseId = defaultWarehouse?.id;
@@ -465,7 +489,7 @@ export class WorkOrdersService {
       throw new BadRequestException('No default warehouse found');
     }
 
-    await this.prisma.inventoryMovement.create({
+    await tx.inventoryMovement.create({
       data: {
         itemId: workOrder.bom.outputItemId,
         warehouseId,
@@ -526,10 +550,10 @@ export class WorkOrdersService {
     });
 
     // Consume materials proportionally
-    await this.consumeMaterials(organizationId, workOrder, quantityProduced);
+    await this.consumeMaterials(this.prisma, organizationId, workOrder, quantityProduced);
 
     // Add finished goods to inventory
-    await this.addFinishedGoods(organizationId, workOrder, quantityProduced);
+    await this.addFinishedGoods(this.prisma, organizationId, workOrder, quantityProduced);
 
     return entry;
   }
@@ -596,15 +620,7 @@ export class WorkOrdersService {
   }
 
   async bulkComplete(organizationId: string, ids: string[]) {
-    const result = await this.prisma.workOrder.updateMany({
-      where: {
-        id: { in: ids },
-        organizationId,
-        status: WorkOrderStatus.IN_PROCESS,
-      },
-      data: { status: WorkOrderStatus.COMPLETED, completedDate: new Date() },
-    });
-    return { completed: result.count, total: ids.length };
+    return runBulk(ids, (id) => this.completeWorkOrder(organizationId, id, {}));
   }
 
   async bulkCancel(organizationId: string, ids: string[]) {

@@ -296,6 +296,17 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       });
       expect(pay.status).toBe(201);
 
+      const laterVoided = await a.post('/payments-made').send({
+        vendorId,
+        date: isoDay(-3),
+        amount: '20',
+        paymentMode: 'BANK_TRANSFER',
+        paidFromAccountId: acc.bank,
+        allocations: [{ billId, amount: '20' }],
+      });
+      expect(laterVoided.status).toBe(201);
+      expect((await a.delete(`/payments-made/${laterVoided.body.id}`)).status).toBe(200);
+
       const expense = await a.post('/expenses').send({
         date: isoDay(-4),
         accountId: acc.rent,
@@ -443,6 +454,32 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       expect(
         D(dash.overview.netPosition).equals(D(dash.overview.totalReceivables).sub(control)),
       ).toBe(true);
+    });
+
+    it('rebuilds payables aging at its cutoff and dates voided payments by reversal journal', async () => {
+      const cutoff = isoDay(-2);
+      const aging = await a.get('/reports/payables-aging').query({ asOfDate: cutoff });
+
+      expect(aging.status).toBe(200);
+      expect(aging.body.asOfDate).toBe(cutoff);
+      expect(D(aging.body.summary.total).equals('1348')).toBe(true);
+      expect(D(aging.body.summary.unappliedCredits).equals('50')).toBe(true);
+      expect(D(aging.body.summary.netTotal).equals('1298')).toBe(true);
+      expect(aging.body.summary.total).toMatch(FOUR_DP);
+
+      const payment = await prisma.paymentMade.findFirstOrThrow({
+        where: { organizationId: tenantA.organizationId, vendorId, amount: D(20) },
+      });
+      const reversal = await prisma.journal.findFirstOrThrow({
+        where: {
+          organizationId: tenantA.organizationId,
+          sourceType: 'PAYMENT_MADE_VOID',
+          sourceId: payment.id,
+        },
+      });
+      expect(reversal.date.getTime()).toBeGreaterThan(
+        new Date(`${cutoff}T23:59:59.999Z`).getTime(),
+      );
     });
 
     it('customer statements are exact, show credit notes and net voided payments', async () => {

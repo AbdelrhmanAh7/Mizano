@@ -4,6 +4,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { AssetsService } from './assets.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
+import { JournalsService } from '../../accounting/services/journals.service';
 
 function createMockAsset(overrides: Record<string, unknown> = {}) {
   return {
@@ -38,17 +39,74 @@ function createMockAsset(overrides: Record<string, unknown> = {}) {
 describe('AssetsService', () => {
   let service: AssetsService;
   let prisma: MockPrismaClient;
+  let journalsService: { create: jest.Mock };
 
   const ORG_ID = 'org-test-001';
 
   beforeEach(async () => {
     prisma = createMockPrisma();
+    journalsService = { create: jest.fn().mockResolvedValue({ id: 'journal-1' }) };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [AssetsService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        AssetsService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: JournalsService, useValue: journalsService },
+      ],
     }).compile();
 
     service = module.get<AssetsService>(AssetsService);
+  });
+
+  describe('dispose', () => {
+    it('creates a source-linked disposal journal through JournalsService in the transaction', async () => {
+      const asset = createMockAsset({
+        currentBookValue: new Decimal('2000'),
+        accumulatedDepreciation: new Decimal('500'),
+        status: AssetStatus.ACTIVE,
+      });
+      prisma.asset.findFirst.mockResolvedValue(asset as never);
+      prisma.asset.updateMany.mockResolvedValue({ count: 1 } as never);
+      prisma.asset.findFirstOrThrow.mockResolvedValue({
+        ...asset,
+        status: AssetStatus.DISPOSED,
+      } as never);
+      prisma.depreciationSchedule.deleteMany.mockResolvedValue({ count: 0 } as never);
+      prisma.account.findFirst
+        .mockResolvedValueOnce({ id: 'gain-loss' } as never)
+        .mockResolvedValueOnce({ id: 'cash' } as never);
+
+      await service.dispose(ORG_ID, asset.id, {
+        disposalAmount: 2000,
+        disposalDate: '2026-10-03',
+      });
+
+      expect(journalsService.create).toHaveBeenCalledWith(
+        ORG_ID,
+        expect.objectContaining({
+          date: '2026-10-03T00:00:00.000Z',
+          lines: expect.arrayContaining([
+            expect.objectContaining({ accountId: 'cash', debit: '2000.0000' }),
+            expect.objectContaining({ accountId: asset.assetAccountId, credit: '2500.0000' }),
+          ]),
+        }),
+        expect.objectContaining({
+          tx: prisma,
+          source: { type: 'ASSET_DISPOSAL', id: asset.id },
+        }),
+      );
+      expect(prisma.journal.create).not.toHaveBeenCalled();
+      expect(prisma.asset.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: asset.id,
+            organizationId: ORG_ID,
+            deletedAt: null,
+            status: AssetStatus.ACTIVE,
+          },
+        }),
+      );
+    });
   });
 
   describe('findAll', () => {

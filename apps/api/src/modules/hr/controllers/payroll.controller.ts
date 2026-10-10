@@ -1,7 +1,19 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
+import { InvalidatesLedger } from '../../../common/decorators/invalidate-cache.decorator';
+import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { PayrollService } from '../services/payroll.service';
@@ -10,6 +22,7 @@ import { PayrollService } from '../services/payroll.service';
 @ApiBearerAuth()
 @Controller('payroll')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseInterceptors(CacheInvalidationInterceptor)
 export class PayrollController {
   constructor(private readonly payrollService: PayrollService) {}
 
@@ -54,6 +67,7 @@ export class PayrollController {
 
   @Post('runs/:id/paid')
   @Permissions('payroll.process')
+  @InvalidatesLedger('payroll:*')
   @ApiOperation({ summary: 'Mark payroll as paid' })
   markAsPaid(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.payrollService.markAsPaid(orgId, id);
