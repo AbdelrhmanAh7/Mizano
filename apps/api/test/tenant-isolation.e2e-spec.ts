@@ -1,9 +1,10 @@
 /**
  * @issue-108 Cross-tenant isolation of the ledger and invoice read endpoints. Two registered
- * tenants each get a sent invoice, an approved bill and a manual journal with distinct amounts
- * (A: 1111, B: 7777). Every list, cursor, get-by-id and report endpoint is then read with each
- * tenant's real token and checked against database ground truth scoped to that tenant, and
- * anonymous, expired and forged tokens are rejected on every endpoint.
+ * tenants each get a sent invoice, an approved bill, a manual journal and a distinct unapplied
+ * vendor credit (A: 1111 / credit 222.22, B: 7777 / credit 333.33). Every list, cursor, get-by-id
+ * and report endpoint is then read with each tenant's real token and checked against database
+ * ground truth scoped to that tenant, and anonymous, expired and forged tokens are rejected on
+ * every endpoint.
  */
 import { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -22,8 +23,9 @@ interface Seeded {
   billId: string;
   journalId: string;
   accountId: string;
-  vendorCreditIdA: string;
-  vendorCreditIdB: string;
+  vendorId: string;
+  vendorCreditId: string;
+  vendorCreditAmount: string;
 }
 
 const D = (v: unknown): Prisma.Decimal => new Prisma.Decimal(String(v));
@@ -37,7 +39,7 @@ describe('Tenant isolation of ledger and invoice reads (e2e) @issue-108', () => 
   let seedA: Seeded;
   let seedB: Seeded;
 
-  async function seedTenant(api: ApiHelper, amount: string): Promise<Seeded> {
+  async function seedTenant(api: ApiHelper, amount: string, creditAmount: string): Promise<Seeded> {
     const chart = await seedChart(api);
     const customer = await api.post('/customers').send({ name: `Cust ${uniqueSuffix()}` });
     expect(customer.status).toBe(201);
@@ -71,28 +73,25 @@ describe('Tenant isolation of ledger and invoice reads (e2e) @issue-108', () => 
     });
     expect(journal.status).toBe(201);
 
-    // Seed distinct unapplied vendor credits for each tenant
-    const vendorCreditA = await api.post('/vendor-credits').send({
+    // Distinct UNAPPLIED vendor credit (different amount per tenant; the bill approves), posted to
+    // the ledger but appliedToBillId stays null so the AP aging report nets it out.
+    const credit = await api.post('/vendor-credits').send({
       vendorId: vendor.body.id,
+      billId: bill.body.id,
       date: isoDay(-1),
-      amount: amount,
+      amount: creditAmount,
     });
-    expect(vendorCreditA.status).toBe(201);
-
-    const vendorCreditB = await api.post('/vendor-credits').send({
-      vendorId: vendor.body.id,
-      date: isoDay(-1),
-      amount: new Prisma.Decimal('8888'),
-    });
-    expect(vendorCreditB.status).toBe(201);
+    expect(credit.status).toBe(201);
+    expect(credit.body.appliedToBillId).toBeNull();
 
     return {
       invoiceId: invoice.body.id,
       billId: bill.body.id,
       journalId: journal.body.id,
       accountId: chart.cash,
-      vendorCreditIdA: vendorCreditA.body.id,
-      vendorCreditIdB: vendorCreditB.body.id,
+      vendorId: vendor.body.id,
+      vendorCreditId: credit.body.id,
+      vendorCreditAmount: creditAmount,
     };
   }
 
@@ -116,8 +115,8 @@ describe('Tenant isolation of ledger and invoice reads (e2e) @issue-108', () => 
     prisma = getPrisma(app);
     tenantA = await registerTenant(app, 'IsoA');
     tenantB = await registerTenant(app, 'IsoB');
-    seedA = await seedTenant(tenantA.api, '1111');
-    seedB = await seedTenant(tenantB.api, '7777');
+    seedA = await seedTenant(tenantA.api, '1111', '222.22');
+    seedB = await seedTenant(tenantB.api, '7777', '333.33');
   });
 
   afterAll(async () => {
@@ -129,12 +128,21 @@ describe('Tenant isolation of ledger and invoice reads (e2e) @issue-108', () => 
     ['B', tenantB, seedB, seedA],
   ];
 
+  /** Get-by-id/report routes: both general-ledger implementations are covered (T1). */
   const byIdPaths = (s: Seeded): string[] => [
     `/invoices/${s.invoiceId}`,
     `/bills/${s.billId}`,
     `/journals/${s.journalId}`,
     `/accounting-reports/general-ledger/${s.accountId}`,
+    `/reports/general-ledger/${s.accountId}`,
   ];
+
+  const cursorCases = (own: Seeded, foreign: Seeded) =>
+    [
+      ['/invoices/cursor', own.invoiceId, foreign.invoiceId],
+      ['/bills/cursor', own.billId, foreign.billId],
+      ['/journals/cursor', own.journalId, foreign.journalId],
+    ] as const;
 
   const allPaths = (): string[] => [
     '/invoices',
@@ -216,7 +224,7 @@ describe('Tenant isolation of ledger and invoice reads (e2e) @issue-108', () => 
       }
     });
 
-    it('@e2e @flow:tenant-isolation @issue-108 AC2: AP aging lists only own bills and credits', async () => {
+    it('@e2e @flow:tenant-isolation @issue-108 AC2: AP aging lists only own bills and credits (T3)', async () => {
       for (const [, tenant, own, foreign] of pairs()) {
         const res = await tenant.api.get('/reports/payables-aging');
         expect(res.status).toBe(200);
@@ -227,27 +235,40 @@ describe('Tenant isolation of ledger and invoice reads (e2e) @issue-108', () => 
         expect(items).not.toContain(foreign.billId);
         expect(res.body.billCount).toBe(1);
         expect(res.body.vendorCount).toBe(1);
+
         const bill = await prisma.bill.findFirstOrThrow({
           where: { id: own.billId, organizationId: tenant.organizationId },
         });
-        expect(D(res.body.summary.netTotal).equals(bill.balanceDue)).toBe(true);
-        expect(D(res.body.summary.total).equals(bill.balanceDue)).toBe(true);
+        const creditSum = await prisma.vendorCredit.aggregate({
+          where: {
+            organizationId: tenant.organizationId,
+            deletedAt: null,
+            appliedToBillId: null,
+            refundedAt: null,
+          },
+          _sum: { amount: true },
+        });
+        const ownCredits = creditSum._sum.amount ?? D(0);
+        expect(ownCredits.greaterThan(0)).toBe(true);
 
-        // Assert vendor credit IDs and totals are tenant-scoped
-        const buckets = res.body.buckets as Record<string, Array<{ creditId: string }>>;
-        const vendorIds = Object.keys(buckets);
-        expect(vendorIds.length).toBeGreaterThan(0);
-        for (const vendorId of vendorIds) {
-          const credits = buckets[vendorId];
-          expect(credits.length).toBeGreaterThanOrEqual(1);
-          // All credit IDs must belong to this tenant
-          for (const credit of credits) {
-            const creditRec = await prisma.vendorCredit.findFirstOrThrow({
-              where: { id: credit.creditId, organizationId: tenant.organizationId },
-            });
-            expect(creditRec.amount).toBeGreaterThan(0);
-          }
-        }
+        // Full bill balance first (netTotal is the balance reduced by the tenant's own credits).
+        expect(D(res.body.summary.total).equals(bill.balanceDue)).toBe(true);
+        // Vendor credit totals are tenant-scoped: only the caller's own credit is netted out.
+        expect(D(res.body.summary.unappliedCredits).equals(ownCredits)).toBe(true);
+        expect(D(res.body.unappliedCredits.total).equals(ownCredits)).toBe(true);
+        expect(D(res.body.summary.netTotal).equals(bill.balanceDue.sub(ownCredits))).toBe(true);
+        const vendors = res.body.unappliedCredits.vendors as Array<{
+          vendorId: string;
+          vendorName: string;
+          amount: string;
+        }>;
+        expect(vendors).toEqual([
+          { vendorId: own.vendorId, vendorName: expect.any(String), amount: ownCredits.toFixed(4) },
+        ]);
+        expect(vendors.map((v) => v.vendorId)).not.toContain(foreign.vendorId);
+        expect(res.body.unappliedCredits.vendors).not.toContainEqual(
+          expect.objectContaining({ vendorId: foreign.vendorId }),
+        );
       }
     });
 
@@ -288,22 +309,21 @@ describe('Tenant isolation of ledger and invoice reads (e2e) @issue-108', () => 
     });
   });
 
-  describe('AC2b: cursor endpoints reject foreign IDs', () => {
-    it('@e2e @flow:tenant-isolation @issue-108 AC2b: foreign IDs as cursor return 404', async () => {
+  describe('AC2b: cursor endpoints reject foreign ids (T4)', () => {
+    it('@e2e @flow:tenant-isolation @issue-108 AC2b: foreign ids as cursor return 404, own ids 200', async () => {
       for (const [, tenant, own, foreign] of pairs()) {
-        for (const [path, foreignId] of [
-          ['/invoices/cursor', foreign.invoiceId],
-          ['/bills/cursor', foreign.billId],
-          ['/journals/cursor', foreign.journalId],
-        ] as const) {
-          const res = await tenant.api.get(path).query({ cursor: foreignId });
-          expect({ path, status: res.status }).toEqual({ path, status: 404 });
+        for (const [path, ownId, foreignId] of cursorCases(own, foreign)) {
+          const foreignRes = await tenant.api.get(path).query({ cursor: foreignId });
+          expect({ path, status: foreignRes.status }).toEqual({ path, status: 404 });
+          expect(foreignRes.body.data ?? []).not.toContain(ownId);
+          const ownRes = await tenant.api.get(path).query({ cursor: ownId });
+          expect({ path, status: ownRes.status }).toEqual({ path, status: 200 });
         }
       }
     });
   });
 
-  describe('AC2c: list endpoints assert scoped pagination totals', () => {
+  describe('AC2c: list endpoints assert scoped pagination totals (T2)', () => {
     it('@e2e @flow:tenant-isolation @issue-108 AC2c: invoice list meta.total matches scoped count', async () => {
       for (const [, tenant] of pairs()) {
         const res = await tenant.api.get('/invoices');
