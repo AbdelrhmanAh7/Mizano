@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { Readable } from 'stream';
 import { of } from 'rxjs';
 import { Logger } from '@nestjs/common';
@@ -25,6 +27,8 @@ import { ExtractionContext } from '../extraction/extraction-strategy.interface';
  */
 
 // Distinct, greppable sentinels for every kind of document content.
+const IMAGE = readFileSync(resolve(__dirname, '../../../../test/fixtures/formats/poor.png'));
+
 const SENTINELS = {
   ocrLine: 'ZXQ-OCR-LINE-7731 Lotus Trading Supplies LLC',
   vendor: 'Lotus Trading Supplies LLC',
@@ -170,7 +174,7 @@ describe('extraction and intake logging never contains document content', () => 
   it('happy path: image -> OCR -> LLM -> intake result logs only metadata', async () => {
     const result = await service.processDocument(
       'org-1',
-      Buffer.from('fake-image-bytes'),
+      IMAGE,
       'image/png',
       'lotus-invoice-ZXQ.png',
     );
@@ -191,7 +195,7 @@ describe('extraction and intake logging never contains document content', () => 
   it('logs no file name even when the name contains document data', async () => {
     await service.processDocument(
       'org-1',
-      Buffer.from('x'),
+      IMAGE,
       'image/png',
       `${SENTINELS.invoiceNumber}-${SENTINELS.vendor}.png`,
     );
@@ -214,7 +218,7 @@ describe('extraction and intake logging never contains document content', () => 
       model: 'test-model',
     });
 
-    await service.processDocument('org-1', Buffer.from('x'), 'image/png');
+    await service.processDocument('org-1', IMAGE, 'image/png');
 
     const output = printed();
     expect(output).toContain('NumberFix');
@@ -236,7 +240,7 @@ describe('extraction and intake logging never contains document content', () => 
       model: 'test-model',
     });
 
-    await service.processDocument('org-1', Buffer.from('x'), 'image/png');
+    await service.processDocument('org-1', IMAGE, 'image/png');
 
     const output = printed();
     expect(output).toContain('LineFix');
@@ -287,9 +291,9 @@ describe('extraction and intake logging never contains document content', () => 
       .spyOn(strategy as unknown as { runTesseract: () => Promise<unknown> }, 'runTesseract')
       .mockRejectedValue(new SyntaxError(`Unexpected token in "${OCR_TEXT}"`));
 
-    const result = await service.processDocument('org-1', Buffer.from('x'), 'image/png');
-
-    expect(result.rawText).toBe('');
+    await expect(service.processDocument('org-1', IMAGE, 'image/png')).rejects.toThrow(
+      'INTAKE_UNREADABLE',
+    );
     const output = printed();
     expect(output).toContain('Tesseract.js OCR failed');
     expect(output).toContain('SyntaxError');
@@ -334,7 +338,7 @@ describe('extraction and intake logging never contains document content', () => 
       {} as ConfigService,
     );
 
-    await failing.processDocument('org-1', Buffer.from('x'), 'image/png').catch(() => undefined);
+    await failing.processDocument('org-1', IMAGE, 'image/png').catch(() => undefined);
 
     expectNoDocumentContent(printed());
   });

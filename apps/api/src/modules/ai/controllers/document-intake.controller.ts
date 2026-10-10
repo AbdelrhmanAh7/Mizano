@@ -51,6 +51,9 @@ import {
   ListIntakeJobsDto,
 } from '../dto/document-intake.dto';
 import { createOcrFileFilter } from '../utils/file-upload.util';
+import { rejectLegacyWord } from '../intake/format-validation';
+import { MAX_INTAKE_BYTES } from '../intake/format-error';
+import { IntakeUploadLimitInterceptor } from '../intake/intake-upload-limit.interceptor';
 
 interface MessageEvent {
   data: string | object;
@@ -77,9 +80,10 @@ export class DocumentIntakeController {
   @Post('process')
   @Permissions('purchases.create')
   @UseInterceptors(
+    IntakeUploadLimitInterceptor,
     FileInterceptor('file', {
       limits: {
-        fileSize: 15 * 1024 * 1024, // 15MB limit
+        fileSize: MAX_INTAKE_BYTES,
       },
       fileFilter: createOcrFileFilter(),
     }),
@@ -87,7 +91,7 @@ export class DocumentIntakeController {
   @ApiOperation({
     summary: 'Upload a document: stores the original and queues a durable intake job',
     description:
-      'Upload an image or PDF. Returns the job immediately. The same file (SHA-256) uploaded ' +
+      'Upload an image, PDF or DOCX. Returns the job immediately. The same file (SHA-256) uploaded ' +
       'again by the same organization returns the existing job (duplicate=true). ' +
       'Use GET /ai/document-intake/:jobId/progress (SSE) or GET /ai/document-intake/:jobId/result.',
   })
@@ -99,7 +103,7 @@ export class DocumentIntakeController {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'Invoice/bill image or PDF file (max 15MB)',
+          description: 'Invoice/bill image, PDF or DOCX file (max 20MB)',
         },
         language: { type: 'string', description: 'OCR language (default: eng+ara)' },
         forceType: {
@@ -130,6 +134,12 @@ export class DocumentIntakeController {
     }
     if (!orgId || !userId) {
       throw new BadRequestException('Authenticated organization and user are required');
+    }
+
+    try {
+      rejectLegacyWord(file.buffer, file.mimetype);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : 'Invalid file type');
     }
 
     const { job, duplicate } = await this.jobs.createFromUpload({

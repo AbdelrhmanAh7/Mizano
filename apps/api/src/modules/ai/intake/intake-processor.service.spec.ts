@@ -7,6 +7,7 @@ import { IntakeProcessorService, needsReview } from './intake-processor.service'
 import { IntakeQueueService } from './intake-queue.service';
 import { FakeIntakeJobTable, MemoryIntakeStorage } from './intake-test-utils';
 import { sha256Hex } from './intake-storage';
+import { IntakeFormatError } from './format-error';
 
 const ORG_A = 'org-a';
 const ORG_B = 'org-b';
@@ -75,6 +76,20 @@ describe('IntakeProcessorService', () => {
     processor.onModuleInit();
     expect(queue.registerHandler).toHaveBeenCalledTimes(1);
   });
+  it('dead-letters an unreadable source once with a bilingual repair and no completed result', async () => {
+    intake.processDocument.mockRejectedValue(new IntakeFormatError('UNREADABLE'));
+    const job = await seed();
+    await processor.handle({ jobId: job.id, organizationId: ORG_A });
+    expect(table.rows[0]).toMatchObject({
+      status: IntakeJobStatus.DEAD_LETTER,
+      attempts: 1,
+      progress: 0,
+    });
+    expect(table.rows[0].lastError).toContain('Retake the whole page upright in good light');
+    expect(table.rows[0].lastError).toMatch(/[\u0600-\u06ff]/);
+    expect(table.rows[0].result).toBeNull();
+    expect(queue.enqueue).not.toHaveBeenCalled();
+  });
 
   it('runs a QUEUED job to EXTRACTED and stores the result', async () => {
     const job = await seed();
@@ -85,6 +100,23 @@ describe('IntakeProcessorService', () => {
       progress: 100,
     });
     expect(table.rows[0].result).toMatchObject({ documentType: 'BILL' });
+  });
+  it('handles the next document after a corrupt source without crashing the worker', async () => {
+    intake.processDocument.mockRejectedValueOnce(new IntakeFormatError('CORRUPT'));
+    const broken = await seed();
+    await processor.handle({ jobId: broken.id, organizationId: ORG_A });
+    expect(table.rows[0].status).toBe(IntakeJobStatus.DEAD_LETTER);
+    const nextBody = Buffer.from('next source');
+    storage.objects.set('key-2', nextBody);
+    const next = await seed({
+      sha256: sha256Hex(nextBody),
+      storageKey: 'key-2',
+      sizeBytes: nextBody.length,
+    });
+    await processor.handle({ jobId: next.id, organizationId: ORG_A });
+    expect(table.rows[1].status).toBe(IntakeJobStatus.EXTRACTED);
+    expect(intake.processDocument).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(logSpies.flatMap((spy) => spy.mock.calls))).not.toContain(SECRET_TEXT);
   });
 
   it('marks incomplete or low-confidence extractions NEEDS_REVIEW', async () => {

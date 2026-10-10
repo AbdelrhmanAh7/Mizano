@@ -11,8 +11,12 @@ import { ExtractionStrategyResolver } from '../extraction/extraction-strategy-re
 import {
   ExtractionContext,
   StrategyExtractionResult,
+  CpuDocumentExtractionResult,
 } from '../extraction/extraction-strategy.interface';
 import { extractTextFromPdf } from '../utils/pdf-extractor.util';
+import { IntakeFormatError } from '../intake/format-error';
+import { validateIntakeFormat } from '../intake/format-validation';
+import { DOCX_MIME, readWord } from '../intake/word-reader';
 import { levenshteinSimilarity, normalizeText } from '../utils/text-similarity.util';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
 import { assertTotalsFit } from '../../sales/utils/sales-helpers';
@@ -37,10 +41,10 @@ export interface CustomerCandidate {
 
 export interface IntakeLineItem {
   description: string;
-  quantity: number;
-  unitPrice: number;
-  taxAmount: number;
-  total: number;
+  quantity: string;
+  unitPrice: string;
+  taxAmount: string;
+  total: string;
 }
 
 export interface DocumentIntakeResult {
@@ -52,10 +56,10 @@ export interface DocumentIntakeResult {
   extractedFields: {
     date: string | null;
     dueDate: string | null;
-    total: number | null;
-    subtotal: number | null;
-    tax: number | null;
-    discount: number | null;
+    total: string | null;
+    subtotal: string | null;
+    tax: string | null;
+    discount: string | null;
     documentNumber: string | null;
     vendorName: string | null;
     vendorAddress: string | null;
@@ -75,6 +79,11 @@ export interface DocumentIntakeResult {
   fieldEvidence?: Record<string, { text: string; lineIndex: number }>;
   /** Rules strategy only: failed consistency checks as machine codes. */
   extractionWarnings?: string[];
+  /** Durable reader version and per-page decisions, without duplicating document text. */
+  formatEvidence?: {
+    readerVersion: string;
+    pages?: Array<{ page: number; route: 'native' | 'ocr' }>;
+  };
   ocrConfidence: number;
 
   /** Vendor matching */
@@ -195,9 +204,6 @@ export interface IntakeProgressEvent {
   error?: string;
 }
 
-/** Truncate PDF raw text to this length before sending to Ollama (speeds up inference). */
-const PDF_TEXT_TRUNCATION_LIMIT = 4000;
-
 function uniqueIds(values: Array<string | undefined>): string[] {
   return [...new Set(values.filter((v): v is string => typeof v === 'string' && v.length > 0))];
 }
@@ -221,10 +227,10 @@ export class DocumentIntakeService {
   ) {}
 
   /**
-   * Process a document through the AI intake pipeline (powered by Ollama).
+   * Process a complete, bounded source through the CPU intake pipeline.
    *
    * Pipeline:
-   *  1. Extract structured data via Ollama (vision for images, text for PDFs)
+   *  1. Read each PDF page or Word block, OCR image content, then extract rule fields
    *  2. Classify document type (INVOICE, RECEIPT, PURCHASE_ORDER, etc.)
    *  3. Match vendor/customer against existing records
    *  4. Check for duplicates
@@ -243,13 +249,14 @@ export class DocumentIntakeService {
       `Processing document intake: org=${organizationId}, mime=${mimeType}, size=${fileBuffer.length}, strategy=${strategy || 'default'}`,
     );
 
+    await validateIntakeFormat(fileBuffer, mimeType);
     let rawText = '';
-    let extraction: DocumentExtractionResult | null = null;
+    let extraction: DocumentExtractionResult | CpuDocumentExtractionResult | null = null;
     let extractionMethod: DocumentIntakeResult['extractionMethod'] = 'ocr-llm';
     const isPdf = mimeType === 'application/pdf';
 
     // Step 1: Build extraction context
-    onProgress?.('extracting', 20, 'AI is reading your document...');
+    onProgress?.('extracting', 20, 'Reading your document... / جارٍ قراءة المستند...');
 
     const context: ExtractionContext = {
       fileBuffer,
@@ -259,32 +266,21 @@ export class DocumentIntakeService {
       isPdf,
     };
 
-    // For PDFs, extract text first (used by all strategies)
+    // Keep the complete bounded text and page routing evidence.
     if (isPdf) {
-      try {
-        const pdfResult = await extractTextFromPdf(fileBuffer);
-        this.logger.log(
-          `PDF extraction: pages=${pdfResult.pageCount}, native=${pdfResult.isNativeText}, textLen=${pdfResult.text.length}`,
-        );
-        context.pdfText = pdfResult.text;
-        context.pdfIsNativeText = pdfResult.isNativeText;
-        context.pdfPageCount = pdfResult.pageCount;
-        if (pdfResult.text.length > 20) {
-          rawText = pdfResult.text;
-          if (rawText.length > PDF_TEXT_TRUNCATION_LIMIT) {
-            rawText = rawText.slice(0, PDF_TEXT_TRUNCATION_LIMIT);
-            context.pdfText = rawText;
-          }
-        }
-      } catch (error) {
-        this.logger.warn(
-          `PDF text extraction failed: ${error instanceof Error ? error.name : 'unknown error'}`,
-        );
-      }
+      const pdfResult = await extractTextFromPdf(fileBuffer);
+      context.pdfText = pdfResult.text;
+      context.pdfIsNativeText = pdfResult.isNativeText;
+      context.pdfPageCount = pdfResult.pageCount;
+      context.pdfPages = pdfResult.pages;
+      rawText = pdfResult.text;
+    } else if (mimeType === DOCX_MIME) {
+      context.documentText = await readWord(fileBuffer, mimeType);
+      rawText = context.documentText;
     }
 
     // Step 2: Resolve and execute extraction strategy
-    const strategyResult = await this.strategyResolver.resolve(context, strategy);
+    const strategyResult = await this.strategyResolver.resolve(context, 'rules');
 
     if (strategyResult) {
       extraction = strategyResult.extraction;
@@ -296,10 +292,9 @@ export class DocumentIntakeService {
       );
     }
 
-    // Step 2b: Fallback — empty result if all strategies failed
-    if (!extraction) {
-      this.logger.warn('All extraction strategies failed — returning empty result');
-      extraction = this.ollamaService.buildEmptyResult(rawText);
+    // A failed/empty extraction is a repairable exception, never a completed draft.
+    if (!extraction || !rawText.trim()) {
+      throw new IntakeFormatError('UNREADABLE');
     }
 
     // Step 2: Classify document — use embedded category from extraction, or fall back to classifier
@@ -311,11 +306,7 @@ export class DocumentIntakeService {
         confidence: extraction.ocrConfidence || 0.8,
       });
     } else {
-      classificationPromise = this.classificationService.classifyDocument(
-        organizationId,
-        rawText,
-        filename,
-      );
+      classificationPromise = this.classificationService.classifyText(organizationId, rawText);
     }
 
     onProgress?.('classifying', 60, 'Classifying and matching...');
@@ -395,10 +386,10 @@ export class DocumentIntakeService {
       extractedFields: {
         date: extraction.date,
         dueDate,
-        total: extraction.total,
-        subtotal: extraction.subtotal,
-        tax: extraction.tax,
-        discount: extraction.discount,
+        total: extraction.total === null ? null : new Decimal(extraction.total).toFixed(4),
+        subtotal: extraction.subtotal === null ? null : new Decimal(extraction.subtotal).toFixed(4),
+        tax: extraction.tax === null ? null : new Decimal(extraction.tax).toFixed(4),
+        discount: extraction.discount === null ? null : new Decimal(extraction.discount).toFixed(4),
         documentNumber: extraction.invoiceNumber,
         vendorName: extraction.vendorName,
         vendorAddress: extraction.vendorAddress,
@@ -409,11 +400,28 @@ export class DocumentIntakeService {
         paymentTerms: extraction.paymentTerms,
         notes: extraction.notes,
         customerName: customerNameFromEntities,
-        lineItems: extraction.lineItems,
+        lineItems: extraction.lineItems.map((line) => ({
+          description: line.description,
+          quantity: new Decimal(line.quantity).toFixed(4),
+          unitPrice: new Decimal(line.unitPrice).toFixed(4),
+          taxAmount: new Decimal(line.taxAmount).toFixed(4),
+          total: new Decimal(line.total).toFixed(4),
+        })),
       },
       fieldConfidence: extraction.fieldConfidence,
       fieldEvidence: extraction.fieldEvidence,
       extractionWarnings: extraction.extractionWarnings,
+      formatEvidence: {
+        readerVersion: 'cpu-formats-v1',
+        ...(context.pdfPages
+          ? {
+              pages: context.pdfPages.map((page) => ({
+                page: page.page,
+                route: page.isNativeText ? ('native' as const) : ('ocr' as const),
+              })),
+            }
+          : {}),
+      },
       ocrConfidence: extraction.ocrConfidence,
       matchedVendor,
       vendorCandidates,
@@ -783,7 +791,7 @@ export class DocumentIntakeService {
     organizationId: string,
     vendorId: string,
     invoiceNumber: string | null,
-    total: number | null,
+    total: string | number | null,
   ): Promise<DocumentIntakeResult['duplicateWarning']> {
     // Check exact invoice number match
     if (invoiceNumber) {
@@ -808,7 +816,7 @@ export class DocumentIntakeService {
     }
 
     // Check amount + recent date similarity
-    if (total && total > 0) {
+    if (total !== null && new Decimal(total).gt(0)) {
       const recentBills = await this.prisma.bill.findMany({
         where: {
           organizationId,
@@ -820,8 +828,7 @@ export class DocumentIntakeService {
       });
 
       for (const bill of recentBills) {
-        const billTotal = Number(bill.grandTotal);
-        if (Math.abs(billTotal - total) < 0.01) {
+        if (new Decimal(bill.grandTotal).sub(total).abs().lt('0.01')) {
           return {
             isDuplicate: true,
             existingId: bill.id,

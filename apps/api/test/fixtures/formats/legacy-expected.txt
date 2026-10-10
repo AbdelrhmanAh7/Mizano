@@ -1,0 +1,7 @@
+Supplier: Formats Synthetic Supplier
+Invoice number: FMT-17
+Invoice date: 2026-09-01
+Currency: EGP
+Subtotal: 200.0000
+VAT: 28.0000
+Grand total: 228.0000
