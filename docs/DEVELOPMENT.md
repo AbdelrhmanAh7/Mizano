@@ -126,11 +126,12 @@ Rules:
 
 ## CI
 
-Active CI checks and gates on PRs and pushes to `master`:
+Checks on PRs and pushes to `master`, by source:
 
-- **Push and PR pipeline (`.github/workflows/ci.yml` / GitHub-hosted runners & localci):** runs four parallel jobs under 5 minutes each (`timeout-minutes: 5`)—**Install Dependencies** (pnpm 8, Node 20, `prisma generate`), **Lint & Type Check**, **Unit Tests** (with PostgreSQL 16 and Redis 7 service containers, `db:push`), and **Build**. These job names match the commit status checks required by automerge gates. Statuses are reported by GitHub-hosted CI or the hub's `localci` job when running on the local Mac runner.
-- **E2E verification (`e2e-army`):** feature-level E2E tests run via the hub's verify suite against throwaway environments, reporting status under `e2e-army` for touched features rather than running inside the basic unit CI jobs.
-- **Local pre-push hook:** runs fast targeted type-check and unit tests for changed packages and their dependents (`turbo run type-check test --filter=...[<base>]`) under a 290 s watchdog, ensuring changes pass type-check and unit tests before push while deferring full CI (`pnpm ci:full`, build, E2E) to CI / the hub's `localci` job.
+- **`.github/workflows/ci.yml` (GitHub-hosted runners):** runs on pushes to `master` and on PRs to `master`/`develop`, on GitHub-hosted runners only (`ubuntu-latest`; free and unlimited because the repository is public; no self-hosted labels, no secrets beyond `GITHUB_TOKEN`). Four independent parallel jobs, each limited to 5 minutes (`timeout-minutes: 5`; split a job rather than raising the limit): **Install Dependencies** (pnpm 8, Node 20, `prisma generate`), **Lint & Type Check**, **Unit Tests** (PostgreSQL 16 and Redis 7 service containers, `db:push`) and **Build**. Their names are the check names the automerge gates wait for, so keep them stable. A newer push to a PR cancels its older run. The workflow uses `pull_request` (never `pull_request_target`); fork PRs run only after approval in the repository settings. E2E is not part of this workflow. `deploy.yml` stays disabled (it needs deployment secrets).
+- **Hub `localci` job (Mac mini):** runs the full CI (`pnpm ci:full`: lint, type-check, test, build) locally and posts GitHub commit statuses under the same job names, so the gates see the same check names whichever runner produced them.
+- **`e2e-army` status (hub verify suite):** feature-level E2E for the features a PR touches, run by the hub against a throwaway environment; it is a separate commit status, not a job in `ci.yml`.
+- **Local pre-push hook:** only fast checks (`turbo run type-check test --filter=...[<base>]`, see Git workflow below); full CI, build and E2E are left to the sources above.
 
 `.github/workflows/demo-planning.yml` validates and syncs `docs/planning/` metadata with `scripts/sync-demo-planning.py`; see the [planning guide](planning/README.md).
 
