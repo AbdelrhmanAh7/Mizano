@@ -1,1 +1,9 @@
-node "$(git rev-parse --show-toplevel)/node_modules/@commitlint/cli/cli.js" --edit "$1"
+#!/usr/bin/env sh
+# Conventional-commit check (commitlint.config.js). Escape hatch: HUSKY=0.
+# A worktree without node_modules skips with a note (localci still runs CI).
+root=$(git rev-parse --show-toplevel)
+if [ ! -f "$root/node_modules/@commitlint/cli/cli.js" ]; then
+  echo "commit-msg: node_modules missing in this worktree; skipping commitlint"
+  exit 0
+fi
+node "$root/node_modules/@commitlint/cli/cli.js" --edit "$1" </dev/null
