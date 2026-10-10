@@ -1,8 +1,0 @@
-[Unit]
-Description=Mizano nightly encrypted backup
-After=docker.service
-Requires=docker.service
-
-[Service]
-Type=oneshot
-ExecStart=/opt/mizano/deploy/pi/scripts/backup.sh

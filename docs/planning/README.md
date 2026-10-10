@@ -6,16 +6,7 @@ The initial [manifest](demo-plan.json) defines **24 issues, 19 labels and 6 mile
 
 ## Synchronize and verify
 
-```bash
-python scripts/sync-demo-planning.py --validate
-python -m unittest discover -s scripts -p 'test_sync_demo_planning.py'
-# On an authenticated operator/CI host; credentials supplied through environment:
-python scripts/sync-demo-planning.py --apply --output /tmp/mizano-planning-result.json
-```
-
-`--validate` is offline and never writes to GitHub. `--apply` uses `GH_TOKEN`/`GITHUB_TOKEN` for this repository's labels, milestones and issues. It reuses existing metadata and preserves human edits, issue states and assignees; only its marked dependency section is refreshed. It never blindly recreates/reopens completed work. Serialize writers; after an uncertain API response, rerun reconciliation instead of issuing duplicate mutations.
-
-The **Demo planning metadata** workflow validates first, then synchronizes using its repository-scoped token. It runs for planning-file changes on the strategy branch and can be manually dispatched after merge. It does not run AI development sessions, deploy the application or send Telegram messages. Its JSON artifact records verified issue URLs/counts and Project status. Native GitHub resource state is authoritative after sync.
+The one-off sync script (`scripts/sync-demo-planning.py`) and its **Demo planning metadata** workflow were retired in the 2026-10 slim-down: the initial sync succeeded, the workflow had been disabled with 0 runs in the last 14 days, and native GitHub issues/milestones are authoritative. Both remain in git history (tag `archive/pre-slimdown-2026-10-10`); this folder keeps the manifest as a record.
 
 ## Project board
 
@@ -36,6 +27,3 @@ Use existing default Status fields where possible; only claim custom views/optio
 
 Select tasks whose dependencies are closed/verified; record real human/agent owner at execution time rather than assigning every task to the maintainer. Lease one issue and path set per worker. Use P0 for demo-blocking finance/security defects, P1 for required journey/reliability, P2 for after-demo scope. Link PRs to issues; attach exact-head tests/review/deploy evidence before closing. No artificial issue closure to meet a metric.
 
-## Initial documentation rollout exemption
-
-The deployment guard examines every changed path across the complete history from the reviewed baseline (including reverted changes), allows only the exact initial planning paths, and checks the deployment workflow content hash. Any application change, changed deployment workflow hash, unknown path or unreadable exemption conservatively requires deployment. This narrowly prevents the initial planning PR from redeploying the application; it does not implement the immutable application-deployment work in issue #25. Later runtime changes remain detectable even if the final commit only changes documentation.
