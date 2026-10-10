@@ -60,6 +60,7 @@ export interface TopCustomer {
   name: string;
   totalRevenue: number;
   invoiceCount: number;
+  currencyCode: string;
 }
 
 export interface BankBalancePoint {
@@ -424,11 +425,13 @@ export function useDashboardCustomers() {
               name: string;
               totalRevenue?: string | number;
               invoiceCount?: number;
+              currencyCode?: string;
             }) => ({
               id: c.id,
               name: c.name,
               totalRevenue: moneyToNumber(c.totalRevenue),
               invoiceCount: c.invoiceCount || 0,
+              currencyCode: c.currencyCode || 'USD',
             }),
           )
         : [];

@@ -16,6 +16,7 @@ import { MonthlyInvoiceVolumeChart } from '@/components/dashboard/charts/monthly
 import { PaymentCollectionChart } from '@/components/dashboard/charts/payment-collection-chart';
 import { CustomerChurnRiskChart } from '@/components/dashboard/charts/customer-churn-risk-chart';
 import { CustomerLTVChart } from '@/components/dashboard/charts/customer-ltv-chart';
+import { useBaseCurrency } from '@/lib/hooks/use-organization';
 
 function ChartSkeleton() {
   return (
@@ -35,6 +36,7 @@ interface SalesSectionProps {
 }
 
 export function SalesSection({ enabled }: SalesSectionProps) {
+  const currency = useBaseCurrency() || 'USD';
   const { data: invoiceStatusData } = useInvoiceStatus(enabled);
   const { data: quoteData } = useQuoteConversion(enabled);
   const { data: volumeData } = useInvoiceVolume(enabled);
@@ -50,7 +52,11 @@ export function SalesSection({ enabled }: SalesSectionProps) {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {volumeData ? <MonthlyInvoiceVolumeChart data={volumeData} /> : <ChartSkeleton />}
-        {collectionData ? <PaymentCollectionChart data={collectionData} /> : <ChartSkeleton />}
+        {collectionData ? (
+          <PaymentCollectionChart data={collectionData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {churnData ? <CustomerChurnRiskChart data={churnData} /> : <ChartSkeleton />}

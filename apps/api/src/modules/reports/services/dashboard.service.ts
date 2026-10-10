@@ -26,7 +26,9 @@ import {
   POSTED_BILL_STATUSES,
   POSTED_EXPENSE_STATUSES,
   POSTED_INVOICE_STATUSES,
+  baseCurrencyWhere,
   endOfUtcDay,
+  getBaseCurrency,
   isIncomeType,
   lastMonths,
   money,
@@ -351,12 +353,14 @@ export class DashboardService {
   }
 
   async getTopCustomers(organizationId: string, limit: number = 5) {
+    const baseCurrency = await getBaseCurrency(this.prisma, organizationId);
     const groups = await this.prisma.invoice.groupBy({
       by: ['customerId'],
       where: {
         organizationId,
         deletedAt: null,
         status: { in: POSTED_INVOICE_STATUSES },
+        ...baseCurrencyWhere(baseCurrency),
       },
       _sum: { grandTotal: true },
       _count: { id: true },
@@ -384,6 +388,7 @@ export class DashboardService {
       name: names.get(t.customerId) ?? '',
       totalRevenue: money(t.total),
       invoiceCount: t.count,
+      currencyCode: baseCurrency,
     }));
   }
 
@@ -415,12 +420,17 @@ export class DashboardService {
   }
 
   async getProjectsOverview(organizationId: string) {
+    const baseCurrency = await getBaseCurrency(this.prisma, organizationId);
     const projects = await this.prisma.project.findMany({
       where: { organizationId },
       include: {
         timesheetEntries: true,
         invoices: {
-          where: { deletedAt: null, status: { in: POSTED_INVOICE_STATUSES } },
+          where: {
+            deletedAt: null,
+            status: { in: POSTED_INVOICE_STATUSES },
+            ...baseCurrencyWhere(baseCurrency),
+          },
         },
       },
     });
@@ -440,6 +450,7 @@ export class DashboardService {
         hoursLogged,
         revenue: money(revenue),
         budget: money(budget),
+        currencyCode: baseCurrency,
         budgetUsedPercent: budget.greaterThan(0) ? revenue.div(budget).mul(100).toNumber() : 0,
       };
     });
@@ -468,6 +479,7 @@ export class DashboardService {
    * account. DRAFT, VOID and deleted records never count.
    */
   private async getTotalReceivables(organizationId: string): Promise<Decimal> {
+    const baseCurrency = await getBaseCurrency(this.prisma, organizationId);
     const [invoices, credits] = await Promise.all([
       this.prisma.invoice.aggregate({
         where: {
@@ -475,6 +487,7 @@ export class DashboardService {
           deletedAt: null,
           balanceDue: { gt: 0 },
           status: { in: POSTED_INVOICE_STATUSES },
+          ...baseCurrencyWhere(baseCurrency),
         },
         _sum: { balanceDue: true },
       }),
@@ -484,6 +497,7 @@ export class DashboardService {
           deletedAt: null,
           type: CreditNoteType.APPLY_TO_INVOICE,
           appliedToInvoiceId: null,
+          invoice: { is: baseCurrencyWhere(baseCurrency) },
         },
         _sum: { amount: true },
       }),
@@ -496,6 +510,7 @@ export class DashboardService {
    * (they debited AP without reducing any bill), so it matches the AP control account.
    */
   private async getTotalPayables(organizationId: string): Promise<Decimal> {
+    const baseCurrency = await getBaseCurrency(this.prisma, organizationId);
     const [bills, credits] = await Promise.all([
       this.prisma.bill.aggregate({
         where: {
@@ -503,11 +518,18 @@ export class DashboardService {
           deletedAt: null,
           balanceDue: { gt: 0 },
           status: { in: ['OPEN', 'PARTIALLY_PAID', 'OVERDUE'] },
+          ...baseCurrencyWhere(baseCurrency),
         },
         _sum: { balanceDue: true },
       }),
       this.prisma.vendorCredit.aggregate({
-        where: { organizationId, deletedAt: null, appliedToBillId: null, refundedAt: null },
+        where: {
+          organizationId,
+          deletedAt: null,
+          appliedToBillId: null,
+          refundedAt: null,
+          bill: { is: baseCurrencyWhere(baseCurrency) },
+        },
         _sum: { amount: true },
       }),
     ]);
@@ -840,9 +862,15 @@ export class DashboardService {
 
   /** Issued invoices by status; DRAFT and VOID are not receivables and are left out. */
   private async computeInvoiceStatus(organizationId: string) {
+    const baseCurrency = await getBaseCurrency(this.prisma, organizationId);
     const counts = await this.prisma.invoice.groupBy({
       by: ['status'],
-      where: { organizationId, deletedAt: null, status: { in: POSTED_INVOICE_STATUSES } },
+      where: {
+        organizationId,
+        deletedAt: null,
+        status: { in: POSTED_INVOICE_STATUSES },
+        ...baseCurrencyWhere(baseCurrency),
+      },
       _count: { id: true },
       _sum: { grandTotal: true },
     });
@@ -900,6 +928,7 @@ export class DashboardService {
 
   private async computeInvoiceVolume(organizationId: string, months: number) {
     const buckets = lastMonths(months);
+    const baseCurrency = await getBaseCurrency(this.prisma, organizationId);
     const groups = await this.prisma.invoice.groupBy({
       by: ['date'],
       where: {
@@ -907,6 +936,7 @@ export class DashboardService {
         deletedAt: null,
         status: { in: POSTED_INVOICE_STATUSES },
         date: { gte: buckets[0].start, lte: buckets[buckets.length - 1].end },
+        ...baseCurrencyWhere(baseCurrency),
       },
       _sum: { grandTotal: true },
       _count: { id: true },
@@ -1033,9 +1063,15 @@ export class DashboardService {
 
   /** Posted bills by status; DRAFT/PENDING/VOID are not payables and are left out. */
   private async computeBillStatus(organizationId: string) {
+    const baseCurrency = await getBaseCurrency(this.prisma, organizationId);
     const counts = await this.prisma.bill.groupBy({
       by: ['status'],
-      where: { organizationId, deletedAt: null, status: { in: POSTED_BILL_STATUSES } },
+      where: {
+        organizationId,
+        deletedAt: null,
+        status: { in: POSTED_BILL_STATUSES },
+        ...baseCurrencyWhere(baseCurrency),
+      },
       _count: { id: true },
       _sum: { grandTotal: true },
     });
@@ -1057,9 +1093,15 @@ export class DashboardService {
   }
 
   private async computeTopVendors(organizationId: string, limit: number) {
+    const baseCurrency = await getBaseCurrency(this.prisma, organizationId);
     const groups = await this.prisma.bill.groupBy({
       by: ['vendorId'],
-      where: { organizationId, deletedAt: null, status: { in: POSTED_BILL_STATUSES } },
+      where: {
+        organizationId,
+        deletedAt: null,
+        status: { in: POSTED_BILL_STATUSES },
+        ...baseCurrencyWhere(baseCurrency),
+      },
       _sum: { grandTotal: true },
       _count: { id: true },
     });
@@ -1100,6 +1142,7 @@ export class DashboardService {
 
   private async computePurchaseTrend(organizationId: string, months: number) {
     const buckets = lastMonths(months);
+    const baseCurrency = await getBaseCurrency(this.prisma, organizationId);
     const range = { gte: buckets[0].start, lte: buckets[buckets.length - 1].end };
 
     const [bills, expenses] = await Promise.all([
@@ -1110,6 +1153,7 @@ export class DashboardService {
           deletedAt: null,
           status: { in: POSTED_BILL_STATUSES },
           date: range,
+          ...baseCurrencyWhere(baseCurrency),
         },
         _sum: { grandTotal: true },
       }),

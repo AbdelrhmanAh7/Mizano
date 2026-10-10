@@ -86,6 +86,7 @@ export interface AgingReport {
   unappliedCredits: number;
   totalCount: number;
   asOfDate: string;
+  currencyCode: string;
 }
 
 export interface GeneralLedgerEntry {
@@ -298,6 +299,7 @@ interface RawAgingData {
   invoiceCount?: number;
   billCount?: number;
   asOfDate?: string;
+  currencyCode?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -508,6 +510,7 @@ function transformAgingReport(
       unappliedCredits: 0,
       totalCount: raw.totalCount ?? raw.invoiceCount ?? raw.billCount ?? 0,
       asOfDate: raw.asOfDate ?? '',
+      currencyCode: raw.currencyCode ?? 'USD',
     };
   }
 
@@ -540,6 +543,7 @@ function transformAgingReport(
     unappliedCredits: toNum(raw.summary?.unappliedCredits),
     totalCount: raw.invoiceCount ?? raw.billCount ?? 0,
     asOfDate: raw.asOfDate ?? '',
+    currencyCode: raw.currencyCode ?? 'USD',
   };
 }
 
@@ -749,12 +753,15 @@ export function usePurchasesByVendorReport(params: DateRange) {
 }
 
 // Helper functions
-export function formatCurrency(amount: number | string | null | undefined): string {
-  if (amount === null || amount === undefined) return '$0.00';
+export function formatCurrency(
+  amount: number | string | null | undefined,
+  currency: string = 'USD',
+): string {
+  if (amount === null || amount === undefined) amount = 0;
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'USD',
+    currency,
   }).format(num);
 }
 

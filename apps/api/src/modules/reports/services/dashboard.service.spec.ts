@@ -248,7 +248,8 @@ describe('DashboardService', () => {
   });
 
   describe('getTopCustomers', () => {
-    it('ranks issued invoices by exact Decimal total using one grouped query', async () => {
+    it('ranks only base-currency issued invoices by exact Decimal total', async () => {
+      prisma.organization.findUnique.mockResolvedValue({ baseCurrency: 'EGP' } as never);
       prisma.invoice.groupBy.mockResolvedValue([
         { customerId: 'c1', _sum: { grandTotal: D('0.1') }, _count: { id: 1 } },
         { customerId: 'c2', _sum: { grandTotal: D('0.30') }, _count: { id: 2 } },
@@ -261,12 +262,14 @@ describe('DashboardService', () => {
       const result = await service.getTopCustomers(ORG_ID, 5);
 
       expect(result).toEqual([
-        { id: 'c2', name: 'Two', totalRevenue: '0.3000', invoiceCount: 2 },
-        { id: 'c1', name: 'One', totalRevenue: '0.1000', invoiceCount: 1 },
+        { id: 'c2', name: 'Two', totalRevenue: '0.3000', invoiceCount: 2, currencyCode: 'EGP' },
+        { id: 'c1', name: 'One', totalRevenue: '0.1000', invoiceCount: 1, currencyCode: 'EGP' },
       ]);
       const where = prisma.invoice.groupBy.mock.calls[0][0].where;
       expect(where).toMatchObject({ organizationId: ORG_ID, deletedAt: null });
       expect(where?.status).toEqual(ISSUED);
+      expect(where?.OR).toEqual([{ currencyCode: 'EGP' }, { currencyCode: null }]);
+      expect(result[0].currencyCode).toBe('EGP');
       expect(prisma.customer.findMany).toHaveBeenCalledTimes(1);
     });
   });
@@ -637,9 +640,20 @@ describe('DashboardService', () => {
       expect(project.budget).toBe('1000.0000');
       expect(project.hoursLogged).toBe(2.5);
       const include = prisma.project.findMany.mock.calls[0][0]?.include as {
-        invoices: { where: { deletedAt: null; status: unknown } };
+        invoices: {
+          where: {
+            deletedAt: null;
+            status: unknown;
+            OR: Array<{ currencyCode: string | null }>;
+          };
+        };
       };
-      expect(include.invoices.where).toEqual({ deletedAt: null, status: ISSUED });
+      expect(include.invoices.where).toMatchObject({
+        deletedAt: null,
+        status: ISSUED,
+        OR: [{ currencyCode: 'USD' }, { currencyCode: null }],
+      });
+      expect(project.currencyCode).toBe('USD');
     });
   });
 });

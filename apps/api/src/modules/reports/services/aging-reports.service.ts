@@ -7,8 +7,10 @@ import {
   POSTED_BILL_STATUSES,
   POSTED_INVOICE_STATUSES,
   agingBucket,
+  baseCurrencyWhere,
   daysPastDue,
   endOfUtcDay,
+  getBaseCurrency,
   money,
   parseReportDate,
   resolveAsOf,
@@ -60,6 +62,7 @@ export class AgingReportsService {
    */
   async getReceivablesAging(organizationId: string, asOfDate?: string) {
     const { asOf } = resolveAsOf(asOfDate);
+    const baseCurrency = await getBaseCurrency(this.prisma, organizationId);
 
     const [invoices, credits] = await Promise.all([
       this.prisma.invoice.findMany({
@@ -69,6 +72,7 @@ export class AgingReportsService {
           balanceDue: { gt: 0 },
           status: { in: POSTED_INVOICE_STATUSES },
           date: { lte: asOf },
+          ...baseCurrencyWhere(baseCurrency),
         },
         include: {
           customer: { select: { id: true, name: true } },
@@ -81,6 +85,7 @@ export class AgingReportsService {
           type: CreditNoteType.APPLY_TO_INVOICE,
           appliedToInvoiceId: null,
           date: { lte: asOf },
+          invoice: { is: baseCurrencyWhere(baseCurrency) },
         },
         select: {
           customerId: true,
@@ -138,6 +143,7 @@ export class AgingReportsService {
 
     return {
       asOfDate: asOf,
+      currencyCode: baseCurrency,
       buckets,
       summary: {
         current: money(bucketTotals.current),
@@ -165,6 +171,7 @@ export class AgingReportsService {
   async getPayablesAging(organizationId: string, asOfDate?: string) {
     const date = asOfDate ? new Date(asOfDate) : new Date();
     date.setHours(23, 59, 59, 999);
+    const baseCurrency = await getBaseCurrency(this.prisma, organizationId);
 
     const bills = await this.prisma.bill.findMany({
       where: {
@@ -174,6 +181,7 @@ export class AgingReportsService {
         // Only bills posted to AP; `date` is the accounting date (billDate is optional).
         status: { in: ['OPEN', 'PARTIALLY_PAID', 'OVERDUE'] },
         date: { lte: date },
+        ...baseCurrencyWhere(baseCurrency),
       },
       include: {
         vendor: { select: { id: true, name: true } },
@@ -189,6 +197,7 @@ export class AgingReportsService {
         appliedToBillId: null,
         refundedAt: null,
         date: { lte: date },
+        bill: { is: baseCurrencyWhere(baseCurrency) },
       },
       select: { vendorId: true, amount: true, vendor: { select: { id: true, name: true } } },
     });
@@ -251,6 +260,7 @@ export class AgingReportsService {
 
     return {
       asOfDate: date,
+      currencyCode: baseCurrency,
       buckets,
       summary: {
         ...summary,
