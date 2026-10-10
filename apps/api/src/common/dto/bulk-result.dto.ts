@@ -6,6 +6,9 @@ export class BulkFailureDto {
 
   @ApiProperty({ description: 'Reason for failure' })
   reason: string;
+
+  @ApiPropertyOptional({ description: 'Machine-readable reason code for UI translation' })
+  code?: string;
 }
 
 export class BulkResultDto {

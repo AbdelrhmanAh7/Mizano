@@ -9,10 +9,23 @@ import {
   Min,
   Max,
   ValidateNested,
+  ArrayMaxSize,
+  MaxLength,
+  IsDateString,
 } from 'class-validator';
-import { Type } from 'class-transformer';
-import { IsDecimalString } from '../../../common/dto/decimal-string';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsDecimalString,
+  MAX_INTEGER_DIGITS,
+  MAX_FRACTION_DIGITS,
+} from '../../../common/dto/decimal-string';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+/** Bulk approval uses the same precision bounds as the confirm DTO. */
+export const DECIMAL_STRING_PATTERN = new RegExp(
+  `^\\d{1,${MAX_INTEGER_DIGITS}}(\\.\\d{1,${MAX_FRACTION_DIGITS}})?$`,
+);
+export const PERCENT_STRING_PATTERN = new RegExp(`^\\d{1,${MAX_INTEGER_DIGITS}}(\\.\\d{1,2})?$`);
 
 export class ProcessDocumentDto {
   @ApiPropertyOptional({
@@ -199,10 +212,38 @@ export const INTAKE_JOB_STATUSES = [
 ] as const;
 
 export class ListIntakeJobsDto {
-  @ApiPropertyOptional({ enum: INTAKE_JOB_STATUSES })
-  @IsIn(INTAKE_JOB_STATUSES)
+  @ApiPropertyOptional({
+    enum: INTAKE_JOB_STATUSES,
+    isArray: true,
+    description: 'One status or a comma-separated list',
+  })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.split(',').filter(Boolean) : value,
+  )
+  @IsIn(INTAKE_JOB_STATUSES, { each: true })
   @IsOptional()
-  status?: (typeof INTAKE_JOB_STATUSES)[number];
+  status?: (typeof INTAKE_JOB_STATUSES)[number][];
+
+  @ApiPropertyOptional({ enum: ['WEB', 'TELEGRAM'] })
+  @IsIn(['WEB', 'TELEGRAM'])
+  @IsOptional()
+  source?: 'WEB' | 'TELEGRAM';
+
+  @ApiPropertyOptional({ example: '2026-09-01', description: 'Created on/after (date)' })
+  @IsDateString()
+  @IsOptional()
+  from?: string;
+
+  @ApiPropertyOptional({ example: '2026-09-30', description: 'Created on/before (date)' })
+  @IsDateString()
+  @IsOptional()
+  to?: string;
+
+  @ApiPropertyOptional({ description: 'Vendor name, invoice number or file name' })
+  @IsString()
+  @MaxLength(100)
+  @IsOptional()
+  search?: string;
 
   @ApiPropertyOptional({ example: 1 })
   @IsInt()
@@ -216,4 +257,13 @@ export class ListIntakeJobsDto {
   @Max(100)
   @IsOptional()
   limit?: number;
+}
+
+export class BulkApproveIntakeDto {
+  @ApiProperty({ description: 'Intake jobs to approve (only complete EXTRACTED jobs succeed)' })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  jobIds: string[];
 }

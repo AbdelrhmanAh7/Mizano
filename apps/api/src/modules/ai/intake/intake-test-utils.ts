@@ -1,3 +1,4 @@
+import { DocumentIntakeResult } from '../services/document-intake.service';
 import { IntakeJob, IntakeJobStatus, IntakeSource, Prisma } from '@prisma/client';
 import { IntakeStorage } from './intake-storage';
 
@@ -117,4 +118,122 @@ export class MemoryIntakeStorage extends IntakeStorage {
   delete = jest.fn(async (key: string): Promise<void> => {
     this.objects.delete(key);
   });
+}
+
+export function billResult(overrides: Partial<DocumentIntakeResult> = {}): DocumentIntakeResult {
+  return {
+    documentType: 'BILL',
+    classificationConfidence: 0.9,
+    extractedFields: {
+      date: '2026-09-01',
+      dueDate: null,
+      total: 115,
+      subtotal: 100,
+      tax: 15,
+      discount: null,
+      documentNumber: 'INV-9',
+      vendorName: 'Acme',
+      vendorAddress: null,
+      vendorPhone: null,
+      vendorEmail: null,
+      vendorTaxId: null,
+      currency: 'EGP',
+      paymentTerms: null,
+      notes: null,
+      customerName: null,
+      lineItems: [{ description: 'CPU', quantity: 1, unitPrice: 100, taxAmount: 15, total: 115 }],
+    },
+    fieldConfidence: {},
+    ocrConfidence: 0.95,
+    matchedVendor: { id: 'v1', name: 'Acme', similarity: 1 },
+    vendorCandidates: [],
+    matchedCustomer: null,
+    customerCandidates: [],
+    duplicateWarning: null,
+    rawText: '',
+    suggestCreateVendor: null,
+    extractionMethod: 'ollama-text',
+    ...overrides,
+  } as DocumentIntakeResult;
+}
+
+export class FakeAuditLogTable {
+  rows: Array<{
+    id: string;
+    organizationId: string;
+    userId: string;
+    action: string;
+    entityType: string;
+    entityId: string;
+    newValues?: unknown;
+    createdAt: Date;
+  }> = [];
+  private seq = 0;
+
+  readonly delegate = {
+    create: jest.fn(
+      async ({
+        data,
+      }: {
+        data: {
+          organizationId: string;
+          userId: string;
+          action: string;
+          entityType: string;
+          entityId: string;
+          newValues?: unknown;
+        };
+      }) => {
+        const row = {
+          id: `audit-${++this.seq}`,
+          createdAt: new Date(),
+          ...data,
+        };
+        this.rows.push(row);
+        return row;
+      },
+    ),
+    findFirst: jest.fn(
+      async ({
+        where,
+      }: {
+        where: { organizationId?: string; entityType?: string; entityId?: string };
+      }) => {
+        return (
+          this.rows
+            .slice()
+            .reverse()
+            .find(
+              (r) =>
+                (!where.organizationId || r.organizationId === where.organizationId) &&
+                (!where.entityType || r.entityType === where.entityType) &&
+                (!where.entityId || r.entityId === where.entityId),
+            ) ?? null
+        );
+      },
+    ),
+  };
+}
+
+export class FakeDocumentTable {
+  rows: Array<{ id: string; organizationId: string; deletedAt: Date | null }> = [];
+
+  readonly delegate = {
+    findFirst: jest.fn(
+      async ({
+        where,
+      }: {
+        where: { id: string; organizationId: string; deletedAt?: Date | null };
+      }) => {
+        return (
+          this.rows.find(
+            (r) =>
+              r.id === where.id &&
+              r.organizationId === where.organizationId &&
+              (where.deletedAt === undefined || r.deletedAt === where.deletedAt),
+          ) ?? null
+        );
+      },
+    ),
+  };
 }

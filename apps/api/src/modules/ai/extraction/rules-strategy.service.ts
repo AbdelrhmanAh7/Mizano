@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
-import { accessSync, constants } from 'fs';
+import { accessSync, constants, statSync } from 'fs';
 import { resolve } from 'path';
 import { describeError } from '../../../common/utils/redact';
 import { DocumentExtractionResult } from '../services/ollama.service';
@@ -18,6 +18,53 @@ const WORKER_INIT_TIMEOUT_MS = 30_000;
 interface TesseractWorker {
   terminate(): Promise<unknown>;
   recognize(buffer: Buffer): Promise<{ data: { text: string; confidence: number } }>;
+}
+
+export type ExactMoney = Record<'subtotal' | 'tax' | 'total', string | null>;
+
+export interface RulesStrategyResult extends StrategyExtractionResult {
+  /** Original Decimal values before the legacy numeric adapter; document content, never log. */
+  exactMoney: ExactMoney;
+}
+
+class LocalOcrAssetsError extends Error {
+  readonly name = 'LocalOcrAssetsError';
+  constructor(
+    message: string,
+    readonly code: string,
+  ) {
+    super(message);
+  }
+}
+
+export function requireLocalOcrAssets(language: string): { lang: string; localPath: string } {
+  const lang = language
+    .trim()
+    .toLowerCase()
+    .replace(/\ben\b/g, 'eng')
+    .replace(/\bar\b/g, 'ara');
+  const directory = process.env.INTAKE_TESSDATA_DIR;
+  if (!directory?.trim())
+    throw new LocalOcrAssetsError(
+      'Local OCR assets required: set INTAKE_TESSDATA_DIR',
+      'OCR_ASSETS_UNCONFIGURED',
+    );
+  const localPath = resolve(directory);
+  for (const assetLanguage of lang.split('+')) {
+    if (!/^[a-z][a-z0-9_]*$/.test(assetLanguage)) throw new Error('Invalid OCR language');
+    try {
+      const asset = resolve(localPath, `${assetLanguage}.traineddata`);
+      accessSync(asset, constants.R_OK);
+      const stat = statSync(asset);
+      if (!stat.isFile() || stat.size === 0) throw new Error('Invalid asset');
+    } catch {
+      throw new LocalOcrAssetsError(
+        'Required local OCR traineddata asset is unavailable',
+        'OCR_ASSET_UNAVAILABLE',
+      );
+    }
+  }
+  return { lang, localPath };
 }
 
 /** Decimal -> number only at the legacy extraction-result boundary (4 dp). */
@@ -91,7 +138,7 @@ export class RulesStrategy implements ExtractionStrategy {
     return true;
   }
 
-  async extract(context: ExtractionContext): Promise<StrategyExtractionResult | null> {
+  async extract(context: ExtractionContext): Promise<RulesStrategyResult | null> {
     const start = Date.now();
     let text = '';
     let textConfidence = 0;
@@ -108,7 +155,9 @@ export class RulesStrategy implements ExtractionStrategy {
         text = ocr.text;
         textConfidence = ocr.confidence / 100;
       } catch (error) {
-        this.logger.error(`Tesseract OCR failed: ${describeError(error)}`);
+        this.logger.error(
+          `Tesseract OCR failed: ${describeError(error, { includeMessage: false })}`,
+        );
       }
     }
 
@@ -126,6 +175,11 @@ export class RulesStrategy implements ExtractionStrategy {
     const elapsed = Date.now() - start;
     return {
       extraction: toExtractionResult(rules, text, elapsed),
+      exactMoney: {
+        subtotal: rules.subtotal?.value.toFixed() ?? null,
+        tax: rules.tax?.value.toFixed() ?? null,
+        total: rules.total?.value.toFixed() ?? null,
+      },
       strategyUsed: 'rules',
       ocrRawConfidence: textConfidence * 100,
       totalTimeMs: elapsed,
@@ -136,26 +190,11 @@ export class RulesStrategy implements ExtractionStrategy {
     imageBuffer: Buffer,
     language: string,
   ): Promise<{ text: string; confidence: number }> {
-    const lang = language
-      .trim()
-      .toLowerCase()
-      .replace(/\ben\b/g, 'eng')
-      .replace(/\bar\b/g, 'ara');
+    const { lang, localPath } = requireLocalOcrAssets(language);
     let pending = this.workers.get(lang);
     if (!pending) {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const Tesseract = require('tesseract.js');
-      const tessdataDir = process.env.INTAKE_TESSDATA_DIR;
-      // Resolve as a filesystem path, never a URL: missing local assets must fail offline.
-      const localPath = tessdataDir ? resolve(tessdataDir) : undefined;
-      if (localPath) {
-        for (const assetLanguage of lang.split('+')) {
-          if (!/^[a-z][a-z0-9_]*$/.test(assetLanguage)) {
-            throw new Error('Invalid OCR language');
-          }
-          accessSync(resolve(localPath, `${assetLanguage}.traineddata`), constants.R_OK);
-        }
-      }
       pending = new Promise<TesseractWorker>((done, reject) => {
         let failed = false;
         const fail = () => {
@@ -167,14 +206,10 @@ export class RulesStrategy implements ExtractionStrategy {
         Promise.resolve()
           .then(() =>
             Tesseract.createWorker(lang, undefined, {
-              ...(localPath
-                ? {
-                    langPath: localPath,
-                    cachePath: localPath,
-                    cacheMethod: 'readOnly',
-                    gzip: false,
-                  }
-                : {}),
+              langPath: localPath,
+              cachePath: localPath,
+              cacheMethod: 'readOnly',
+              gzip: false,
               errorHandler: fail,
             }),
           )

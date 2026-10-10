@@ -12,15 +12,24 @@ import { IntakeStorage } from './intake-storage';
 const LOW_CONFIDENCE = 0.6;
 const DEFAULT_RETRY_BASE_MS = 5000;
 
+/** The parts of an intake result that decide review routing. */
+export type ReviewInput = Pick<DocumentIntakeResult, 'ocrConfidence' | 'documentType'> & {
+  extractedFields: Pick<DocumentIntakeResult['extractedFields'], 'total' | 'date'>;
+  duplicateWarning?: DocumentIntakeResult['duplicateWarning'];
+  /** Field validation needs the organization (base currency, vendors); the offline benchmark omits it. */
+  validation?: Pick<NonNullable<DocumentIntakeResult['validation']>, 'requiresReview'>;
+};
+
 /** Decide whether an accountant must look before approval. */
-export function needsReview(result: DocumentIntakeResult): boolean {
+export function needsReview(result: ReviewInput): boolean {
   const fields = result.extractedFields;
   return (
     result.ocrConfidence < LOW_CONFIDENCE ||
     fields.total === null ||
     fields.date === null ||
     result.documentType === 'OTHER' ||
-    result.duplicateWarning?.isDuplicate === true
+    result.duplicateWarning?.isDuplicate === true ||
+    result.validation?.requiresReview === true
   );
 }
 

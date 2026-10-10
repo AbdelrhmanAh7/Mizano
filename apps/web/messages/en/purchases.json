@@ -413,5 +413,102 @@
     "noExpenses": "No expenses found",
     "noPayments": "No payments found",
     "noCredits": "No vendor credits found"
+  },
+  "inbox": {
+    "title": "Invoice inbox",
+    "description": "Documents received from the web and Telegram. Approve complete ones in bulk and fix the exceptions.",
+    "refresh": "Refresh",
+    "approveSelected": "Approve selected ({count})",
+    "selectAll": "Select all ready documents",
+    "selectRow": "Select {name}",
+    "noAccess": "You do not have permission to use the invoice inbox.",
+    "tabs": {
+      "ready": "Ready",
+      "review": "Needs review",
+      "failed": "Failed",
+      "approved": "Approved"
+    },
+    "columns": {
+      "date": "Received",
+      "source": "Source",
+      "file": "File",
+      "vendor": "Vendor",
+      "invoiceNo": "Invoice no.",
+      "total": "Total",
+      "status": "Status",
+      "confidence": "Confidence",
+      "actions": "Actions"
+    },
+    "source": {
+      "WEB": "Web",
+      "TELEGRAM": "Telegram"
+    },
+    "filters": {
+      "search": "Search vendor, invoice no. or file",
+      "source": "Source",
+      "allSources": "All sources",
+      "from": "From date",
+      "to": "To date"
+    },
+    "review": "Review",
+    "retry": "Retry",
+    "openDraft": "Open draft bill",
+    "viewOriginal": "Original",
+    "viewOriginalFor": "View original file {name}",
+    "previous": "Previous",
+    "next": "Next",
+    "pageOf": "Page {page} of {total}",
+    "reconnecting": "Connection problem. Showing the last loaded data and retrying.",
+    "error": {
+      "title": "Could not load the inbox",
+      "description": "Check your connection and try again.",
+      "retry": "Try again"
+    },
+    "empty": {
+      "ready": {
+        "title": "Nothing ready to approve",
+        "description": "Complete documents appear here automatically after extraction."
+      },
+      "review": {
+        "title": "No documents need review",
+        "description": "Documents with missing or uncertain values appear here."
+      },
+      "failed": {
+        "title": "No failed documents",
+        "description": "Documents that could not be read appear here so you can retry them."
+      },
+      "approved": {
+        "title": "No approved documents yet",
+        "description": "Approved documents link to their draft bills."
+      }
+    },
+    "blocker": {
+      "NO_RESULT": "No extraction result yet",
+      "NOT_BILL": "Not classified as a bill",
+      "NO_VENDOR": "No existing vendor matched",
+      "NO_DATE": "Document date is missing",
+      "NO_TOTAL": "Total is missing",
+      "NO_LINES": "No line items were extracted",
+      "INVALID_LINE": "A line has a missing quantity or price",
+      "TAX_UNRESOLVED": "Tax rate could not be determined exactly",
+      "TOTAL_MISMATCH": "Line totals do not match the document total",
+      "CURRENCY_MISMATCH": "Document or organization currency is missing or does not match"
+    },
+    "confirm": {
+      "title": "Approve {count} documents?",
+      "description": "This creates {count} draft bills from the extracted data. Drafts stay separate from posted balances until each bill is approved.",
+      "confirm": "Approve",
+      "cancel": "Cancel"
+    },
+    "toast": {
+      "approvedTitle": "Documents approved",
+      "approvedDescription": "{count} draft bills were created.",
+      "partialTitle": "{processed} of {total} approved",
+      "moreFailures": "and {count} more failed",
+      "errorTitle": "Could not approve the selected documents",
+      "retryQueued": "Document queued for another attempt",
+      "retryFailed": "Could not retry this document",
+      "originalFailed": "Could not open the original file"
+    }
   }
 }

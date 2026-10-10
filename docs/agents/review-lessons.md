@@ -12,6 +12,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Scope every row lock by organization:** `WHERE id = $1 AND "organizationId" = $2 FOR UPDATE`. A caller-supplied foreign id must lock nothing. _(lockInvoices, lockBills)_
 - **A check and the write it guards share one transaction and one lock.** Duplicate and overlap checks run inside the same tx as the insert, under an advisory lock. _(VAT period overlap)_
 - **Lock every record you read to decide a mutation.** For example, voiding a credit note must lock the note before reading `appliedToInvoiceId`, or a concurrent apply slips through. _(credit-note void vs. apply)_
+- **Serialize background recovery sweeps with mutation creation using the same row lock.** Hold the job lock through the approval claim, draft, marker and link transaction, and through recovery's marker read and guarded update. Locking only draft creation leaves a gap: recovery can reopen a separately committed claim before confirmation takes the lock. _(intake recovery vs. draft confirm)_
+- **Report success and write external feedback only after the owning transaction commits.** A service called inside another service's transaction must defer these effects to the transaction owner, so a later link failure cannot leave success logs or feedback for a rolled-back draft. _(intake approval transaction)_
 
 ## 2. Idempotency and retries
 
@@ -29,6 +31,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **A journal is dated on the document date.**
 - **A reversal or refund never precedes its source.** Default to `max(today, sourceDate)` and reject an earlier explicit date. _(JournalsService.reverse, vendor-credit refund)_
+- **Web defaults use the user's local calendar date** (`format(d, 'yyyy-MM-dd')`), never `toISOString()`, which gives yesterday in UTC+ zones such as Cairo.
+- **A regex shape check for dates must cover the full grammar (anchored at the end) and must be combined with a calendar round-trip check** to catch invalid dates like February 30th.
 - **A date-only end bound means end of day** (`endOfUtcDay`). A void at 10:00 on the end date belongs to that period.
 - **Web defaults use the user's local calendar date** (`format(d, 'yyyy-MM-dd')`), never `toISOString()`, which gives yesterday in UTC+ zones such as Cairo.
 - **"Current" figures exclude future-dated entries.** Cash today means lines dated ≤ end of today.
@@ -38,9 +42,11 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 ## 5. Single-currency ledger and data
 
 - **Reject a document whose `currencyCode` differs from the org `baseCurrency`.** Never post foreign amounts one-for-one. Carry the currency when copying, for example quote → invoice.
+- **Automatic intake approval requires both currencies to be known.** Missing or blank document/base currency stays a per-job exception; use the same validator for inbox readiness and bulk approval.
 - **Only bank registers (`BankAccount.currency`) carry a meaningful currency.** `Account.currency` is a schema default and must not be used for eligibility.
 - **Freeze the base currency once journals exist,** and serialize that check with posting through the ledger lock.
 - **Never write a data migration that guesses.** If no stored evidence separates "explicitly chosen" from "default", do not backfill; fix the read rule instead. _(baseCurrency and account-currency backfills, both removed)_
+- **Missing organization settings stay unknown.** Reject validation when the organization or its base currency is unavailable; never substitute SAR. Tax-ID and VAT rules come from the organization's base currency, so a misread extracted currency cannot select another country's rules. _(intake field validation)_
 - **Handle legacy rows.** Journals created before source linking have `sourceType = null`, for example opening balance `OB-001`. Reversal and replacement must find them, or explicitly refuse.
 
 ## 6. Money arithmetic
@@ -48,10 +54,12 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Use Decimal end to end for money arithmetic and comparisons, and send fixed 4-dp strings.** No `parseFloat`, `Number()` or `toNumber()` in sums, balances or checks. Converting an exact API string to a number only at the display boundary (formatting, chart plotting via `moneyToNumber`) is allowed.
 - **Decimal precision must cover products before subtraction.** Two `Decimal(19,4)` factors can require 38 significant digits; the default 20 can lose 4-dp amounts when large valuations cancel. Use a locally cloned constructor with aggregation headroom, never change global precision, and test large products as well as fractional values. _(inventory value trend, PR #59)_
 - **Bound inputs to `Decimal(19,4)`:** at most 15 integer and 4 fraction digits, validated with `common/dto/decimal-string.ts`. Bound computed totals before writing.
+- **When merging validator replacements, preserve exported contracts used by intake consumers.** Bulk readiness patterns must match the confirm DTO's precision limits; verify both with boundary tests. Removing conflict markers alone can leave missing exports or incompatible validation.
 - **Allocate VAT cumulatively.** Each partial credit's VAT = `round(totalVAT × cumulative/total) − already allocated`, so the parts sum exactly to the whole.
 - **The web preview rounds per line exactly like the server** (`computeDocumentTotals`), otherwise the shown and stored totals differ.
 - **When storage changes (net vs. gross), update every view:** list, detail, PDF and report. _(tax-inclusive expenses)_
 - **Keep accepted amounts.** Converting a quote copies its stored lines and totals rather than recomputing them.
+- **Benchmark exact money before rounding or numeric adapters.** Carry original Decimal strings into scoring, reject unsupported ground-truth precision and count unsupported predictions as mismatches. Check bounds before expanding exponents with `toFixed`, so unsupported values cannot allocate enormous strings.
 
 ## 7. Tenancy, roles and validation
 
@@ -63,6 +71,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Gate UI actions with exactly the API route's permission.**
 - **Money-bearing imports require the same per-entity create permission as the single-record routes.**
 - **Adding auth to a server endpoint or socket changes its contract: update every client in the same PR** (send the token, handle expiry and reconnect). A server-only change silently breaks the client. _(events gateway vs `use-realtime`)_
+- **Validate entity ownership before writing idempotency markers, even when audit user metadata is supplied.** An idempotency marker writer must unconditionally verify the referenced entity belongs to `organizationId` and is not deleted (`deletedAt: null`), rather than skipping the lookup when caller-provided `userId` is present. _(writeDraftMarker INTAKE_DRAFT)_
 
 ## 8. Voided and deleted records
 
@@ -85,9 +94,12 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 ## 11. Web UI
 
 - **Every new string needs en and ar,** including dialog titles, confirm and cancel buttons, placeholders, selector labels and report row names. Shared components accept localized label props.
+- **Navigation labels include breadcrumbs.** Reuse the same translation key as the sidebar, and refresh memoized labels when the locale changes.
+- **Reserve file-viewer tabs during the click, before awaiting authenticated downloads.** Detach the opener explicitly; report a blocked tab, close it on fetch/navigation failure, and release blob URLs.
 - **Keep error, loading and empty distinct.** Never collapse a failed query into `[]` ("no accounts"). Show an error with Retry, and block submit while a required lookup is loading or failed.
 - **Show the currency of the document**, falling back to the org base currency, never the counterparty's default. The API must actually return the fields the UI relies on (for example `baseCurrency`).
 - **Payment-wide effects get payment-wide warnings.** Voiding a payment affects every allocated bill.
+- **Changing lines does not acknowledge extracted amount blockers.** A different net alone proves nothing about tax or gross reconciliation. Keep amount blockers subject to explicit acknowledgement, including when extracted amounts are missing. _(intake field validation)_
 
 ## 12. Caches, tests and scope
 
@@ -95,6 +107,10 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.
+- **Paginated searches apply their predicate in the database for both page and count.** Never materialize all matching ids or cap that intermediate list; preserve tenant/deletion filters, literal wildcard escaping and stable ordering.
+- **Parallel branches that touch one pipeline are verified together, not one by one.** A clean textual merge can still change behaviour: field validation moved the inbox E2E's foreign-currency fixture from `EXTRACTED` to `NEEDS_REVIEW`, and bulk approval had to adopt the transactional confirm (claim, draft, `INTAKE_DRAFT` marker and job link in one transaction) that the reconcile branch gave the single route. After merging, rerun every branch's seeded E2E on the merged tree, route each bulk path through the merged single-record command, and change the fixture to the intended scenario, never the assertion. _(intake bundle)_
+- **Validate benchmark labels at the JSON boundary.** Require a document map and every scored field as a string or explicit null before opening corpus files.
+- **OCR must fail closed without local language assets.** Check all requested traineddata files before image benchmarking and worker creation; require readable, nonempty regular files and never allow a CDN fallback. Use static error codes to distinguish configuration failures without logging paths.
 
 ## Review process
 

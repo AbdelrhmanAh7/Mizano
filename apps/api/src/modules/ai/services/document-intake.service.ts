@@ -1,8 +1,9 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { AiFeature, AiFeedbackAction } from '@prisma/client';
+import { AiFeature, AiFeedbackAction, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { INTAKE_DRAFT_ENTITY, lockIntakeJob } from '../intake/intake-jobs.service';
 import { OllamaService, DocumentExtractionResult } from './ollama.service';
 import { DocumentClassificationService, DocumentCategory } from './document-classification.service';
 import { EntityExtractionService } from './entity-extraction.service';
@@ -14,6 +15,8 @@ import {
 } from '../extraction/extraction-strategy.interface';
 import { extractTextFromPdf } from '../utils/pdf-extractor.util';
 import { levenshteinSimilarity, normalizeText } from '../utils/text-similarity.util';
+import { ExtractionValidation, validateExtraction } from '../validation/extraction-validation';
+import { normalizeDigits } from '../extraction/rules/rules-normalize';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
 import { assertTotalsFit } from '../../sales/utils/sales-helpers';
 
@@ -75,6 +78,8 @@ export interface DocumentIntakeResult {
   fieldEvidence?: Record<string, { text: string; lineIndex: number }>;
   /** Rules strategy only: failed consistency checks as machine codes. */
   extractionWarnings?: string[];
+  /** Per-field validation (status, reason codes, source evidence). */
+  validation?: ExtractionValidation;
   ocrConfidence: number;
 
   /** Vendor matching */
@@ -151,6 +156,8 @@ export interface ConfirmIntakeInput {
   projectId?: string;
   /** User corrections for AI learning */
   corrections?: Record<string, unknown>;
+  jobId?: string;
+  userId?: string;
 }
 
 /** A confirmed line after tenant validation and Decimal computation. */
@@ -198,6 +205,45 @@ export interface IntakeProgressEvent {
 /** Truncate PDF raw text to this length before sending to Ollama (speeds up inference). */
 const PDF_TEXT_TRUNCATION_LIMIT = 4000;
 
+/**
+ * Builds the strategy input exactly as the intake processor does: PDF text layer first
+ * (truncated), images untouched. Shared with the offline extraction benchmark.
+ */
+export async function buildExtractionContext(
+  fileBuffer: Buffer,
+  mimeType: string,
+  language: string,
+  filename?: string,
+  logger?: Logger,
+): Promise<{ context: ExtractionContext; rawText: string }> {
+  const isPdf = mimeType === 'application/pdf';
+  const context: ExtractionContext = { fileBuffer, mimeType, filename, language, isPdf };
+  let rawText = '';
+  if (isPdf) {
+    try {
+      const pdfResult = await extractTextFromPdf(fileBuffer);
+      logger?.log(
+        `PDF extraction: pages=${pdfResult.pageCount}, native=${pdfResult.isNativeText}, textLen=${pdfResult.text.length}`,
+      );
+      context.pdfText = pdfResult.text;
+      context.pdfIsNativeText = pdfResult.isNativeText;
+      context.pdfPageCount = pdfResult.pageCount;
+      if (pdfResult.text.length > 20) {
+        rawText = pdfResult.text;
+        if (rawText.length > PDF_TEXT_TRUNCATION_LIMIT) {
+          rawText = rawText.slice(0, PDF_TEXT_TRUNCATION_LIMIT);
+          context.pdfText = rawText;
+        }
+      }
+    } catch (error) {
+      logger?.warn(
+        `PDF text extraction failed: ${error instanceof Error ? error.name : 'unknown error'}`,
+      );
+    }
+  }
+  return { context, rawText };
+}
+
 function uniqueIds(values: Array<string | undefined>): string[] {
   return [...new Set(values.filter((v): v is string => typeof v === 'string' && v.length > 0))];
 }
@@ -243,45 +289,21 @@ export class DocumentIntakeService {
       `Processing document intake: org=${organizationId}, mime=${mimeType}, size=${fileBuffer.length}, strategy=${strategy || 'default'}`,
     );
 
-    let rawText = '';
     let extraction: DocumentExtractionResult | null = null;
     let extractionMethod: DocumentIntakeResult['extractionMethod'] = 'ocr-llm';
-    const isPdf = mimeType === 'application/pdf';
 
     // Step 1: Build extraction context
     onProgress?.('extracting', 20, 'AI is reading your document...');
 
-    const context: ExtractionContext = {
+    const prepared = await buildExtractionContext(
       fileBuffer,
       mimeType,
+      _language,
       filename,
-      language: _language,
-      isPdf,
-    };
-
-    // For PDFs, extract text first (used by all strategies)
-    if (isPdf) {
-      try {
-        const pdfResult = await extractTextFromPdf(fileBuffer);
-        this.logger.log(
-          `PDF extraction: pages=${pdfResult.pageCount}, native=${pdfResult.isNativeText}, textLen=${pdfResult.text.length}`,
-        );
-        context.pdfText = pdfResult.text;
-        context.pdfIsNativeText = pdfResult.isNativeText;
-        context.pdfPageCount = pdfResult.pageCount;
-        if (pdfResult.text.length > 20) {
-          rawText = pdfResult.text;
-          if (rawText.length > PDF_TEXT_TRUNCATION_LIMIT) {
-            rawText = rawText.slice(0, PDF_TEXT_TRUNCATION_LIMIT);
-            context.pdfText = rawText;
-          }
-        }
-      } catch (error) {
-        this.logger.warn(
-          `PDF text extraction failed: ${error instanceof Error ? error.name : 'unknown error'}`,
-        );
-      }
-    }
+      this.logger,
+    );
+    const context = prepared.context;
+    let rawText = prepared.rawText;
 
     // Step 2: Resolve and execute extraction strategy
     const strategyResult = await this.strategyResolver.resolve(context, strategy);
@@ -357,6 +379,8 @@ export class DocumentIntakeService {
       );
     }
 
+    const validation = await this.validateFields(organizationId, extraction);
+
     // Step 6: Use extracted dueDate, fall back to +30 days from invoice date
     let dueDate: string | null = extraction.dueDate;
     if (!dueDate && extraction.date) {
@@ -414,6 +438,7 @@ export class DocumentIntakeService {
       fieldConfidence: extraction.fieldConfidence,
       fieldEvidence: extraction.fieldEvidence,
       extractionWarnings: extraction.extractionWarnings,
+      validation,
       ocrConfidence: extraction.ocrConfidence,
       matchedVendor,
       vendorCandidates,
@@ -427,6 +452,34 @@ export class DocumentIntakeService {
     };
   }
 
+  /** Field validation for any strategy; vendor match is by tax ID within the organization. */
+  private async validateFields(
+    organizationId: string,
+    extraction: DocumentExtractionResult,
+  ): Promise<ExtractionValidation> {
+    const org = await this.prisma.organization.findFirst({
+      where: { id: organizationId },
+      select: { baseCurrency: true },
+    });
+    if (!org?.baseCurrency?.trim()) {
+      throw new BadRequestException('Organization base currency is unavailable');
+    }
+    const taxId = extraction.vendorTaxId?.trim();
+    const digits = taxId ? normalizeDigits(taxId).replace(/[\s\-.]/g, '') : undefined;
+    let vendorMatchedByTaxId = false;
+    if (taxId && digits) {
+      const vendor = await this.prisma.vendor.findFirst({
+        where: { organizationId, deletedAt: null, taxId: { in: [...new Set([taxId, digits])] } },
+        select: { id: true },
+      });
+      vendorMatchedByTaxId = vendor !== null;
+    }
+    return validateExtraction(
+      { ...extraction },
+      { baseCurrency: org.baseCurrency, vendorMatchedByTaxId },
+    );
+  }
+
   /**
    * Confirm extracted data and create a draft Bill or Invoice.
    *
@@ -434,21 +487,51 @@ export class DocumentIntakeService {
    * belong to `organizationId` before anything is written; a foreign or unknown
    * id is rejected with 400 and no mutation. Totals come from the shared Decimal
    * calculator: `taxRatePercent` is a percentage, line `amount` is the net.
+   * When a transaction is supplied, its owner calls recordConfirmation after commit.
    */
   async confirmAndCreate(
     organizationId: string,
     dto: ConfirmIntakeInput,
+    tx?: Prisma.TransactionClient,
   ): Promise<{ type: 'bill' | 'invoice'; id: string; number: string }> {
     if (!organizationId) {
       throw new BadRequestException('Organization context is required');
     }
-    if (dto.type === 'BILL') {
-      return this.createDraftBill(organizationId, dto);
+    if (dto.type !== 'BILL' && dto.type !== 'INVOICE') {
+      throw new BadRequestException('type must be BILL or INVOICE');
     }
-    if (dto.type === 'INVOICE') {
-      return this.createDraftInvoice(organizationId, dto);
+    const result =
+      dto.type === 'BILL'
+        ? await this.createDraftBill(organizationId, dto, tx)
+        : await this.createDraftInvoice(organizationId, dto, tx);
+    if (!tx) await this.recordConfirmation(organizationId, dto, result);
+    return result;
+  }
+
+  /** Best-effort feedback and success logging; call only after the draft transaction commits. */
+  async recordConfirmation(
+    organizationId: string,
+    dto: ConfirmIntakeInput,
+    draft: { type: 'bill' | 'invoice'; id: string; number: string },
+  ): Promise<void> {
+    if (draft.type === 'bill') {
+      try {
+        await this.feedbackService.processFeedback(organizationId, {
+          feature: AiFeature.DOCUMENT_CLASSIFICATION,
+          aiSuggestion: { type: 'document_intake', documentType: 'BILL' },
+          userAction: dto.corrections ? AiFeedbackAction.CORRECTED : AiFeedbackAction.ACCEPTED,
+          userAnswer: dto.corrections ? JSON.stringify(dto.corrections) : undefined,
+          inputData: { billNumber: draft.number, vendorId: dto.vendorId },
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Failed to log intake feedback: ${error instanceof Error ? error.name : 'unknown error'}`,
+        );
+      }
     }
-    throw new BadRequestException('type must be BILL or INVOICE');
+    this.logger.log(
+      `Created draft ${draft.type} ${draft.id} (${dto.lines.length} lines) from document intake for org ${organizationId}`,
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -634,64 +717,85 @@ export class DocumentIntakeService {
     };
   }
 
+  /**
+   * Append-only idempotency record of the draft created for an intake job. Written in the same
+   * transaction as the draft, so recovery can link a draft whose job update was lost.
+   */
+  private async writeDraftMarker(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    dto: ConfirmIntakeInput,
+    draft: { type: 'bill' | 'invoice'; id: string },
+  ): Promise<void> {
+    if (!dto.jobId) return;
+    const job = await tx.intakeJob.findFirst({
+      where: { id: dto.jobId, organizationId, deletedAt: null },
+      select: { createdById: true },
+    });
+    if (!job) throw new BadRequestException('Intake job not found');
+    const actorUserId = dto.userId ?? job.createdById;
+    await tx.auditLog.create({
+      data: {
+        organizationId,
+        userId: actorUserId,
+        action: 'CREATE',
+        entityType: INTAKE_DRAFT_ENTITY,
+        entityId: dto.jobId,
+        newValues: { draftType: draft.type, draftId: draft.id },
+      },
+    });
+  }
+
   private async createDraftBill(
     organizationId: string,
     dto: ConfirmIntakeInput,
+    tx?: Prisma.TransactionClient,
   ): Promise<{ type: 'bill'; id: string; number: string }> {
     const resolved = await this.resolveConfirmation(organizationId, dto);
     const vendorId = dto.vendorId as string;
 
     const billNumber = dto.documentNumber || (await this.generateBillNumber(organizationId));
 
-    const bill = await this.prisma.bill.create({
-      data: {
-        billNumber,
-        vendorId,
-        date: new Date(dto.date),
-        dueDate: new Date(dto.dueDate),
-        subtotal: resolved.subtotal,
-        taxAmount: resolved.taxAmount,
-        grandTotal: resolved.grandTotal,
-        balanceDue: resolved.grandTotal,
-        reference: dto.reference,
-        currencyCode: resolved.currencyCode,
-        notes: dto.notes || 'Created from document scan',
-        projectId: dto.projectId || null,
-        organizationId,
-        lines: {
-          create: resolved.lines.map((line) => ({
-            itemId: line.itemId,
-            accountId: line.accountId,
-            taxRateId: line.taxRateId,
-            description: line.description,
-            quantity: line.quantity,
-            rate: line.rate,
-            taxRate: line.taxRatePercent,
-            amount: line.netAmount,
-          })),
+    const create = async (tx: Prisma.TransactionClient) => {
+      if (dto.jobId) {
+        await lockIntakeJob(tx, organizationId, dto.jobId);
+      }
+      const b = await tx.bill.create({
+        data: {
+          billNumber,
+          vendorId,
+          date: new Date(dto.date),
+          dueDate: new Date(dto.dueDate),
+          subtotal: resolved.subtotal,
+          taxAmount: resolved.taxAmount,
+          grandTotal: resolved.grandTotal,
+          balanceDue: resolved.grandTotal,
+          reference: dto.reference,
+          currencyCode: resolved.currencyCode,
+          notes: dto.notes || 'Created from document scan',
+          projectId: dto.projectId || null,
+          organizationId,
+          lines: {
+            create: resolved.lines.map((line) => ({
+              itemId: line.itemId,
+              accountId: line.accountId,
+              taxRateId: line.taxRateId,
+              description: line.description,
+              quantity: line.quantity,
+              rate: line.rate,
+              taxRate: line.taxRatePercent,
+              amount: line.netAmount,
+            })),
+          },
         },
-      },
-      select: { id: true },
-    });
-
-    // Log feedback for AI improvement
-    try {
-      await this.feedbackService.processFeedback(organizationId, {
-        feature: AiFeature.DOCUMENT_CLASSIFICATION,
-        aiSuggestion: { type: 'document_intake', documentType: 'BILL' },
-        userAction: dto.corrections ? AiFeedbackAction.CORRECTED : AiFeedbackAction.ACCEPTED,
-        userAnswer: dto.corrections ? JSON.stringify(dto.corrections) : undefined,
-        inputData: { billNumber, vendorId },
+        select: { id: true },
       });
-    } catch (error) {
-      this.logger.warn(
-        `Failed to log intake feedback: ${error instanceof Error ? error.name : 'unknown error'}`,
-      );
-    }
 
-    this.logger.log(
-      `Created draft bill ${bill.id} (${resolved.lines.length} lines) from document intake for org ${organizationId}`,
-    );
+      await this.writeDraftMarker(tx, organizationId, dto, { type: 'bill', id: b.id });
+
+      return b;
+    };
+    const bill = tx ? await create(tx) : await this.prisma.$transaction(create);
 
     return { type: 'bill', id: bill.id, number: billNumber };
   }
@@ -699,47 +803,54 @@ export class DocumentIntakeService {
   private async createDraftInvoice(
     organizationId: string,
     dto: ConfirmIntakeInput,
+    tx?: Prisma.TransactionClient,
   ): Promise<{ type: 'invoice'; id: string; number: string }> {
     const resolved = await this.resolveConfirmation(organizationId, dto);
     const customerId = dto.customerId as string;
 
     const invoiceNumber = await this.generateInvoiceNumber(organizationId);
 
-    const invoice = await this.prisma.invoice.create({
-      data: {
-        invoiceNumber,
-        customerId,
-        projectId: dto.projectId || null,
-        date: new Date(dto.date),
-        dueDate: new Date(dto.dueDate),
-        subtotal: resolved.subtotal,
-        taxAmount: resolved.taxAmount,
-        shippingAmount: new Decimal(0),
-        grandTotal: resolved.grandTotal,
-        balanceDue: resolved.grandTotal,
-        currencyCode: resolved.currencyCode,
-        notes: dto.notes || 'Created from document scan',
-        organizationId,
-        lines: {
-          // InvoiceLine has no accountId column; a supplied account is only validated.
-          create: resolved.lines.map((line) => ({
-            itemId: line.itemId,
-            taxRateId: line.taxRateId,
-            description: line.description,
-            quantity: line.quantity,
-            rate: line.rate,
-            discount: line.discountPercent,
-            taxRate: line.taxRatePercent,
-            amount: line.netAmount,
-          })),
+    const create = async (tx: Prisma.TransactionClient) => {
+      if (dto.jobId) {
+        await lockIntakeJob(tx, organizationId, dto.jobId);
+      }
+      const inv = await tx.invoice.create({
+        data: {
+          invoiceNumber,
+          customerId,
+          projectId: dto.projectId || null,
+          date: new Date(dto.date),
+          dueDate: new Date(dto.dueDate),
+          subtotal: resolved.subtotal,
+          taxAmount: resolved.taxAmount,
+          shippingAmount: new Decimal(0),
+          grandTotal: resolved.grandTotal,
+          balanceDue: resolved.grandTotal,
+          currencyCode: resolved.currencyCode,
+          notes: dto.notes || 'Created from document scan',
+          organizationId,
+          lines: {
+            // InvoiceLine has no accountId column; a supplied account is only validated.
+            create: resolved.lines.map((line) => ({
+              itemId: line.itemId,
+              taxRateId: line.taxRateId,
+              description: line.description,
+              quantity: line.quantity,
+              rate: line.rate,
+              discount: line.discountPercent,
+              taxRate: line.taxRatePercent,
+              amount: line.netAmount,
+            })),
+          },
         },
-      },
-      select: { id: true },
-    });
+        select: { id: true },
+      });
 
-    this.logger.log(
-      `Created draft invoice ${invoice.id} (${resolved.lines.length} lines) from document intake for org ${organizationId}`,
-    );
+      await this.writeDraftMarker(tx, organizationId, dto, { type: 'invoice', id: inv.id });
+
+      return inv;
+    };
+    const invoice = tx ? await create(tx) : await this.prisma.$transaction(create);
 
     return { type: 'invoice', id: invoice.id, number: invoiceNumber };
   }

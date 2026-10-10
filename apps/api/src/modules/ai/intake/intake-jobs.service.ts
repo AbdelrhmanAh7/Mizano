@@ -10,9 +10,12 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IntakeJob, IntakeJobStatus, IntakeSource, Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { describeError } from '../../../common/utils/redact';
+import { endOfUtcDay } from '../../reports/utils/report-utils';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { IntakeStage } from '../services/document-intake.service';
+import { DocumentIntakeResult, IntakeStage } from '../services/document-intake.service';
+import { buildBillConfirmation, IntakeBlockerCode } from './intake-bulk-approve';
 import { IntakeQueueService } from './intake-queue.service';
 import { buildIntakeStorageKey, IntakeStorage, sha256Hex } from './intake-storage';
 
@@ -21,6 +24,34 @@ export type IntakeJobView = Omit<IntakeJob, 'storageKey' | 'deletedAt' | 'result
   result?: Prisma.JsonValue | null;
   stage: IntakeStage;
 };
+
+/** Inbox row data derived from the stored result; never includes raw document text. */
+export interface IntakeJobSummary {
+  documentType: string | null;
+  vendorName: string | null;
+  documentNumber: string | null;
+  date: string | null;
+  /** Fixed 4-dp decimal string. */
+  total: string | null;
+  currency: string | null;
+  confidence: number | null;
+  /** EXTRACTED and complete enough for bulk approval. */
+  readyToApprove: boolean;
+  blocker: IntakeBlockerCode | null;
+}
+
+export type IntakeJobListItem = Omit<IntakeJobView, 'result'> & { summary: IntakeJobSummary };
+
+export interface ListIntakeJobsQuery {
+  status?: IntakeJobStatus | IntakeJobStatus[];
+  source?: IntakeSource;
+  /** Inclusive date-only bounds on createdAt. */
+  from?: string;
+  to?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
 
 export interface CreateIntakeUpload {
   organizationId: string;
@@ -37,11 +68,21 @@ export interface CreateIntakeUpload {
 const DEFAULT_MAX_ACTIVE_PER_ORG = 50;
 const DEFAULT_LEASE_MS = 5 * 60 * 1000;
 const DEFAULT_RETRY_BASE_MS = 5000;
+export const DEFAULT_APPROVAL_GRACE_MS = 5 * 60 * 1000;
+
+/** AuditLog.entityType of the per-job idempotency record of a created draft. */
+export const INTAKE_DRAFT_ENTITY = 'INTAKE_DRAFT';
 
 /** How long a PROCESSING job may go without an update before another worker may take it over. */
 export function intakeLeaseMs(config: ConfigService): number {
   const n = Number(config.get<string>('INTAKE_LEASE_MS'));
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_LEASE_MS;
+}
+
+/** How long an APPROVED job may remain without draftDocumentId before recovery sweep claims or reopens it. */
+export function intakeApprovalGraceMs(config: ConfigService): number {
+  const n = Number(config.get<string>('INTAKE_APPROVAL_GRACE_MS'));
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_APPROVAL_GRACE_MS;
 }
 
 /** Legacy progress stage derived from the durable status, for the progress UI. */
@@ -70,6 +111,18 @@ export function isTerminalStage(stage: IntakeStage): boolean {
 
 export function queueJobId(jobId: string, attempts: number): string {
   return `${jobId}-a${attempts}`;
+}
+
+/**
+ * Row-locks one intake job for the rest of the transaction.
+ * Scoped by organization: another tenant's job id matches nothing and is never locked.
+ */
+export async function lockIntakeJob(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+  jobId: string,
+): Promise<void> {
+  await tx.$queryRaw`SELECT id FROM "intake_jobs" WHERE id = ${jobId} AND "organizationId" = ${organizationId} FOR UPDATE`;
 }
 
 const RECOVERY_BATCH = 200;
@@ -155,6 +208,8 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
         after = batch[batch.length - 1].id;
       }
       if (enqueued > 0) this.logger.log(`Re-enqueued ${enqueued} intake job(s)`);
+
+      await this.recoverApprovedJobs();
     } catch (error) {
       this.logger.error(
         `Intake recovery failed: ${describeError(error, { includeMessage: false })}`,
@@ -254,31 +309,108 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
     return job;
   }
 
+  /** Base currency of the organization; drafts in another currency are never bulk-approved. */
+  async baseCurrency(organizationId: string): Promise<string | null> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { baseCurrency: true },
+    });
+    return org?.baseCurrency ?? null;
+  }
+
+  summarize(job: IntakeJob, baseCurrency: string | null): IntakeJobSummary {
+    const result = (job.result ?? null) as DocumentIntakeResult | null;
+    const fields = result?.extractedFields;
+    let total: string | null = null;
+    if (fields?.total !== null && fields?.total !== undefined) {
+      try {
+        total = new Decimal(String(fields.total)).toFixed(4);
+      } catch {
+        total = null;
+      }
+    }
+    const confirmation =
+      job.status === IntakeJobStatus.EXTRACTED
+        ? buildBillConfirmation(result, { baseCurrency })
+        : null;
+    return {
+      documentType: result?.documentType ?? null,
+      vendorName: result?.matchedVendor?.name ?? fields?.vendorName ?? null,
+      documentNumber: fields?.documentNumber ?? null,
+      date: fields?.date ?? null,
+      total,
+      currency: fields?.currency ?? null,
+      confidence: typeof result?.ocrConfidence === 'number' ? result.ocrConfidence : null,
+      readyToApprove: confirmation?.ok === true,
+      blocker: confirmation && !confirmation.ok ? confirmation.code : null,
+    };
+  }
+
   async list(
     organizationId: string,
-    query: { status?: IntakeJobStatus; page?: number; limit?: number },
+    query: ListIntakeJobsQuery,
   ): Promise<{
-    data: IntakeJobView[];
+    data: IntakeJobListItem[];
     meta: { page: number; limit: number; total: number; totalPages: number };
   }> {
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(100, Math.max(1, query.limit ?? 20));
+    const search = query.search?.trim();
+    const createdAt: Prisma.DateTimeFilter = {};
+    if (query.from) createdAt.gte = new Date(query.from);
+    if (query.to) createdAt.lte = endOfUtcDay(new Date(query.to));
+    // An empty status list (`?status=`) means "no status filter", not "no rows".
+    const statuses = Array.isArray(query.status) ? query.status : [query.status];
+    const statusFilter = statuses.filter((s): s is IntakeJobStatus => Boolean(s));
     const where: Prisma.IntakeJobWhereInput = {
       organizationId,
       deletedAt: null,
-      ...(query.status ? { status: query.status } : {}),
+      ...(statusFilter.length > 0 ? { status: { in: statusFilter } } : {}),
+      ...(query.source ? { source: query.source } : {}),
+      ...(query.from || query.to ? { createdAt } : {}),
     };
-    const [rows, total] = await Promise.all([
-      this.prisma.intakeJob.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.intakeJob.count({ where }),
+    // JSON string filters are case-sensitive in Prisma. Keep ILIKE and every other
+    // filter in one SQL predicate used by both queries, without loading matching ids.
+    const pattern = `%${search?.replace(/[\\%_]/g, '\\$&')}%`;
+    const predicate = Prisma.sql`
+      "organizationId" = ${organizationId} AND "deletedAt" IS NULL
+      ${statusFilter.length > 0 ? Prisma.sql`AND "status" IN (${Prisma.join(statusFilter.map((status) => Prisma.sql`${status}::"IntakeJobStatus"`))})` : Prisma.empty}
+      ${query.source ? Prisma.sql`AND "source" = ${query.source}::"IntakeSource"` : Prisma.empty}
+      ${query.from ? Prisma.sql`AND "createdAt" >= ${createdAt.gte}` : Prisma.empty}
+      ${query.to ? Prisma.sql`AND "createdAt" <= ${createdAt.lte}` : Prisma.empty}
+      AND (
+        "originalFileName" ILIKE ${pattern}
+        OR "result"->'extractedFields'->>'vendorName' ILIKE ${pattern}
+        OR "result"->'matchedVendor'->>'name' ILIKE ${pattern}
+        OR "result"->'extractedFields'->>'documentNumber' ILIKE ${pattern}
+      )`;
+    const [rows, total, baseCurrency] = await Promise.all([
+      search
+        ? this.prisma.$queryRaw<IntakeJob[]>(Prisma.sql`
+            SELECT * FROM "intake_jobs" WHERE ${predicate}
+            ORDER BY "createdAt" DESC, "id" DESC
+            LIMIT ${limit} OFFSET ${(page - 1) * limit}`)
+        : this.prisma.intakeJob.findMany({
+            where,
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+            skip: (page - 1) * limit,
+            take: limit,
+          }),
+      search
+        ? this.prisma
+            .$queryRaw<{ total: bigint }[]>(
+              Prisma.sql`
+              SELECT COUNT(*) AS "total" FROM "intake_jobs" WHERE ${predicate}`,
+            )
+            .then(([row]) => Number(row.total))
+        : this.prisma.intakeJob.count({ where }),
+      this.baseCurrency(organizationId),
     ]);
     return {
-      data: rows.map((row) => this.toView(row, false)),
+      data: rows.map((row) => ({
+        ...this.toView(row, false),
+        summary: this.summarize(row, baseCurrency),
+      })),
       meta: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
     };
   }
@@ -319,10 +451,18 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
   }
 
   /** EXTRACTED/NEEDS_REVIEW -> APPROVED; returns the status to restore if the draft fails. */
-  async claimForApproval(jobId: string, organizationId: string): Promise<IntakeJobStatus> {
-    const current = await this.getForOrg(jobId, organizationId);
+  async claimForApproval(
+    jobId: string,
+    organizationId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<IntakeJobStatus> {
+    const db = tx ?? this.prisma;
+    const current = tx
+      ? await tx.intakeJob.findFirst({ where: { id: jobId, organizationId, deletedAt: null } })
+      : await this.getForOrg(jobId, organizationId);
+    if (!current) throw new NotFoundException('Intake job not found');
     const previous = current.status;
-    const claimed = await this.prisma.intakeJob.updateMany({
+    const claimed = await db.intakeJob.updateMany({
       where: {
         id: jobId,
         organizationId,
@@ -352,14 +492,216 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
     });
   }
 
+  /** Claim, draft and link commit together; recovery cannot reopen an in-flight confirmation. */
+  async confirmWithApproval<T extends { type: string; id: string }>(
+    jobId: string,
+    organizationId: string,
+    createDraft: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return this.prisma.$transaction(async (tx) => {
+      await lockIntakeJob(tx, organizationId, jobId);
+      await this.claimForApproval(jobId, organizationId, tx);
+      const draft = await createDraft(tx);
+      const linked = await tx.intakeJob.updateMany({
+        where: {
+          id: jobId,
+          organizationId,
+          deletedAt: null,
+          status: IntakeJobStatus.APPROVED,
+          draftDocumentId: null,
+        },
+        data: { draftDocumentType: draft.type, draftDocumentId: draft.id },
+      });
+      if (linked.count === 0) throw new ConflictException('Intake job could not be linked');
+      return draft;
+    });
+  }
+
   async linkDraft(
     jobId: string,
     organizationId: string,
     draft: { type: string; id: string },
   ): Promise<void> {
     await this.prisma.intakeJob.updateMany({
-      where: { id: jobId, organizationId, status: IntakeJobStatus.APPROVED },
+      where: {
+        id: jobId,
+        organizationId,
+        deletedAt: null,
+        status: IntakeJobStatus.APPROVED,
+        draftDocumentId: null,
+      },
       data: { draftDocumentType: draft.type, draftDocumentId: draft.id },
     });
+  }
+
+  /**
+   * Recovers APPROVED jobs that have no draftDocumentId (e.g. process crashed between approval
+   * claim and draft linking).
+   *
+   * For each job older than the grace period:
+   * 1. Looks up the INTAKE_DRAFT audit marker (strictly org-scoped).
+   * 2. If marker and draft exist: links the draft with a guarded org-scoped update.
+   * 3. If no draft exists: marks the job back to EXTRACTED with a redacted lastError
+   *    so the accountant can confirm again.
+   *
+   * Never creates a draft during recovery.
+   */
+  async recoverApprovedJobs(options?: {
+    organizationId?: string;
+    now?: Date;
+    graceMs?: number;
+  }): Promise<{ linked: number; reopened: number }> {
+    let linked = 0;
+    let reopened = 0;
+    const now = options?.now ?? new Date();
+    const graceMs = options?.graceMs ?? intakeApprovalGraceMs(this.config);
+    const cutoff = new Date(now.getTime() - graceMs);
+
+    try {
+      let after = '';
+      for (;;) {
+        const batch = await this.prisma.intakeJob.findMany({
+          where: {
+            deletedAt: null,
+            id: { gt: after },
+            status: IntakeJobStatus.APPROVED,
+            draftDocumentId: null,
+            updatedAt: { lt: cutoff },
+            ...(options?.organizationId ? { organizationId: options.organizationId } : {}),
+          },
+          select: {
+            id: true,
+            organizationId: true,
+            status: true,
+            updatedAt: true,
+          },
+          orderBy: { id: 'asc' },
+          take: RECOVERY_BATCH,
+        });
+
+        for (const job of batch) {
+          const outcome = await this.recoverSingleApprovedJob(job.id, job.organizationId);
+          if (outcome === 'linked') linked += 1;
+          else if (outcome === 'reopened') reopened += 1;
+        }
+
+        if (batch.length < RECOVERY_BATCH) break;
+        after = batch[batch.length - 1].id;
+      }
+
+      if (linked > 0 || reopened > 0) {
+        this.logger.log(`Recovered approved intake jobs: linked=${linked}, reopened=${reopened}`);
+      }
+    } catch (error) {
+      this.logger.error(
+        `Intake approved jobs recovery failed: ${describeError(error, { includeMessage: false })}`,
+      );
+    }
+
+    return { linked, reopened };
+  }
+
+  private async recoverSingleApprovedJob(
+    jobId: string,
+    organizationId: string,
+  ): Promise<'linked' | 'reopened' | 'none'> {
+    return this.prisma.$transaction(async (tx) => {
+      await lockIntakeJob(tx, organizationId, jobId);
+
+      const marker = await tx.auditLog.findFirst({
+        where: { organizationId, entityType: INTAKE_DRAFT_ENTITY, entityId: jobId },
+        orderBy: { createdAt: 'desc' },
+        select: { newValues: true },
+      });
+
+      let draftInfo: { type: string; id: string } | null = null;
+      if (marker && marker.newValues && typeof marker.newValues === 'object') {
+        const v = marker.newValues as Record<string, unknown>;
+        const draftType = typeof v.draftType === 'string' ? v.draftType : null;
+        const draftId = typeof v.draftId === 'string' ? v.draftId : null;
+        if (draftType && draftId) {
+          const exists = await this.verifyDraftExists(organizationId, draftType, draftId, tx);
+          if (exists) {
+            draftInfo = { type: draftType.toLowerCase(), id: draftId };
+          }
+        }
+      }
+
+      if (draftInfo) {
+        const updated = await tx.intakeJob.updateMany({
+          where: {
+            id: jobId,
+            organizationId,
+            deletedAt: null,
+            status: IntakeJobStatus.APPROVED,
+            draftDocumentId: null,
+          },
+          data: {
+            draftDocumentType: draftInfo.type,
+            draftDocumentId: draftInfo.id,
+          },
+        });
+        if (updated.count > 0) {
+          this.logger.log(
+            `Recovered intake job ${jobId}: linked draft ${draftInfo.type}:${draftInfo.id} for org ${organizationId}`,
+          );
+          return 'linked';
+        }
+        return 'none';
+      }
+
+      const reopened = await tx.intakeJob.updateMany({
+        where: {
+          id: jobId,
+          organizationId,
+          deletedAt: null,
+          status: IntakeJobStatus.APPROVED,
+          draftDocumentId: null,
+        },
+        data: {
+          status: IntakeJobStatus.EXTRACTED,
+          lastError: 'Approval interrupted before draft creation; ready to confirm again',
+        },
+      });
+      if (reopened.count > 0) {
+        this.logger.warn(
+          `Recovered intake job ${jobId}: no draft found for org ${organizationId}; reopened to EXTRACTED`,
+        );
+        return 'reopened';
+      }
+      return 'none';
+    });
+  }
+
+  private async verifyDraftExists(
+    organizationId: string,
+    draftType: string,
+    draftId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<boolean> {
+    const db = tx ?? this.prisma;
+    const type = draftType.toLowerCase();
+    if (type === 'bill') {
+      const bill = await db.bill.findFirst({
+        where: { id: draftId, organizationId, deletedAt: null },
+        select: { id: true },
+      });
+      return !!bill;
+    }
+    if (type === 'invoice') {
+      const invoice = await db.invoice.findFirst({
+        where: { id: draftId, organizationId, deletedAt: null },
+        select: { id: true },
+      });
+      return !!invoice;
+    }
+    if (type === 'expense') {
+      const expense = await db.expense.findFirst({
+        where: { id: draftId, organizationId, deletedAt: null },
+        select: { id: true },
+      });
+      return !!expense;
+    }
+    return false;
   }
 }

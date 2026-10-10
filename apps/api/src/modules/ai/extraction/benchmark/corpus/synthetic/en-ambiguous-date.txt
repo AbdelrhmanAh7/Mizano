@@ -1,0 +1,9 @@
+SYNTHETIC FIXTURE - NOT A REAL INVOICE
+Gulf Office Furniture
+Tax Invoice
+Invoice No: GOF-0099
+Date: 03/04/2024
+VAT Number: 300111222300003
+Subtotal: SAR 5,000.00
+VAT 15%: SAR 750.00
+Total: SAR 5,750.00
