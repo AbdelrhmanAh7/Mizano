@@ -17,12 +17,12 @@ import { RevenuePoint, formatCompactCurrency } from '@/lib/hooks/use-dashboard';
 
 interface MonthlyBurnRateChartProps {
   data: RevenuePoint[];
-  currency?: string;
+  currency: string;
 }
 
 export const MonthlyBurnRateChart = memo(function MonthlyBurnRateChart({
   data,
-  currency = 'USD',
+  currency,
 }: MonthlyBurnRateChartProps) {
   const t = useTranslations('common.dashboard.charts');
 

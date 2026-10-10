@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -55,6 +56,7 @@ import { cn } from '@/lib/utils';
 export default function InvoiceDetailPage() {
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
+  const money = useDocumentMoney();
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -72,14 +74,6 @@ export default function InvoiceDetailPage() {
 
   const canEdit = hasPermission('sales.edit');
   const canDelete = hasPermission('sales.delete');
-
-  const formatCurrency = (amount: string | number, currency: string = 'USD') => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(num);
-  };
 
   const confirmDelete = async () => {
     try {
@@ -283,7 +277,9 @@ export default function InvoiceDetailPage() {
               <DollarSign className="h-4 w-4" />
               Grand Total
             </div>
-            <div className="text-2xl font-bold font-mono">{formatCurrency(grandTotal)}</div>
+            <div className="text-2xl font-bold font-mono">
+              {money(grandTotal, invoice.currencyCode)}
+            </div>
           </CardContent>
         </Card>
 
@@ -294,7 +290,7 @@ export default function InvoiceDetailPage() {
               Amount Paid
             </div>
             <div className="text-2xl font-bold font-mono text-green-600">
-              {formatCurrency(amountPaid)}
+              {money(amountPaid, invoice.currencyCode)}
             </div>
           </CardContent>
         </Card>
@@ -306,7 +302,7 @@ export default function InvoiceDetailPage() {
               Balance Due
             </div>
             <div className={cn('text-2xl font-bold font-mono', balanceDue > 0 && 'text-red-600')}>
-              {formatCurrency(balanceDue)}
+              {money(balanceDue, invoice.currencyCode)}
             </div>
           </CardContent>
         </Card>
@@ -378,7 +374,7 @@ export default function InvoiceDetailPage() {
                             {parseFloat(line.quantity || '0').toFixed(2)}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatCurrency(line.rate || '0')}
+                            {money(line.rate || '0', invoice.currencyCode)}
                           </TableCell>
                           <TableCell className="text-right font-mono">
                             {parseFloat(line.discount || '0').toFixed(0)}%
@@ -387,7 +383,7 @@ export default function InvoiceDetailPage() {
                             {parseFloat(line.taxRate || '0').toFixed(0)}%
                           </TableCell>
                           <TableCell className="text-right font-mono font-medium whitespace-nowrap">
-                            {formatCurrency(line.amount || '0')}
+                            {money(line.amount || '0', invoice.currencyCode)}
                           </TableCell>
                         </TableRow>
                       ),
@@ -406,7 +402,7 @@ export default function InvoiceDetailPage() {
                       {tCommon('subtotal')}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatCurrency(invoice.subtotal || '0')}
+                      {money(invoice.subtotal || '0', invoice.currencyCode)}
                     </TableCell>
                   </TableRow>
                   {parseFloat(invoice.taxAmount || '0') > 0 && (
@@ -415,7 +411,7 @@ export default function InvoiceDetailPage() {
                         {tCommon('tax')}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatCurrency(invoice.taxAmount || '0')}
+                        {money(invoice.taxAmount || '0', invoice.currencyCode)}
                       </TableCell>
                     </TableRow>
                   )}
@@ -425,7 +421,7 @@ export default function InvoiceDetailPage() {
                         {t('invoices.form.shippingAmount')}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatCurrency(invoice.shippingAmount || '0')}
+                        {money(invoice.shippingAmount || '0', invoice.currencyCode)}
                       </TableCell>
                     </TableRow>
                   )}
@@ -434,7 +430,7 @@ export default function InvoiceDetailPage() {
                       {tCommon('total')}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatCurrency(invoice.grandTotal || '0')}
+                      {money(invoice.grandTotal || '0', invoice.currencyCode)}
                     </TableCell>
                   </TableRow>
                 </TableFooter>
@@ -563,7 +559,7 @@ export default function InvoiceDetailPage() {
                         : '-'}
                     </TableCell>
                     <TableCell className="text-right font-mono text-green-600">
-                      {formatCurrency(allocation.amount || '0')}
+                      {money(allocation.amount || '0', invoice.currencyCode)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -606,7 +602,7 @@ export default function InvoiceDetailPage() {
                       {creditNote.date ? format(new Date(creditNote.date), 'MMM d, yyyy') : '-'}
                     </TableCell>
                     <TableCell className="text-right font-mono text-orange-600">
-                      {formatCurrency(creditNote.total || '0')}
+                      {money(creditNote.total || '0', invoice.currencyCode)}
                     </TableCell>
                   </TableRow>
                 ))}

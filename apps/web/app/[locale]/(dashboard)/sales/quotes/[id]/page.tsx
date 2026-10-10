@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -37,13 +38,13 @@ import {
 } from '@/lib/hooks/use-quotes';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { QuoteStatusBadge } from '@/components/sales/status-badge';
-import { formatCurrency } from '@/lib/hooks/use-customers';
 import { format } from 'date-fns';
 
 export default function QuoteDetailPage() {
   const params = useParams();
   const router = useRouter();
   const t = useTranslations('sales');
+  const money = useDocumentMoney();
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const quoteId = params.id as string;
@@ -197,7 +198,6 @@ export default function QuoteDetailPage() {
   }
 
   const lines = quote.lines || [];
-  const currency = quote.customer?.currency || 'USD';
 
   return (
     <div className="space-y-6">
@@ -340,13 +340,13 @@ export default function QuoteDetailPage() {
                   </TableCell>
                   <TableCell className="text-right font-mono">{line.quantity}</TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatCurrency(parseFloat(line.rate), currency)}
+                    {money(line.rate, quote.currencyCode)}
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     {parseFloat(line.discountPercent || '0') > 0 ? `${line.discountPercent}%` : '-'}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatCurrency(parseFloat(line.amount), currency)}
+                    {money(line.amount, quote.currencyCode)}
                   </TableCell>
                 </TableRow>
               ))}
@@ -356,7 +356,7 @@ export default function QuoteDetailPage() {
                   {t('quotes.table.subtotal')}
                 </TableCell>
                 <TableCell className="text-right font-mono">
-                  {formatCurrency(parseFloat(quote.subtotal || '0'), currency)}
+                  {money(quote.subtotal || '0', quote.currencyCode)}
                 </TableCell>
               </TableRow>
               {parseFloat(quote.discountAmount || '0') > 0 && (
@@ -365,7 +365,7 @@ export default function QuoteDetailPage() {
                     {t('quotes.table.discount')}
                   </TableCell>
                   <TableCell className="text-right font-mono text-red-600">
-                    -{formatCurrency(parseFloat(quote.discountAmount || '0'), currency)}
+                    -{money(quote.discountAmount || '0', quote.currencyCode)}
                   </TableCell>
                 </TableRow>
               )}
@@ -375,7 +375,7 @@ export default function QuoteDetailPage() {
                     {t('quotes.table.tax')}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatCurrency(parseFloat(quote.taxAmount), currency)}
+                    {money(quote.taxAmount, quote.currencyCode)}
                   </TableCell>
                 </TableRow>
               )}
@@ -384,7 +384,7 @@ export default function QuoteDetailPage() {
                   {t('quotes.table.total')}
                 </TableCell>
                 <TableCell className="text-right font-mono text-lg">
-                  {formatCurrency(parseFloat(quote.grandTotal || '0'), currency)}
+                  {money(quote.grandTotal || '0', quote.currencyCode)}
                 </TableCell>
               </TableRow>
             </TableBody>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { format } from 'date-fns';
 import { useTranslations } from 'next-intl';
 import {
@@ -14,7 +15,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { RecentTransaction, formatCurrency } from '@/lib/hooks/use-dashboard';
+import { RecentTransaction } from '@/lib/hooks/use-dashboard';
 import { Link } from '@/i18n/routing';
 
 interface RecentTransactionsProps {
@@ -56,6 +57,7 @@ function getTransactionColors(type: RecentTransaction['type']) {
 }
 
 export function RecentTransactions({ transactions }: RecentTransactionsProps) {
+  const money = useDocumentMoney();
   const t = useTranslations('common.dashboard.recentTransactions');
 
   return (
@@ -112,7 +114,7 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
                       ) : (
                         <ArrowDownRight className="h-4 w-4" />
                       )}
-                      {formatCurrency(Math.abs(transaction.amount))}
+                      {money(Math.abs(transaction.amount))}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {format(new Date(transaction.date), 'MMM d')}

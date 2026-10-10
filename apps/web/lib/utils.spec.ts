@@ -27,8 +27,8 @@ describe('cn (className utility)', () => {
 });
 
 describe('formatCurrency', () => {
-  it('formats USD amount with default locale', () => {
-    const result = formatCurrency(1234.56);
+  it('formats an explicit USD amount with the default locale', () => {
+    const result = formatCurrency(1234.56, 'USD');
     expect(result).toBe('$1,234.56');
   });
 
@@ -39,19 +39,19 @@ describe('formatCurrency', () => {
   });
 
   it('formats zero amount', () => {
-    const result = formatCurrency(0);
+    const result = formatCurrency(0, 'USD');
     expect(result).toBe('$0.00');
   });
 
   it('formats negative amount', () => {
-    const result = formatCurrency(-500.25);
+    const result = formatCurrency(-500.25, 'USD');
     expect(result).toContain('500.25');
     // Should contain a minus sign or be wrapped in parentheses
     expect(result).toMatch(/[-\u2212(]/);
   });
 
   it('formats large amounts with commas', () => {
-    const result = formatCurrency(1000000);
+    const result = formatCurrency(1000000, 'USD');
     expect(result).toBe('$1,000,000.00');
   });
 

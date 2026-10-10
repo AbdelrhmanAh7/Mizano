@@ -16,13 +16,10 @@ import { RevenuePoint, formatCompactCurrency } from '@/lib/hooks/use-dashboard';
 
 interface RevenueChartProps {
   data: RevenuePoint[];
-  currency?: string;
+  currency: string;
 }
 
-export const RevenueChart = memo(function RevenueChart({
-  data,
-  currency = 'USD',
-}: RevenueChartProps) {
+export const RevenueChart = memo(function RevenueChart({ data, currency }: RevenueChartProps) {
   const t = useTranslations('common.dashboard.charts');
 
   return (

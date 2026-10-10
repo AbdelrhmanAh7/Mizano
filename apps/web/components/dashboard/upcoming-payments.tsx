@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { format, isToday, isTomorrow, isPast } from 'date-fns';
 import { useTranslations } from 'next-intl';
 import { CalendarClock, AlertCircle } from 'lucide-react';
@@ -7,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { UpcomingPayment, formatCurrency } from '@/lib/hooks/use-dashboard';
+import { UpcomingPayment } from '@/lib/hooks/use-dashboard';
 import { Link } from '@/i18n/routing';
 
 interface UpcomingPaymentsProps {
@@ -26,6 +27,7 @@ function getDueDateLabel(
 }
 
 export function UpcomingPayments({ payments }: UpcomingPaymentsProps) {
+  const money = useDocumentMoney();
   const t = useTranslations('common.dashboard.upcomingPayments');
 
   return (
@@ -78,9 +80,7 @@ export function UpcomingPayments({ payments }: UpcomingPaymentsProps) {
                     <p className="text-sm text-muted-foreground truncate">{payment.vendorName}</p>
                   </div>
                   <div className="text-end shrink-0">
-                    <p className="font-mono font-medium text-red-600">
-                      {formatCurrency(payment.amount)}
-                    </p>
+                    <p className="font-mono font-medium text-red-600">{money(payment.amount)}</p>
                   </div>
                 </div>
               );

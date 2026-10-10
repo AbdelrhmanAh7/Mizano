@@ -4,6 +4,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { vendorsApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { formatMoney } from '@/lib/format-money';
 
 // Types
 type ApiError = { response?: { data?: { message?: string } } };
@@ -269,10 +270,6 @@ export function getBalanceColor(balance: string | number | undefined): string {
 /**
  * Format currency amount
  */
-export function formatCurrency(amount: string | number, currency: string = 'USD'): string {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(num);
+export function formatCurrency(amount: string | number, currency: string): string {
+  return formatMoney(amount, currency);
 }

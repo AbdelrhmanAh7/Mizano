@@ -21,12 +21,12 @@ interface BankBalancePoint {
 
 interface BankBalanceChartProps {
   data: BankBalancePoint[];
-  currency?: string;
+  currency: string;
 }
 
 export const BankBalanceChart = memo(function BankBalanceChart({
   data,
-  currency = 'USD',
+  currency,
 }: BankBalanceChartProps) {
   const t = useTranslations('common.dashboard.charts');
 

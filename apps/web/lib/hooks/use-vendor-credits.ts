@@ -2,6 +2,7 @@
 
 import { useToast } from '@/components/ui/use-toast';
 import { vendorCreditsApi } from '@/lib/api';
+import { formatMoney } from '@/lib/format-money';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CreateVendorCreditPayload } from '@/components/purchases/vendor-credit-payload';
@@ -298,16 +299,7 @@ export function getTypeText(type: VendorCreditType): string {
  */
 export function formatCurrency(
   amount: string | number | null | undefined,
-  currency: string = 'USD',
+  currency: string,
 ): string {
-  const num =
-    amount === null || amount === undefined
-      ? 0
-      : typeof amount === 'string'
-        ? parseFloat(amount)
-        : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(isNaN(num) ? 0 : num);
+  return formatMoney(amount, currency);
 }

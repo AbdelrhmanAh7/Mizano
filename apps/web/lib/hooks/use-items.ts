@@ -1,5 +1,7 @@
 'use client';
 
+import { formatMoney } from '@/lib/format-money';
+import { parseDecimal } from '@/lib/decimal';
 import { useToast } from '@/components/ui/use-toast';
 import { itemsApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
@@ -287,14 +289,11 @@ export function getStockStatus(item: Item): {
 /**
  * Format currency amount
  */
-export function formatCurrency(amount: string | number | null, currency: string = 'USD'): string {
+export function formatCurrency(amount: string | number | null, currency: string): string {
   if (amount === null || amount === undefined) return '-';
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (isNaN(num)) return '-';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(num);
+  if (typeof amount === 'string' && parseDecimal(amount) === null) return '-';
+  if (typeof amount === 'number' && isNaN(amount)) return '-';
+  return formatMoney(amount, currency);
 }
 
 /**

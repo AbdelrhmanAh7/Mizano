@@ -1,5 +1,6 @@
 'use client';
 
+import { useBaseCurrency } from '@/lib/hooks/use-organization';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -31,6 +32,7 @@ interface CRMSectionProps {
 }
 
 export function CRMSection({ enabled }: CRMSectionProps) {
+  const currency = useBaseCurrency();
   const { data: pipelineData } = useDealPipeline(enabled);
   const { data: sourceData } = useLeadsBySource(enabled);
   const { data: conversionData } = useLeadConversionTrend(enabled);
@@ -39,7 +41,11 @@ export function CRMSection({ enabled }: CRMSectionProps) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {pipelineData ? <DealPipelineChart data={pipelineData} /> : <ChartSkeleton />}
+        {pipelineData && currency ? (
+          <DealPipelineChart data={pipelineData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
         {sourceData ? <LeadsBySourceChart data={sourceData} /> : <ChartSkeleton />}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

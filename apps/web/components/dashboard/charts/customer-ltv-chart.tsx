@@ -9,12 +9,12 @@ import { CLVSegmentItem } from '@/lib/hooks/use-dashboard-sections';
 
 interface CustomerLTVChartProps {
   data: CLVSegmentItem[];
-  currency?: string;
+  currency: string;
 }
 
 export const CustomerLTVChart = memo(function CustomerLTVChart({
   data,
-  currency = 'USD',
+  currency,
 }: CustomerLTVChartProps) {
   const t = useTranslations('common.dashboard.charts');
 

@@ -22,14 +22,14 @@ interface AgingBucket {
 
 interface ReceivablesAgingChartProps {
   data: AgingBucket[];
-  currency?: string;
+  currency: string;
 }
 
 const BUCKET_COLORS = ['#22c55e', '#84cc16', '#f59e0b', '#f97316', '#ef4444'];
 
 export const ReceivablesAgingChart = memo(function ReceivablesAgingChart({
   data,
-  currency = 'USD',
+  currency,
 }: ReceivablesAgingChartProps) {
   const t = useTranslations('common.dashboard.charts');
 

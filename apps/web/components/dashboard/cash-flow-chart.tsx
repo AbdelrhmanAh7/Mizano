@@ -17,13 +17,10 @@ import { CashFlowPoint, formatCompactCurrency } from '@/lib/hooks/use-dashboard'
 
 interface CashFlowChartProps {
   data: CashFlowPoint[];
-  currency?: string;
+  currency: string;
 }
 
-export const CashFlowChart = memo(function CashFlowChart({
-  data,
-  currency = 'USD',
-}: CashFlowChartProps) {
+export const CashFlowChart = memo(function CashFlowChart({ data, currency }: CashFlowChartProps) {
   const t = useTranslations('common.dashboard.charts');
 
   return (

@@ -1,5 +1,6 @@
 'use client';
 
+import { useBaseCurrency } from '@/lib/hooks/use-organization';
 import { AIBusinessPulse } from '@/components/dashboard/ai-business-pulse';
 import { WidgetErrorBoundary } from '@/components/dashboard/widget-error-boundary';
 import { DateRangePicker } from '@/components/dashboard/date-range-picker';
@@ -109,6 +110,7 @@ export function DashboardClient() {
   const { data: inventoryData } = useDashboardInventory();
   const { data: projectsData } = useDashboardProjects();
 
+  const baseCurrency = useBaseCurrency();
   const queryClient = useQueryClient();
   const t = useTranslations('common.dashboard');
 
@@ -142,11 +144,12 @@ export function DashboardClient() {
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
             data-tour="dashboard-stats"
           >
-            {statsLoading ? (
+            {statsLoading || !baseCurrency ? (
               Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)
             ) : (
               <>
                 <StatCard
+                  currency={baseCurrency}
                   title={t('stats.revenue')}
                   value={statsData?.stats.revenue || 0}
                   icon={TrendingUp}
@@ -155,6 +158,7 @@ export function DashboardClient() {
                   trend={trends?.revenue}
                 />
                 <StatCard
+                  currency={baseCurrency}
                   title={t('stats.expenses')}
                   value={statsData?.stats.expenses || 0}
                   icon={TrendingDown}
@@ -167,6 +171,7 @@ export function DashboardClient() {
                   }
                 />
                 <StatCard
+                  currency={baseCurrency}
                   title={t('stats.netProfit')}
                   value={statsData?.stats.netProfit || 0}
                   icon={DollarSign}
@@ -175,6 +180,7 @@ export function DashboardClient() {
                   trend={trends?.profit}
                 />
                 <StatCard
+                  currency={baseCurrency}
                   title={t('stats.bankBalance')}
                   value={statsData?.stats.bankBalance || 0}
                   icon={Wallet}
@@ -189,11 +195,12 @@ export function DashboardClient() {
       case 'kpi-row-2':
         return (
           <div key={widgetId} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {statsLoading ? (
+            {statsLoading || !baseCurrency ? (
               Array.from({ length: 6 }).map((_, i) => <StatCardSkeleton key={i} />)
             ) : (
               <>
                 <StatCard
+                  currency={baseCurrency}
                   title={t('stats.receivables')}
                   value={statsData?.stats.totalReceivables || 0}
                   icon={Receipt}
@@ -201,6 +208,7 @@ export function DashboardClient() {
                   iconBgColor="bg-emerald-100"
                 />
                 <StatCard
+                  currency={baseCurrency}
                   title={t('stats.payables')}
                   value={statsData?.stats.totalPayables || 0}
                   icon={CreditCard}
@@ -208,6 +216,7 @@ export function DashboardClient() {
                   iconBgColor="bg-orange-100"
                 />
                 <StatCard
+                  currency={baseCurrency}
                   title={t('stats.netPosition')}
                   value={statsData?.netPosition || 0}
                   icon={ArrowLeftRight}
@@ -215,6 +224,7 @@ export function DashboardClient() {
                   iconBgColor={(statsData?.netPosition || 0) >= 0 ? 'bg-green-100' : 'bg-red-100'}
                 />
                 <StatCard
+                  currency={baseCurrency}
                   title={t('stats.yearlyRevenue')}
                   value={statsData?.yearlyRevenue || 0}
                   icon={DollarSign}
@@ -260,13 +270,21 @@ export function DashboardClient() {
             data-tour="dashboard-charts"
           >
             <div className="relative">
-              {cashFlowData ? <CashFlowChart data={cashFlowData} /> : <ChartSkeleton />}
+              {cashFlowData && baseCurrency ? (
+                <CashFlowChart data={cashFlowData} currency={baseCurrency} />
+              ) : (
+                <ChartSkeleton />
+              )}
               <div className="absolute top-4 end-4">
                 <ChartDrillLink href="/banking/accounts" label={t('drillLinks.viewTransactions')} />
               </div>
             </div>
             <div className="relative">
-              {revenueData ? <RevenueChart data={revenueData} /> : <ChartSkeleton />}
+              {revenueData && baseCurrency ? (
+                <RevenueChart data={revenueData} currency={baseCurrency} />
+              ) : (
+                <ChartSkeleton />
+              )}
               <div className="absolute top-4 end-4">
                 <ChartDrillLink href="/sales/invoices" label={t('drillLinks.viewInvoices')} />
               </div>
@@ -278,7 +296,11 @@ export function DashboardClient() {
         return (
           <div key={widgetId} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="relative">
-              {statsData ? <ARAPChart data={statsData.receivablesVsPayables} /> : <ChartSkeleton />}
+              {statsData && baseCurrency ? (
+                <ARAPChart data={statsData.receivablesVsPayables} currency={baseCurrency} />
+              ) : (
+                <ChartSkeleton />
+              )}
               <div className="absolute top-4 end-4">
                 <ChartDrillLink
                   href="/sales/invoices?status=OVERDUE"
@@ -287,7 +309,11 @@ export function DashboardClient() {
               </div>
             </div>
             <div className="relative">
-              {expensesData ? <ExpensesPie data={expensesData} /> : <ChartSkeleton />}
+              {expensesData && baseCurrency ? (
+                <ExpensesPie data={expensesData} currency={baseCurrency} />
+              ) : (
+                <ChartSkeleton />
+              )}
               <div className="absolute top-4 end-4">
                 <ChartDrillLink href="/purchases/expenses" label={t('drillLinks.viewExpenses')} />
               </div>
@@ -299,8 +325,9 @@ export function DashboardClient() {
         return (
           <div key={widgetId} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="relative">
-              {revenueData ? (
+              {revenueData && baseCurrency ? (
                 <ProfitMarginChart
+                  currency={baseCurrency}
                   data={revenueData.map((r) => ({
                     month: r.month,
                     revenue: r.revenue,
@@ -316,7 +343,11 @@ export function DashboardClient() {
               </div>
             </div>
             <div className="relative">
-              {customersData ? <TopCustomersChart data={customersData} /> : <ChartSkeleton />}
+              {customersData && baseCurrency ? (
+                <TopCustomersChart data={customersData} currency={baseCurrency} />
+              ) : (
+                <ChartSkeleton />
+              )}
               <div className="absolute top-4 end-4">
                 <ChartDrillLink href="/sales/customers" label={t('drillLinks.viewCustomers')} />
               </div>
@@ -328,13 +359,21 @@ export function DashboardClient() {
         return (
           <div key={widgetId} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="relative">
-              {bankingData ? <BankBalanceChart data={bankingData} /> : <ChartSkeleton />}
+              {bankingData && baseCurrency ? (
+                <BankBalanceChart data={bankingData} currency={baseCurrency} />
+              ) : (
+                <ChartSkeleton />
+              )}
               <div className="absolute top-4 end-4">
                 <ChartDrillLink href="/banking/accounts" label={t('drillLinks.viewAccounts')} />
               </div>
             </div>
             <div className="relative">
-              {inventoryData ? <InventoryValueChart data={inventoryData} /> : <ChartSkeleton />}
+              {inventoryData && baseCurrency ? (
+                <InventoryValueChart data={inventoryData} currency={baseCurrency} />
+              ) : (
+                <ChartSkeleton />
+              )}
               <div className="absolute top-4 end-4">
                 <ChartDrillLink href="/inventory/items" label={t('drillLinks.viewItems')} />
               </div>

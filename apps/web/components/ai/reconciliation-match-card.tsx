@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { Check, Eye, FileText, Receipt, CreditCard, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -87,6 +88,7 @@ export function ReconciliationMatchCard({
   isLoading,
   className,
 }: ReconciliationMatchCardProps) {
+  const money = useDocumentMoney();
   const config = entityTypeConfig[match.entityType];
   const Icon = config.icon;
 
@@ -111,12 +113,7 @@ export function ReconciliationMatchCard({
     return entity.customer?.name || entity.vendor?.name || 'Unknown';
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
+  const formatCurrency = (amount: number) => money(amount);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {

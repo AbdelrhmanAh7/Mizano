@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -104,7 +105,8 @@ interface LineItemsFormProps {
   name: string;
   taxRates?: TaxRate[];
   taxRatesStatus?: { isLoading: boolean; isError: boolean };
-  currency?: string;
+  /** Document currency; omitted means the organization base currency. */
+  currency?: string | null;
   showTax?: boolean;
   showDiscount?: boolean;
 }
@@ -166,7 +168,7 @@ export function calculateLineTotals(
   };
 }
 
-export function formatAmount(amount: number, currency = 'USD'): string {
+export function formatAmount(amount: number, currency: string): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
@@ -182,11 +184,13 @@ export function LineItemsForm({
   name,
   taxRates = [],
   taxRatesStatus,
-  currency = 'USD',
+  currency,
   showTax = true,
   showDiscount = true,
 }: LineItemsFormProps) {
   const t = useTranslations('sales');
+  const money = useDocumentMoney();
+  const fmt = (amount: number) => money(amount, currency);
   const { data: items = [] } = useActiveItems();
 
   const { fields, append, remove } = useFieldArray({
@@ -326,7 +330,7 @@ export function LineItemsForm({
                     <SelectItem value="__custom__">Custom item</SelectItem>
                     {items.map((item: Item) => (
                       <SelectItem key={item.id} value={item.id}>
-                        {item.name} - {formatAmount(parseFloat(item.sellingPrice), currency)}
+                        {item.name} - {money(item.sellingPrice, currency)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -402,7 +406,7 @@ export function LineItemsForm({
 
               {/* Amount */}
               <div className="text-right font-mono text-sm font-medium h-9 flex items-center justify-end">
-                {formatAmount(parseFloat(watch(`${name}.${index}.amount`) || '0'), currency)}
+                {money(watch(`${name}.${index}.amount`) || '0', currency)}
               </div>
 
               {/* Actions */}
@@ -425,31 +429,25 @@ export function LineItemsForm({
         <div className="border-t mt-4 pt-4 space-y-2">
           <div className="flex justify-end gap-8 text-sm">
             <span className="text-muted-foreground">Subtotal:</span>
-            <span className="font-mono w-24 text-right">
-              {formatAmount(totals.subtotal, currency)}
-            </span>
+            <span className="font-mono w-24 text-right">{fmt(totals.subtotal)}</span>
           </div>
           {showDiscount && totals.totalDiscount > 0 && (
             <div className="flex justify-end gap-8 text-sm">
               <span className="text-muted-foreground">Discount:</span>
               <span className="font-mono w-24 text-right text-red-600">
-                -{formatAmount(totals.totalDiscount, currency)}
+                -{fmt(totals.totalDiscount)}
               </span>
             </div>
           )}
           {showTax && totals.totalTax > 0 && (
             <div className="flex justify-end gap-8 text-sm">
               <span className="text-muted-foreground">Tax:</span>
-              <span className="font-mono w-24 text-right">
-                {formatAmount(totals.totalTax, currency)}
-              </span>
+              <span className="font-mono w-24 text-right">{fmt(totals.totalTax)}</span>
             </div>
           )}
           <div className="flex justify-end gap-8 text-base font-semibold border-t pt-2">
             <span>Total:</span>
-            <span className="font-mono w-24 text-right">
-              {formatAmount(totals.grandTotal, currency)}
-            </span>
+            <span className="font-mono w-24 text-right">{fmt(totals.grandTotal)}</span>
           </div>
         </div>
       </CardContent>

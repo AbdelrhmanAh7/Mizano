@@ -18,7 +18,7 @@ import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
 
 interface DealPipelineChartProps {
   data: DealPipelineItem[];
-  currency?: string;
+  currency: string;
 }
 
 const STAGE_COLORS: Record<string, string> = {
@@ -32,7 +32,7 @@ const STAGE_COLORS: Record<string, string> = {
 
 export const DealPipelineChart = memo(function DealPipelineChart({
   data,
-  currency = 'USD',
+  currency,
 }: DealPipelineChartProps) {
   const t = useTranslations('common.dashboard.charts');
 

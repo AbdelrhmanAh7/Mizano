@@ -202,6 +202,8 @@
     },
     "approvePost": "Approve & post",
     "approved": "Bill approved and posted",
+    "loadError": "Could not load this bill.",
+    "retry": "Retry",
     "approveFailed": "Failed to approve bill",
     "payments": "Payments",
     "noPayments": "No payments recorded for this bill",

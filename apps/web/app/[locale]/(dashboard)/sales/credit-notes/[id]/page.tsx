@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -18,17 +19,10 @@ import { format } from 'date-fns';
 export default function CreditNoteDetailPage() {
   const params = useParams();
   const t = useTranslations('sales');
+  const money = useDocumentMoney();
   const creditNoteId = params.id as string;
 
   const { data: creditNote, isLoading } = useCreditNote(creditNoteId);
-
-  const formatCurrency = (amount: string | number, currency: string = 'USD') => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(num);
-  };
 
   if (isLoading) {
     return (
@@ -112,7 +106,7 @@ export default function CreditNoteDetailPage() {
               {t('creditNotes.creditAmount')}
             </div>
             <div className="text-2xl font-bold font-mono text-orange-600">
-              {formatCurrency(creditNote.amount)}
+              {money(creditNote.amount)}
             </div>
           </CardContent>
         </Card>
@@ -209,7 +203,7 @@ export default function CreditNoteDetailPage() {
                     <div className="text-sm text-muted-foreground">
                       {t('creditNotes.invoiceTotal')}
                     </div>
-                    <div className="font-mono">{formatCurrency(creditNote.invoice.grandTotal)}</div>
+                    <div className="font-mono">{money(creditNote.invoice.grandTotal)}</div>
                   </div>
                 )}
               </>

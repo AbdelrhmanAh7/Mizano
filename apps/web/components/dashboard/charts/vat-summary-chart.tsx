@@ -18,12 +18,12 @@ import { VATSummaryItem } from '@/lib/hooks/use-dashboard-sections';
 
 interface VATSummaryChartProps {
   data: VATSummaryItem[];
-  currency?: string;
+  currency: string;
 }
 
 export const VATSummaryChart = memo(function VATSummaryChart({
   data,
-  currency = 'USD',
+  currency,
 }: VATSummaryChartProps) {
   const t = useTranslations('common.dashboard.charts');
 

@@ -1,5 +1,7 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
+import { absDecimal } from '@/lib/decimal';
 import { useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -20,7 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { useBankAccount, formatCurrency } from '@/lib/hooks/use-bank-accounts';
+import { useBankAccount } from '@/lib/hooks/use-bank-accounts';
 import {
   useUnmatchedTransactions,
   useSuggestedMatches,
@@ -43,6 +45,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
   const [selectedTransaction, setSelectedTransaction] = useState<string | null>(null);
 
   const { data: account, isLoading: accountLoading } = useBankAccount(accountId);
+  const money = useDocumentMoney();
   const { data: transactionsData, isLoading: transactionsLoading } =
     useUnmatchedTransactions(accountId);
   const { data: suggestedData } = useSuggestedMatches(selectedTransaction || '');
@@ -121,14 +124,16 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">{t('reconciliation.bookBalance')}</p>
-            <p className="text-2xl font-bold font-mono">{formatCurrency(account.systemBalance)}</p>
+            <p className="text-2xl font-bold font-mono">
+              {money(account.systemBalance, account.currency)}
+            </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">{t('reconciliation.bankBalance')}</p>
             <p className="text-2xl font-bold font-mono">
-              {formatCurrency(account.bankBalance || 0)}
+              {money(account.bankBalance || 0, account.currency)}
             </p>
           </CardContent>
         </Card>
@@ -202,7 +207,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                             )}
                           >
                             {tx.type === 'DEPOSIT' ? '+' : '-'}
-                            {formatCurrency(Math.abs(parseFloat(tx.amount as string)))}
+                            {money(absDecimal(String(tx.amount)), account?.currency)}
                           </p>
                           {tx.confidence !== null && (
                             <p className={cn('text-xs', getConfidenceColor(tx.confidence))}>
@@ -251,7 +256,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                             )}
                           >
                             {selectedTx.type === 'DEPOSIT' ? '+' : '-'}
-                            {formatCurrency(Math.abs(parseFloat(selectedTx.amount as string)))}
+                            {money(absDecimal(String(selectedTx.amount)), account?.currency)}
                           </span>
                         </p>
                       </div>
@@ -287,7 +292,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                                 </p>
                                 <p className="text-sm font-mono mt-1">
                                   {t('reconciliation.balanceDue', {
-                                    amount: formatCurrency(match.balanceDue),
+                                    amount: money(match.balanceDue, account?.currency),
                                   })}
                                 </p>
                               </div>

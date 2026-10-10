@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
 import { ImportWizard } from '@/components/import/import-wizard';
@@ -29,7 +30,6 @@ import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import {
-  formatCurrency,
   getBalanceColor,
   useDeleteVendor,
   useInfiniteVendors,
@@ -45,6 +45,7 @@ import { Suspense, useState } from 'react';
 function VendorsPageContent() {
   const t = useTranslations('purchases');
   const tCommon = useTranslations('common');
+  const money = useDocumentMoney();
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const { onExportAll } = useExportAll('vendors', 'vendors');
@@ -178,7 +179,7 @@ function VendorsPageContent() {
         const balance = parseFloat(row.original.outstandingBalance || '0');
         return (
           <span className={cn('font-mono font-medium', getBalanceColor(balance))}>
-            {formatCurrency(balance, row.original.currency)}
+            {money(balance, row.original.currency)}
           </span>
         );
       },

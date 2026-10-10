@@ -33,6 +33,8 @@ export interface QuoteLine {
 export interface Quote {
   id: string;
   quoteNumber: string;
+  /** Document currency; absent means the organization base currency. */
+  currencyCode?: string | null;
   customerId: string;
   customer?: {
     id: string;

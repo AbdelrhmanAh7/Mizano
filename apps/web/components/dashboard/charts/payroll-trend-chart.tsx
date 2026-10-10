@@ -19,12 +19,12 @@ import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
 
 interface PayrollTrendChartProps {
   data: PayrollTrendPoint[];
-  currency?: string;
+  currency: string;
 }
 
 export const PayrollTrendChart = memo(function PayrollTrendChart({
   data,
-  currency = 'USD',
+  currency,
 }: PayrollTrendChartProps) {
   const t = useTranslations('common.dashboard.charts');
 

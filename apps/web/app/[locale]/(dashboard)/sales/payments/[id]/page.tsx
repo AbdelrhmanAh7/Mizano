@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -40,20 +41,13 @@ export default function PaymentReceivedDetailPage() {
   const params = useParams();
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
+  const money = useDocumentMoney();
   const paymentId = params.id as string;
 
   const { data: payment, isLoading } = usePaymentReceived(paymentId);
   const voidPayment = useVoidPaymentReceived();
   const { hasPermission } = usePermissions();
   const canVoid = hasPermission('sales.delete');
-
-  const formatCurrency = (amount: string | number, currency: string = 'USD') => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(num);
-  };
 
   if (isLoading) {
     return (
@@ -169,7 +163,7 @@ export default function PaymentReceivedDetailPage() {
               {t('payments.amount')}
             </div>
             <div className="text-2xl font-bold font-mono text-green-600">
-              {formatCurrency(payment.amount)}
+              {money(payment.amount)}
             </div>
           </CardContent>
         </Card>
@@ -315,16 +309,16 @@ export default function PaymentReceivedDetailPage() {
                         </Link>
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatCurrency(allocation.invoice?.grandTotal || '0')}
+                        {money(allocation.invoice?.grandTotal || '0')}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatCurrency(
+                        {money(
                           parseFloat(allocation.invoice?.balanceDue || '0') +
                             parseFloat(allocation.amount || '0'),
                         )}
                       </TableCell>
                       <TableCell className="text-right font-mono text-green-600 font-semibold">
-                        {formatCurrency(allocation.amount || '0')}
+                        {money(allocation.amount || '0')}
                       </TableCell>
                     </TableRow>
                   ),

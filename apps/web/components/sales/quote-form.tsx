@@ -135,9 +135,6 @@ export function QuoteForm({
     }
   }, [quote, form, taxRates]);
 
-  const selectedCustomerId = form.watch('customerId');
-  const selectedCustomer = customers.find((c: Customer) => c.id === selectedCustomerId);
-
   const handleSubmit = (data: QuoteFormData) => {
     // Never save lines against a tax lookup that failed or has not finished.
     if (taxRatesStatus?.isError || taxRatesStatus?.isLoading) return;
@@ -231,7 +228,6 @@ export function QuoteForm({
         name="lines"
         taxRates={taxRates}
         taxRatesStatus={taxRatesStatus}
-        currency={selectedCustomer?.currency || 'USD'}
         showTax={true}
         showDiscount={true}
       />

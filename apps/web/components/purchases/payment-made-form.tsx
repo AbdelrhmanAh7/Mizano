@@ -30,12 +30,23 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { useUnpaidBills, paymentModeOptions, formatCurrency } from '@/lib/hooks/use-payments-made';
+import { useUnpaidBills, paymentModeOptions } from '@/lib/hooks/use-payments-made';
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
+import {
+  compareDecimals,
+  isPositiveDecimal,
+  isZeroDecimal,
+  minDecimal,
+  normalizeDecimal,
+  parseDecimal,
+  subtractDecimals,
+  sumDecimals,
+} from '@/lib/decimal';
 
 const paymentMadeSchema = z.object({
   vendorId: z.string().min(1, 'Vendor is required'),
   date: z.date({ required_error: 'Date is required' }),
-  amount: z.number().positive('Amount must be positive'),
+  amount: z.string().refine((value) => isPositiveDecimal(value), 'Amount must be positive'),
   paymentMode: z.string().min(1, 'Payment mode is required'),
   paidFromAccountId: z.string().min(1, 'Account is required'),
   reference: z.string().optional(),
@@ -49,9 +60,10 @@ interface BillAllocation {
   billNumber: string;
   date: string;
   dueDate: string;
-  grandTotal: number;
-  balanceDue: number;
-  allocated: number;
+  /** Decimal strings; money never becomes a JS number in this form. */
+  grandTotal: string;
+  balanceDue: string;
+  allocated: string;
   selected: boolean;
 }
 
@@ -75,13 +87,15 @@ export function PaymentMadeForm({
   preselectedBillId,
 }: PaymentMadeFormProps) {
   const [allocations, setAllocations] = useState<BillAllocation[]>([]);
+  // Payments are recorded and posted in the organization base currency.
+  const money = useDocumentMoney();
 
   const form = useForm<PaymentMadeFormData>({
     resolver: zodResolver(paymentMadeSchema),
     defaultValues: {
       vendorId: preselectedVendorId || '',
       date: new Date(),
-      amount: 0,
+      amount: '',
       paymentMode: 'BANK_TRANSFER',
       paidFromAccountId: '',
       reference: '',
@@ -96,10 +110,6 @@ export function PaymentMadeForm({
   const { data: billsData, isLoading: billsLoading } = useUnpaidBills(
     selectedVendorId || undefined,
   );
-
-  // Get selected vendor's currency
-  const selectedVendor = vendors.find((v) => v.id === selectedVendorId);
-  const currency = selectedVendor?.currency || 'USD';
 
   // Update allocations when bills data changes
   useEffect(() => {
@@ -117,9 +127,9 @@ export function PaymentMadeForm({
           billNumber: bill.billNumber,
           date: bill.date,
           dueDate: bill.dueDate,
-          grandTotal: parseFloat(bill.grandTotal || '0'),
-          balanceDue: parseFloat(bill.balanceDue || '0'),
-          allocated: 0,
+          grandTotal: normalizeDecimal(bill.grandTotal || '0'),
+          balanceDue: normalizeDecimal(bill.balanceDue || '0'),
+          allocated: '',
           selected: preselectedBillId === bill.id,
         }),
       );
@@ -142,11 +152,11 @@ export function PaymentMadeForm({
     }
   }, [billsData, preselectedBillId, form]);
 
-  // Calculate totals
+  // Calculate totals (exact decimal arithmetic)
   const totals = useMemo(() => {
-    const totalAllocated = allocations.reduce((sum, a) => sum + a.allocated, 0);
-    const totalBalanceDue = allocations.reduce((sum, a) => sum + a.balanceDue, 0);
-    const unallocated = paymentAmount - totalAllocated;
+    const totalAllocated = sumDecimals(allocations.map((a) => a.allocated));
+    const totalBalanceDue = sumDecimals(allocations.map((a) => a.balanceDue));
+    const unallocated = subtractDecimals(paymentAmount, totalAllocated);
     return { totalAllocated, totalBalanceDue, unallocated };
   }, [allocations, paymentAmount]);
 
@@ -159,7 +169,7 @@ export function PaymentMadeForm({
           return {
             ...a,
             selected: newSelected,
-            allocated: newSelected ? a.balanceDue : 0,
+            allocated: newSelected ? a.balanceDue : '',
           };
         }
         return a;
@@ -167,19 +177,17 @@ export function PaymentMadeForm({
     );
   };
 
-  // Update allocation amount
-  const updateAllocation = (billId: string, amount: number) => {
+  // Update allocation amount from the raw input text; never above the bill's balance
+  const updateAllocation = (billId: string, raw: string) => {
     setAllocations((prev) =>
       prev.map((a) => {
-        if (a.billId === billId) {
-          const validAmount = Math.min(Math.max(0, amount), a.balanceDue);
-          return {
-            ...a,
-            allocated: validAmount,
-            selected: validAmount > 0,
-          };
-        }
-        return a;
+        if (a.billId !== billId) return a;
+        if (raw === '') return { ...a, allocated: '', selected: false };
+        const parsed = parseDecimal(raw);
+        // Ignore malformed or negative input (the field keeps its previous value).
+        if (parsed === null || raw.trim().startsWith('-')) return a;
+        const next = compareDecimals(raw, a.balanceDue) > 0 ? a.balanceDue : raw;
+        return { ...a, allocated: next, selected: isPositiveDecimal(next) };
       }),
     );
   };
@@ -189,13 +197,13 @@ export function PaymentMadeForm({
     let remaining = paymentAmount;
     setAllocations((prev) =>
       prev.map((a) => {
-        if (remaining <= 0) return { ...a, allocated: 0, selected: false };
-        const toAllocate = Math.min(remaining, a.balanceDue);
-        remaining -= toAllocate;
+        if (!isPositiveDecimal(remaining)) return { ...a, allocated: '', selected: false };
+        const toAllocate = minDecimal(remaining, a.balanceDue);
+        remaining = subtractDecimals(remaining, toAllocate);
         return {
           ...a,
-          allocated: toAllocate,
-          selected: toAllocate > 0,
+          allocated: isPositiveDecimal(toAllocate) ? toAllocate : '',
+          selected: isPositiveDecimal(toAllocate),
         };
       }),
     );
@@ -203,32 +211,26 @@ export function PaymentMadeForm({
 
   // Clear all allocations
   const clearAllocations = () => {
-    setAllocations((prev) => prev.map((a) => ({ ...a, allocated: 0, selected: false })));
+    setAllocations((prev) => prev.map((a) => ({ ...a, allocated: '', selected: false })));
   };
 
   const handleSubmit = (data: PaymentMadeFormData) => {
-    // Money crosses the API as 2-dp decimal strings; compare in integer cents (no float drift).
-    const toCents = (n: number): number => Math.round(n * 100);
-    const centsToString = (c: number): string => (c / 100).toFixed(2);
+    // Money crosses the API as decimal strings and is compared exactly (no float drift).
     const selectedAllocations = allocations
-      .filter((a) => toCents(a.allocated) > 0)
-      .map((a) => ({ billId: a.billId, amount: centsToString(toCents(a.allocated)) }));
+      .filter((a) => isPositiveDecimal(a.allocated))
+      .map((a) => ({ billId: a.billId, amount: normalizeDecimal(a.allocated) }));
 
-    const amountCents = toCents(data.amount);
-    const allocatedCents = selectedAllocations.reduce(
-      (sum, a) => sum + toCents(Number(a.amount)),
-      0,
-    );
-    if (selectedAllocations.length === 0 || allocatedCents !== amountCents) {
+    const allocated = sumDecimals(selectedAllocations.map((a) => a.amount));
+    if (selectedAllocations.length === 0 || compareDecimals(allocated, data.amount) !== 0) {
       form.setError('amount', {
-        message: `Allocated ${centsToString(allocatedCents)} must equal the payment amount ${centsToString(amountCents)}`,
+        message: `Allocated ${allocated} must equal the payment amount ${normalizeDecimal(data.amount)}`,
       });
       return;
     }
 
     onSubmit({
       ...data,
-      amount: centsToString(amountCents),
+      amount: normalizeDecimal(data.amount),
       date: format(data.date, 'yyyy-MM-dd'),
       allocations: selectedAllocations,
     });
@@ -310,7 +312,7 @@ export function PaymentMadeForm({
                 step="0.01"
                 min="0"
                 placeholder="0.00"
-                {...form.register('amount', { valueAsNumber: true })}
+                {...form.register('amount')}
               />
               {form.formState.errors.amount && (
                 <p className="text-sm text-red-500">{form.formState.errors.amount.message}</p>
@@ -399,7 +401,7 @@ export function PaymentMadeForm({
                   variant="outline"
                   size="sm"
                   onClick={autoAllocate}
-                  disabled={paymentAmount <= 0}
+                  disabled={!isPositiveDecimal(paymentAmount)}
                 >
                   Auto-Allocate
                 </Button>
@@ -443,10 +445,10 @@ export function PaymentMadeForm({
                         <TableCell>{format(new Date(allocation.date), 'MMM d, yyyy')}</TableCell>
                         <TableCell>{format(new Date(allocation.dueDate), 'MMM d, yyyy')}</TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(allocation.grandTotal, currency)}
+                          {money(allocation.grandTotal)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(allocation.balanceDue, currency)}
+                          {money(allocation.balanceDue)}
                         </TableCell>
                         <TableCell className="text-right">
                           <Input
@@ -454,10 +456,8 @@ export function PaymentMadeForm({
                             step="0.01"
                             min="0"
                             max={allocation.balanceDue}
-                            value={allocation.allocated || ''}
-                            onChange={(e) =>
-                              updateAllocation(allocation.billId, parseFloat(e.target.value) || 0)
-                            }
+                            value={allocation.allocated}
+                            onChange={(e) => updateAllocation(allocation.billId, e.target.value)}
                             className="w-32 text-right ml-auto"
                           />
                         </TableCell>
@@ -471,25 +471,21 @@ export function PaymentMadeForm({
                   <div className="w-64 space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Payment Amount:</span>
-                      <span className="font-mono font-medium">
-                        {formatCurrency(paymentAmount, currency)}
-                      </span>
+                      <span className="font-mono font-medium">{money(paymentAmount)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span>Total Allocated:</span>
-                      <span className="font-mono font-medium">
-                        {formatCurrency(totals.totalAllocated, currency)}
-                      </span>
+                      <span className="font-mono font-medium">{money(totals.totalAllocated)}</span>
                     </div>
                     <div className="flex justify-between text-sm border-t pt-2">
                       <span>Unallocated:</span>
                       <span
                         className={cn(
                           'font-mono font-medium',
-                          totals.unallocated !== 0 && 'text-yellow-600',
+                          !isZeroDecimal(totals.unallocated) && 'text-yellow-600',
                         )}
                       >
-                        {formatCurrency(totals.unallocated, currency)}
+                        {money(totals.unallocated)}
                       </span>
                     </div>
                   </div>

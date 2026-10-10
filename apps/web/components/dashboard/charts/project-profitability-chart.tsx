@@ -18,12 +18,12 @@ import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
 
 interface ProjectProfitabilityChartProps {
   data: ProjectProfitabilityItem[];
-  currency?: string;
+  currency: string;
 }
 
 export const ProjectProfitabilityChart = memo(function ProjectProfitabilityChart({
   data,
-  currency = 'USD',
+  currency,
 }: ProjectProfitabilityChartProps) {
   const t = useTranslations('common.dashboard.charts');
 

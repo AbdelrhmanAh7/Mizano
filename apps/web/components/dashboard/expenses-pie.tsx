@@ -8,12 +8,12 @@ import { ExpenseCategory, formatCompactCurrency } from '@/lib/hooks/use-dashboar
 
 interface ExpensesPieProps {
   data: ExpenseCategory[];
-  currency?: string;
+  currency: string;
 }
 
 const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-export const ExpensesPie = memo(function ExpensesPie({ data, currency = 'USD' }: ExpensesPieProps) {
+export const ExpensesPie = memo(function ExpensesPie({ data, currency }: ExpensesPieProps) {
   const t = useTranslations('common.dashboard.charts');
 
   return (

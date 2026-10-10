@@ -5,7 +5,7 @@ import { useLocale } from 'next-intl';
 export function useFormatters() {
   const locale = useLocale();
 
-  const formatCurrency = (amount: number, currency: string = 'USD') => {
+  const formatCurrency = (amount: number, currency: string) => {
     return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency,

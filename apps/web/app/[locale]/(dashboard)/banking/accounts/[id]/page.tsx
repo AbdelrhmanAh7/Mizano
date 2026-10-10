@@ -1,5 +1,7 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
+import { absDecimal } from '@/lib/decimal';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -44,7 +46,6 @@ import {
   useDeleteBankAccount,
   getAccountTypeLabel,
   getAccountTypeColor,
-  formatCurrency,
 } from '@/lib/hooks/use-bank-accounts';
 import {
   getStatusLabel,
@@ -73,6 +74,7 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
   const { data: account, isLoading } = useBankAccount(id);
   const { data: transactionsData } = useBankAccountTransactions(id);
   const { data: historyData } = useBankAccountBalanceHistory(id);
+  const money = useDocumentMoney();
   const deleteBankAccount = useDeleteBankAccount();
 
   const transactions = transactionsData?.data || [];
@@ -199,7 +201,7 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
                     currentBalance < 0 ? 'text-red-600' : 'text-green-600',
                   )}
                 >
-                  {formatCurrency(currentBalance)}
+                  {money(currentBalance, account.currency)}
                 </p>
               </div>
             </div>
@@ -209,7 +211,7 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Bank Balance</p>
-            <p className="text-2xl font-bold font-mono">{formatCurrency(bankBalance)}</p>
+            <p className="text-2xl font-bold font-mono">{money(bankBalance, account.currency)}</p>
           </CardContent>
         </Card>
 
@@ -222,7 +224,7 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
                 Math.abs(difference) > 0.01 ? 'text-yellow-600' : 'text-green-600',
               )}
             >
-              {formatCurrency(difference)}
+              {money(difference, account.currency)}
             </p>
           </CardContent>
         </Card>
@@ -262,7 +264,7 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
                   tick={{ fontSize: 11 }}
                 />
                 <Tooltip
-                  formatter={(value: number) => [formatCurrency(value), 'Balance']}
+                  formatter={(value: number) => [money(value, account?.currency), 'Balance']}
                   labelFormatter={(label: string) => format(new Date(label), 'MMM d, yyyy')}
                 />
                 <Line
@@ -386,7 +388,7 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
                               )}
                             >
                               {tx.type === 'DEPOSIT' ? '+' : '-'}
-                              {formatCurrency(Math.abs(parseFloat(String(tx.amount))))}
+                              {money(absDecimal(String(tx.amount)), account.currency)}
                             </span>
                           </div>
                         </TableCell>

@@ -86,7 +86,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **Every new string needs en and ar,** including dialog titles, confirm and cancel buttons, placeholders, selector labels and report row names. Shared components accept localized label props.
 - **Keep error, loading and empty distinct.** Never collapse a failed query into `[]` ("no accounts"). Show an error with Retry, and block submit while a required lookup is loading or failed.
-- **Show the currency of the document**, falling back to the org base currency, never the counterparty's default. The API must actually return the fields the UI relies on (for example `baseCurrency`).
+- **Show the currency of the document**, falling back to the org base currency, never the counterparty's default. The API must actually return the fields the UI relies on (for example `baseCurrency`). No formatter has a default currency: `formatCurrency`/`formatMoney` require it, and pages call `useDocumentMoney()` (`lib/hooks/use-organization.ts`), which uses `documentCurrency(doc.currencyCode, baseCurrency)` and renders `—` while the base currency is unknown instead of guessing USD. Dashboard charts and `StatCard` take a required `currency` prop. Money in a form stays a decimal string (`lib/decimal.ts`); `parseFloat`/`Number()` only at the display boundary.
 - **Payment-wide effects get payment-wide warnings.** Voiding a payment affects every allocated bill.
 
 ## 12. Caches, tests and scope

@@ -1,5 +1,6 @@
 'use client';
 
+import { useCompactMoney } from '@/lib/hooks/use-organization';
 import { memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +16,6 @@ import {
   Legend,
 } from 'recharts';
 import { useCashFlowForecast, type CashFlowForecast } from '@/lib/hooks/use-ai-insights';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -23,6 +23,7 @@ function formatDate(dateStr: string): string {
 }
 
 export const CashFlowForecastChart = memo(function CashFlowForecastChart() {
+  const compact = useCompactMoney();
   const { data, isLoading } = useCashFlowForecast(30);
 
   const forecasts: CashFlowForecast[] = Array.isArray(data?.data)
@@ -94,11 +95,11 @@ export const CashFlowForecastChart = memo(function CashFlowForecastChart() {
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                tickFormatter={(v) => formatCompactCurrency(v)}
+                tickFormatter={(v) => compact(v)}
               />
               <Tooltip
                 formatter={(value, name) => [
-                  typeof value === 'number' ? formatCompactCurrency(value) : String(value),
+                  typeof value === 'number' ? compact(value) : String(value),
                   name === 'predicted'
                     ? 'Expected'
                     : name === 'upper'

@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
 import { ImportWizard } from '@/components/import/import-wizard';
@@ -24,11 +25,7 @@ import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
-import {
-  formatCurrency,
-  useInfiniteVendorCredits,
-  VendorCredit,
-} from '@/lib/hooks/use-vendor-credits';
+import { useInfiniteVendorCredits, VendorCredit } from '@/lib/hooks/use-vendor-credits';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { useTranslations } from 'next-intl';
@@ -37,6 +34,7 @@ import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
 function VendorCreditsPageContent() {
+  const money = useDocumentMoney();
   const t = useTranslations('purchases');
   const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
@@ -134,8 +132,7 @@ function VendorCreditsPageContent() {
         />
       ),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
-      cell: ({ row }) =>
-        formatCurrency(row.original.amount, row.original.vendor?.currency || 'USD'),
+      cell: ({ row }) => money(row.original.amount),
     },
     {
       id: 'balance',
@@ -143,7 +140,7 @@ function VendorCreditsPageContent() {
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
       cell: ({ row }) => {
         const balance = row.original.appliedToBillId ? '0' : row.original.amount;
-        return formatCurrency(balance, row.original.vendor?.currency || 'USD');
+        return money(balance);
       },
     },
     {

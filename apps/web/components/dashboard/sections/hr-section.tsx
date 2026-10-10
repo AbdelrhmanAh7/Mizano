@@ -1,5 +1,6 @@
 'use client';
 
+import { useBaseCurrency } from '@/lib/hooks/use-organization';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -33,6 +34,7 @@ interface HRSectionProps {
 }
 
 export function HRSection({ enabled }: HRSectionProps) {
+  const currency = useBaseCurrency();
   const { data: payrollData } = usePayrollTrend(enabled);
   const { data: headcountData } = useDepartmentHeadcount(enabled);
   const { data: attendanceData } = useAttendanceOverview(enabled);
@@ -42,7 +44,11 @@ export function HRSection({ enabled }: HRSectionProps) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {payrollData ? <PayrollTrendChart data={payrollData} /> : <ChartSkeleton />}
+        {payrollData && currency ? (
+          <PayrollTrendChart data={payrollData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
         {headcountData ? <DepartmentHeadcountChart data={headcountData} /> : <ChartSkeleton />}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

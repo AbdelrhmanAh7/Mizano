@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { useEffect, useMemo } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -78,6 +79,7 @@ export function PaymentReceivedForm({
   onCancel,
   isSubmitting,
 }: PaymentReceivedFormProps) {
+  const money = useDocumentMoney();
   const { data: customersData } = useCustomers({ limit: 100 });
   const customers = customersData?.data || [];
 
@@ -167,13 +169,7 @@ export function PaymentReceivedForm({
     }
   }, [openInvoices, defaultInvoiceId, replace, form]);
 
-  const formatCurrency = (amount: string | number) => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(num);
-  };
+  const formatCurrency = (amount: string | number) => money(amount);
 
   // Calculate total allocated
   const totalAllocated = useMemo(() => {

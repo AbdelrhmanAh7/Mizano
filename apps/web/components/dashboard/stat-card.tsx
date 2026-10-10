@@ -17,7 +17,7 @@ interface StatCardProps {
   };
   iconColor?: string;
   iconBgColor?: string;
-  currency?: string;
+  currency: string;
 }
 
 export const StatCard = memo(function StatCard({
@@ -27,7 +27,7 @@ export const StatCard = memo(function StatCard({
   trend,
   iconColor = 'text-blue-600',
   iconBgColor = 'bg-blue-100',
-  currency = 'USD',
+  currency,
 }: StatCardProps) {
   const t = useTranslations('common.dashboard');
 

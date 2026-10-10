@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
 import { ImportWizard } from '@/components/import/import-wizard';
@@ -35,6 +36,7 @@ import { Suspense, useState } from 'react';
 function CreditNotesPageContent() {
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
+  const money = useDocumentMoney();
 
   const TYPE_OPTIONS: Array<{ value: string; label: string }> = [
     { value: 'all', label: tCommon('all') },
@@ -86,14 +88,6 @@ function CreditNotesPageContent() {
         ]
       : []),
   ];
-
-  const formatCurrency = (amount: string | number, currency: string = 'USD') => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(num);
-  };
 
   const columns: ColumnDef<CreditNote>[] = [
     {
@@ -181,7 +175,7 @@ function CreditNotesPageContent() {
         headerClassName: 'text-right',
         cellClassName: 'text-right font-mono text-orange-600',
       },
-      cell: ({ row }) => formatCurrency(row.original.amount),
+      cell: ({ row }) => money(row.original.amount),
     },
     {
       id: 'actions',

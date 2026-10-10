@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { useTranslations } from 'next-intl';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
@@ -29,7 +30,6 @@ import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import { LEDGER_QUERY_KEYS, invalidateLedgerQueries } from '@/lib/hooks/use-journals';
 import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import {
-  formatCurrency,
   formatPaymentMode,
   PaymentMade,
   useInfinitePaymentsMade,
@@ -42,11 +42,10 @@ import { format } from 'date-fns';
 import { Ban, Eye, Plus, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
-import { useBaseCurrency } from '@/lib/hooks/use-organization';
 
 function PaymentsMadePageContent() {
   const t = useTranslations('purchases');
-  const baseCurrency = useBaseCurrency();
+  const money = useDocumentMoney();
   const tCommon = useTranslations('common');
   const { hasPermission } = usePermissions();
   const { toast } = useToast();
@@ -175,7 +174,7 @@ function PaymentsMadePageContent() {
         />
       ),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono font-medium' },
-      cell: ({ row }) => formatCurrency(row.original.amount, baseCurrency),
+      cell: ({ row }) => money(row.original.amount),
     },
     {
       id: 'actions',

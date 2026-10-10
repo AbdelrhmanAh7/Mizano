@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -54,13 +55,8 @@ function getSourceColor(source: MovementSource): string {
   return colors[source] || 'bg-gray-50 text-gray-700';
 }
 
-function formatCurrency(amount: string | number | null | undefined): string {
-  if (amount === null || amount === undefined) return '$0.00';
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num);
-}
-
 function MovementsPageContent() {
+  const money = useDocumentMoney();
   const tableParams = useTableParams({ defaultSortBy: 'createdAt', mode: 'virtual' });
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -154,7 +150,7 @@ function MovementsPageContent() {
       accessorKey: 'costPerUnit',
       header: 'Cost/Unit',
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
-      cell: ({ row }) => formatCurrency(row.original.costPerUnit),
+      cell: ({ row }) => money(row.original.costPerUnit),
     },
   ];
 

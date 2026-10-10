@@ -22,11 +22,12 @@ import {
   getAccountTypeColor,
   getAccountTypeLabel,
 } from '@/lib/hooks/use-accounts';
-import { moneyToNumber } from '@/lib/money';
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { useJournals, formatJournalAmount } from '@/lib/hooks/use-journals';
 import { format } from 'date-fns';
 
 export default function AccountDetailPage() {
+  const money = useDocumentMoney();
   const params = useParams();
   const accountId = params.id as string;
 
@@ -172,12 +173,7 @@ export default function AccountDetailPage() {
               <div className="space-y-4">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Current Balance</p>
-                  <p className="text-3xl font-bold">
-                    {new Intl.NumberFormat('en-US', {
-                      style: 'currency',
-                      currency: account.currency || 'USD',
-                    }).format(moneyToNumber(balance.balance))}
-                  </p>
+                  <p className="text-3xl font-bold">{money(balance.balance)}</p>
                 </div>
                 {balance.totalDebits !== undefined && (
                   <div className="grid grid-cols-2 gap-4">

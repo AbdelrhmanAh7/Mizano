@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import type { DateRangeValue } from '@/components/data-table';
 import {
   DataTable,
@@ -31,12 +32,7 @@ import {
 import { useToast } from '@/components/ui/use-toast';
 import { expensesApi } from '@/lib/api';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
-import {
-  Expense,
-  formatCurrency,
-  useDeleteExpense,
-  useInfiniteExpenses,
-} from '@/lib/hooks/use-expenses';
+import { Expense, useDeleteExpense, useInfiniteExpenses } from '@/lib/hooks/use-expenses';
 import { useExportAll } from '@/lib/hooks/use-export-all';
 import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { usePermissions } from '@/lib/hooks/use-permissions';
@@ -55,6 +51,7 @@ function ExpensesPageContent() {
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const { onExportAll } = useExportAll('expenses', 'expenses');
+  const money = useDocumentMoney();
   const tableParams = useTableParams({
     defaultSortBy: 'date',
     filterKeys: ['startDate', 'endDate'],
@@ -224,7 +221,7 @@ function ExpensesPageContent() {
       cell: ({ row }) => {
         const expense = row.original;
         // `amount` is stored net of VAT for inclusive and exclusive entries alike.
-        return formatCurrency(sumDecimals([expense.amount, expense.taxAmount || '0']));
+        return money(sumDecimals([expense.amount, expense.taxAmount || '0']));
       },
     },
     {

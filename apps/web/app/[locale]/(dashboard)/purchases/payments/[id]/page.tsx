@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -32,9 +33,7 @@ import {
   usePaymentMade,
   useDeletePaymentMade,
   formatPaymentMode,
-  formatCurrency,
 } from '@/lib/hooks/use-payments-made';
-import { useBaseCurrency } from '@/lib/hooks/use-organization';
 
 interface PaymentDetailPageProps {
   params: { id: string };
@@ -43,14 +42,11 @@ interface PaymentDetailPageProps {
 export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
   const { id } = params;
   const t = useTranslations('purchases');
-  const baseCurrency = useBaseCurrency();
+  const money = useDocumentMoney();
   const tCommon = useTranslations('common');
   const router = useRouter();
   const { data: payment, isLoading } = usePaymentMade(id);
   const deletePayment = useDeletePaymentMade();
-
-  // Payments are recorded and posted in the organization base currency.
-  const currency = baseCurrency;
 
   const handleDelete = async () => {
     await deletePayment.mutateAsync(id);
@@ -149,9 +145,7 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('payments.amount')}</p>
-                <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(payment.amount, currency)}
-                </p>
+                <p className="text-2xl font-bold font-mono">{money(payment.amount)}</p>
               </div>
             </div>
           </CardContent>
@@ -253,7 +247,7 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
                           : '-'}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatCurrency(allocation.amount, currency)}
+                        {money(allocation.amount)}
                       </TableCell>
                     </TableRow>
                   ))}

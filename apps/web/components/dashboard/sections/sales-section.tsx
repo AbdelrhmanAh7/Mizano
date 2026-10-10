@@ -1,5 +1,6 @@
 'use client';
 
+import { useBaseCurrency } from '@/lib/hooks/use-organization';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -35,6 +36,7 @@ interface SalesSectionProps {
 }
 
 export function SalesSection({ enabled }: SalesSectionProps) {
+  const currency = useBaseCurrency();
   const { data: invoiceStatusData } = useInvoiceStatus(enabled);
   const { data: quoteData } = useQuoteConversion(enabled);
   const { data: volumeData } = useInvoiceVolume(enabled);
@@ -50,11 +52,19 @@ export function SalesSection({ enabled }: SalesSectionProps) {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {volumeData ? <MonthlyInvoiceVolumeChart data={volumeData} /> : <ChartSkeleton />}
-        {collectionData ? <PaymentCollectionChart data={collectionData} /> : <ChartSkeleton />}
+        {collectionData && currency ? (
+          <PaymentCollectionChart data={collectionData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {churnData ? <CustomerChurnRiskChart data={churnData} /> : <ChartSkeleton />}
-        {clvData ? <CustomerLTVChart data={clvData} /> : <ChartSkeleton />}
+        {clvData && currency ? (
+          <CustomerLTVChart data={clvData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
       </div>
     </div>
   );

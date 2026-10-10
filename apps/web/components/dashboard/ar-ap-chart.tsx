@@ -8,10 +8,10 @@ import { ReceivablesPayables, formatCompactCurrency } from '@/lib/hooks/use-dash
 
 interface ARAPChartProps {
   data: ReceivablesPayables;
-  currency?: string;
+  currency: string;
 }
 
-export const ARAPChart = memo(function ARAPChart({ data, currency = 'USD' }: ARAPChartProps) {
+export const ARAPChart = memo(function ARAPChart({ data, currency }: ARAPChartProps) {
   const t = useTranslations('common.dashboard.charts');
 
   const chartData = [

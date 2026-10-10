@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { CollectionPriorityCard } from '@/components/ai';
 import type { DateRangeValue } from '@/components/data-table';
 import {
@@ -73,6 +74,7 @@ import { Suspense, useState } from 'react';
 function InvoicesPageContent() {
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
+  const money = useDocumentMoney();
 
   const STATUS_OPTIONS = [
     { value: 'DRAFT', label: t('invoices.status.draft') },
@@ -277,14 +279,6 @@ function InvoicesPageContent() {
     }
   };
 
-  const formatCurrency = (amount: string | number, currency: string = 'USD') => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(num);
-  };
-
   const columns: ColumnDef<Invoice>[] = [
     {
       accessorKey: 'invoiceNumber',
@@ -362,7 +356,7 @@ function InvoicesPageContent() {
         />
       ),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
-      cell: ({ row }) => formatCurrency(row.original.grandTotal),
+      cell: ({ row }) => money(row.original.grandTotal, row.original.currencyCode),
     },
     {
       accessorKey: 'balanceDue',
@@ -372,7 +366,7 @@ function InvoicesPageContent() {
         const balanceDue = parseFloat(row.original.balanceDue || '0');
         return (
           <span className={cn(balanceDue > 0 && 'text-red-600 font-semibold')}>
-            {formatCurrency(row.original.balanceDue)}
+            {money(row.original.balanceDue, row.original.currencyCode)}
           </span>
         );
       },

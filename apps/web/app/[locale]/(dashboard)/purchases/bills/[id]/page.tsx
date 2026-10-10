@@ -38,17 +38,11 @@ import {
   normalizeDecimal,
   subtractDecimals,
 } from '@/lib/decimal';
-import {
-  useBill,
-  useApproveBill,
-  formatCurrency,
-  getStatusVariant,
-  getStatusText,
-} from '@/lib/hooks/use-bills';
+import { useBill, useApproveBill, getStatusVariant, getStatusText } from '@/lib/hooks/use-bills';
 import { invalidateLedgerQueries } from '@/lib/hooks/use-journals';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { cn } from '@/lib/utils';
-import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 
 const PAYABLE_STATUSES = ['OPEN', 'OVERDUE', 'PARTIALLY_PAID'];
 
@@ -68,12 +62,12 @@ interface BillDetailPageProps {
 export default function BillDetailPage({ params }: BillDetailPageProps) {
   const { id } = params;
   const t = useTranslations('purchases');
-  const baseCurrency = useBaseCurrency();
+  const money = useDocumentMoney();
   const tCommon = useTranslations('common');
   const { hasPermission } = usePermissions();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data: bill, isLoading } = useBill(id);
+  const { data: bill, isLoading, isError, refetch } = useBill(id);
   const approveBill = useApproveBill();
   const [paymentToVoid, setPaymentToVoid] = useState<BillPaymentRow | null>(null);
   const [isVoiding, setIsVoiding] = useState(false);
@@ -131,6 +125,22 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
     );
   }
 
+  if (isError && !bill) {
+    return (
+      <div className="text-center py-12 space-y-4" role="alert">
+        <p className="text-muted-foreground">{t('bills.loadError')}</p>
+        <div className="flex justify-center gap-2">
+          <Button variant="outline" onClick={() => void refetch()}>
+            {t('bills.retry')}
+          </Button>
+          <Button asChild variant="ghost">
+            <Link href="/purchases/bills">{tCommon('buttons.back')}</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   if (!bill) {
     return (
       <div className="text-center py-12">
@@ -162,8 +172,6 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
   });
   const isOverdue =
     bill.status === 'OVERDUE' || (bill.status === 'OPEN' && new Date(bill.dueDate) < new Date());
-  // A bill without its own currency is posted in the base currency, so it is shown in it.
-  const currency = documentCurrency(bill.currencyCode, baseCurrency);
 
   return (
     <div className="space-y-6">
@@ -219,7 +227,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-mono">
-              {formatCurrency(grandTotal, currency)}
+              {money(grandTotal, bill.currencyCode)}
             </div>
           </CardContent>
         </Card>
@@ -237,7 +245,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
                 hasBalance ? 'text-destructive' : 'text-success',
               )}
             >
-              {formatCurrency(balanceDue, currency)}
+              {money(balanceDue, bill.currencyCode)}
             </div>
           </CardContent>
         </Card>
@@ -305,11 +313,11 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
                         </TableCell>
                         <TableCell className="text-right font-mono">{qty}</TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(rate, currency)}
+                          {money(rate, bill.currencyCode)}
                         </TableCell>
                         <TableCell className="text-right">{taxRate}%</TableCell>
                         <TableCell className="text-right font-mono font-medium">
-                          {formatCurrency(amount, currency)}
+                          {money(amount, bill.currencyCode)}
                         </TableCell>
                       </TableRow>
                     );
@@ -322,23 +330,23 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
                 <div className="w-64 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>{tCommon('subtotal')}</span>
-                    <span className="font-mono">{formatCurrency(bill.subtotal, currency)}</span>
+                    <span className="font-mono">{money(bill.subtotal, bill.currencyCode)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>{tCommon('tax')}</span>
-                    <span className="font-mono">{formatCurrency(bill.taxAmount, currency)}</span>
+                    <span className="font-mono">{money(bill.taxAmount, bill.currencyCode)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between text-lg font-bold">
                     <span>{tCommon('total')}</span>
-                    <span className="font-mono">{formatCurrency(grandTotal, currency)}</span>
+                    <span className="font-mono">{money(grandTotal, bill.currencyCode)}</span>
                   </div>
                   {compareDecimals(balanceDue, grandTotal) !== 0 && (
                     <>
                       <div className="flex justify-between text-sm text-muted-foreground">
                         <span>{t('bills.status.paid')}</span>
                         <span className="font-mono">
-                          {formatCurrency(subtractDecimals(grandTotal, balanceDue), currency)}
+                          {money(subtractDecimals(grandTotal, balanceDue), bill.currencyCode)}
                         </span>
                       </div>
                       <div
@@ -348,7 +356,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
                         )}
                       >
                         <span>{t('bills.table.balance')}</span>
-                        <span className="font-mono">{formatCurrency(balanceDue, currency)}</span>
+                        <span className="font-mono">{money(balanceDue, bill.currencyCode)}</span>
                       </div>
                     </>
                   )}
@@ -395,7 +403,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
                       </TableCell>
                       <TableCell>{format(new Date(row.date), 'MMM d, yyyy')}</TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatCurrency(row.amount, currency)}
+                        {money(row.amount, bill.currencyCode)}
                       </TableCell>
                       {canVoid && (
                         <TableCell className="text-right">

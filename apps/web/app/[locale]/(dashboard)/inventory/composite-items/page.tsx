@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import {
   AlertDialog,
@@ -20,7 +21,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   CompositeItem,
-  formatCurrency,
   useDeleteCompositeItem,
   useInfiniteCompositeItems,
 } from '@/lib/hooks/use-composite-items';
@@ -31,6 +31,7 @@ import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
 function CompositeItemsPageContent() {
+  const money = useDocumentMoney();
   const tableParams = useTableParams({ defaultSortBy: 'name', mode: 'virtual' });
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -82,7 +83,7 @@ function CompositeItemsPageContent() {
       accessorKey: 'sellingPrice',
       header: 'Selling Price',
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
-      cell: ({ row }) => formatCurrency(row.original.sellingPrice),
+      cell: ({ row }) => money(row.original.sellingPrice),
     },
     {
       id: 'componentCount',
