@@ -142,3 +142,39 @@
   Total: 4 suites passed, 104 tests passed
   Lint: 4 packages successful
   ```
+
+---
+
+# EVIDENCE.md — Stale and duplicate issue triage (#135)
+
+- **Issue**: #135 · **Base (`master`)**: `615060ed6294e16375a1f1ea9385cb7e812cd24f`
+- **Tested commit**: `d1d8295` (e2e salvage; no production code changed) · **Date**: 2026-10-08
+- **Verdicts and owner commands**: [docs/planning/STALE-ISSUES.md](docs/planning/STALE-ISSUES.md)
+
+| REQ | Acceptance criterion                                            | Verification                                                                                                                                                                  | Status                           |
+| --- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| AC1 | #11/#12/#109 closed or re-scoped with a comment on master lines | Lines checked with `sed -n` on master; #75/#76 e2e moved into `accountant-journey.e2e-spec.ts` (tests tagged `@issue-135 AC1`) and passing; #111 spec run on unchanged master | Evidence ready; owner runs `gh`  |
+| AC2 | One of #116/#103 closed                                         | `git diff --stat origin/master...origin/ai/{102,113}`: both docs-only; `gh workflow list --all`: Deploy `disabled_manually`                                                   | Owner action (`gh pr close 103`) |
+| AC3 | #97 family off `ai-ready`                                       | `grep` of `apps/api/src`: ZATCA/e-invoicing only in `deep-search.service.ts:99-102`; `gh issue view` labels                                                                   | Owner action (label edit)        |
+| AC4 | #82 and #84 merged first                                        | `gh pr view 82`: `MERGEABLE CLEAN APPROVED`; `gh pr view 84`: `MERGEABLE UNSTABLE draft=true`                                                                                 | Owner action (merge)             |
+
+## Commands and results
+
+```bash
+# Postgres 16 throwaway cluster on 127.0.0.1:55535, fresh DB, prisma migrate deploy, REDIS_URL=
+cd apps/api && npx jest --config ./test/jest-e2e.json --runInBand test/accountant-journey
+Test Suites: 1 passed, 1 total
+Tests:       37 passed, 37 total
+
+# The two original branch files, run unchanged against master code
+Tests:       73 passed, 73 total   # #75 + #76 accountant-journey.e2e-spec.ts
+
+# PR #111's rules-normalize.spec.ts copied onto unchanged master
+Tests:       23 passed, 23 total
+
+npx eslint test/accountant-journey.e2e-spec.ts --max-warnings 0   # clean
+npx tsc --noEmit -p test/tsconfig.e2e.json                         # clean
+UNIT_RESULT_PLACEHOLDER
+```
+
+Not done here: no issue or PR was closed, labelled or merged (see [AI_QUESTIONS.md](AI_QUESTIONS.md)).
