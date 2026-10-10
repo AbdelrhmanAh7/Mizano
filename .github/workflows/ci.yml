@@ -1,15 +1,31 @@
 # Mizano ERP - Continuous Integration Pipeline
 # =============================================
-# Runs on all PRs and pushes to master/develop branches.
-# Optimized: shared pnpm cache, parallel jobs, no redundant installs.
+# Runs on all PRs and on pushes to the default branch (master), on GitHub-hosted runners only (ubuntu-latest, free and
+# unlimited for this public repository). No self-hosted labels and no secrets beyond the automatic GITHUB_TOKEN.
+#
+# Owner rule: every job stays under 5 minutes (timeout-minutes: 5), so the pipeline is split into parallel jobs.
+# The job names are the check names the hub gates and automerge wait for ("Install Dependencies", "Lint & Type Check",
+# "Unit Tests", "Build"): keep them stable. Jobs are independent and each installs from the shared pnpm store cache
+# (setup-node), so none waits for another and a failed install cannot skip the others silently.
+#
+# Fork PRs: this workflow uses `pull_request` (read-only token, no secrets), never `pull_request_target`; first-time
+# fork contributors need an approval in the repository settings before it runs. Leave that setting on.
 
 name: CI
 
 on:
   push:
-    branches: [master, develop]
+    branches: [master]
   pull_request:
     branches: [master, develop]
+
+permissions:
+  contents: read
+
+# A newer push to the same PR cancels the older run; pushes to master are never cancelled, so every master head gets a result.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   NODE_VERSION: '20'
@@ -17,11 +33,12 @@ env:
 
 jobs:
   # ==========================================
-  # Install & Cache Dependencies (shared)
+  # Install: the lockfile installs and the Prisma client generates
   # ==========================================
   install:
     name: Install Dependencies
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -43,23 +60,13 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
 
-      - name: Cache node_modules
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            node_modules
-            apps/*/node_modules
-            packages/*/node_modules
-            apps/api/src/generated
-          key: modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
-
   # ==========================================
-  # Lint & Type Check (after install)
+  # Lint & Type Check
   # ==========================================
   lint:
     name: Lint & Type Check
     runs-on: ubuntu-latest
-    needs: install
+    timeout-minutes: 5
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -73,16 +80,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
 
-      - name: Restore node_modules
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            node_modules
-            apps/*/node_modules
-            packages/*/node_modules
-            apps/api/src/generated
-          key: modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
 
       - name: Run ESLint
         run: pnpm lint
@@ -91,12 +95,12 @@ jobs:
         run: pnpm turbo run type-check
 
   # ==========================================
-  # Unit Tests (parallel with lint)
+  # Unit Tests (PostgreSQL and Redis service containers)
   # ==========================================
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
-    needs: install
+    timeout-minutes: 5
     services:
       postgres:
         image: postgres:16-alpine
@@ -135,16 +139,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
 
-      - name: Restore node_modules
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            node_modules
-            apps/*/node_modules
-            packages/*/node_modules
-            apps/api/src/generated
-          key: modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
 
       - name: Push database schema
         run: pnpm db:push
@@ -161,12 +162,12 @@ jobs:
           NODE_ENV: test
 
   # ==========================================
-  # Build (parallel with lint and test)
+  # Build
   # ==========================================
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: install
+    timeout-minutes: 5
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -180,16 +181,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
 
-      - name: Restore node_modules
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            node_modules
-            apps/*/node_modules
-            packages/*/node_modules
-            apps/api/src/generated
-          key: modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
 
       - name: Build all packages
         run: pnpm build
