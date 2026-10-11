@@ -263,6 +263,22 @@ describe('PayrollService postings (#130)', () => {
     expect(result.totalGross).toBe('1015.1500');
   });
 
+  it('counts attendance inside the payroll month in local time, as AttendanceService stores it', async () => {
+    prisma.payrollRun.findFirst.mockResolvedValue({ ...run, status: PayrollStatus.DRAFT } as never);
+    prisma.employee.findMany.mockResolvedValue([
+      { id: 'emp-1', basicSalary: dec('10000'), allowances: {}, deductions: {} },
+    ] as never);
+    prisma.attendance.findMany.mockResolvedValue([] as never);
+
+    await serviceWithLock().calculatePayroll(ORG, run.id);
+
+    // Days are kept at local midnight: a UTC month would drop the 1st on a server ahead of UTC.
+    expect(prisma.attendance.findMany.mock.calls[0][0]?.where?.date).toEqual({
+      gte: new Date(2026, 7, 1),
+      lt: new Date(2026, 8, 1),
+    });
+  });
+
   it('never marks a zero-gross run paid without a journal', async () => {
     prisma.payrollRun.findFirst.mockResolvedValue({
       ...run,

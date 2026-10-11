@@ -94,14 +94,13 @@ describe('System postings through JournalsService (e2e) @issue-130', () => {
         },
       });
       employeeId = employee.id;
-      await prisma.attendance.create({
-        data: {
-          employeeId,
-          date: new Date(Date.UTC(periodA.year, periodA.month - 1, 10)),
-          status: 'PRESENT',
-          organizationId: tenant.organizationId,
-        },
+      // Recorded through the API on the 1st: stored at local midnight, it counts for that month.
+      const attendance = await api.post('/attendance').send({
+        employeeId,
+        date: `${periodA.year}-${String(periodA.month).padStart(2, '0')}-01`,
+        status: 'PRESENT',
       });
+      expect(attendance.status).toBe(201);
     });
 
     it('@e2e @flow:payroll @issue-130 AC-Decimal: payslip and run totals are exact (gross = net + deductions)', async () => {

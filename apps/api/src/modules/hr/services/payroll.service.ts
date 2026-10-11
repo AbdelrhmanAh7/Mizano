@@ -95,8 +95,9 @@ export class PayrollService {
       throw new BadRequestException('Payroll already processed');
     }
 
-    const periodStart = new Date(Date.UTC(payrollRun.year, payrollRun.month - 1, 1));
-    const nextPeriodStart = new Date(Date.UTC(payrollRun.year, payrollRun.month, 1));
+    // AttendanceService stores days at local midnight, so the month is bounded in local time too.
+    const periodStart = new Date(payrollRun.year, payrollRun.month - 1, 1);
+    const nextPeriodStart = new Date(payrollRun.year, payrollRun.month, 1);
 
     const totals = await this.prisma.$transaction(async (tx) => {
       // Claim the draft first so a concurrent calculation cannot create payslips twice.
