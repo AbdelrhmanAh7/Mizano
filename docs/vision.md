@@ -4,7 +4,7 @@ _Updated 2026-10-10 in the backlog restructure. Goals are GitHub milestones; eac
 
 ## Vision
 
-Mizano is the Arabic-first accounting system for small businesses and their accountants in Egypt and the Gulf, light enough to run on a Raspberry Pi 5 in the office: a vendor bill photo or PDF becomes a validated, posted journal entry with its source evidence, and the books always balance. The pilot (invites on 2 Nov 2026) proves it with 3-5 invited accountants on the Pi. The next phase opens a scoped API and signed webhooks so FlowLine can automate the work around the books — deal won → quote, invoice overdue → reminder, payment received → thank-you — with no autonomous payments or tax filing.
+Mizano is the Arabic-first accounting system for small businesses and their accountants in Egypt and the Gulf, light enough to run on a Raspberry Pi 5 in the office: a vendor bill photo or PDF becomes a validated draft with its source evidence, then a posted journal entry after authorized accountant batch approval, and the books always balance. The pilot (invites on 2 Nov 2026) proves it with 3-5 invited accountants on the Pi. The next phase opens a scoped API and signed webhooks so FlowLine can automate the work around the books — deal won → quote, invoice overdue → reminder, payment received → thank-you — with no autonomous payments or tax filing.
 
 ## Pilot goals
 
@@ -19,12 +19,12 @@ Mizano is the Arabic-first accounting system for small businesses and their acco
 
 | Goal (milestone) | Due | Acceptance criteria | Demo |
 |---|---|---|---|
-| [MZ G5 · FlowLine integration API (keys + webhooks)](https://github.com/AbdelrhmanAh7/Mizano/milestone/17) | 2026-11-16 | Next phase. Done when: an organization admin can create a scoped API key (customers:write, quotes:write, invoices:read, payments:read) that authenticates the existing customer/quote/invoice endpoints, and Mizano delivers HMAC-signed outbound webhooks (invoice.overdue, payment.received, quote.accepted) with retries; FlowLine's 'FL G5 · Mizano connector v1' can run end to end against it. Story: docs/video/integration-story.md. | #179 |
+| [MZ G5 · FlowLine integration API (keys + webhooks)](https://github.com/AbdelrhmanAh7/Mizano/milestone/17) | 2026-11-16 | Next phase. Done when: an organization admin can create a scoped API key (customers:write, quotes:write, invoices:read, payments:read) that authenticates the existing customer/quote/invoice/payment endpoints, and Mizano delivers HMAC-signed outbound webhooks (invoice.overdue, payment.received, quote.accepted) with retries; FlowLine's 'FL G5 · Mizano connector v1' can run end to end against it. Story: the 'FlowLine ↔ Mizano integration' section below (full data contracts written with epic #169). | #179 |
 | [MZ G6 · Post-pilot: Telegram intake, VAT and hardening](https://github.com/AbdelrhmanAh7/Mizano/milestone/18) | 2026-12-15 | Next phase. Done when: Telegram channel invoices reach the same intake queue (#20), the VAT return draft and its checks exist (#114, #119, #120), credential rotation and anomaly alerts ship (#97), and the ledger follow-ups (#90 sub-issues) are merged. | #180 |
 
 ## FlowLine ↔ Mizano integration (planned)
 
-Status: vision, not built. Full story and data contracts: `docs/video/integration-story.md` (same page in both repos).
+Status: vision, not built. Planned flow and rules: this section. The full story and data contracts are planned as `docs/video/integration-story.md` in both repos (tracked by FlowLine_Web #138) and are not written yet.
 
 ```mermaid
 flowchart LR
@@ -32,12 +32,12 @@ flowchart LR
   Q -->|"deal won: customer + lines"| C["Mizano: customer + draft quote"]
   C --> I["Mizano: quote → invoice, VAT, ledger"]
   I -->|"invoice.overdue webhook"| F["FlowLine: Invoice Follow-up List (review step)"]
-  I -->|"payment.received webhook"| T["FlowLine: thank-you / next step"]
+  I -->|"payment.received webhook"| T["FlowLine: draft thank-you / next step (human approval before delivery)"]
 ```
 
 - This repo's side: epic #169 in goal **MZ G5 · FlowLine integration API (keys + webhooks)** (due 2026-11-16).
 - Other side: the G5 epic in [AbdelrhmanAh7/FlowLine_Web](https://github.com/AbdelrhmanAh7/FlowLine_Web/milestones).
-- Rules: money as decimal strings; no autonomous payments or tax submission; a human approval step before anything leaves the company; Arabic names kept as entered.
+- Rules: Decimal arithmetic and comparisons end to end, fixed 4-decimal-place money strings between services; no autonomous payments or tax submission; a human approval step before anything leaves the company; Arabic names kept as entered.
 
 ## How the hub uses this
 
