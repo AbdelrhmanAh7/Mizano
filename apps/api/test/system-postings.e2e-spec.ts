@@ -175,6 +175,26 @@ describe('System postings through JournalsService (e2e) @issue-130', () => {
       expect(list.body.map((s: { id: string }) => s.id)).not.toContain(slips[0].id);
     });
 
+    it('@e2e @flow:payroll @issue-130 AC-SoftDelete: a deleted processed run is recreated as a draft and recalculates', async () => {
+      const deleted = await prisma.payrollRun.findFirstOrThrow({
+        where: { organizationId: tenant.organizationId, ...periodB },
+      });
+      expect(deleted.deletedAt).not.toBeNull();
+
+      const recreated = await api.post('/payroll/runs').send(periodB);
+      expect(recreated.status).toBe(201);
+      expect(recreated.body).toMatchObject({ id: deleted.id, status: 'DRAFT', processedAt: null });
+      // The discarded payslip never reached the ledger and no longer holds the (run, employee) key.
+      expect(await prisma.payslip.count({ where: { payrollRunId: deleted.id } })).toBe(0);
+
+      const calc = await api.post(`/payroll/runs/${deleted.id}/calculate`);
+      expect(calc.status).toBe(201);
+      const slips = await prisma.payslip.findMany({ where: { payrollRunId: deleted.id } });
+      expect(slips).toHaveLength(1);
+      expect(slips[0].deletedAt).toBeNull();
+      expect(await journalsFor(tenant.organizationId, 'PAYROLL', deleted.id)).toHaveLength(0);
+    });
+
     it('@e2e @flow:payroll @issue-130 AC-SoftDelete: re-creating a draft run keeps the existing draft row', async () => {
       const period = monthOf(-4);
       const first = await api.post('/payroll/runs').send(period);
@@ -325,6 +345,53 @@ describe('System postings through JournalsService (e2e) @issue-130', () => {
       expect(await journalsFor(tenant.organizationId, 'DEPRECIATION', schedule.id)).toHaveLength(1);
     });
 
+    it('@e2e @flow:depreciation @issue-130 AC-Order: no period posts or reverses behind a later posted one', async () => {
+      // monthOf(-1) and monthOf(0) are posted; the purchase month never was.
+      const behind = await api.post(`/assets/${assetId}/depreciate`).query(purchase);
+      expect(behind.status).toBe(400);
+      expect(String(behind.body.message)).toMatch(/later/i);
+
+      const previous = await scheduleFor(assetId, monthOf(-1));
+      const reversed = await api.post(`/assets/schedule/${previous.id}/reverse`);
+      expect(reversed.status).toBe(400);
+      expect(String(reversed.body.message)).toMatch(/later/i);
+      expect((await scheduleFor(assetId, monthOf(-1))).executedAt).not.toBeNull();
+    });
+
+    it('@e2e @flow:depreciation @issue-130 AC-Register: the asset register equals the posted depreciation', async () => {
+      const posted = await prisma.depreciationSchedule.findMany({
+        where: { assetId, executedAt: { not: null } },
+        include: { journal: { include: { lines: true } } },
+      });
+      const ledger = posted
+        .flatMap((row) => row.journal?.lines ?? [])
+        .filter((line) => line.accountId === accounts.accumulated)
+        .reduce((sum, line) => sum.add(line.credit), new Prisma.Decimal(0));
+      const asset = await prisma.asset.findUniqueOrThrow({ where: { id: assetId } });
+      // monthOf(-1) + monthOf(0): the unposted purchase month is not on the books.
+      expect(asset.accumulatedDepreciation.toFixed(4)).toBe('166.6600');
+      expect(asset.accumulatedDepreciation.toFixed(4)).toBe(ledger.toFixed(4));
+      expect(asset.currentBookValue.toFixed(4)).toBe('833.3400');
+    });
+
+    it('@e2e @flow:depreciation @issue-130 AC-CatchUp: the monthly run posts the open periods after the latest posted one, oldest first', async () => {
+      const id = await createAsset(1200);
+      expect((await api.post(`/assets/${id}/depreciate`).query(purchase)).status).toBe(200);
+
+      const run = await api.post('/assets/depreciation/run');
+      expect(run.status).toBe(200);
+      expect(run.body.journalsCreated).toBe(2);
+      for (const period of [monthOf(-1), monthOf(0)]) {
+        const schedule = await scheduleFor(id, period);
+        const journals = await journalsFor(tenant.organizationId, 'DEPRECIATION', schedule.id);
+        expect(journals).toHaveLength(1);
+        expectBalanced(journals[0].lines);
+        expect(journals[0].date.toISOString()).toBe(midnightIso(monthEnd(period)));
+      }
+      const asset = await prisma.asset.findUniqueOrThrow({ where: { id } });
+      expect(asset.accumulatedDepreciation.toFixed(4)).toBe('300.0000'); // 3 x 1200 / 12
+    });
+
     it('@e2e @flow:depreciation @issue-130 AC1: disposing twice concurrently posts one balanced ASSET_DISPOSAL journal with cash and loss lines', async () => {
       const disposedId = await createAsset(1000, 5);
       const disposalDate = `${purchase.year}-${String(purchase.month).padStart(2, '0')}-15`;
@@ -342,8 +409,55 @@ describe('System postings through JournalsService (e2e) @issue-130', () => {
       const debit = (accountId: string) =>
         journal.lines.find((l) => l.accountId === accountId && !l.debit.isZero());
       expect(decimalEquals(debit(chart.cash)?.debit, '600')).toBe(true);
-      expect(journal.lines.some((l) => decimalEquals(l.debit, '400'))).toBe(true);
       expect(journal.lines.some((l) => decimalEquals(l.credit, '1000'))).toBe(true);
+      const lossLine = journal.lines.find((l) => decimalEquals(l.debit, '400'));
+      const lossAccount = await prisma.account.findUniqueOrThrow({
+        where: { id: lossLine!.accountId },
+      });
+      expect(lossAccount.type).toBe('EXPENSE');
+      expect(lossAccount.code).not.toBe('6100'); // Rent Expense
+    });
+
+    it('@e2e @flow:depreciation @issue-130 AC-GainLoss: a disposal gain is credited to an income account', async () => {
+      const soldId = await createAsset(1000, 5);
+      const disposalDate = `${purchase.year}-${String(purchase.month).padStart(2, '0')}-20`;
+      const res = await api
+        .post(`/assets/${soldId}/dispose`)
+        .send({ disposalDate, disposalAmount: 1200 });
+      expect(res.status).toBe(200);
+
+      const [journal] = await journalsFor(tenant.organizationId, 'ASSET_DISPOSAL', soldId);
+      expectBalanced(journal.lines);
+      const gainLine = journal.lines.find((l) => decimalEquals(l.credit, '200'));
+      const gainAccount = await prisma.account.findUniqueOrThrow({
+        where: { id: gainLine!.accountId },
+      });
+      expect(['INCOME', 'REVENUE']).toContain(gainAccount.type);
+    });
+
+    it('@e2e @flow:depreciation @issue-130 AC-Dispose: a fully depreciated asset can be disposed of', async () => {
+      const wornId = await createAsset(600);
+      const periods = await prisma.depreciationSchedule.findMany({
+        where: { assetId: wornId },
+        orderBy: [{ year: 'asc' }, { month: 'asc' }],
+      });
+      for (const p of periods) {
+        const res = await api
+          .post(`/assets/${wornId}/depreciate`)
+          .query({ month: p.month, year: p.year });
+        expect(res.status).toBe(200);
+      }
+      const worn = await prisma.asset.findUniqueOrThrow({ where: { id: wornId } });
+      expect(worn.status).toBe('FULLY_DEPRECIATED');
+      expect(worn.currentBookValue.toFixed(4)).toBe('0.0000');
+
+      const res = await api
+        .post(`/assets/${wornId}/dispose`)
+        .send({ disposalDate: monthEnd(periods[periods.length - 1]), disposalAmount: 0 });
+      expect(res.status).toBe(200);
+      const [journal] = await journalsFor(tenant.organizationId, 'ASSET_DISPOSAL', wornId);
+      expectBalanced(journal.lines);
+      expect(sumLines(journal.lines).debit.toFixed(4)).toBe('600.0000');
     });
   });
 
@@ -443,6 +557,28 @@ describe('System postings through JournalsService (e2e) @issue-130', () => {
       const wo = await prisma.workOrder.findUniqueOrThrow({ where: { id: workOrderId } });
       expect(wo.status).toBe('COMPLETED');
       expect(wo.journalId).toBe(journals[0].id);
+    });
+
+    it('@e2e @flow:cogm @issue-130 AC1: bulk completion posts one balanced COGM journal per work order and never repeats one', async () => {
+      const ids = [await startedWorkOrder(), await startedWorkOrder()];
+      const res = await api.post('/manufacturing/work-orders/bulk-complete').send({ ids });
+      expect(res.status).toBe(201);
+      expect(res.body).toEqual({ processed: 2, total: 2, failures: [] });
+      for (const id of ids) {
+        const journals = await journalsFor(tenant.organizationId, 'COGM', id);
+        expect(journals).toHaveLength(1);
+        expectBalanced(journals[0].lines);
+        expect(sumLines(journals[0].lines).debit.toFixed(4)).toBe('1.1100');
+        const wo = await prisma.workOrder.findUniqueOrThrow({ where: { id } });
+        expect(wo).toMatchObject({ status: 'COMPLETED', journalId: journals[0].id });
+      }
+
+      const again = await api.post('/manufacturing/work-orders/bulk-complete').send({ ids });
+      expect(again.body).toMatchObject({ processed: 0, total: 2 });
+      expect(again.body.failures).toHaveLength(2);
+      for (const id of ids) {
+        expect(await journalsFor(tenant.organizationId, 'COGM', id)).toHaveLength(1);
+      }
     });
 
     it('@e2e @flow:cogm @issue-130 AC3: a lock date covering the completion date rejects the COGM posting and moves no stock', async () => {
