@@ -23,16 +23,18 @@ describe('CodeRabbit configuration', () => {
     throw new Error('Could not find .coderabbit.yaml in parent directories');
   }
 
-  it('should have auto_incremental_review enabled to match PR description', () => {
+  it('should not auto-review every push (incremental reviews off, hub requests re-reviews)', () => {
     const fileContents = fs.readFileSync(configPath, 'utf8');
     const config = yaml.load(fileContents) as Record<string, unknown>;
 
     const reviews = config.reviews as Record<string, unknown>;
     const autoReview = reviews.auto_review as Record<string, unknown>;
-    const autoIncrementalReview = autoReview.auto_incremental_review;
 
-    // PR description: "auto-review on non-draft PRs of master with incremental reviews"
-    expect(autoIncrementalReview).toBe(true);
+    // Essentials plan: 5 reviews/hour/repo. One automatic review per PR; follow-up
+    // pushes are re-reviewed only when the hub posts `@coderabbitai review`.
+    expect(autoReview.auto_incremental_review).toBe(false);
+    // Pausing only applies to automatic incremental reviews, so it must stay unset.
+    expect(autoReview).not.toHaveProperty('auto_pause_after_reviewed_commits');
   });
 
   it('should have request_changes_workflow enabled for blocking reviews', () => {

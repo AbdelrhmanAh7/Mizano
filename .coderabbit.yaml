@@ -9,7 +9,7 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
-    auto_incremental_review: true   # incremental reviews on every push for non-draft PRs on master
+    auto_incremental_review: false   # one automatic review per PR (5 reviews/hour quota); the hub requests @coderabbitai review after each fix push
     base_branches:
       - master
   path_filters:
