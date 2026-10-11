@@ -390,7 +390,7 @@ Unset launcher heap_size_limit: 4395630592
 
 # Issue #130 — Payroll, depreciation and COGM post through JournalsService
 
-- **Tested code SHA**: `2ae0cabc660aa4efb7cb272b8fb47169f4930662` (branch `ai/130`; master `fcaed26` merged in `fa7fa07`). The commit that adds this record only touches `EVIDENCE.md`.
+- **Tested code SHA**: `2ae0cabc660aa4efb7cb272b8fb47169f4930662` (branch `ai/130`; master `fcaed26` merged in `fa7fa07`). The commits after it only touch `EVIDENCE.md` and `docs/agents/review-lessons.md`, so the code at the PR head is the tested code.
 - **Environment**: macOS (UTC+3), Node 26, my own PostgreSQL 16 cluster on `127.0.0.1:55130` (fresh databases, `prisma migrate deploy`), `REDIS_URL=` blank.
 - **Round**: review round 2 (CTO "changes needed" and CodeRabbit review on PR #195, 2026-10-10/11). The round 1 record for `9bae74c` is kept below.
 
