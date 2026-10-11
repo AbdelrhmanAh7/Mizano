@@ -127,4 +127,60 @@ describe('WorkOrdersService COGM posting (#130)', () => {
     expect(prisma.inventoryMovement.create).not.toHaveBeenCalled();
     expect(prisma.journal.create).not.toHaveBeenCalled();
   });
+
+  describe('bulk completion', () => {
+    function bulkService(lockDate: Date | null = null): WorkOrdersService {
+      const service = serviceWithLock(lockDate);
+      jest
+        .spyOn(service, 'findOne')
+        .mockImplementation(async (_org: string, id: string) => ({ ...workOrder, id }) as never);
+      return service;
+    }
+
+    it('bulk completion posts one balanced COGM journal per work order through the single command', async () => {
+      const service = bulkService();
+      const complete = jest.spyOn(service, 'completeWorkOrder');
+
+      const result = await service.bulkComplete(ORG, ['wo-1', 'wo-2']);
+
+      expect(result).toEqual({ processed: 2, total: 2, failures: [] });
+      const journals = writtenJournals(prisma);
+      expect(journals).toHaveLength(2);
+      journals.forEach((journal) => {
+        expectBalanced(journal.lines);
+        expect(journal.sourceType).toBe('COGM');
+      });
+      expect(journals.map((journal) => journal.sourceId)).toEqual(['wo-1', 'wo-2']);
+      expect(complete).toHaveBeenCalledTimes(2);
+      complete.mock.calls.forEach(([, , dto]) => {
+        expect(dto.quantityProduced).toBe(workOrder.quantity);
+      });
+    });
+
+    it('bulk completion reports an order completed meanwhile instead of posting it twice', async () => {
+      prisma.workOrder.updateMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 0 });
+
+      const result = await bulkService().bulkComplete(ORG, ['wo-1', 'wo-2']);
+
+      expect(result.processed).toBe(1);
+      expect(result.failures).toEqual([
+        { id: 'wo-2', reason: 'Work order has already been completed' },
+      ]);
+      expect(writtenJournals(prisma)).toHaveLength(1);
+    });
+
+    it('bulk completion inside a locked period posts nothing and reports every order', async () => {
+      const result = await bulkService(new Date('2099-01-01T00:00:00.000Z')).bulkComplete(ORG, [
+        'wo-1',
+        'wo-2',
+      ]);
+
+      expect(result.processed).toBe(0);
+      expect(result.failures).toHaveLength(2);
+      (result.failures ?? []).forEach((failure) => expect(failure.reason).toMatch(/locked/));
+      expect(prisma.journal.create).not.toHaveBeenCalled();
+    });
+  });
 });

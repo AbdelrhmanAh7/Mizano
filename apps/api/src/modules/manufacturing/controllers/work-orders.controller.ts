@@ -147,6 +147,7 @@ export class WorkOrdersController {
 
   @Post('bulk-complete')
   @Permissions('manufacturing.edit')
+  @InvalidatesLedger('inventory:*', 'items:*')
   @ApiOperation({ summary: 'Bulk complete work orders' })
   bulkComplete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
     return this.workOrdersService.bulkComplete(orgId, dto.ids);

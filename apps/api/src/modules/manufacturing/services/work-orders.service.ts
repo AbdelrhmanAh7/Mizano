@@ -7,7 +7,9 @@ import {
 } from '@nestjs/common';
 import { Item, Prisma, WorkOrderStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { round } from '../../../common/utils/document-totals';
+import { runBulk } from '../../../common/utils/run-bulk';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
 
@@ -601,16 +603,16 @@ export class WorkOrdersService {
     return { started: result.count, total: ids.length };
   }
 
-  async bulkComplete(organizationId: string, ids: string[]) {
-    const result = await this.prisma.workOrder.updateMany({
-      where: {
-        id: { in: ids },
-        organizationId,
-        status: WorkOrderStatus.IN_PROCESS,
-      },
-      data: { status: WorkOrderStatus.COMPLETED, completedDate: new Date() },
+  /**
+   * Bulk completion reuses the single-order command for every id (runBulk), so each order is
+   * claimed, moves stock and posts its COGM:workOrderId journal exactly like a manual
+   * completion; an order that cannot complete is reported instead of skipped.
+   */
+  bulkComplete(organizationId: string, ids: string[]): Promise<BulkResultDto> {
+    return runBulk(ids, async (id) => {
+      const workOrder = await this.findOne(organizationId, id);
+      return this.completeWorkOrder(organizationId, id, { quantityProduced: workOrder.quantity });
     });
-    return { completed: result.count, total: ids.length };
   }
 
   async bulkCancel(organizationId: string, ids: string[]) {
