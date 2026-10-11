@@ -390,62 +390,58 @@ Unset launcher heap_size_limit: 4395630592
 
 # EVIDENCE — #183 Secure Docker Compose production stacks (Mizano #132-1)
 
-- **Tested commit**: the head of branch `ai/183` on PR #203 containing this file (`git log -1 -- EVIDENCE.md`
-  is the evidence commit; compose/spec/script files are unchanged by it).
-- **Scope**: `docker-compose.production.yml`, `deploy/pi/docker-compose.pi.yml`, `.env.example`,
-  `deploy/pi/.env.pi.example`, `docs/DEVELOPMENT.md`, `scripts/check-compose-security.sh`,
-  `apps/api/src/cache/production-compose.spec.ts`, `docs/ops/pending-workflow-changes.md`.
-- **E2E**: no e2e-army test; deployment config only, no user-facing flow changes.
-- **CTO answers (2026-10-11) recorded**: (1) derive a masked hex `REDIS_PASSWORD` from the existing
-  `POSTGRES_PASSWORD` in `deploy.yml`; (2) add `bash scripts/check-compose-security.sh` to the `ci.yml`
-  lint job with dummy secrets and keep the spec in the unit suite. Both are workflow edits, and the owner rule
-  for this repo says workflow files are never edited by the implementer, so per the CTO's own fallback the exact
-  patches are in `docs/ops/pending-workflow-changes.md` (the `deploy.yml` one must land before the next
-  production deploy). No secret was created, rotated or touched. `AI_QUESTIONS.md` is removed.
+- **Tested commit**: `98e9e38` (code fix `f62ce27`, e2e-army test `98e9e38`). Only this file changes after
+  it; every output below was taken on `98e9e38`.
+- **Scope**: `docker-compose.production.yml`, `deploy/pi/docker-compose.pi.yml`, `apps/api/src/cache/redis-url.ts`
+  and its three callers (`cache.module.ts`, `cache.service.ts`, `modules/ai/intake/intake-queue.service.ts`),
+  `scripts/check-compose-security.sh`, `apps/api/src/cache/{production-compose,redis-url}.spec.ts`,
+  `e2e-army/183-redis-password-api.e2e.ts`, `.env.example`, `deploy/pi/.env.pi.example`, `docs/DEVELOPMENT.md`,
+  `docs/ops/pending-workflow-changes.md`.
+- **E2E**: `e2e-army/183-redis-password-api.e2e.ts`, request-level, tagged `feat:mz-system-diagnostics` and
+  `feat:mz-intake-processor` (the two features `featurecov map` reports for the changed API files).
+- **Workflow edits** (`deploy.yml`, `ci.yml`): not applied, because the owner rule says the implementer never
+  edits workflow files. The CTO-approved patches are in `docs/ops/pending-workflow-changes.md`. Neither one
+  blocks a deploy any more (see R4). No secret was created, rotated or touched.
 
-| REQ | Requirement                                                   | Where                                                                                                                                | Verified by                                                                                                         |
-| --- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| R1  | No published 5432/6379                                        | postgres and redis services have no `ports:` in either file                                                                          | spec "publishes no Postgres or Redis port"; script requires empty `ports` on both services (any host port fails it) |
-| R2  | `POSTGRES_PASSWORD` is required (`:?`)                        | `docker-compose.production.yml:102`, `deploy/pi/docker-compose.pi.yml:20`; no `mizano_secret` fallback                               | spec "fails to render without POSTGRES_PASSWORD"; script negative case                                              |
-| R3  | Redis requires a password (`--requirepass`)                   | `${REDIS_PASSWORD:-${POSTGRES_PASSWORD:?…}}` at `docker-compose.production.yml:137-139`, `deploy/pi/docker-compose.pi.yml:50-56`     | spec "runs Redis with --requirepass…"; script checks `--requirepass <expected>`                                     |
-| R4  | Every `REDIS_URL` carries the same password                   | `docker-compose.production.yml:22`, `deploy/pi/docker-compose.pi.yml:97`                                                             | spec "prefers REDIS_PASSWORD…" (parsed with `connectionFromUrl`); script fails when no `REDIS_URL` exists           |
-| R5  | Healthcheck authenticates without the password in its command | `REDISCLI_AUTH` env; `redis-cli --no-auth-warning ping` at `docker-compose.production.yml:151`, `deploy/pi/docker-compose.pi.yml:67` | spec "keeps the password out…" and `REDISCLI_AUTH` equals `REDIS_PASSWORD`; script checks `REDISCLI_AUTH`           |
-| R6  | URL-safe password guidance (64 hex `REDIS_PASSWORD`)          | `.env.example`, `deploy/pi/.env.pi.example`, `docs/DEVELOPMENT.md`, `docs/ops/pending-workflow-changes.md`                           | review                                                                                                              |
+| REQ | Requirement                                                   | Where                                                                                                                                                                                                                                     | Verified by                                                                                                                                                                                                                                                                                           |
+| --- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R1  | No published 5432/6379                                        | postgres and redis services have no `ports:` in either file                                                                                                                                                                               | spec "publishes no Postgres or Redis port"; script fails on any `ports` entry of either service (`check-compose-security.sh:32-35`)                                                                                                                                                                   |
+| R2  | `POSTGRES_PASSWORD` is required (`:?`)                        | `docker-compose.production.yml:104`, `deploy/pi/docker-compose.pi.yml:20`; no `mizano_secret` fallback                                                                                                                                    | spec "fails to render without POSTGRES_PASSWORD"; script negative case                                                                                                                                                                                                                                |
+| R3  | Redis requires a password (`--requirepass`)                   | `docker-compose.production.yml:139-141`, `deploy/pi/docker-compose.pi.yml:50-56`                                                                                                                                                          | spec "runs Redis with --requirepass…"; script checks `--requirepass <expected>`                                                                                                                                                                                                                       |
+| R4  | The API authenticates with any password                       | compose passes a credential-free `REDIS_URL` plus the raw `REDIS_PASSWORD` (`docker-compose.production.yml:23-24`, `deploy/pi/docker-compose.pi.yml:98-99`); `apps/api/src/cache/redis-url.ts` percent-encodes it for all three consumers | `redis-url.spec.ts` (decodes the same through `connectionFromUrl`, ioredis and node-redis); spec "lets the API connect with a fallback POSTGRES_PASSWORD full of URL-special characters" (`production-compose.spec.ts:108`) fails on the old compose files; script rejects credentials in `REDIS_URL` |
+| R5  | Healthcheck authenticates without the password in its command | `REDISCLI_AUTH` env; `redis-cli --no-auth-warning ping` at `docker-compose.production.yml:153`, `deploy/pi/docker-compose.pi.yml:67`                                                                                                      | spec "keeps the password out…"; script checks `REDISCLI_AUTH`                                                                                                                                                                                                                                         |
 
 ## Review threads addressed
 
-- `scripts/check-compose-security.sh` port check: now reads `docker compose config --format json` and fails on
-  any `ports` entry of `postgres`/`redis`, so a `15432:5432` mapping is rejected.
-- `scripts/check-compose-security.sh` Redis URLs: fails when no service defines `REDIS_URL`; each URL must
-  carry the expected password. It checks both the `POSTGRES_PASSWORD` fallback and an explicit 64-hex `REDIS_PASSWORD`.
-- Encoding the Redis password in the API URLs: compose interpolation cannot percent-encode. Instead the
-  password is required to be URL-safe (hex, derived in `deploy.yml`, see pending patch) and documented; the raw
-  `POSTGRES_PASSWORD` fallback is for local/Pi values generated with `openssl rand -hex 32`.
+- `docker-compose.production.yml:22` / `deploy/pi/docker-compose.pi.yml:97` (URL-encoding the Redis password):
+  root cause: Compose interpolation cannot percent-encode, so compose must never put the password into a URL.
+  Compose now passes the password on its own and the API encodes it in one place (`redis-url.ts`). This
+  removes the earlier hex-only rule.
+- `scripts/check-compose-security.sh:32` (port check): already fixed in `8ec7d95`. It reads
+  `docker compose config --format json` and fails when `postgres` or `redis` has any `ports` entry,
+  whatever the host port.
 
-## Test output (`cd apps/api && npx jest src/cache/production-compose.spec.ts`)
+## Test output on `98e9e38` (`cd apps/api && npx jest src/cache src/modules/ai/intake`)
 
 ```text
+PASS src/cache/redis-url.spec.ts
 PASS src/cache/production-compose.spec.ts
-docker-compose.production.yml (#183)
-  ✓ fails to render without POSTGRES_PASSWORD
-  ✓ publishes no Postgres or Redis port
-  ✓ runs Redis with --requirepass falling back to POSTGRES_PASSWORD
-  ✓ prefers REDIS_PASSWORD and gives every REDIS_URL the same credentials
-  ✓ keeps the password out of the Redis healthcheck command
-deploy/pi/docker-compose.pi.yml (#183)
-  ✓ fails to render without POSTGRES_PASSWORD
-  ✓ publishes no Postgres or Redis port
-  ✓ runs Redis with --requirepass falling back to POSTGRES_PASSWORD
-  ✓ prefers REDIS_PASSWORD and gives every REDIS_URL the same credentials
-  ✓ keeps the password out of the Redis healthcheck command
-Tests:       10 passed, 10 total
+PASS src/cache/cache.service.spec.ts
+PASS src/modules/ai/intake/intake-jobs.service.spec.ts
+PASS src/modules/ai/intake/intake-job-owner.guard.spec.ts
+PASS src/modules/ai/intake/intake-storage.spec.ts
+PASS src/modules/ai/intake/intake-processor.service.spec.ts
+Tests:       68 passed, 68 total
 ```
 
-ESLint on the spec: clean. The full suite runs on GitHub CI after the push (not run locally by instruction).
+The #183 specs (16 tests: 6 per compose file + 4 `resolveRedisUrl`) all pass. ESLint and Prettier are clean on the changed
+files. `tsc --noEmit` (apps/api) reports only 10 errors, and all of them already existed: they come from the unbuilt
+`@mizano/shared-types` package in the logger module, not from any changed file.
 
 ## Not verified here
 
-- `docker compose config` itself: Docker is not installed on the machine that ran this, so
-  `scripts/check-compose-security.sh` was only syntax-checked (`bash -n`) and its `jq` filters were run against a
-  hand-written config JSON (a `15432:5432` mapping is counted). It has not been run against real Compose output.
-- The `deploy.yml` / `ci.yml` edits: not applied (see above).
+- `docker compose config` itself: Docker is not installed on this machine, so `scripts/check-compose-security.sh`
+  was checked only with `bash -n` and by running its `jq` filters on a hand-written config.
+- The e2e-army test: not run locally. `run-local.sh` needs a pushed ref, and the implementer does not push.
+  The verify job runs it.
+- The full suite: runs on GitHub CI after the push. Per instructions, it was not run locally.
