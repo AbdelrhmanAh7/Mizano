@@ -209,8 +209,10 @@ describe('Logger endpoints and stream (e2e)', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
-    await app.listen(0);
-    port = (app.getHttpServer().address() as { port: number }).port;
+    const address = app.getHttpServer().address() as { address: string; port: number };
+    // createTestApp binds 127.0.0.1 so no other local listener can share the port (#134).
+    expect(address.address).toBe('127.0.0.1');
+    port = address.port;
     anon = ApiHelper.anonymous(app);
     tenantA = await registerTenant(app, 'LogA');
     tenantB = await registerTenant(app, 'LogB');
