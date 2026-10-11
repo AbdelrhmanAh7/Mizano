@@ -47,12 +47,13 @@ services:
     restart: unless-stopped
     mem_limit: 256m
     environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}}
+      - REDISCLI_AUTH=${REDIS_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}}
     command:
       [
         'redis-server',
         '--requirepass',
-        '${REDIS_PASSWORD}',
+        '${REDIS_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}}',
         '--appendonly',
         'yes',
         '--maxmemory',
@@ -63,7 +64,7 @@ services:
     volumes:
       - ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/redis:/data
     healthcheck:
-      test: ['CMD', 'redis-cli', '-a', '$$REDIS_PASSWORD', '--no-auth-warning', 'ping']
+      test: ['CMD', 'redis-cli', '--no-auth-warning', 'ping']
       interval: 10s
       timeout: 3s
       retries: 5
@@ -93,7 +94,7 @@ services:
       NODE_ENV: production
       API_PORT: '6001'
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
-      REDIS_URL: ${REDIS_URL:?set REDIS_URL}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}}@redis:6379/0
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET}
       CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN}

@@ -158,7 +158,7 @@ Required secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `PRODUCTION_UR
 
 The workflow still pulls an Ollama vision model on the host; the CPU-only demo mandate replaces that through the deployment/runtime issues (immutable digest deploys, restore and rollback evidence). Never report a deployment as verified without health and acceptance evidence for the exact SHA.
 
-**Production stack** (`docker-compose.production.yml`): `api` (6001), `web` (5001, standalone Next.js), `postgres` (5432), `redis` (6379, AOF), `nginx` (80/443 using `nginx/nginx.conf`) and optional `certbot` (`--profile with-nginx`). Manual equivalent: `pnpm docker:prod` with `.env.prod`; stop with `pnpm docker:prod:down`.
+**Production stack** (`docker-compose.production.yml`): `api` (6001), `web` (5001, standalone Next.js), `postgres` and `redis` (AOF, `--requirepass`) on the internal network only (no published 5432/6379), `nginx` (80/443 using `nginx/nginx.conf`) and optional `certbot` (`--profile with-nginx`). `POSTGRES_PASSWORD` is required (`docker compose config` fails without it); Redis uses `REDIS_PASSWORD`, falling back to `POSTGRES_PASSWORD`, and the API's `REDIS_URL` is built from it, so use URL-safe passwords (`openssl rand -hex 32`) or percent-encode them in `DATABASE_URL`. `scripts/check-compose-security.sh` verifies this with Docker. Manual equivalent: `pnpm docker:prod` with `.env.prod`; stop with `pnpm docker:prod:down`.
 
 **Other compose files:** `docker-compose.yml` (local PostgreSQL + Redis), `docker-compose.sit.yml` (SIT resource overrides, `pnpm docker:sit`), `docker-compose.dev.yml` (shared dev server env override).
 
