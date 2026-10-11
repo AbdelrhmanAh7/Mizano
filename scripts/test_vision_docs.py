@@ -29,6 +29,9 @@ EXPECTED_TITLES = {
     18: "MZ G6 · Post-pilot: Telegram intake, VAT and hardening",
 }
 
+# Demo (goal checklist) issue per milestone number; a swap in both docs must fail.
+EXPECTED_DEMOS = {13: 175, 14: 176, 15: 177, 16: 178, 17: 179, 18: 180}
+
 # | [MZ G1 · ...](https://github.com/AbdelrhmanAh7/Mizano/milestone/13) | due | criteria | #175 |
 GOAL_ROW = re.compile(
     r"\[(MZ G\d[^\]]*)\]\(https://github\.com/AbdelrhmanAh7/Mizano/milestone/(\d+)\)"
@@ -69,7 +72,9 @@ class VisionDocsTests(unittest.TestCase):
         rows = goal_rows(VISION)
         bullets = goal_bullets(BACKLOG)
         self.assertEqual({n: demo for n, (_title, demo) in rows.items()}, {n: demo for n, (_title, demo) in bullets.items()})
-        self.assertEqual(sorted(demo for _title, demo in rows.values()), list(range(175, 181)))
+        for source, goals in (("docs/vision.md", rows), ("docs/backlog-restructure.md", bullets)):
+            self.assertEqual({n: demo for n, (_title, demo) in goals.items()}, EXPECTED_DEMOS,
+                             f"milestone to demo issue mapping drifted in {source}")
 
     def test_goal_docs_agree_on_titles(self):
         """The two docs carry identical titles per milestone number."""
