@@ -488,3 +488,17 @@ Why `auth.e2e-spec.ts` and `helpers/app.helper.ts` changed: setup only. `createT
 ## Remaining scope of #134 (R5), tracked separately
 
 PR body says `Refs #134`, not `Closes`. Specs for ledger-writing services with none, each asserting exact Decimal journal lines, tenant scoping and idempotent retries: #206 costing (FIFO/COGS), #207 currency (`convertToBaseCurrency`, unrealised FX), #208 depreciation, #209 bank-transactions + bulk-operations, #210 bank-statement-import.
+
+## Re-run after the harness reverted `ci.yml` again (head `364b2c1` + the `ci.yml` restore commit)
+
+`baa6071` (an automatic "owner-only" revert) had removed the `e2e` job again, so `test-gate.e2e-spec.ts` AC1 would have failed. The CTO authorised the edit; this commit restores `.github/workflows/ci.yml` byte-for-byte from `708591f` (`git checkout 708591f -- .github/workflows/ci.yml`, no other file touched). If the harness reverts it once more, the exact diff is `git diff baa6071 708591f -- .github/workflows/ci.yml` and issue #134 needs the `ci-change` label.
+
+Fresh PostgreSQL 16 cluster (127.0.0.1:56134), `prisma migrate deploy`, `REDIS_URL=` blank, run through `suite.sh`:
+
+```text
+$ pnpm test:e2e
+api:test:e2e: Test Suites: 14 passed, 14 total
+api:test:e2e: Tests:       307 passed, 307 total
+```
+
+`test/test-gate.e2e-spec.ts` alone (5 tests, AC1 x3 + AC2 x2) passes against the restored job; `prettier --check` on `ci.yml` and this file is clean. Not run: the GitHub `E2E Tests` job itself (first runs after the push).
