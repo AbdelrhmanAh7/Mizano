@@ -38,7 +38,7 @@ Owner ask: smaller, linked tasks with no duplicate work, a vision with clear goa
 
 **Labels:** priority:P0 -> priority:p0; priority:P1 -> priority:p1; priority:P2 -> priority:p2; type:strategy -> type:epic; ci -> type:ci; type:quality -> type:chore. Shared set across FlowLine_Web, Mizano and NileQuant: `type:{bug,feature,chore,docs,test,security,ci,epic,demo}`, `priority:p0..p3`, `area:*`, `pilot`, plus the hub's `ai-ready`, `ai-skip`, `ai-claude`, `ai-stuck`, `ai-hold`, `ai-fix`, `codex-handoff`, `needs-owner`, `model:*`, `effort:*`, `difficulty:*`. Renames keep every issue attached; no label the hub reads was deleted (the hub matches `priority:\s*p0` case-insensitively).
 
-**Board:** https://github.com/users/AbdelrhmanAh7/projects/20 — fields Goal, Status, Priority, Due; every open issue and PR added.
+**Board:** https://github.com/users/AbdelrhmanAh7/projects/20 — fields Goal, Status, Priority, Due; open issues and PRs were added, except demo issues #175 and #176 (G1, G2), which are not on the board yet.
 
 ## Rules kept
 
