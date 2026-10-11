@@ -18,8 +18,14 @@ import { expect } from 'e2e';
 
 test(
   '@issue-123 AC2: a negative VAT rate is rejected',
-  { tags: ['feat:mz-sales-invoices'] },
+  { tags: ['feat:mz-sales-invoices', 'lvl:ui'] },
   async ({ app, agent, screen }) => {
+    // agent steps need a model; without one (E2E_ARMY_NOAGENT=1, e.g. the GitHub job) the test skips itself
+    test.skip(process.env.E2E_ARMY_NOAGENT === '1', 'no model available');
+    await app.open('/en/login');
+    await agent.act('sign in as {email} with password {pw}', {
+      params: { email: 'admin@mizano.com', pw: 'password123' },
+    });
     await app.open('/en/sales/invoices/new');
     await agent.act('fill the VAT rate with {rate} and submit the invoice', {
       params: { rate: '-5' },
@@ -44,9 +50,12 @@ The feature suite lives in `e2e-army/features/` (see [e2e-army/README.md](e2e-ar
 Run it locally against a throwaway database:
 
 ```bash
+export E2E_ARMY_DB_DISPOSABLE=1   # every run wipes and reseeds the database below
 DATABASE_URL=postgresql://user:pass@127.0.0.1:5432/mizano_e2e pnpm e2e:army                                     # everything
 DATABASE_URL=… pnpm e2e:army e2e-army/123-vat-rate.e2e.ts                                                        # your test
 DATABASE_URL=… E2E_ARMY_SKIP_SETUP=1 pnpm e2e:army --tag shard:smoke                                             # one shard, reuse the setup
 ```
+
+The runner refuses a database unless one `_`/`-` separated part of its name is exactly `test`, `e2e` or `verify`, and it needs Node `^22.22.3` or `>=24.8.0` (the `e2e` package's engines; the app itself targets Node 20).
 
 Agent steps need a model, which is configured through the environment only (see `e2e.config.ts`). Without one, agent tests skip and locator and API tests still run. Existing Playwright and Jest E2E specs stay as plain tests.

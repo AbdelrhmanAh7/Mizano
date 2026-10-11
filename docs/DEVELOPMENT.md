@@ -4,7 +4,7 @@ Setup, environments, database, testing, CI, git workflow and deployment for Miza
 
 ## Prerequisites
 
-- Node 20 (CI and Docker images use Node 20; `engines` allows >=18)
+- Node 20 (CI and Docker images use Node 20; `engines` allows >=18). `pnpm e2e:army` alone needs Node `^22.22.3` or `>=24.8.0` (the `e2e` runner's engines); its GitHub job uses Node 22
 - pnpm 8.14 via `corepack enable` (pinned in `packageManager`)
 - Docker with Compose for PostgreSQL 16 and Redis 7
 - Python 3 only for the planning scripts in `scripts/`

@@ -57,18 +57,27 @@ function runCli(o: CliModelOpts, text: string, dir: string, signal?: AbortSignal
     // its 5 min budget, so lift the background bit off the model process (it is network/latency bound, not CPU heavy).
     if (child.pid && process.platform === "darwin") execFile("/usr/sbin/taskpolicy", ["-B", "-p", String(child.pid)], () => undefined);
     if (o.cli === "claude") { child.stdin!.end(text); }
-    let out = "", err = "";
-    const t = setTimeout(() => { child.kill("SIGKILL"); reject(new Error(`${o.cli} timed out`)); }, o.timeoutMs ?? 150_000);
-    signal?.addEventListener("abort", () => { child.kill("SIGKILL"); reject(new Error("aborted")); });
+    let out = "", err = "", settled = false;
+    // Every path (timeout, abort, error, exit) settles once and clears the timer and the abort listener; only a live child is killed.
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(t);
+      signal?.removeEventListener("abort", onAbort);
+      fn();
+    };
+    const kill = () => { if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL"); };
+    const onAbort = () => settle(() => { kill(); reject(new Error("aborted")); });
+    const t = setTimeout(() => settle(() => { kill(); reject(new Error(`${o.cli} timed out`)); }), o.timeoutMs ?? 150_000);
+    if (signal?.aborted) onAbort(); else signal?.addEventListener("abort", onAbort, { once: true });
     child.stdout!.on("data", (d) => (out += d));
     child.stderr!.on("data", (d) => (err += d));
-    child.on("error", (e) => { clearTimeout(t); reject(e); });
-    child.on("exit", (code) => {
-      clearTimeout(t);
+    child.on("error", (e) => settle(() => reject(e)));
+    child.on("exit", (code) => settle(() => {
       if (code !== 0) return reject(new Error(`${o.cli} exit ${code}: ${(err || out).slice(0, 300)}`));
       if (o.cli === "claude") { try { const j = JSON.parse(out); if (j.is_error) return reject(new Error(String(j.result).slice(0, 300))); return resolve(String(j.result ?? "")); } catch { /* raw */ } }
       resolve(out);
-    });
+    }));
   });
 }
 

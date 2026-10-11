@@ -3,9 +3,11 @@
 # Next.js web app, runs tester-army/e2e on e2e-army/ (config: e2e.config.ts) and stops everything again. Same recipe as the hub's
 # verify job (nql-agents ops/verify/Mizano.sh), so a local run sees what the PR gate sees.
 #
-#   DATABASE_URL         required: a throwaway Postgres database whose name contains test, e2e or verify (schema-pushed + seeded)
+#   DATABASE_URL         required: a throwaway Postgres database; one `_`/`-` separated part of its name must be exactly test, e2e or
+#                        verify (mizano_e2e, test_mizano; not "latest"). Every run WIPES it (prisma db push --force-reset) and seeds it.
+#   E2E_ARMY_DB_DISPOSABLE  required: 1 = you confirm that database may be wiped
 #   E2E_ARMY_PORT_WEB    web port, default 5101       E2E_ARMY_PORT_API   API port, default 6101 (both kept off the dev ports)
-#   E2E_ARMY_SKIP_SETUP  1 = reuse the prepared database and build (iterate on tests)
+#   E2E_ARMY_SKIP_SETUP  1 = reuse the prepared database and build (iterate on tests; the api tests assume fresh data)
 #   E2E_ARMY_MODEL_* / E2E_ARMY_CLI   model for agent steps, see e2e.config.ts (none: agent tests skip, the others run)
 #
 #   pnpm e2e:army                                    whole suite (PR tests + every feature shard)
@@ -13,15 +15,20 @@
 #   pnpm e2e:army --tag feat:mz-journals             one feature
 #   pnpm e2e:army e2e-army/153-e2e-army-gate.e2e.ts  one file
 #
-# No outbound side effects: no Redis, SMTP, Telegram, OCR or Ollama; the JWT / NextAuth secrets are random per run. Logs: .e2e/app-*.log
+# Needs Node ^22.22.3 or >=24.8.0 (the e2e runner's engines). No outbound side effects: no Redis, SMTP, Telegram, OCR or Ollama; the JWT / NextAuth secrets are random per run. Logs: .e2e/app-*.log
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-: "${DATABASE_URL:?set DATABASE_URL to a throwaway test database (its name must contain test, e2e or verify)}"
+node -e 'const [a,b,c]=process.versions.node.split(".").map(Number);process.exit((a===22&&(b>22||b===22&&c>=3))||a>24||a===24&&b>=8?0:1)' ||
+  { echo "e2e-army: Node $(node -v) is too old, the e2e runner needs ^22.22.3 or >=24.8.0" >&2; exit 78; }
+: "${DATABASE_URL:?set DATABASE_URL to a throwaway test database (one _ or - separated part of its name: test, e2e or verify)}"
 DB_NAME="${DATABASE_URL##*/}"
 DB_NAME="${DB_NAME%%\?*}"
-[[ "$DB_NAME" =~ (test|e2e|verify) ]] || { echo "e2e-army: refusing database '$DB_NAME' (name must contain test, e2e or verify)" >&2; exit 78; }
+[[ "$DB_NAME" =~ (^|[_-])(test|e2e|verify)([_-]|$) ]] ||
+  { echo "e2e-army: refusing database '$DB_NAME' (one _ or - separated part of its name must be test, e2e or verify)" >&2; exit 78; }
+[ "${E2E_ARMY_DB_DISPOSABLE:-}" = 1 ] ||
+  { echo "e2e-army: every run wipes '$DB_NAME'; set E2E_ARMY_DB_DISPOSABLE=1 to confirm it is a throwaway database" >&2; exit 78; }
 
 PORT_WEB="${E2E_ARMY_PORT_WEB:-5101}"
 PORT_API="${E2E_ARMY_PORT_API:-6101}"
@@ -38,9 +45,9 @@ SECRET1="$(secret)" SECRET2="$(secret)" SECRET3="$(secret)"
 mkdir -p .e2e
 
 if [ "${E2E_ARMY_SKIP_SETUP:-}" != 1 ]; then
-  echo "[e2e-army] preparing $DB_NAME and building the API"
+  echo "[e2e-army] resetting and seeding $DB_NAME, building the API"
   pnpm db:generate >/dev/null
-  pnpm --filter api exec prisma db push --skip-generate --accept-data-loss >/dev/null
+  pnpm --filter api exec prisma db push --skip-generate --force-reset >/dev/null # fresh data every run
   pnpm --filter api exec prisma db seed >/dev/null
   pnpm turbo run build --filter=api --filter='@mizano/web^...' --output-logs=errors-only
 fi
