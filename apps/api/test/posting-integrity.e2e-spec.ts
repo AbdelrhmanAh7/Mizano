@@ -170,6 +170,8 @@ describe('Posting integrity (e2e, real database)', () => {
   });
 
   describe('document posting (invoice send)', () => {
+    const NOT_DRAFT = 'Only draft invoices can be sent';
+
     async function draftInvoice(): Promise<string> {
       const res = await a.post('/invoices').send({
         customerId,
@@ -187,8 +189,10 @@ describe('Posting integrity (e2e, real database)', () => {
       const first = await journalsFor(INVOICE_SEND, id);
       expect(first).toHaveLength(1);
 
+      // The invoice is no longer a draft, so the replay is refused before anything posts.
       const again = await a.patch(`/invoices/${id}/send`);
-      expect([400, 409]).toContain(again.status);
+      expect(again.status).toBe(400);
+      expect(again.body.message).toBe(NOT_DRAFT);
       const posted = await journalsFor(INVOICE_SEND, id);
       expect(posted.map((j) => j.id)).toEqual([first[0].id]);
       expect(posted[0].lines).toHaveLength(first[0].lines.length);
@@ -202,7 +206,11 @@ describe('Posting integrity (e2e, real database)', () => {
       );
       const statuses = results.map((r) => r.status);
       expect(statuses.filter((s) => s === 200)).toHaveLength(1);
-      for (const s of statuses.filter((x) => x !== 200)) expect([400, 409]).toContain(s);
+      // The losers wait on the invoice row lock, then find it sent: never a second journal.
+      for (const r of results.filter((x) => x.status !== 200)) {
+        expect(r.status).toBe(400);
+        expect(r.body.message).toBe(NOT_DRAFT);
+      }
 
       const posted = await journalsFor(INVOICE_SEND, id);
       expect(posted).toHaveLength(1);
@@ -235,7 +243,9 @@ describe('Posting integrity (e2e, real database)', () => {
       const lock = await a.patch('/organization/lock-date').send({ lockDate: midnightIso(day) });
       expect(lock.status).toBe(200);
       try {
-        expect([400, 409]).toContain((await a.patch(`/invoices/${id}/send`)).status);
+        const again = await a.patch(`/invoices/${id}/send`);
+        expect(again.status).toBe(400);
+        expect(again.body.message).toBe(NOT_DRAFT);
       } finally {
         await a.patch('/organization/lock-date').send({ lockDate: null });
       }

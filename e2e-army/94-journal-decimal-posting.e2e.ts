@@ -69,7 +69,8 @@ test(
     expect(ok.status).toBe(201);
     const stored = await call(`/journals/${ok.body.id}`, "GET", undefined, token);
     expect(stored.status).toBe(200);
-    expect(Number.parseFloat(stored.body.totalDebit)).toBe(1234.56);
-    expect(String(stored.body.totalDebit)).toBe(String(stored.body.totalCredit));
+    // Totals come back as exact 4-dp decimal strings, never as JSON numbers.
+    expect(stored.body.totalDebit).toBe("1234.5600");
+    expect(stored.body.totalCredit).toBe("1234.5600");
   },
 );
