@@ -1,7 +1,7 @@
 import Decimal from 'decimal.js';
 import * as invoiceRules from '../rules/invoice-rules-extractor';
 import { buildExtractionContext } from '../../services/document-intake.service';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { main, benchmarkError, toFieldValues } from './run-benchmark';
@@ -29,6 +29,7 @@ describe('benchmark runner', () => {
   const originalDir = process.env.INTAKE_TESSDATA_DIR;
   let directory: string;
   beforeEach(() => {
+    jest.clearAllMocks();
     directory = mkdtempSync(join(tmpdir(), 'mizano-benchmark-'));
     process.argv = ['node', 'benchmark', '--corpus', directory];
     delete process.env.INTAKE_TESSDATA_DIR;
@@ -158,10 +159,18 @@ describe('benchmark runner', () => {
     expect(output).toMatch(/^Benchmark failed: (Error|SyntaxError|Non-Error thrown \(string\))\n$/);
   });
 
-  it('rejects --out when it is missing a path or consumes the next flag', async () => {
-    process.argv = ['node', 'benchmark', '--corpus', directory, '--out', '--labels'];
-    await expect(main()).rejects.toThrow('--out requires a directory path');
-  });
+  it.each([{ following: [] }, { following: ['--labels'] }, { following: ['--language', 'eng'] }])(
+    'rejects --out without an operand before extraction or report output (%j)',
+    async ({ following }) => {
+      process.argv.push('--out', ...following);
+      const extract = jest.spyOn(RulesStrategy.prototype, 'extract');
+      const output = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+      await expect(main()).rejects.toThrow('--out requires a directory path');
+      expect(extract).not.toHaveBeenCalled();
+      expect(output).not.toHaveBeenCalled();
+      expect(existsSync(join(directory, 'benchmark.json'))).toBe(false);
+    },
+  );
 
   it('rejects scanned PDFs without usable text layers', async () => {
     labels({ 'scanned.pdf': fields });
@@ -173,11 +182,48 @@ describe('benchmark runner', () => {
         language: 'eng',
         isPdf: true,
         pdfIsNativeText: false,
-      } as any,
+      },
       rawText: '',
     });
+    const extract = jest.spyOn(RulesStrategy.prototype, 'extract');
     await expect(main()).rejects.toThrow(
       'Unsupported benchmark input: scanned PDF without usable text layer (scanned.pdf)',
     );
+    expect(extract).not.toHaveBeenCalled();
+  });
+
+  it('passes native-text PDF context to extraction and writes both reports', async () => {
+    labels({ 'native.pdf': fields });
+    writeFileSync(join(directory, 'native.pdf'), 'pdf fixture');
+    const context = {
+      fileBuffer: Buffer.from('pdf fixture'),
+      mimeType: 'application/pdf',
+      language: 'eng+ara',
+      isPdf: true,
+      pdfIsNativeText: true,
+      pdfText: 'Invoice INV-1\nTotal: 1.23',
+      pdfPageCount: 1,
+    };
+    jest.mocked(buildExtractionContext).mockResolvedValue({ context, rawText: context.pdfText });
+    const extract = jest.spyOn(RulesStrategy.prototype, 'extract');
+    const output = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const reports = join(directory, 'reports');
+    process.argv.push('--out', reports);
+    await main();
+    expect(buildExtractionContext).toHaveBeenCalledWith(
+      context.fileBuffer,
+      'application/pdf',
+      'eng+ara',
+      'native.pdf',
+    );
+    expect(extract).toHaveBeenCalledTimes(1);
+    expect(extract).toHaveBeenCalledWith(context);
+    expect(await extract.mock.results[0].value).not.toBeNull();
+    expect(output).toHaveBeenCalledWith(expect.stringContaining('Documents: 1'));
+    expect(readFileSync(join(reports, 'benchmark.md'), 'utf8')).toContain('Documents: 1');
+    expect(JSON.parse(readFileSync(join(reports, 'benchmark.json'), 'utf8'))).toMatchObject({
+      report: { documents: 1 },
+      documents: [{ file: 'native.pdf' }],
+    });
   });
 });
