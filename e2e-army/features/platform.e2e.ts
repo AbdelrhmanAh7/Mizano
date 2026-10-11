@@ -363,7 +363,7 @@ test("[mz-notification-jobs.1] notification job work items: overdue invoices, up
   const aging = await a.api.get("/reports/receivables-aging");
   expect(aging.body.buckets.over90.map((i: any) => i.invoiceId)).toContain(inv.id);
   const alerts = await a.api.get("/ai/reorder/alerts");
-  expect(alerts.status).toBeLessThan(500);
+  expect(alerts.status).toBe(200);
   expect((await a.api.get("/notifications")).status).toBe(200);
 });
 
@@ -500,7 +500,7 @@ test("[mz-currency.1] currency API: supported currencies, exchange rates CRUD, c
   expect((await b.api.put(`/currency/exchange-rates/${rate.body.id}`, { rate: 1 })).status).toBe(404);
   expect((await b.api.del(`/currency/exchange-rates/${rate.body.id}`)).status).toBe(404);
   expect((await a.api.del(`/currency/exchange-rates/${rate.body.id}`)).status).toBe(200);
-  expect((await a.api.get("/currency/unrealized-gain-loss")).status).toBeLessThan(500);
+  expect((await a.api.get("/currency/unrealized-gain-loss")).status).toBe(200);
 });
 
 test("[mz-user-preferences.1] user preferences API: dashboard layout and tour progress are stored per user", { tags: ["feat:mz-user-preferences", "shard:platform-api", "lvl:api"] }, async () => {

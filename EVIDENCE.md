@@ -414,3 +414,11 @@ Known risk: the form sign-in of AC1 timed out once (150 s) while the Mac was und
 Blocked, not counted: a second `E2E_ARMY_CLI=agy` smoke run at `8364be1` ran while the Mac's load average was about 30 (other suites queued behind the governor). It took 18 m 41 s and failed 5 of 8: the agy model calls timed out or were aborted, and `[mz-i18n-rtl.1]`, which needs no model, missed its 5 s `expect.poll`. The same test had passed 20 minutes earlier on the same head without load. This is host saturation, not a test result.
 
 Hub-side follow-up (outside this repository): the verify job copies up to 8 top-level `e2e-army/*.e2e.ts` files into its runner and runs all of them on every PR. Once more than a few issue tests exist, it should copy only the files the PR changed, or it will run old issue tests and drop new ones past the eighth.
+
+## Round 3 (CTO answers, #153)
+
+- **Depreciation fix kept**: `apps/api/src/modules/assets/services/depreciation.service.ts` (client errors answer 404/409, not 500) is exercised by `[mz-asset-depreciation.1]` and `[mz-fixed-assets.2]` (shard `banking-api`, both in the failing list above); the unit cases are in `depreciation.service.spec.ts`.
+- **Redis**: no service container on purpose; `REDIS_URL: ''` is explicit in `.github/workflows/e2e-army.yml` and `scripts/e2e-army.sh`, and `[mz-health.2]` (shard `platform-api`) asserts the API is healthy on the in-memory cache.
+- **Assertions tightened** (review threads): `ai.e2e.ts` non-document upload and invalid suggestion status now expect exactly 400; `platform.e2e.ts` reorder alerts and unrealized gain/loss expect 200.
+- **Not verified in this round**: the shards were not re-run locally. The implementer sandbox forbids local port binding (a throwaway Postgres could not start) and cannot reach api.github.com, so the CI results of the earlier head were not readable either. Prettier passes on the changed files; the shard runtimes (each <= 5 min) are measured by the GitHub `e2e-army` matrix on this push.
+- **Defect found, not fixed here (follow-up issue)**: `PATCH /ai/deep-search/suggestions/:id` with a valid status (`accepted`) on an unknown id answers 200 `{success:true}` (`updateMany` count 0 is not turned into a 404). The test keeps the exact 400 for the invalid status.

@@ -151,7 +151,7 @@ test("[mz-deep-search.2] DeepSearch API: job history and permissions are served 
   expect(rows(jobs)).toHaveLength(0);
   expect((await a.api.get("/ai/deep-search/jobs/ghost")).status).toBe(404);
   expect((await a.api.get("/ai/deep-search/suggestions/ghost/prompt")).status).toBe(404);
-  expect((await a.api.patch("/ai/deep-search/suggestions/ghost", { status: "ACCEPTED" })).status).toBeGreaterThanOrEqual(400);
+  expect((await a.api.patch("/ai/deep-search/suggestions/ghost", { status: "ACCEPTED" })).status).toBe(400); // the DTO accepts lowercase accepted / dismissed only
   expect((await b.api.get("/ai/deep-search/jobs")).status).toBe(200);
   // starting a job scrapes external web sources and reads the repository: refused to run here, only its input validation is checked
   expect((await a.api.post("/ai/deep-search/run", { notAField: true })).status).toBe(400);
@@ -163,7 +163,7 @@ test("[mz-document-intake.1] intake API: a PDF becomes a durable job with its or
   const file = { name: "inv.pdf", type: "application/pdf", data: bytes };
   expect((await anon.upload("/ai/document-intake/process", file)).status).toBe(401);
   expect((await a.api.request("POST", "/ai/document-intake/process", { body: {} })).status).toBe(400); // no file
-  expect((await a.api.upload("/ai/document-intake/process", { name: "notes.txt", type: "text/plain", data: "hello" })).status).toBeGreaterThanOrEqual(400);
+  expect((await a.api.upload("/ai/document-intake/process", { name: "notes.txt", type: "text/plain", data: "hello" })).status).toBe(400); // the OCR file filter rejects non-document types
 
   const up = await a.api.upload("/ai/document-intake/process", file);
   expect(up.status).toBe(201);
