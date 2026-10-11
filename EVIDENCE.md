@@ -399,9 +399,18 @@ Unset launcher heap_size_limit: 4395630592
   `docs/ops/pending-workflow-changes.md`.
 - **E2E**: `e2e-army/183-redis-password-api.e2e.ts`, request-level, tagged `feat:mz-system-diagnostics` and
   `feat:mz-intake-processor` (the two features `featurecov map` reports for the changed API files).
-- **Workflow edits** (`deploy.yml`, `ci.yml`): not applied, because the owner rule says the implementer never
-  edits workflow files. The CTO-approved patches are in `docs/ops/pending-workflow-changes.md`. Neither one
-  blocks a deploy any more (see R4). No secret was created, rotated or touched.
+- **Workflow edits** (`deploy.yml`, `ci.yml`): applied in this PR (CTO approved):
+  - `deploy.yml:225-227`: derives a 64-char hex Redis password from `POSTGRES_PASSWORD` using `sha256sum | cut -c1-64`,
+    adds it with `::add-mask::`, writes `REDIS_PASSWORD`. The compose files use `${REDIS_PASSWORD:-${POSTGRES_PASSWORD}}`
+    as the fallback, so local and Pi deployments continue to work. No new secret is created; only the existing
+    `POSTGRES_PASSWORD` is used.
+  - `ci.yml:95-96`: adds "Compose security check" step that runs `scripts/check-compose-security.sh` with dummy
+    passwords (`POSTGRES_PASSWORD=ci-dummy`, `REDIS_PASSWORD=0000...`). The script asserts no 5432/6379 ports,
+    Redis has `--requirepass`, every service has `REDIS_PASSWORD` and a credential-free `REDIS_URL`, and config
+    fails without `POSTGRES_PASSWORD`.
+- **Security**: No published 5432/6379 ports; Redis requires password; API authenticates with any password
+  (percent-encoded by `redis-url.ts`). The CI gate enforces this via `check-compose-security.sh` and the unit
+  suite via `production-compose.spec.ts`. No secrets are created or rotated in this PR.
 
 | REQ | Requirement                                                   | Where                                                                                                                                                                                                                                     | Verified by                                                                                                                                                                                                                                                                                           |
 | --- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

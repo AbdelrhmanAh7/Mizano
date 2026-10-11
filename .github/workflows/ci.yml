@@ -94,6 +94,9 @@ jobs:
       - name: Run TypeScript type check
         run: pnpm turbo run type-check
 
+      - name: Compose security check
+        run: bash scripts/check-compose-security.sh
+
   # ==========================================
   # Unit Tests (mock-only: no database, no Redis)
   # ==========================================
