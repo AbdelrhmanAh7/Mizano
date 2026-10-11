@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Verifies the production compose stacks (#183): postgres/redis publish no
-# port, Redis runs with --requirepass, every REDIS_URL carries credentials,
+# port, Redis runs with --requirepass, every REDIS_URL service gets REDIS_PASSWORD,
 # and `docker compose config` fails when POSTGRES_PASSWORD is unset.
 # Needs Docker Compose v2 and jq. Uses dummy values only; prints no passwords.
 set -euo pipefail
@@ -40,13 +40,16 @@ check_render() {
   [[ "$(jq -r '.services.redis.environment.REDISCLI_AUTH // ""' <<<"$out")" == "$expected" ]] \
     || report "$f" "redis healthcheck auth (REDISCLI_AUTH) missing or wrong password"
 
-  local urls count=0 url
-  urls=$(jq -r '.services[].environment // {} | .REDIS_URL // empty' <<<"$out")
-  while IFS= read -r url; do
+  # Compose cannot URL-encode, so REDIS_URL carries no credentials and the API
+  # encodes the raw REDIS_PASSWORD next to it (apps/api/src/cache/redis-url.ts).
+  local pairs count=0 url pass
+  pairs=$(jq -r '.services[].environment // {} | select(.REDIS_URL) | [.REDIS_URL, (.REDIS_PASSWORD // "")] | @tsv' <<<"$out")
+  while IFS=$'\t' read -r url pass; do
     [[ -n "$url" ]] || continue
     count=$((count + 1))
-    [[ "$url" == "redis://:${expected}@"* ]] || report "$f" "REDIS_URL without the redis password"
-  done <<<"$urls"
+    [[ "$url" != *@* ]] || report "$f" "REDIS_URL embeds credentials (pass REDIS_PASSWORD instead)"
+    [[ "$pass" == "$expected" ]] || report "$f" "REDIS_URL service without the redis password in REDIS_PASSWORD"
+  done <<<"$pairs"
   [[ $count -gt 0 ]] || report "$f" "no service defines REDIS_URL"
 }
 

@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { connectionFromUrl } from '../modules/ai/intake/intake-queue.service';
+import { resolveRedisUrl } from './redis-url';
 
 /**
  * #183: the production compose stacks keep Postgres/Redis off the host and
@@ -67,6 +68,12 @@ function service(rendered: string, name: string): string {
   return rest.slice(0, end === -1 ? undefined : end).join('\n');
 }
 
+/** Value of one environment entry, in list (`- KEY=value`) or map (`KEY: value`) form. */
+function envOf(serviceText: string, key: string): string | undefined {
+  const match = new RegExp(`^\\s*(?:- )?${key}(?:=|: )(.*)$`, 'm').exec(serviceText);
+  return match?.[1].trim();
+}
+
 describe.each(FILES)('%s (#183)', (file) => {
   it('fails to render without POSTGRES_PASSWORD', () => {
     expect(() => render(file, {})).toThrow('POSTGRES_PASSWORD is required');
@@ -87,17 +94,26 @@ describe.each(FILES)('%s (#183)', (file) => {
     expect(redis).toContain(`REDISCLI_AUTH=${PG_PASS}`);
   });
 
-  it('prefers REDIS_PASSWORD and gives every REDIS_URL the same credentials', () => {
+  it('prefers REDIS_PASSWORD and hands the API the same password next to a credential-free REDIS_URL', () => {
     const rendered = render(file, { POSTGRES_PASSWORD: PG_PASS, REDIS_PASSWORD: REDIS_PASS });
     const redis = service(rendered, 'redis');
     expect(redis).toMatch(new RegExp(`--requirepass'?,?\\s*'?${REDIS_PASS}`));
     expect(redis).toContain(`REDISCLI_AUTH=${REDIS_PASS}`);
     expect(redis).not.toContain(PG_PASS);
-    const urls = rendered.match(/redis:\/\/[^\s"']+/g) ?? [];
-    expect(urls.length).toBeGreaterThan(0);
-    for (const url of urls) {
-      expect(connectionFromUrl(url)).toMatchObject({ host: 'redis', password: REDIS_PASS });
-    }
+    const api = service(rendered, 'api');
+    expect(envOf(api, 'REDIS_URL')).toBe('redis://redis:6379/0');
+    expect(envOf(api, 'REDIS_PASSWORD')).toBe(REDIS_PASS);
+  });
+
+  it('lets the API connect with a fallback POSTGRES_PASSWORD full of URL-special characters', () => {
+    const special = 'army183/pg+=@:%?';
+    const api = service(render(file, { POSTGRES_PASSWORD: special }), 'api');
+    const env = {
+      REDIS_URL: envOf(api, 'REDIS_URL'),
+      REDIS_PASSWORD: envOf(api, 'REDIS_PASSWORD'),
+    };
+    const url = resolveRedisUrl({ get: (key) => env[key as keyof typeof env] });
+    expect(connectionFromUrl(url as string)).toMatchObject({ host: 'redis', password: special });
   });
 
   it('keeps the password out of the Redis healthcheck command', () => {

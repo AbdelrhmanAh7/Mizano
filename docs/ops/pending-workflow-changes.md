@@ -2,8 +2,8 @@
 
 Owner rule: workflow/CI files are not edited by the implementer. The CTO approved
 both changes below (comment on PR #203, 2026-10-11) and no secret is created or
-rotated. Apply them by hand; the `deploy.yml` change must land **before the next
-production deploy**.
+rotated. Apply them by hand. Neither blocks a deploy: without change 1 Redis and
+the API use `POSTGRES_PASSWORD` (any characters; the API URL-encodes it).
 
 ## 1. `.github/workflows/deploy.yml` (env file generation, about line 225)
 
@@ -21,11 +21,10 @@ with (no `set -x`; never echo the value elsewhere):
               printf 'REDIS_PASSWORD=%s\n' "${REDIS_PASS_HEX}"
 ```
 
-Compose then uses `REDIS_PASSWORD` for `--requirepass`, `REDISCLI_AUTH` and the
-API's `REDIS_URL` (hex is URL-safe). The fallback
-`${REDIS_PASSWORD:-${POSTGRES_PASSWORD}}` stays for local and Pi use. Until this
-lands, a production `POSTGRES_PASSWORD` containing `/ + = @ : % ?` breaks the
-API's `REDIS_URL`.
+Compose then uses a Redis password distinct from the database one for
+`--requirepass`, `REDISCLI_AUTH` and the API's `REDIS_PASSWORD`. The API
+percent-encodes it into the credential-free `REDIS_URL`
+(`apps/api/src/cache/redis-url.ts`), so no character restriction applies.
 
 ## 2. `.github/workflows/ci.yml` (lint job)
 
