@@ -340,11 +340,13 @@ export class DocumentIntakeController {
     return runBulk(dto.jobIds, async (jobId) => {
       const job = await this.jobs.getForOrg(jobId, orgId);
       if (job.status !== IntakeJobStatus.EXTRACTED) {
-        throw new ConflictException(
-          job.status === IntakeJobStatus.APPROVED
+        const alreadyApproved = job.status === IntakeJobStatus.APPROVED;
+        throw new ConflictException({
+          code: alreadyApproved ? 'ALREADY_APPROVED' : 'NOT_READY',
+          message: alreadyApproved
             ? 'Already approved'
             : `Only ready (extracted) jobs can be approved, this one is ${job.status}`,
-        );
+        });
       }
       const confirmation = buildBillConfirmation(job.result as DocumentIntakeResult | null, {
         baseCurrency,

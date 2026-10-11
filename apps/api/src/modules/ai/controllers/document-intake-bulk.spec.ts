@@ -103,6 +103,20 @@ describe('DocumentIntakeController.bulkApprove', () => {
     expect(drafts).toBe(1);
   });
 
+  it('returns stable codes for already-approved and non-ready status failures', async () => {
+    const res = await controller.bulkApprove(ORG_A, { jobIds: ['done', 'review', 'failed'] });
+    expect(res).toMatchObject({
+      processed: 0,
+      total: 3,
+      failures: [
+        { id: 'done', code: 'ALREADY_APPROVED', reason: 'Already approved' },
+        { id: 'review', code: 'NOT_READY' },
+        { id: 'failed', code: 'NOT_READY' },
+      ],
+    });
+    expect(intake.confirmAndCreate).not.toHaveBeenCalled();
+  });
+
   it('leaves a missing-currency job as an exception while approving a ready job', async () => {
     const base = billResult();
     rows.set(

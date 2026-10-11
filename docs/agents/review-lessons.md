@@ -95,6 +95,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 ## 11. Web UI
 
 - **Every new string needs en and ar,** including dialog titles, confirm and cancel buttons, placeholders, selector labels and report row names. Shared components accept localized label props.
+- **Bulk failure localization is an API-to-UI contract.** Every expected status rejection needs a stable code and matching keys in both message catalogs; test coded failures using real Arabic messages and test the unknown-code fallback separately. A guarded lookup cannot translate an error whose API response has no code. _(intake bulk approval, PR #85)_
 - **Navigation labels include breadcrumbs.** Reuse the same translation key as the sidebar, and refresh memoized labels when the locale changes.
 - **Reserve file-viewer tabs during the click, before awaiting authenticated downloads.** Detach the opener explicitly; report a blocked tab, close it on fetch/navigation failure, and release blob URLs.
 - **Keep error, loading and empty distinct.** Never collapse a failed query into `[]` ("no accounts"). Show an error with Retry, and block submit while a required lookup is loading or failed.

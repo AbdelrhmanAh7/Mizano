@@ -109,6 +109,7 @@ function inbox(rows: IntakeInboxRow[]) {
 describe('IntakeInbox', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    currentMockLocale = 'en';
     mockCanUse = true;
     mockUseInbox.mockReturnValue(inbox([row('a'), row('b'), row('c', {}, false)]));
   });
@@ -163,6 +164,64 @@ describe('IntakeInbox', () => {
         expect.objectContaining({
           variant: 'destructive',
           description: 'Vendor b: No existing vendor was matched',
+        }),
+      ),
+    );
+  });
+
+  it.each(['en', 'ar'])('translates coded bulk status failures in %s', async (locale) => {
+    currentMockLocale = locale;
+    mockBulk.mockResolvedValue({
+      processed: 0,
+      total: 2,
+      failures: [
+        { id: 'a', code: 'ALREADY_APPROVED', reason: 'Already approved' },
+        { id: 'b', code: 'NOT_READY', reason: 'Only ready jobs can be approved' },
+      ],
+    });
+    const blockers = allLocales[locale].inbox.blocker;
+    expect(blockers.ALREADY_APPROVED).toBeTruthy();
+    expect(blockers.NOT_READY).toBeTruthy();
+    render(
+      <div dir={locale === 'ar' ? 'rtl' : 'ltr'}>
+        <IntakeInbox />
+      </div>,
+    );
+    expect(screen.getByRole('table').closest('[dir]')).toHaveAttribute(
+      'dir',
+      locale === 'ar' ? 'rtl' : 'ltr',
+    );
+    fireEvent.click(screen.getByLabelText('selectAll'));
+    fireEvent.click(screen.getByRole('button', { name: /approveSelected/ }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'confirm.confirm' }));
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: 'destructive',
+          description: `Vendor a: ${blockers.ALREADY_APPROVED}\nVendor b: ${blockers.NOT_READY}`,
+        }),
+      ),
+    );
+  });
+
+  it('falls back to the server reason for an unknown code in Arabic', async () => {
+    currentMockLocale = 'ar';
+    mockBulk.mockResolvedValue({
+      processed: 1,
+      total: 2,
+      failures: [{ id: 'b', code: 'FUTURE_CODE', reason: 'Fallback reason' }],
+    });
+    render(<IntakeInbox />);
+    fireEvent.click(screen.getByLabelText('selectAll'));
+    fireEvent.click(screen.getByRole('button', { name: /approveSelected/ }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'confirm.confirm' }));
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: 'destructive',
+          description: 'Vendor b: Fallback reason',
         }),
       ),
     );

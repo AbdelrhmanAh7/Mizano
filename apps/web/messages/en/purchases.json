@@ -483,6 +483,8 @@
       }
     },
     "blocker": {
+      "ALREADY_APPROVED": "Already approved",
+      "NOT_READY": "Only ready documents can be approved",
       "NO_RESULT": "No extraction result yet",
       "NOT_BILL": "Not classified as a bill",
       "NO_VENDOR": "No existing vendor matched",
