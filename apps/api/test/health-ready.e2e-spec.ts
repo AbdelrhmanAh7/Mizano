@@ -19,7 +19,7 @@ describe('Health Ready Endpoint (e2e)', () => {
   const envBackup = { ...process.env };
 
   beforeAll(async () => {
-    app = await createTestApp();
+    app = await createTestApp((builder) => builder, { globalPrefix: 'api' });
     prisma = getPrisma(app);
     statfsSpy = jest.spyOn(fs.promises, 'statfs');
     queryRawSpy = jest.spyOn(prisma, '$queryRaw');
@@ -39,7 +39,7 @@ describe('Health Ready Endpoint (e2e)', () => {
     process.env = { ...envBackup };
   });
 
-  const ready = (): request.Test => request(app.getHttpServer()).get('/health/ready');
+  const ready = (): request.Test => request(app.getHttpServer()).get('/api/health/ready');
 
   it('@e2e @health-ready @issue-110 AC1: A healthy DB and enough disk returns 200 with the documented JSON shape', async () => {
     queryRawSpy.mockResolvedValue([{ '?column?': 1 }]);
@@ -79,7 +79,7 @@ describe('Health Ready Endpoint (e2e)', () => {
     });
   });
 
-  it('@e2e @health-ready @issue-110 AC2 timeout: a hung DB returns 503 within the timeout and probes are not stacked', async () => {
+  it('@e2e @health-ready @issue-110 AC2 timeout: a hung DB returns 503 within the timeout and concurrent probes share one query', async () => {
     process.env.READY_DB_TIMEOUT_MS = '100';
     let release: (value: unknown) => void = () => undefined;
     queryRawSpy.mockReturnValue(new Promise((resolve) => (release = resolve)));
@@ -96,7 +96,28 @@ describe('Health Ready Endpoint (e2e)', () => {
       expect(response.body.db).toBe('fail');
     }
     expect(elapsedMs).toBeLessThan(2000);
-    expect(queryRawSpy).toHaveBeenCalledTimes(1);
+    // The two concurrent requests shared one query; the timeout freed the slot, so the third started a fresh one.
+    expect(queryRawSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('@e2e @health-ready @issue-110 AC2 recovery: readiness returns 200 once the DB answers after a timed-out probe', async () => {
+    process.env.READY_DB_TIMEOUT_MS = '100';
+    queryRawSpy.mockReturnValueOnce(new Promise(() => undefined));
+    queryRawSpy.mockResolvedValue([{ '?column?': 1 }]);
+    statfsSpy.mockResolvedValue(okDisk);
+
+    const hung = await ready();
+    const recovered = await ready();
+
+    expect(hung.status).toBe(503);
+    expect(hung.body.db).toBe('fail');
+    expect(recovered.status).toBe(200);
+    expect(recovered.body).toEqual({
+      status: 'ok',
+      db: 'ok',
+      disk: { freeBytes: 2048000, freePct: 50 },
+    });
+    expect(queryRawSpy).toHaveBeenCalledTimes(2);
   });
 
   it('@e2e @health-ready @issue-110 AC3: Free space below the threshold returns 503 and the body names disk as failing', async () => {
@@ -175,7 +196,7 @@ describe('Health Ready Endpoint (e2e)', () => {
   it('@e2e @health-ready @issue-110 AC1: /health liveness keeps its existing shape', async () => {
     queryRawSpy.mockResolvedValue([{ '?column?': 1 }]);
 
-    const response = await request(app.getHttpServer()).get('/health');
+    const response = await request(app.getHttpServer()).get('/api/health');
 
     expect(response.status).toBe(200);
     expect(response.body.status).toBe('healthy');

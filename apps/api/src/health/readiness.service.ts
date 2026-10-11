@@ -44,19 +44,35 @@ export class ReadinessService {
     return { status: db === 'ok' && diskOk ? 'ok' : 'fail', db, disk };
   }
 
+  /** Starts the shared `SELECT 1`; the slot is freed when it settles, never by a later probe's query. */
+  private startDbQuery(): Promise<unknown> {
+    const query = Promise.resolve(this.prisma.$queryRaw`SELECT 1`);
+    const release = (): void => {
+      if (this.pendingDbQuery === query) this.pendingDbQuery = undefined;
+    };
+    query.then(release, release);
+    return query;
+  }
+
   private async probeDb(): Promise<'ok' | 'fail'> {
     const timeoutMs = envNumber('READY_DB_TIMEOUT_MS', DEFAULT_DB_TIMEOUT_MS, 60_000);
     let timer: NodeJS.Timeout | undefined;
+    let query: Promise<unknown> | undefined;
+    let timedOut = false;
     const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error('readiness db probe timed out')), timeoutMs);
+      timer = setTimeout(() => {
+        timedOut = true;
+        reject(new Error('readiness db probe timed out'));
+      }, timeoutMs);
     });
     try {
-      this.pendingDbQuery ??= Promise.resolve(this.prisma.$queryRaw`SELECT 1`).finally(() => {
-        this.pendingDbQuery = undefined;
-      });
-      await Promise.race([this.pendingDbQuery, timeout]);
+      query = this.pendingDbQuery ??= this.startDbQuery();
+      await Promise.race([query, timeout]);
       return 'ok';
     } catch (error) {
+      // A hung query must not pin the slot: the next request starts a fresh probe, so the
+      // endpoint recovers as soon as the database does and handlers never pile up on a stale promise.
+      if (timedOut && this.pendingDbQuery === query) this.pendingDbQuery = undefined;
       this.logger.warn(`DB probe failed: ${describeError(error, { includeMessage: false })}`);
       return 'fail';
     } finally {
@@ -67,7 +83,9 @@ export class ReadinessService {
   private async probeDisk(): Promise<DiskReport | 'fail'> {
     const minFreePct = envNumber('READY_MIN_FREE_PCT', DEFAULT_MIN_FREE_PCT, 100);
     try {
-      const stat = await fs.promises.statfs(process.env.DATA_DIR || process.cwd());
+      const stat = await fs.promises.statfs(
+        process.env.DATA_DIR || process.env.INTAKE_STORAGE_DIR || process.cwd(),
+      );
       // bavail, not bfree: root-reserved blocks are not usable by the API process.
       const blocks = Number(stat.blocks);
       const bavail = Number(stat.bavail);

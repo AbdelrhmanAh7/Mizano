@@ -18,10 +18,12 @@ class UnlimitedThrottlerStorage implements ThrottlerStorage {
 /**
  * Boots the real AppModule in-process with the same global validation pipe as `src/main.ts`,
  * so request validation and response shapes match production. The `/api` global prefix is not
- * applied: routes are addressed as `/bills`, `/journals`, ...
+ * applied by default: routes are addressed as `/bills`, `/journals`, ... Pass `globalPrefix: 'api'`
+ * to address them as in production (`/api/health/ready`).
  */
 export async function createTestApp(
   configure: (builder: TestingModuleBuilder) => TestingModuleBuilder = (builder) => builder,
+  options: { globalPrefix?: string } = {},
 ): Promise<INestApplication> {
   const builder = Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(ThrottlerStorage)
@@ -29,6 +31,7 @@ export async function createTestApp(
   const moduleFixture = await configure(builder).compile();
 
   const app = moduleFixture.createNestApplication();
+  if (options.globalPrefix) app.setGlobalPrefix(options.globalPrefix);
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

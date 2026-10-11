@@ -258,6 +258,41 @@ describe('ReadinessService', () => {
       delete process.env.READY_DB_TIMEOUT_MS;
     });
 
+    it('@issue-110 unit: a timed-out probe frees the slot so the next check recovers', async () => {
+      process.env.READY_DB_TIMEOUT_MS = '50';
+      const queryRaw = prismaService.$queryRaw as jest.Mock;
+      queryRaw.mockReturnValueOnce(new Promise(() => undefined));
+      queryRaw.mockResolvedValueOnce([{ '?column?': 1 }]);
+      statfsSpy.mockResolvedValue(okDisk);
+
+      const first = await service.check();
+      const second = await service.check();
+
+      expect(first.db).toBe('fail');
+      expect(second).toEqual({ status: 'ok', db: 'ok', disk: { freeBytes: 2048000, freePct: 50 } });
+      expect(queryRaw).toHaveBeenCalledTimes(2);
+      delete process.env.READY_DB_TIMEOUT_MS;
+    });
+
+    it('@issue-110 unit: the disk probe uses DATA_DIR, then INTAKE_STORAGE_DIR, then the cwd', async () => {
+      (prismaService.$queryRaw as jest.Mock).mockResolvedValue([{ '?column?': 1 }]);
+      statfsSpy.mockResolvedValue(okDisk);
+
+      process.env.DATA_DIR = '/data/primary';
+      process.env.INTAKE_STORAGE_DIR = '/data/originals';
+      await service.check();
+      delete process.env.DATA_DIR;
+      await service.check();
+      delete process.env.INTAKE_STORAGE_DIR;
+      await service.check();
+
+      expect(statfsSpy.mock.calls.map((call) => call[0])).toEqual([
+        '/data/primary',
+        '/data/originals',
+        process.cwd(),
+      ]);
+    });
+
     it('@issue-110 unit: both DB and disk probe errors have redacted messages', async () => {
       (prismaService.$queryRaw as jest.Mock).mockRejectedValue(new Error(SECRET_DSN));
       statfsSpy.mockRejectedValue(new Error(`EACCES ${SECRET_PATH}`));

@@ -1,10 +1,10 @@
-import { Controller, Get, Inject, Optional, Res } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Inject, Optional, Res } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
-import { ReadinessService } from './readiness.service';
+import { ReadinessReport, ReadinessService } from './readiness.service';
 
 interface HealthCheckResponse {
   status: 'healthy' | 'unhealthy';
@@ -85,9 +85,11 @@ export class HealthController {
 
   /** Readiness for the Pi monitor: 200 when DB and data disk are fine, 503 otherwise. */
   @Get('ready')
-  async readiness(@Res() res: Response): Promise<void> {
+  async readiness(@Res({ passthrough: true }) res: Response): Promise<ReadinessReport> {
     const report = await this.readinessService.check();
-    res.status(report.status === 'ok' ? 200 : 503).json(report);
+    // Not an HttpException: AllExceptionsFilter would rewrite the body and drop the per-probe fields.
+    if (report.status !== 'ok') res.status(HttpStatus.SERVICE_UNAVAILABLE);
+    return report;
   }
 
   @Get('live')
