@@ -126,7 +126,12 @@ Rules:
 
 ## CI
 
-`.github/workflows/ci.yml` runs on pushes and PRs to `master`/`develop`: install (pnpm 8, Node 20, `prisma generate`) → lint and type-check → unit tests (with PostgreSQL 16 and Redis 7 services, `db:push`) → build. E2E is not part of CI yet.
+Checks on PRs and pushes to `master`, by source:
+
+- **`.github/workflows/ci.yml` (GitHub-hosted runners):** runs on pushes to `master` and on PRs to `master`/`develop`, on GitHub-hosted runners only (`ubuntu-latest`; free and unlimited because the repository is public; no self-hosted labels, no secrets beyond `GITHUB_TOKEN`). Four independent parallel jobs, each limited to 5 minutes (`timeout-minutes: 5`; split a job rather than raising the limit): **Install Dependencies** (pnpm 8, Node 20, `prisma generate`), **Lint & Type Check**, **Unit Tests** (PostgreSQL 16 and Redis 7 service containers, `db:push`) and **Build**. Their names are the check names the automerge gates wait for, so keep them stable. A newer push to a PR cancels its older run. The workflow uses `pull_request` (never `pull_request_target`); fork PRs run only after approval in the repository settings. E2E is not part of this workflow. `deploy.yml` stays disabled (it needs deployment secrets).
+- **Hub `localci` job (Mac mini):** runs the full CI (`pnpm ci:full`: lint, type-check, test, build) locally and posts GitHub commit statuses under the same job names, so the gates see the same check names whichever runner produced them.
+- **`e2e-army` status (hub verify suite):** feature-level E2E for the features a PR touches, run by the hub against a throwaway environment; it is a separate commit status, not a job in `ci.yml`.
+- **Local pre-push hook:** only fast checks (`turbo run type-check test --filter=...[<base>]`, see Git workflow below); full CI, build and E2E are left to the sources above.
 
 `.github/workflows/demo-planning.yml` validates and syncs `docs/planning/` metadata with `scripts/sync-demo-planning.py`; see the [planning guide](planning/README.md).
 
@@ -136,7 +141,7 @@ Zero-tolerance policy: `pnpm ci:full` must pass with no warnings or errors (no `
 
 - Branch from current `master`; one issue, branch and worktree per worker (`demo/<issue>-<topic>` during the sprint). Every change goes through a PR linked to an issue, using `.github/pull_request_template.md`, with independent review of the exact tested head.
 - Conventional commits enforced by commitlint (`commitlint.config.js`): types `feat fix docs style refactor perf test build ci chore revert`, lower-case subject, max 72 characters, no trailing period.
-- Hooks (husky): `pre-commit` runs `_lint_staged.js` (ESLint `--fix` + Prettier on staged files, Windows-safe replacement for lint-staged); `commit-msg` runs commitlint; `pre-push` runs `pnpm ci:full`.
+- Hooks (husky): `pre-commit` runs `_lint_staged.js` (ESLint `--fix` + Prettier on staged files, Windows-safe replacement for lint-staged); `commit-msg` runs commitlint; `pre-push` runs `turbo run type-check test --filter=...[<base>]` (type-check + unit tests for the changed packages and their dependents — every package when root config such as `package.json`/`pnpm-lock.yaml`/`turbo.json` changes, or when the pushed commit differs from checked-out HEAD; ~20–40 s, ≤ 2.5 min cold for all packages; no lint, build or E2E). Both hooks run under a watchdog: 60 s for pre-commit, 290 s for pre-push (the 5-minute rule). The full CI (`pnpm ci:full`, build, E2E) runs on CI / via the hub's `localci` job, which posts the GitHub commit statuses. Hooks work in linked worktrees and skip with a one-line note when that worktree has no `node_modules` (they never install); bypass deliberately with `HUSKY=0` (or `SKIP_LOCAL_CI=1` for pre-push).
 - Prettier: single quotes, semicolons, trailing commas, width 100 (`.prettierrc`).
 
 ## Deployment
