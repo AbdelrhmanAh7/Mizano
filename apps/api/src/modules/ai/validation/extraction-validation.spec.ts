@@ -50,6 +50,23 @@ describe('validateDate', () => {
     expect(validateDate('2026-01-31abc', false, NOW).status).toBe('invalid');
   });
 
+  it.each([
+    '2026-09-011',
+    '2026-09-01garbage',
+    '2026-09-01T99:99',
+    '2026-09-01T99:99:00Z',
+    '2026-09-01T12:60:00Z',
+    '2026-09-01T12:00:60Z',
+    '2026-09-01T12:00:00+25:00',
+    '2026-09-01T12:00:00+03:60',
+    '2026-09-01T24:00:00Z',
+  ])('rejects malformed dates and impossible timestamp components (%s)', (value) => {
+    expect(validateDate(value, false, NOW)).toMatchObject({
+      status: 'invalid',
+      reasons: ['DATE_INVALID'],
+    });
+  });
+
   it('accepts date-only and valid ISO timestamps with Z or an offset', () => {
     expect(validateDate('2026-09-01', false, NOW).status).toBe('valid');
     expect(validateDate('2026-09-01T12:00:00Z', false, NOW).status).toBe('valid');
@@ -187,6 +204,13 @@ describe('validateExtraction', () => {
     ]);
     const v = validateExtraction({ ...GOOD, currency: 'EGP', vendorTaxId: '123456789' }, ctx);
     expect(v.blockingFields).toContain('currency');
+  });
+
+  it('routes impossible timestamp values to review despite otherwise valid extraction', () => {
+    const v = validateExtraction({ ...GOOD, date: '2026-09-01T99:99:00Z' }, ctx);
+    expect(v.requiresReview).toBe(true);
+    expect(v.blockingFields).toEqual(['date']);
+    expect(v.fields.date.reasons).toEqual(['DATE_INVALID']);
   });
 
   it('uses SA rules when the extracted currency is misread as EGP', () => {

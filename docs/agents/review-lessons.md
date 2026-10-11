@@ -33,6 +33,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **A reversal or refund never precedes its source.** Default to `max(today, sourceDate)` and reject an earlier explicit date. _(JournalsService.reverse, vendor-credit refund)_
 - **Web defaults use the user's local calendar date** (`format(d, 'yyyy-MM-dd')`), never `toISOString()`, which gives yesterday in UTC+ zones such as Cairo.
 - **A regex shape check for dates must cover the full grammar (anchored at the end) and must be combined with a calendar round-trip check** to catch invalid dates like February 30th.
+- **Timestamp grammar also needs time and offset validation.** Matching two digits for hours/minutes/seconds does not reject `99:99:00`; reject time overflow and invalid offsets before using the date. Reject midnight overflow (`24:00:00`) instead of silently moving the document to the next day. _(intake date validation, PR #85)_
 - **A date-only end bound means end of day** (`endOfUtcDay`). A void at 10:00 on the end date belongs to that period.
 - **Web defaults use the user's local calendar date** (`format(d, 'yyyy-MM-dd')`), never `toISOString()`, which gives yesterday in UTC+ zones such as Cairo.
 - **"Current" figures exclude future-dated entries.** Cash today means lines dated ≤ end of today.

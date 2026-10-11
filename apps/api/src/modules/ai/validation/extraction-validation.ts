@@ -104,6 +104,12 @@ const TIMESTAMP_RE =
 function parseDateParts(value: string): { y: number; mo: number; d: number } | null {
   const m = DATE_ONLY_RE.exec(value) ?? TIMESTAMP_RE.exec(value);
   if (!m) return null;
+  if (
+    m[4] !== undefined &&
+    (Number(m[4]) > 23 || Number(m[5]) > 59 || Number(m[6]) > 59 || Number.isNaN(Date.parse(value)))
+  ) {
+    return null;
+  }
   return { y: Number(m[1]), mo: Number(m[2]), d: Number(m[3]) };
 }
 
