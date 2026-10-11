@@ -5,6 +5,7 @@ coverage
 pnpm-lock.yaml
 *.min.js
 *.min.css
+.env.example
 e2e-army/features
 e2e-army/lib.ts
 e2e-army/cli-model.ts

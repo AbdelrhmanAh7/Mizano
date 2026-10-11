@@ -90,6 +90,12 @@ pnpm test:e2e
 
 The blocking E2E gate is **e2e-army** ([tester-army/e2e](https://github.com/tester-army/e2e), plain-language Playwright tests in `e2e-army/`): `DATABASE_URL=<throwaway test db> pnpm e2e:army` starts the API and web app and runs it. Every PR that touches a user flow adds or updates `e2e-army/<issue>-<flow>.e2e.ts` in its first commit; see [CONTRIBUTING.md](CONTRIBUTING.md#e2e-tests-e2e-army-blocking).
 
+### Configuration
+
+Runtime environment settings can be configured in `.env.local` or environment-specific files (see `.env.example`):
+
+- `MIZANO_NODE_HEAP_MB`: Optional integer between 128 and 4096. Caps Node V8 heap space (`--max-old-space-size=<n>`) via the start launcher. Because the launcher evaluates this setting to configure Node arguments before the application process boots and before `.env.local` is loaded by NestJS, this variable must be exported in the service/process environment (e.g. shell, systemd, or container environment). In containerized setups, this variable will not reach containers until the compose profile (#39) passes it. When unset, Node default heap limits apply. For Raspberry Pi 5 (8GB) deployments, `1024` (1GB) is a suggested starting value to tune (not a measured benchmark).
+
 ## Repository layout
 
 ```
