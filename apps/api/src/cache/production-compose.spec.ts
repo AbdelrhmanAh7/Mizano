@@ -89,7 +89,10 @@ describe.each(FILES)('%s (#183)', (file) => {
 
   it('prefers REDIS_PASSWORD and gives every REDIS_URL the same credentials', () => {
     const rendered = render(file, { POSTGRES_PASSWORD: PG_PASS, REDIS_PASSWORD: REDIS_PASS });
-    expect(service(rendered, 'redis')).toMatch(new RegExp(`--requirepass'?,?\\s*'?${REDIS_PASS}`));
+    const redis = service(rendered, 'redis');
+    expect(redis).toMatch(new RegExp(`--requirepass'?,?\\s*'?${REDIS_PASS}`));
+    expect(redis).toContain(`REDISCLI_AUTH=${REDIS_PASS}`);
+    expect(redis).not.toContain(PG_PASS);
     const urls = rendered.match(/redis:\/\/[^\s"']+/g) ?? [];
     expect(urls.length).toBeGreaterThan(0);
     for (const url of urls) {
