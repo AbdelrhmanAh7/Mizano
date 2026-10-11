@@ -1,9 +1,17 @@
 import { ExecutionContext, Logger } from '@nestjs/common';
+import { INTERCEPTORS_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { lastValueFrom, of } from 'rxjs';
 import { CacheService } from '../../cache/cache.service';
-import { LEDGER_CACHE_PATTERNS, InvalidatesLedger } from '../decorators/invalidate-cache.decorator';
+import { AssetsController } from '../../modules/assets/controllers/assets.controller';
+import { PayrollController } from '../../modules/hr/controllers/payroll.controller';
+import { WorkOrdersController } from '../../modules/manufacturing/controllers/work-orders.controller';
+import {
+  INVALIDATE_CACHE_KEY,
+  LEDGER_CACHE_PATTERNS,
+  InvalidatesLedger,
+} from '../decorators/invalidate-cache.decorator';
 import { CacheInvalidationInterceptor } from './cache-invalidation.interceptor';
 
 describe('CacheInvalidationInterceptor', () => {
@@ -85,5 +93,26 @@ describe('CacheInvalidationInterceptor', () => {
       }
     }
     expect(warnSpy).toHaveBeenCalledWith('Cache invalidation error: Error');
+  });
+});
+
+describe('controllers that post system journals (#130)', () => {
+  // @InvalidatesLedger is only metadata: without the interceptor on the controller nothing is
+  // cleared, and journal lists, reports and the dashboard stay stale after the posting.
+  it.each([
+    ['AssetsController', AssetsController],
+    ['PayrollController', PayrollController],
+    ['WorkOrdersController', WorkOrdersController],
+  ])('%s applies the interceptor its ledger-posting handlers rely on', (_name, controller) => {
+    const prototype = controller.prototype as unknown as Record<string, object>;
+    const posting = Object.getOwnPropertyNames(prototype).filter((name) =>
+      ((Reflect.getMetadata(INVALIDATE_CACHE_KEY, prototype[name]) as string[]) ?? []).includes(
+        'journals:*',
+      ),
+    );
+    expect(posting.length).toBeGreaterThan(0);
+    expect(Reflect.getMetadata(INTERCEPTORS_METADATA, controller)).toContain(
+      CacheInvalidationInterceptor,
+    );
   });
 });

@@ -8,11 +8,13 @@ import {
   Post,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentOrg, InvalidatesLedger, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 import {
   CreateWorkOrderData,
   UpdateWorkOrderData,
@@ -23,6 +25,7 @@ import {
 @ApiBearerAuth()
 @Controller('manufacturing/work-orders')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseInterceptors(CacheInvalidationInterceptor)
 export class WorkOrdersController {
   constructor(private readonly workOrdersService: WorkOrdersService) {}
 

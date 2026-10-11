@@ -1,15 +1,27 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import { CurrentOrg, InvalidatesLedger, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 import { PayrollService } from '../services/payroll.service';
 
 @ApiTags('Payroll')
 @ApiBearerAuth()
 @Controller('payroll')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseInterceptors(CacheInvalidationInterceptor)
 export class PayrollController {
   constructor(private readonly payrollService: PayrollService) {}
 

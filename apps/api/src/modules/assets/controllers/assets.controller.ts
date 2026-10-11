@@ -10,6 +10,7 @@ import {
   Put,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -18,6 +19,7 @@ import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 import {
   AssetDetailResponse,
   AssetListResponse,
@@ -37,6 +39,7 @@ import { DepreciationService } from '../services/depreciation.service';
 @ApiBearerAuth()
 @Controller('assets')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseInterceptors(CacheInvalidationInterceptor)
 export class AssetsController {
   constructor(
     private readonly assetsService: AssetsService,
