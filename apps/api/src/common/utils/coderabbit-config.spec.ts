@@ -59,6 +59,24 @@ describe('CodeRabbit configuration', () => {
     expect(autoReview.base_branches).toEqual(['master']);
   });
 
+  it('should never block merges: every pre-merge check is warning-only and noise is off', () => {
+    const fileContents = fs.readFileSync(configPath, 'utf8');
+    const config = yaml.load(fileContents) as Record<string, unknown>;
+
+    const reviews = config.reviews as Record<string, unknown>;
+    const preMergeChecks = reviews.pre_merge_checks as Record<string, unknown>;
+    const customChecks = preMergeChecks.custom_checks as Array<{ name: string; mode: string }>;
+
+    expect(reviews.profile).toBe('assertive');
+    expect(reviews.high_level_summary).toBe(false);
+    expect(reviews.poem).toBe(false);
+    expect(preMergeChecks.issue_assessment).toEqual({ mode: 'warning' });
+    expect(customChecks.length).toBeGreaterThan(0);
+    for (const check of customChecks) {
+      expect({ name: check.name, mode: check.mode }).toEqual({ name: check.name, mode: 'warning' });
+    }
+  });
+
   it('should have path_filters configured to skip lockfiles and build output', () => {
     const fileContents = fs.readFileSync(configPath, 'utf8');
     const config = yaml.load(fileContents) as Record<string, unknown>;
