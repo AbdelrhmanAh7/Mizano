@@ -264,7 +264,7 @@ test("[mz-sales-invoices.3] invoice API: sending posts one balanced journal, sen
   ]));
 
   // sending again, editing and deleting a sent invoice are refused and post nothing more
-  expect([400, 409]).toContain((await a.api.patch(`/invoices/${inv.id}/send`)).status);
+  expect((await a.api.patch(`/invoices/${inv.id}/send`)).status).toBe(400); // "Only draft invoices can be sent"
   expect((await a.api.patch(`/invoices/${inv.id}`, { notes: "tamper" })).status).toBe(400);
   expect((await a.api.del(`/invoices/${inv.id}`)).status).toBe(400);
   expect(subDec((await acct(a.api, d.defaultArAccountId)).debit, ar0.debit)).toBe("228");
@@ -402,7 +402,8 @@ test("[mz-delivery-challans.2] delivery challan API: draft -> issue (stock leave
   expect((await anon.get("/delivery-challans")).status).toBe(401);
   const customer = (await a.api.post("/customers", { name: seeded("Challan customer"), currency: "EGP" })).body.id;
   const stock = await stockedItem(a, "challan", 10);
-  const stockOf = async () => Number((await a.api.get(`/items/${stock.itemId}`)).body.currentStock);
+  // quantity on hand of the warehouse level the challan moves (Item.currentStock is maintained by inventory adjustments only)
+  const stockOf = async () => sumDec(rows(await a.api.get(`/inventory-levels/by-item/${stock.itemId}`)).map((l: any) => l.quantity));
   const base = { customerId: customer, challanType: "SUPPLY", date: DATE.doc, lines: [{ itemId: stock.itemId, quantity: 2, description: "Two units", warehouseId: stock.warehouseId }] };
 
   const created = await a.api.post("/delivery-challans", base);
@@ -422,27 +423,27 @@ test("[mz-delivery-challans.2] delivery challan API: draft -> issue (stock leave
   expect(ids(await b.api.get("/delivery-challans", { limit: 100 }))).not.toContain(id);
 
   expect((await a.api.put(`/delivery-challans/${id}`, { notes: "edited while draft" })).status).toBe(200);
-  expect(await stockOf()).toBe(10);
+  expect(await stockOf()).toBe("10");
   const issued = await a.api.post(`/delivery-challans/${id}/issue`);
-  expect(issued.status).toBe(201);
+  expect(issued.status).toBe(200);
   expect(issued.body.status).toBe("ISSUED");
-  expect(await stockOf()).toBe(8); // two units left the warehouse
+  expect(await stockOf()).toBe("8"); // two units left the warehouse
   expect((await a.api.put(`/delivery-challans/${id}`, { notes: "late" })).status).toBe(400);
   expect((await a.api.del(`/delivery-challans/${id}`)).status).toBe(400);
-  expect((await a.api.post(`/delivery-challans/${id}/issue`)).status).toBe(400);
+  expect((await a.api.post(`/delivery-challans/${id}/issue`)).status).toBe(409); // guarded transition: already issued
   const back = await a.api.post(`/delivery-challans/${id}/mark-returned`);
-  expect(back.status).toBe(201);
+  expect(back.status).toBe(200);
   expect(back.body.status).toBe("RETURNED");
-  expect(await stockOf()).toBe(10); // returned goods are back on the shelf
-  expect((await a.api.post(`/delivery-challans/${id}/mark-returned`)).status).toBe(400);
+  expect(await stockOf()).toBe("10"); // returned goods are back on the shelf
+  expect((await a.api.post(`/delivery-challans/${id}/mark-returned`)).status).toBe(409); // already returned
 
   // more than the warehouse holds is refused and changes nothing
   const big = (await a.api.post("/delivery-challans", { ...base, lines: [{ itemId: stock.itemId, quantity: 11, warehouseId: stock.warehouseId }] })).body.id;
   const refused = await a.api.post(`/delivery-challans/${big}/issue`);
   expect(refused.status).toBe(400);
   expect(refused.body.message).toMatch(/Insufficient stock/);
-  expect(await stockOf()).toBe(10);
+  expect(await stockOf()).toBe("10");
   expect((await a.api.get(`/delivery-challans/${big}`)).body.status).toBe("DRAFT");
-  expect((await a.api.del(`/delivery-challans/${big}`)).status).toBe(200);
+  expect((await a.api.del(`/delivery-challans/${big}`)).status).toBe(204);
   expect((await a.api.get(`/delivery-challans/${big}`)).status).toBe(404);
 });

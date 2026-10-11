@@ -16,6 +16,8 @@ export class AssetsService {
    * Create a new asset with depreciation schedule
    */
   async create(organizationId: string, dto: CreateAssetDto): Promise<unknown> {
+    await this.assertOwnAccounts(organizationId, dto);
+
     // Generate asset number
     const assetNumber = await this.generateAssetNumber(organizationId);
 
@@ -385,6 +387,23 @@ export class AssetsService {
   }
 
   // ============ Helper Methods ============
+
+  /** Body ids: every referenced ledger account must belong to the caller's organization (400). */
+  private async assertOwnAccounts(
+    organizationId: string,
+    dto: Pick<
+      CreateAssetDto,
+      'assetAccountId' | 'depreciationAccountId' | 'accumulatedDeprAccountId'
+    >,
+  ): Promise<void> {
+    const accountIds = [
+      ...new Set([dto.assetAccountId, dto.depreciationAccountId, dto.accumulatedDeprAccountId]),
+    ];
+    const found = await this.prisma.account.count({
+      where: { id: { in: accountIds }, organizationId, deletedAt: null },
+    });
+    if (found !== accountIds.length) throw new BadRequestException('Account not found');
+  }
 
   private async generateAssetNumber(organizationId: string): Promise<string> {
     const lastAsset = await this.prisma.asset.findFirst({

@@ -220,7 +220,12 @@ export class DeliveryChallansService {
         data: { status: ChallanStatus.ISSUED },
       });
       if (res.count !== 1) {
-        throw new ConflictException('Only draft challans can be issued');
+        await this.throwNotFoundOrConflict(
+          tx,
+          organizationId,
+          id,
+          'Only draft challans can be issued',
+        );
       }
 
       // Reload challan with lines for inventory operations
@@ -299,7 +304,12 @@ export class DeliveryChallansService {
         data: { status: ChallanStatus.RETURNED },
       });
       if (res.count !== 1) {
-        throw new ConflictException('Only issued challans can be marked as returned');
+        await this.throwNotFoundOrConflict(
+          tx,
+          organizationId,
+          id,
+          'Only issued challans can be marked as returned',
+        );
       }
 
       // Reload challan with lines for inventory operations
@@ -441,7 +451,7 @@ export class DeliveryChallansService {
 
   // ============ Helper Methods ============
 
-  /** Every customer, invoice, item and warehouse id in the payload must belong to the org. */
+  /** Every customer, invoice, item and warehouse id in the payload must belong to the org (an unknown or foreign body id is a 400). */
   private async assertReferencesInOrg(
     organizationId: string,
     dto: UpdateDeliveryChallanDto,
@@ -451,7 +461,7 @@ export class DeliveryChallansService {
         where: { id: dto.customerId, organizationId, deletedAt: null },
       });
       if (!customer) {
-        throw new NotFoundException('Customer not found');
+        throw new BadRequestException('Customer not found');
       }
     }
 
@@ -460,7 +470,7 @@ export class DeliveryChallansService {
         where: { id: dto.invoiceId, organizationId, deletedAt: null },
       });
       if (!invoice) {
-        throw new NotFoundException('Invoice not found');
+        throw new BadRequestException('Invoice not found');
       }
     }
 
@@ -469,17 +479,37 @@ export class DeliveryChallansService {
         where: { id: line.itemId, organizationId, deletedAt: null },
       });
       if (!item) {
-        throw new NotFoundException(`Item ${line.itemId} not found`);
+        throw new BadRequestException(`Item ${line.itemId} not found`);
       }
       if (line.warehouseId) {
         const warehouse = await this.prisma.warehouse.findFirst({
           where: { id: line.warehouseId, organizationId, deletedAt: null },
         });
         if (!warehouse) {
-          throw new NotFoundException(`Warehouse ${line.warehouseId} not found`);
+          throw new BadRequestException(`Warehouse ${line.warehouseId} not found`);
         }
       }
     }
+  }
+
+  /**
+   * A guarded status transition matched no row: a challan that is not in this organization (or is
+   * deleted) is a 404, one that exists but is in the wrong status is a 409.
+   */
+  private async throwNotFoundOrConflict(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    id: string,
+    conflictMessage: string,
+  ): Promise<never> {
+    const exists = await tx.deliveryChallan.findFirst({
+      where: { id, organizationId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!exists) {
+      throw new NotFoundException('Delivery challan not found');
+    }
+    throw new ConflictException(conflictMessage);
   }
 
   /**

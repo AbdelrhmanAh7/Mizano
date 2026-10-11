@@ -1,10 +1,10 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { TransferCursorQueryDto } from '../dto/transfer-cursor-query.dto';
+import { TransferQueryDto } from '../dto/transfer-query.dto';
 import { CreateTransferData, TransfersService } from '../services/transfers.service';
 
 @ApiTags('Inventory Transfers')
@@ -24,11 +24,7 @@ export class TransfersController {
   @Get()
   @Permissions('inventory.view')
   @ApiOperation({ summary: 'List stock transfers' })
-  findAll(
-    @CurrentOrg() orgId: string,
-    @Query()
-    query: PaginationDto & { status?: string; fromWarehouseId?: string; toWarehouseId?: string },
-  ) {
+  findAll(@CurrentOrg() orgId: string, @Query() query: TransferQueryDto) {
     return this.transfersService.findAll(orgId, query);
   }
 

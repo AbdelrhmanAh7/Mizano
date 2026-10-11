@@ -23,6 +23,27 @@ export interface UpdateTimesheetDto {
 export class TimesheetsService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Hours are a non-negative number that fits the Decimal(10, 2) column. Anything else is a 400:
+   * `new Decimal('x')` would otherwise throw a plain Error and answer 500.
+   */
+  private toHours(value: unknown): Decimal {
+    const invalid = new BadRequestException('hours must be a non-negative number below 100000000');
+    if ((typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '') {
+      throw invalid;
+    }
+    let hours: Decimal;
+    try {
+      hours = new Decimal(value);
+    } catch {
+      throw invalid;
+    }
+    if (!hours.isFinite() || hours.isNegative() || hours.greaterThanOrEqualTo('100000000')) {
+      throw invalid;
+    }
+    return hours;
+  }
+
   async create(organizationId: string, userId: string, dto: CreateTimesheetDto) {
     // Verify project
     const project = await this.prisma.project.findFirst({
@@ -38,14 +59,16 @@ export class TimesheetsService {
       if (!task) throw new NotFoundException('Task not found');
     }
 
+    const hours = this.toHours(dto.hours);
+
     return this.prisma.timesheetEntry.create({
       data: {
         userId,
         projectId: dto.projectId,
         taskId: dto.taskId,
         date: new Date(dto.date),
-        duration: new Decimal(dto.hours),
-        hours: new Decimal(dto.hours),
+        duration: hours,
+        hours,
         description: dto.description,
         isBillable: dto.isBillable ?? true,
         isBilled: false,
@@ -64,6 +87,20 @@ export class TimesheetsService {
     userId: string,
     dto: { projectId: string; taskId?: string; description?: string },
   ) {
+    // The project (and task) must belong to the caller's organization
+    const project = await this.prisma.project.findFirst({
+      where: { id: dto.projectId, organizationId },
+      select: { id: true },
+    });
+    if (!project) throw new NotFoundException('Project not found');
+    if (dto.taskId) {
+      const task = await this.prisma.task.findFirst({
+        where: { id: dto.taskId, projectId: dto.projectId, organizationId },
+        select: { id: true },
+      });
+      if (!task) throw new NotFoundException('Task not found');
+    }
+
     // Check for existing running timer
     const existing = await this.prisma.timesheetEntry.findFirst({
       where: { userId, organizationId, timerStartedAt: { not: null }, timerEndedAt: null },
@@ -212,7 +249,7 @@ export class TimesheetsService {
     const data: Prisma.TimesheetEntryUpdateInput = {};
     if (dto.description !== undefined) data.description = dto.description;
     if (dto.isBillable !== undefined) data.isBillable = dto.isBillable;
-    if (dto.hours) data.hours = new Decimal(dto.hours as string | number);
+    if (dto.hours !== undefined) data.hours = this.toHours(dto.hours);
     if (dto.date) data.date = new Date(dto.date);
 
     return this.prisma.timesheetEntry.update({

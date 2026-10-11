@@ -1,6 +1,7 @@
 import { IsString, IsOptional, IsEnum, IsBoolean, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { TaxType } from '@prisma/client';
+import { IsDecimalString } from '../../../common/dto/decimal-string';
 
 export class UpdateTaxRateDto {
   @ApiProperty({ required: false })
@@ -15,9 +16,10 @@ export class UpdateTaxRateDto {
   @MaxLength(500)
   description?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, description: 'VAT percentage (15 => 15%), at most 2 decimals' })
   @IsString()
   @IsOptional()
+  @IsDecimalString(2)
   rate?: string;
 
   @ApiProperty({ required: false, enum: TaxType })

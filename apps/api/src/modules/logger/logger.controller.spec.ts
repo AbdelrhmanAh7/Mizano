@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { LoggerController } from './logger.controller';
 import { LoggerService } from './logger.service';
@@ -84,7 +85,9 @@ describe('LoggerController', () => {
 
       expect(controller.getLogs(ORG)).toEqual([]);
       expect(controller.getStats(ORG).totalErrors).toBe(0);
-      expect(controller.getById(ORG, other.id)).toBeUndefined();
+      expect(() => controller.getById(ORG, other.id)).toThrow(NotFoundException);
+      expect(() => controller.getById(ORG, 'no-such-entry')).toThrow(NotFoundException);
+      expect(controller.getById('org-2', other.id)).toBe(other);
       expect(controller.updateStatus(ORG, { ids: [other.id], status: LogStatus.FIXED })).toEqual({
         updated: 0,
       });

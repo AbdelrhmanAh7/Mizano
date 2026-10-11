@@ -70,8 +70,10 @@ function tenant() {
 
 test(
   '@issue-153 AC1: the demo accountant signs in through the form and reaches the dashboard; a wrong password is refused',
-  // 240 s like the hub's browser tests: next dev compiles /en/login and /en/dashboard on first hit (150 s timed out once under load)
-  { tags: ['feat:mz-auth', 'lvl:ui'], timeout: 240_000 },
+  // next dev compiles /en/login and /en/dashboard on first hit (150 s timed out once under load). Worst case, all waits below fail:
+  // 3 x (40 s form + 30 s redirect) + 40 s heading = 250 s, plus the wrong-password call (a 429 is waited out for up to 85 s only if
+  // it happens), so the test's own budget covers every wait and a failure reports the real assertion, not a timeout
+  { tags: ['feat:mz-auth', 'lvl:ui'], timeout: 340_000 },
   async ({ app, screen, browser }) => {
     const bad = await call('POST', '/auth/login', {
       email: ADMIN.email,
@@ -81,19 +83,19 @@ test(
     // next dev compiles on the first hit and a submit before hydration is a plain GET: retry the form like the hub suite does
     for (let i = 0; i < 3; i++) {
       await app.open('/en/login');
-      await expect(screen.getByRole('button', 'Sign In')).toBeVisible({ timeout: 60_000 });
+      await expect(screen.getByRole('button', 'Sign In')).toBeVisible({ timeout: 40_000 });
       await screen.getByRole('textbox', 'Email').fill(ADMIN.email);
       await screen.getByRole('textbox', 'Password').fill(ADMIN.password);
       await screen.getByRole('button', 'Sign In').tap();
       try {
-        await expect(browser).toHaveURL(/\/en\/dashboard/, { timeout: 45_000 });
+        await expect(browser).toHaveURL(/\/en\/dashboard/, { timeout: 30_000 });
         break;
       } catch (e) {
         if (i === 2) throw e;
       }
     }
     await expect(screen.getByRole('heading', 'Dashboard', { level: 1 })).toBeVisible({
-      timeout: 90_000,
+      timeout: 40_000,
     });
   },
 );

@@ -30,3 +30,50 @@ describe('BomService movement signs', () => {
     });
   });
 });
+
+describe('BomService.create one active BOM per output item', () => {
+  const setup = () => {
+    const prisma = createMockPrisma();
+    prisma.item.findFirst.mockResolvedValue({ id: 'item-out' } as never);
+    prisma.bOM.create.mockResolvedValue({ id: 'bom-new' } as never);
+    const service = new BomService(prisma as unknown as PrismaService);
+    return { prisma, service };
+  };
+
+  it.each([
+    ['omitted', undefined],
+    ['true', true],
+  ])('rejects a second active BOM when isActive is %s', async (_name, isActive) => {
+    const { prisma, service } = setup();
+    prisma.bOM.findFirst.mockResolvedValue({ id: 'bom-old' } as never);
+
+    await expect(
+      service.create('org', { name: 'B', outputItemId: 'item-out', isActive }),
+    ).rejects.toThrow('An active BOM already exists for this item');
+    expect(prisma.bOM.findFirst).toHaveBeenCalledWith({
+      where: { outputItemId: 'item-out', organizationId: 'org', isActive: true },
+    });
+    expect(prisma.bOM.create).not.toHaveBeenCalled();
+  });
+
+  it('allows an inactive BOM next to the active one without checking', async () => {
+    const { prisma, service } = setup();
+
+    await service.create('org', { name: 'B', outputItemId: 'item-out', isActive: false });
+
+    expect(prisma.bOM.findFirst).not.toHaveBeenCalled();
+    expect(prisma.bOM.create).toHaveBeenCalled();
+  });
+
+  it('creates the first BOM of an item, active by default', async () => {
+    const { prisma, service } = setup();
+    prisma.bOM.findFirst.mockResolvedValue(null);
+
+    await service.create('org', { name: 'B', outputItemId: 'item-out' });
+
+    expect(prisma.bOM.create.mock.calls[0][0].data).toMatchObject({
+      isActive: true,
+      organizationId: 'org',
+    });
+  });
+});

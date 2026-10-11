@@ -230,13 +230,14 @@ export class WorkOrdersService {
       throw new BadRequestException('Work order is not in process');
     }
 
-    const quantityProduced = dto.quantityProduced;
+    const quantityProduced = this.assertQuantityProduced(dto.quantityProduced);
 
-    // Consume materials proportionally
-    await this.consumeMaterials(organizationId, workOrder, quantityProduced);
-
-    // Add finished goods to inventory
-    await this.addFinishedGoods(organizationId, workOrder, quantityProduced);
+    // Consume materials proportionally and add the finished goods in one transaction, so the
+    // movements, the warehouse levels and the item totals never disagree after a failure.
+    await this.prisma.$transaction(async (tx) => {
+      await this.consumeMaterials(tx, organizationId, workOrder, quantityProduced);
+      await this.addFinishedGoods(tx, organizationId, workOrder, quantityProduced);
+    });
 
     // Create COGM journal entry
     const journalId = await this.createCOGMJournal(organizationId, workOrder, quantityProduced);
@@ -411,7 +412,33 @@ export class WorkOrdersService {
     return `JRN-${String(lastNumber + 1).padStart(3, '0')}`;
   }
 
+  private assertQuantityProduced(quantityProduced: number): number {
+    if (
+      typeof quantityProduced !== 'number' ||
+      !Number.isFinite(quantityProduced) ||
+      quantityProduced <= 0
+    ) {
+      throw new BadRequestException('quantityProduced must be a positive number');
+    }
+    return quantityProduced;
+  }
+
+  /** Production consumes from and delivers to the organization's default warehouse. */
+  private async defaultWarehouseId(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+  ): Promise<string> {
+    const defaultWarehouse = await tx.warehouse.findFirst({
+      where: { organizationId, isDefault: true },
+    });
+    if (!defaultWarehouse) {
+      throw new BadRequestException('No default warehouse found');
+    }
+    return defaultWarehouse.id;
+  }
+
   private async consumeMaterials(
+    tx: Prisma.TransactionClient,
     organizationId: string,
     workOrder: WorkOrderWithBom,
     quantityProduced: number,
@@ -420,22 +447,37 @@ export class WorkOrdersService {
     const outputQty = bom.outputQuantity;
     const multiplier = quantityProduced / outputQty;
 
-    // Get default warehouse
-    const defaultWarehouse = await this.prisma.warehouse.findFirst({
-      where: { organizationId, isDefault: true },
-    });
-    const warehouseId = defaultWarehouse?.id;
-
-    if (!warehouseId) {
-      throw new BadRequestException('No default warehouse found');
-    }
+    const warehouseId = await this.defaultWarehouseId(tx, organizationId);
 
     for (const bomItem of bom.items) {
       const baseQty = parseFloat(bomItem.quantity.toString());
       const consumeQty = Math.round(baseQty * multiplier);
 
+      if (consumeQty > 0) {
+        // The warehouse must hold the quantity (guarded update): a level never goes negative.
+        const moved = await tx.inventoryLevel.updateMany({
+          where: {
+            itemId: bomItem.itemId,
+            warehouseId,
+            organizationId,
+            quantity: { gte: new Decimal(consumeQty) },
+          },
+          data: { quantity: { decrement: consumeQty } },
+        });
+        if (moved.count === 0) {
+          throw new BadRequestException(
+            `Insufficient stock of component ${bomItem.itemId} in the default warehouse`,
+          );
+        }
+        // Item total: guarded so it never goes negative either (legacy rows may be short)
+        await tx.item.updateMany({
+          where: { id: bomItem.itemId, organizationId, currentStock: { gte: consumeQty } },
+          data: { currentStock: { decrement: consumeQty } },
+        });
+      }
+
       // Create OUT inventory movement (positive quantity, movementType carries direction)
-      await this.prisma.inventoryMovement.create({
+      await tx.inventoryMovement.create({
         data: {
           itemId: bomItem.itemId,
           warehouseId,
@@ -451,23 +493,17 @@ export class WorkOrdersService {
   }
 
   private async addFinishedGoods(
+    tx: Prisma.TransactionClient,
     organizationId: string,
     workOrder: WorkOrderWithBom,
     quantityProduced: number,
   ) {
-    // Get default warehouse
-    const defaultWarehouse = await this.prisma.warehouse.findFirst({
-      where: { organizationId, isDefault: true },
-    });
-    const warehouseId = defaultWarehouse?.id;
+    const warehouseId = await this.defaultWarehouseId(tx, organizationId);
+    const itemId = workOrder.bom.outputItemId;
 
-    if (!warehouseId) {
-      throw new BadRequestException('No default warehouse found');
-    }
-
-    await this.prisma.inventoryMovement.create({
+    await tx.inventoryMovement.create({
       data: {
-        itemId: workOrder.bom.outputItemId,
+        itemId,
         warehouseId,
         type: 'production',
         quantity: quantityProduced,
@@ -476,6 +512,15 @@ export class WorkOrdersService {
         referenceId: workOrder.id,
         organizationId,
       },
+    });
+    await tx.inventoryLevel.upsert({
+      where: { itemId_warehouseId: { itemId, warehouseId } },
+      update: { quantity: { increment: quantityProduced } },
+      create: { itemId, warehouseId, quantity: new Decimal(quantityProduced), organizationId },
+    });
+    await tx.item.updateMany({
+      where: { id: itemId, organizationId },
+      data: { currentStock: { increment: quantityProduced } },
     });
   }
 
@@ -510,28 +555,30 @@ export class WorkOrdersService {
       throw new BadRequestException('Work order is not in process');
     }
 
-    const quantityProduced = dto.quantityProduced;
+    const quantityProduced = this.assertQuantityProduced(dto.quantityProduced);
 
-    // Create ProductionEntry record
-    const entry = await this.prisma.productionEntry.create({
-      data: {
-        workOrderId: id,
-        date: dto.date ? new Date(dto.date) : new Date(),
-        quantityProduced: Math.round(quantityProduced),
-        quantityRejected: dto.quantityRejected ? Math.round(dto.quantityRejected) : 0,
-        wastageQuantity: dto.wastageQuantity ? Math.round(dto.wastageQuantity) : 0,
-        notes: dto.notes,
-        organizationId,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      // Create ProductionEntry record
+      const entry = await tx.productionEntry.create({
+        data: {
+          workOrderId: id,
+          date: dto.date ? new Date(dto.date) : new Date(),
+          quantityProduced: Math.round(quantityProduced),
+          quantityRejected: dto.quantityRejected ? Math.round(dto.quantityRejected) : 0,
+          wastageQuantity: dto.wastageQuantity ? Math.round(dto.wastageQuantity) : 0,
+          notes: dto.notes,
+          organizationId,
+        },
+      });
+
+      // Consume materials proportionally
+      await this.consumeMaterials(tx, organizationId, workOrder, quantityProduced);
+
+      // Add finished goods to inventory
+      await this.addFinishedGoods(tx, organizationId, workOrder, quantityProduced);
+
+      return entry;
     });
-
-    // Consume materials proportionally
-    await this.consumeMaterials(organizationId, workOrder, quantityProduced);
-
-    // Add finished goods to inventory
-    await this.addFinishedGoods(organizationId, workOrder, quantityProduced);
-
-    return entry;
   }
 
   async getProductionHistory(organizationId: string, id: string) {

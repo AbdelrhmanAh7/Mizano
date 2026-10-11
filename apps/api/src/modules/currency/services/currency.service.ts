@@ -222,19 +222,18 @@ export class CurrencyService {
 
     const base = baseCurrency?.toUpperCase() || org?.baseCurrency || 'SAR';
 
-    // Get latest rates from base currency
-    const rates = await this.prisma.$queryRaw<Array<Record<string, unknown>>>`
-      SELECT DISTINCT ON (to_currency) *
-      FROM exchange_rates
-      WHERE organization_id = ${organizationId}
-        AND from_currency = ${base}
-      ORDER BY to_currency, date DESC
-    `;
+    // Latest rate per target currency from the base currency. The table columns are camelCase
+    // ("toCurrency", "organizationId"), so use the typed client instead of hand-written snake_case SQL.
+    const rates = await this.prisma.exchangeRate.findMany({
+      where: { organizationId, fromCurrency: base },
+      orderBy: [{ toCurrency: 'asc' }, { date: 'desc' }],
+      distinct: ['toCurrency'],
+    });
 
     return rates.map((r) => ({
-      fromCurrency: r.from_currency,
-      toCurrency: r.to_currency,
-      rate: parseFloat(String(r.rate)),
+      fromCurrency: r.fromCurrency,
+      toCurrency: r.toCurrency,
+      rate: parseFloat(r.rate.toString()),
       date: r.date,
       source: r.source,
     }));

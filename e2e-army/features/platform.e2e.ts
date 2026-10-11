@@ -334,16 +334,16 @@ test("[mz-notifications.2] notifications API: per-user list, unread count, mark 
   for (const title of ["Invoice Overdue", "Bill Due Soon", "Low Stock Alert", "New Lead Assigned"]) expect(seededTitles).toContain(title);
   const count = await admin.get("/notifications/unread-count");
   expect(count.status).toBe(200);
-  const unread = Number(count.body.count ?? count.body.unreadCount ?? count.body);
-  expect(unread).toBeGreaterThanOrEqual(0);
+  const unread: number = count.body.count; // {count}
+  expect(Number.isInteger(unread)).toBe(true);
   const target = rows(list).find((n: any) => n.isRead === false);
-  if (target) {
-    expect((await admin.post(`/notifications/${target.id}/read`)).status).toBe(201);
-    const after = Number((await admin.get("/notifications/unread-count")).body.count ?? (await admin.get("/notifications/unread-count")).body.unreadCount);
-    expect(after).toBe(unread - 1);
-  }
-  expect((await admin.post("/notifications/read-all")).status).toBe(201);
-  expect(Number((await admin.get("/notifications/unread-count")).body.count ?? (await admin.get("/notifications/unread-count")).body.unreadCount ?? 0)).toBe(0);
+  expect(target, "the seeded demo notifications start unread").toBeDefined();
+  expect((await admin.post(`/notifications/${target.id}/read`)).status).toBe(201);
+  expect((await admin.get("/notifications/unread-count")).body).toEqual({ count: unread - 1 });
+  const readAll = await admin.post("/notifications/read-all");
+  expect(readAll.status).toBe(201);
+  expect(readAll.body).toEqual({ updated: unread - 1 });
+  expect((await admin.get("/notifications/unread-count")).body).toEqual({ count: 0 });
   expect((await admin.del("/notifications/ghost-id")).status).toBe(404);
   // a fresh organization has no notifications and cannot touch the demo ones
   expect(rows(await a.api.get("/notifications"))).toHaveLength(0);
@@ -377,9 +377,13 @@ test("[mz-global-search.2] search API: finds records across entities within the 
   const found = await a.api.get("/search", { q: unique });
   expect(found.status).toBe(200);
   expect(JSON.stringify(found.body)).toContain(vendor.id);
-  const onlyCustomers = await a.api.get("/search", { q: unique, types: "customer" });
+  // `types` is an array query parameter: the bracket form is what the web client (axios) sends; a bare `types=customer` string is rejected by @IsArray
+  const onlyCustomers = await a.api.get("/search", { q: unique, "types[]": "customer" });
   expect(onlyCustomers.status).toBe(200);
+  expect(JSON.stringify(onlyCustomers.body)).toContain(customer.id);
   expect(JSON.stringify(onlyCustomers.body)).not.toContain(vendor.id);
+  expect((await a.api.get("/search", { q: unique, types: "customer" })).status).toBe(400); // a single bare string is not an array
+  expect((await a.api.get("/search", { q: unique, "types[]": "starship" })).status).toBe(400);
   expect((await a.api.get("/search", { q: "a" })).status).toBe(400); // two characters minimum
   expect((await a.api.get("/search")).status).toBe(400);
   expect(JSON.stringify((await b.api.get("/search", { q: unique })).body)).not.toContain(customer.id);
@@ -387,7 +391,9 @@ test("[mz-global-search.2] search API: finds records across entities within the 
   expect(rec.status).toBe(201);
   expect(JSON.stringify((await a.api.get("/search/history")).body)).toContain(unique);
   expect(JSON.stringify((await b.api.get("/search/history")).body)).not.toContain(unique);
-  expect((await a.api.del("/search/history")).status).toBe(200);
+  const cleared = await a.api.del("/search/history");
+  expect(cleared.status).toBe(200);
+  expect(cleared.body).toEqual({ deleted: 1 });
   expect(rows(await a.api.get("/search/history"))).toHaveLength(0);
 });
 
@@ -420,21 +426,40 @@ test("[mz-import-export.1] import API: parse, validate and execute a customers C
   // bad input is a client error, never a crash
   expect((await a.api.upload("/import/parse", { name: "notes.txt", type: "text/plain", data: "hello" })).status).toBe(400);
   expect((await a.api.upload("/import/validate", file, {})).status).toBe(400); // config missing
-  const brokenConfig = await a.api.upload("/import/validate", file, { config: "{not json" });
-  expect(brokenConfig.status, "a malformed config is the client's mistake").toBe(400);
-  expect((await a.api.upload("/import/validate", file, { config: JSON.stringify({ ...config, entityType: "starships" }) })).status).toBe(400);
-  const badRows = { name: "bad.csv", type: "text/csv", data: csv(["Name,Email", `${seeded("Bad email")},not-an-email`]) };
-  const invalid = await a.api.upload("/import/validate", badRows, { config: JSON.stringify({ entityType: "customers", columnMappings: [{ sourceColumn: "Name", targetField: "name" }, { sourceColumn: "Email", targetField: "email" }] }) });
+  for (const path of ["/import/validate", "/import/execute"]) {
+    const brokenConfig = await a.api.upload(path, file, { config: "{not json" });
+    expect(brokenConfig.status, `${path}: a malformed config is the client's mistake`).toBe(400);
+    expect(brokenConfig.body.message).toBe("Config must be valid JSON");
+    const unknownType = await a.api.upload(path, file, { config: JSON.stringify({ ...config, entityType: "starships" }) });
+    expect(unknownType.status).toBe(400);
+    expect(unknownType.body.message).toMatch(/^Invalid config: entityType: entityType must be one of the following values/);
+    const noMappings = await a.api.upload(path, file, { config: JSON.stringify({ entityType: "customers" }) });
+    expect(noMappings.status).toBe(400);
+    expect(noMappings.body.message).toMatch(/^Invalid config: columnMappings: /);
+  }
+  // row-level problems are reported by validate (201 with valid:false), not thrown: a missing required name and a non-numeric payment term
+  const badRows = { name: "bad.csv", type: "text/csv", data: csv(["Name,PaymentTerms", `${seeded("Bad terms")},thirty`, ",30"]) };
+  const invalid = await a.api.upload("/import/validate", badRows, { config: JSON.stringify({ entityType: "customers", columnMappings: [{ sourceColumn: "Name", targetField: "name" }, { sourceColumn: "PaymentTerms", targetField: "paymentTerms" }] }) });
   expect(invalid.status).toBe(201);
-  expect(invalid.body.valid).toBe(false);
-  expect(invalid.body.errors.length).toBeGreaterThan(0);
+  expect(invalid.body).toEqual({
+    valid: false, totalRows: 2, validRows: 0, invalidRows: 2, warnings: [],
+    errors: [
+      { row: 2, field: "paymentTerms", value: "thirty", error: "Must be a valid number" },
+      { row: 3, field: "name", value: "", error: "Customer Name is required" },
+    ],
+  });
+  expect(rows(await a.api.get("/customers", { search: "Bad terms" }))).toHaveLength(0); // validate never writes
 
   // export
   const exported = await a.api.request("GET", "/export/customers", { query: { format: "csv" } });
   expect(exported.status).toBe(200);
   expect(exported.headers.get("content-type")).toContain("text/csv");
   expect(exported.text).toContain(name1);
-  expect((await b.api.request("GET", "/export/customers", { query: { format: "csv" } })).text).not.toContain(name1);
+  // another tenant exports only its own rows: tenant B has no customers, so there is nothing to export
+  const foreignExport = await b.api.request("GET", "/export/customers", { query: { format: "csv" } });
+  expect(foreignExport.status).toBe(400);
+  expect(foreignExport.body.message).toBe("No data to export");
+  expect(foreignExport.text).not.toContain(name1);
   const tpl = await a.api.get("/export/template/customers");
   expect(tpl.status).toBe(200);
   const customerId = rows(await a.api.get("/customers", { search: name1 }))[0].id;

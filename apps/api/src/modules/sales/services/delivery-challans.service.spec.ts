@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ChallanStatus, ChallanType } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { DeliveryChallansService } from './delivery-challans.service';
@@ -40,18 +40,20 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
       ['customer', { customerId: 'cust-a' }, 'Customer not found'],
       ['invoice', { invoiceId: 'inv-a' }, 'Invoice not found'],
       ['item', { lines: [{ itemId: 'item-a', quantity: 1 }] }, 'Item item-a not found'],
-    ])('rejects a %s outside the org before writing', async (_label, dto, message) => {
-      await expect(service.update(ORG, 'dc-1', dto)).rejects.toThrow(
-        new NotFoundException(message),
-      );
+    ])('rejects a %s outside the org with a 400 before writing', async (_label, dto, message) => {
+      const result = service.update(ORG, 'dc-1', dto);
+      await expect(result).rejects.toBeInstanceOf(BadRequestException);
+      await expect(result).rejects.toThrow(message);
       expect(prisma.deliveryChallanLine.deleteMany).not.toHaveBeenCalled();
       expect(prisma.deliveryChallan.update).not.toHaveBeenCalled();
     });
 
-    it('rejects a warehouse outside the org before writing', async () => {
+    it('rejects a warehouse outside the org with a 400 before writing', async () => {
       prisma.item.findFirst.mockResolvedValue({ id: 'item-b' } as never);
       const dto = { lines: [{ itemId: 'item-b', quantity: 1, warehouseId: 'wh-a' }] };
-      await expect(service.update(ORG, 'dc-1', dto)).rejects.toThrow('Warehouse wh-a not found');
+      const result = service.update(ORG, 'dc-1', dto);
+      await expect(result).rejects.toBeInstanceOf(BadRequestException);
+      await expect(result).rejects.toThrow('Warehouse wh-a not found');
       expect(prisma.deliveryChallanLine.deleteMany).not.toHaveBeenCalled();
       expect(prisma.deliveryChallan.update).not.toHaveBeenCalled();
     });
@@ -148,6 +150,17 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
     it('rejects with 409 when challan is not in expected status', async () => {
       prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 0 } as never);
       await expect(service[method](ORG, 'dc-1')).rejects.toThrow(ConflictException);
+      expect(prisma.inventoryMovement.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects with 404, not 409, when the challan is not in the org', async () => {
+      prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 0 } as never);
+      prisma.deliveryChallan.findFirst.mockReset();
+      prisma.deliveryChallan.findFirst.mockResolvedValue(null as never);
+      await expect(service[method](ORG, 'dc-1')).rejects.toThrow(NotFoundException);
+      expect(scopedTo(prisma.deliveryChallan.findFirst as jest.Mock)).toEqual([
+        { id: 'dc-1', organizationId: ORG, deletedAt: null },
+      ]);
       expect(prisma.inventoryMovement.create).not.toHaveBeenCalled();
     });
   });

@@ -157,3 +157,49 @@ describe('DealsService.getPipelineMetrics', () => {
     );
   });
 });
+
+describe('DealsService.create expectedAmount', () => {
+  let service: DealsService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new DealsService(mockPrisma as never);
+    mockPrisma.deal.create.mockResolvedValue({ id: 'deal-1' });
+  });
+
+  it('stores the amount as a Decimal', async () => {
+    await service.create('org-001', { dealName: 'D', expectedAmount: 5000.5 }, 'user-1');
+
+    const data = mockPrisma.deal.create.mock.calls[0][0].data;
+    expect(data.expectedAmount).toBeInstanceOf(Decimal);
+    expect(data.expectedAmount.toString()).toBe('5000.5');
+    expect(data.organizationId).toBe('org-001');
+  });
+
+  it('accepts a zero amount', async () => {
+    await service.create('org-001', { dealName: 'D', expectedAmount: 0 }, 'user-1');
+
+    expect(mockPrisma.deal.create.mock.calls[0][0].data.expectedAmount.toString()).toBe('0');
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['null', null],
+    ['empty', ''],
+    ['not a number', 'abc'],
+    ['negative', -1],
+    ['NaN', Number.NaN],
+    ['too many decimals', '1.23456'],
+    ['too large', '1000000000000000'],
+    ['an object', {}],
+  ])('rejects a %s amount with a BadRequestException and writes nothing', async (_name, amount) => {
+    await expect(
+      service.create(
+        'org-001',
+        { dealName: 'D', expectedAmount: amount as unknown as number },
+        'user-1',
+      ),
+    ).rejects.toThrow('expectedAmount must be a non-negative number');
+    expect(mockPrisma.deal.create).not.toHaveBeenCalled();
+  });
+});

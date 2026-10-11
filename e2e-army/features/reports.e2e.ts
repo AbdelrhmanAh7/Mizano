@@ -160,19 +160,24 @@ test("[mz-sales-purchase-reports.2] sales and purchase reports aggregate the pos
   expect((await anon.get("/reports/sales-by-customer")).status).toBe(401);
   const byCustomer = await a.api.get("/reports/sales-by-customer", WIDE);
   expect(byCustomer.status).toBe(200);
-  const list = Array.isArray(byCustomer.body) ? byCustomer.body : byCustomer.body.customers ?? byCustomer.body.data ?? [];
-  expect(list.length).toBe(2);
-  const text = JSON.stringify(byCustomer.body);
-  expect(text).toContain(seeded("Report customer 1"));
-  expect(text).toContain("1500.3");
+  // entries are ordered by total, largest first: customer 2 (3 x 500.10, unpaid) before customer 1 (1000 + 14% VAT, 100 paid)
+  expect(byCustomer.body.entries.map((e: any) => [e.customerId, e.customerName, e.invoiceCount, e.totalAmount, e.paidAmount, e.balanceDue])).toEqual([
+    [s.c2, seeded("Report customer 2"), 1, "1500.3000", "0.0000", "1500.3000"],
+    [s.c1, seeded("Report customer 1"), 1, "1140.0000", "100.0000", "1040.0000"],
+  ]);
+  expect([byCustomer.body.totalAmount, byCustomer.body.totalPaid, byCustomer.body.totalBalance]).toEqual(["2640.3000", "100.0000", "2540.3000"]);
   const byItem = await a.api.get("/reports/sales-by-item", WIDE);
   expect(byItem.status).toBe(200);
+  expect(byItem.body.entries).toEqual([]); // the scenario invoices carry no inventory items
   const byVendor = await a.api.get("/reports/purchases-by-vendor", WIDE);
   expect(byVendor.status).toBe(200);
-  expect(JSON.stringify(byVendor.body)).toContain(seeded("Report vendor"));
-  expect(JSON.stringify(byVendor.body)).toContain("1200"); // 800 + 400 net purchases
+  // both bills are approved: 800 + 400 plus 14% VAT = 912 + 456, nothing paid yet
+  expect(byVendor.body.entries.map((e: any) => [e.vendorId, e.vendorName, e.billCount, e.totalAmount, e.paidAmount, e.balanceDue, e.unappliedCredits])).toEqual([
+    [s.v, seeded("Report vendor"), 2, "1368.0000", "0.0000", "1368.0000", "0.0000"],
+  ]);
+  expect([byVendor.body.totalAmount, byVendor.body.totalPaid, byVendor.body.totalBalance]).toEqual(["1368.0000", "0.0000", "1368.0000"]);
   const b = await tenant("reports-b");
-  expect(JSON.stringify((await b.api.get("/reports/sales-by-customer", WIDE)).body)).not.toContain(seeded("Report customer 1"));
+  expect((await b.api.get("/reports/sales-by-customer", WIDE)).body.entries).toEqual([]);
 });
 
 test("[mz-dashboard.2] dashboard API: overview ties to the ledger, every widget endpoint answers for the demo organization", { tags: ["feat:mz-dashboard", "shard:reports-api", "lvl:api"] }, async () => {

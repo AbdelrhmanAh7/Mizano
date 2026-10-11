@@ -14,11 +14,35 @@ export class UpdateWarehouseDto {
   @MaxLength(100)
   name?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, description: 'Street address (stored as `street`)' })
   @IsString()
   @IsOptional()
   @MaxLength(500)
   address?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  city?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  state?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  @MaxLength(20)
+  postalCode?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  country?: string;
 
   @ApiProperty({ required: false })
   @IsBoolean()

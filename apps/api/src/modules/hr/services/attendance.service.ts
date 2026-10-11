@@ -231,9 +231,11 @@ export class AttendanceService {
     });
     if (!attendance) throw new NotFoundException('Attendance record not found');
 
-    const data: Prisma.AttendanceUpdateInput = {
-      ...(dto as unknown as Prisma.AttendanceUpdateInput),
-    };
+    // Only these fields are editable: spreading the raw body would let a caller move the record to
+    // another employee or organization (organizationId / employeeId are not updatable here).
+    const data: Prisma.AttendanceUpdateInput = {};
+    if (dto.status !== undefined) data.status = dto.status as AttendanceStatus;
+    if (dto.notes !== undefined) data.notes = dto.notes as string | null;
     if (dto.date) data.date = new Date(dto.date as string);
     if (dto.checkIn) data.checkIn = new Date(dto.checkIn as string);
     if (dto.checkOut) data.checkOut = new Date(dto.checkOut as string);

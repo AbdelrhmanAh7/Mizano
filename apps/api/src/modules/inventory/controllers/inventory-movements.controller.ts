@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { InventoryMovementQueryDto } from '../dto/inventory-movement-query.dto';
 import { InventoryMovementsService } from '../services/inventory-movements.service';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 
@@ -17,17 +17,7 @@ export class InventoryMovementsController {
   @Get()
   @Permissions('inventory.view')
   @ApiOperation({ summary: 'List inventory movements with pagination and filters' })
-  findAll(
-    @CurrentOrg() orgId: string,
-    @Query()
-    query: PaginationDto & {
-      itemId?: string;
-      warehouseId?: string;
-      type?: string;
-      dateFrom?: string;
-      dateTo?: string;
-    },
-  ) {
+  findAll(@CurrentOrg() orgId: string, @Query() query: InventoryMovementQueryDto) {
     return this.inventoryMovementsService.findAll(orgId, query);
   }
 

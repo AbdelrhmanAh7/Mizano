@@ -9,6 +9,7 @@ import {
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { ItemType } from '@prisma/client';
+import { IsDecimalString } from '../../../common/dto/decimal-string';
 
 export class CreateItemDto {
   @ApiProperty({ example: 'Product Name' })
@@ -36,6 +37,7 @@ export class CreateItemDto {
   @ApiProperty({ example: '100.00' })
   @IsString()
   @IsNotEmpty()
+  @IsDecimalString()
   sellingPrice: string;
 
   @ApiProperty({ required: false })
@@ -46,6 +48,7 @@ export class CreateItemDto {
   @ApiProperty({ required: false, default: '0', example: '50.00' })
   @IsString()
   @IsOptional()
+  @IsDecimalString()
   costPrice?: string;
 
   @ApiProperty({ required: false })

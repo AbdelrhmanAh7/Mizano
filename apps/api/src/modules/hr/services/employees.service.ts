@@ -46,15 +46,11 @@ export class EmployeesService {
     organizationId: string,
     query: PaginationDto & { isActive?: boolean | string; status?: string; department?: string },
   ) {
-    const {
-      page = 1,
-      limit = 50,
-      sortBy = 'name',
-      sortOrder = 'asc',
-      isActive,
-      status,
-      department,
-    } = query;
+    const { sortBy = 'name', sortOrder = 'asc', isActive, status, department } = query;
+    // The controller's query type is an intersection (no runtime class), so ValidationPipe does not
+    // transform it: page and limit arrive as strings and must be numbers for skip / take.
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 50;
     const where: Prisma.EmployeeWhereInput = { organizationId, deletedAt: null };
     if (isActive !== undefined) {
       where.isActive = typeof isActive === 'string' ? isActive === 'true' : isActive;

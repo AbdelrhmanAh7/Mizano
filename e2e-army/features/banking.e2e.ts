@@ -88,6 +88,7 @@ test("[mz-bank-accounts.2] bank account API: create linked to a ledger account, 
   expect(ids(await a.api.get("/bank-accounts"))).toContain(id);
   expect((await a.api.get(`/bank-accounts/${id}`)).body.id).toBe(id);
   expect((await a.api.patch(`/bank-accounts/${id}`, { name: `${name} v2` })).body.name).toBe(`${name} v2`);
+  expect((await a.api.patch(`/bank-accounts/${id}`, { linkedAccountId: b.chart.bank })).status).toBe(400); // another tenant's ledger account (body id)
   const stats = await a.api.get("/bank-accounts/stats");
   expect(stats.status).toBe(200);
   expect((await a.api.get(`/bank-accounts/${id}/balance-history`)).status).toBe(200);
@@ -121,7 +122,8 @@ test("[mz-bank-transactions.2] bank transaction API: manual entry, bulk import, 
 
   const bulk = await a.api.post("/bank-transactions/import", { bankAccountId: account, transactions: [
     { date: DATE.doc, type: "DEPOSIT", amount: "10.00", description: "bulk deposit" }, { date: DATE.doc, type: "WITHDRAWAL", amount: "4.25", description: "bulk withdrawal" }] });
-  expect([200, 201]).toContain(bulk.status);
+  expect(bulk.status).toBe(201);
+  expect(bulk.body).toEqual({ imported: 2 });
   expect((await b.api.post("/bank-transactions/import", { bankAccountId: account, transactions: [{ date: DATE.doc, type: "DEPOSIT", amount: "1.00", description: "foreign import" }] })).status).toBe(400);
 
   // statement file import: columns are auto-detected, repeated rows are not imported twice
@@ -195,6 +197,9 @@ test("[mz-bank-rules.2] bank rule API: create, test a rule against a transaction
   const created = await a.api.post("/bank-rules", { name: seeded("Rule"), conditions, action: { description: "Cloud services" }, isActive: true });
   expect(created.status).toBe(201);
   const id = created.body.id as string;
+  const bAccount = (await b.api.post("/bank-accounts", { name: seeded("Bank rule B"), currency: "USD", type: "BANK", linkedAccountId: b.chart.bank })).body.id;
+  expect((await a.api.post("/bank-rules", { name: seeded("Foreign account rule"), bankAccountId: bAccount, conditions })).status).toBe(400); // another tenant's bank account (body id)
+  expect((await a.api.patch(`/bank-rules/${id}`, { bankAccountId: bAccount })).status).toBe(400);
   expect((await a.api.post("/bank-rules", { conditions })).status).toBe(400);
   expect((await a.api.post("/bank-rules", { name: "bad conditions", conditions: "nope" })).status).toBe(400);
   const hit = await a.api.post("/bank-rules/test", { conditions, transaction: { description: "AWS via Amazon Web Services", amount: "250.00" } });
@@ -245,7 +250,9 @@ test("[mz-fixed-assets.2] fixed asset API: create with schedule, validation, upd
   for (const bad of [{ purchasePrice: -1 }, { usefulLifeYears: 0 }, { usefulLifeYears: 101 }, { assetType: "SPACESHIP" }, { name: undefined }]) {
     expect((await a.api.post("/assets", { ...body, ...bad })).status).toBe(400);
   }
-  expect((await a.api.post("/assets", { ...body, assetAccountId: b.chart.bank })).status).toBe(400); // another tenant's account (body id)
+  for (const field of ["assetAccountId", "depreciationAccountId", "accumulatedDeprAccountId"] as const) {
+    expect((await a.api.post("/assets", { ...body, [field]: b.chart.bank })).status).toBe(400); // another tenant's account (body id), one request per field
+  }
   expect(ids(await a.api.get("/assets"))).toContain(id);
   expect((await a.api.get(`/assets/${id}`)).body.id).toBe(id);
   expect((await a.api.put(`/assets/${id}`, { name: seeded("Asset v2"), usefulLifeYears: 4 })).status).toBe(200);
@@ -260,7 +267,7 @@ test("[mz-fixed-assets.2] fixed asset API: create with schedule, validation, upd
 
   const disposed = await a.api.post(`/assets/${id}/dispose`, { disposalDate: DATE.doc, disposalAmount: 8000 });
   expect(disposed.status).toBe(200);
-  expect(disposed.body.status).toMatch(/DISPOSED|SOLD/);
+  expect(disposed.body.status).toBe("DISPOSED");
   expect((await a.api.post(`/assets/${id}/dispose`, { disposalDate: DATE.doc, disposalAmount: 1 })).status).toBe(400);
   expect((await a.api.put(`/assets/${id}`, { name: "late edit" })).status).toBe(400);
   const spare = (await a.api.post("/assets", { ...body, name: seeded("Spare asset") })).body.id;
@@ -276,17 +283,17 @@ test("[mz-asset-depreciation.1] depreciation job: running the monthly depreciati
   const expense = await ensureAccount(a, "5290", "E2E Depreciation Expense", "EXPENSE");
   const asset = (await a.api.post("/assets", { name: seeded("Dep asset"), assetType: "MACHINERY", purchaseDate: "2025-01-15", purchasePrice: 12000, salvageValue: 0, usefulLifeYears: 10, assetAccountId: fixed, depreciationAccountId: expense, accumulatedDeprAccountId: accum })).body;
   expect(asset.id).toBeTruthy();
-  const before = await acct(a.api, expense);
+  const before = await acct(a.api, expense), accumBefore = await acct(a.api, accum);
   const run = await a.api.post("/assets/depreciation/run");
   expect(run.status).toBe(200);
   expect(run.body.processed).toBeGreaterThanOrEqual(1);
   expect(run.body.journalsCreated).toBe(run.body.processed);
   const after = await acct(a.api, expense);
   expect(subDec(after.debit, before.debit)).toBe("100"); // 12000 / 120 months
-  expect(subDec((await acct(a.api, accum)).credit, "0")).toBe("100");
+  expect(subDec((await acct(a.api, accum)).credit, accumBefore.credit)).toBe("100");
   const again = await a.api.post("/assets/depreciation/run");
   expect(again.status).toBe(200);
-  expect(again.body.journalsCreated).toBe(0); // the month is already depreciated
+  expect([again.body.processed, again.body.journalsCreated]).toEqual([0, 0]); // the month is already depreciated
   expect(subDec((await acct(a.api, expense)).debit, before.debit)).toBe("100");
   // an unscheduled period is a client error, not a crash
   const none = await a.api.post(`/assets/${asset.id}/depreciate`, undefined, { month: 1, year: 2000 });

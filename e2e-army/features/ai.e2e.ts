@@ -186,7 +186,7 @@ test("[mz-document-intake.1] intake API: a PDF becomes a durable job with its or
   expect(ids(mine)).toContain(jobId);
   expect(ids(await b.api.get("/ai/document-intake/jobs"))).not.toContain(jobId);
   expect((await a.api.get("/ai/document-intake/jobs", { status: "BOGUS" })).status).toBe(400);
-  for (const path of ["", "/result", "/original"]) expect((await b.api.get(`/ai/document-intake/${jobId}${path}`)).status).toBe(404);
+  for (const path of ["/progress", "/result", "/original"]) expect((await b.api.get(`/ai/document-intake/${jobId}${path}`)).status).toBe(404);
   expect((await b.api.post(`/ai/document-intake/${jobId}/retry`)).status).toBe(404);
   expect((await anon.get(`/ai/document-intake/${jobId}/result`)).status).toBe(401);
   expect((await anon.get("/ai/document-intake/jobs")).status).toBe(401);

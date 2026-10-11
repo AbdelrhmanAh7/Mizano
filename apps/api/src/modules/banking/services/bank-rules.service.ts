@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateBankRuleDto } from '../dto/create-bank-rule.dto';
@@ -15,7 +15,21 @@ export interface BankRuleCondition {
 export class BankRulesService {
   constructor(private prisma: PrismaService) {}
 
+  /** A rule's bank account comes from the body: it must belong to the caller's organization (400). */
+  private async assertOwnBankAccount(
+    organizationId: string,
+    bankAccountId: string | null | undefined,
+  ): Promise<void> {
+    if (!bankAccountId) return;
+    const account = await this.prisma.bankAccount.findFirst({
+      where: { id: bankAccountId, organizationId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!account) throw new BadRequestException('Bank account not found');
+  }
+
   async create(organizationId: string, dto: CreateBankRuleDto) {
+    await this.assertOwnBankAccount(organizationId, dto.bankAccountId);
     return this.prisma.bankRule.create({
       data: {
         name: dto.name,
@@ -66,6 +80,7 @@ export class BankRulesService {
 
   async update(organizationId: string, id: string, dto: UpdateBankRuleDto) {
     await this.findOne(organizationId, id);
+    await this.assertOwnBankAccount(organizationId, dto.bankAccountId);
     const data: Prisma.BankRuleUncheckedUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.bankAccountId !== undefined) data.bankAccountId = dto.bankAccountId;
