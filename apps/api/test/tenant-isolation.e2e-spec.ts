@@ -225,14 +225,13 @@ describe('Tenant isolation of ledger and invoice reads (e2e) @issue-108', () => 
     });
 
     it('@e2e @flow:tenant-isolation @issue-108 AC2: AP aging lists only own bills and credits (T3)', async () => {
-      for (const [, tenant, own, foreign] of pairs()) {
+      for (const [, tenant, own] of pairs()) {
         const res = await tenant.api.get('/reports/payables-aging');
         expect(res.status).toBe(200);
         const items = Object.values(res.body.buckets as Record<string, Array<{ billId: string }>>)
           .flat()
           .map((i) => i.billId);
         expect(items).toEqual([own.billId]);
-        expect(items).not.toContain(foreign.billId);
         expect(res.body.billCount).toBe(1);
         expect(res.body.vendorCount).toBe(1);
 
@@ -265,10 +264,6 @@ describe('Tenant isolation of ledger and invoice reads (e2e) @issue-108', () => 
         expect(vendors).toEqual([
           { vendorId: own.vendorId, vendorName: expect.any(String), amount: ownCredits.toFixed(4) },
         ]);
-        expect(vendors.map((v) => v.vendorId)).not.toContain(foreign.vendorId);
-        expect(res.body.unappliedCredits.vendors).not.toContainEqual(
-          expect.objectContaining({ vendorId: foreign.vendorId }),
-        );
       }
     });
 
@@ -315,7 +310,7 @@ describe('Tenant isolation of ledger and invoice reads (e2e) @issue-108', () => 
         for (const [path, ownId, foreignId] of cursorCases(own, foreign)) {
           const foreignRes = await tenant.api.get(path).query({ cursor: foreignId });
           expect({ path, status: foreignRes.status }).toEqual({ path, status: 404 });
-          expect(foreignRes.body.data ?? []).not.toContain(ownId);
+          expect(sortedIds(foreignRes.body.data ?? [])).toEqual([]);
           const ownRes = await tenant.api.get(path).query({ cursor: ownId });
           expect({ path, status: ownRes.status }).toEqual({ path, status: 200 });
         }
@@ -324,39 +319,22 @@ describe('Tenant isolation of ledger and invoice reads (e2e) @issue-108', () => 
   });
 
   describe('AC2c: list endpoints assert scoped pagination totals (T2)', () => {
-    it('@e2e @flow:tenant-isolation @issue-108 AC2c: invoice list meta.total matches scoped count', async () => {
+    it('@e2e @flow:tenant-isolation @issue-108 AC2c: invoice, bill and journal meta.total match the scoped count', async () => {
       for (const [, tenant] of pairs()) {
-        const res = await tenant.api.get('/invoices');
-        expect(res.status).toBe(200);
-        expect(res.body.meta.total).toBe(1);
-        const dbCount = await prisma.invoice.count({
-          where: { organizationId: tenant.organizationId, deletedAt: null },
-        });
-        expect(res.body.meta.total).toBe(dbCount);
-      }
-    });
-
-    it('@e2e @flow:tenant-isolation @issue-108 AC2c: bill list meta.total matches scoped count', async () => {
-      for (const [, tenant] of pairs()) {
-        const res = await tenant.api.get('/bills');
-        expect(res.status).toBe(200);
-        expect(res.body.meta.total).toBe(1);
-        const dbCount = await prisma.bill.count({
-          where: { organizationId: tenant.organizationId, deletedAt: null },
-        });
-        expect(res.body.meta.total).toBe(dbCount);
-      }
-    });
-
-    it('@e2e @flow:tenant-isolation @issue-108 AC2c: journal list meta.total matches scoped count', async () => {
-      for (const [, tenant] of pairs()) {
-        const res = await tenant.api.get('/journals').query({ limit: 100 });
-        expect(res.status).toBe(200);
-        expect(res.body.meta.total).toBeGreaterThanOrEqual(3);
-        const dbCount = await prisma.journal.count({
-          where: { organizationId: tenant.organizationId, deletedAt: null },
-        });
-        expect(res.body.meta.total).toBe(dbCount);
+        const where = { organizationId: tenant.organizationId, deletedAt: null };
+        const counts = {
+          '/invoices': await prisma.invoice.count({ where }),
+          '/bills': await prisma.bill.count({ where }),
+          '/journals': await prisma.journal.count({ where }),
+        };
+        expect(counts['/invoices']).toBe(1);
+        expect(counts['/bills']).toBe(1);
+        expect(counts['/journals']).toBeGreaterThanOrEqual(3);
+        for (const [path, count] of Object.entries(counts)) {
+          const res = await tenant.api.get(path).query({ limit: 100 });
+          expect({ path, status: res.status }).toEqual({ path, status: 200 });
+          expect({ path, total: res.body.meta.total }).toEqual({ path, total: count });
+        }
       }
     });
   });
