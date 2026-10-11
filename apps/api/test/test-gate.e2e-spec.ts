@@ -55,6 +55,7 @@ const E2E_SUITES = [
   'sales',
 ];
 
+// The jest/pnpm subprocess tests start one or two jest processes; give a slow runner room.
 describe('@issue-134 test gates', () => {
   const ci = read('.github/workflows/ci.yml');
   const e2eJob = workflowJob(ci, 'e2e');
@@ -103,7 +104,7 @@ describe('@issue-134 test gates', () => {
       .split('\n')
       .map((file) => path.basename(file.trim()));
     for (const suite of E2E_SUITES) expect(listed).toContain(`${suite}.e2e-spec.ts`);
-  });
+  }, 30_000);
 
   it('@e2e @flow:test-gate @issue-134 AC2: package.json has no inline jest block and its jest scripts use _jest.config.js', () => {
     const api = readJson<PackageJson>('apps/api/package.json');
@@ -134,5 +135,5 @@ describe('@issue-134 test gates', () => {
         ['^tesseract\\.js$', path.join(apiDir, 'src/test/mocks/tesseract.mock.js')],
       ]),
     );
-  });
+  }, 60_000);
 });
