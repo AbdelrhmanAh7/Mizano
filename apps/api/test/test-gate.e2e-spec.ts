@@ -59,24 +59,17 @@ const E2E_SUITES = [
 describe('@issue-134 test gates', () => {
   const ci = read('.github/workflows/ci.yml');
   const e2eJob = workflowJob(ci, 'e2e');
-  // Workflow files are owner-only for the AI engineers: until the owner adds the `e2e` job from
-  // AI_QUESTIONS.md, this check is skipped (not weakened) so `pnpm test:e2e` stays green; it
-  // switches itself on as soon as ci.yml has the job.
-  const itWhenJobExists = e2eJob ? it : it.skip;
-
-  itWhenJobExists(
-    '@e2e @flow:test-gate @issue-134 AC1: ci.yml has an e2e job that runs pnpm test:e2e on PostgreSQL',
-    () => {
-      expect(e2eJob).toBeDefined();
-      const job = e2eJob ?? '';
-      expect(job).toMatch(/image: postgres:16/);
-      expect(job).toMatch(/prisma db:migrate deploy/);
-      expect(job).toMatch(/DATABASE_URL: postgresql:\/\//);
-      expect(job).toMatch(/^\s+run: pnpm test:e2e\s*$/m);
-    },
-  );
+  it('@e2e @flow:test-gate @issue-134 AC1: ci.yml has an e2e job that runs pnpm test:e2e on PostgreSQL', () => {
+    expect(e2eJob).toBeDefined();
+    const job = e2eJob ?? '';
+    expect(job).toMatch(/image: postgres:16/);
+    expect(job).toMatch(/prisma migrate deploy/);
+    expect(job).toMatch(/DATABASE_URL: postgresql:\/\//);
+    expect(job).toMatch(/^\s+run: pnpm test:e2e\s*$/m);
+  });
 
   it('@e2e @flow:test-gate @issue-134 AC1: a failing e2e suite fails the job (nothing masks the exit code)', () => {
+    expect(e2eJob).toBeDefined();
     const job = e2eJob ?? '';
     expect(job).not.toMatch(/continue-on-error/);
     expect(job).not.toMatch(/\|\|\s*true/);

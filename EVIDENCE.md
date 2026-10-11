@@ -392,19 +392,19 @@ Unset launcher heap_size_limit: 4395630592
 
 - **Issue**: #134 (`[audit] Run the 11 e2e suites in a gate and unify the two API jest configs`)
 - **Base (`origin/master`)**: `fcaed262cd11876a9876c921f9dc4d04a351a0ed`
-- **Tested head**: `472c751af7d353cb1af6a36ed317f988e7b63a3f` (the e2e runs below ran on it; the commit carrying this file only edits EVIDENCE.md and deletes AI_QUESTIONS.md)
-- **Environment**: macOS (Darwin 27), Node v26.10.0, pnpm 8.14.0, PostgreSQL 16 (own throwaway cluster on 127.0.0.1:56134, database dropped, recreated and migrated with `prisma migrate deploy` before every run, deleted afterwards), no Redis (`REDIS_URL=` blank)
-- **Not run**: the GitHub Actions `E2E Tests` job itself (it reaches GitHub only after the push), and the full unit suite on this head (owner rule 2026-10-08: GitHub-hosted CI runs it). The job's commands were reproduced locally.
+- **Tested head**: the parent of the commit that carries this file (it adds the final `e2e` job to `.github/workflows/ci.yml`, restores the `prisma migrate deploy` assertion in `test-gate.e2e-spec.ts` and deletes `AI_QUESTIONS.md`; the runs below were made with exactly those files, `git log -1 --format=%H` of the PR's last commit before this one)
+- **Environment**: macOS (Darwin 27), Node v26.10.0, pnpm 8.14.0, PostgreSQL 16 (own throwaway cluster on 127.0.0.1:56134, `test` user, database dropped, recreated and migrated with `prisma migrate deploy` before every run, deleted afterwards), no Redis (`REDIS_URL=` blank)
+- **Not run**: the GitHub Actions `E2E Tests` job itself (it first runs after the push; its commands were reproduced locally step by step), and the full unit suite (owner rule 2026-10-08: GitHub-hosted CI runs it).
 
 ## Requirements
 
-| REQ | Requirement                                                                                     | Verified by                                                                                                                                                                                                                                                                                                | Status  |
-| --- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| AC1 | `ci.yml` has an `e2e` job that fails when `reports.e2e-spec.ts` fails                           | `E2E Tests` job: workflow edits are owner-only and were reverted, the job YAML is in `AI_QUESTIONS.md` (status PARTIAL until pasted); `test/test-gate.e2e-spec.ts` (3 AC1 tests; the ci.yml-job check skips until the job exists) passes; a deliberately failing reports test makes `pnpm test:e2e` exit 1 | PARTIAL |
-| AC2 | `node apps/api/_run_tests.js` and `pnpm --filter api test` load the same config file            | `test/test-gate.e2e-spec.ts` (2 AC2 tests): no inline `jest` block; both `--showConfig` outputs are equal, same project id                                                                                                                                                                                 | PASSED  |
-| R3  | `test:e2e` turbo task                                                                           | `turbo.json` `test:e2e` (`cache: false`, `DATABASE_URL`/`REDIS_URL`/`APP_ENV` passed through); root `test:e2e` = `turbo test:e2e`                                                                                                                                                                          | PASSED  |
-| R4  | Pin dates in the payment and churn prediction specs                                             | Fake timers per test; 69/69 prediction tests passed with the clock pinned to 2025-12-15 and to 2031-03-02 (at `f1953d1`, files unchanged since)                                                                                                                                                            | PASSED  |
-| R5  | Specs for depreciation, costing, currency, bank transactions, statement import, bulk operations | Split out to respect the PR size limit (CTO decision on PR #139): #206 costing, #207 currency, #208 depreciation, #209 bank transactions + bulk operations, #210 statement import                                                                                                                          | OPEN    |
+| REQ | Requirement                                                                                     | Verified by                                                                                                                                                                                                                                                                                                                                                                                          | Status |
+| --- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| AC1 | `ci.yml` has an `e2e` job that fails when `reports.e2e-spec.ts` fails                           | `.github/workflows/ci.yml` job `e2e` (`E2E Tests`, ubuntu-latest, 5 min, `postgres:16-alpine` service, `prisma migrate deploy`, `run: pnpm test:e2e`, `REDIS_URL: ''`, no `continue-on-error`, no secrets); `test/test-gate.e2e-spec.ts` now always runs its ci.yml check (the skip is gone) and passes against the real job; a deliberately failing reports test makes `pnpm test:e2e` fail (below) | PASSED |
+| AC2 | `node apps/api/_run_tests.js` and `pnpm --filter api test` load the same config file            | `test/test-gate.e2e-spec.ts` (2 AC2 tests): no inline `jest` block; both `--showConfig` outputs are equal, same project id                                                                                                                                                                                                                                                                           | PASSED |
+| R3  | `test:e2e` turbo task                                                                           | `turbo.json` `test:e2e` (`cache: false`, `DATABASE_URL`/`REDIS_URL`/`APP_ENV` passed through); root `test:e2e` = `turbo test:e2e`                                                                                                                                                                                                                                                                    | PASSED |
+| R4  | Pin dates in the payment and churn prediction specs                                             | Fake timers per test; 69/69 prediction tests passed with the clock pinned to 2025-12-15 and to 2031-03-02 (at `f1953d1`, files unchanged since)                                                                                                                                                                                                                                                      | PASSED |
+| R5  | Specs for depreciation, costing, currency, bank transactions, statement import, bulk operations | Split out to respect the PR size limit (CTO decision on PR #139): #206 costing, #207 currency, #208 depreciation, #209 bank transactions + bulk operations, #210 statement import                                                                                                                                                                                                                    | OPEN   |
 
 ## Acceptance tests fail first
 
@@ -458,3 +458,33 @@ exit=1
 ```
 
 The `E2E Tests` job runs the same `pnpm test:e2e` with no `continue-on-error` and no `|| true`, so the job fails the same way.
+
+## Final head re-run (job as committed in ci.yml)
+
+Fresh database (`createdb` + `pnpm --filter api exec prisma migrate deploy`), `REDIS_URL=` blank, same env as the job:
+
+```text
+$ pnpm test:e2e
+api:test:e2e: PASS test/reports.e2e-spec.ts ... PASS test/test-gate.e2e-spec.ts (14 suites, none skipped)
+api:test:e2e: Test Suites: 14 passed, 14 total
+api:test:e2e: Tests:       307 passed, 307 total
+```
+
+`pnpm --filter api type-check` exit 0; `eslint test/test-gate.e2e-spec.ts` clean; `prettier --check` on `ci.yml` and the spec clean.
+
+Fail-first for AC1 on this head (a `deliberate break` test appended to `reports.e2e-spec.ts`, then reverted):
+
+```text
+$ pnpm test:e2e -- --testPathPattern reports
+api:test:e2e: FAIL test/reports.e2e-spec.ts   ✕ deliberate break (#134 gate check)
+api:test:e2e: Tests: 1 failed, 15 passed, 16 total
+Failed:    api#test:e2e            (turbo exits 1; the job has nothing that masks it)
+```
+
+AC2 on this head: `test-gate.e2e-spec.ts` › "\_run_tests.js and pnpm --filter api test load the same config" passes (equal `--showConfig`, same project id; sharp/tesseract.js stubs present in `_jest.config.js`).
+
+Why `auth.e2e-spec.ts` and `helpers/app.helper.ts` changed: setup only. `createTestApp` now listens on `127.0.0.1` (see the foreign-listener finding above) so `auth.e2e-spec.ts` no longer calls `app.listen(0)` itself and reads the bound port instead; one `expect` was added (address is `127.0.0.1`), none removed or loosened.
+
+## Remaining scope of #134 (R5), tracked separately
+
+PR body says `Refs #134`, not `Closes`. Specs for ledger-writing services with none, each asserting exact Decimal journal lines, tenant scoping and idempotent retries: #206 costing (FIFO/COGS), #207 currency (`convertToBaseCurrency`, unrealised FX), #208 depreciation, #209 bank-transactions + bulk-operations, #210 bank-statement-import.

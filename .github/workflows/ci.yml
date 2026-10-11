@@ -5,7 +5,7 @@
 #
 # Owner rule: every job stays under 5 minutes (timeout-minutes: 5), so the pipeline is split into parallel jobs.
 # The job names are the check names the hub gates and automerge wait for ("Install Dependencies", "Lint & Type Check",
-# "Unit Tests", "Build"): keep them stable. Jobs are independent and each installs from the shared pnpm store cache
+# "Unit Tests", "Build", "E2E Tests"): keep them stable. Jobs are independent and each installs from the shared pnpm store cache
 # (setup-node), so none waits for another and a failed install cannot skip the others silently.
 #
 # Fork PRs: this workflow uses `pull_request` (read-only token, no secrets), never `pull_request_target`; first-time
@@ -190,25 +190,16 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: mizano_e2e
+        ports:
+          - 5432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        ports:
-          - 5432:5432
-      redis:
-        image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -230,14 +221,15 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
 
-      - name: Run database migrations
-        run: pnpm db:migrate deploy
+      - name: Apply database migrations
+        run: pnpm --filter api exec prisma migrate deploy
         env:
-          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
-          REDIS_URL: redis://127.0.0.1:6379
+          # Throwaway credentials of the ephemeral service container above, not secrets.
+          DATABASE_URL: postgresql://test:test@localhost:5432/mizano_e2e
 
       - name: Run E2E tests
         run: pnpm test:e2e
         env:
-          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
-          REDIS_URL: redis://127.0.0.1:6379
+          DATABASE_URL: postgresql://test:test@localhost:5432/mizano_e2e
+          # Blank on purpose: the cache and the intake queue run in-process, as in the verified local runs.
+          REDIS_URL: ''
