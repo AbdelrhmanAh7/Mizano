@@ -655,3 +655,14 @@ test("[mz-system-diagnostics.2] cache and performance admin API: cache stats, ke
   }
   expect((await a.api.post("/performance/reset")).status).toBeLessThan(300);
 });
+
+test("[mz-health.2] without Redis (REDIS_URL empty, as in pnpm e2e:army and the e2e-army CI job) the API is healthy on its in-memory cache", { tags: ["feat:mz-health", "shard:platform-api", "lvl:api"] }, async () => {
+  const health = await anon.get("/health");
+  expect(health.status).toBe(200);
+  // the health probe writes, reads and deletes a key through the cache manager: the in-memory store answers it
+  expect(health.body).toMatchObject({ status: "healthy", services: { database: { status: "connected" }, redis: { status: "connected" } } });
+  expect((await anon.get("/health/ready")).status).toBe(200);
+  const stats = await (await adminApi()).get("/cache/stats");
+  expect(stats.status).toBe(200);
+  expect(stats.body).toMatchObject({ storeType: "memory", connected: true }); // no Redis behind it
+});
