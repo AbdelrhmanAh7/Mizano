@@ -222,9 +222,7 @@ jobs:
               printf 'POSTGRES_PASSWORD=%s\n' "${PG_PASS}"
               echo "POSTGRES_DB=${PG_DB:-mizano_db}"
               printf 'DATABASE_URL=postgresql://%s:%s@postgres:5432/%s?schema=public\n' "${PG_USER:-mizano}" "${PG_PASS_ENCODED}" "${PG_DB:-mizano_db}"
-              REDIS_PASS_HEX=$(printf '%s' "${PG_PASS}" | sha256sum | cut -c1-64)
-              echo "::add-mask::${REDIS_PASS_HEX}"
-              printf 'REDIS_PASSWORD=%s\n' "${REDIS_PASS_HEX}"
+              echo "REDIS_URL=redis://redis:6379"
               printf 'JWT_SECRET=%s\n' "${JWT_S}"
               printf 'JWT_REFRESH_SECRET=%s\n' "${JWT_RS}"
               echo "JWT_EXPIRATION=15m"
