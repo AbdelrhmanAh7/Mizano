@@ -290,6 +290,5 @@ test("[mz-asset-depreciation.1] depreciation job: running the monthly depreciati
   expect(subDec((await acct(a.api, expense)).debit, before.debit)).toBe("100");
   // an unscheduled period is a client error, not a crash
   const none = await a.api.post(`/assets/${asset.id}/depreciate`, undefined, { month: 1, year: 2000 });
-  expect(none.status).toBeGreaterThanOrEqual(400);
-  expect(none.status).toBeLessThan(500);
+  expect(none.status).toBe(404);
 });

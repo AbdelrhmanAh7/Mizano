@@ -251,13 +251,14 @@ test("[mz-ai-infrastructure.1] AI infrastructure API: model status is admin only
   const a = await A();
   expect((await anon.get("/internal/ollama-status")).status).toBe(401);
   const status = await a.api.get("/internal/ollama-status");
-  expect(status.status).toBeLessThan(500);
+  expect(status.status).toBe(200);
+  expect(status.body).toMatchObject({ ollama_reachable: false }); // the verify stack has no model proxy
   expect(JSON.stringify(status.body)).not.toMatch(/OLLAMA_WEBHOOK_SECRET|secret"\s*:/i);
-  // Colab pushes the tunnel URL with a secret; without (or with a wrong) secret the update is refused and the URL unchanged
-  const noSecret = await anon.post("/internal/tunnel-update", { url: "https://evil.example.test" });
-  expect([400, 401, 403]).toContain(noSecret.status);
-  const wrong = await anon.request("POST", "/internal/tunnel-update", { body: { url: "https://evil.example.test" }, headers: { "x-webhook-secret": "not-the-secret", authorization: "Bearer not-the-secret" } });
-  expect([400, 401, 403]).toContain(wrong.status);
+  // Colab pushes the tunnel URL with a secret in the body; without (or with a wrong) secret the update is refused and the URL unchanged
+  const noSecret = await anon.post("/internal/tunnel-update", { tunnel_url: "https://evil.example.test" });
+  expect(noSecret.status).toBe(403);
+  const wrong = await anon.post("/internal/tunnel-update", { tunnel_url: "https://evil.example.test", secret: "not-the-secret" });
+  expect(wrong.status).toBe(403);
   const after = await a.api.get("/internal/ollama-status");
   expect(JSON.stringify(after.body)).not.toContain("evil.example.test");
 });
