@@ -214,16 +214,23 @@ describe('DashboardService', () => {
           // Detect if an incorrect isActive/deletedAt filter is applied
           if (args.where.isActive === true) calledWithActiveFilter = true;
           if (args.where.deletedAt === null) calledWithDeletedFilter = true;
-          // Historical control accounts are inactive and soft-deleted
-          return args.where.type === AccountType.ASSET
-            ? [
-                { id: 'ar-old', isActive: false, deletedAt: new Date() },
-                { id: 'ar-new', isActive: true, deletedAt: null },
-              ]
-            : [
-                { id: 'ap-old', isActive: false, deletedAt: new Date() },
-                { id: 'ap-new', isActive: true, deletedAt: null },
-              ];
+          // Historical control accounts are inactive and soft-deleted. The mock honors
+          // account-level filters, so an incorrect isActive/deletedAt filter drops them.
+          const candidates =
+            args.where.type === AccountType.ASSET
+              ? [
+                  { id: 'ar-old', isActive: false, deletedAt: new Date() },
+                  { id: 'ar-new', isActive: true, deletedAt: null },
+                ]
+              : [
+                  { id: 'ap-old', isActive: false, deletedAt: new Date() },
+                  { id: 'ap-new', isActive: true, deletedAt: null },
+                ];
+          return candidates.filter(
+            (a) =>
+              (args.where?.isActive === undefined || a.isActive === args.where.isActive) &&
+              (args.where?.deletedAt === undefined || a.deletedAt === args.where.deletedAt),
+          );
         }
         if (args.where?.subType) return [];
         if (args.where?.id) return [{ id: 'cash' }];
