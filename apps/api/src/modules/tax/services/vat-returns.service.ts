@@ -758,7 +758,8 @@ export class VatReturnsService {
    * ("... - VAT Payable" by invoices and credit notes, "... - VAT Receivable" by bills, and the
    * "Output VAT cleared"/"Input VAT cleared" lines of VAT return settlements). Any account that
    * ever carried such a line in this organization still counts as a VAT account. Current
-   * defaults always win when an account appears on both sides.
+   * defaults always win when an account appears on both sides. Source-less journals (legacy
+   * postings written before journals were source-linked) count only with their document shape.
    */
   private async historicalVatAccounts(
     db: Db,
@@ -772,26 +773,59 @@ export class VatReturnsService {
       JournalSourceType.VENDOR_CREDIT,
       JournalSourceType.VAT_RETURN,
     ];
-    const lines = (descriptions: string[]) =>
+    // A source-less journal is VAT evidence only with a legacy document's fixed reference and
+    // line shape (the same evidence LEGACY_INVOICE_SEND/LEGACY_BILL_APPROVAL require), so a manual
+    // journal whose line merely ends with "- VAT Payable" cannot make its account a VAT account.
+    const legacy = (
+      suffix: string,
+      journal: Prisma.JournalWhereInput,
+      linePrefix: string,
+    ): Prisma.JournalLineWhereInput => ({
+      description: { startsWith: linePrefix, endsWith: suffix },
+      journal: { ...journal, organizationId },
+    });
+    const legacyDoc = (reference: string): Prisma.JournalWhereInput => ({
+      sourceType: null,
+      reversalOfId: null,
+      isPosted: true,
+      deletedAt: null,
+      reference: { startsWith: reference },
+    });
+    const lines = (descriptions: string[], legacyShapes: Prisma.JournalLineWhereInput[]) =>
       db.journalLine.findMany({
         where: {
-          OR: descriptions.map((d) => ({ description: { endsWith: d } })),
-          // Source-less journals are legacy document postings (invoices, bills, credits and
-          // expenses written before journals were source-linked; the source-link migration
-          // backfilled nothing), identified by the same line markers.
-          journal: {
-            organizationId,
-            deletedAt: null,
-            isPosted: true,
-            OR: [{ sourceType: { in: sources } }, { sourceType: null }],
-          },
+          OR: [
+            ...descriptions.map((d) => ({
+              description: { endsWith: d },
+              journal: {
+                organizationId,
+                deletedAt: null,
+                isPosted: true,
+                sourceType: { in: sources },
+              },
+            })),
+            ...legacyShapes,
+          ],
         },
         select: { accountId: true },
         distinct: ['accountId'],
       });
     const [output, input] = await Promise.all([
-      lines(['- VAT Payable', '- Output VAT cleared']),
-      lines(['- VAT Receivable', '- Input VAT cleared']),
+      lines(
+        ['- VAT Payable', '- Output VAT cleared'],
+        [
+          legacy('- VAT Payable', LEGACY_INVOICE_SEND, 'Invoice '),
+          legacy('- VAT Payable', legacyDoc('Credit Note '), 'Credit Note '),
+        ],
+      ),
+      lines(
+        ['- VAT Receivable', '- Input VAT cleared'],
+        [
+          legacy('- VAT Receivable', LEGACY_BILL_APPROVAL, 'Bill '),
+          legacy('- VAT Receivable', legacyDoc('Expense '), 'Expense '),
+          legacy('- VAT Receivable', legacyDoc('Vendor Credit '), 'Vendor Credit '),
+        ],
+      ),
     ]);
     return {
       output: (output ?? []).map((l) => l.accountId),

@@ -309,12 +309,12 @@ describe('VatReturnsService', () => {
       const update = prisma.vATReturn.updateMany.mock.calls[0][0];
       expect((update.data.outputVAT as Decimal).toFixed(4)).toBe('125.5000');
       const marker = prisma.journalLine.findMany.mock.calls[0][0].where;
-      expect(marker.journal).toMatchObject({
+      expect(marker.OR[0].journal).toMatchObject({
         organizationId: ORG,
         isPosted: true,
         deletedAt: null,
       });
-      expect(marker.journal.OR[0].sourceType.in).toEqual(
+      expect(marker.OR[0].journal.sourceType.in).toEqual(
         expect.arrayContaining([
           'INVOICE_SEND',
           'BILL_APPROVAL',
@@ -324,7 +324,44 @@ describe('VatReturnsService', () => {
           'VAT_RETURN',
         ]),
       );
-      expect(marker.journal.OR).toContainEqual({ sourceType: null });
+    });
+
+    it('does not treat a manual look-alike "- VAT Payable" journal as VAT evidence', async () => {
+      prisma.vATReturn.findFirst.mockResolvedValue(vatReturn({ status: 'DRAFT' }));
+      prisma.vATReturn.updateMany.mockResolvedValue({ count: 1 });
+      prisma.vATReturn.findUniqueOrThrow.mockResolvedValue({ id: 'vr-1' });
+      givenLedger({ outputCredit: '0', inputDebit: '0' });
+
+      await service.calculate(ORG, 'vr-1');
+
+      const [outputQuery, inputQuery] = prisma.journalLine.findMany.mock.calls.map(
+        (c) => c[0].where.OR,
+      );
+      for (const branches of [outputQuery, inputQuery]) {
+        // No branch accepts a source-less journal on the line suffix alone.
+        const sourceless = branches.filter(
+          (b: { journal: { sourceType: unknown } }) => b.journal.sourceType === null,
+        );
+        expect(sourceless.length).toBeGreaterThan(0);
+        for (const b of sourceless) {
+          expect(b.journal.organizationId).toBe(ORG);
+          expect(b.journal.reference.startsWith).toMatch(/^[A-Z][A-Za-z ]+ $/);
+          expect(b.description.startsWith).toBe(b.journal.reference.startsWith);
+        }
+      }
+      expect(outputQuery).toContainEqual({
+        description: { startsWith: 'Invoice ', endsWith: '- VAT Payable' },
+        journal: { ...legacyInvoiceSend, organizationId: ORG },
+      });
+      expect(
+        inputQuery.map((b: { journal: { reference?: unknown } }) => b.journal.reference),
+      ).toEqual(
+        expect.arrayContaining([
+          { startsWith: 'Bill ' },
+          { startsWith: 'Expense ' },
+          { startsWith: 'Vendor Credit ' },
+        ]),
+      );
     });
 
     it('nets credit-note style debits against output VAT', async () => {
