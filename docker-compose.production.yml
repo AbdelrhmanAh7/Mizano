@@ -92,7 +92,6 @@ services:
       retries: 3
       start_period: 15s
 
-
   # ============================================
   # PostgreSQL Database
   # ============================================
@@ -138,7 +137,20 @@ services:
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}}
       - REDISCLI_AUTH=${REDIS_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}}
-    command: redis-server --requirepass ${REDIS_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}} --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    # Array form: the password stays one argv entry, never split by a shell
+    # (a single quote in it is the only character YAML cannot carry here).
+    command:
+      [
+        'redis-server',
+        '--requirepass',
+        '${REDIS_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}}',
+        '--appendonly',
+        'yes',
+        '--maxmemory',
+        '256mb',
+        '--maxmemory-policy',
+        'allkeys-lru',
+      ]
     deploy:
       resources:
         limits:

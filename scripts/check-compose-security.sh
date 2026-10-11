@@ -25,10 +25,15 @@ config() { docker compose --env-file /dev/null -f "$1" config --format json; }
 # check FILE PG_PASSWORD EXPECTED_REDIS_PASSWORD [REDIS_PASSWORD]
 check_render() {
   local f=$1 pg=$2 expected=$3 redis=${4:-} out
-  if ! out=$(POSTGRES_PASSWORD="$pg" REDIS_PASSWORD="$redis" config "$f" 2>&1); then
-    report "$f" "docker compose config failed: $out"
+  # stderr (e.g. the obsolete `version:` warning) must not end up in the JSON.
+  local err
+  err=$(mktemp)
+  if ! out=$(POSTGRES_PASSWORD="$pg" REDIS_PASSWORD="$redis" config "$f" 2>"$err"); then
+    report "$f" "docker compose config failed: $(cat "$err")"
+    rm -f "$err"
     return
   fi
+  rm -f "$err"
   # Any ports entry on postgres/redis counts, whatever the host port is.
   local published
   published=$(jq -r '[.services.postgres.ports, .services.redis.ports] | map(. // []) | add | length' <<<"$out")
