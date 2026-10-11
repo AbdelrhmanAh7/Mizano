@@ -2742,6 +2742,7 @@ model EmailLog {
 
   @@index([organizationId])
   @@index([organizationId, entityType, entityId])
+  @@index([organizationId, entityType, sentAt])
   @@map("email_logs")
 }
 

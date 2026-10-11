@@ -212,16 +212,20 @@ describe('EmailService.checkVolumeAnomaly', () => {
     prisma = { emailLog: { count: jest.fn(), findFirst: jest.fn().mockResolvedValue(null) } };
     cache = new Map();
     claims = new Set();
-    cacheSet = jest.fn((key: string, value: unknown) => {
-      cache.set(key, value);
+    cacheSet = jest.fn((key: string) => {
+      cache.set(key, true);
       return Promise.resolve();
     });
     service = new EmailService(
       prisma as unknown as PrismaService,
       {} as PdfService,
       {
-        get: jest.fn((key: string) => Promise.resolve(cache.get(key) ?? null)),
-        set: cacheSet,
+        hasFlag: jest.fn((key: string) => Promise.resolve(cache.get(key) === true)),
+        setFlag: cacheSet,
+        clearFlag: jest.fn((key: string) => {
+          cache.set(key, false);
+          return Promise.resolve();
+        }),
         claim: jest.fn((key: string) => {
           if (claims.has(key)) return Promise.resolve(false);
           claims.add(key);
@@ -363,13 +367,21 @@ describe('EmailService.checkVolumeAnomaly', () => {
 
     await service.checkVolumeAnomaly(orgId);
 
-    expect(cacheSet).toHaveBeenCalledWith(
-      stateKey,
-      true,
-      expect.objectContaining({ ttl: expect.any(Number) }),
-    );
-    const { ttl } = cacheSet.mock.calls[0][2] as { ttl: number };
+    expect(cacheSet).toHaveBeenCalledWith(stateKey, expect.any(Number));
+    const ttl = cacheSet.mock.calls[0][1] as number;
     expect(ttl).toBeGreaterThanOrEqual(24 * 60 * 60);
+  });
+
+  it('@issue-105 AC1: the daily check re-evaluates every organization that sent recently', async () => {
+    const groupBy = jest
+      .fn()
+      .mockResolvedValue([{ organizationId: 'org-a' }, { organizationId: 'org-b' }]);
+    (prisma.emailLog as unknown as { groupBy: jest.Mock }).groupBy = groupBy;
+    const spy = jest.spyOn(service, 'checkVolumeAnomaly').mockResolvedValue();
+
+    await service.checkRecentOrganizations();
+
+    expect(spy.mock.calls.map((c) => c[0])).toEqual(['org-a', 'org-b']);
   });
 
   it('@issue-105 AC1: bounds the Telegram call with a timeout signal', async () => {

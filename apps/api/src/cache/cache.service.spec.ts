@@ -85,3 +85,41 @@ describe('CacheService.claim (no Redis)', () => {
     now.mockRestore();
   });
 });
+
+describe('CacheService flags and Redis claim failures', () => {
+  function service(): CacheService {
+    return new CacheService(memoryCache(), { get: () => undefined } as unknown as ConfigService);
+  }
+
+  it('sets, reads and clears a durable flag', async () => {
+    const svc = service();
+    expect(await svc.hasFlag('f')).toBe(false);
+    await svc.setFlag('f', 60);
+    expect(await svc.hasFlag('f')).toBe(true);
+    await svc.clearFlag('f');
+    expect(await svc.hasFlag('f')).toBe(false);
+  });
+
+  it('keeps the flag in Redis, not cache-manager, when Redis is connected', async () => {
+    const svc = service();
+    const redis = {
+      status: 'ready',
+      set: jest.fn().mockResolvedValue('OK'),
+      exists: jest.fn().mockResolvedValue(1),
+    };
+    (svc as unknown as { redisClient: unknown }).redisClient = redis;
+
+    await svc.setFlag('f', 60);
+
+    expect(redis.set).toHaveBeenCalledWith('f', '1', 'EX', 60);
+    expect(await svc.hasFlag('f')).toBe(true);
+  });
+
+  it('fails the claim closed when Redis errors instead of using a local lock', async () => {
+    const svc = service();
+    const redis = { status: 'ready', set: jest.fn().mockRejectedValue(new Error('down')) };
+    (svc as unknown as { redisClient: unknown }).redisClient = redis;
+
+    expect(await svc.claim('k', 30)).toBe(false);
+  });
+});

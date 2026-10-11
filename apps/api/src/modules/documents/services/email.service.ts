@@ -8,6 +8,7 @@ import {
   PayslipEmailContext,
 } from '../dto/documents.dto';
 import { escapeHtml, formatCurrency, formatDate, safeColor } from '../templates/base.template';
+import { Cron } from '@nestjs/schedule';
 import nodemailer from 'nodemailer';
 import type { Attachment } from 'nodemailer/lib/mailer';
 
@@ -641,6 +642,19 @@ export class EmailService {
 
   // ============ Anomaly Alert ============
 
+  /** Day-boundary check so an incident recovers even when no invoice e-mail is sent today. */
+  @Cron('5 0 * * *', { timeZone: 'UTC' })
+  async checkRecentOrganizations(): Promise<void> {
+    const since = new Date();
+    since.setUTCHours(0, 0, 0, 0);
+    since.setTime(since.getTime() - MS_PER_DAY);
+    const rows = await this.prisma.emailLog.groupBy({
+      by: ['organizationId'],
+      where: { entityType: 'invoice', sentAt: { gte: since } },
+    });
+    for (const row of rows) await this.checkVolumeAnomalySafely(row.organizationId);
+  }
+
   /** Notify-only: a failing check must never change the outcome of the send itself. */
   private async checkVolumeAnomalySafely(organizationId: string): Promise<void> {
     try {
@@ -695,7 +709,7 @@ export class EmailService {
     }
 
     const stateKey = `notify-volume-${organizationId}`;
-    const alerting = (await this.cacheService.get<boolean>(stateKey)) === true;
+    const alerting = await this.cacheService.hasFlag(stateKey);
     const shouldAlert = todayCount > threshold && !alerting;
     const shouldRecover = todayCount <= threshold && alerting;
     if (!shouldAlert && !shouldRecover) return;
@@ -705,7 +719,7 @@ export class EmailService {
     if (!(await this.cacheService.claim(claimKey, ALERT_CLAIM_TTL_SECONDS))) return;
     try {
       // Another request may have finished the same transition between our read and our claim.
-      if (((await this.cacheService.get<boolean>(stateKey)) === true) !== alerting) return;
+      if ((await this.cacheService.hasFlag(stateKey)) !== alerting) return;
 
       // Dedupe state is recorded only after Telegram confirms delivery, so a failed call is retried.
       const delivered = await this.notifyTelegram(
@@ -714,7 +728,8 @@ export class EmailService {
           : `[Mizano] RECOVERED: Outbound invoice email volume back to normal. Count: ${todayCount}, Threshold: ${threshold}`,
       );
       if (delivered) {
-        await this.cacheService.set(stateKey, shouldAlert, { ttl: ALERT_STATE_TTL_SECONDS });
+        if (shouldAlert) await this.cacheService.setFlag(stateKey, ALERT_STATE_TTL_SECONDS);
+        else await this.cacheService.clearFlag(stateKey);
       }
     } finally {
       await this.cacheService.releaseClaim(claimKey);

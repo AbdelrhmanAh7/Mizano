@@ -112,7 +112,9 @@ export class CacheService implements OnModuleInit {
       try {
         return (await this.redisClient!.set(key, '1', 'EX', ttlSeconds, 'NX')) === 'OK';
       } catch {
-        this.logger.warn('Redis claim failed; falling back to an in-process claim');
+        // Redis is the coordination backend: never mix in an independent in-process lock domain.
+        this.logger.warn('Redis claim failed; treating the claim as not acquired');
+        return false;
       }
     }
     const now = Date.now();
@@ -120,6 +122,29 @@ export class CacheService implements OnModuleInit {
     if (expiresAt !== undefined && expiresAt > now) return false;
     this.localClaims.set(key, now + ttlSeconds * 1000);
     return true;
+  }
+
+  /**
+   * Durable boolean flag: stored directly in Redis (survives API restarts) when connected,
+   * otherwise in process memory. Unlike {@link set}, never routed through cache-manager.
+   */
+  async setFlag(key: string, ttlSeconds: number): Promise<void> {
+    if (this.isRedisAvailable) {
+      await this.redisClient!.set(key, '1', 'EX', ttlSeconds);
+      return;
+    }
+    this.localClaims.set(key, Date.now() + ttlSeconds * 1000);
+  }
+
+  async hasFlag(key: string): Promise<boolean> {
+    if (this.isRedisAvailable) return (await this.redisClient!.exists(key)) === 1;
+    const expiresAt = this.localClaims.get(key);
+    return expiresAt !== undefined && expiresAt > Date.now();
+  }
+
+  async clearFlag(key: string): Promise<void> {
+    this.localClaims.delete(key);
+    if (this.isRedisAvailable) await this.redisClient!.del(key);
   }
 
   /** Release a claim taken with {@link claim}. */
