@@ -390,22 +390,104 @@ Unset launcher heap_size_limit: 4395630592
 
 # Issue #130 — Payroll, depreciation and COGM post through JournalsService
 
-- **Tested code SHA**: `9bae74c92cfbce4ace45cf98952894f62664bfeb` (branch `ai/130`, based on master `615060e`). Later commits on the branch only touch `EVIDENCE.md` and `docs/agents/review-lessons.md`.
-- **Environment**: macOS, Node with offline pnpm install, private PostgreSQL 16 cluster on `127.0.0.1:55130` (fresh database, `prisma migrate deploy`), `REDIS_URL=` blank.
+- **Tested code SHA**: `2ae0cabc660aa4efb7cb272b8fb47169f4930662` (branch `ai/130`; master `fcaed26` merged in `fa7fa07`). The commit that adds this record only touches `EVIDENCE.md`.
+- **Environment**: macOS (UTC+3), Node 26, my own PostgreSQL 16 cluster on `127.0.0.1:55130` (fresh databases, `prisma migrate deploy`), `REDIS_URL=` blank.
+- **Round**: review round 2 (CTO "changes needed" and CodeRabbit review on PR #195, 2026-10-10/11). The round 1 record for `9bae74c` is kept below.
+
+## Review round 2: findings and fixes
+
+| Finding (source)                                                                                                         | Fix                                                                                                                                        | Verified by                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| PR conflicted with master (CTO 1)                                                                                        | merge `fa7fa07`; EVIDENCE.md keeps master's #95 and #127 records byte for byte                                                             | `prisma migrate deploy` on a fresh database applies `20261008000000_payslip_soft_delete` after master's latest `20261003000000_intake_jobs`     |
+| Fully depreciated assets could not be disposed (CodeRabbit, CTO 2)                                                       | `3ae774e`: ACTIVE and FULLY_DEPRECIATED in the pre-check and the guarded update                                                            | unit "disposes a fully depreciated asset" and "rejects an asset in a non-disposable status"; e2e AC-Dispose; e2e-army disposal flow             |
+| Gain/loss account chosen without the sign, 6100 Rent Expense possible (CodeRabbit, CTO 3)                                | `3ae774e`: gain to an active income account (7100 first, else the highest-coded INCOME/REVENUE), loss to the highest-coded active EXPENSE  | unit gain to 7100, gain fallback, loss never 6100, each balanced; e2e AC-GainLoss and the loss account type; e2e-army disposal flow             |
+| Depreciation posted or reversed out of order, register drifted from the ledger (CodeRabbit, CTO 4)                       | `f465a47`: order guards under the ledger lock, latest-only reversal, register = sum of posted periods, monthly run catches up oldest first | unit "period order" (the three rejection tests fail with the guards removed); e2e AC-Order, AC-Register, AC-CatchUp; e2e-army depreciation flow |
+| Depreciation spec did not assert the asset update (CodeRabbit, CTO 5)                                                    | `f465a47`: one mock resolver per lookup                                                                                                    | register payload asserted after a posting, at salvage, after a reversal and with nothing posted                                                 |
+| bulk-complete skipped the COGM command (CodeRabbit outside-diff, CTO 6)                                                  | `e2f0dbe`: `runBulk` over `completeWorkOrder`, `@InvalidatesLedger` on the route                                                           | unit bulk tests (one journal per order, completed meanwhile, locked period); e2e bulk AC1; e2e-army COGM flow                                   |
+| A deleted processed run blocked its period (CodeRabbit)                                                                  | `2a9a0a8`: guarded restore as a fresh draft                                                                                                | unit lifecycle tests; e2e AC-SoftDelete recreate; e2e-army payroll flow                                                                         |
+| `softDeleteRuns` checked before it wrote (CodeRabbit)                                                                    | `2a9a0a8`: claim first, payslips of the runs with this exact `deletedAt`                                                                   | unit "soft-deletes the payslips of exactly the runs it claimed"                                                                                 |
+| `markAsPaid` read accounts before the ledger lock (CodeRabbit)                                                           | `f72b450` (round 1 progress commit)                                                                                                        | unit "takes the ledger lock before reading the posting accounts"                                                                                |
+| e2e-army: fixed-seed organization breaks a re-run, lock date without `finally`, account 1100 missing (CodeRabbit, CTO 7) | `5f057fe`, `ae54861`                                                                                                                       | e2e-army 4/4 on a fresh database and 4/4 again on the same stack                                                                                |
+| E-mail/PDF/employee changes widen the scope (CTO 8)                                                                      | kept and explained in `f995f7f`                                                                                                            | see Scope below; e-mail spec fixed (14/14 with the PDF spec)                                                                                    |
+| Found by the e2e-army run: no ledger cache was cleared after these postings                                              | `2a57e99`: `CacheInvalidationInterceptor` on the assets, payroll and work-order controllers                                                | wiring spec (fails with the interceptor removed); e2e-army reads its journals through the API                                                   |
+| Found by hub test mz-payroll.2: UTC month bounds dropped the 1st of the month                                            | `2ae0cab`: local-time month bounds, as attendance is stored                                                                                | unit bounds test (fails with UTC bounds on this UTC+3 machine); e2e records attendance through the API on the 1st; mz-payroll.2 passes          |
 
 ## Acceptance criteria
 
-| REQ                                                                                                     | Verified by                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| AC1 a double run of each posting yields one journal                                                     | `test/system-postings.e2e-spec.ts`: concurrent `POST /payroll/runs/:id/paid` x2, manual `POST /assets/:id/depreciate` + `POST /assets/depreciation/run`, concurrent `POST /assets/:id/dispose` x2, concurrent `POST /manufacturing/work-orders/:id/complete` x2 each leave exactly one journal for `PAYROLL`, `DEPRECIATION`, `ASSET_DISPOSAL`, `COGM` + source id |
-| AC2 reversing depreciation keeps the original `isPosted=true` and creates a linked reversal             | e2e `AC2: reversing depreciation…` (original still posted, `reversedBy` set, reversal posted and balanced, period re-runnable); unit `depreciation.service.spec.ts` (no `journal.update`, `reversalOfId` set)                                                                                                                                                      |
-| AC3 unit tests assert debits = credits and that a lock date rejects the post                            | `payroll.service.spec.ts`, `depreciation.service.spec.ts`, `assets.service.spec.ts` (disposal), `work-orders.service.spec.ts` (COGM) run the real `JournalsService` over the mocked client; e2e `AC3` tests for payroll, depreciation and COGM                                                                                                                     |
-| Decimal: gross = net + deductions; schedule sums to the depreciable amount; COGM quantities not rounded | e2e `AC-Decimal` tests and the COGM AC1 test (`0.3333` consumed, not `0`); unit tests for payslip and schedule rounding                                                                                                                                                                                                                                            |
-| Payslips soft-deleted, draft runs reused instead of hard-deleted                                        | e2e `AC-SoftDelete` tests; migration `20261008000000_payslip_soft_delete`                                                                                                                                                                                                                                                                                          |
+| REQ                                                                                         | Verified by                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 a double run of each posting yields one journal                                         | e2e: concurrent pay x2, manual + monthly depreciation, concurrent dispose x2, concurrent complete x2 and bulk complete (twice) each leave one journal per `PAYROLL`, `DEPRECIATION`, `ASSET_DISPOSAL`, `COGM` source id; e2e-army: the same through the HTTP API |
+| AC2 reversing depreciation keeps the original `isPosted=true` and creates a linked reversal | e2e AC2 and e2e-army (original still posted, `reversedBy` set, reversal posted and balanced); unit (no `journal.update`, `reversalOfId` set, latest period only)                                                                                                 |
+| AC3 unit tests assert debits = credits and that a lock date rejects the post                | payroll, depreciation, disposal and COGM specs run the real `JournalsService` over the mocked client (balance and lock date); e2e and e2e-army lock-date tests                                                                                                   |
+| Decimal amounts, per-line rounding, remainder absorption                                    | e2e AC-Decimal (payslip, schedule) and COGM `0.3333` / `1.11`; unit payslip and schedule rounding                                                                                                                                                                |
+| Payslips soft-deleted                                                                       | e2e AC-SoftDelete; migration `20261008000000_payslip_soft_delete`                                                                                                                                                                                                |
+
+## Commands and results (round 2, `2ae0cab`)
+
+```bash
+cd apps/api && npx jest src/modules/hr/services/payroll.service.spec.ts src/modules/assets/services \
+  src/modules/manufacturing/services/work-orders.service.spec.ts src/modules/manufacturing/controllers/work-orders.controller.spec.ts \
+  src/modules/documents/services/email.service.spec.ts src/modules/documents/services/pdf.service.spec.ts \
+  src/modules/accounting/services/journals.service.spec.ts src/common/interceptors/cache-invalidation.interceptor.spec.ts
+```
+
+```text
+Test Suites: 9 passed, 9 total
+Tests:       132 passed, 132 total
+```
+
+```bash
+cd apps/api && DATABASE_URL=<fresh database> REDIS_URL= npx jest --config ./test/jest-e2e.json --runInBand test/system-postings.e2e-spec.ts
+pnpm --filter api type-check   # tsc --noEmit && tsc --noEmit -p test/tsconfig.e2e.json
+pnpm --filter api lint         # eslint "{src,apps,libs,test}/**/*.ts"
+```
+
+```text
+Tests:       19 passed, 19 total
+type-check: exit 0
+lint: exit 0, no problems
+```
+
+e2e-army (`e2e-army/130-postings.e2e.ts`, e2e v0.18.0 with the hub's `e2e.config.ts`) against this branch's API: `nest build`, then `node dist/main.js` with the verify stack's environment from `ops/verify/Mizano.sh` (production mode, random JWT secrets, no Redis/SMTP/AI services, relaxed rate limits) on a fresh migrated and seeded database:
+
+```text
+fresh run:  Tests  4 passed (4)   Duration  1.74s
+re-run:     Tests  4 passed (4)   Duration  61.39s   (includes one 60 s wait for the auth rate limit)
+```
+
+Hub feature API tests for the touched features (`tests-dev/Mizano/banking.e2e.ts` and `people.e2e.ts`, `--grep` on the five ids), each run on a fresh database:
+
+| Test                    | master `fcaed26`                                        | `ai/130` `2ae0cab`     |
+| ----------------------- | ------------------------------------------------------- | ---------------------- |
+| mz-asset-depreciation.1 | failed (an unscheduled period answers 500)              | passed                 |
+| mz-payroll.2            | passed                                                  | passed                 |
+| mz-fixed-assets.2       | failed (an asset accepts another tenant's account: 201) | failed, same assertion |
+| mz-bom.2                | failed (a second active BOM for the item: 201)          | failed, same assertion |
+| mz-work-orders.2        | failed (component level 10, expected 4)                 | failed, same assertion |
+
+The three failures are identical on master and come from code this PR does not change (asset creation, BOM creation, inventory levels).
+
+Not run locally, per the owner's directive (2026-10-08: the full suites and the build run on CI after the push): the full API unit suite, the web unit suite, the full API e2e suite and the builds. The UI e2e-army smoke (`tests/Mizano.e2e.ts`) needs the web build and a model; the verify job runs it.
+
+## Scope
+
+- Kept: the payslip read filters in `email.service.ts`, `pdf.service.ts` and `employees.service.ts` (from `f72b450`). The soft delete leaves rows that used to be hard-deleted, so every reader must skip `deletedAt` rows (review lessons: soft-deleted parents return 404). Without the filters a deleted payslip could still be e-mailed, rendered as a PDF or listed on the employee.
+- Depreciation order: the first posting of an asset may start at any period, so a backdated asset starts depreciating in the month it is first run (the hub test mz-asset-depreciation.1 expects exactly that). From then on periods post and reverse strictly in order, and the asset register is the sum of the posted periods, so it equals the ledger whatever the order.
+- Size: this round changes about 1,150 lines, most of them tests (unit, e2e, e2e-army). That is above the ~300-line guideline; the reviewers asked for all of these fixes in this PR.
+
+## Remaining limitations
+
+- Backdated assets: the periods before an asset's first posting stay open and are not posted (there is no opening accumulated depreciation input), so its book value stays above salvage; the register still equals the ledger.
+- `GET /employees?limit=...` answers "Database validation error", and `PATCH /organization/lock-date` hands a date-only string straight to Prisma (400). Both are pre-existing and outside #130; the e2e-army test avoids them.
+- `checkMaterialAvailability` and the asset summary still use float arithmetic for display figures (not postings).
+- The CodeRabbit threads are answered by the commits above. Replying on GitHub is left to the harness (this session does not push).
+- Reviewer: none yet. This record is the author's own run.
+
+## Round 1 (`9bae74c`, before the review)
 
 The acceptance tests were committed failing first (`5bb0a38`): 12 of 12 failed on master behaviour (float totals `569.6891`, no source-linked journal, lock date ignored, two concurrent disposals/completions both returning 2xx). `4bb3a60` changed the expected rounding scale from 4 dp to the codebase's `CURRENCY_SCALE` (2 dp); the assertions stay exact.
 
-## Commands and results
+### Commands and results (round 1)
 
 ```bash
 cd apps/api && npx jest --config ./test/jest-e2e.json --runInBand   # fresh DB
@@ -439,10 +521,3 @@ Tests:       458 passed, 458 total
 tsc: exit 0 (both projects)
 eslint: exit 0, no warnings
 ```
-
-## Remaining limitations
-
-- Account selection for payroll, disposal and COGM still uses the existing name/code lookups (now ordered by code and rejecting a missing account). The disposal gain/loss lookup still accepts code `6100`, which is "Rent Expense" in the default chart; choosing dedicated configured accounts is left for a follow-up.
-- `POST /manufacturing/work-orders/bulk-complete` still marks work orders completed with an `updateMany` and posts no COGM journal. It should reuse `completeWorkOrder` through `runBulk`; left out to keep this PR's scope.
-- `checkMaterialAvailability` and the asset summary still use float arithmetic for display figures (not postings).
-- Reviewer: none yet. This record is the author's own run.
