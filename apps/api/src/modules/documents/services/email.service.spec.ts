@@ -9,11 +9,19 @@ const XSS = '<script>alert(1)</script>';
 
 interface WhereClause {
   id?: string;
-  payrollRun?: { organizationId?: string };
+  deletedAt?: null;
+  payrollRun?: { organizationId?: string; deletedAt?: null };
+}
+
+interface FakeOptions {
+  /** Simulates a soft-deleted payslip row: only unfiltered queries still see it. */
+  payslipDeleted?: boolean;
+  /** Simulates a soft-deleted payroll run: only unfiltered queries still see it. */
+  runDeleted?: boolean;
 }
 
 /** Tenant-aware fake: payslip-1 belongs to ORG_A; lookups must be scoped to find it. */
-function buildPrisma(): Record<string, Record<string, jest.Mock>> {
+function buildPrisma(options: FakeOptions = {}): Record<string, Record<string, jest.Mock>> {
   const payslipRow = {
     id: 'payslip-1',
     netPay: { toString: () => '1000' },
@@ -21,11 +29,20 @@ function buildPrisma(): Record<string, Record<string, jest.Mock>> {
     employee: { name: 'Sara', email: 'sara@org-a.example' },
     payrollRun: { month: 9, year: 2026, periodStart: null, periodEnd: null, payDate: null },
   };
+  // A soft-deleted row is returned only to a query that does not filter
+  // `deletedAt` out, exactly like the database behaves.
+  const payslipVisible = (where: WhereClause) =>
+    !options.payslipDeleted ||
+    (where.deletedAt === undefined && where.payrollRun?.deletedAt === undefined);
+  const runVisible = (where: { deletedAt?: null }) =>
+    !options.runDeleted || where.deletedAt === undefined;
   return {
     payslip: {
       findFirst: jest.fn(({ where }: { where: WhereClause }) =>
         Promise.resolve(
-          where.id === 'payslip-1' && where.payrollRun?.organizationId === ORG_A
+          where.id === 'payslip-1' &&
+            where.payrollRun?.organizationId === ORG_A &&
+            payslipVisible(where)
             ? payslipRow
             : null,
         ),
@@ -36,9 +53,15 @@ function buildPrisma(): Record<string, Record<string, jest.Mock>> {
     },
     emailLog: { create: jest.fn().mockResolvedValue({ id: 'log-1' }) },
     payrollRun: {
-      findFirst: jest.fn().mockResolvedValue({
-        payslips: [{ id: 'payslip-1', employeeId: 'emp-1', employee: {} }],
-      }),
+      findFirst: jest.fn(({ where }: { where: { id?: string; deletedAt?: null } }) =>
+        Promise.resolve(
+          where.id === 'run-1' && runVisible(where)
+            ? {
+                payslips: [{ id: 'payslip-1', employeeId: 'emp-1', employee: {} }],
+              }
+            : null,
+        ),
+      ),
     },
     invoice: { findFirst: jest.fn() },
   };
@@ -74,11 +97,41 @@ describe('EmailService.sendPayslip tenant scoping', () => {
     expect(result.success).toBe(true);
     expect(prisma.payslip.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'payslip-1', payrollRun: { organizationId: ORG_A } },
+        where: {
+          id: 'payslip-1',
+          deletedAt: null,
+          payrollRun: { organizationId: ORG_A, deletedAt: null },
+        },
       }),
     );
     expect(pdf.generatePayslipPdf).toHaveBeenCalledWith(ORG_A, 'payslip-1');
     expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('never sends a soft-deleted payslip, even when its run is live', async () => {
+    const deleted = buildPrisma({ payslipDeleted: true });
+    const deletedService = new EmailService(
+      deleted as unknown as PrismaService,
+      pdf as unknown as PdfService,
+    );
+
+    const result = await deletedService.sendPayslip(ORG_A, 'payslip-1');
+
+    expect(result).toEqual({ success: false, error: 'Payslip not found' });
+    expect(pdf.generatePayslipPdf).not.toHaveBeenCalled();
+  });
+
+  it('cannot send a payslip of a soft-deleted payroll run', async () => {
+    const deleted = buildPrisma({ runDeleted: true });
+    const deletedService = new EmailService(
+      deleted as unknown as PrismaService,
+      pdf as unknown as PdfService,
+    );
+
+    const result = await deletedService.sendPayslip(ORG_A, 'payslip-1');
+
+    expect(result).toEqual({ success: false, error: 'Payslip not found' });
+    expect(pdf.generatePayslipPdf).not.toHaveBeenCalled();
   });
 
   it("cannot send, or even see, another organization's payslip", async () => {
@@ -94,7 +147,10 @@ describe('EmailService.sendPayslip tenant scoping', () => {
 
     // every payslip lookup (main + failure path) carried the caller's organization
     for (const [arg] of prisma.payslip.findFirst.mock.calls as Array<[{ where: WhereClause }]>) {
-      expect(arg.where.payrollRun).toEqual({ organizationId: ORG_B });
+      expect(arg.where.payrollRun).toEqual({
+        organizationId: ORG_B,
+        deletedAt: null,
+      });
     }
     const log = (prisma.emailLog.create.mock.calls[0][0] as { data: Record<string, unknown> }).data;
     expect(log).toMatchObject({
@@ -112,10 +168,24 @@ describe('EmailService.sendPayslip tenant scoping', () => {
     const result = await service.sendAllPayslips(ORG_A, 'run-1');
 
     expect(prisma.payrollRun.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'run-1', organizationId: ORG_A } }),
+      expect.objectContaining({
+        where: { id: 'run-1', organizationId: ORG_A, deletedAt: null },
+      }),
     );
     expect(spy).toHaveBeenCalledWith(ORG_A, 'payslip-1', expect.any(Object));
     expect(result).toMatchObject({ total: 1, sent: 1, failed: 0 });
+  });
+
+  it('sendAllPayslips cannot read a soft-deleted payroll run', async () => {
+    const deleted = buildPrisma({ runDeleted: true });
+    const deletedService = new EmailService(
+      deleted as unknown as PrismaService,
+      pdf as unknown as PdfService,
+    );
+
+    await expect(deletedService.sendAllPayslips(ORG_A, 'run-1')).rejects.toThrow(
+      'Payroll run not found',
+    );
   });
 });
 

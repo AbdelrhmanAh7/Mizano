@@ -187,9 +187,8 @@ export class PdfService {
     const payslip = await this.prisma.payslip.findFirst({
       where: {
         id: payslipId,
-        payrollRun: {
-          organizationId,
-        },
+        deletedAt: null,
+        payrollRun: { organizationId, deletedAt: null },
       },
       include: {
         employee: true,

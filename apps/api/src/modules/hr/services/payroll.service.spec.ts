@@ -262,4 +262,160 @@ describe('PayrollService postings (#130)', () => {
     );
     expect(result.totalGross).toBe('1015.1500');
   });
+
+  it('never marks a zero-gross run paid without a journal', async () => {
+    prisma.payrollRun.findFirst.mockResolvedValue({
+      ...run,
+      totalGross: dec('0'),
+      totalNet: dec('0'),
+      totalDeductions: dec('0'),
+    } as never);
+
+    await expect(serviceWithLock().markAsPaid(ORG, run.id)).rejects.toThrow(BadRequestException);
+    expect(prisma.payrollRun.updateMany).not.toHaveBeenCalled();
+    expect(prisma.journal.create).not.toHaveBeenCalled();
+  });
+
+  it('never marks a run with negative net pay paid', async () => {
+    prisma.payrollRun.findFirst.mockResolvedValue({
+      ...run,
+      totalNet: dec('-10.00'),
+    } as never);
+
+    await expect(serviceWithLock().markAsPaid(ORG, run.id)).rejects.toThrow(BadRequestException);
+    expect(prisma.payrollRun.updateMany).not.toHaveBeenCalled();
+    expect(prisma.journal.create).not.toHaveBeenCalled();
+  });
+
+  it('resolves dedicated salary, cash and payable accounts before generic prefixes', async () => {
+    prisma.account.findFirst.mockImplementation(((args: { where: Record<string, unknown> }) =>
+      // Queries with a `code` filter are the generic-prefix fallbacks.
+      Promise.resolve({ id: 'code' in args.where ? 'acc-prefix' : 'acc-dedicated' })) as never);
+
+    await serviceWithLock().markAsPaid(ORG, run.id);
+
+    const accountIds = writtenJournals(prisma)[0].lines.map((l) => l.accountId);
+    expect(accountIds).toContain('acc-dedicated');
+    expect(accountIds).not.toContain('acc-prefix');
+  });
+
+  it('falls back to generic prefix accounts only when no dedicated account exists', async () => {
+    prisma.account.findFirst.mockImplementation(((args: { where: Record<string, unknown> }) =>
+      Promise.resolve('code' in args.where ? { id: 'acc-prefix' } : null)) as never);
+
+    await serviceWithLock().markAsPaid(ORG, run.id);
+
+    const accountIds = writtenJournals(prisma)[0].lines.map((l) => l.accountId);
+    expect(accountIds.every((id) => id === 'acc-prefix')).toBe(true);
+  });
+
+  it('takes the ledger lock before reading the posting accounts', async () => {
+    const order: string[] = [];
+    prisma.$executeRaw.mockImplementation(((sql: unknown) => {
+      order.push(`lock:${String(sql)}`);
+      return Promise.resolve(0);
+    }) as never);
+    prisma.account.findFirst.mockImplementation(((args: { where: Record<string, unknown> }) => {
+      order.push('account');
+      return Promise.resolve({ id: 'acc-1' });
+    }) as never);
+
+    await serviceWithLock().markAsPaid(ORG, run.id);
+
+    expect(order[0]).toMatch(/^lock:/);
+    expect(order.slice(1).every((step) => step === 'account')).toBe(true);
+  });
+});
+
+describe('PayrollService run lifecycle (#130)', () => {
+  const ORG = 'org-1';
+  const run = {
+    id: 'run-1',
+    month: 8,
+    year: 2026,
+    status: PayrollStatus.PROCESSED,
+    totalGross: dec('787.88'),
+    totalNet: dec('569.45'),
+    totalDeductions: dec('218.43'),
+    organizationId: ORG,
+  };
+  let prisma: MockPrismaClient;
+
+  function service(): PayrollService {
+    return new PayrollService(prisma as unknown as PrismaService, {} as never);
+  }
+
+  beforeEach(() => {
+    prisma = createMockPrisma();
+    prisma.payrollRun.update.mockResolvedValue(run as never);
+  });
+
+  it('blocks a live processed run for the same period', async () => {
+    prisma.payrollRun.findFirst.mockResolvedValue({ ...run, deletedAt: null } as never);
+
+    await expect(service().createPayrollRun(ORG, { month: 8, year: 2026 })).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(prisma.payrollRun.update).not.toHaveBeenCalled();
+  });
+
+  it('restores a soft-deleted processed run as a fresh draft', async () => {
+    prisma.payrollRun.findFirst.mockResolvedValue({
+      ...run,
+      deletedAt: new Date(),
+      processedAt: new Date(),
+    } as never);
+
+    await service().createPayrollRun(ORG, { month: 8, year: 2026 });
+
+    // Its ledger-less payslips are removed so the unique keys free up...
+    expect(prisma.payslip.deleteMany).toHaveBeenCalledWith({
+      where: { payrollRunId: run.id },
+    });
+    // ...and the run is reset to a draft instead of blocking the period.
+    expect(prisma.payrollRun.update).toHaveBeenCalledWith({
+      where: { id: run.id },
+      data: expect.objectContaining({
+        deletedAt: null,
+        status: PayrollStatus.DRAFT,
+        processedAt: null,
+        paidAt: null,
+        journalId: null,
+      }),
+    });
+  });
+
+  it('reuses a live draft run without touching its payslips', async () => {
+    prisma.payrollRun.findFirst.mockResolvedValue({
+      ...run,
+      status: PayrollStatus.DRAFT,
+      deletedAt: null,
+    } as never);
+
+    await service().createPayrollRun(ORG, { month: 8, year: 2026 });
+
+    expect(prisma.payslip.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.payrollRun.update).toHaveBeenCalledWith({
+      where: { id: run.id },
+      data: expect.objectContaining({ deletedAt: null }),
+    });
+  });
+
+  it('soft-deletes the payslips of the runs it claimed, never of paid runs', async () => {
+    prisma.payrollRun.updateMany.mockResolvedValue({ count: 2 });
+
+    const deleted = await service().bulkDelete(ORG, ['run-1', 'run-2']);
+
+    expect(deleted).toBe(2);
+    // The guarded claim happens before the payslip write that depends on it.
+    const [claim, payslipWrite] = [
+      prisma.payrollRun.updateMany.mock.calls[0][0],
+      prisma.payslip.updateMany.mock.calls[0][0],
+    ];
+    expect(claim.data).toEqual({ deletedAt: expect.any(Date) });
+    expect(payslipWrite.where.payrollRun).toEqual({
+      organizationId: ORG,
+      status: { not: PayrollStatus.PAID },
+    });
+  });
 });

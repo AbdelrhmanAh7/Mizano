@@ -102,7 +102,11 @@ export class EmployeesService {
       where: { id, organizationId, deletedAt: null },
       include: {
         attendances: { take: 10, orderBy: { date: 'desc' } },
-        payslips: { take: 10, orderBy: { payrollRunId: 'desc' } },
+        payslips: {
+          where: { deletedAt: null },
+          take: 10,
+          orderBy: { payrollRunId: 'desc' },
+        },
       },
     });
     if (!employee) throw new NotFoundException('Employee not found');

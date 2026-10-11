@@ -7,6 +7,7 @@ import {
 import { Prisma, PayrollStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { round } from '../../../common/utils/document-totals';
+import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
 
@@ -31,17 +32,33 @@ export class PayrollService {
   ) {}
 
   async createPayrollRun(organizationId: string, dto: { month: number; year: number }) {
+    // Soft-deleted runs are included: they still occupy the (month, year)
+    // unique key, so the period can only be recovered by restoring them.
     const existing = await this.prisma.payrollRun.findFirst({
       where: { organizationId, month: dto.month, year: dto.year },
     });
-    if (existing && existing.status !== PayrollStatus.DRAFT) {
+    if (existing && existing.deletedAt === null && existing.status !== PayrollStatus.DRAFT) {
       throw new BadRequestException('Payroll run already exists for this period');
     }
-    // A draft has no payslips or journal: reuse (and restore) it instead of deleting it.
     if (existing) {
-      return this.prisma.payrollRun.update({
-        where: { id: existing.id },
-        data: { deletedAt: null },
+      return this.prisma.$transaction(async (tx) => {
+        // A deleted unpaid run is restored as a fresh draft. Its soft-deleted
+        // payslips hold the (payrollRunId, employeeId) unique keys and have no
+        // ledger effect, so they are removed to let a recalculation recreate them.
+        await tx.payslip.deleteMany({ where: { payrollRunId: existing.id } });
+        return tx.payrollRun.update({
+          where: { id: existing.id },
+          data: {
+            deletedAt: null,
+            status: PayrollStatus.DRAFT,
+            processedAt: null,
+            paidAt: null,
+            journalId: null,
+            totalGross: new Decimal(0),
+            totalDeductions: new Decimal(0),
+            totalNet: new Decimal(0),
+          },
+        });
       });
     }
 
@@ -163,6 +180,13 @@ export class PayrollService {
     const period = `${payrollRun.month}/${payrollRun.year}`;
     const periodEnd = new Date(Date.UTC(payrollRun.year, payrollRun.month, 0));
 
+    // A run with nothing to pay must never be marked PAID: there is no
+    // balanced journal to post for it, so the transition is rejected up front.
+    const { totalGross, totalNet, totalDeductions } = payrollRun;
+    if (totalGross.isZero() || !totalNet.greaterThan(0)) {
+      throw new BadRequestException('Payroll has no positive net pay to mark as paid');
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const { count } = await tx.payrollRun.updateMany({
         where: {
@@ -175,59 +199,90 @@ export class PayrollService {
       });
       if (count === 0) throw new ConflictException('Payroll run has already been paid');
 
-      const { totalGross, totalNet, totalDeductions } = payrollRun;
-      if (totalGross.isZero()) {
-        return tx.payrollRun.findUniqueOrThrow({ where: { id: payrollRunId } });
-      }
+      // Lock order matches the other automated posting paths: the ledger lock is
+      // taken before any account used by the journal is read.
+      await lockOrganizationLedger(tx, organizationId);
 
-      // Find salary expense account (EXPENSE type, name containing "Salary" or "Wages")
-      const salaryAccount = await tx.account.findFirst({
-        where: {
-          organizationId,
-          type: 'EXPENSE',
-          isActive: true,
-          deletedAt: null,
-          OR: [
-            { name: { contains: 'Salary', mode: 'insensitive' } },
-            { name: { contains: 'Wages', mode: 'insensitive' } },
-            { code: { startsWith: '5' } },
-          ],
-        },
-        orderBy: { code: 'asc' },
-      });
+      // Dedicated accounts (by name) win over generic code prefixes, so payroll
+      // never lands on COGS or a generic payable when the chart has the real one.
+      const salaryAccount =
+        (await tx.account.findFirst({
+          where: {
+            organizationId,
+            type: 'EXPENSE',
+            isActive: true,
+            deletedAt: null,
+            OR: [
+              { name: { contains: 'Salary', mode: 'insensitive' } },
+              { name: { contains: 'Wages', mode: 'insensitive' } },
+            ],
+          },
+          orderBy: { code: 'asc' },
+        })) ??
+        (await tx.account.findFirst({
+          where: {
+            organizationId,
+            type: 'EXPENSE',
+            isActive: true,
+            deletedAt: null,
+            code: { startsWith: '5' },
+          },
+          orderBy: { code: 'asc' },
+        }));
 
-      // Find cash/bank account (ASSET type)
-      const cashAccount = await tx.account.findFirst({
-        where: {
-          organizationId,
-          type: 'ASSET',
-          isActive: true,
-          deletedAt: null,
-          OR: [
-            { name: { contains: 'Cash', mode: 'insensitive' } },
-            { name: { contains: 'Bank', mode: 'insensitive' } },
-            { code: { startsWith: '1' } },
-          ],
-        },
-        orderBy: { code: 'asc' },
-      });
+      const cashAccount =
+        (await tx.account.findFirst({
+          where: {
+            organizationId,
+            type: 'ASSET',
+            isActive: true,
+            deletedAt: null,
+            OR: [
+              { name: { contains: 'Cash', mode: 'insensitive' } },
+              { name: { contains: 'Bank', mode: 'insensitive' } },
+            ],
+          },
+          orderBy: { code: 'asc' },
+        })) ??
+        (await tx.account.findFirst({
+          where: {
+            organizationId,
+            type: 'ASSET',
+            isActive: true,
+            deletedAt: null,
+            code: { startsWith: '1' },
+          },
+          orderBy: { code: 'asc' },
+        }));
 
       // Deductions and taxes are owed to third parties until remitted.
       const liabilityAccount = totalDeductions.greaterThan(0)
-        ? await tx.account.findFirst({
+        ? ((await tx.account.findFirst({
             where: {
               organizationId,
               type: 'LIABILITY',
               isActive: true,
               deletedAt: null,
               OR: [
+                { name: { contains: 'Salary', mode: 'insensitive' } },
                 { name: { contains: 'Payroll', mode: 'insensitive' } },
+              ],
+            },
+            orderBy: { code: 'asc' },
+          })) ??
+          (await tx.account.findFirst({
+            where: {
+              organizationId,
+              type: 'LIABILITY',
+              isActive: true,
+              deletedAt: null,
+              OR: [
                 { name: { contains: 'Tax', mode: 'insensitive' } },
                 { name: { contains: 'Payable', mode: 'insensitive' } },
               ],
             },
             orderBy: { code: 'asc' },
-          })
+          })))
         : null;
 
       if (!salaryAccount || !cashAccount || (totalDeductions.greaterThan(0) && !liabilityAccount)) {
@@ -407,22 +462,26 @@ export class PayrollService {
   private async softDeleteRuns(organizationId: string, ids: string[]): Promise<number> {
     const deletedAt = new Date();
     return this.prisma.$transaction(async (tx) => {
-      const runs = await tx.payrollRun.findMany({
+      // Claim first with the guarded write: it decides which runs this
+      // transaction deletes, so a concurrent calculate/pay cannot commit in
+      // between and leave payslips behind in the wrong state.
+      const result = await tx.payrollRun.updateMany({
         where: {
           id: { in: ids },
           organizationId,
           status: { not: PayrollStatus.PAID },
           deletedAt: null,
         },
-        select: { id: true },
-      });
-      const runIds = runs.map((r) => r.id);
-      await tx.payslip.updateMany({
-        where: { payrollRunId: { in: runIds }, deletedAt: null },
         data: { deletedAt },
       });
-      const result = await tx.payrollRun.updateMany({
-        where: { id: { in: runIds }, status: { not: PayrollStatus.PAID }, deletedAt: null },
+      // Only payslips of the claimed, still unpaid runs are soft-deleted
+      // with them; a PAID run's payslips stay live.
+      await tx.payslip.updateMany({
+        where: {
+          payrollRunId: { in: ids },
+          deletedAt: null,
+          payrollRun: { organizationId, status: { not: PayrollStatus.PAID } },
+        },
         data: { deletedAt },
       });
       return result.count;

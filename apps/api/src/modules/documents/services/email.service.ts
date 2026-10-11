@@ -225,7 +225,8 @@ export class EmailService {
       const payslip = await this.prisma.payslip.findFirst({
         where: {
           id: payslipId,
-          payrollRun: { organizationId },
+          deletedAt: null,
+          payrollRun: { organizationId, deletedAt: null },
         },
         include: {
           employee: true,
@@ -305,7 +306,11 @@ export class EmailService {
       const errorMessage = error instanceof Error ? error.message : String(error);
       // Same tenant scoping as the happy path: never read another organization's employee e-mail.
       const payslip = await this.prisma.payslip.findFirst({
-        where: { id: payslipId, payrollRun: { organizationId } },
+        where: {
+          id: payslipId,
+          deletedAt: null,
+          payrollRun: { organizationId, deletedAt: null },
+        },
         select: { employee: { select: { email: true } } },
       });
 
@@ -336,9 +341,10 @@ export class EmailService {
     errors: Array<{ employeeId: string; error: string }>;
   }> {
     const payrollRun = await this.prisma.payrollRun.findFirst({
-      where: { id: payrollRunId, organizationId },
+      where: { id: payrollRunId, organizationId, deletedAt: null },
       include: {
         payslips: {
+          where: { deletedAt: null },
           include: { employee: true },
         },
       },
