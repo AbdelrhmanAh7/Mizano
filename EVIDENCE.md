@@ -391,20 +391,20 @@ Unset launcher heap_size_limit: 4395630592
 # EVIDENCE.md — Run the e2e suites in a CI gate and unify the API jest configs (#134)
 
 - **Issue**: #134 (`[audit] Run the 11 e2e suites in a gate and unify the two API jest configs`)
-- **Base (`master`)**: `615060ed6294e16375a1f1ea9385cb7e812cd24f`
-- **Tested head**: `f1953d1fd4b14ecbcd879a78dcb2e17db193dd14` (everything below ran on it unless noted; this file is the only later change)
-- **Environment**: macOS (Darwin 27), Node v26.10.0, pnpm 8.14.0, PostgreSQL 16 (own throwaway cluster on 127.0.0.1:56134, fresh database per run, stopped and deleted afterwards), no Redis (`REDIS_URL=` blank)
-- **Not run**: the GitHub Actions `e2e` job itself. CI and deploy workflows are disabled on the repository, so the job was reproduced locally with the same commands (`prisma migrate deploy`, then `pnpm test:e2e`).
+- **Base (`origin/master`)**: `fcaed262cd11876a9876c921f9dc4d04a351a0ed`
+- **Tested head**: `472c751af7d353cb1af6a36ed317f988e7b63a3f` (the e2e runs below ran on it; the commit carrying this file only edits EVIDENCE.md and deletes AI_QUESTIONS.md)
+- **Environment**: macOS (Darwin 27), Node v26.10.0, pnpm 8.14.0, PostgreSQL 16 (own throwaway cluster on 127.0.0.1:56134, database dropped, recreated and migrated with `prisma migrate deploy` before every run, deleted afterwards), no Redis (`REDIS_URL=` blank)
+- **Not run**: the GitHub Actions `E2E Tests` job itself (it reaches GitHub only after the push), and the full unit suite on this head (owner rule 2026-10-08: GitHub-hosted CI runs it). The job's commands were reproduced locally.
 
 ## Requirements
 
-| REQ | Requirement                                                                                     | Verified by                                                                                                                                         | Status |
-| --- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| AC1 | `ci.yml` has an `e2e` job that fails when `reports.e2e-spec.ts` fails                           | `test/test-gate.e2e-spec.ts` (3 AC1 tests); local run of the job's commands with a deliberately failing reports test exits 1                        | PASSED |
-| AC2 | `node apps/api/_run_tests.js` and `pnpm --filter api test` load the same config file            | `test/test-gate.e2e-spec.ts` (2 AC2 tests): no inline `jest` block; both `--showConfig` outputs are equal, same project id                          | PASSED |
-| R3  | `test:e2e` turbo task                                                                           | `turbo.json` `test:e2e` (`cache: false`, `DATABASE_URL`/`REDIS_URL`/`APP_ENV` passed through); root `test:e2e` = `turbo test:e2e`; AC1 test asserts | PASSED |
-| R4  | Pin dates in the payment and churn prediction specs                                             | Fake timers per test; 69/69 prediction tests pass with the clock pinned to 2025-12-15 and to 2031-03-02                                             | PASSED |
-| R5  | Specs for depreciation, costing, currency, bank transactions, statement import, bulk operations | Not in this PR (size limit); see AI_QUESTIONS.md                                                                                                    | OPEN   |
+| REQ | Requirement                                                                                     | Verified by                                                                                                                                                                       | Status |
+| --- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| AC1 | `ci.yml` has an `e2e` job that fails when `reports.e2e-spec.ts` fails                           | `E2E Tests` job in `ci.yml`; `test/test-gate.e2e-spec.ts` (3 AC1 tests) passes; a deliberately failing reports test makes `pnpm test:e2e` exit 1                                  | PASSED |
+| AC2 | `node apps/api/_run_tests.js` and `pnpm --filter api test` load the same config file            | `test/test-gate.e2e-spec.ts` (2 AC2 tests): no inline `jest` block; both `--showConfig` outputs are equal, same project id                                                        | PASSED |
+| R3  | `test:e2e` turbo task                                                                           | `turbo.json` `test:e2e` (`cache: false`, `DATABASE_URL`/`REDIS_URL`/`APP_ENV` passed through); root `test:e2e` = `turbo test:e2e`                                                 | PASSED |
+| R4  | Pin dates in the payment and churn prediction specs                                             | Fake timers per test; 69/69 prediction tests passed with the clock pinned to 2025-12-15 and to 2031-03-02 (at `f1953d1`, files unchanged since)                                   | PASSED |
+| R5  | Specs for depreciation, costing, currency, bank transactions, statement import, bulk operations | Split out to respect the PR size limit (CTO decision on PR #139): #206 costing, #207 currency, #208 depreciation, #209 bank transactions + bulk operations, #210 statement import | OPEN   |
 
 ## Acceptance tests fail first
 
@@ -421,40 +421,40 @@ Tests: 4 failed, 1 passed, 5 total
 
 ## Findings while implementing
 
-- **The two configs really diverged.** `_jest.config.js` compiled with `esModuleInterop: true`; `apps/api/tsconfig.json` (the build and the old package.json block) does not. Under `_run_tests.js`, `import.service.hardening.spec.ts` failed 4 tests with `TypeError: csv is not a function`, while CI passed. The unified config compiles with `apps/api/tsconfig.json`, loads `src/test/setup.ts`, keeps the sharp/tesseract stubs and `diagnostics: false` (spec type errors still fail `tsc --noEmit`, which includes `src/**`). The transform now matches `.ts` only, which removes a ts-jest `allowJs` warning on the two JS mocks.
-- **Parallel e2e flakes.** Before `--runInBand`, `pnpm test:e2e` failed 5 `intake.e2e-spec.ts` tests (`NEEDS_REVIEW` instead of `EXTRACTED`); the same suite alone passed 16/16. Each suite boots the full app on the shared database, and another suite's intake sweep processed intake's jobs with the real extractor. In band the run passes and is faster locally (40 s instead of about 105 s).
-- **One unexplained flake.** In the deliberate-break run, `accountant-journey` › `get /organization/account-settings returns 401` got 200 once. Guards, JWT strategy and interceptors show no bypass, and the next run on the same code passed. This shared Mac has other sessions listening on localhost ports (an earlier session saw HTTP 407 from the proxy), so a supertest ephemeral-port collision is the likely cause. Not reproduced; reported, not fixed.
+- **The two configs really diverged.** `_jest.config.js` compiled with `esModuleInterop: true`; `apps/api/tsconfig.json` (the build and the old package.json block) does not. Under `_run_tests.js`, `import.service.hardening.spec.ts` failed 4 tests with `TypeError: csv is not a function`, while CI passed. The unified config compiles with `apps/api/tsconfig.json`, loads `src/test/setup.ts`, keeps the sharp/tesseract stubs and `diagnostics: false` (spec type errors still fail `tsc --noEmit`, which includes `src/**`).
+- **Parallel e2e flakes.** Before `--runInBand`, `pnpm test:e2e` failed 5 `intake.e2e-spec.ts` tests (`NEEDS_REVIEW` instead of `EXTRACTED`): each suite boots the full app on the shared database, and another suite's intake sweep processed intake's jobs with the real extractor. In band the run passes.
+- **Foreign listener on the supertest port (root-caused and fixed).** After merging master, 2 of 3 fresh in-band runs failed in untouched suites: `reports` › `tenant B sees none of tenant A's figures` (`socket hang up`) and `ai` › `creates no journals while serving AI reads` (`Expected: 200, Received: 407`). 407 is a proxy answer. `createTestApp` never listened, so supertest bound the wildcard `::` on port 0 and dialled `127.0.0.1:<port>`. On macOS that bind succeeds even when another process already holds `127.0.0.1:<port>`; reproduced with two plain node servers: `bind :: on 60656 succeeded while 127.0.0.1 held`, `127.0.0.1 answered 407`. This also explains the earlier one-off anonymous 200 in `accountant-journey`. Fix: `createTestApp` listens on `127.0.0.1` itself (`test/helpers/app.helper.ts`), and `auth.e2e-spec.ts` asserts the address. After the fix, 4 of 4 fresh runs passed.
 
 ## Commands and results (tested head)
 
 ```text
-$ pnpm turbo lint type-check test --force
-Tasks:    12 successful, 12 total
-api:test:          Test Suites: 136 passed, 136 total / Tests: 2197 passed, 2197 total
-@mizano/web:test:  Test Suites: 48 passed, 48 total / Tests: 458 passed, 458 total
-
 $ dropdb/createdb mizano_e2e && pnpm --filter api exec prisma migrate deploy
 All migrations have been successfully applied.
 $ REDIS_URL= pnpm test:e2e          # turbo test:e2e -> jest --config ./test/jest-e2e.json --runInBand
-Test Suites: 12 passed, 12 total
-Tests:       262 passed, 262 total
-Tasks:       3 successful, 3 total   (exit 0)
+run1: Test Suites: 14 passed, 14 total / Tests: 307 passed, 307 total (exit 0)
+run2: Test Suites: 14 passed, 14 total / Tests: 307 passed, 307 total (exit 0)
+run3: Test Suites: 14 passed, 14 total / Tests: 307 passed, 307 total (exit 0)
+run4: Test Suites: 14 passed, 14 total / Tests: 307 passed, 307 total (exit 0)
 
-$ node apps/api/_run_tests.js --showConfig      -> id=4e6f0e4cdaa5b5c0606fd4ef9c9af360 setup=src/test/setup.ts
-$ pnpm --filter api test -- --showConfig        -> id=4e6f0e4cdaa5b5c0606fd4ef9c9af360 setup=src/test/setup.ts
+$ pnpm --filter api type-check
+> tsc --noEmit && tsc --noEmit -p test/tsconfig.e2e.json      (exit 0)
+$ pnpm --filter api exec eslint test/helpers/app.helper.ts test/auth.e2e-spec.ts test/test-gate.e2e-spec.ts   (no output)
 ```
+
+The 14 suites include `test-gate.e2e-spec.ts` (AC1 and AC2 checks against the committed `ci.yml` and package scripts) and the two suites master added since (`delivery-challan-isolation`, `node-heap`).
 
 ## A failing reports suite fails the gate
 
-At `f5cd05221d2573f6014a12ef40805cc73151ffa0` (CI job and scripts as in the tested head), one deliberately failing test was added to `reports.e2e-spec.ts` (`expect('0.0000').toBe('1.0000')`), then reverted:
+On the tested head, one deliberately failing test was appended to `reports.e2e-spec.ts` (`expect('0.0000').toBe('1.0000')`), run on a fresh database, then reverted:
 
 ```text
 $ REDIS_URL= pnpm test:e2e
 api:test:e2e: FAIL test/reports.e2e-spec.ts
-api:test:e2e: Test Suites: 2 failed, 10 passed, 12 total
-api:test:e2e:  ELIFECYCLE  Command failed with exit code 1.
+api:test:e2e:   ● Reports and dashboard reconcile with the ledger (e2e) › deliberate break (#134 gate check)
+api:test:e2e: Test Suites: 1 failed, 13 passed, 14 total
+api:test:e2e: Tests:       1 failed, 307 passed, 308 total
 Failed:    api#test:e2e
-pnpm test:e2e exit=1
+exit=1
 ```
 
-The second failed suite in that run is the `accountant-journey` flake described above.
+The `E2E Tests` job runs the same `pnpm test:e2e` with no `continue-on-error` and no `|| true`, so the job fails the same way.
