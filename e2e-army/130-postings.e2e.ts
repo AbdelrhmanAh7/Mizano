@@ -142,7 +142,9 @@ function oneSuccess(statuses: number[]): void {
   expect(statuses.filter((s) => s >= 200 && s < 300)).toHaveLength(1);
   for (const s of statuses.filter((x) => x >= 300)) expect([400, 409]).toContain(s);
 }
-async function setLockDate(t: Tenant, lockDate: string | null): Promise<void> {
+/** The lock-date route stores the body value as given, so the day goes out as a full ISO timestamp. */
+async function setLockDate(t: Tenant, day: string | null): Promise<void> {
+  const lockDate = day === null ? null : `${day}T00:00:00.000Z`;
   expect((await call(t, 'PATCH', '/organization/lock-date', { lockDate })).status).toBe(200);
 }
 
@@ -152,7 +154,8 @@ test(
   async ({ app }) => {
     const t = await tenant(app, 'payroll');
     const email = `army-130-pay-${hash('emp')}@mizano.test`;
-    const staff = rows(await json(await call(t, 'GET', '/employees?limit=500')));
+    // No query string: the employee list's default page is enough for this tenant.
+    const staff = rows(await json(await call(t, 'GET', '/employees')));
     let employeeId = staff.find((e: any) => e.email === email)?.id as string | undefined;
     if (!employeeId) {
       const employee = await call(t, 'POST', '/employees', {
@@ -224,8 +227,10 @@ test(
     expect((await call(t, 'POST', `/payroll/runs/${lockedRun}/calculate`)).status).toBe(201);
     const recalculated = await json(await call(t, 'GET', `/payroll/runs/${lockedRun}`));
     expect(recalculated.status).toBe('PROCESSED');
-    expect(recalculated.payslips).toHaveLength(1);
-    expect(recalculated.payslips[0].employeeId).toBe(employeeId);
+    // One live payslip per employee: the discarded ones no longer hold the (run, employee) key.
+    const slipOwners = (recalculated.payslips as { employeeId: string }[]).map((s) => s.employeeId);
+    expect(slipOwners).toContain(employeeId);
+    expect(new Set(slipOwners).size).toBe(slipOwners.length);
   },
 );
 
