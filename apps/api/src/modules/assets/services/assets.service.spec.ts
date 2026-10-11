@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { AssetStatus, AssetType, DepreciationMethod, Prisma } from '@prisma/client';
+import { AccountType, AssetStatus, AssetType, DepreciationMethod, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { AssetsService } from './assets.service';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -190,23 +190,37 @@ describe('AssetsService', () => {
       currentBookValue: new Decimal('2000'),
     });
 
-    function disposeWith(lockDate: Date | null = null, gainLossAccount = true) {
-      const journals = realJournalsService(prisma, lockDate);
+    type AccountResolver = (args: Prisma.AccountFindFirstArgs) => { id: string } | null;
+
+    const isCashQuery = (args: Prisma.AccountFindFirstArgs): boolean =>
+      !!args.where?.code && typeof args.where.code === 'object' && 'startsWith' in args.where.code;
+    const accountQueries = (): Prisma.AccountFindFirstArgs[] =>
+      prisma.account.findFirst.mock.calls.map(([args]) => args as Prisma.AccountFindFirstArgs);
+    const gainLossQueries = (): Prisma.AccountFindFirstArgs[] =>
+      accountQueries().filter((args) => !isCashQuery(args));
+
+    function disposeWith(
+      opts: {
+        lockDate?: Date | null;
+        asset?: ReturnType<typeof createMockAsset>;
+        disposalAmount?: number;
+        resolve?: AccountResolver;
+      } = {},
+    ): Promise<unknown> {
+      const target = opts.asset ?? asset;
+      const resolve: AccountResolver =
+        opts.resolve ??
+        ((args) => (isCashQuery(args) ? { id: 'acc-cash' } : { id: 'acc-gain-loss' }));
+      const journals = realJournalsService(prisma, opts.lockDate ?? null);
       const disposer = new AssetsService(prisma as unknown as PrismaService, journals);
-      prisma.asset.findFirst.mockResolvedValue(asset as never);
+      prisma.asset.findFirst.mockResolvedValue(target as never);
       prisma.asset.updateMany.mockResolvedValue({ count: 1 });
-      prisma.asset.findUniqueOrThrow.mockResolvedValue(asset as never);
-      prisma.account.findFirst.mockImplementation((({ where }: Prisma.AccountFindFirstArgs) =>
-        Promise.resolve(
-          where?.code && 'startsWith' in (where.code as object)
-            ? { id: 'acc-cash' }
-            : gainLossAccount
-              ? { id: 'acc-gain-loss' }
-              : null,
-        )) as never);
-      return disposer.dispose(ORG_ID, asset.id, {
+      prisma.asset.findUniqueOrThrow.mockResolvedValue(target as never);
+      prisma.account.findFirst.mockImplementation(((args: Prisma.AccountFindFirstArgs) =>
+        Promise.resolve(isCashQuery(args) ? { id: 'acc-cash' } : resolve(args))) as never);
+      return disposer.dispose(ORG_ID, target.id, {
         disposalDate: '2026-06-15',
-        disposalAmount: 1500,
+        disposalAmount: opts.disposalAmount ?? 1500,
       });
     }
 
@@ -226,13 +240,105 @@ describe('AssetsService', () => {
     });
 
     it('rejects the disposal when the lock date covers the disposal date', async () => {
-      await expect(disposeWith(new Date('2026-06-30T00:00:00.000Z'))).rejects.toThrow(/locked/);
+      await expect(disposeWith({ lockDate: new Date('2026-06-30T00:00:00.000Z') })).rejects.toThrow(
+        /locked/,
+      );
       expect(prisma.journal.create).not.toHaveBeenCalled();
     });
 
     it('rejects instead of dropping the loss line when no gain/loss account exists', async () => {
-      await expect(disposeWith(null, false)).rejects.toThrow(BadRequestException);
+      await expect(
+        disposeWith({ resolve: (args) => (isCashQuery(args) ? { id: 'acc-cash' } : null) }),
+      ).rejects.toThrow(BadRequestException);
       expect(prisma.journal.create).not.toHaveBeenCalled();
+    });
+
+    it('disposes a fully depreciated asset', async () => {
+      const fullyDepreciated = createMockAsset({
+        status: AssetStatus.FULLY_DEPRECIATED,
+        accumulatedDepreciation: new Decimal('2250'),
+        currentBookValue: new Decimal('250'),
+        salvageValue: new Decimal('250'),
+      });
+
+      await disposeWith({ asset: fullyDepreciated, disposalAmount: 100 });
+
+      const [journal, ...rest] = writtenJournals(prisma);
+      expect(rest).toHaveLength(0);
+      expect(journal.sourceType).toBe('ASSET_DISPOSAL');
+      expectBalanced(journal.lines);
+      const updateWhere = prisma.asset.updateMany.mock.calls[0][0].where;
+      expect(updateWhere?.status).toEqual({
+        in: [AssetStatus.ACTIVE, AssetStatus.FULLY_DEPRECIATED],
+      });
+    });
+
+    it('rejects an asset in a non-disposable status', async () => {
+      const disposed = createMockAsset({ status: AssetStatus.DISPOSED });
+
+      await expect(disposeWith({ asset: disposed })).rejects.toThrow(BadRequestException);
+      await expect(disposeWith({ asset: disposed })).rejects.toThrow(
+        /cannot be disposed in status DISPOSED/,
+      );
+      expect(prisma.asset.updateMany).not.toHaveBeenCalled();
+      expect(prisma.journal.create).not.toHaveBeenCalled();
+    });
+
+    it('credits a gain to income account 7100 when the chart has it', async () => {
+      await disposeWith({
+        disposalAmount: 2300,
+        resolve: (args) => (args.where?.code === '7100' ? { id: 'acc-7100' } : { id: 'acc-other' }),
+      });
+
+      const query = gainLossQueries().find((args) => args.where?.code === '7100');
+      expect(query?.where).toMatchObject({
+        organizationId: ORG_ID,
+        deletedAt: null,
+        isActive: true,
+        type: { in: [AccountType.INCOME, AccountType.REVENUE] },
+      });
+      const [journal] = writtenJournals(prisma);
+      expectBalanced(journal.lines);
+      const gainLine = journal.lines.find((l) => l.accountId === 'acc-7100');
+      expect(gainLine?.credit.toFixed(2)).toBe('300.00');
+      expect(gainLine?.debit.toFixed(2)).toBe('0.00');
+      expect(journal.lines.some((l) => l.accountId === 'acc-other')).toBe(false);
+    });
+
+    it('falls back to the highest-coded income account for a gain', async () => {
+      await disposeWith({
+        disposalAmount: 2300,
+        resolve: (args) => (args.where?.code === '7100' ? null : { id: 'acc-income' }),
+      });
+
+      const fallback = gainLossQueries().find((args) => args.where?.code === undefined);
+      expect(fallback?.where?.type).toEqual({ in: [AccountType.INCOME, AccountType.REVENUE] });
+      expect(fallback?.where?.isActive).toBe(true);
+      expect(fallback?.orderBy).toEqual({ code: 'desc' });
+      const [journal] = writtenJournals(prisma);
+      expectBalanced(journal.lines);
+      const gainLine = journal.lines.find((l) => l.accountId === 'acc-income');
+      expect(gainLine?.credit.toFixed(2)).toBe('300.00');
+    });
+
+    it('debits a loss to the highest-coded expense account and never looks up 6100', async () => {
+      await disposeWith({ resolve: () => ({ id: 'acc-expense' }) });
+
+      const queries = gainLossQueries();
+      expect(queries).toHaveLength(1);
+      expect(queries[0].where).toMatchObject({
+        organizationId: ORG_ID,
+        deletedAt: null,
+        isActive: true,
+        type: AccountType.EXPENSE,
+      });
+      expect(queries[0].orderBy).toEqual({ code: 'desc' });
+      expect(JSON.stringify(accountQueries())).not.toContain('6100');
+      const [journal] = writtenJournals(prisma);
+      expectBalanced(journal.lines);
+      const lossLine = journal.lines.find((l) => l.accountId === 'acc-expense');
+      expect(lossLine?.debit.toFixed(2)).toBe('500.00');
+      expect(lossLine?.credit.toFixed(2)).toBe('0.00');
     });
   });
 });

@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { AssetStatus, DepreciationMethod, Prisma } from '@prisma/client';
+import { AccountType, AssetStatus, DepreciationMethod, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
@@ -14,6 +14,9 @@ import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
 import { AssetQueryDto, CreateAssetDto, DisposeAssetDto, UpdateAssetDto } from '../dto/assets.dto';
+
+/** A fully depreciated asset (set by the depreciation posting) is still on the books and disposable. */
+const DISPOSABLE_STATUSES: AssetStatus[] = [AssetStatus.ACTIVE, AssetStatus.FULLY_DEPRECIATED];
 
 @Injectable()
 export class AssetsService {
@@ -260,13 +263,18 @@ export class AssetsService {
       if (!asset) {
         throw new NotFoundException('Asset not found');
       }
-      if (asset.status !== AssetStatus.ACTIVE) {
-        throw new BadRequestException('Asset is already disposed');
+      if (!DISPOSABLE_STATUSES.includes(asset.status)) {
+        throw new BadRequestException(`Asset cannot be disposed in status ${asset.status}`);
       }
 
       const gainLoss = disposalAmount.minus(asset.currentBookValue);
       const { count } = await tx.asset.updateMany({
-        where: { id: assetId, organizationId, status: AssetStatus.ACTIVE, deletedAt: null },
+        where: {
+          id: assetId,
+          organizationId,
+          status: { in: DISPOSABLE_STATUSES },
+          deletedAt: null,
+        },
         data: {
           status: AssetStatus.DISPOSED,
           disposalDate,
@@ -588,24 +596,23 @@ export class AssetsService {
     }
 
     if (!gainLoss.isZero()) {
+      // A gain is credited to income (code 7100 when the chart has it), a loss debited to an
+      // expense. Other income and expenses close the chart (the P&L reads 49xx/8xxx and 7xxx-9xxx
+      // as non-operating), so the highest-coded active account of that type is the default.
+      const isGain = gainLoss.isPositive();
+      const sameSide: Prisma.AccountWhereInput = {
+        organizationId,
+        deletedAt: null,
+        isActive: true,
+        type: isGain ? { in: [AccountType.INCOME, AccountType.REVENUE] } : AccountType.EXPENSE,
+      };
       const gainLossAccount =
-        (await tx.account.findFirst({
-          where: { organizationId, deletedAt: null, code: { in: ['7100', '6100'] } },
-          orderBy: { code: 'desc' },
-        })) ??
-        (await tx.account.findFirst({
-          where: {
-            organizationId,
-            deletedAt: null,
-            isActive: true,
-            type: gainLoss.isPositive() ? 'INCOME' : 'EXPENSE',
-          },
-          orderBy: { code: 'asc' },
-        }));
+        (isGain ? await tx.account.findFirst({ where: { ...sameSide, code: '7100' } }) : null) ??
+        (await tx.account.findFirst({ where: sameSide, orderBy: { code: 'desc' } }));
       if (!gainLossAccount) {
         throw new BadRequestException('A gain/loss account is required to record the disposal');
       }
-      if (gainLoss.isPositive()) {
+      if (isGain) {
         credit(gainLossAccount.id, gainLoss, `Gain on disposal - ${asset.assetNumber}`);
       } else {
         debit(gainLossAccount.id, gainLoss.abs(), `Loss on disposal - ${asset.assetNumber}`);
