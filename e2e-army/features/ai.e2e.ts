@@ -9,8 +9,9 @@ import { createHash } from "node:crypto";
 const A = () => ledgerTenant("ai");
 const B = () => ledgerTenant("ai-b");
 
-/** The AI contract in the verify stack: a clean answer, or an explicit 503 "AI unavailable" - never a crash. */
-const graceful = (status: number) => (status >= 200 && status < 300) || status === 503 || status === 400 || status === 404;
+/** The AI contract in the verify stack: a clean answer, or an explicit 503 "AI unavailable" - never a crash, a missing route (404) or a
+ *  rejected fixture (400); expected 404s (ghost / foreign ids) are asserted one by one. */
+const graceful = (status: number) => (status >= 200 && status < 300) || status === 503;
 async function sweep(api: Api, calls: Array<[string, string, unknown?]>): Promise<string[]> {
   const failures: string[] = [];
   for (const [method, path, body] of calls) {
@@ -92,7 +93,7 @@ test("[mz-ai-risk-compliance.1] risk APIs: anomalies, fraud alerts, audit risk, 
   expect(anomalies.status).toBe(200);
   // another organization's risk data is never visible
   expect(JSON.stringify((await b.api.get("/ai/anomalies")).body)).not.toContain(customer);
-  expect((await b.api.get(`/ai/audit-risk/customer/${customer}`)).status).toBeLessThan(600);
+  expect((await b.api.get(`/ai/audit-risk/customer/${customer}`)).status).toBe(404); // another tenant's customer
 });
 
 test("[mz-ai-predictions.1] prediction APIs: cash flow, payments, churn, lifetime value, leads, pipeline, pricing, sentiment and reconciliation answer without errors", { tags: ["feat:mz-ai-predictions", "shard:ai-api", "lvl:api"] }, async () => {
@@ -133,7 +134,7 @@ test("[mz-ai-categorization.1] categorization and extraction APIs: bank transact
   const entries0 = rows(await a.api.get("/journals", { limit: 100 })).length;
   expect(await sweep(a.api, [
     ["GET", "/ai/categorization/stats"], ["GET", "/ai/categorize/stats"], ["GET", "/ai/categorize/bank-transactions"],
-    ["POST", "/ai/categorization/predict", { description: "Office supplies purchase", amount: 150 }],
+    ["POST", "/ai/categorization/predict", { description: "Office supplies purchase", amount: 150, direction: "expense" }],
     ["POST", "/ai/categorize", { description: "Monthly rent payment", amount: 5000 }],
     ["POST", "/ai/suggest-vendor", { description: "Amazon Web Services invoice" }],
     ["POST", "/ai/entities/extract", { text: "Invoice from Supplier Alpha total 115.00 EGP" }],
@@ -174,10 +175,10 @@ test("[mz-document-intake.1] intake API: a PDF becomes a durable job with its or
   expect(other.body.data.duplicate).toBe(false);
   expect(other.body.data.jobId).not.toBe(jobId);
 
-  const original = await a.api.request("GET", `/ai/document-intake/${jobId}/original`);
+  const original = await a.api.bytes(`/ai/document-intake/${jobId}/original`);
   expect(original.status).toBe(200);
   expect(original.headers.get("content-type")).toContain("application/pdf");
-  expect(sha(new TextEncoder().encode(original.text))).toBe(sha(bytes)); // byte for byte
+  expect(sha(original.data)).toBe(sha(bytes)); // byte for byte, hashed from the raw response bytes
   const result = await a.api.get(`/ai/document-intake/${jobId}/result`);
   expect(result.status).toBe(200);
   expect(result.body.data).not.toHaveProperty("storageKey");

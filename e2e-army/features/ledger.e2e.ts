@@ -4,16 +4,11 @@
 import { test } from "@e2e-dev/web";
 import { expect } from "e2e";
 import { needsModel, seededInt } from "../lib.ts";
-import { DATE, acct, adminApi, anon, dec, defaults, ensureAccount, h1, ids, journalOf, ledgerTenant, lineSig, rows, seeded, signIn, subDec, sumDec, tenant, uuidFrom } from "./_mz.e2e.ts";
+import { arabic, DATE, acct, adminApi, anon, dec, defaults, ensureAccount, h1, ids, journalOf, ledgerTenant, lineSig, rows, seeded, signIn, subDec, sumDec, tenant, uuidFrom } from "./_mz.e2e.ts";
 
 const L = () => ledgerTenant("ledger");
 const LB = () => ledgerTenant("ledger-b");
 
-async function arabic({ app, screen, browser }: any, path: string, title: string) {
-  await app.open(path);
-  await expect(h1(screen, title)).toBeVisible({ timeout: 60_000 });
-  await expect.poll(() => browser.evaluate(() => document.documentElement.dir)).toBe("rtl");
-}
 const journalBody = (a: string, b: string, amount: string, over: Record<string, unknown> = {}) => ({
   date: DATE.doc, reference: seeded("JRN"), lines: [{ accountId: a, debit: amount, description: "debit side" }, { accountId: b, credit: amount }], ...over,
 });
@@ -482,7 +477,10 @@ test("[mz-tax-payments.2] VAT payment API: a recorded payment is listed against 
   const c = a.chart;
   const sale = await a.api.post("/journals", { date: "2026-02-10", reference: seeded("SALE-P"), lines: [{ accountId: c.bank, debit: "114" }, { accountId: c.revenue, credit: "100" }, { accountId: c.vatPayable, credit: "14" }] });
   expect(sale.status).toBe(201);
-  const ret = (await a.api.post("/vat-returns", { startDate: DATE.q1Start, endDate: DATE.q1End })).body.id;
+  // pnpm e2e:army and the hub start from a reset database; a reused one already holds this tenant's Q1 return (overlapping period)
+  const created = await a.api.post("/vat-returns", { startDate: DATE.q1Start, endDate: DATE.q1End });
+  expect(created.status, `Q1 VAT return not created (reused database?): ${created.text.slice(0, 200)}`).toBe(201);
+  const ret = created.body.id as string;
   expect((await a.api.post(`/vat-returns/${ret}/calculate`, {})).status).toBe(201);
   expect((await a.api.post(`/vat-returns/${ret}/submit`, {})).status).toBe(201);
   const pay = await a.api.post(`/vat-returns/${ret}/payment`, { amount: "14", date: "2026-04-10", paidFromAccountId: c.bank });

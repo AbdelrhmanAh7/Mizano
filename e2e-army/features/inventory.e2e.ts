@@ -4,16 +4,11 @@
 import { test } from "@e2e-dev/web";
 import { expect } from "e2e";
 import { needsModel } from "../lib.ts";
-import { DATE, acct, adminApi, anon, dec, h1, ids, journalOf, ledgerTenant, lineSig, rows, seeded, signIn, stockedItem, subDec, tenant } from "./_mz.e2e.ts";
+import { arabic, DATE, acct, adminApi, anon, dec, h1, ids, journalOf, ledgerTenant, lineSig, rows, seeded, signIn, stockedItem, subDec, tenant } from "./_mz.e2e.ts";
 
 const A = () => ledgerTenant("inventory");
 const B = () => ledgerTenant("inventory-b");
 
-async function arabic({ app, screen, browser }: any, path: string, title?: string) {
-  await app.open(path);
-  if (title) await expect(h1(screen, title)).toBeVisible({ timeout: 60_000 });
-  await expect.poll(() => browser.evaluate(() => document.documentElement.dir)).toBe("rtl");
-}
 
 // ───────────────────────────────────────────── ui ─────────────────────────────────────────────
 test("[mz-items.1] create an inventory item through the form and find it in the items list", { tags: ["feat:mz-items", "shard:ui-inventory", "lvl:ui"], timeout: 240_000 }, async (fx) => {

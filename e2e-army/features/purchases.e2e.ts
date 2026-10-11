@@ -4,24 +4,11 @@
 import { test } from "@e2e-dev/web";
 import { expect } from "e2e";
 import { needsModel } from "../lib.ts";
-import { DATE, acct, adminApi, anon, dec, defaults, h1, ids, journalOf, ledgerTenant, lineSig, rows, seeded, seededEmail, signIn, subDec, tenant } from "./_mz.e2e.ts";
+import { arabic, docWithLine, DATE, acct, adminApi, anon, dec, defaults, h1, ids, journalOf, ledgerTenant, lineSig, rows, seeded, seededEmail, signIn, subDec, tenant } from "./_mz.e2e.ts";
 
 const A = () => ledgerTenant("purchases");
 const B = () => tenant("purchases-b");
 
-async function arabic({ app, screen, browser }: any, path: string, title: string) {
-  await app.open(path);
-  await expect(h1(screen, title)).toBeVisible({ timeout: 60_000 });
-  await expect.poll(() => browser.evaluate(() => document.documentElement.dir)).toBe("rtl");
-}
-async function docWithLine(api: any, list: string, description: string): Promise<any | undefined> {
-  const r = await api.get(list, { limit: 30, sortBy: "createdAt", sortOrder: "desc" });
-  for (const row of rows(r).slice(0, 30)) {
-    const full = Array.isArray(row.lines) ? row : (await api.get(`${list}/${row.id}`)).body;
-    if ((full?.lines ?? []).some((l: any) => l.description === description)) return full;
-  }
-  return undefined;
-}
 const billBody = (vendorId: string, accountId: string, lines: Array<Record<string, string>>, extra: Record<string, unknown> = {}) => ({
   vendorId, date: DATE.doc, dueDate: DATE.due, lines: lines.map((l, i) => ({ description: `Line ${i + 1}`, accountId, ...l })), ...extra,
 });
@@ -295,8 +282,10 @@ test("[mz-vendor-credits.2] vendor credit API: credit against a posted bill, app
   expect(journal).toBeDefined();
   expect(dec(journal.totalDebit)).toBe(dec(journal.totalCredit));
 
-  expect((await a.api.post("/vendor-credits", { vendorId: vendor, billId: bill.id, amount: "1.00001" })).status).toBe(400);
-  expect((await a.api.post("/vendor-credits", { vendorId: vendor, billId: "nope", amount: "1" })).status).toBe(400);
+  // a complete valid request with exactly one field broken, so the 400 comes from the rule under test
+  const valid = { vendorId: vendor, billId: bill.id, date: DATE.payment, reason: "Returned goods", amount: "1" };
+  expect((await a.api.post("/vendor-credits", { ...valid, amount: "1.00001" })).status).toBe(400); // more than 4 decimals
+  expect((await a.api.post("/vendor-credits", { ...valid, billId: "nope" })).status).toBe(400); // unknown bill
   expect((await b.api.get(`/vendor-credits/${credit.body.id}`)).status).toBe(404);
   expect((await b.api.post(`/vendor-credits/${credit.body.id}/apply-to-bill`, { billId: bill.id })).status).toBe(404);
   const accounts = await a.api.get("/vendor-credits/refund-accounts");

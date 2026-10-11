@@ -4,16 +4,11 @@
 import { test } from "@e2e-dev/web";
 import { expect } from "e2e";
 import { needsModel } from "../lib.ts";
-import { DATE, acct, adminApi, anon, dec, ensureAccount, h1, ids, invoiceBody, journalOf, ledgerTenant, lineSig, rows, seeded, signIn, subDec } from "./_mz.e2e.ts";
+import { arabic, DATE, acct, adminApi, anon, dec, ensureAccount, h1, ids, invoiceBody, journalOf, ledgerTenant, lineSig, rows, seeded, signIn, subDec } from "./_mz.e2e.ts";
 
 const A = () => ledgerTenant("banking");
 const B = () => ledgerTenant("banking-b");
 
-async function arabic({ app, screen, browser }: any, path: string, title?: string) {
-  await app.open(path);
-  if (title) await expect(h1(screen, title)).toBeVisible({ timeout: 60_000 });
-  await expect.poll(() => browser.evaluate(() => document.documentElement.dir)).toBe("rtl");
-}
 const csv = (lines: string[]) => lines.join("\n") + "\n";
 
 // ───────────────────────────────────────────── ui ─────────────────────────────────────────────
@@ -244,14 +239,13 @@ test("[mz-fixed-assets.2] fixed asset API: create with schedule, validation, upd
   const schedule = await a.api.get(`/assets/${id}/schedule`);
   expect(schedule.status).toBe(200);
   expect(schedule.body).toHaveLength(60); // 5 years, monthly
-  expect(Number(schedule.body[0].amount)).toBeCloseTo(166.67, 2); // (12000 - 2000) / 60
-  expect(Number(schedule.body.at(-1).bookValue)).toBeCloseTo(2000, 2);
+  expect(dec(schedule.body[0].amount)).toBe("166.6667"); // (12000 - 2000) / 60, Decimal(19,4)
+  expect(dec(schedule.body.at(-1).bookValue)).toBe("2000"); // ends exactly at the salvage value
 
   for (const bad of [{ purchasePrice: -1 }, { usefulLifeYears: 0 }, { usefulLifeYears: 101 }, { assetType: "SPACESHIP" }, { name: undefined }]) {
     expect((await a.api.post("/assets", { ...body, ...bad })).status).toBe(400);
   }
-  expect((await a.api.post("/assets", { ...body, assetAccountId: b.chart.bank })).status).toBeGreaterThanOrEqual(400); // another tenant's account
-  expect((await a.api.post("/assets", { ...body, assetAccountId: b.chart.bank })).status).toBeLessThan(500);
+  expect((await a.api.post("/assets", { ...body, assetAccountId: b.chart.bank })).status).toBe(400); // another tenant's account (body id)
   expect(ids(await a.api.get("/assets"))).toContain(id);
   expect((await a.api.get(`/assets/${id}`)).body.id).toBe(id);
   expect((await a.api.put(`/assets/${id}`, { name: seeded("Asset v2"), usefulLifeYears: 4 })).status).toBe(200);

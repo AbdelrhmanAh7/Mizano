@@ -4,16 +4,11 @@
 import { test } from "@e2e-dev/web";
 import { expect } from "e2e";
 import { needsModel } from "../lib.ts";
-import { DATE, acct, adminApi, anon, dec, defaults, h1, invoiceBody, ledgerTenant, rows, seeded, signIn, sumDec, subDec, tenant } from "./_mz.e2e.ts";
+import { arabic, DATE, acct, adminApi, anon, dec, defaults, h1, invoiceBody, ledgerTenant, rows, seeded, signIn, sumDec, subDec, tenant } from "./_mz.e2e.ts";
 
 const FOUR_DP = /^-?\d+\.\d{4}$/;
 const WIDE = { startDate: "2025-01-01", endDate: "2099-12-31" };
 
-async function arabic({ app, screen, browser }: any, path: string, title: string) {
-  await app.open(path);
-  await expect(h1(screen, title)).toBeVisible({ timeout: 60_000 });
-  await expect.poll(() => browser.evaluate(() => document.documentElement.dir)).toBe("rtl");
-}
 
 /** One scenario tenant shared by the report tests of this process (idempotent per process, exact absolute numbers on a fresh database). */
 let scenarioP: Promise<any> | null = null;
@@ -157,7 +152,7 @@ test("[mz-aging-reports.2] aging API: open invoices and bills land in the right 
   expect(dec(vs.body.closingBalance)).toBe("1368");
   const b = await tenant("reports-b");
   expect((await b.api.get("/reports/receivables-aging")).body.invoiceCount).toBe(0);
-  expect(Object.keys((await b.api.get(`/reports/customer-statement/${s.c1}`, WIDE)).body)).toHaveLength(0);
+  expect((await b.api.get(`/reports/customer-statement/${s.c1}`, WIDE)).status).toBe(404); // another tenant's customer
 });
 
 test("[mz-sales-purchase-reports.2] sales and purchase reports aggregate the posted documents per customer, item and vendor", { tags: ["feat:mz-sales-purchase-reports", "shard:reports-api", "lvl:api"] }, async () => {

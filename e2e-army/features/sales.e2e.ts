@@ -4,26 +4,11 @@
 import { test } from "@e2e-dev/web";
 import { expect } from "e2e";
 import { needsModel } from "../lib.ts";
-import { DATE, acct, adminApi, anon, defaults, h1, ids, invoiceBody, journalOf, ledgerTenant, lineSig, rows, salesReturnsAccount, seeded, seededEmail, sumDec, subDec, dec, signIn, stockedItem, tenant } from "./_mz.e2e.ts";
+import { arabic, docWithLine, DATE, acct, adminApi, anon, defaults, h1, ids, invoiceBody, journalOf, ledgerTenant, lineSig, rows, salesReturnsAccount, seeded, seededEmail, sumDec, subDec, dec, signIn, stockedItem, tenant } from "./_mz.e2e.ts";
 
 const A = () => ledgerTenant("sales");
 const B = () => tenant("sales-b");
 
-/** Opens an Arabic page and checks the right-to-left layout + the Arabic title (no model call). */
-async function arabic({ app, screen, browser }: any, path: string, title: string) {
-  await app.open(path);
-  await expect(h1(screen, title)).toBeVisible({ timeout: 60_000 });
-  await expect.poll(() => browser.evaluate(() => document.documentElement.dir)).toBe("rtl");
-}
-/** Finds the newest document of a list endpoint whose lines carry `description` (documents have no unique name). */
-async function docWithLine(api: any, list: string, description: string): Promise<any | undefined> {
-  const r = await api.get(list, { limit: 30, sortBy: "createdAt", sortOrder: "desc" });
-  for (const row of rows(r).slice(0, 30)) {
-    const full = Array.isArray(row.lines) ? row : (await api.get(`${list}/${row.id}`)).body;
-    if ((full?.lines ?? []).some((l: any) => l.description === description)) return full;
-  }
-  return undefined;
-}
 
 // ───────────────────────────────────────────── ui ─────────────────────────────────────────────
 test("[mz-customers.1] create a customer through the form, find it in the list; the page is available in Arabic", { tags: ["feat:mz-customers", "shard:ui-sales", "lvl:ui"], timeout: 240_000 }, async (fx) => {
@@ -425,7 +410,7 @@ test("[mz-delivery-challans.2] delivery challan API: draft -> issue (stock leave
   expect(created.body.status).toBe("DRAFT");
   expect(created.body.challanNumber).toBeTruthy();
   const id = created.body.id as string;
-  expect((await a.api.post("/delivery-challans", { ...base, customerId: "nope" })).status).toBe(404);
+  expect((await a.api.post("/delivery-challans", { ...base, customerId: "nope" })).status).toBe(400); // unknown body id, as for quotes and invoices
   expect((await a.api.post("/delivery-challans", { ...base, challanType: "BARTER" })).status).toBe(400);
   expect((await a.api.post("/delivery-challans", { ...base, lines: [{ itemId: stock.itemId, quantity: 0 }] })).status).toBe(400);
 

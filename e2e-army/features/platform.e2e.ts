@@ -5,17 +5,12 @@
 import { test } from "@e2e-dev/web";
 import { expect } from "e2e";
 import { needsModel } from "../lib.ts";
-import { Api, DATE, ADMIN, adminApi, anon, dec, ensureAccount, h1, ids, invoiceBody, journalOf, ledgerTenant, rows, seeded, seededEmail, signIn, tenant, TENANT_PASSWORD, uuidFrom } from "./_mz.e2e.ts";
+import { arabic, Api, DATE, ADMIN, adminApi, anon, dec, ensureAccount, h1, ids, invoiceBody, journalOf, ledgerTenant, rows, seeded, seededEmail, signIn, tenant, TENANT_PASSWORD, uuidFrom } from "./_mz.e2e.ts";
 
 const A = () => ledgerTenant("platform");
 const B = () => ledgerTenant("platform-b");
 const WEB = () => String(process.env.E2E_ARMY_URL ?? "").replace(/\/+$/, "");
 
-async function arabic({ app, screen, browser }: any, path: string, title?: string) {
-  await app.open(path);
-  if (title) await expect(h1(screen, title)).toBeVisible({ timeout: 60_000 });
-  await expect.poll(() => browser.evaluate(() => document.documentElement.dir)).toBe("rtl");
-}
 const csv = (lines: string[]) => lines.join("\n") + "\n";
 
 // ───────────────────────────────────────────── ui: shell ─────────────────────────────────────────────
@@ -349,12 +344,12 @@ test("[mz-notifications.2] notifications API: per-user list, unread count, mark 
   }
   expect((await admin.post("/notifications/read-all")).status).toBe(201);
   expect(Number((await admin.get("/notifications/unread-count")).body.count ?? (await admin.get("/notifications/unread-count")).body.unreadCount ?? 0)).toBe(0);
-  expect((await admin.del("/notifications/ghost-id")).status).toBeGreaterThanOrEqual(400);
+  expect((await admin.del("/notifications/ghost-id")).status).toBe(404);
   // a fresh organization has no notifications and cannot touch the demo ones
   expect(rows(await a.api.get("/notifications"))).toHaveLength(0);
   const demoId = rows(list)[0].id;
-  expect((await a.api.post(`/notifications/${demoId}/read`)).status).toBeGreaterThanOrEqual(400);
-  expect((await a.api.del(`/notifications/${demoId}`)).status).toBeGreaterThanOrEqual(400);
+  expect((await a.api.post(`/notifications/${demoId}/read`)).status).toBe(404); // another tenant's notification
+  expect((await a.api.del(`/notifications/${demoId}`)).status).toBe(404);
 });
 
 test("[mz-notification-jobs.1] notification job work items: overdue invoices, upcoming bills and low stock are visible in the data the hourly/daily jobs read", { tags: ["feat:mz-notification-jobs", "shard:platform-api", "lvl:api"] }, async () => {
@@ -468,8 +463,8 @@ test("[mz-documents.1] document API: invoice, quote and bill PDFs, statements, a
   expect(statement.status).toBe(200);
   // no SMTP is configured in the throwaway stack: sending reports it instead of pretending
   const send = await a.api.post(`/documents/invoice/${inv.id}/send`, { to: seededEmail("recipient") });
-  expect([200, 201, 400]).toContain(send.status);
-  expect(JSON.stringify(send.body)).toMatch(/not configured|SMTP|success/i);
+  expect(send.status).toBe(200);
+  expect(send.body).toMatchObject({ success: false, error: expect.stringMatching(/not configured.*SMTP/i) }); // never a fake success
   expect((await a.api.post(`/documents/invoice/${inv.id}/send`, { to: "not-an-email" })).status).toBe(400);
   expect((await a.api.get("/documents/email-logs")).status).toBe(200);
   expect(rows(await b.api.get("/documents/email-logs"))).toHaveLength(0);
@@ -607,8 +602,13 @@ test("[mz-error-logger.1] error logger API: browsers report errors per organizat
   expect((await a.api.post("/logger/capture", { level: "loud", source: "frontend", message })).status).toBe(400);
   expect((await a.api.post("/logger/capture", { level: "error", source: "frontend" })).status).toBe(400);
   // a client may not claim the trusted backend source
-  const claimed = await a.api.post("/logger/capture", { level: "warn", source: "backend", message: seeded("claims backend") });
+  const claimedMessage = seeded("claims backend");
+  const claimed = await a.api.post("/logger/capture", { level: "warn", source: "backend", message: claimedMessage });
   expect(claimed.status).toBe(201);
+  const claimedLogs = await a.api.get("/logger/logs", { search: claimedMessage });
+  const claimedEntry = rows(claimedLogs).find((l: any) => l.message === claimedMessage) ?? (claimedLogs.body.logs ?? []).find((l: any) => l.message === claimedMessage);
+  expect(claimedEntry).toBeDefined();
+  expect(claimedEntry.source).toBe("frontend"); // stored as a browser report, not as the trusted backend
   const logs = await a.api.get("/logger/logs", { search: message });
   expect(logs.status).toBe(200);
   const entry = rows(logs).find((l: any) => l.message === message) ?? (logs.body.logs ?? []).find((l: any) => l.message === message);
@@ -625,7 +625,9 @@ test("[mz-error-logger.1] error logger API: browsers report errors per organizat
   const prompt = await a.api.post("/logger/generate-prompt", { logIds: [entry.id], includeStacks: true });
   expect([200, 201]).toContain(prompt.status);
   expect(JSON.stringify(prompt.body)).toContain(message);
-  expect((await b.api.del("/logger/clear", { ids: [entry.id] })).status).toBeLessThan(500);
+  const foreignClear = await b.api.del("/logger/clear", { ids: [entry.id] }); // a bulk clear only ever matches the caller's own entries
+  expect(foreignClear.status).toBe(200);
+  expect(foreignClear.body).toEqual({ removed: 0 });
   expect(JSON.stringify((await a.api.get("/logger/logs", { search: message })).body)).toContain(message); // another tenant's clear did not remove it
   expect((await a.api.del("/logger/clear", { ids: [entry.id] })).status).toBe(200);
 });

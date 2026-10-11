@@ -43,6 +43,11 @@ export class Api {
     }
     return res;
   }
+  /** GET of a binary resource: the raw response bytes (no text decoding, so a binary file compares byte for byte). */
+  async bytes(path: string): Promise<{ status: number; headers: Headers; data: Uint8Array }> {
+    const res = await fetch(new URL(apiBase() + path), { headers: this.token ? { authorization: `Bearer ${this.token}` } : {}, redirect: "manual" });
+    return { status: res.status, headers: res.headers, data: new Uint8Array(await res.arrayBuffer()) };
+  }
   get(path: string, query?: Query) { return this.request("GET", path, { query }); }
   post(path: string, body?: unknown, query?: Query) { return this.request("POST", path, { body: body ?? {}, query }); }
   patch(path: string, body?: unknown) { return this.request("PATCH", path, { body: body ?? {} }); }
@@ -187,6 +192,21 @@ export async function signIn(fx: any, landing = "/en/dashboard") {
 
 /** The heading (h1) of a dashboard page. */
 export const h1 = (screen: any, name: string | RegExp) => screen.getByRole("heading", name, { level: 1 });
+/** Opens an Arabic page and checks the right-to-left layout (+ the Arabic h1 title when given); no model call. */
+export async function arabic({ app, screen, browser }: any, path: string, title?: string) {
+  await app.open(path);
+  if (title) await expect(h1(screen, title)).toBeVisible({ timeout: 60_000 });
+  await expect.poll(() => browser.evaluate(() => document.documentElement.dir)).toBe("rtl");
+}
+/** Finds the newest document of a list endpoint whose lines carry `description` (documents have no unique name). */
+export async function docWithLine(api: Api, list: string, description: string): Promise<any | undefined> {
+  const r = await api.get(list, { limit: 30, sortBy: "createdAt", sortOrder: "desc" });
+  for (const row of rows(r).slice(0, 30)) {
+    const full = Array.isArray(row.lines) ? row : (await api.get(`${list}/${row.id}`)).body;
+    if ((full?.lines ?? []).some((l: any) => l.description === description)) return full;
+  }
+  return undefined;
+}
 
 // ─────────────────────────────── misc builders ───────────────────────────────
 /** Fixed document dates (deterministic): booked in the past, due far in the future so "current" aging never rots. */

@@ -4,16 +4,11 @@
 import { test } from "@e2e-dev/web";
 import { expect } from "e2e";
 import { needsModel } from "../lib.ts";
-import { DATE, acct, adminApi, anon, dec, ensureAccount, h1, ids, ledgerTenant, rows, seeded, seededEmail, signIn, stockedItem, subDec, tenant } from "./_mz.e2e.ts";
+import { arabic, DATE, acct, adminApi, anon, dec, ensureAccount, h1, ids, ledgerTenant, rows, seeded, seededEmail, signIn, stockedItem, subDec, tenant } from "./_mz.e2e.ts";
 
 const A = () => ledgerTenant("people");
 const B = () => tenant("people-b");
 
-async function arabic({ app, screen, browser }: any, path: string, title?: string) {
-  await app.open(path);
-  if (title) await expect(h1(screen, title)).toBeVisible({ timeout: 60_000 });
-  await expect.poll(() => browser.evaluate(() => document.documentElement.dir)).toBe("rtl");
-}
 
 // ───────────────────────────────────────────── ui: people ─────────────────────────────────────────────
 test("[mz-employees.1] create an employee through the form and find them in the employees list", { tags: ["feat:mz-employees", "shard:ui-people", "lvl:ui"], timeout: 240_000 }, async (fx) => {
@@ -310,8 +305,8 @@ test("[mz-crm-deals.2] deal API: pipeline stages, stage moves, won once, lost, c
   expect(lost.status).toBe(200);
   expect(lost.body.stage).toBe("LOST");
   expect((await a.api.post(`/crm/deals/${lostId}/won`, {})).status).toBe(400);
-  const activity = await a.api.post("/crm/activities", { type: "CALL", subject: "Follow-up call", dealId: lostId });
-  expect([201, 400]).toContain(activity.status);
+  const activity = await a.api.post("/crm/activities", { type: "CALL", description: "Follow-up call", dealId: lostId });
+  expect(activity.status, activity.text.slice(0, 200)).toBe(201);
   expect((await a.api.get("/crm/activities")).status).toBe(200);
   expect((await a.api.get("/crm/activities/stats")).status).toBe(200);
   expect((await a.api.del(`/crm/deals/${lostId}`)).status).toBe(204);
@@ -339,7 +334,7 @@ test("[mz-projects.2] project and task API: create, validation, tasks, profitabi
   expect(task.status).toBe(201);
   expect(task.body).toMatchObject({ status: "TODO", priority: "HIGH" });
   expect((await a.api.post("/tasks", { projectId: id, name: "" })).status).toBe(400);
-  expect((await a.api.post("/tasks", { projectId: "ghost", name: "orphan" })).status).toBeGreaterThanOrEqual(400);
+  expect((await a.api.post("/tasks", { projectId: "ghost", name: "orphan" })).status).toBe(404); // unknown project
   const done = await a.api.put(`/tasks/${task.body.id}`, { status: "DONE" });
   expect(done.status).toBe(200);
   expect(done.body.status).toBe("DONE");
@@ -369,12 +364,12 @@ test("[mz-timesheets.2] timesheet API: log time against a project, timer start/s
   const id = entry.body.id as string;
   expect((await a.api.post("/timesheets", { projectId: "ghost", date: "2026-03-09", hours: "1" })).status).toBe(404);
   expect((await b.api.post("/timesheets", { projectId: project, date: "2026-03-09", hours: "1" })).status).toBe(404);
-  expect((await a.api.post("/timesheets", { projectId: project, date: "2026-03-09", hours: "x" })).status).toBeGreaterThanOrEqual(400);
+  expect((await a.api.post("/timesheets", { projectId: project, date: "2026-03-09", hours: "x" })).status).toBe(400); // not a number: rejected, never a 500
   expect(ids(await a.api.get("/timesheets", { projectId: project }))).toContain(id);
   expect((await a.api.put(`/timesheets/${id}`, { hours: "8" })).status).toBe(200);
-  const weekly = await a.api.get("/timesheets/weekly-summary", { weekStartDate: "2026-03-09" });
+  const weekly = await a.api.get("/timesheets/weekly-summary", { weekStart: "2026-03-09" });
   expect(weekly.status).toBe(200);
-  expect(JSON.stringify(weekly.body)).toContain("8");
+  expect(weekly.body.totalHours).toBe(8); // the one entry of that week, updated to 8 h
   expect((await a.api.get("/timesheets/report", { startDate: "2026-03-01", endDate: "2026-03-31" })).status).toBe(200);
   expect((await b.api.get(`/timesheets/${id}`)).status).toBe(404);
   expect((await b.api.put(`/timesheets/${id}`, { hours: "1" })).status).toBe(404);
@@ -406,8 +401,9 @@ test("[mz-bom.2] bill of materials API: create with components, one active BOM p
   expect((await b.api.post("/manufacturing/bom", body)).status).toBe(404); // another tenant's item
   const req = await a.api.get(`/manufacturing/bom/${id}/requirements`, { quantity: 4 });
   expect(req.status).toBe(200);
-  expect(JSON.stringify(req.body)).toContain(part.itemId);
-  expect(JSON.stringify(req.body)).toContain("6"); // 4 outputs = 2 batches x 3 units
+  const partRow = (req.body.requirements ?? []).find((r: any) => r.item?.id === part.itemId);
+  expect(partRow, JSON.stringify(req.body).slice(0, 300)).toBeDefined();
+  expect(partRow.requiredQuantity).toBe(6); // 4 outputs = 2 batches x 3 units
   const copy = await a.api.post(`/manufacturing/bom/${id}/duplicate`, { name: seeded("BOM copy") });
   expect(copy.status).toBe(201);
   expect(copy.body.id).not.toBe(id);
