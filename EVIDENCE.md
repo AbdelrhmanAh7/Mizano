@@ -390,7 +390,7 @@ Unset launcher heap_size_limit: 4395630592
 
 # EVIDENCE — #183 Secure Docker Compose production stacks (Mizano #132-1)
 
-- **Tested commit**: `TESTED_SHA`. Only this file changes after it; every output below was taken on that commit.
+- **Tested commit**: `2ab8576`. Only this file changes after it; every output below was taken on that commit.
 - **Scope**: `docker-compose.production.yml`, `deploy/pi/docker-compose.pi.yml`, `apps/api/src/cache/redis-url.ts`
   and its three callers (`cache.module.ts`, `cache.service.ts`, `modules/ai/intake/intake-queue.service.ts`),
   `scripts/check-compose-security.sh`, `apps/api/src/cache/{production-compose,redis-url}.spec.ts`,
@@ -440,10 +440,17 @@ workflows). Both edits are written out in `docs/ops/pending-workflow-changes.md`
 - Earlier threads (URL-encoding in `REDIS_URL`; port check by `ports` length) are fixed by `redis-url.ts` and
   `8ec7d95`, unchanged here.
 
-## Test output on `TESTED_SHA` (`cd apps/api && npx jest src/cache src/modules/ai/intake`)
+## Test output on `2ab8576` (`cd apps/api && npx jest src/cache src/modules/ai/intake`)
 
 ```text
-TEST_OUTPUT
+PASS src/modules/ai/intake/intake-jobs.service.spec.ts
+PASS src/modules/ai/intake/intake-job-owner.guard.spec.ts
+PASS src/modules/ai/intake/intake-storage.spec.ts
+PASS src/cache/cache.service.spec.ts
+PASS src/cache/production-compose.spec.ts
+PASS src/cache/redis-url.spec.ts
+PASS src/modules/ai/intake/intake-processor.service.spec.ts
+Tests:       71 passed, 71 total
 ```
 
 ## Not verified here
@@ -455,4 +462,6 @@ TEST_OUTPUT
   pending CI step.
 - The e2e-army test: not run locally. `run-local.sh` needs a pushed ref, and the implementer does not push.
   The verify job runs it.
+- `pnpm --filter api type-check`: started, but the shared `tsc` lock wrapper never released and the run was killed
+  at the time limit, so it did not finish. The changed TypeScript is one spec file, which ts-jest compiled above.
 - The full suite: runs on GitHub CI after the push. Per instructions, it was not run locally.
