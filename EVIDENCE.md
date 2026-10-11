@@ -1,239 +1,101 @@
-# EVIDENCE.md — PR Merge Sprint Audit (#95)
+# EVIDENCE.md — Issue #42: CPU extraction runtime with pinned Arabic/English assets
 
-## Overview
+Part of #42 (not "Closes"): the measurement acceptance has **not** been run, see the table below.
+Complements #16 and #24. The Raspberry Pi was retired on 2026-10-10; the project is served from the
+Mac mini, so nothing in this file claims a Pi result.
 
-- **Issue**: #95 (MZ · PR merge sprint until queue ≤ 5)
-- **Base Commit (`master`)**: `b83d72b5a1900350d7575dfa39396e95b058a5c4`
-- **Audit Date**: 2026-10-07
-- **Reviewed Scope**: 6 oldest open pull requests (#58, #60, #65, #66, #67, #68)
-
----
-
-## Requirements Verification Matrix
-
-| REQ ID | Requirement                                         | Verification Method                                | Status |
-| ------ | --------------------------------------------------- | -------------------------------------------------- | ------ |
-| REQ-1  | Retrieve 6 oldest open PRs                          | `gh pr list --search "sort:created-asc" --limit 6` | PASSED |
-| REQ-2  | Record exact tested commit SHAs                     | Git ref inspection (`headRefOid` per PR)           | PASSED |
-| REQ-3  | Execute local test suites per PR                    | Run unit/web suites with output captured           | PASSED |
-| REQ-4  | Domain risk audit (money, tenant, idempotency, RTL) | Diff inspection against AGENTS.md rules            | PASSED |
-| REQ-5  | Commit audit table & gh commands                    | Committed to `docs/planning/MERGE-QUEUE.md`        | PASSED |
-| REQ-6  | Non-destructive execution (<300 doc lines)          | No PRs merged; doc-only additions                  | PASSED |
-
----
-
-## Detailed Test Logs & Commit Evidence
-
-### PR #58
-
-- **Commit SHA**: `2b3f01c3d7e9fe4877bb29b8af903437b3eee92a`
-- **Branch**: `demo/20-telegram-intake`
-- **Commands**:
-  ```bash
-  git checkout --detach 2b3f01c3d7e9fe4877bb29b8af903437b3eee92a
-  pnpm --filter ./apps/api exec prisma generate
-  pnpm --filter ./apps/api test telegram
-  pnpm lint
-  ```
-- **Output**:
-  ```text
-  PASS src/modules/telegram/telegram.client.spec.ts
-  PASS src/modules/telegram/telegram-link.service.spec.ts
-  PASS src/modules/telegram/telegram-intake.service.spec.ts
-  Test Suites: 3 passed, 3 total
-  Tests:       74 passed, 74 total
-  Lint: 4 packages successful
-  ```
-
-### PR #60
-
-- **Commit SHA**: `d01e25239b4a3a62c1034a0258c53e614655ed69`
-- **Branch**: `demo/38-arm64-images`
-- **Commands**:
-  ```bash
-  git checkout --detach d01e25239b4a3a62c1034a0258c53e614655ed69
-  pnpm --filter ./apps/api test intake
-  pnpm lint
-  ```
-- **Output**:
-  ```text
-  Test Suites: 1 skipped, 17 passed, 17 of 18 total
-  Tests:       9 skipped, 284 passed, 293 total
-  Lint: 4 packages successful
-  ```
-
-### PR #65
-
-- **Commit SHA**: `5eb0340b0e002730f52709d3a7ad8a6097203f77`
-- **Branch**: `demo/followup-vat`
-- **Commands**:
-  ```bash
-  git checkout --detach 5eb0340b0e002730f52709d3a7ad8a6097203f77
-  pnpm --filter ./apps/api test vat
-  pnpm --filter ./apps/api test default-roles
-  pnpm lint
-  ```
-- **Output**:
-  ```text
-  PASS src/modules/tax/controllers/vat-returns.controller.spec.ts
-  PASS src/modules/tax/interceptors/vat-decimal.interceptor.spec.ts
-  PASS src/modules/tax/services/vat-returns.service.spec.ts
-  Test Suites: 3 passed, 3 total | Tests: 74 passed, 74 total
-  PASS src/modules/roles/constants/default-roles.constant.spec.ts (1 passed)
-  Lint: 4 packages successful
-  ```
-
-### PR #66
-
-- **Commit SHA**: `310ac2b1aa7129b4c51403f46eb6ee36f4d1e778`
-- **Branch**: `demo/followup-reports-ledger`
-- **Commands**:
-  ```bash
-  git checkout --detach 310ac2b1aa7129b4c51403f46eb6ee36f4d1e778
-  pnpm --filter ./apps/api test aging-reports
-  pnpm --filter ./apps/api test depreciation
-  pnpm --filter ./apps/api test work-orders
-  pnpm lint
-  ```
-- **Output**:
-  ```text
-  PASS src/modules/reports/services/aging-reports.receivables.spec.ts (28 passed)
-  PASS src/modules/assets/services/depreciation.service.spec.ts (22 passed)
-  PASS src/modules/manufacturing/services/work-orders.service.spec.ts (29 passed)
-  Test Suites: 6 passed, 6 total | Tests: 79 passed, 79 total
-  Lint: 4 packages successful
-  ```
-
-### PR #67
-
-- **Commit SHA**: `be7478f715f1e0f0efb8447e922db9d79d37fbc1`
-- **Branch**: `demo/followup-sales-banking`
-- **Commands**:
-  ```bash
-  git checkout --detach be7478f715f1e0f0efb8447e922db9d79d37fbc1
-  pnpm --filter ./apps/api test recurring-profiles credit-notes
-  pnpm --filter ./apps/web test payments bill-form invoices
-  pnpm lint
-  ```
-- **Output**:
-  ```text
-  PASS src/modules/accounting/services/recurring-profiles.service.spec.ts (41 passed)
-  PASS src/modules/sales/services/credit-notes.service.spec.ts (47 passed)
-  PASS @mizano/web (payments, bill-form, invoices): 4 passed, 16 passed
-  Total: 8 suites passed, 104 tests passed
-  Lint: 4 packages successful
-  ```
-
-### PR #68
-
-- **Commit SHA**: `7c632bdf74832cfc94f97cb49c196d168e99127f`
-- **Branch**: `demo/followup-org-currency`
-- **Commands**:
-  ```bash
-  git checkout --detach 7c632bdf74832cfc94f97cb49c196d168e99127f
-  pnpm --filter ./apps/api test organizations
-  pnpm --filter ./apps/web test report-currency report-labels purchases-currency
-  pnpm lint
-  ```
-- **Output**:
-  ```text
-  PASS src/modules/organizations/organizations.service.spec.ts (26 passed)
-  PASS @mizano/web (report-currency, report-labels, purchases-currency): 3 passed, 78 passed
-  Total: 4 suites passed, 104 tests passed
-  Lint: 4 packages successful
-  ```
-
----
-
-# Evidence for Issue #42: [Pi] CPU extraction runtime on the Pi 5 with pinned Arabic/English assets
-
-Part of the tiny live deployment on a Raspberry Pi 5 (Cortex-A76, 8GB). Complements #16 and #24.
+- **Tested commit**: `015d32a2e88eb6e7d656941f4ca1b07a1029cd85` (code; this file is committed afterwards and changes no code).
+- **Environment of the checks below**: macOS arm64 developer machine, no PostgreSQL, Redis, Docker or
+  `prlimit`. Anything that needs them (the seeded API e2e specs, the Linux `prlimit` process suite,
+  the arm64 image build) was **not run locally**; GitHub-hosted CI runs them after the push.
 
 ## Acceptance status
 
-| Acceptance item (issue #42)                                                           | Status                                                                                                                |
-| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Pinned `ara`+`eng` OCR assets in the worker image, no runtime downloads, no GPU/cloud | Implemented; offline initialization verified on the dev host (REQ-42-1). Image build verified in Dockerfile           |
-| Worker concurrency and memory capped; backlog never starves the API                   | Implemented (REQ-42-2, REQ-42-3). Linux `prlimit` suite skipped on macOS                                              |
-| Documents above the latency budget go to exceptions                                   | Implemented (REQ-42-4). Retries scheduled, non-retriable exceptions move to DEAD_LETTER                               |
-| p50/p95 latency and peak RAM per document type **on the Pi**, held-out corpus (#24)   | **Delegated to CI/CD runner.** Shared S3 bucket `mizano-qa-assets` and Pi runner protocol tracked in follow-up #158   |
-| API p95 under an agreed threshold while the worker processes a batch                  | **Threshold agreed at <500ms** (CTO decision, PR #93). Queue decoupling verified; on-Pi benchmark run tracked in #158 |
+| Acceptance item (issue #42)                                          | Status                                                                                                           |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Pinned `ara`+`eng` assets built into the image, no runtime download  | Implemented (REQ-42-1); offline initialization covered by `ocr-assets.e2e-spec.ts` (CI), hashes by unit specs    |
+| No GPU, paid or cloud model                                          | Implemented: rules + Tesseract only (REQ-42-2)                                                                   |
+| Worker concurrency and memory capped; backlog never starves the API  | Implemented as design (REQ-42-2, REQ-42-3); starvation **not measured**                                          |
+| Documents above the latency budget go to exceptions                  | Implemented (REQ-42-4)                                                                                           |
+| p50/p95 latency and peak RAM per document type, held-out corpus #24  | **Unknown / not yet measured.** The benchmark harness exists (REQ-42-5); it was only run on the small dev corpus |
+| API p95 under an agreed threshold while the worker processes a batch | **Unknown / not yet measured.** No threshold is agreed and no automated test claims to measure it (REQ-42-6)     |
 
-Issue #42 scope for the CPU extraction runtime and worker isolation is implemented. PR #93
-references `Refs #42`. Physical on-Pi measurement run with the frozen #24 corpus is tracked
-in follow-up issue [#158](https://github.com/AbdelrhmanAh7/Mizano/issues/158).
-
----
+Issue #42 therefore stays open; the PR says `Part of #42`.
 
 ## Requirements and verification
 
 ### REQ-42-1: Pinned offline OCR assets
 
-- **Implementation**: `apps/api/ocr-assets.sha256` pins `eng.traineddata` and `ara.traineddata`;
-  `apps/api/src/modules/ai/extraction/offline-tesseract.ts` verifies the hashes and passes local
-  `langPath`/`cachePath`; `apps/api/Dockerfile` unpacks `@tesseract.js-data/{eng,ara}@1.0.0` on the
-  build host, checks `sha256sum -c` and copies the files to `/app/tessdata`.
-- **Verification**: `ocr-assets.spec.ts` and `cpu-extraction.ocr.spec.ts` pass.
+- `apps/api/ocr-assets.sha256` pins `eng.traineddata` and `ara.traineddata`;
+  `extraction/offline-tesseract.ts` verifies the hashes and loads from local paths; the API
+  Dockerfile checks `sha256sum -c` while building the image.
+- Verified by `ocr-assets.spec.ts` and `cpu-extraction.ocr.spec.ts` (real Tesseract on a rendered image).
 
 ### REQ-42-2: Dedicated CPU extraction worker and process isolation
 
-- **Implementation**: `apps/api/src/intake-worker.ts` boots `IntakeWorkerModule` (no controllers,
-  schedulers or LLM providers); `intake-child.ts` runs rules/OCR in a child process;
-  `intake-executor.service.ts` supervises it (RSS polling, Linux `prlimit`, signal mapping);
-  `deploy/pi/docker-compose.pi.yml` adds an `intake-worker` service with `mem_limit: 2048m`.
-- **Verification**: `intake-child.spec.ts` and `intake-executor.service.spec.ts` pass.
+- `intake-worker.ts` boots `IntakeWorkerModule` (no controllers or LLM providers); `intake-child.ts`
+  runs rules/OCR in a child; `intake-executor.service.ts` supervises it (RSS polling, `prlimit`).
+- Verified by `intake-child.spec.ts`, `intake-executor.service.spec.ts`; the real `prlimit` suite
+  (`intake-executor.process.spec.ts`) skips off Linux and runs in CI.
 
-### REQ-42-3: Worker concurrency and queue backlog isolation
+### REQ-42-3: Concurrency cap and API decoupling
 
-- **Implementation**: `intake-queue.service.ts` is producer-only in the API; the BullMQ consumer
-  starts only in the worker. `INTAKE_CONCURRENCY` defaults to 1 and is capped at 2.
-- **Verification**: `intake-queue.service.spec.ts` passes (API never creates a Worker;
-  invalid concurrency falls back to 1; values above 2 are capped).
+- The API only enqueues (`intake-queue.service.ts`); the consumer runs in the worker.
+  `INTAKE_CONCURRENCY` defaults to 1 and is capped at 2.
+- Verified by `intake-queue.service.spec.ts` and the concurrency cases in `test/intake.e2e-spec.ts`
+  (CI; they observe `maxInFlight` of a stubbed executor, i.e. the cap, not API latency).
 
-### REQ-42-4: Latency budget and deadline exception routing
+### REQ-42-4: Latency budget and exception routing
 
-- **Implementation**: `INTAKE_JOB_DEADLINE_MS` (default 120 s) is enforced by the executor's
-  wall-clock timer; `intake-runtime.ts` classifies `INTAKE_TIMEOUT`, `INTAKE_RESOURCE_LIMIT` and
-  `INTAKE_WORKER_FAILED`; `intake-processor.service.ts` records `FAILED`, schedules retries, and moves non-retriable exceptions to `DEAD_LETTER`.
-- **Verification**: `intake-runtime.spec.ts`, `intake-executor.service.spec.ts` and
-  `intake-processor.service.spec.ts` pass.
+- `INTAKE_JOB_DEADLINE_MS` is enforced by the executor; timeouts and resource limits become
+  `FAILED`/`DEAD_LETTER` jobs instead of blocking. Verified by `intake-runtime.spec.ts`,
+  `intake-executor.service.spec.ts`, `intake-processor.service.spec.ts`.
 
-### REQ-42-5: Benchmark harness and latency measurement
+### REQ-42-5: Benchmark harness
 
-- **Implementation**: `apps/api/src/modules/ai/extraction/benchmark/run-benchmark.ts` and
-  `scoring.ts` report per-field precision/recall/exact match, review share, latency percentiles and
-  peak RSS, with file names only.
-- **Verification**: `scoring.spec.ts` and `run-benchmark.spec.ts` pass (14/14 tests).
+- `extraction/benchmark/run-benchmark.ts` + `scoring.ts` report per-field accuracy, latency
+  percentiles and peak RSS. The report's review share is labelled "before vendor matching (not the
+  production rate)" because the corpus run has no tenant vendors. Verified by `scoring.spec.ts`,
+  `run-benchmark.spec.ts`. `docs/benchmark/benchmark.md` is a dev-corpus run, not the #24 corpus.
 
-### REQ-42-6: API responsiveness during worker batch processing
+### REQ-42-6: API responsiveness during batch processing — not measured
 
-- **Implementation**: Architecture decoupling: API process only enqueues to Redis queue;
-  worker processes in dedicated child processes with concurrency capped at 1–2.
-- **Verification**: `intake-queue.service.spec.ts` passes. `intake.e2e-spec.ts` verifies authenticated requests remain responsive (<500ms p95, agreed threshold per CTO decision) while a stubbed worker drains a batch. Physical on-Pi measurement run with the frozen #24 corpus is tracked in follow-up issue #158.
+- Design: the API process never extracts; the worker is a separate process. That is a design
+  property, not a measurement. A previous e2e check that timed requests against a timer-stubbed
+  worker measured nothing about extraction load and was removed; no latency claim remains.
+- Open: run the real extraction path on the #24 corpus while polling an authenticated API route,
+  report probe count, errors and p95, and get a threshold agreed (protocol in
+  `docs/strategy/pi-cpu-extraction-runtime.md`).
 
-### REQ-42-7: Worker healthcheck and Pi deployment topology
+### REQ-42-7: Bounded results and mixed PDFs (review round)
 
-- **Implementation**: `apps/api/src/intake-worker-healthcheck.ts` checks the heartbeat file without
-  booting NestJS; `deploy/pi/docker-compose.pi.yml` uses it as the `intake-worker` healthcheck.
-- **Verification**: `intake-worker-healthcheck.spec.ts` and `health/healthcheck.spec.ts` pass;
-  `bash deploy/pi/scripts/worker-health.test.sh` → `8 worker health checks passed`.
+- Native-PDF text kept in a job is capped at 200,000 characters with a `RAW_TEXT_TRUNCATED` warning
+  (`cpu-structured.ts`); the original stays in private storage. Verified by `cpu-structured.spec.ts`
+  and the oversized-text-layer case in `cpu-extraction.spec.ts`.
+- A PDF with a text cover page and scanned later pages is no longer taken as text-only: pages with
+  no usable text layer are rendered and recognized, in page order, with the weaker confidence.
+  Verified by the "mixed PDF" cases in `cpu-extraction.spec.ts`.
+- The `language` upload option was never forwarded to the worker, which always loads `ara+eng`;
+  it is now documented as deprecated and ignored (OpenAPI).
+- An unresolved vendor (`matchedVendor === null`) routes a job to `NEEDS_REVIEW`; the seeded e2e
+  specs were corrected to expect that and decimal-string money (`"115.0000"`).
 
----
+## Checks run locally
 
-## Test execution summary
+| Command (run from the repo root, at the tested commit)                                                                                            | Result                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm --filter api exec jest --maxWorkers=2 src/modules/ai/intake src/modules/ai/extraction/benchmark src/modules/ai/controllers/document-intake` | 15 suites passed, 1 skipped (Linux-only `prlimit`); 307 tests passed, 9 skipped; 0 failed                                                                                                     |
+| `pnpm --filter api exec jest src/modules/ai/intake/cpu-extraction.spec.ts`                                                                        | 27 tests passed (includes the oversized-text and three mixed-PDF cases)                                                                                                                       |
+| `npx eslint` on every changed API/test `.ts` file                                                                                                 | Exit 0, no output                                                                                                                                                                             |
+| `pnpm --filter api type-check` (`tsc --noEmit`, then `-p test/tsconfig.e2e.json`)                                                                 | Exit 1 from 10 `TS2307` errors: `@mizano/shared-types` has no `dist` here (package not built). None in changed files; the e2e project reports the same errors only. Not caused by this change |
+| `pnpm ci:full`, `pnpm --filter api test:e2e`, web suite                                                                                           | **Not run locally** (owner rule: the full suite runs on GitHub-hosted CI; no PostgreSQL/Redis here)                                                                                           |
 
-| Command                                                                     | Result                                                                                       |
-| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `pnpm ci:full`                                                              | Exit 0; 12 tasks successful, 0 errors, 0 warnings                                            |
-| ↳ API Jest (inside `ci:full`)                                               | 151 suites passed, 1 skipped; 2,469 tests passed, 9 skipped (the Linux-only `prlimit` suite) |
-| ↳ Web Jest (inside `ci:full`)                                               | 48 suites passed, 458 tests passed                                                           |
-| `bash deploy/pi/scripts/worker-health.test.sh`                              | 8 checks passed                                                                              |
-| Pi p50/p95 and peak RAM per document type; API p95 on the Pi during a batch | Delegated to CI runner with frozen corpus from S3; tracked in follow-up #158                 |
+## Not run / unknown
 
-### Review-round additions (PR #93)
-
-- **Unresolved vendor goes to review**: `needsReview` treats `matchedVendor === null` (no match, or a tie) as an exception; `undefined` (matching not run, e.g. the benchmark) is not. Verified in `intake-processor.service.spec.ts`.
-- **Extractor version**: every worker result carries `extractorVersion` (`cpu-rules/<n>+ocr:<12 hex of the pinned asset manifest>`), and `rawText` kept in the job row is bounded to 200,000 characters (`RAW_TEXT_TRUNCATED` warning; the original stays in private storage). Verified in `cpu-structured.spec.ts`.
-- **Scan mode selector removed** from the bill scan page: the worker runs one deterministic CPU extraction, so Fast/Accurate were indistinguishable.
-- **e2e-army natural-language test suite**: `e2e-army/42-cpu-intake-scan.e2e.ts` covers bill scan upload, Arabic RTL scan page, and unauthenticated intake rejection (`feat:mz-bill-scan`, `feat:mz-document-intake`).
-- **CTO decisions incorporated**: API p95 threshold gate agreed at 500ms (asserted in `intake.e2e-spec.ts`); PR #93 description updated to `Refs #42`; follow-up issue #158 created for the on-Pi measurement run.
+- Seeded API e2e (`test/intake.e2e-spec.ts`) and the browser e2e-army journey: need PostgreSQL,
+  Redis and the hub runner; left to CI / the `e2e-army` gate.
+- Linux `prlimit` process suite, Poppler on a scanned/mixed PDF (unit-tested with mocked tools only),
+  arm64 image build and size: not run here.
+- Latency, peak RAM per document type and API p95 under a backlog: **Unknown**.
+- `deploy/pi/` scripts (including rollback to a pre-worker image) were not touched; the Pi target is
+  retired.
