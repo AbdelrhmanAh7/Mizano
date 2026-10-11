@@ -8,14 +8,32 @@ import {
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
-import { AssetStatus } from '@prisma/client';
+import { AssetStatus, Prisma } from '@prisma/client';
 import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 import { describeError } from '../../../common/utils/redact';
 import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
 
+interface Period {
+  month: number;
+  year: number;
+}
+
 /** Last day of a schedule month (UTC): the accounting date of its depreciation journal. */
 function periodEnd(month: number, year: number): Date {
   return new Date(Date.UTC(year, month, 0));
+}
+
+const isAfter = (a: Period, b: Period): boolean =>
+  a.year > b.year || (a.year === b.year && a.month > b.month);
+
+/** Schedule rows strictly after a period. */
+function after(p: Period): Prisma.DepreciationScheduleWhereInput {
+  return { OR: [{ year: { gt: p.year } }, { year: p.year, month: { gt: p.month } }] };
+}
+
+/** Schedule rows strictly before a period. */
+function before(p: Period): Prisma.DepreciationScheduleWhereInput {
+  return { OR: [{ year: { lt: p.year } }, { year: p.year, month: { lt: p.month } }] };
 }
 
 @Injectable()
@@ -62,8 +80,10 @@ export class DepreciationService {
   }
 
   /**
-   * Run the current month's depreciation for every active asset of an organization. Shares
-   * {@link postSchedule} with the manual run, so a schedule already posted by either is skipped.
+   * Posts every active asset's open periods up to the current month, oldest first, resuming
+   * after the asset's latest posted period; an asset with nothing posted yet starts at the
+   * current month. Shares {@link postSchedule} with the manual run, so a schedule already posted
+   * by either is skipped, and a missed month is caught up instead of blocking the next one.
    */
   async runMonthlyDepreciation(organizationId: string): Promise<{
     processed: number;
@@ -71,35 +91,52 @@ export class DepreciationService {
     totalDepreciation: number;
   }> {
     const today = new Date();
-    const month = today.getUTCMonth() + 1;
-    const year = today.getUTCFullYear();
+    const current: Period = { month: today.getUTCMonth() + 1, year: today.getUTCFullYear() };
 
-    const due = await this.prisma.depreciationSchedule.findMany({
+    const open = await this.prisma.depreciationSchedule.findMany({
       where: {
         organizationId,
-        month,
-        year,
         executedAt: null,
         amount: { gt: 0 },
+        OR: [{ year: { lt: current.year } }, { year: current.year, month: { lte: current.month } }],
         asset: { organizationId, status: AssetStatus.ACTIVE, deletedAt: null },
       },
-      select: { assetId: true },
+      select: { assetId: true, month: true, year: true },
+      orderBy: [{ year: 'asc' }, { month: 'asc' }],
     });
+    const assetIds = [...new Set(open.map((s) => s.assetId))];
+    const latestPosted = await this.prisma.depreciationSchedule.findMany({
+      where: { organizationId, assetId: { in: assetIds }, executedAt: { not: null } },
+      orderBy: [{ year: 'desc' }, { month: 'desc' }],
+      distinct: ['assetId'],
+      select: { assetId: true, month: true, year: true },
+    });
+    const resumeAfter = new Map(latestPosted.map((s) => [s.assetId, s]));
 
     let journalsCreated = 0;
     let totalDepreciation = new Decimal(0);
 
-    for (const { assetId } of due) {
-      try {
-        const posted = await this.postSchedule(organizationId, assetId, month, year);
-        journalsCreated++;
-        totalDepreciation = totalDepreciation.add(posted.amount);
-      } catch (error) {
-        // Posted meanwhile by a manual run: nothing left to do for this asset.
-        if (error instanceof ConflictException) continue;
-        this.logger.error(
-          `Failed to process depreciation for asset ${assetId}: ${describeError(error, { includeMessage: false })}`,
-        );
+    for (const assetId of assetIds) {
+      const last = resumeAfter.get(assetId);
+      const due = open.filter(
+        (s) =>
+          s.assetId === assetId &&
+          (last ? isAfter(s, last) : s.month === current.month && s.year === current.year),
+      );
+      for (const { month, year } of due) {
+        try {
+          const posted = await this.postSchedule(organizationId, assetId, month, year);
+          journalsCreated++;
+          totalDepreciation = totalDepreciation.add(posted.amount);
+        } catch (error) {
+          // Posted meanwhile by a manual run: carry on with the next period.
+          if (error instanceof ConflictException) continue;
+          this.logger.error(
+            `Failed to process depreciation for asset ${assetId}: ${describeError(error, { includeMessage: false })}`,
+          );
+          // Its later periods cannot post past the one that failed.
+          break;
+        }
       }
     }
 
@@ -131,9 +168,9 @@ export class DepreciationService {
 
   /**
    * Posts one schedule period through the ledger command, dated on the period end. Under the
-   * ledger lock the schedule is claimed by a guarded update, and the journal carries
-   * DEPRECIATION:scheduleId, so a concurrent cron and manual run post it once. A period re-run
-   * after a reversal gets the suffix `:<n>` (n = reversed postings so far).
+   * ledger lock the period order is checked, the schedule is claimed by a guarded update, and the
+   * journal carries DEPRECIATION:scheduleId, so a concurrent cron and manual run post it once. A
+   * period re-run after a reversal gets the suffix `:<n>` (n = reversed postings so far).
    */
   private async postSchedule(
     organizationId: string,
@@ -156,6 +193,7 @@ export class DepreciationService {
       if (!schedule.amount.greaterThan(0)) {
         throw new BadRequestException('Nothing to depreciate for this period');
       }
+      await this.assertPostable(tx, organizationId, schedule);
 
       const { count } = await tx.depreciationSchedule.updateMany({
         where: { id: schedule.id, organizationId, executedAt: null },
@@ -206,18 +244,71 @@ export class DepreciationService {
         where: { id: schedule.id },
         data: { journalId: journal.id },
       });
-      await tx.asset.update({
-        where: { id: assetId },
-        data: {
-          accumulatedDepreciation: schedule.accumulatedTotal,
-          currentBookValue: schedule.bookValue,
-          ...(schedule.bookValue.equals(asset.salvageValue) && {
-            status: AssetStatus.FULLY_DEPRECIATED,
-          }),
-        },
-      });
+      await this.syncAssetRegister(tx, organizationId, asset);
 
       return { journalId: journal.id, amount: schedule.amount };
+    });
+  }
+
+  /**
+   * Periods post in order: never behind a later posted period, and once an asset has posted
+   * depreciation no open period may be skipped. The first posting may start at any period, so a
+   * backdated asset begins depreciating in the period it is first run.
+   */
+  private async assertPostable(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    schedule: Period & { assetId: string },
+  ): Promise<void> {
+    const latest = await tx.depreciationSchedule.findFirst({
+      where: { assetId: schedule.assetId, organizationId, executedAt: { not: null } },
+      orderBy: [{ year: 'desc' }, { month: 'desc' }],
+      select: { month: true, year: true },
+    });
+    if (!latest) return;
+    if (isAfter(latest, schedule)) {
+      throw new BadRequestException(
+        'A later depreciation period is already posted; reverse it first',
+      );
+    }
+    const skipped = await tx.depreciationSchedule.findFirst({
+      where: {
+        assetId: schedule.assetId,
+        organizationId,
+        executedAt: null,
+        amount: { gt: 0 },
+        AND: [after(latest), before(schedule)],
+      },
+      select: { id: true },
+    });
+    if (skipped) throw new BadRequestException('Post the earlier open depreciation periods first');
+  }
+
+  /**
+   * The asset register follows the ledger: accumulated depreciation is the sum of the posted
+   * periods, the book value is cost less that sum, and the asset is fully depreciated once its
+   * book value reaches the salvage value.
+   */
+  private async syncAssetRegister(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    asset: { id: string; purchasePrice: Decimal; salvageValue: Decimal },
+  ): Promise<void> {
+    const posted = await tx.depreciationSchedule.aggregate({
+      where: { assetId: asset.id, organizationId, executedAt: { not: null } },
+      _sum: { amount: true },
+    });
+    const accumulated = posted._sum.amount ?? new Decimal(0);
+    const bookValue = asset.purchasePrice.sub(accumulated);
+    await tx.asset.update({
+      where: { id: asset.id },
+      data: {
+        accumulatedDepreciation: accumulated,
+        currentBookValue: bookValue,
+        status: bookValue.greaterThan(asset.salvageValue)
+          ? AssetStatus.ACTIVE
+          : AssetStatus.FULLY_DEPRECIATED,
+      },
     });
   }
 
@@ -285,8 +376,9 @@ export class DepreciationService {
   }
 
   /**
-   * Reverses a posted depreciation period with a linked reversal journal. The original journal
-   * stays posted (history is immutable); the schedule is reopened so the period can be re-run.
+   * Reverses the asset's latest posted depreciation period with a linked reversal journal. The
+   * original journal stays posted (history is immutable); the schedule is reopened so the period
+   * can be re-run, and the asset register follows the remaining posted periods.
    */
   async reverseDepreciation(organizationId: string, scheduleId: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
@@ -303,6 +395,16 @@ export class DepreciationService {
       if (schedule.asset.status === AssetStatus.DISPOSED) {
         throw new BadRequestException('Cannot reverse depreciation of a disposed asset');
       }
+      const later = await tx.depreciationSchedule.findFirst({
+        where: {
+          assetId: schedule.assetId,
+          organizationId,
+          executedAt: { not: null },
+          ...after(schedule),
+        },
+        select: { id: true },
+      });
+      if (later) throw new BadRequestException('Reverse the later depreciation periods first');
 
       const { count } = await tx.depreciationSchedule.updateMany({
         where: { id: scheduleId, organizationId, journalId: schedule.journalId },
@@ -315,20 +417,7 @@ export class DepreciationService {
         source: { type: JournalSourceType.DEPRECIATION_REVERSAL, id: schedule.journalId },
       });
 
-      // Recalculate asset accumulated depreciation
-      const lastExecuted = await tx.depreciationSchedule.findFirst({
-        where: { assetId: schedule.assetId, organizationId, executedAt: { not: null } },
-        orderBy: [{ year: 'desc' }, { month: 'desc' }],
-      });
-
-      await tx.asset.update({
-        where: { id: schedule.assetId },
-        data: {
-          accumulatedDepreciation: lastExecuted?.accumulatedTotal ?? new Decimal(0),
-          currentBookValue: lastExecuted?.bookValue ?? schedule.asset.purchasePrice,
-          status: AssetStatus.ACTIVE,
-        },
-      });
+      await this.syncAssetRegister(tx, organizationId, schedule.asset);
     });
   }
 }
