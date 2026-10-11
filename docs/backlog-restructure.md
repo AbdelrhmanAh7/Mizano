@@ -6,7 +6,7 @@ Owner ask: smaller, linked tasks with no duplicate work, a vision with clear goa
 
 | | before | after |
 |---|---|---|
-| Open issues | 54 | 65 |
+| Open issues | 54 | 68 |
 | Open issues in a goal milestone | 0 | 60 |
 | Duplicates closed (as duplicate, cross-linked) | — | 1 |
 | Stale/obsolete closed (not planned, with reason) | — | 1 |
@@ -20,7 +20,7 @@ Owner ask: smaller, linked tasks with no duplicate work, a vision with clear goa
 ## Goals
 
 - [MZ G1 · Safe, green master (P0 blockers)](https://github.com/AbdelrhmanAh7/Mizano/milestone/13) — due 2026-10-16 — demo #175
-- [MZ G2 · Pi stable: 15/15 pilot features green](https://github.com/AbdelrhmanAh7/Mizano/milestone/14) — due 2026-10-23 — demo #176
+- [MZ G2 · Mac mini stable: 15/15 pilot features green](https://github.com/AbdelrhmanAh7/Mizano/milestone/14) — due 2026-10-23 — demo #176
 - [MZ G3 · Bill scan to posted entry, feature-complete](https://github.com/AbdelrhmanAh7/Mizano/milestone/15) — due 2026-10-30 — demo #177
 - [MZ G4 · Pilot launch: 3 accountants post a scanned bill](https://github.com/AbdelrhmanAh7/Mizano/milestone/16) — due 2026-11-02 — demo #178
 - [MZ G5 · FlowLine integration API (keys + webhooks)](https://github.com/AbdelrhmanAh7/Mizano/milestone/17) — due 2026-11-16 — demo #179
