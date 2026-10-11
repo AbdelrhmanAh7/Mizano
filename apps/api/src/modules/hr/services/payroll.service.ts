@@ -37,28 +37,38 @@ export class PayrollService {
     const existing = await this.prisma.payrollRun.findFirst({
       where: { organizationId, month: dto.month, year: dto.year },
     });
-    if (existing && existing.deletedAt === null && existing.status !== PayrollStatus.DRAFT) {
+    if (existing && existing.deletedAt === null) {
+      // A live draft has no payslips or journal yet: it is reused as is.
+      if (existing.status === PayrollStatus.DRAFT) return existing;
       throw new BadRequestException('Payroll run already exists for this period');
     }
     if (existing) {
       return this.prisma.$transaction(async (tx) => {
-        // A deleted unpaid run is restored as a fresh draft. Its soft-deleted
-        // payslips hold the (payrollRunId, employeeId) unique keys and have no
-        // ledger effect, so they are removed to let a recalculation recreate them.
-        await tx.payslip.deleteMany({ where: { payrollRunId: existing.id } });
-        return tx.payrollRun.update({
-          where: { id: existing.id },
+        // A deleted run was never paid: the guarded claim brings it back as a
+        // fresh draft, and a paid or concurrently restored run is left alone.
+        const { count } = await tx.payrollRun.updateMany({
+          where: {
+            id: existing.id,
+            organizationId,
+            deletedAt: { not: null },
+            status: { not: PayrollStatus.PAID },
+          },
           data: {
             deletedAt: null,
             status: PayrollStatus.DRAFT,
             processedAt: null,
-            paidAt: null,
-            journalId: null,
             totalGross: new Decimal(0),
             totalDeductions: new Decimal(0),
             totalNet: new Decimal(0),
           },
         });
+        if (count === 0) throw new ConflictException('Payroll run already exists for this period');
+        // Its discarded payslips never reached the ledger; they would block the
+        // recalculation on the (payrollRunId, employeeId) unique key.
+        await tx.payslip.deleteMany({
+          where: { payrollRunId: existing.id, deletedAt: { not: null } },
+        });
+        return tx.payrollRun.findUniqueOrThrow({ where: { id: existing.id } });
       });
     }
 
@@ -474,14 +484,10 @@ export class PayrollService {
         },
         data: { deletedAt },
       });
-      // Only payslips of the claimed, still unpaid runs are soft-deleted
-      // with them; a PAID run's payslips stay live.
+      // Only payslips of the runs this transaction claimed (same deletedAt)
+      // are soft-deleted with them; a paid run's payslips stay live.
       await tx.payslip.updateMany({
-        where: {
-          payrollRunId: { in: ids },
-          deletedAt: null,
-          payrollRun: { organizationId, status: { not: PayrollStatus.PAID } },
-        },
+        where: { deletedAt: null, payrollRun: { id: { in: ids }, organizationId, deletedAt } },
         data: { deletedAt },
       });
       return result.count;
