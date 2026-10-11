@@ -49,7 +49,11 @@ export class StageTimer {
     const running = this.current;
     this.current = null;
     if (!running || at === null) return;
-    const ms = Math.max(0, Math.round(at - running.startedAt));
-    this.timings[running.stage] = (this.timings[running.stage] ?? 0) + ms;
+    const diff = at - running.startedAt;
+    if (!Number.isFinite(diff)) return;
+    const ms = Math.max(0, Math.round(diff));
+    const total = (this.timings[running.stage] ?? 0) + ms;
+    if (!Number.isSafeInteger(total)) return;
+    this.timings[running.stage] = total;
   }
 }
