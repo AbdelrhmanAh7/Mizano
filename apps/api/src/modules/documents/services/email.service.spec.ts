@@ -30,10 +30,11 @@ function buildPrisma(options: FakeOptions = {}): Record<string, Record<string, j
     payrollRun: { month: 9, year: 2026, periodStart: null, periodEnd: null, payDate: null },
   };
   // A soft-deleted row is returned only to a query that does not filter
-  // `deletedAt` out, exactly like the database behaves.
+  // `deletedAt` out, exactly like the database behaves: a deleted payslip is
+  // hidden by its own filter, a deleted run by the payroll-run relation filter.
   const payslipVisible = (where: WhereClause) =>
-    !options.payslipDeleted ||
-    (where.deletedAt === undefined && where.payrollRun?.deletedAt === undefined);
+    (!options.payslipDeleted || where.deletedAt === undefined) &&
+    (!options.runDeleted || where.payrollRun?.deletedAt === undefined);
   const runVisible = (where: { deletedAt?: null }) =>
     !options.runDeleted || where.deletedAt === undefined;
   return {
