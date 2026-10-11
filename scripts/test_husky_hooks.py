@@ -15,6 +15,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 PRE_PUSH = ROOT / ".husky" / "pre-push"
+PRE_COMMIT = ROOT / ".husky" / "pre-commit"
 ZERO = "0" * 40
 
 
@@ -166,6 +167,64 @@ class PrePushHookTests(unittest.TestCase):
                     break
                 time.sleep(0.1)
             self.assertFalse(pid_alive(pid), f"pid {pid} survived the watchdog")
+
+
+class PreCommitHookTests(unittest.TestCase):
+    """The real .husky/pre-commit with a recording _lint_staged.js: staged files only, 60 s watchdog."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="mz-precommit-"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.repo = self.tmp / "repo"
+        (self.repo / ".husky").mkdir(parents=True)
+        git(self.repo, "init", "-q", "-b", "master")
+        git(self.repo, "config", "user.email", "t@example.com")
+        git(self.repo, "config", "user.name", "t")
+        shutil.copy(PRE_COMMIT, self.repo / ".husky" / "pre-commit")
+        (self.repo / "node_modules" / "eslint" / "bin").mkdir(parents=True)
+        (self.repo / "node_modules" / "eslint" / "bin" / "eslint.js").write_text("")
+        (self.repo / "node_modules" / "prettier").mkdir(parents=True)
+        (self.repo / "node_modules" / "prettier" / "bin").mkdir()
+        (self.repo / "node_modules" / "prettier" / "bin" / "prettier.cjs").write_text("")
+        self.log = self.tmp / "staged.log"
+        self.runner(f"require('fs').writeFileSync({str(self.log)!r}, require('child_process')"
+                    ".execSync('git diff --cached --name-only').toString());")
+        (self.repo / "staged.md").write_text("a")
+        (self.repo / "unstaged.md").write_text("b")
+        git(self.repo, "add", "staged.md")
+
+    def runner(self, js):
+        (self.repo / "_lint_staged.js").write_text(js)
+
+    def run_hook(self, **env):
+        clean = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+        clean.update(env)
+        return subprocess.run(["sh", str(self.repo / ".husky" / "pre-commit")], cwd=self.repo,
+                              env=clean, capture_output=True, text=True, timeout=60)
+
+    def test_lints_only_the_staged_files(self):
+        result = self.run_hook()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.log.read_text().split(), ["staged.md"])
+
+    def test_failing_lint_blocks_the_commit(self):
+        self.runner("process.exit(1);")
+        self.assertEqual(self.run_hook().returncode, 1)
+
+    def test_missing_node_modules_skips_with_a_note(self):
+        (self.repo / "node_modules" / "eslint" / "bin" / "eslint.js").unlink()
+        result = self.run_hook()
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("node_modules missing", result.stdout)
+        self.assertFalse(self.log.exists())
+
+    def test_watchdog_stops_a_hung_lint_run(self):
+        self.runner("setTimeout(() => {}, 60000);")
+        started = time.monotonic()
+        result = self.run_hook(MZ_PRECOMMIT_LIMIT_SECONDS="2")
+        self.assertEqual(result.returncode, 124, result.stdout + result.stderr)
+        self.assertLess(time.monotonic() - started, 30)
+        self.assertIn("exceeded the 2s limit", result.stderr)
 
 
 if __name__ == "__main__":
