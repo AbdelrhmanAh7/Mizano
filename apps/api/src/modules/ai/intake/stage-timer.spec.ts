@@ -71,10 +71,12 @@ describe('@issue-126 StageTimer', () => {
     expect(timer.snapshot()).toEqual({});
   });
 
-  it('does not record a stage that overflows Number.MAX_SAFE_INTEGER', () => {
-    const timer = new StageTimer(scripted(0, Number.MAX_SAFE_INTEGER));
-    timer.start('load');
-    timer.stop();
-    expect(timer.snapshot()).toEqual({});
+  it('does not record a repeated stage whose total overflows Number.MAX_SAFE_INTEGER', () => {
+    const max = Number.MAX_SAFE_INTEGER;
+    const timer = new StageTimer(scripted(0, max, 2 * max));
+    timer.start('load'); // reading 0
+    timer.start('load'); // reading max: records load = max
+    timer.stop(); // reading 2 * max: max + max is not a safe integer, so it is dropped
+    expect(timer.snapshot()).toEqual({ load: max });
   });
 });
