@@ -70,7 +70,7 @@ describe('@issue-134 test gates', () => {
       expect(e2eJob).toBeDefined();
       const job = e2eJob ?? '';
       expect(job).toMatch(/image: postgres:16/);
-      expect(job).toMatch(/prisma migrate deploy/);
+      expect(job).toMatch(/prisma db:migrate deploy/);
       expect(job).toMatch(/DATABASE_URL: postgresql:\/\//);
       expect(job).toMatch(/^\s+run: pnpm test:e2e\s*$/m);
     },

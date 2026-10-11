@@ -99,7 +99,7 @@ jobs:
   # ==========================================
   # Every unit test mocks Prisma and Redis (apps/api/src/test/mocks); the suites pass with an unreachable DATABASE_URL, so
   # the job needs no service containers and no `db:push` (slim-down 2026-10-10, docs/slimdown-plan.md). The real-database
-  # API e2e specs run in nightly.yml.
+  # API e2e specs run in the `e2e` job below.
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -178,3 +178,66 @@ jobs:
         run: pnpm build
         env:
           NEXT_PUBLIC_API_URL: https://api.example.com
+
+  # ==========================================
+  # E2E Tests (real-database API suites)
+  # ==========================================
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Run database migrations
+        run: pnpm db:migrate deploy
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+          REDIS_URL: redis://127.0.0.1:6379
+
+      - name: Run E2E tests
+        run: pnpm test:e2e
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+          REDIS_URL: redis://127.0.0.1:6379
