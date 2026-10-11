@@ -36,6 +36,10 @@ and reads the space available to the API on `DATA_DIR`, else `INTAKE_STORAGE_DIR
 `{status:"ok", db:"ok", disk:{freeBytes, freePct}}`, otherwise 503 with `status:"fail"` and only the failed probe marked:
 `db:"fail"` when the query fails or times out (`disk` keeps its numbers), `disk:"fail"` when free space is below
 `READY_MIN_FREE_PCT` (default 10; invalid values fall back to 10) or unreadable (`db` stays `"ok"`).
+A timed-out `SELECT 1` cannot be cancelled through Prisma, so at most two such queries are left outstanding; while both
+are still hanging, readiness reports `db:"fail"` without opening another connection. `deploy/pi/docker-compose.pi.yml`
+whitelists the API environment and does not yet pass `READY_DB_TIMEOUT_MS` or `READY_MIN_FREE_PCT`, so on the Pi the
+defaults apply until a compose follow-up forwards them (compose files are out of scope for #110).
 
 ## Commands
 

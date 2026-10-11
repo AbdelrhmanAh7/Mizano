@@ -241,18 +241,60 @@ describe('ReadinessService', () => {
     });
 
     it('@issue-110 unit: READY_DB_TIMEOUT_MS=5000 allows a query slower than the 2s default budget to finish', async () => {
-      process.env.READY_DB_TIMEOUT_MS = '5000';
-      // Mock query to resolve after default timeout (2000ms) but before configured timeout (5000ms)
-      const queryPromise = new Promise((resolve) =>
-        setTimeout(() => resolve([{ '?column?': 1 }]), 2100),
-      );
-      (prismaService.$queryRaw as any).mockReturnValue(queryPromise);
+      jest.useFakeTimers();
+      try {
+        process.env.READY_DB_TIMEOUT_MS = '5000';
+        // Resolves after the 2000 ms default timeout but before the configured 5000 ms.
+        (prismaService.$queryRaw as jest.Mock).mockReturnValue(
+          new Promise((resolve) => setTimeout(() => resolve([{ '?column?': 1 }]), 2100)),
+        );
+        statfsSpy.mockResolvedValue(okDisk);
+
+        const pending = service.check();
+        await jest.advanceTimersByTimeAsync(2100);
+        const report = await pending;
+
+        expect(report.db).toBe('ok');
+        expect(prismaService.$queryRaw as jest.Mock).toHaveBeenCalledTimes(1);
+      } finally {
+        jest.useRealTimers();
+        delete process.env.READY_DB_TIMEOUT_MS;
+      }
+    });
+
+    it('@issue-110 unit: repeated hangs never leave more than two timed-out queries outstanding', async () => {
+      process.env.READY_DB_TIMEOUT_MS = '20';
+      const queryRaw = prismaService.$queryRaw as jest.Mock;
+      queryRaw.mockReturnValue(new Promise(() => undefined));
       statfsSpy.mockResolvedValue(okDisk);
 
-      const report = await service.check();
+      const reports = [];
+      for (let i = 0; i < 5; i += 1) reports.push(await service.check());
 
-      expect(report.db).toBe('ok');
-      expect(prismaService.$queryRaw as any).toHaveBeenCalledTimes(1);
+      expect(reports.map((r) => r.db)).toEqual(['fail', 'fail', 'fail', 'fail', 'fail']);
+      expect(queryRaw).toHaveBeenCalledTimes(2);
+      delete process.env.READY_DB_TIMEOUT_MS;
+    });
+
+    it('@issue-110 unit: a timed-out query that finally settles releases its outstanding allowance', async () => {
+      process.env.READY_DB_TIMEOUT_MS = '20';
+      const queryRaw = prismaService.$queryRaw as jest.Mock;
+      const releases: Array<(value: unknown) => void> = [];
+      queryRaw.mockImplementationOnce(() => new Promise((resolve) => releases.push(resolve)));
+      queryRaw.mockImplementationOnce(() => new Promise((resolve) => releases.push(resolve)));
+      queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+      statfsSpy.mockResolvedValue(okDisk);
+
+      await service.check();
+      await service.check();
+      expect((await service.check()).db).toBe('fail');
+      expect(queryRaw).toHaveBeenCalledTimes(2);
+
+      releases[0]([{ '?column?': 1 }]);
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect((await service.check()).db).toBe('ok');
+      expect(queryRaw).toHaveBeenCalledTimes(3);
       delete process.env.READY_DB_TIMEOUT_MS;
     });
 

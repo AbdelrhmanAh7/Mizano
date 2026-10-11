@@ -109,4 +109,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Persist deploy state where later commands read it.** Pinned digests live in `.env.pi` (atomic rewrite of those keys only), or a later `compose up` silently reverts to the old images.
 - **Rollback must be repeatable.** Track an active pointer in `deployments.log` (`OK`/`ROLLBACK` lines), not "the previous OK line", or the second rollback is a no-op.
 - **Check DB readiness over TCP** (`pg_isready -h 127.0.0.1`). The temporary init server listens on the unix socket only and passes a socket probe.
+- **A timeout that frees a slot must still bound what it abandons.** Racing a query against a timer does not cancel it: clearing the single-flight slot lets the endpoint recover, but cap the abandoned queries (readiness allows two) or a persistent hang drains the connection pool. Test both the recovery and the cap.
+- **Probe the volume that is actually mounted.** A disk check on the working directory measures the container overlay, not the SSD; resolve `DATA_DIR`, then `INTAKE_STORAGE_DIR`, and never put the path in the response.
+- **Log the unrounded value that decided a failure,** or a 9.999 % reading rounds to "10 % free, minimum 10 %" and a real 503 looks inconsistent.
 - **Dedupe alerts on stable keys** (check name), never on live values like percentages; alert once on start and once on recovery.

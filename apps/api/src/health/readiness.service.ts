@@ -16,6 +16,8 @@ export interface ReadinessReport {
 
 const DEFAULT_MIN_FREE_PCT = 10;
 const DEFAULT_DB_TIMEOUT_MS = 2000;
+/** Timed-out probes that may still hold a pool connection; beyond this readiness fails without a new query. */
+const MAX_ABANDONED_DB_PROBES = 2;
 
 /** Parses a positive-number env var, falling back when it is unset, non-numeric or out of range. */
 function envNumber(name: string, fallback: number, max: number): number {
@@ -29,12 +31,16 @@ function envNumber(name: string, fallback: number, max: number): number {
  * open, and the report only ever contains fixed strings and two numbers: error text and paths
  * stay in the (redacted) log. At most one `SELECT 1` is in flight: requests arriving while it is
  * pending share it, so timed-out probes cannot pile up in the Prisma pool queue (that wait is
- * itself bounded by `pool_timeout`, see PrismaService).
+ * itself bounded by `pool_timeout`, see PrismaService). A timed-out `SELECT 1` cannot be cancelled
+ * through Prisma, so its slot is freed (the endpoint recovers with the database) but at most
+ * `MAX_ABANDONED_DB_PROBES` such queries may be outstanding; past that readiness reports `db`
+ * failing without opening another connection, so a persistent hang cannot drain the pool.
  */
 @Injectable()
 export class ReadinessService {
   private readonly logger = new Logger(ReadinessService.name);
   private pendingDbQuery?: Promise<unknown>;
+  private abandonedDbProbes = 0;
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -66,13 +72,23 @@ export class ReadinessService {
       }, timeoutMs);
     });
     try {
+      if (!this.pendingDbQuery && this.abandonedDbProbes >= MAX_ABANDONED_DB_PROBES) {
+        throw new Error('too many timed-out readiness db probes still outstanding');
+      }
       query = this.pendingDbQuery ??= this.startDbQuery();
       await Promise.race([query, timeout]);
       return 'ok';
     } catch (error) {
       // A hung query must not pin the slot: the next request starts a fresh probe, so the
       // endpoint recovers as soon as the database does and handlers never pile up on a stale promise.
-      if (timedOut && this.pendingDbQuery === query) this.pendingDbQuery = undefined;
+      if (timedOut && query && this.pendingDbQuery === query) {
+        this.pendingDbQuery = undefined;
+        this.abandonedDbProbes += 1;
+        const settled = (): void => {
+          this.abandonedDbProbes -= 1;
+        };
+        query.then(settled, settled);
+      }
       this.logger.warn(`DB probe failed: ${describeError(error, { includeMessage: false })}`);
       return 'fail';
     } finally {
@@ -92,7 +108,9 @@ export class ReadinessService {
       const rawPct = blocks > 0 ? (bavail / blocks) * 100 : 0;
       const freePct = Math.round(rawPct * 100) / 100;
       if (rawPct < minFreePct) {
-        this.logger.warn(`Disk probe below threshold: ${freePct}% free, minimum ${minFreePct}%`);
+        this.logger.warn(
+          `Disk probe below threshold: ${rawPct}% free (unrounded), minimum ${minFreePct}%`,
+        );
         return 'fail';
       }
       return { freeBytes: bavail * Number(stat.bsize), freePct };
