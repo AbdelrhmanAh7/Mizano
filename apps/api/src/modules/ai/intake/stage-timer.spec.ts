@@ -66,6 +66,15 @@ describe('@issue-126 StageTimer', () => {
 
   it('skips a stage when the clock reads produce an infinite difference', () => {
     const timer = new StageTimer(scripted(-1e308, 1e308));
+    expect(() => {
+      timer.start('load');
+      timer.stop();
+    }).not.toThrow();
+    expect(timer.snapshot()).toEqual({});
+  });
+
+  it('skips a single finite duration above the safe integer limit', () => {
+    const timer = new StageTimer(scripted(0, Number.MAX_SAFE_INTEGER + 1));
     timer.start('load');
     timer.stop();
     expect(timer.snapshot()).toEqual({});
