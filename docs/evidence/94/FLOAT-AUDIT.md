@@ -1,37 +1,25 @@
-# AI questions and follow-ups: issue #94
+# Float audit and follow-ups: issue #94
 
 **Status: partly done, and not complete against the brief.** The brief asks to audit every money calculation and replace float use, and to prove atomic, idempotent posting. Only these parts are done and tested (see [EVIDENCE.md](EVIDENCE.md)):
 
 - the single ledger command (`JournalsService.create`) and the invoice-send path that goes through it: exact decimal storage and transport, one journal per source event under replay and 8-way concurrency, and no partial rows on failure;
 - the float balance check in `packages/validators`.
 
-These gates stay **open** until the owner either accepts the follow-ups below or narrows the acceptance criteria:
+These gates stay **open** for the rest until F1–F8 below are done:
 
-- **Atomic, idempotent posting** does not hold for assets (depreciation and disposal), payroll and manufacturing. They write journals with `tx.journal.create`, outside the single command, with no ledger lock and no source key (Decision 2, F1–F3).
-- **Decimal arithmetic** is not done everywhere. The audit still finds 695 float hits on HEAD, including 53 ledger-class and 12 DTO-class hits, listed below (F1–F8).
+- **Atomic, idempotent posting** does not hold for assets (depreciation and disposal), payroll and manufacturing. They write journals with `tx.journal.create`, outside the single command, with no ledger lock and no source key (F1–F3):
+  - asset depreciation and disposal: `assets/services/depreciation.service.ts:105,224` and `assets.service.ts:650`
+  - payroll: `hr/services/payroll.service.ts:257`
+  - manufacturing: `manufacturing/services/work-orders.service.ts:380`
+- **Decimal arithmetic** is not done everywhere. The audit still finds 696 float hits on HEAD, including 53 ledger-class and 12 DTO-class hits, listed below (F1–F8).
 
-This file lists the owner decisions and every float hit deferred to a follow-up, as the Tech Lead plan asked.
+This file replaces `AI_QUESTIONS.md`: the CTO answered its three questions on PR #99 (2026-10-08) and asked for it to be deleted.
 
-## Decisions for the owner
+## Owner decisions (answered on PR #99)
 
-1. **What a replayed post returns.** The plan said a repeated post "returns the same ID". The repo rule (review-lessons §2) rejects the replay with a 409 `ConflictException`, and the original entry stays the only one. This PR keeps that rule and tests it: after a replay, the only journal is the first call's. Returning the existing entry instead would change the contract of about 20 posting callers. Should replays keep returning 409, or do you want a separate issue for "replay returns the original"?
-2. **Posting paths that skip the single command.** Several modules write journals with `tx.journal.create` instead of `JournalsService.create`:
-   - asset depreciation and disposal: `assets/services/depreciation.service.ts:105,224` and `assets.service.ts:650`
-   - payroll: `hr/services/payroll.service.ts:257`
-   - manufacturing: `manufacturing/services/work-orders.service.ts:380`
-
-   These writes take no ledger lock and carry no source key, so a retried or concurrent run can post twice. They also compute amounts with floats (D1 ledger below). Are these modules in the Pi demo? If not, hide them for go-live. If they are, they need F1–F3 before the gate holds for them.
-
-3. **Money sent as JSON numbers.** The global `ValidationPipe` uses `enableImplicitConversion`, so a JSON number sent to a decimal-string field is converted to a string only after `JSON.parse` has rounded it: `1234567890123.4567` arrives as `"1234567890123.4568"`. The web still sends numbers from `valueAsNumber` money inputs:
-   - `payment-made-form.tsx:313`
-   - `item-form.tsx:217,229`
-   - `bank-account-form.tsx:160`
-   - `project-form.tsx:289,323`
-   - `deal-form.tsx:151`
-   - `bom-form.tsx:177`
-   - `tax-rate-form.tsx:107`
-
-   Rejecting numbers now would break those forms. The proposed order is to move these inputs to strings first, then make `IsDecimalString` and journal lines refuse non-strings (F5).
+1. **What a replayed post returns:** keep the 409 `ConflictException` (review-lessons §2). The original entry stays the only one. The invoice-send path refuses a replay earlier, with 400 "Only draft invoices can be sent", because the invoice is no longer a draft.
+2. **Assets, payroll and manufacturing:** not in the MVP demo. Hide them for go-live instead of refactoring them here; F1–F3 stay follow-ups. Hiding the modules is a separate change, not part of this PR.
+3. **Money sent as JSON numbers:** keep accepting numbers for now so the forms keep working, and move the web inputs to strings in a follow-up (F5). The global `ValidationPipe` uses `enableImplicitConversion`, so a JSON number is rounded by `JSON.parse` before it becomes a string: `1234567890123.4567` arrives as `"1234567890123.4568"`. Inputs that still send `valueAsNumber`: `payment-made-form.tsx:313`, `item-form.tsx:217,229`, `bank-account-form.tsx:160`, `project-form.tsx:289,323`, `deal-form.tsx:151`, `bom-form.tsx:177`, `tax-rate-form.tsx:107`.
 
 ## CI suggestions (not applied, because workflows are owner-only)
 
@@ -65,7 +53,7 @@ This file lists the owner decisions and every float hit deferred to a follow-up,
 
 ## Float audit: every hit on HEAD
 
-The command is in docs/evidence/94/EVIDENCE.md. Master had 697 hits; HEAD has 695.
+The command is in docs/evidence/94/EVIDENCE.md. Master `b83d72b` had 697 hits and HEAD 695 when this list was made; after merging master `fcaed26` (698 hits) HEAD has 696. The one new hit on both is `nodeHeapMbSchema` in `packages/validators/src/index.ts` (#127), which parses a heap size in MB, not money.
 
 **Fixed in this PR:** `packages/validators/src/index.ts:251-252`, the float balance check, which is now exact. Separately, the ledger command now bounds amounts to the `Decimal(19,4)` storage scale.
 

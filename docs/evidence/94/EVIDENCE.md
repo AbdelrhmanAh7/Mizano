@@ -1,25 +1,25 @@
 # Evidence: issue #94, decimal money math and idempotent posting
 
-This file covers issue #94 only. It lives in `docs/evidence/94/` (council ruling on PR #99), next to [AI_QUESTIONS.md](AI_QUESTIONS.md). The root `EVIDENCE.md` keeps the issue #95 merge-sprint audit exactly as on `master`, plus a one-line index that points here.
+This file covers issue #94 only. It lives in `docs/evidence/94/` (council ruling on PR #99), next to [FLOAT-AUDIT.md](FLOAT-AUDIT.md) (the per-file float audit and follow-ups F1–F8; it replaces `AI_QUESTIONS.md`, whose questions the CTO answered on PR #99). The root `EVIDENCE.md` keeps the issue #95 merge-sprint audit exactly as on `master`, plus a one-line index that points here.
 
 Gate items: "Decimal arithmetic correct" and "Atomic, idempotent posting".
 
-- **Base:** `master` at `b83d72b4cfa358f3a6ba4be9d9f1b613ac9fe1f2`. `615060e` (the #95 audit docs) was merged in `10b0e2f`. Master has since gained `4b6edad` (CI runners, `.github/workflows/ci.yml` and one line of `docs/DEVELOPMENT.md`), merged into this branch with no conflict; it touches no application code, so the output below was not re-run after that merge (this worktree has no `node_modules`).
-- **Tested head:** `7955496e18521eab03ae6f5f51a785a2356a6fde`, clean tree. All output below was produced at this SHA on 2026-10-08, in the review round 2/3 for PR #99. The commit that records this file changes only `EVIDENCE.md` (`git diff --stat 7955496 HEAD`).
-- **What earlier rounds are worth:** output pasted in earlier rounds could not be checked from the history, so it is gone. Each claim below is either a fact about the git history (commands given) or output re-run at the tested head.
+- **Base:** `master` at `fcaed262cd11876a9876c921f9dc4d04a351a0ed`, merged into this branch in `9d4c20d` (the only conflict was the root `EVIDENCE.md` index, resolved by taking master's text plus the index). The merge brings no change to the two production files of this PR; master's changes under `apps/api/src` and `packages` are delivery-challan scoping (#131) and the `MIZANO_NODE_HEAP_MB` config (#127).
+- **Tested head:** `76ed8e8f2d30a1796a7c8893459f81d2f8d6e504`, clean tree, on 2026-10-11 (review round 8). The output under "Red" and "Green at the tested head" was produced there. The commit that records this file changes only `docs/evidence/94/` (`git diff --stat 76ed8e8 HEAD`).
+- **Older output:** the full seeded E2E run (12 suites, 268 tests) and `pnpm ci:full` were run at `7955496` on 2026-10-08 and were not repeated at `76ed8e8`; they are kept below, marked with that SHA. GitHub CI runs the unit suite on the pushed head; no CI job runs the E2E specs.
 - **Host:** Darwin arm64, Node v26.10.0, pnpm 8.14.0, PostgreSQL 16.15 (Homebrew).
-- **Database:** a throwaway cluster started by this session (`initdb`, port 55594, `fsync=off`), dropped and re-created with `prisma migrate deploy` before each e2e run, `REDIS_URL` blank. No mocks, SQLite or in-memory database were used for the database tests. This is the implementer's own evidence, not an independent review.
+- **Database:** a throwaway cluster started by this session (`initdb`, port 55595, `fsync=off`), dropped and re-created with `prisma migrate deploy` before each e2e run, `REDIS_URL` blank. No mocks, SQLite or in-memory database were used for the database tests. This is the implementer's own evidence, not an independent review.
 
 ## What changed, from the history
 
-`git log --oneline master..HEAD` lists 12 commits (`10b0e2f` is the merge of master). Production code changed in two commits and two files only:
+`git log --oneline --no-merges origin/master..HEAD` lists the branch's own commits (`10b0e2f`, `9a37475`, `078cc09` and `9d4c20d` are merges of master). Production code changed in two commits and two files only:
 
 | Commit    | File                                                   | Change                                                                                                                                                                 |
 | --------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `7d5087f` | `apps/api/.../accounting/services/journals.service.ts` | `parseAmount` rejects more than 4 decimals or more than 15 integer digits, the `Decimal(19,4)` bounds. Before, `POST /journals` stored a journal that did not balance. |
 | `beac7a9` | `packages/validators/src/index.ts`                     | `createJournalSchema` summed with `parseFloat` and an epsilon. It now sums BigInt ten-thousandths exactly. No new dependency.                                          |
 
-Everything else is tests (`941a411`, `7afa66c`, `cd79694`, `328ca68`) and docs (`6e0891e`, `835f161`, `a997dd7`, `636c8af`, `7955496`, and this record). The idempotency design is unchanged: each post takes the per-org advisory lock `lockOrganizationLedger`, the unique key `(organizationId, sourceType, sourceId)` blocks duplicates, and the document row lock runs before the ledger lock. `document-totals.ts` and `decimal-string.ts` are not touched (`git diff master HEAD --stat` lists neither).
+Everything else is tests (`941a411`, `7afa66c`, `cd79694`, `328ca68`, `1195f8d`, `76ed8e8`) and docs (`6e0891e`, `835f161`, `a997dd7`, `636c8af`, `7955496`, and this record). The idempotency design is unchanged: each post takes the per-org advisory lock `lockOrganizationLedger`, the unique key `(organizationId, sourceType, sourceId)` blocks duplicates, and the document row lock runs before the ledger lock. `document-totals.ts` and `decimal-string.ts` are not touched (`git diff origin/master HEAD --stat` lists neither).
 
 ## Requirements and how each is verified
 
@@ -27,7 +27,7 @@ Everything else is tests (`941a411`, `7afa66c`, `cd79694`, `328ca68`) and docs (
 
 | REQ | Requirement                                                                                 | Verified by                                                                                                                                                                                                                                                                                                       | Result                                                          |
 | --- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| R1  | Every money calculation is audited for floats                                               | The audit command below counts 697 hits on `b83d72b`, 697 on `615060e` and 695 on HEAD. Every hit is classified per file in [AI_QUESTIONS.md](AI_QUESTIONS.md). Two lines are fixed; the rest are deferred to follow-ups F1–F8.                                                                                   | audit done, fix partial: the gate stays open                    |
+| R1  | Every money calculation is audited for floats                                               | The audit command below counts 697 hits on `b83d72b`, 698 on master `fcaed26` and 696 on HEAD. Every hit is classified per file in [FLOAT-AUDIT.md](FLOAT-AUDIT.md). Two lines are fixed; the rest are deferred to follow-ups F1–F8.                                                                              | audit done, fix partial: the gate stays open                    |
 | R2  | EGP rounds to 2 dp, half-up (the documented rule)                                           | `document-totals.spec.ts` › "EGP 2 dp rounding and VAT": 0.005→0.01, 1.005→1.01, 2.675→2.68, 0.125→0.13, 1.004→1.00                                                                                                                                                                                               | pass on master's code and on HEAD                               |
 | R3  | VAT: 14% of 99.99 is 14.00, the rate is stored apart from the amount, and gross = net + tax | Same block, plus 15% VAT on 99.99 → 15.00 / 114.99, per-line rounding (100.02 / 14.01 / 114.03), exact values at 15 integer digits and at zero, Arabic-Indic digits rejected, and no result is a JS `number`.                                                                                                     | pass on master's code and on HEAD                               |
 | R4  | Money travels as decimal strings                                                            | `decimal-string.spec.ts` ("1234.10" survives the pipe's implicit conversion; Arabic-Indic digits are rejected). E2E: `1234.10` and `999999999999999.9999` round-trip as strings through POST and GET and are stored exactly.                                                                                      | pass on master's code and on HEAD                               |
@@ -59,14 +59,24 @@ export DATABASE_URL=postgresql://mizano@127.0.0.1:55594/mizano_e2e APP_ENV=e2e94
 
 ### Red: the new tests against master's code
 
+The red run happens in a disposable worktree, so this checkout and its index are never touched. The worktree has this branch's tests and master's two production files:
+
 ```bash
-git checkout b83d72b -- apps/api/src/modules/accounting/services/journals.service.ts packages/validators/src/index.ts
-# ... run the commands below, then restore:
-git checkout HEAD -- apps/api/src/modules/accounting/services/journals.service.ts packages/validators/src/index.ts
+W=$TMPDIR/mz94-red
+git worktree add --detach "$W" HEAD
+cd "$W"
+git checkout origin/master -- apps/api/src/modules/accounting/services/journals.service.ts packages/validators/src/index.ts
+ln -s "$OLDPWD/node_modules" node_modules
+cp -R "$OLDPWD/apps/api/node_modules" apps/api/node_modules   # relative pnpm links, so @mizano/* resolve inside $W
+cp -R "$OLDPWD/packages/shared-types/dist" packages/shared-types/dist
+(cd packages/validators && npx tsc)                           # the unit suite loads @mizano/validators from dist
+# ... run the commands below from "$W/apps/api", then:
+cd "$OLDPWD" && git worktree remove --force "$W" && git status --short   # prints nothing
 ```
 
 ```text
-$ node apps/api/_run_tests.js '--testPathPattern="(journals.service|document-totals|decimal-string|shared-journal-schema).spec"'
+$ npx jest src/modules/accounting/services/journals.service.spec.ts src/common/utils/document-totals.spec.ts \
+    src/common/dto/decimal-string.spec.ts src/common/dto/shared-journal-schema.spec.ts
 PASS src/common/utils/document-totals.spec.ts
 PASS src/common/dto/decimal-string.spec.ts
 FAIL src/modules/accounting/services/journals.service.spec.ts
@@ -100,15 +110,28 @@ The first failure of each pair is the stored-scale bug (a journal that does not 
 ```text
 $ git status --short            # (empty)
 $ git rev-parse HEAD
-7955496e18521eab03ae6f5f51a785a2356a6fde
+76ed8e8f2d30a1796a7c8893459f81d2f8d6e504
 
-$ node apps/api/_run_tests.js '--testPathPattern="(journals.service|document-totals|decimal-string|shared-journal-schema).spec"'
+$ npx jest src/modules/accounting/services/journals.service.spec.ts src/common/utils/document-totals.spec.ts \
+    src/common/dto/decimal-string.spec.ts src/common/dto/shared-journal-schema.spec.ts
+PASS src/common/dto/shared-journal-schema.spec.ts
 PASS src/common/utils/document-totals.spec.ts
 PASS src/common/dto/decimal-string.spec.ts
 PASS src/modules/accounting/services/journals.service.spec.ts
-PASS src/common/dto/shared-journal-schema.spec.ts
 Tests:       77 passed, 77 total
 
+$ npx jest --config ./test/jest-e2e.json --runInBand test/posting-integrity.e2e-spec.ts   # fresh database
+PASS test/posting-integrity.e2e-spec.ts
+Tests:       11 passed, 11 total
+
+$ psql ... unbalanced journals            -> 0
+$ psql ... duplicate (sourceType, sourceId) -> 0
+$ npx tsc --noEmit -p apps/api/tsconfig.json   -> exit 0
+```
+
+At `7955496` (2026-10-08, not repeated at `76ed8e8`):
+
+```text
 $ npx jest --config ./test/jest-e2e.json --runInBand      # every seeded E2E suite, fresh database
 PASS test/purchases.e2e-spec.ts
 PASS test/posting-integrity.e2e-spec.ts
@@ -125,9 +148,6 @@ PASS test/banking.e2e-spec.ts
 Test Suites: 12 passed, 12 total
 Tests:       268 passed, 268 total
 
-$ psql ... unbalanced journals            -> 0
-$ psql ... duplicate (sourceType, sourceId) -> 0
-
 $ pnpm ci:full --force        # lint + type-check + unit tests, 0 turbo cache hits
 api:test: Test Suites: 137 passed, 137 total
 api:test: Tests:       2220 passed, 2220 total
@@ -140,7 +160,7 @@ ci:full exit=0
 
 `pnpm ci:full` printed 13 `no-unused-vars` and `exhaustive-deps` warnings from `apps/web` files that this branch does not touch, plus Turbo's "no output files found" notices for `api#lint` and `api#test`. Both already exist on master and are not caused by this PR.
 
-The 11 tests of `posting-integrity.e2e-spec.ts` (all pass at the tested head):
+The 11 tests of `posting-integrity.e2e-spec.ts` (all pass at `76ed8e8`):
 
 | Test                                                                            | AC  |
 | ------------------------------------------------------------------------------- | --- |
@@ -148,7 +168,7 @@ The 11 tests of `posting-integrity.e2e-spec.ts` (all pass at the tested head):
 | round-trips `1234.10` and `999999999999999.9999` as exact decimal strings (2)   | AC2 |
 | rejects amounts storage would round instead of storing an unbalanced journal    | AC2 |
 | posts a retried source event once and rejects the replay with a conflict        | AC3 |
-| sends the same invoice twice and keeps the first journal as the only one        | AC3 |
+| sends the same invoice twice and keeps the first journal as the only one (400)  | AC3 |
 | rejects a repeated send once the period is locked, still with one journal       | AC3 |
 | posts exactly one balanced journal when one event is posted 8 times at once     | AC4 |
 | sends one invoice 5 times at once and posts exactly one journal                 | AC4 |
@@ -174,10 +194,10 @@ STATEMENT:  SELECT pg_advisory_xact_lock(hashtext($1))
 ```bash
 git grep -nE 'parseFloat\(|(^|[^A-Za-z0-9_.])Number\(|\.toNumber\(\)|Math\.round\(|IsNumber\(|z\.number\(\)' <rev> \
   -- apps/api/src packages/validators/src packages/shared-types/src | grep -v '\.spec\.ts' | grep -v __tests__ | wc -l
-# b83d72b: 697   615060e: 697   HEAD: 695   (validators/src/index.ts:251-252 removed)
+# b83d72b: 697   615060e: 697   fcaed26 (master now): 698   HEAD: 696   (validators/src/index.ts:251-252 removed)
 ```
 
-`Decimal#toFixed` calls are exact, so they are not counted. `shared-types` money fields typed `number` are listed separately in AI_QUESTIONS.md.
+`Decimal#toFixed` calls are exact, so they are not counted. `shared-types` money fields typed `number` are listed separately in FLOAT-AUDIT.md.
 
 ## Review rounds on PR #99
 
@@ -192,13 +212,21 @@ git grep -nE 'parseFloat\(|(^|[^A-Za-z0-9_.])Number\(|\.toNumber\(\)|Math\.round
 
 Round 7 (rework after the council ruling): the verify gate needs an e2e-army test for each touched feature (`mz-journals`), so `e2e-army/94-journal-decimal-posting.e2e.ts` was added. It is a request-level test: a journal with 5 decimals and one that is off by 0.0001 are both refused with 400, and a balanced EGP 2dp journal is stored with equal totals. It was written but not run on this host, because it needs the hub's throwaway stack; the verify job runs it. The PR description should say `Refs #94`, not `Closes #94` (council ruling); the PR body is edited by the harness, not by this branch.
 
+Round 8 (`9d4c20d`, `76ed8e8` and the commit that records this text; CodeRabbit review of 2026-10-09 and the CTO answers on PR #99):
+
+- Master `fcaed26` merged; the root `EVIDENCE.md` conflict was resolved by keeping master's text plus the index line.
+- `posting-integrity.e2e-spec.ts`: the three invoice-send replay assertions now expect exactly 400 with "Only draft invoices can be sent" instead of "400 or 409". The review asked for exactly 409, but 409 is unreachable on that path: the status check runs under the invoice row lock, before the lock-date check and the guarded `DRAFT -> SENT` update. The ledger-command replay keeps its exact 409.
+- e2e-army test: `totalDebit` and `totalCredit` are compared with the exact strings `"1234.5600"`, not with `parseFloat`.
+- The red-run recipe now uses a disposable worktree; the red and green runs above were repeated at `76ed8e8` with it.
+- `AI_QUESTIONS.md` is replaced by `FLOAT-AUDIT.md` (CTO housekeeping): the questions became the answered decisions, and the audit, CI suggestions and follow-ups F1–F8 are kept. Hiding assets, payroll and manufacturing for go-live and opening F1–F8 as issues stay owner actions.
+
 ## Known gaps and pre-existing issues
 
-- **Replay returns 409, not the original id.** This follows the repo's rule. See AI_QUESTIONS.md, decision 1.
+- **Replay returns 409, not the original id.** This follows the repo's rule. The CTO confirmed it on PR #99 (FLOAT-AUDIT.md, decision 1). The invoice-send path refuses a replay earlier, with exactly 400 "Only draft invoices can be sent".
 - **JSON shape of amounts.** Journal line amounts in JSON are Decimal strings without trailing zeros (`"1234.1"`), and totals are fixed 4-dp (`"1234.1000"`). Neither is ever a JSON number. The API still accepts JSON _numbers_ for money (decision 3, F5).
 - **Asset, payroll and manufacturing posting.** These modules post with `tx.journal.create`, outside the single command, with no ledger lock and no source key, so they are not idempotent (decision 2, F1–F3). The "atomic, idempotent posting" gate holds for the core ledger command and the invoice-send path only.
-- **Float use remains.** 695 audit hits remain on HEAD; only the validator balance check and the storage bound are fixed. The "decimal arithmetic" gate is open for the rest (F1–F8).
-- **`_run_tests.js` and `csv`.** Re-run at the tested head: `node apps/api/_run_tests.js '--testPathPattern="import.service.hardening"'` gives `TypeError: csv is not a function`, `Tests: 4 failed, 5 passed, 9 total`; `npx jest import.service.hardening` in `apps/api` (the CI config) gives `Tests: 9 passed, 9 total`. The cause is the runner's compile options (`esModuleInterop`), not this PR; the file is untouched here.
-- **No CI coverage for E2E.** `pnpm ci:full` runs no E2E, so this spec needs a Postgres CI job (AI_QUESTIONS.md, CI suggestions).
-- **Diff size.** The diff is over the ~300-line guide. About 30 lines are production code (`git diff --stat master HEAD -- apps/api/src packages ':!*.spec.ts'`); most of the rest is the evidence tests the issue asked for, plus this file and AI_QUESTIONS.md.
+- **Float use remains.** 696 audit hits remain on HEAD; only the validator balance check and the storage bound are fixed. The "decimal arithmetic" gate is open for the rest (F1–F8).
+- **`_run_tests.js` and `csv`.** Run at `7955496`: `node apps/api/_run_tests.js '--testPathPattern="import.service.hardening"'` gives `TypeError: csv is not a function`, `Tests: 4 failed, 5 passed, 9 total`; `npx jest import.service.hardening` in `apps/api` (the CI config) gives `Tests: 9 passed, 9 total`. The cause is the runner's compile options (`esModuleInterop`), not this PR; the file is untouched here.
+- **No CI coverage for E2E.** `pnpm ci:full` runs no E2E, so this spec needs a Postgres CI job (FLOAT-AUDIT.md, CI suggestions).
+- **Diff size.** The diff is over the ~300-line guide. About 30 lines are production code (`git diff --stat master HEAD -- apps/api/src packages ':!*.spec.ts'`); most of the rest is the evidence tests the issue asked for, plus this file and FLOAT-AUDIT.md.
 - **Sandbox.** Inside the sandbox `pnpm install` cannot write package files, jest cannot write its cache, and `initdb` cannot get shared memory, so those commands ran outside it.
