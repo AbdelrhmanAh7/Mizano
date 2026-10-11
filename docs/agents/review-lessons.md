@@ -25,6 +25,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **Mutable default accounts change, so later events must use the account the original journal used,** not today's default. A refund credits the AP account the vendor-credit journal debited. A VAT payment debits the payable the settlement journal credited. A credit's VAT reverses the account the bill approval debited. _(vendor credits, VAT payment)_
 - **Aggregate over historical accounts too.** VAT figures include every account that carried VAT lines, not only the current defaults.
+- **A register follows what was posted.** The asset register is the sum of the posted depreciation periods, not a schedule row's running snapshot, and periods post and reverse in order. _(depreciation, #130)_
 
 ## 4. Dates
 
@@ -34,6 +35,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Web defaults use the user's local calendar date** (`format(d, 'yyyy-MM-dd')`), never `toISOString()`, which gives yesterday in UTC+ zones such as Cairo.
 - **"Current" figures exclude future-dated entries.** Cash today means lines dated ≤ end of today.
 - **Side records carry the document date.** Inventory movements are dated on the adjustment date, not on `createdAt` = now.
+- **Bound a month the way its rows are stored.** Attendance days are kept at local midnight, so payroll bounds its month in local time; UTC bounds drop the 1st on servers ahead of UTC. _(payroll, #130)_
 - **Historical reports keep later-voided documents in their original period** and show the reversal on the void date. Filtering on today's status rewrites history. _(customer statement)_
 
 ## 5. Single-currency ledger and data
@@ -94,7 +96,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 12. Caches, tests and scope
 
-- **Every endpoint that posts or reverses uses one `@InvalidatesLedger(...)`,** imports included.
+- **Every endpoint that posts or reverses uses one `@InvalidatesLedger(...)`,** imports included, and its controller applies `@UseInterceptors(CacheInvalidationInterceptor)`: the decorator is only metadata, so without the interceptor no cache is cleared. _(#130)_
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.
