@@ -172,6 +172,31 @@ describe('benchmark runner', () => {
     },
   );
 
+  it.each([
+    { flag: '--labels', operand: 'a file path', following: [] as string[] },
+    { flag: '--labels', operand: 'a file path', following: ['--out', 'reports'] },
+    { flag: '--language', operand: 'a language code', following: [] as string[] },
+    { flag: '--language', operand: 'a language code', following: ['--out', 'reports'] },
+  ])(
+    'rejects $flag without an operand instead of using its default ($following)',
+    async ({ flag, operand, following }) => {
+      labels({ 'invoice.txt': fields });
+      writeFileSync(join(directory, 'invoice.txt'), 'Total: 1.23');
+      process.argv.push(flag, ...following);
+      const extract = jest.spyOn(RulesStrategy.prototype, 'extract');
+      const output = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+      await expect(main()).rejects.toThrow(`${flag} requires ${operand}`);
+      expect(extract).not.toHaveBeenCalled();
+      expect(output).not.toHaveBeenCalled();
+      expect(existsSync(join(directory, 'reports'))).toBe(false);
+    },
+  );
+
+  it('rejects --corpus followed by another flag as a missing operand', async () => {
+    process.argv = ['node', 'benchmark', '--corpus', '--out', directory];
+    await expect(main()).rejects.toThrow('--corpus requires a directory path');
+  });
+
   it('rejects scanned PDFs without usable text layers', async () => {
     labels({ 'scanned.pdf': fields });
     writeFileSync(join(directory, 'scanned.pdf'), 'binary');

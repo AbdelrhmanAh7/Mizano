@@ -33,13 +33,16 @@ const MIME_BY_EXT: Record<string, string> = {
   '.txt': 'text/plain',
 };
 
-function arg(name: string): string | undefined {
+/**
+ * Value of `--name <operand>`; undefined when the flag is absent. A present flag with no operand
+ * (end of argv, or the next token is another flag) is an error, never a silent default.
+ */
+function arg(name: string, operand: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
-  if (i >= 0 && i + 1 < process.argv.length) {
-    const val = process.argv[i + 1];
-    return val.startsWith('--') ? undefined : val;
-  }
-  return undefined;
+  if (i < 0) return undefined;
+  const val = process.argv[i + 1];
+  if (val === undefined || val.startsWith('--')) throw new Error(`--${name} requires ${operand}`);
+  return val;
 }
 
 function money(value: number | null): string | null {
@@ -93,16 +96,12 @@ async function contextFor(
 }
 
 export async function main(): Promise<void> {
-  const corpus = arg('corpus');
+  const corpus = arg('corpus', 'a directory path');
   if (!corpus) throw new Error('--corpus <dir> is required');
   const corpusDir = resolve(corpus);
-  const labelsPath = resolve(arg('labels') ?? join(corpusDir, 'labels.json'));
-
-  const outDirIndex = process.argv.indexOf('--out');
-  const outDir = arg('out');
-  if (outDirIndex >= 0 && !outDir) throw new Error('--out requires a directory path');
-
-  const language = arg('language') ?? 'eng+ara';
+  const labelsPath = resolve(arg('labels', 'a file path') ?? join(corpusDir, 'labels.json'));
+  const outDir = arg('out', 'a directory path');
+  const language = arg('language', 'a language code') ?? 'eng+ara';
 
   // Strategy logs are metadata-only, but keep the report readable.
   Logger.overrideLogger(['error']);
