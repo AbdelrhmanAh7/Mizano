@@ -27,4 +27,5 @@ How `.husky/pre-push` works:
 - Escape hatch: `SKIP_LOCAL_CI=1 git push` (or `HUSKY=0`); localci still runs the full CI.
 
 Measured on the Mac mini (2026-10-11): `pre-commit` on a one-file docs change 0.3 s; `pre-push` with no
-affected package 0.7 s (turbo runs 0 tasks). Budgets are hard caps enforced by the watchdogs.
+affected package 0.7 s (turbo runs 0 tasks); `pre-push` over all 4 packages with a warm turbo cache 3.4 s. A cold run of real
+packages was not timed (a manual type-check did not finish within 200 s on the busy shared Mac). Budgets are hard caps enforced by the watchdogs.
