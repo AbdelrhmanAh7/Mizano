@@ -230,11 +230,11 @@ export function formatMarkdown(report: BenchmarkReport, scores: DocumentScore[])
   lines.push(
     '',
     `Documents: ${report.documents} | all fields exact: ${pct(report.allFieldsExact)} | ` +
-      `NEEDS_REVIEW: ${pct(report.needsReviewShare)}`,
+      `NEEDS_REVIEW before vendor matching (not the production rate): ${pct(report.needsReviewShare)}`,
     `Latency p50 ${report.latencyMs.p50.toFixed(1)} ms | p95 ${report.latencyMs.p95.toFixed(1)} ms | ` +
       `max ${report.latencyMs.max.toFixed(1)} ms | peak RSS ${report.peakRssMb.toFixed(0)} MB`,
     '',
-    '| Document | Latency (ms) | NEEDS_REVIEW | Fields matched | Mismatched fields |',
+    '| Document | Latency (ms) | NEEDS_REVIEW before vendor matching | Fields matched | Mismatched fields |',
     '| --- | --- | --- | --- | --- |',
   );
   for (const s of scores) {

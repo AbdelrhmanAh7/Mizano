@@ -6,7 +6,7 @@ import { promisify } from 'util';
 import { createOfflineTesseractWorker } from '../extraction/offline-tesseract';
 import { writeSecureFile } from '../utils/secure-temp.util';
 import { cpuReviewResult, extractCpuDocument, runPdfTool } from './cpu-extraction';
-import { NATIVE_TEXT_CONFIDENCE, structuredCpuResult } from './cpu-structured';
+import { MAX_STORED_RAW_TEXT, NATIVE_TEXT_CONFIDENCE, structuredCpuResult } from './cpu-structured';
 
 // `execFile` is promisified once at import; the real one has a custom promisifier that
 // resolves `{ stdout, stderr }`, so the mock provides the same shape.
@@ -177,6 +177,64 @@ describe('CPU extraction without an LLM', () => {
       if (original === undefined) delete process.env.INTAKE_TOOL_CPU_SECONDS;
       else process.env.INTAKE_TOOL_CPU_SECONDS = original;
     }
+  });
+
+  it('bounds an oversized native text layer before it reaches the job result', async () => {
+    const huge = `Tax Invoice\n${'x'.repeat(MAX_STORED_RAW_TEXT * 3)}`;
+    jest.mocked(readFile).mockResolvedValue(huge);
+    const result = await extractCpuDocument(Buffer.from('pdf'), 'application/pdf', '/tmp/job');
+    expect(result.rawText).toHaveLength(MAX_STORED_RAW_TEXT);
+    expect(result.extractionWarnings).toContain('RAW_TEXT_TRUNCATED');
+    expect(JSON.stringify(result).length).toBeLessThan(MAX_STORED_RAW_TEXT * 2);
+  });
+
+  describe('mixed PDF (text cover page, scanned invoice page)', () => {
+    const cover = 'Quarterly statement cover page for the supplier account.';
+    function mixed(layer: string): void {
+      jest
+        .mocked(readFile)
+        .mockImplementation(((path: string) =>
+          Promise.resolve(
+            path.endsWith(`${sep}info`) ? layer : Buffer.from(`page ${path}`),
+          )) as never);
+    }
+
+    it('recognizes only the pages that have no text layer and keeps page order', async () => {
+      mixed(`${cover}\f \f${cover} two\f`);
+      recognize.mockResolvedValue({
+        data: { text: 'Invoice No: INV-2024-0042\nTotal: EGP 1,140.00', confidence: 70 },
+      });
+      const result = await extractCpuDocument(Buffer.from('pdf'), 'application/pdf', '/tmp/job');
+      expect(recognize).toHaveBeenCalledTimes(1);
+      expect(toolCalls().map((c) => c.tool)).toEqual(['/usr/bin/pdftotext', '/usr/bin/pdftoppm']);
+      expect(toolCalls()[1].args.slice(0, 4)).toEqual(['-f', '2', '-l', '2']);
+      expect(result.rawText).toBe(
+        `${cover}\nInvoice No: INV-2024-0042\nTotal: EGP 1,140.00\n${cover} two`,
+      );
+      expect(result.extractedFields).toMatchObject({ documentNumber: 'INV-2024-0042' });
+      // The scanned page's own score caps the confidence below the text layer's.
+      expect(result).toEqual(
+        structuredCpuResult(
+          `${cover}\nInvoice No: INV-2024-0042\nTotal: EGP 1,140.00\n${cover} two`,
+          0.7,
+        ),
+      );
+      expect(terminate).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not start OCR when every page has a text layer', async () => {
+      mixed(`${cover}\f${cover} two\f`);
+      await extractCpuDocument(Buffer.from('pdf'), 'application/pdf', '/tmp/job');
+      expect(createOfflineTesseractWorker).not.toHaveBeenCalled();
+    });
+
+    it('rejects more textless pages than the page limit', async () => {
+      mixed(`${cover}${'\f '.repeat(22)}`);
+      await expect(
+        extractCpuDocument(Buffer.from('pdf'), 'application/pdf', '/tmp/job'),
+      ).rejects.toThrow('Page limit');
+      expect(createOfflineTesseractWorker).not.toHaveBeenCalled();
+    });
   });
 
   describe('scanned PDF', () => {

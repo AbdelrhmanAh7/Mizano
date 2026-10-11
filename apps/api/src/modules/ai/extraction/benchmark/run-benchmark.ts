@@ -1,6 +1,7 @@
 /**
  * Offline extraction benchmark: runs the intake processor's CPU-only rules path over a labelled
- * corpus and reports per-field precision/recall/exact match, NEEDS_REVIEW share, latency and
+ * corpus and reports per-field precision/recall/exact match, NEEDS_REVIEW share (before vendor
+ * matching), latency and
  * peak RSS. Prints metrics and file names only, never document text or extracted values.
  *
  *   pnpm exec ts-node --transpile-only -r tsconfig-paths/register \
@@ -126,6 +127,8 @@ export async function main(): Promise<void> {
       total: result.extractedFields.total,
     };
 
+    // Vendor matching needs a tenant database, which the corpus run does not have: the production
+    // rule "no resolved vendor means review" is deliberately left out, so this is a lower bound.
     const review = needsReview({
       ocrConfidence: result.ocrConfidence ?? 0,
       classificationConfidence: result.classificationConfidence ?? 0,

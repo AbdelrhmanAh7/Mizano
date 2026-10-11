@@ -12,6 +12,8 @@ export { cpuReviewResult } from './cpu-structured';
 
 const execute = promisify(execFile);
 const MAX_PAGES = 20;
+/** A page with less text than this has no usable text layer and is recognized instead. */
+const MIN_PAGE_TEXT = 10;
 
 function toolCpuLimit(): string {
   const seconds = Number(process.env.INTAKE_TOOL_CPU_SECONDS ?? 60);
@@ -37,28 +39,41 @@ export async function extractCpuDocument(
   // Original and rendered pages remain private and are removed by the supervisor even on SIGKILL.
   const original = join(directory, 'original');
   await writeSecureFile(original, buffer);
-  let pages = 1;
+  let pageNumbers = [1];
+  // Text layer per page of a PDF that has one; pages without usable text are recognized instead.
+  let layer: string[] = [];
+  let confidence = 1;
   if (mimeType === 'application/pdf') {
     const info = join(directory, 'info');
     // pdftotext processes the complete document; no silent first-N-page truncation.
     await runPdfTool('/usr/bin/pdftotext', ['-enc', 'UTF-8', original, info]);
     const text = await readFile(info, 'utf8');
-    if (text.trim().length > 50) return structuredCpuResult(text, NATIVE_TEXT_CONFIDENCE);
-    const output = await execute(
-      '/usr/bin/prlimit',
-      ['--as=536870912', toolCpuLimit(), '--', '/usr/bin/pdfinfo', original],
-      { maxBuffer: 65536, env: { PATH: '/usr/bin:/bin', LC_ALL: 'C' } },
-    );
-    pages = Number(/^Pages:\s+(\d+)$/m.exec(output.stdout)?.[1]);
-    if (!Number.isInteger(pages) || pages < 1 || pages > MAX_PAGES) throw new Error('Page limit');
+    if (text.trim().length > 50) {
+      // pdftotext ends every page with a form feed, so a scanned page inside a mixed PDF shows
+      // up as a page with (almost) no text.
+      layer = text.split('\f');
+      if (layer.length > 1 && layer[layer.length - 1].trim() === '') layer.pop();
+      pageNumbers = layer.flatMap((t, i) => (t.trim().length < MIN_PAGE_TEXT ? [i + 1] : []));
+      if (pageNumbers.length === 0) return structuredCpuResult(text, NATIVE_TEXT_CONFIDENCE);
+      confidence = NATIVE_TEXT_CONFIDENCE;
+    } else {
+      const output = await execute(
+        '/usr/bin/prlimit',
+        ['--as=536870912', toolCpuLimit(), '--', '/usr/bin/pdfinfo', original],
+        { maxBuffer: 65536, env: { PATH: '/usr/bin:/bin', LC_ALL: 'C' } },
+      );
+      const pages = Number(/^Pages:\s+(\d+)$/m.exec(output.stdout)?.[1]);
+      if (!Number.isInteger(pages) || pages < 1) throw new Error('Page limit');
+      pageNumbers = Array.from({ length: pages }, (_, i) => i + 1);
+    }
+    if (pageNumbers.length > MAX_PAGES) throw new Error('Page limit');
   } else if (!mimeType.startsWith('image/')) {
     throw new Error('Unsupported CPU format');
   }
   const engine = await createOfflineTesseractWorker();
   try {
-    const texts: string[] = [];
-    let confidence = 1;
-    for (let page = 1; page <= pages; page += 1) {
+    const texts = layer;
+    for (const page of pageNumbers) {
       let image = buffer;
       if (mimeType === 'application/pdf') {
         const prefix = join(directory, 'page');
@@ -79,7 +94,7 @@ export async function extractCpuDocument(
         image = await preprocessForOcr(buffer, mimeType);
       }
       const result = await engine.recognize(image);
-      texts.push(result.data.text);
+      texts[page - 1] = result.data.text;
       confidence = Math.min(confidence, result.data.confidence / 100);
     }
     return structuredCpuResult(texts.join('\n'), confidence);

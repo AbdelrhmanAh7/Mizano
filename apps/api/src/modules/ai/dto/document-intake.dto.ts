@@ -16,8 +16,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ProcessDocumentDto {
   @ApiPropertyOptional({
-    description: 'OCR language (default: eng+ara)',
+    description:
+      'Deprecated and ignored: the CPU worker always recognizes the pinned Arabic and English assets together',
     example: 'eng+ara',
+    deprecated: true,
   })
   @IsString()
   @IsOptional()

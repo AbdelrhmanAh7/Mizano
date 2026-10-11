@@ -103,7 +103,10 @@ export class DocumentIntakeController {
           format: 'binary',
           description: 'Invoice/bill image or PDF file (max 15MB)',
         },
-        language: { type: 'string', description: 'OCR language (default: eng+ara)' },
+        language: {
+          type: 'string',
+          description: 'Deprecated and ignored: the worker always uses ara+eng',
+        },
         forceType: {
           type: 'string',
           enum: ['BILL', 'INVOICE'],

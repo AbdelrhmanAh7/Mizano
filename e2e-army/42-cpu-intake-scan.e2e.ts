@@ -30,10 +30,10 @@ test(
 );
 
 test(
-  '@issue-42 AC3: the intake job list rejects unauthenticated requests while extraction runs in the worker',
-  { tags: ['feat:mz-document-intake'] },
-  async ({ app }) => {
-    const res = await fetch(new URL('/api/ai/document-intake/jobs', app.baseUrl));
-    expect(res.status).toBe(401);
+  '@issue-42 AC3: the bill scan page is not available without signing in',
+  { tags: ['feat:mz-bill-scan'] },
+  async ({ app, agent }) => {
+    await app.open('/en/purchases/bills/scan');
+    await agent.assert('the sign-in form is shown and no bill upload control is available');
   },
 );
