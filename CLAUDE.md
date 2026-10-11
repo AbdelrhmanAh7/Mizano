@@ -272,7 +272,7 @@ Browser → API (6001) → Intake job (BullMQ/Redis) → extraction strategies i
 - Add GPU config, Colab tunnels or paid cloud AI (Gemini, OpenAI, etc.) — the demo is fully offline-capable
 - Call external AI APIs as a fallback
 - Assume Ollama is available — always handle it gracefully when disabled
-- Ship employed `ai/schedulers/*` crons on the Pi: `AI_SCHEDULERS_ENABLED=false` unless explicitly enabled
+- Run the `ai/schedulers/*` crons on the Pi: keep `AI_SCHEDULERS_ENABLED=false` unless explicitly enabled
 
 ## Docs Reference
 
