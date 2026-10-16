@@ -16,7 +16,7 @@ reviews:
   auto_review:
     enabled: false
     drafts: false
-    auto_incremental_review: false   # one automatic review per PR (5 reviews/hour quota); the hub requests @coderabbitai review after each fix push
+    auto_incremental_review: false   # reviews are manual only (5 reviews/hour quota); the hub posts @coderabbitai review after marking a PR ready and after each fix push
     base_branches:
       - master
   path_filters:
