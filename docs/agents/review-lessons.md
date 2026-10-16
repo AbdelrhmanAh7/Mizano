@@ -64,6 +64,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Money-bearing imports require the same per-entity create permission as the single-record routes.**
 - **Adding auth to a server endpoint or socket changes its contract: update every client in the same PR** (send the token, handle expiry and reconnect). A server-only change silently breaks the client. _(events gateway vs `use-realtime`)_
 
+- **Use concrete DTO classes for `@Query()` parameters.** Intersections erase the runtime metatype, bypassing ValidationPipe transformation and leaving Prisma pagination values as strings. Decorate all service and existing client filters, preserve service defaults, and test through the real pipe options.
+
 ## 8. Voided and deleted records
 
 - **Posted documents that were voided stay readable** (read-only, with `deletedAt` set) on their detail endpoint so journal source links resolve. Lists exclude them. Deleted drafts, which never posted, return 404.
