@@ -574,6 +574,7 @@ export class DeliveryChallansService {
     tx?: Prisma.TransactionClient,
   ) {
     const client = tx ?? this.prisma;
+    assertWholeUnits(quantity);
     // Find or create inventory level
     const where: Prisma.InventoryLevelWhereInput = { itemId, organizationId };
     if (warehouseId) {
@@ -620,6 +621,12 @@ export class DeliveryChallansService {
         organizationId,
       },
     });
+
+    // Keep the item total (Item.currentStock, what /items shows) in step with the warehouse level
+    await client.item.updateMany({
+      where: { id: itemId, organizationId },
+      data: { currentStock: { decrement: quantity } },
+    });
   }
 
   private async increaseInventory(
@@ -631,6 +638,7 @@ export class DeliveryChallansService {
     tx?: Prisma.TransactionClient,
   ) {
     const client = tx ?? this.prisma;
+    assertWholeUnits(quantity);
     const where: Prisma.InventoryLevelWhereInput = { itemId, organizationId };
     if (warehouseId) {
       where.warehouseId = warehouseId;
@@ -673,5 +681,19 @@ export class DeliveryChallansService {
         organizationId,
       },
     });
+
+    await client.item.updateMany({
+      where: { id: itemId, organizationId },
+      data: { currentStock: { increment: quantity } },
+    });
+  }
+}
+
+/** Stock is kept in whole units (Item.currentStock is an Int; adjustments accept whole units only). */
+function assertWholeUnits(quantity: number): void {
+  if (!Number.isInteger(quantity)) {
+    throw new BadRequestException(
+      `Quantity ${quantity} of a stock-tracked item must be a whole number of units`,
+    );
   }
 }

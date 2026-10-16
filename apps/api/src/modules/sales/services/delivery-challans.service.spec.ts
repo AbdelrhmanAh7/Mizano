@@ -207,4 +207,48 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
       expect.objectContaining({ where: { itemId: 'item-b', organizationId: ORG } }),
     );
   });
+
+  describe('item stock total', () => {
+    const tracked = (status: ChallanStatus, quantity: number) => {
+      const c = challan(status, { itemId: 'item-b', warehouseId: 'wh-b' });
+      c.lines[0].quantity = new Decimal(quantity);
+      prisma.deliveryChallan.findFirst.mockResolvedValue(c as never);
+      prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 1 } as never);
+      prisma.item.findFirst.mockResolvedValue({ id: 'item-b', trackInventory: true } as never);
+      prisma.warehouse.findFirst.mockResolvedValue({ id: 'wh-b' } as never);
+      prisma.inventoryLevel.aggregate.mockResolvedValue({
+        _sum: { quantity: new Decimal(10) },
+      } as never);
+      prisma.inventoryLevel.findFirst.mockResolvedValue({
+        id: 'lvl-1',
+        warehouseId: 'wh-b',
+      } as never);
+      prisma.item.updateMany.mockResolvedValue({ count: 1 } as never);
+    };
+
+    it('issue takes the quantity off the item total as well as the warehouse level', async () => {
+      tracked(ChallanStatus.DRAFT, 2);
+      await service.issue(ORG, 'dc-1');
+      expect(prisma.item.updateMany).toHaveBeenCalledWith({
+        where: { id: 'item-b', organizationId: ORG },
+        data: { currentStock: { decrement: 2 } },
+      });
+    });
+
+    it('mark-returned puts the quantity back on the item total', async () => {
+      tracked(ChallanStatus.ISSUED, 2);
+      await service.markReturned(ORG, 'dc-1');
+      expect(prisma.item.updateMany).toHaveBeenCalledWith({
+        where: { id: 'item-b', organizationId: ORG },
+        data: { currentStock: { increment: 2 } },
+      });
+    });
+
+    it('refuses a fractional quantity of a stock-tracked item (stock is kept in whole units)', async () => {
+      tracked(ChallanStatus.DRAFT, 1.5);
+      await expect(service.issue(ORG, 'dc-1')).rejects.toThrow(BadRequestException);
+      expect(prisma.inventoryMovement.create).not.toHaveBeenCalled();
+      expect(prisma.item.updateMany).not.toHaveBeenCalled();
+    });
+  });
 });
