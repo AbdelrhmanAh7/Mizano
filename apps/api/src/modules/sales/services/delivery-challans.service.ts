@@ -8,6 +8,8 @@ import {
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ChallanStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
+import { runBulk } from '../../../common/utils/run-bulk';
 import {
   CreateDeliveryChallanDto,
   UpdateDeliveryChallanDto,
@@ -220,7 +222,13 @@ export class DeliveryChallansService {
         data: { status: ChallanStatus.ISSUED },
       });
       if (res.count !== 1) {
-        throw new ConflictException('Only draft challans can be issued');
+        await this.rejectTransition(
+          tx,
+          organizationId,
+          id,
+          ChallanStatus.DRAFT,
+          'Only draft challans can be issued',
+        );
       }
 
       // Reload challan with lines for inventory operations
@@ -299,7 +307,13 @@ export class DeliveryChallansService {
         data: { status: ChallanStatus.RETURNED },
       });
       if (res.count !== 1) {
-        throw new ConflictException('Only issued challans can be marked as returned');
+        await this.rejectTransition(
+          tx,
+          organizationId,
+          id,
+          ChallanStatus.ISSUED,
+          'Only issued challans can be marked as returned',
+        );
       }
 
       // Reload challan with lines for inventory operations
@@ -407,36 +421,33 @@ export class DeliveryChallansService {
 
   // ============ Bulk Operations ============
 
-  async bulkDelete(
-    organizationId: string,
-    ids: string[],
-  ): Promise<{ deleted: number; total: number }> {
-    const result = await this.prisma.deliveryChallan.updateMany({
-      where: {
-        id: { in: ids },
-        organizationId,
-        deletedAt: null,
-        status: ChallanStatus.DRAFT,
-      },
-      data: { deletedAt: new Date() },
-    });
-    return { deleted: result.count, total: ids.length };
+  // Bulk actions reuse the single-record commands: same tenant checks, status rules and stock moves.
+  async bulkDelete(organizationId: string, ids: string[]): Promise<BulkResultDto> {
+    return runBulk(ids, (id) => this.remove(organizationId, id));
   }
 
-  async bulkIssue(
+  async bulkIssue(organizationId: string, ids: string[]): Promise<BulkResultDto> {
+    return runBulk(ids, (id) => this.issue(organizationId, id));
+  }
+
+  /**
+   * The guarded status update matched no row: a challan missing from this organization is a 404,
+   * one in another status a 400 (same answers as update/remove); only a lost race stays a 409.
+   */
+  private async rejectTransition(
+    tx: Prisma.TransactionClient,
     organizationId: string,
-    ids: string[],
-  ): Promise<{ issued: number; total: number }> {
-    const result = await this.prisma.deliveryChallan.updateMany({
-      where: {
-        id: { in: ids },
-        organizationId,
-        deletedAt: null,
-        status: ChallanStatus.DRAFT,
-      },
-      data: { status: ChallanStatus.ISSUED },
+    id: string,
+    expected: ChallanStatus,
+    message: string,
+  ): Promise<never> {
+    const current = await tx.deliveryChallan.findFirst({
+      where: { id, organizationId, deletedAt: null },
+      select: { status: true },
     });
-    return { issued: result.count, total: ids.length };
+    if (!current) throw new NotFoundException('Delivery challan not found');
+    if (current.status !== expected) throw new BadRequestException(message);
+    throw new ConflictException(message);
   }
 
   // ============ Helper Methods ============

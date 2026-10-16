@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ChallanStatus, ChallanType } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { DeliveryChallansService } from './delivery-challans.service';
@@ -149,6 +149,45 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
       prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 0 } as never);
       await expect(service[method](ORG, 'dc-1')).rejects.toThrow(ConflictException);
       expect(prisma.inventoryMovement.create).not.toHaveBeenCalled();
+    });
+
+    it('answers 404 for a challan of another organization (or none)', async () => {
+      prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 0 } as never);
+      prisma.deliveryChallan.findFirst.mockResolvedValue(null);
+      await expect(service[method](ORG, 'dc-1')).rejects.toThrow(NotFoundException);
+      expect(prisma.inventoryMovement.create).not.toHaveBeenCalled();
+    });
+
+    it('answers 400 when the challan is in another status', async () => {
+      const other = status === ChallanStatus.DRAFT ? ChallanStatus.ISSUED : ChallanStatus.RETURNED;
+      prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 0 } as never);
+      prisma.deliveryChallan.findFirst.mockResolvedValue(
+        challan(other, { itemId: 'item-b', warehouseId: null }) as never,
+      );
+      await expect(service[method](ORG, 'dc-1')).rejects.toThrow(BadRequestException);
+      expect(prisma.inventoryMovement.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe.each([
+    ['bulkDelete', 'remove'],
+    ['bulkIssue', 'issue'],
+  ] as const)('%s', (bulk, single) => {
+    it(`runs ${single} per record and reports per-record failures`, async () => {
+      const spy = jest
+        .spyOn(service, single)
+        .mockResolvedValueOnce({} as never)
+        .mockRejectedValueOnce(new NotFoundException('Delivery challan not found'));
+      await expect(service[bulk](ORG, ['dc-1', 'dc-2', 'dc-1'])).resolves.toEqual({
+        processed: 1,
+        total: 2,
+        failures: [{ id: 'dc-2', reason: 'Delivery challan not found' }],
+      });
+      expect(spy.mock.calls).toEqual([
+        [ORG, 'dc-1'],
+        [ORG, 'dc-2'],
+      ]);
+      expect(prisma.deliveryChallan.updateMany).not.toHaveBeenCalled();
     });
   });
 
