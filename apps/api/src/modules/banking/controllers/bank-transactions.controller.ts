@@ -19,7 +19,7 @@ import {
   InvalidateCache,
   Permissions,
 } from '../../../common/decorators';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { BankTransactionQueryDto } from '../dto/bank-transaction-query.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
@@ -99,20 +99,14 @@ export class BankTransactionsController {
   @Permissions('banking.view')
   @CacheResponse('bank-transactions:list')
   @CacheTTL(120)
-  findAll(
-    @CurrentOrg() orgId: string,
-    @Query() query: PaginationDto & { bankAccountId?: string; status?: string },
-  ) {
+  findAll(@CurrentOrg() orgId: string, @Query() query: BankTransactionQueryDto) {
     return this.bankTransactionsService.findAll(orgId, query);
   }
 
   @Get('unmatched')
   @Permissions('banking.view')
   @ApiOperation({ summary: 'List unmatched (PENDING) bank transactions' })
-  findUnmatched(
-    @CurrentOrg() orgId: string,
-    @Query() query: PaginationDto & { bankAccountId?: string },
-  ) {
+  findUnmatched(@CurrentOrg() orgId: string, @Query() query: BankTransactionQueryDto) {
     return this.bankTransactionsService.findAll(orgId, { ...query, status: 'PENDING' });
   }
 
