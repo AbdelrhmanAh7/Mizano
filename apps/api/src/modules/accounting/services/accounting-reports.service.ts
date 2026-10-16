@@ -33,6 +33,7 @@ export interface GeneralLedgerEntry {
   date: Date;
   journalId: string;
   journalNumber: string;
+  reference: string | null;
   description: string;
   debit: string;
   credit: string;
@@ -140,7 +141,7 @@ export class AccountingReportsService {
       },
       include: {
         journal: {
-          select: { id: true, journalNumber: true, date: true, notes: true },
+          select: { id: true, journalNumber: true, date: true, notes: true, reference: true },
         },
       },
       orderBy: [{ journal: { date: 'asc' } }, { journalId: 'asc' }, { id: 'asc' }],
@@ -155,6 +156,7 @@ export class AccountingReportsService {
         date: line.journal.date,
         journalId: line.journal.id,
         journalNumber: line.journal.journalNumber,
+        reference: line.journal.reference ?? null,
         description: line.description || line.journal.notes || '',
         debit: money(debit),
         credit: money(credit),
