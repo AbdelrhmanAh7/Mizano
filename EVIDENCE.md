@@ -483,6 +483,36 @@ Not run locally, per the owner's directive (2026-10-08: the full suites and the 
 - The CodeRabbit threads are answered by the commits above. Replying on GitHub is left to the harness (this session does not push).
 - Reviewer: none yet. This record is the author's own run.
 
+## Review round 3 (CTO on `4341fb1`, CodeRabbit/Codex threads)
+
+- **Tested code SHA**: `08a751a` (branch `ai/130`, on top of `c373cc6` = master `fcaed26`..`origin/master` merged). Same environment as above; a fresh PostgreSQL 16 cluster, `prisma migrate deploy` (latest applied: `20261009000000_payslip_soft_delete`).
+
+| Finding                                                                                                        | Status                                                                                                                                                                               | Evidence                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Merge conflict / migration order                                                                               | Fixed: `origin/master` merged, the payslip soft-delete migration renamed to `20261009000000_...` (after master's `20261008000000_intake_stage_timings`); only adds a nullable column | `prisma migrate deploy` on an empty DB: "Database schema is up to date", last row `20261009000000_payslip_soft_delete`                          |
+| COGM account reads before the ledger lock; stale work-order snapshot                                           | Fixed in `work-orders.service.ts` `completeWorkOrder`: lock, guarded claim, reload in the transaction                                                                                | unit: "derives movements and journal from the work order reloaded inside the transaction", "takes the organization ledger lock before claiming" |
+| Single payroll delete reports success when the guarded claim lost                                              | Fixed: `ConflictException` unless exactly one run was claimed                                                                                                                        | unit: "rejects a single deletion whose guarded claim lost the race to a payment"                                                                |
+| Disposal gain/loss account and FULLY_DEPRECIATED, depreciation order, bulk-complete COGM, re-runnable e2e-army | Already fixed by `3ae774e`, `f465a47`, `e2f0dbe`, `5f057fe`; re-verified below                                                                                                       | e2e `AC-GainLoss`, `AC-Dispose`, `AC-Order`, bulk-complete COGM                                                                                 |
+| Correction commands for PAYROLL/ASSET_DISPOSAL/COGM reversal                                                   | Not done: new feature, see `AI_QUESTIONS.md`                                                                                                                                         | open question                                                                                                                                   |
+
+```bash
+cd apps/api && pnpm exec jest --maxWorkers=2 src/modules/manufacturing src/modules/hr src/modules/assets src/modules/accounting/services/journals
+DATABASE_URL=postgresql://postgres@127.0.0.1:55130/m130 REDIS_URL= pnpm exec jest --config ./test/jest-e2e.json --runInBand test/system-postings.e2e-spec.ts
+pnpm exec eslint --max-warnings 0 src/modules/manufacturing src/modules/hr/services src/modules/assets test/system-postings.e2e-spec.ts
+pnpm exec tsc --noEmit ; pnpm exec tsc --noEmit -p test/tsconfig.e2e.json
+```
+
+```text
+unit:   Test Suites: 8 passed, 8 total   Tests: 126 passed, 126 total
+e2e:    Test Suites: 1 passed, 1 total   Tests: 19 passed, 19 total
+eslint: exit 0
+tsc:    exit 1 / 2, the only error: src/common/utils/coderabbit-config.spec.ts(7,23) TS7016 (no types for 'js-yaml')
+```
+
+The `tsc` error is not from this branch: `apps/api/package.json` declares `@types/js-yaml` exactly as on master, but this checkout's `node_modules` lacks it (an offline-install artifact); CI installs it. No other `tsc` error appears in either project.
+
+Not run in this round: the e2e-army test (needs the hub's runner and a built stack; it passed twice in round 2 on `2ae0cab`, and the API behaviour it covers is unchanged apart from the two fixes above), the full API and web unit suites and the builds (owner directive: CI runs them after the push).
+
 ## Round 1 (`9bae74c`, before the review)
 
 The acceptance tests were committed failing first (`5bb0a38`): 12 of 12 failed on master behaviour (float totals `569.6891`, no source-linked journal, lock date ignored, two concurrent disposals/completions both returning 2xx). `4bb3a60` changed the expected rounding scale from 4 dp to the codebase's `CURRENCY_SCALE` (2 dp); the assertions stay exact.
