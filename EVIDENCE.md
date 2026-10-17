@@ -506,10 +506,10 @@ pnpm exec tsc --noEmit ; pnpm exec tsc --noEmit -p test/tsconfig.e2e.json
 unit:   Test Suites: 8 passed, 8 total   Tests: 126 passed, 126 total
 e2e:    Test Suites: 1 passed, 1 total   Tests: 19 passed, 19 total
 eslint: exit 0
-tsc:    exit 1 / 2, the only error: src/common/utils/coderabbit-config.spec.ts(7,23) TS7016 (no types for 'js-yaml')
+tsc:    exit 0 (both projects) after adding the missing @types/js-yaml 4.0.9 to this checkout's node_modules
 ```
 
-The `tsc` error is not from this branch: `apps/api/package.json` declares `@types/js-yaml` exactly as on master, but this checkout's `node_modules` lacks it (an offline-install artifact); CI installs it. No other `tsc` error appears in either project.
+Before that, `tsc` reported one TS7016 in master's `coderabbit-config.spec.ts`: `apps/api/package.json` declares `@types/js-yaml` but this checkout's `node_modules` lacked it (offline-install artifact, not a code change). I copied the declared version (4.0.9) from another worktree and `tsc` is clean.
 
 Not run in this round: the e2e-army test (needs the hub's runner and a built stack; it passed twice in round 2 on `2ae0cab`, and the API behaviour it covers is unchanged apart from the two fixes above), the full API and web unit suites and the builds (owner directive: CI runs them after the push).
 
