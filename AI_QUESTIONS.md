@@ -1,0 +1,1 @@
+label missing: #113 has no `ci-change` label (checked 2026-10-17 with `gh issue view 113 --json labels`), so the trigger-only deploy.yml edit from 9aae00f is not re-applied; deploy-workflow.spec.ts stays red until it is.
