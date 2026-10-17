@@ -390,7 +390,37 @@ Unset launcher heap_size_limit: 4395630592
 
 # EVIDENCE — #183 Secure Docker Compose production stacks (Mizano #132-1)
 
-- **Tested commit**: `2ab8576`. Only this file changes after it; every output below was taken on that commit.
+- **Tested commit**: `8cda9cf4` (merge of `origin/master` into `ai/183`, tree identical to the final head except
+  this file and `AI_QUESTIONS.md`). `production-compose.spec.ts` reads this file, so it was re-run after the last
+  edit of this file (output below).
+- **Sentry**: none. This comes from security audit #132; there is no Sentry issue. No UI change, so no screenshots.
+
+## Acceptance criteria
+
+1. **AC1** `docker compose config` shows no published 5432/6379 (postgres and redis have no `ports:`).
+2. **AC2** `POSTGRES_PASSWORD` is required via `${POSTGRES_PASSWORD:?}`; config fails without it.
+3. **AC3** Redis runs with `--requirepass`, in array form (one argv entry).
+4. **AC4** The API authenticates to Redis, whatever characters the password has.
+5. **AC5** The Redis healthcheck authenticates without the password in its command.
+
+## Verification report
+
+| AC  | Command / test                                                                          | Observed                                         |
+| --- | --------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| AC1 | `npx jest src/cache/production-compose.spec.ts` ("publishes no Postgres or Redis port") | exit 0, pass (both compose files)                |
+| AC2 | same spec ("fails to render without POSTGRES_PASSWORD")                                 | exit 0, pass                                     |
+| AC3 | same spec ("runs Redis with --requirepass…", "…one argv entry…")                        | exit 0, pass                                     |
+| AC4 | `npx jest src/cache/redis-url.spec.ts` and spec "lets the API connect…"                 | exit 0, pass                                     |
+| AC5 | same spec ("keeps the password out of the Redis healthcheck command")                   | exit 0, pass                                     |
+| all | `npx prisma generate && npx jest src/cache src/modules/ai/intake`                       | 9 suites, 86 tests passed (after merging master) |
+
+Real `docker compose config` was **not** run: see "Not verified here".
+
+### Regression proof (fails on base, passes on head)
+
+`production-compose.spec.ts` and `redis-url.ts` copied onto a detached worktree of `origin/master`, then
+`npx jest src/cache/production-compose.spec.ts`: **exit 1, 12 failed / 3 passed** (the 3 passes are "keeps the password out of the Redis healthcheck command" for both files and "publishes no Postgres or Redis port" for one file). On the head: all pass.
+
 - **Scope**: `docker-compose.production.yml`, `deploy/pi/docker-compose.pi.yml`, `apps/api/src/cache/redis-url.ts`
   and its three callers (`cache.module.ts`, `cache.service.ts`, `modules/ai/intake/intake-queue.service.ts`),
   `scripts/check-compose-security.sh`, `apps/api/src/cache/{production-compose,redis-url}.spec.ts`,
@@ -440,18 +470,15 @@ workflows). Both edits are written out in `docs/ops/pending-workflow-changes.md`
 - Earlier threads (URL-encoding in `REDIS_URL`; port check by `ports` length) are fixed by `redis-url.ts` and
   `8ec7d95`, unchanged here.
 
-## Test output on `2ab8576` (`cd apps/api && npx jest src/cache src/modules/ai/intake`)
+## Test output on the head (`cd apps/api && npx prisma generate && npx jest src/cache src/modules/ai/intake`)
 
 ```text
-PASS src/modules/ai/intake/intake-jobs.service.spec.ts
-PASS src/modules/ai/intake/intake-job-owner.guard.spec.ts
-PASS src/modules/ai/intake/intake-storage.spec.ts
-PASS src/cache/cache.service.spec.ts
-PASS src/cache/production-compose.spec.ts
-PASS src/cache/redis-url.spec.ts
-PASS src/modules/ai/intake/intake-processor.service.spec.ts
-Tests:       71 passed, 71 total
+Test Suites: 9 passed, 9 total
+Tests:       86 passed, 86 total
 ```
+
+(The Prisma client had to be regenerated after merging master's `stageTimingsMs` migration; before that three
+intake suites failed to compile for that reason only.)
 
 ## Not verified here
 
@@ -462,6 +489,8 @@ Tests:       71 passed, 71 total
   pending CI step.
 - The e2e-army test: not run locally. `run-local.sh` needs a pushed ref, and the implementer does not push.
   The verify job runs it.
-- `pnpm --filter api type-check`: started, but the shared `tsc` lock wrapper never released and the run was killed
-  at the time limit, so it did not finish. The changed TypeScript is one spec file, which ts-jest compiled above.
+- `tsc --noEmit -p apps/api`: exit 1 with errors only in files this PR does not touch (missing
+  `@types/js-yaml` in `coderabbit-config.spec.ts`, `common/filters/http-exception.filter.ts`,
+  `modules/logger/logger.service.ts`, all arriving from master). No error mentions `src/cache` or
+  `intake-queue.service.ts`. `cache.module.ts` is compiled by this run; the e2e-army file is not in the API project.
 - The full suite: runs on GitHub CI after the push. Per instructions, it was not run locally.
