@@ -159,6 +159,36 @@ describe('BillForm expense account per line (#216)', () => {
     ).toHaveAttribute('aria-selected', 'false');
   });
 
+  it('clears the item-derived account when switching to Manual Entry', async () => {
+    const onSubmit = renderForm();
+    fireEvent.click(within(itemPicker(0)).getByRole('option', { name: 'Paper' }));
+    expect(
+      within(accountPicker(0)).getByRole('option', { name: '6200 · Office Supplies' }),
+    ).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.click(within(itemPicker(0)).getByRole('option', { name: 'Manual Entry' }));
+    expect(
+      within(accountPicker(0))
+        .getAllByRole('option')
+        .filter((o) => o.getAttribute('aria-selected') === 'true'),
+    ).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create Bill' }));
+    expect(await screen.findByText('Line 1: Choose an expense account')).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('keeps a manually chosen account when switching to Manual Entry', () => {
+    renderForm();
+    fireEvent.click(within(itemPicker(0)).getByRole('option', { name: 'Paper' }));
+    fireEvent.click(within(accountPicker(0)).getByRole('option', { name: '6100 · Rent Expense' }));
+
+    fireEvent.click(within(itemPicker(0)).getByRole('option', { name: 'Manual Entry' }));
+    expect(
+      within(accountPicker(0)).getByRole('option', { name: '6100 · Rent Expense' }),
+    ).toHaveAttribute('aria-selected', 'true');
+  });
+
   it('preselects accountId and submits when editing an existing bill', async () => {
     const onSubmit = jest.fn();
     const existingBill = {

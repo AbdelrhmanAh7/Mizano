@@ -253,7 +253,15 @@ export function BillForm({
 
   const handleItemSelect = (index: number, itemId: string) => {
     if (itemId === 'none') {
+      // Drop an account that came from the previous item; keep one the user picked by hand.
+      const previousItem = items.find((i) => i.id === form.getValues(`lines.${index}.itemId`));
+      const accountId = form.getValues(`lines.${index}.accountId`);
       form.setValue(`lines.${index}.itemId`, '');
+      if (previousItem?.purchaseAccountId && accountId === previousItem.purchaseAccountId) {
+        form.setValue(`lines.${index}.accountId`, '', {
+          shouldValidate: form.formState.isSubmitted,
+        });
+      }
       return;
     }
     const item = items.find((i) => i.id === itemId);
