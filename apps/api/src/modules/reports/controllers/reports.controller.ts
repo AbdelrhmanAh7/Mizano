@@ -7,7 +7,10 @@ import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { PdfService } from '../../documents/services/pdf.service';
 import { AgingReportsService } from '../services/aging-reports.service';
 import { DashboardService } from '../services/dashboard.service';
-import { FinancialReportsService } from '../services/financial-reports.service';
+import {
+  FinancialReportsService,
+  GeneralLedgerReport,
+} from '../services/financial-reports.service';
 import { FinancialNarrativeService } from '../../ai/services/financial-narrative.service';
 import { MAX_DAYS, MAX_MONTHS, clampInt } from '../utils/report-utils';
 
@@ -502,13 +505,19 @@ export class ReportsController {
   @CacheResponse('reports:general-ledger')
   @CacheTTL(600)
   @ApiOperation({ summary: 'Get General Ledger for account' })
-  getGeneralLedger(
+  async getGeneralLedger(
     @CurrentOrg() orgId: string,
     @Param('accountId') accountId: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
-  ) {
+  ): Promise<GeneralLedgerReport> {
+    await this.assertAccountOwnership(orgId, accountId);
     return this.financialReportsService.getGeneralLedger(orgId, accountId, startDate, endDate);
+  }
+
+  /** 404 before any ledger work when the account is not the caller's organization's (#223). */
+  private async assertAccountOwnership(orgId: string, accountId: string): Promise<void> {
+    await this.financialReportsService.assertAccountOwnership(orgId, accountId);
   }
 
   // Aging Reports

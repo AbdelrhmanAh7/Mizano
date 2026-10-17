@@ -617,17 +617,29 @@ export class FinancialReportsService {
     };
   }
 
+  /**
+   * The account, scoped to the caller's organization. A foreign or unknown id is the same 404,
+   * so a caller cannot tell another tenant's account from one that does not exist.
+   */
+  async assertAccountOwnership(
+    organizationId: string,
+    accountId: string,
+  ): Promise<GeneralLedgerReport['account']> {
+    const account = await this.prisma.account.findFirst({
+      where: { id: accountId, organizationId },
+      select: { id: true, code: true, name: true, type: true },
+    });
+    if (!account) throw new NotFoundException('Account not found');
+    return account;
+  }
+
   async getGeneralLedger(
     organizationId: string,
     accountId: string,
     startDate?: string,
     endDate?: string,
   ): Promise<GeneralLedgerReport> {
-    const account = await this.prisma.account.findFirst({
-      where: { id: accountId, organizationId },
-      select: { id: true, code: true, name: true, type: true },
-    });
-    if (!account) throw new NotFoundException('Account not found');
+    const account = await this.assertAccountOwnership(organizationId, accountId);
 
     const period = resolvePeriod(startDate, endDate);
     const [currencyCode, prior, lines] = await Promise.all([
