@@ -3036,6 +3036,9 @@ model IntakeJob {
   lastError         String?
   /// Extraction result and evidence. May contain document data; never logged.
   result            Json?
+  /// Whole milliseconds per worker stage of the latest attempt (load, extract, parse,
+  /// validate). Stage names and numbers only; never document content.
+  stageTimingsMs    Json?
   forceType         String?
   strategy          String?
   language          String?
