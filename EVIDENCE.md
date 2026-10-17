@@ -394,55 +394,63 @@ Unset launcher heap_size_limit: 4395630592
 
 - **Issue**: #216 (Bill form: add expense-account picker per line so UI-made bills can be approved)
 - **PR**: #230
-- **Tested code commit**: `c803914` (the later commits on this branch change only this file)
+- **Tested head (code)**: `0564c04` (the commit after it changes only this file)
 - **Base**: `master` at `f972414`
 - **Date**: 2026-10-17
 - **Sentry**: none. The bug came from the 2026-10-11 demo walkthrough (400 "All bill lines must have an expense account assigned before approval"), not from a Sentry issue.
 
-Status meanings: **local** = run in this worktree, with the exit code shown below. **gate** = covered only by the e2e-army test, which runs in the hub's `e2e-army` check on PR #230 against the app built from this branch. It was not run locally, so no local result is claimed for it.
+Status meanings: **PASSED (local, exit 0)** = run in this worktree at `0564c04`, with the command and output below. **UNVERIFIED – pending E2E** = covered only by `e2e-army/216-bill-expense-account.e2e.ts`. That test was **not run** in this worktree: `run-local.sh` needs the hub lock directory, the Keychain DB password and a pushed ref, and none of those are available in this sandbox. It runs in the hub's `e2e-army` check on PR #230. Until that check reports, no result is claimed.
 
 ## Acceptance criteria (numbered from the issue)
 
-| AC      | Criterion (issue #216)                                                                            | Covering test                                                                                                                                                                                                                                                                                                                                                                                         | Status           |
-| ------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| **AC1** | UI bill with a manual line + chosen expense account saves; Approve & post → Approved, one journal | Form side: `bill-form.spec.tsx` › `submits a manual line with the chosen account so the bill can be approved`, `blocks submit and says "Choose an expense account" when a line has none`. API side (unchanged): `bills.service.spec.ts` › `should transition DRAFT to OPEN and post one balanced journal in the same transaction`. End to end: `e2e-army/216-bill-expense-account.e2e.ts` › `AC1-AC4` | local (0) + gate |
-| **AC2** | Double-clicking Approve still yields one journal (#11)                                            | `bills.service.spec.ts` › `should post nothing when a concurrent approval already won`, `should reject approving a non-DRAFT bill`; e2e-army `AC1-AC4` ("click Approve & post twice")                                                                                                                                                                                                                 | local (0) + gate |
-| **AC3** | Record payment on that bill works                                                                 | e2e-army `AC1-AC4` ("record a full payment")                                                                                                                                                                                                                                                                                                                                                          | gate only        |
-| **AC4** | Trial balance stays balanced afterwards                                                           | e2e-army `AC1-AC4` (trial balance debits = credits)                                                                                                                                                                                                                                                                                                                                                   | gate only        |
-| **AC5** | Playwright or component test covering create → choose account → approve                           | `bill-form.spec.tsx` (7 tests: account list, item default, item without an account clears it, edit preselect, blocked submit, submit payload, Arabic); `bill-form.scan.spec.tsx` › `gives every reviewed line an expense account picker and blocks submit until each has one`                                                                                                                         | local (0)        |
-| **AC6** | Works in /ar (RTL)                                                                                | `bill-form.spec.tsx` › `labels the picker and the error in Arabic`; e2e-army `AC6` (`حساب المصروف` visible, `document.documentElement.dir === 'rtl'`)                                                                                                                                                                                                                                                 | local (0) + gate |
+| AC      | Criterion (issue #216)                                                                            | Covering test                                                                                                                                                                                                                                                                                                                                           | Status                                                                                               |
+| ------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **AC1** | UI bill with a manual line + chosen expense account saves; Approve & post → Approved, one journal | Form: `bill-form.spec.tsx` › `submits a manual line with the chosen account so the bill can be approved`, `blocks submit and says "Choose an expense account" when a line has none`. API (unchanged): `bills.service.spec.ts` › `should transition DRAFT to OPEN and post one balanced journal in the same transaction`. End to end: e2e-army `AC1-AC4` | Form + service: PASSED (local, exit 0). Full UI flow: UNVERIFIED – pending E2E                       |
+| **AC2** | Double-clicking Approve still yields one journal (#11)                                            | `bills.service.spec.ts` › `should post nothing when a concurrent approval already won`, `should reject approving a non-DRAFT bill`; e2e-army `AC1-AC4` ("click Approve & post twice")                                                                                                                                                                   | Service: PASSED (local, exit 0). UI: UNVERIFIED – pending E2E                                        |
+| **AC3** | Record payment on that bill works                                                                 | e2e-army `AC1-AC4` ("record a full payment")                                                                                                                                                                                                                                                                                                            | UNVERIFIED – pending E2E                                                                             |
+| **AC4** | Trial balance stays balanced afterwards                                                           | e2e-army `AC1-AC4` (trial balance debits = credits)                                                                                                                                                                                                                                                                                                     | UNVERIFIED – pending E2E                                                                             |
+| **AC5** | Playwright or component test covering create → choose account → approve                           | `bill-form.spec.tsx` (7 tests); `bill-form.scan.spec.tsx` › `gives every reviewed line an expense account picker and blocks submit until each has one`; `scan/page.spec.tsx` (lookup error + Retry, loading state). Scan page in the real app: e2e-army                                                                                                 | Component/page tests: PASSED (local, exit 0). Scan page in the running app: UNVERIFIED – pending E2E |
+| **AC6** | Works in /ar (RTL)                                                                                | `bill-form.spec.tsx` › `labels the picker and the error in Arabic` (labels only); e2e-army `AC6` (`حساب المصروف` visible, `document.documentElement.dir === 'rtl'`)                                                                                                                                                                                     | Arabic labels: PASSED (local, exit 0). RTL in browser: UNVERIFIED – pending E2E                      |
 
 No Playwright screenshots were taken in this worktree, because the app stack is not started here. The e2e-army gate records its own screen evidence on the PR.
+
+## Review threads fixed in `0564c04`
+
+- `bill-form.tsx:396`: the "Item" heading now uses `tForm('item')` (`purchases.bills.form.item`, en "Item" / ar "الصنف").
+- `scan/page.tsx:844`: the root cause was that the accounts/items lookup error branch reused `createFailed`, a message for a failed bill create. That branch now shows `ai.intake.scan.optionsLoadFailed` and keeps Retry. The options spinner shows `optionsLoading`. Paired en/ar keys were added. Regression test: `scan/page.spec.tsx`. Both of its tests fail on `109e2bc` (2 failed) and pass on `0564c04`.
 
 ## Changed covering tests
 
 - `apps/web/components/purchases/bill-form.spec.tsx` (new)
 - `apps/web/components/purchases/bill-form.scan.spec.tsx` (extended)
-- `e2e-army/216-bill-expense-account.e2e.ts` (new, first commit `f6a0636`)
+- `apps/web/app/[locale]/(dashboard)/purchases/bills/scan/page.spec.tsx` (new, `0564c04`)
+- `e2e-army/216-bill-expense-account.e2e.ts` (new, first commit `f6a0636`; not run locally)
 
-## Commands and observed results (2026-10-17, worktree at `2638331`; code identical to `c803914`)
+## Commands and observed results (2026-10-17, worktree at `0564c04`)
 
 ```text
-$ (apps/web) npx jest --maxWorkers=2 components/purchases/bill-form
+$ (apps/web) npx jest --maxWorkers=2 purchases/bills/scan/page.spec components/purchases/bill-form
+PASS app/[locale]/(dashboard)/purchases/bills/scan/page.spec.tsx
 PASS components/purchases/bill-form.spec.tsx
 PASS components/purchases/bill-form.scan.spec.tsx
-Test Suites: 2 passed, 2 total
-Tests:       13 passed, 13 total
+Tests:       15 passed, 15 total
 exit 0
 
-$ (apps/api) npx jest --maxWorkers=2 src/modules/purchases/services/bills.service.spec.ts -t "approv|concurrent|expense account"
-✓ should transition DRAFT to OPEN and post one balanced journal in the same transaction
-✓ should post nothing when a concurrent approval already won
-✓ should reject approving a non-DRAFT bill
-Tests: 33 skipped, 10 passed, 43 total
+$ (apps/web) scan/page.tsx restored from 109e2bc, then npx jest purchases/bills/scan/page.spec
+✕ shows the lookup error with Retry, and Retry refetches the failed accounts
+✕ shows the loading hint while accounts load
+Tests:       2 failed, 2 total
+
+$ (apps/web) npx tsc --noEmit      # after `pnpm --filter @mizano/shared-types build` (dist/ was missing in the worktree)
 exit 0
 
-$ (apps/web) tsc --noEmit        # after building packages/shared-types (its dist/ was missing in the worktree)
-exit 0, 0 errors
-
-$ (apps/web) npx next lint --file <the 4 changed web source/spec files>
+$ (apps/web) npx next lint --file <scan/page.tsx, scan/page.spec.tsx, bill-form.tsx>
 ✔ No ESLint warnings or errors
+exit 0
+
+$ npx prettier --check <changed message JSON and web files>
+All matched files use Prettier code style!
 exit 0
 ```
 
-Not a bug fix in the regression-test sense: the API rule is unchanged. The web form previously never sent `accountId`, and the new specs cover the added picker. So there is no base-fails/head-passes run to show.
+API spec results (`bills.service.spec.ts`, approval tests, 10 passed, exit 0) were recorded at `2638331`. This round did not change the API.
