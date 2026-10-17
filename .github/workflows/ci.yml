@@ -4,6 +4,7 @@
 # unlimited for this public repository). No self-hosted labels and no secrets beyond the automatic GITHUB_TOKEN.
 #
 # Owner rule: every job stays under 5 minutes (timeout-minutes: 5), so the pipeline is split into parallel jobs.
+# The only exception is docker-build (timeout-minutes: 30; native builds take 8-12 min): pending owner decision, see AI_QUESTIONS.md.
 # The job names are the check names the hub gates and automerge wait for ("Install Dependencies", "Lint & Type Check",
 # "Unit Tests", "Build"): keep them stable. Jobs are independent and each installs from the shared pnpm store cache
 # (setup-node), so none waits for another and a failed install cannot skip the others silently.

@@ -169,7 +169,7 @@ The GitHub Actions workflow includes gating, draft skips, Turbo caching, and con
 
 `turbo.json` declares no `inputs` for `build`, `lint`, `type-check` and `test`, so Turborepo hashes every file of a package that git tracks (or that is untracked and not ignored) and runs the task again when any of them changes. The old `src/**` globs matched nothing in `apps/web` (its code lives in `app/`, `components/`, `lib/`, `messages/` and `public/`), so web tasks hashed only `package.json`, `tsconfig.json` and the lint/jest config and replayed a cached result for any web change. Locally the replay crossed branches, because Turborepo shares `.turbo/cache` between git worktrees: the first result recorded on any branch replayed on every other branch, and `pnpm ci:full` never really checked web code. CI would have done the same as soon as the Turbo cache is restored there. The same globs also skipped `apps/api/test/` (lint and type-check), `apps/api/prisma/` (lint, type-check and test) and the Nest/SWC configs.
 
-`.prettierrc` and `.prettierignore` are `globalDependencies` because the API lint runs Prettier through ESLint. `scripts/test_turbo_config.py` (standard library only, run by the CI lint job) fails when a task declares `inputs` without `$TURBO_DEFAULT`. If you add `inputs` to a task again, start from `$TURBO_DEFAULT` and subtract, then check the result:
+`.prettierrc` and `.prettierignore` are `globalDependencies` because the API lint runs Prettier through ESLint. `scripts/test_turbo_config.py` (standard library only, run by the CI lint job) fails when a task declares `inputs` without `$TURBO_DEFAULT$`. If you add `inputs` to a task again, start from `$TURBO_DEFAULT$` and subtract, then check the result:
 
 ```bash
 # change a web file, then:
