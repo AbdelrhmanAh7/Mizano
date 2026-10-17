@@ -18,6 +18,15 @@ import { describeError } from '../../common/utils/redact';
 const loggerWsOriginRaw =
   process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:5001';
 const loggerWsOrigins = loggerWsOriginRaw.split(',').map((o) => o.trim());
+const expandedLoggerWsOrigins = new Set<string>(loggerWsOrigins);
+for (const origin of loggerWsOrigins) {
+  if (origin.startsWith('http://127.0.0.1:')) {
+    expandedLoggerWsOrigins.add(origin.replace('http://127.0.0.1:', 'http://localhost:'));
+  } else if (origin.startsWith('http://localhost:')) {
+    expandedLoggerWsOrigins.add(origin.replace('http://localhost:', 'http://127.0.0.1:'));
+  }
+}
+const allowedLoggerWsOrigins = Array.from(expandedLoggerWsOrigins);
 
 /** Same permission as `GET /logger/logs`: admin-level (Admin role), see LoggerController. */
 class LoggerSocketAccess {
@@ -59,7 +68,8 @@ export function loggerOrgRoom(organizationId: string): string {
 @WebSocketGateway({
   namespace: '/logger',
   cors: {
-    origin: loggerWsOrigins.length === 1 ? loggerWsOrigins[0] : loggerWsOrigins,
+    origin:
+      allowedLoggerWsOrigins.length === 1 ? allowedLoggerWsOrigins[0] : allowedLoggerWsOrigins,
     credentials: true,
   },
 })

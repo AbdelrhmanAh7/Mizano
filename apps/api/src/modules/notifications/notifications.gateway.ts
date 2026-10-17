@@ -43,11 +43,20 @@ export function notificationsOrgRoom(organizationId: string): string {
 // Parse comma-separated CORS origins (same logic as main.ts bootstrap)
 const wsOriginRaw = process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:5001';
 const wsOrigins = wsOriginRaw.split(',').map((o) => o.trim());
+const expandedWsOrigins = new Set<string>(wsOrigins);
+for (const origin of wsOrigins) {
+  if (origin.startsWith('http://127.0.0.1:')) {
+    expandedWsOrigins.add(origin.replace('http://127.0.0.1:', 'http://localhost:'));
+  } else if (origin.startsWith('http://localhost:')) {
+    expandedWsOrigins.add(origin.replace('http://localhost:', 'http://127.0.0.1:'));
+  }
+}
+const allowedWsOrigins = Array.from(expandedWsOrigins);
 
 @WebSocketGateway({
   namespace: '/events',
   cors: {
-    origin: wsOrigins.length === 1 ? wsOrigins[0] : wsOrigins,
+    origin: allowedWsOrigins.length === 1 ? allowedWsOrigins[0] : allowedWsOrigins,
     credentials: true,
   },
 })

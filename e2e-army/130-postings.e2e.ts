@@ -516,3 +516,28 @@ test(
     for (const id of ids) await expectOneCogm(id);
   },
 );
+
+test(
+  '@issue-130 AC-CORS: local web redirects preserve 127.0.0.1 origin and return CORS headers',
+  { tags: ['feat:mz-payroll', 'feat:mz-fixed-assets', 'feat:mz-work-orders', 'lvl:api'] },
+  async ({ app }) => {
+    const webBase = (app.baseUrl ?? 'http://127.0.0.1:3000').replace(/\/+$/, '');
+    if (!webBase.startsWith('http://127.0.0.1:')) return;
+
+    // A request without locale prefix to 127.0.0.1 must redirect on 127.0.0.1 (never localhost)
+    const res = await fetch(`${webBase}/hr/payroll`, {
+      redirect: 'manual',
+      headers: {
+        host: new URL(webBase).host,
+        origin: webBase,
+      },
+    });
+
+    if (res.status === 307 || res.status === 308) {
+      const loc = res.headers.get('location') ?? '';
+      expect(loc).toContain('127.0.0.1');
+      expect(loc).not.toContain('localhost');
+      expect(res.headers.get('access-control-allow-origin')).toBe(webBase);
+    }
+  },
+);

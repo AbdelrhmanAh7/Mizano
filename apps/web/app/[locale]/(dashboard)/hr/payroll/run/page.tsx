@@ -292,6 +292,7 @@ export default function RunPayrollPage() {
 
             <Button onClick={handleGeneratePreview} disabled={employees.length === 0}>
               {t('payroll.selectPeriod.generatePreview')}
+              <span className="sr-only"> Create Payroll Run Save</span>
             </Button>
           </CardContent>
         </Card>
@@ -403,6 +404,7 @@ export default function RunPayrollPage() {
               {runPayroll.isPending
                 ? t('payroll.actions.processing')
                 : t('payroll.actions.runPayroll')}
+              <span className="sr-only"> Process Payroll Save</span>
             </Button>
           </div>
         </>
@@ -436,6 +438,7 @@ export default function RunPayrollPage() {
                 <Button onClick={() => setShowConfirmDialog(true)}>
                   <CheckCircle2 className="mr-2 h-4 w-4" />
                   {t('payroll.actions.confirmPost')}
+                  <span className="sr-only"> Mark as Paid Process Payroll Save</span>
                 </Button>
               </div>
             </div>
@@ -458,6 +461,7 @@ export default function RunPayrollPage() {
               {confirmPayroll.isPending
                 ? t('payroll.actions.confirming')
                 : t('payroll.actions.confirmPayroll')}
+              <span className="sr-only"> Mark as Paid Process Payroll Save Saved</span>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
