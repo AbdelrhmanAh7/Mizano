@@ -16,6 +16,7 @@ const presets: { label: string; value: DatePreset }[] = [
   { label: 'Last Quarter', value: 'lastQuarter' },
   { label: 'This Year', value: 'thisYear' },
   { label: 'Last 12 Months', value: 'last12Months' },
+  { label: 'All Time', value: 'all' },
 ];
 
 export function DateRangePicker() {

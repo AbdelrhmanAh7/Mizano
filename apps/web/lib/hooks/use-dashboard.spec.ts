@@ -202,3 +202,52 @@ describe('transformDashboardOverview', () => {
     expect(result.stats.bankBalance).toBe(0.25);
   });
 });
+
+describe('dashboard period filter', () => {
+  const { getPresetDates, parsePeriod, useDashboardFilters } = jest.requireActual<
+    typeof import('@/lib/stores/use-dashboard-filters')
+  >('@/lib/stores/use-dashboard-filters');
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('defaults to the current calendar month', () => {
+    const now = new Date();
+    const state = useDashboardFilters.getState();
+    expect(state.preset).toBe('thisMonth');
+    expect(state.dateRange.from).toEqual(new Date(now.getFullYear(), now.getMonth(), 1));
+  });
+
+  it('parses ?period= and falls back to this month for invalid values', () => {
+    expect(parsePeriod('all')).toBe('all');
+    expect(parsePeriod('lastMonth')).toBe('lastMonth');
+    expect(parsePeriod('bogus')).toBe('thisMonth');
+    expect(parsePeriod('custom')).toBe('thisMonth');
+    expect(parsePeriod(null)).toBe('thisMonth');
+  });
+
+  it('"all" reaches back further than the month', () => {
+    expect(getPresetDates('all').from.getTime()).toBeLessThan(
+      getPresetDates('thisMonth').from.getTime(),
+    );
+  });
+
+  it('requests a different range (and query key) when the period changes', async () => {
+    const get = jest.spyOn(api, 'get').mockResolvedValue({ data: { data: {} } });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client }, children);
+    const { useDashboardStats } =
+      jest.requireActual<typeof import('./use-dashboard')>('./use-dashboard');
+    const { rerender } = renderHook(
+      ({ preset }: { preset: 'thisMonth' | 'all' }) => useDashboardStats(getPresetDates(preset)),
+      { wrapper, initialProps: { preset: 'thisMonth' } },
+    );
+    await waitFor(() => expect(get).toHaveBeenCalledTimes(1));
+    rerender({ preset: 'all' });
+    await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
+    const [first, second] = get.mock.calls.map((c) => String(c[0]));
+    expect(first).toContain('startDate=');
+    expect(second).toContain('startDate=2000-01-01');
+    expect(first).not.toBe(second);
+  });
+});

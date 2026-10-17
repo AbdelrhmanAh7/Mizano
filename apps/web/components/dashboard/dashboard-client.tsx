@@ -22,7 +22,7 @@ import {
   useDashboardRevenue,
   useDashboardStats,
 } from '@/lib/hooks/use-dashboard';
-import { useDashboardFilters } from '@/lib/stores/use-dashboard-filters';
+import { parsePeriod, useDashboardFilters } from '@/lib/stores/use-dashboard-filters';
 import { useDashboardLayout } from '@/lib/stores/use-dashboard-layout';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { CashFlowChart } from '@/components/dashboard/cash-flow-chart';
 import { RevenueChart } from '@/components/dashboard/revenue-chart';
 import { ARAPChart } from '@/components/dashboard/ar-ap-chart';
@@ -99,7 +100,28 @@ function StatCardSkeleton() {
 }
 
 export function DashboardClient() {
-  const { dateRange } = useDashboardFilters();
+  const { dateRange, preset, setPreset } = useDashboardFilters();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const urlPeriod = searchParams.get('period');
+
+  // URL -> store: a `?period=` link (or reload) selects that period; invalid values mean this month.
+  useEffect(() => {
+    const next = parsePeriod(urlPeriod);
+    if (next !== useDashboardFilters.getState().preset) setPreset(next);
+    // Run only when the URL value changes, not when the store changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlPeriod]);
+
+  // store -> URL: keep the address in sync so reloads show the same period.
+  useEffect(() => {
+    if (preset === 'custom' || preset === parsePeriod(urlPeriod)) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('period', preset);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset]);
   const { data: statsData, isLoading: statsLoading } = useDashboardStats(dateRange);
   const { data: revenueData } = useDashboardRevenue();
   const { data: cashFlowData } = useDashboardCashFlow();
