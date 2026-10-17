@@ -314,7 +314,6 @@ jobs:
 
             # Rolling restart app services
             docker compose -f docker-compose.production.yml up -d --no-deps api
-            docker compose -f docker-compose.production.yml up -d --no-deps intake-worker
             sleep 15
             docker compose -f docker-compose.production.yml up -d --no-deps web
             docker compose -f docker-compose.production.yml up -d --no-deps nginx
