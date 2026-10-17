@@ -2,9 +2,13 @@ import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AiWorkerModule } from './modules/ai/worker/ai-worker.module';
+import { assertWorkerQueueConfigured } from './modules/ai/worker/worker-config';
+import { describeError } from './common/utils/redact';
 import { resolveLogLevels } from './modules/logger/log-level';
 
 async function bootstrap(): Promise<void> {
+  // AiWorkerModule's ConfigModule has loaded the env files into process.env by now.
+  assertWorkerQueueConfigured({ get: (key) => process.env[key] });
   const app = await NestFactory.createApplicationContext(AiWorkerModule, { bufferLogs: true });
   const configService = app.get(ConfigService);
   app.useLogger(
@@ -28,4 +32,9 @@ async function bootstrap(): Promise<void> {
   logger.log('Intake worker started, waiting for jobs...');
 }
 
-void bootstrap();
+bootstrap().catch((error: unknown) => {
+  new Logger('IntakeWorker').error(describeError(error));
+  // NestFactory buffers logs until the app is up; flush so the reason reaches the container log.
+  Logger.flush();
+  process.exit(1);
+});

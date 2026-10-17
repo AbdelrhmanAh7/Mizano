@@ -122,3 +122,26 @@ pnpm build --force
 - **Symptom**: Local CI failed on step `Build` (exit 1) on PR #146 (`sha=5c47baa637038db8ccfc3e67b157cab26c23a9c6`).
 - **Root Cause**: During Next.js production build (`@mizano/web#build`), `next/font/google` attempts to fetch font binaries (`Inter` and `Noto Sans Arabic`) from Google Fonts CDN (`fonts.googleapis.com` / `fonts.gstatic.com`). The local runner experienced a transient network socket hang up and ETIMEDOUT during that run, causing Webpack to error out with `Failed to fetch Inter from Google Fonts`.
 - **Verification**: Locally verified clean build with `pnpm build --force` where all 4 packages build without error, and subsequent localci runs completed successfully in ~77s.
+
+---
+
+## Round 3: review findings on PR #146 (merge of master `1df27af` at `962b028`, e2e-army at `37c2640`)
+
+Acceptance criteria for this round:
+
+- **AC1** The production compose worker has a non-HTTP healthcheck instead of the API's inherited probe.
+- **AC2** `/data/intake` is writable by UID 1001 on a fresh named volume (pre-created and chowned before `USER nestjs`); api and worker share the volume, storage dir and `REDIS_URL`.
+- **AC3** The worker defaults to the CPU-only extractor (`rules`, Ollama off, no `qwen3-vl`) with `INTAKE_TESSDATA_DIR=/app/apps/api`.
+- **AC4** The Pi compose runs a real `worker` service (same entrypoint, healthcheck, originals volume); `pnpm dev` starts the worker.
+- **AC5** The worker fails fast when `REDIS_URL` is unset (IntakeQueueService otherwise falls back to a private in-process queue).
+- **AC6** The e2e-army file covers the upload API request-level (401 unauthenticated, 201 + listed job, 400 without file).
+
+| AC      | Verification                                                                                                                | Observed                                                                  |
+| ------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| AC1-AC4 | `apps/api/src/modules/ai/worker/worker-deploy-config.spec.ts` (parses both compose files + Dockerfile)                      | Base deploy files: 7 failed, 2 passed. Head: all pass.                    |
+| AC5     | `apps/api/src/modules/ai/worker/worker-config.spec.ts`                                                                      | 4 passed                                                                  |
+| AC1-AC5 | `cd apps/api && pnpm exec jest --maxWorkers=2 src/modules/ai/worker src/modules/ai/intake/intake-processor.timings.spec.ts` | `Test Suites: 3 passed, Tests: 19 passed`                                 |
+| lint    | `pnpm --filter api exec eslint src/main.worker.ts src/modules/ai/worker`                                                    | exit 0                                                                    |
+| AC6     | `e2e-army/142-intake-worker.e2e.ts`                                                                                         | NOT run locally: needs the hub verify stack. Runs in the `e2e-army` gate. |
+
+Not verified locally: `apps/api/test/*.e2e-spec.ts` (no PostgreSQL/Redis in the sandbox) and the deploy workflow change (left to the owner, see `AI_QUESTIONS.md`).
