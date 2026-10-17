@@ -1,58 +1,77 @@
 import { test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 
-// Request-level checks of the payslip PDF endpoint (no model calls).
-const PDF_PATH = '/api/payslips/army-115-missing/pdf';
+// The verify stack serves the web app only (the API is on another port), so these tests drive the
+// payslip page the way an accountant does and check the PDF response the page requests.
+// The seeded demo org has the paid run "payroll-feb-2026" with three payslips.
+const RUN_PATH = '/hr/payroll/payroll-feb-2026';
 
-async function loginToken(baseUrl: string): Promise<string> {
-  const res = await fetch(new URL('/api/auth/login', baseUrl), {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: 'admin@mizano.com', password: 'password123' }),
-  });
-  expect(res.status).toBeLessThan(300);
-  const body = (await res.json()) as { accessToken?: string; data?: { accessToken?: string } };
-  const token = body.accessToken ?? body.data?.accessToken;
-  expect(token).toBeTruthy();
-  return token as string;
+/** Demo admin sign-in with locators; next dev may submit the form before hydration, so retry. */
+async function signIn({ app, screen, browser }: any): Promise<void> {
+  for (let i = 0; i < 3; i++) {
+    await app.open('/en/login');
+    await expect(screen.getByRole('button', 'Sign In')).toBeVisible();
+    await screen.getByRole('textbox', 'Email').fill('admin@mizano.com');
+    await screen.getByRole('textbox', 'Password').fill('password123');
+    await screen.getByRole('button', 'Sign In').tap();
+    try {
+      await expect(browser).toHaveURL(/\/en\/(dashboard|onboarding|accounting|sales)/, {
+        timeout: 40_000,
+      });
+      return;
+    } catch (error) {
+      if (i === 2) throw error;
+    }
+  }
+}
+
+/** Opens the first seeded payslip of the run in the given locale and returns its page path. */
+async function openFirstPayslip({ app, screen }: any, locale: 'en' | 'ar'): Promise<void> {
+  await app.open(`/${locale}${RUN_PATH}`);
+  const href = await screen.getByRole('link', 'View').first().getAttribute('href');
+  expect(href).toContain('/hr/payslips/');
+  const payslipPath = String(href).replace(/^\/(en|ar)(?=\/)/, '');
+  await app.open(`/${locale}${payslipPath}`);
+}
+
+for (const locale of ['en', 'ar'] as const) {
+  test(
+    `@issue-115 AC1+AC2: the ${locale} payslip page downloads an attachment PDF in ${locale}`,
+    { tags: ['feat:mz-payroll', 'lvl:ui'] },
+    async (fx: any) => {
+      const { screen, browser } = fx;
+      await signIn(fx);
+      await openFirstPayslip(fx, locale);
+
+      if (locale === 'ar') {
+        expect(await browser.evaluate(() => document.documentElement.dir)).toBe('rtl');
+        await expect(screen.getByText('تحميل PDF')).toBeVisible();
+      } else {
+        expect(await browser.evaluate(() => document.documentElement.dir)).toBe('ltr');
+        await expect(screen.getByText('Download PDF')).toBeVisible();
+      }
+
+      const response = browser.waitForResponse(/\/payslips\/[^/?]+\/pdf/);
+      await screen.getByTestId('download-pdf-button').tap();
+      const pdf = await response;
+
+      expect(pdf.status).toBe(200);
+      expect(pdf.url).toContain(`lang=${locale}`);
+      expect(pdf.headers['content-type']).toContain('application/pdf');
+      expect(pdf.headers['content-disposition']).toContain('attachment');
+      expect(pdf.headers['content-disposition']).toContain('payslip-');
+    },
+  );
 }
 
 test(
-  '@issue-115 AC1: an unauthenticated payslip PDF request is rejected with 401',
-  { tags: ['feat:mz-payroll', 'lvl:api'] },
-  async ({ app }) => {
-    const res = await fetch(new URL(PDF_PATH, app.baseUrl));
-    expect(res.status).toBe(401);
-  },
-);
-
-test(
-  '@issue-115 AC2: lang=ar and lang=en are accepted, an unsupported lang returns 400',
-  { tags: ['feat:mz-payroll', 'lvl:api'] },
-  async ({ app }) => {
-    const token = await loginToken(app.baseUrl);
-    const headers = { authorization: `Bearer ${token}` };
-
-    const bad = await fetch(new URL(`${PDF_PATH}?lang=fr`, app.baseUrl), { headers });
-    expect(bad.status).toBe(400);
-
-    // Valid languages pass validation and reach the lookup, so an unknown id is a 404 (not 400).
-    for (const lang of ['ar', 'en']) {
-      const res = await fetch(new URL(`${PDF_PATH}?lang=${lang}`, app.baseUrl), { headers });
-      expect(res.status).toBe(404);
-    }
-  },
-);
-
-test(
-  '@issue-115 AC5: an unknown payslip id returns 404 and no PDF body',
-  { tags: ['feat:mz-payroll', 'lvl:api'] },
-  async ({ app }) => {
-    const token = await loginToken(app.baseUrl);
-    const res = await fetch(new URL(PDF_PATH, app.baseUrl), {
-      headers: { authorization: `Bearer ${token}` },
-    });
-    expect(res.status).toBe(404);
-    expect(res.headers.get('content-type') ?? '').not.toContain('application/pdf');
+  '@issue-115 AC5: an unknown payslip id shows not-found and no download button',
+  { tags: ['feat:mz-payroll', 'lvl:ui'] },
+  async (fx: any) => {
+    const { app, screen } = fx;
+    await signIn(fx);
+    await app.open('/en/hr/payslips/army-115-missing');
+    await expect(screen.getByText('not found')).toBeVisible();
+    await expect(screen.getByTestId('download-pdf-button')).toHaveCount(0);
   },
 );

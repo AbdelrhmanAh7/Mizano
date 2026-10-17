@@ -4,12 +4,17 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import {
+  fontCandidates,
   formatDecimal,
   getPinnedFontPath,
   PayslipPdfData,
   PayslipPdfService,
   renderPayslipPdf,
+  visualRuns,
 } from './payslip-pdf.service';
 import { PayrollService } from './payroll.service';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -27,6 +32,30 @@ async function parsePdf(buffer: Buffer): Promise<{ text: string; numpages: numbe
   }
   return pdfParse({ data: new Uint8Array(buffer) });
 }
+
+/** Text items with their x position (pdf.js user space), i.e. the visual layout of the page. */
+async function textItems(buffer: Buffer): Promise<Array<{ x: number; y: number; str: string }>> {
+  const pdfParse = pdfParseModule.default || pdfParseModule;
+  const items: Array<{ x: number; y: number; str: string }> = [];
+  // Uint8Array: pdf.js rejects a Buffer from outside the jest realm for some documents
+  await pdfParse(
+    { data: new Uint8Array(buffer) },
+    {
+      pagerender: async (page: {
+        getTextContent: () => Promise<{ items: Array<{ str: string; transform: number[] }> }>;
+      }) => {
+        const content = await page.getTextContent();
+        for (const item of content.items) {
+          items.push({ x: item.transform[4], y: item.transform[5], str: item.str });
+        }
+        return '';
+      },
+    },
+  );
+  return items;
+}
+
+const ARABIC = /[\u0600-\u06FF]/;
 
 describe('PayslipPdfService & renderPayslipPdf', () => {
   const sampleData: PayslipPdfData = {
@@ -178,6 +207,57 @@ describe('PayslipPdfService & renderPayslipPdf', () => {
       // Deterministic
       const again = await parsePdf(await renderPayslipPdf(mixed, 'ar'));
       expect(again.text).toBe(parsed.text);
+    });
+  });
+
+  describe('bidi layout', () => {
+    it('orders runs visually: an RTL line puts the digits left of the Arabic label', () => {
+      const runs = visualRuns('فترة الراتب: 10/2026', true).map((r) => r.text);
+      expect(runs.join('')).toContain('10/2026');
+      expect(runs[0]).toBe('10/2026');
+      expect(ARABIC.test(runs[runs.length - 1])).toBe(true);
+    });
+
+    it('orders mixed Arabic/Latin/digits by the Unicode bidi algorithm in an RTL line', () => {
+      expect(visualRuns('شركة النيل 2026 Nile Co', true).map((r) => r.text)).toEqual([
+        'Nile Co',
+        ' ',
+        '2026',
+        'شركة النيل ',
+      ]);
+    });
+
+    it('keeps a leading minus attached to its digits when the amount is laid out LTR', () => {
+      expect(visualRuns('-200.00 EGP', false)).toEqual([{ text: '-200.00 EGP', rtl: false }]);
+    });
+
+    it('keeps plain LTR and empty text untouched', () => {
+      expect(visualRuns('Employee ID: EMP-001', false)).toEqual([
+        { text: 'Employee ID: EMP-001', rtl: false },
+      ]);
+      expect(visualRuns('', true)).toEqual([]);
+    });
+
+    it('places values left of their Arabic labels on the rendered ar page', async () => {
+      const items = await textItems(await renderPayslipPdf(sampleData, 'ar'));
+      const period = items.find((i) => i.str.trim() === '10/2026');
+      const periodLabel = items.find((i) => ARABIC.test(i.str) && i.y === period?.y);
+      expect(period).toBeDefined();
+      expect(periodLabel).toBeDefined();
+      expect(period!.x).toBeLessThan(periodLabel!.x);
+
+      const net = items.find((i) => i.str.trim() === '11711.04 EGP');
+      const netLabel = items.find((i) => ARABIC.test(i.str) && Math.abs(i.y - (net?.y ?? 0)) < 6);
+      expect(net).toBeDefined();
+      expect(netLabel).toBeDefined();
+      expect(net!.x).toBeLessThan(netLabel!.x);
+    });
+
+    it('keeps the labels left of the values on the rendered en page', async () => {
+      const items = await textItems(await renderPayslipPdf(sampleData, 'en'));
+      const net = items.find((i) => i.str.trim() === '11711.04 EGP');
+      const netLabel = items.find((i) => i.str.includes('NET PAYABLE SALARY'));
+      expect(netLabel!.x).toBeLessThan(net!.x);
     });
   });
 
@@ -391,6 +471,76 @@ describe('PayslipPdfService & renderPayslipPdf', () => {
       ).toBe(calculatedPayslip.netSalary.toFixed(4));
     });
 
+    it('shows a stored total with no itemised deductions as one "Other Deductions" row', async () => {
+      mockPayrollService.getPayslip.mockResolvedValue({
+        ...mockPrismaPayslip,
+        housingAllowance: new Prisma.Decimal('0'),
+        transportAllowance: new Prisma.Decimal('0'),
+        grossSalary: new Prisma.Decimal('13846.10'),
+        gosiEmployee: new Prisma.Decimal('0'),
+        incomeTax: new Prisma.Decimal('0'),
+        totalDeductions: new Prisma.Decimal('2645.35'),
+        netSalary: new Prisma.Decimal('11200.75'),
+      });
+      const parsed = await parsePdf(await service.generatePayslipPdf(orgId, payslipId, 'en'));
+      expect(parsed.text).toContain('Other Deductions');
+      // once as the row, once as the total
+      expect(parsed.text.split('2645.35 EGP')).toHaveLength(3);
+      expect(parsed.text).toContain('11200.75 EGP');
+    });
+
+    it('reconciles a payslip whose total column is 0 from gross - net', async () => {
+      mockPayrollService.getPayslip.mockResolvedValue({
+        ...mockPrismaPayslip,
+        gosiEmployee: new Prisma.Decimal('100'),
+        incomeTax: new Prisma.Decimal('0'),
+        totalDeductions: new Prisma.Decimal('0'),
+        netSalary: new Prisma.Decimal('13745.60'),
+      });
+      const parsed = await parsePdf(await service.generatePayslipPdf(orgId, payslipId, 'en'));
+      // gross 14345.60 - net 13745.60 = 600.00: 100.00 itemised, 500.00 not
+      expect(parsed.text).toContain('600.00 EGP');
+      expect(parsed.text).toContain('500.00 EGP');
+    });
+
+    it('does not list a figure twice when the snapshot columns and the JSON hold the same data (seed shape)', async () => {
+      mockPayrollService.getPayslip.mockResolvedValue({
+        ...mockPrismaPayslip,
+        basicSalary: new Prisma.Decimal('8000'),
+        housingAllowance: new Prisma.Decimal('1000'),
+        transportAllowance: new Prisma.Decimal('500'),
+        allowances: { housing: 1000, transport: 500 },
+        grossSalary: new Prisma.Decimal('9500'),
+        gosiEmployee: new Prisma.Decimal('600'),
+        incomeTax: new Prisma.Decimal('0'),
+        deductions: { insurance: 600 },
+        totalDeductions: new Prisma.Decimal('600'),
+        netSalary: new Prisma.Decimal('8900'),
+      });
+      const items = await textItems(await service.generatePayslipPdf(orgId, payslipId, 'en'));
+      const amounts = items.map((i) => i.str.trim());
+      expect(amounts.filter((a) => a === '1000.00 EGP')).toHaveLength(1);
+      expect(amounts.filter((a) => a === '600.00 EGP')).toHaveLength(2); // the row and the total
+      expect(amounts).not.toContain('Other Earnings');
+      expect(amounts).not.toContain('Other Deductions');
+    });
+
+    it('shows earnings the line items do not explain as one "Other Earnings" row', async () => {
+      mockPayrollService.getPayslip.mockResolvedValue({
+        ...mockPrismaPayslip,
+        housingAllowance: new Prisma.Decimal('0'),
+        transportAllowance: new Prisma.Decimal('0'),
+        grossSalary: new Prisma.Decimal('13000.00'),
+        gosiEmployee: new Prisma.Decimal('0'),
+        incomeTax: new Prisma.Decimal('0'),
+        totalDeductions: new Prisma.Decimal('0'),
+        netSalary: new Prisma.Decimal('13000.00'),
+      });
+      const parsed = await parsePdf(await service.generatePayslipPdf(orgId, payslipId, 'en'));
+      expect(parsed.text).toContain('Other Earnings');
+      expect(parsed.text).toContain('654.40 EGP'); // 13000.00 - 12345.60
+    });
+
     it('preserves a four-decimal stored amount (123.4567 is not rounded to 123.46)', async () => {
       mockPayrollService.getPayslip.mockResolvedValue({
         ...mockPrismaPayslip,
@@ -459,6 +609,32 @@ describe('PayslipPdfService & renderPayslipPdf', () => {
         const fs = require('fs');
         expect(fs.existsSync(fontPath)).toBe(true);
         expect(fontPath).toMatch(/Amiri-Regular\.ttf$/);
+      });
+
+      it.each([
+        ['dist', 'modules'],
+        ['dist', 'src/modules'],
+      ])('finds the font copied by nest build next to a %s/%s layout', (outDir, modules) => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'payslip-font-'));
+        try {
+          const fontDir = path.join(root, 'dist', 'assets', 'fonts');
+          fs.mkdirSync(fontDir, { recursive: true });
+          fs.writeFileSync(path.join(fontDir, 'Amiri-Regular.ttf'), 'x');
+          const dirname = path.join(root, outDir, modules, 'hr', 'services');
+          fs.mkdirSync(dirname, { recursive: true });
+          // cwd deliberately elsewhere: the lookup must not depend on it
+          const found = getPinnedFontPath(dirname, path.join(root, 'elsewhere'));
+          expect(found).toBe(path.join(fontDir, 'Amiri-Regular.ttf'));
+        } finally {
+          fs.rmSync(root, { recursive: true, force: true });
+        }
+      });
+
+      it('throws when the font is in none of the candidate locations', () => {
+        expect(() => getPinnedFontPath('/nonexistent/a/b/c/d', '/nonexistent')).toThrow(
+          'Pinned font file not found',
+        );
+        expect(fontCandidates('/x/a/b/c/d', '/cwd')[0]).toBe('/x/assets/fonts/Amiri-Regular.ttf');
       });
     });
   });
