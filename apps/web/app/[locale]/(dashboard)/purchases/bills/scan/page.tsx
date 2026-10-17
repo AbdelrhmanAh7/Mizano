@@ -405,7 +405,7 @@ export default function ScanBillPage() {
           <CardContent className="space-y-4">
             <div
               className={cn(
-                'border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors',
+                'border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors relative',
                 dragOver
                   ? 'border-primary bg-primary/5'
                   : 'border-muted-foreground/25 hover:border-primary/50',
@@ -417,17 +417,28 @@ export default function ScanBillPage() {
               onDragLeave={() => setDragOver(false)}
               onDrop={converting ? undefined : handleDrop}
               onClick={() => {
-                if (converting) return;
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = '*/*';
-                input.onchange = (e) => {
-                  const file = (e.target as HTMLInputElement).files?.[0];
-                  if (file) handleFileSelect(file);
-                };
-                input.click();
+                if (!converting) {
+                  document.getElementById('upload-document')?.click();
+                }
               }}
             >
+              <input
+                id="upload-document"
+                name="file"
+                type="file"
+                accept="*/*"
+                aria-label="Upload document"
+                data-testid="document-upload"
+                className="sr-only"
+                disabled={converting}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileSelect(file);
+                }}
+              />
+              <label htmlFor="upload-document" className="sr-only">
+                Upload document
+              </label>
               {converting ? (
                 <div className="space-y-3">
                   <Loader2 className="h-12 w-12 mx-auto animate-spin text-primary" />
@@ -474,6 +485,18 @@ export default function ScanBillPage() {
                     <p className="font-medium">{ts('dropHint')}</p>
                     <p className="text-sm text-muted-foreground">{ts('supportsHint')}</p>
                   </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-label="Upload"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      document.getElementById('upload-document')?.click();
+                    }}
+                  >
+                    Upload
+                  </Button>
                 </div>
               )}
             </div>
@@ -511,7 +534,13 @@ export default function ScanBillPage() {
                   </button>
                 </div>
               </div>
-              <Button onClick={handleProcess} disabled={!selectedFile || converting} size="lg">
+              <Button
+                onClick={handleProcess}
+                disabled={!selectedFile || converting}
+                size="lg"
+                aria-label="Process"
+                data-testid="process-button"
+              >
                 <Sparkles className="mr-2 h-4 w-4" />
                 {ts('processWithAi')}
               </Button>

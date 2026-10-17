@@ -146,3 +146,23 @@ Acceptance criteria for this round:
 | AC6        | `e2e-army/142-intake-worker.e2e.ts`                                                                                           | NOT run locally: needs the hub verify stack. Runs in the `e2e-army` gate.                                                                                                                                                                                        |
 
 Not verified locally: `apps/api/test/*.e2e-spec.ts` (no PostgreSQL/Redis in the sandbox) and the deploy workflow change (left to the owner, see `AI_QUESTIONS.md`).
+
+---
+
+## Round 4: Verification fixes on head `924ccd5` / round 2 failure
+
+Acceptance criteria for this round:
+
+- **AC1 (CORS Fix)**: The API allows loopback origins (`http://localhost:*` and `http://127.0.0.1:*` on any port) in non-production environments to avoid cross-origin blocking when the test/verification stack runs on dynamic ports (e.g. `4316`, `4312`).
+- **AC2 (Scan Upload Accessibility)**: `/en/purchases/bills/scan` provides an accessible `<input type="file" id="upload-document" aria-label="Upload document" />` in the DOM with associated label, an explicit "Upload" button, and an accessible "Process" button (`aria-label="Process"`).
+- **AC3 (Worker Module Controls)**: `/en/ai-insights` provides a "View Jobs" button, a "Start Worker" button, and a "Worker Configuration" button that displays the worker container metadata (`Worker Container`, `API Image`, `Worker Entrypoint`).
+- **AC4 (E2E Army Suite)**: `e2e-army/142-intake-worker.e2e.ts` includes end-to-end assertions covering the AI insights worker controls and bill scan upload accessibility.
+
+| AC      | Verification                                                                                                                                                    | Observed                                                          |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| AC1     | `pnpm --filter api exec jest src/common/utils/cors.util.spec.ts`                                                                                                | 6 passed (all loopback/production origin matrix covered)          |
+| AC1     | `pnpm --filter api exec jest src/common/utils/cors.util.spec.ts src/modules/ai/worker/worker-deploy-config.spec.ts src/modules/ai/worker/worker-config.spec.ts` | 3 suites, 19 tests passed (0 failures)                            |
+| AC1     | `pnpm --filter api exec eslint src/main.ts src/common/utils/cors.util.ts src/common/utils/cors.util.spec.ts`                                                    | exit 0                                                            |
+| AC2-AC3 | `pnpm --filter @mizano/web exec eslint app/[locale]/(dashboard)/purchases/bills/scan/page.tsx app/[locale]/(dashboard)/ai-insights/page.tsx`                    | exit 0                                                            |
+| AC2-AC3 | `pnpm --filter @mizano/web exec tsc --noEmit`                                                                                                                   | exit 0                                                            |
+| AC4     | `e2e-army/142-intake-worker.e2e.ts` updated with AC3 & AC4 scenarios                                                                                            | Tagged with `feat:mz-document-intake`, `feat:mz-intake-processor` |

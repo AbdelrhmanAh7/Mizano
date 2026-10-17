@@ -15,9 +15,20 @@ import {
   Eye,
   X,
   Sparkles,
+  Play,
+  Settings2,
+  ListOrdered,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -81,6 +92,10 @@ export default function AIInsightsPage() {
     (i) => i.priority === 'HIGH' || i.priority === 'CRITICAL',
   ).length;
 
+  const [workerConfigOpen, setWorkerConfigOpen] = useState(false);
+  const [viewJobsOpen, setViewJobsOpen] = useState(false);
+  const [workerRunning, setWorkerRunning] = useState(true);
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -102,7 +117,7 @@ export default function AIInsightsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <Brain className="h-8 w-8 text-primary" />
@@ -110,12 +125,105 @@ export default function AIInsightsPage() {
           </h1>
           <p className="text-muted-foreground">{t('subtitle')}</p>
         </div>
-        <Button onClick={handleRunAnalysis} disabled={runAnomalyDetection.isPending}>
-          <RefreshCw
-            className={`mr-2 h-4 w-4 ${runAnomalyDetection.isPending ? 'animate-spin' : ''}`}
-          />
-          {runAnomalyDetection.isPending ? t('analyzing') : t('runAnalysis')}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setWorkerRunning(true)}
+            aria-label="Start Worker"
+          >
+            <Play className="mr-2 h-4 w-4" />
+            {t('startWorker')}
+          </Button>
+
+          <Button variant="outline" onClick={() => setViewJobsOpen(true)} aria-label="View Jobs">
+            <ListOrdered className="mr-2 h-4 w-4" />
+            {t('viewJobs')}
+          </Button>
+
+          <Dialog open={workerConfigOpen} onOpenChange={setWorkerConfigOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" aria-label="Worker Configuration">
+                <Settings2 className="mr-2 h-4 w-4" />
+                {t('workerConfiguration')}
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{t('workerConfiguration')}</DialogTitle>
+                <DialogDescription>
+                  Worker Container, API Image and Worker Entrypoint configuration
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <span className="font-medium">{t('workerContainer')}</span>
+                  <Badge variant="outline">intake-worker</Badge>
+                </div>
+                <div className="flex items-center justify-between border-b pb-2">
+                  <span className="font-medium">{t('apiImage')}</span>
+                  <span className="text-sm font-mono text-muted-foreground">
+                    ghcr.io/abdelrhmanah7/mizano-api:latest
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-b pb-2">
+                  <span className="font-medium">{t('workerEntrypoint')}</span>
+                  <span className="text-sm font-mono text-muted-foreground">
+                    node dist/main.worker.js
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pt-2">
+                  <span className="font-medium">{t('workerStatus')}</span>
+                  <Badge variant={workerRunning ? 'default' : 'secondary'}>
+                    {workerRunning ? t('workerRunning') : t('workerReady')}
+                  </Badge>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setWorkerRunning(true)}
+                  aria-label="Start Worker"
+                >
+                  {t('startWorker')}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setWorkerConfigOpen(false);
+                    setViewJobsOpen(true);
+                  }}
+                  aria-label="View Jobs"
+                >
+                  {t('viewJobs')}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={viewJobsOpen} onOpenChange={setViewJobsOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{t('viewJobs')}</DialogTitle>
+                <DialogDescription>Document intake queue and worker jobs</DialogDescription>
+              </DialogHeader>
+              <div className="py-4 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Intake jobs are processed asynchronously by the background worker container.
+                </p>
+                <Button asChild className="w-full">
+                  <Link href="/purchases/bills/scan">Go to Bill Scan & Intake Jobs</Link>
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Button onClick={handleRunAnalysis} disabled={runAnomalyDetection.isPending}>
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${runAnomalyDetection.isPending ? 'animate-spin' : ''}`}
+            />
+            {runAnomalyDetection.isPending ? t('analyzing') : t('runAnalysis')}
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}

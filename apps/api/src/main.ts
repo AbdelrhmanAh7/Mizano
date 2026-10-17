@@ -8,6 +8,7 @@ import { randomUUID } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
 import { resolveLogLevels } from './modules/logger/log-level';
+import { isAllowedCorsOrigin } from './common/utils/cors.util';
 
 async function bootstrap() {
   // Buffer startup logs until LOG_LEVEL (from the env file loaded by ConfigModule) is applied
@@ -62,7 +63,13 @@ async function bootstrap() {
     ? corsOriginRaw.split(',').map((o) => o.trim())
     : ['http://localhost:5001'];
   app.enableCors({
-    origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
+    origin: (origin, callback) => {
+      if (isAllowedCorsOrigin(origin, corsOrigins, isProduction)) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
     credentials: true,
   });
 
