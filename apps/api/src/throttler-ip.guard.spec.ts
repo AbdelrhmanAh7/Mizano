@@ -52,14 +52,28 @@ function req(
 }
 
 describe('IpThrottlerGuard.getTracker', () => {
-  it('prefers CF-Connecting-IP over X-Forwarded-For', async () => {
+  it('ignores CF-Connecting-IP and keys on X-Forwarded-For (both Cloudflare and Tailscale append the client)', async () => {
     const tracker = await guard.tracker(
       req({ 'cf-connecting-ip': '203.0.113.7', 'x-forwarded-for': '198.51.100.9' }, '10.0.0.2'),
     );
-    expect(tracker).toBe('203.0.113.7');
+    expect(tracker).toBe('198.51.100.9');
   });
 
-  it('takes the client entry of X-Forwarded-For (right-most non-proxy) when there is no CF-Connecting-IP', async () => {
+  it('cannot be bypassed by rotating a client-supplied CF-Connecting-IP through a trusted proxy', async () => {
+    const trackers = await Promise.all(
+      ['203.0.113.1', '203.0.113.2', '203.0.113.3'].map((forged) =>
+        guard.tracker(
+          req({ 'cf-connecting-ip': forged, 'x-forwarded-for': '100.101.102.103' }, '127.0.0.1'),
+        ),
+      ),
+    );
+    expect(new Set(trackers)).toEqual(new Set(['100.101.102.103']));
+    await expect(guard.tracker(req({ 'cf-connecting-ip': '203.0.113.9' }))).resolves.toBe(
+      '127.0.0.1',
+    );
+  });
+
+  it('takes the client entry of X-Forwarded-For (right-most non-proxy) ', async () => {
     const tracker = await guard.tracker(
       req({ 'x-forwarded-for': '198.51.100.9, 172.16.0.1' }, '127.0.0.1'),
     );
@@ -80,7 +94,7 @@ describe('IpThrottlerGuard.getTracker', () => {
   });
 
   it('normalizes IPv4-mapped IPv6, whitespace, quotes and brackets', async () => {
-    await expect(guard.tracker(req({ 'cf-connecting-ip': '::ffff:203.0.113.7' }))).resolves.toBe(
+    await expect(guard.tracker(req({ 'x-forwarded-for': '::ffff:203.0.113.7' }))).resolves.toBe(
       '203.0.113.7',
     );
     await expect(guard.tracker(req({ 'x-forwarded-for': ' 203.0.113.7 ' }))).resolves.toBe(

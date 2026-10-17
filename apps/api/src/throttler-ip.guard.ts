@@ -61,8 +61,10 @@ function firstHeader(headers: Record<string, unknown> | undefined, name: string)
 /**
  * Behind Cloudflare / Tailscale serve every request arrives from the proxy, so keying the
  * throttler on the socket address put all users in one bucket (one client locked everyone out).
- * Throttles per client IP instead. From a trusted proxy: CF-Connecting-IP (set by Cloudflare),
- * else the right-most X-Forwarded-For entry that is not a trusted proxy. Otherwise the socket
+ * Throttles per client IP instead. From a trusted proxy: the right-most X-Forwarded-For entry
+ * that is not a trusted proxy (Cloudflare's edge and Tailscale serve both append the client).
+ * CF-Connecting-IP is ignored: only Cloudflare overwrites it, so via Tailscale serve it is
+ * client-supplied and rotating it would give a fresh bucket per attempt. Otherwise the socket
  * address, so requests without proxy headers never share one bucket.
  */
 @Injectable()
@@ -72,10 +74,7 @@ export class IpThrottlerGuard extends ThrottlerGuard {
     const peer = normalizeIp(socket?.remoteAddress);
     if (isTrustedProxy(peer)) {
       const headers = req.headers as Record<string, unknown> | undefined;
-      const forwardedFor = firstHeader(headers, 'x-forwarded-for');
-      const client =
-        normalizeIp(firstHeader(headers, 'cf-connecting-ip')) ??
-        clientFromForwardedFor(forwardedFor);
+      const client = clientFromForwardedFor(firstHeader(headers, 'x-forwarded-for'));
       if (client) return client;
     }
     return peer ?? normalizeIp(req.ip) ?? 'unknown';
