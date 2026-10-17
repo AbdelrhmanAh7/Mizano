@@ -92,18 +92,6 @@
     "over90": "Over 90 Days",
     "total": "Total"
   },
-  "apReconciliation": {
-    "title": "AP Reconciliation",
-    "description": "Reconcile AP subledger with control account",
-    "check": "Reconciliation Check",
-    "subledgerTotal": "Subledger Total",
-    "controlBalance": "Control Balance",
-    "difference": "Difference",
-    "reconciled": "Reconciled",
-    "unbalanced": "Unbalanced",
-    "asOfDate": "As of Date",
-    "currency": "Currency"
-  },
   "salesByCustomer": {
     "title": "Sales by Customer",
     "description": "Sales breakdown by customer"

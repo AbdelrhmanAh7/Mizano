@@ -92,18 +92,6 @@
     "over90": "أكثر من 90 يوم",
     "total": "الإجمالي"
   },
-  "apReconciliation": {
-    "title": "تسوية حسابات الموردين",
-    "description": "مطابقة دفتر الأستاذ المساعد للموردين مع حساب المراقبة",
-    "check": "فحص المطابقة (Reconciliation Check)",
-    "subledgerTotal": "إجمالي دفتر الموردين المساعد",
-    "controlBalance": "رصيد حساب مراقبة الموردين",
-    "difference": "الفرق",
-    "reconciled": "متطابق",
-    "unbalanced": "غير متطابق",
-    "asOfDate": "حتى تاريخ",
-    "currency": "العملة"
-  },
   "salesByCustomer": {
     "title": "المبيعات حسب العميل",
     "description": "تفصيل المبيعات حسب العميل"

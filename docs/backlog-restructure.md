@@ -4,18 +4,18 @@ Owner ask: smaller, linked tasks with no duplicate work, a vision with clear goa
 
 ## Counts
 
-|                                                     | before | after |
-| --------------------------------------------------- | ------ | ----- |
-| Open issues                                         | 54     | 68    |
-| Open issues in a goal milestone                     | 0      | 60    |
-| Duplicates closed (as duplicate, cross-linked)      | —      | 1     |
-| Stale/obsolete closed (not planned, with reason)    | —      | 1     |
-| Merged into another issue (scope copied by comment) | —      | 0     |
-| Oversized issues split → new sub-issues             | —      | 1 → 4 |
-| New small tasks (next-phase integration, metrics)   | —      | 6     |
-| Goal demo checklist issues                          | 0      | 6     |
-| Sub-issue links added                               | —      | 26    |
-| Labels renamed to the shared spelling               | —      | 6     |
+| | before | after |
+|---|---|---|
+| Open issues | 54 | 68 |
+| Open issues in a goal milestone | 0 | 60 |
+| Duplicates closed (as duplicate, cross-linked) | — | 1 |
+| Stale/obsolete closed (not planned, with reason) | — | 1 |
+| Merged into another issue (scope copied by comment) | — | 0 |
+| Oversized issues split → new sub-issues | — | 1 → 4 |
+| New small tasks (next-phase integration, metrics) | — | 6 |
+| Goal demo checklist issues | 0 | 6 |
+| Sub-issue links added | — | 26 |
+| Labels renamed to the shared spelling | — | 6 |
 
 ## Goals
 

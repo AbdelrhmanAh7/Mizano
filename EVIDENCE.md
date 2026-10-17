@@ -390,40 +390,38 @@ Unset launcher heap_size_limit: 4395630592
 
 # Evidence: #125 AP subledger vs control-account reconciliation
 
-- **Tested SHA**: `1b3ba31` (branch `ai/125`, merged with `origin/master` at `1df27af`). Later commits touch only this file.
+- **Scope**: backend only (service, controller route, module, unit spec, API e2e spec, e2e-army API test). The web report page was moved to branch `ai/125-ui` (follow-up PR) per the CTO answer; no `apps/web` file is in this diff.
+- **Tested SHA**: recorded in the commit that follows this file's last edit (`git log -1 -- EVIDENCE.md`).
 - **Implementer**: Claude Code (Sonnet 5.5). Author evidence, not an independent review.
-- **Environment**: macOS, a throwaway PostgreSQL 16 cluster (`prisma migrate deploy`, schema up to date), `REDIS_URL=` blank.
 
-| AC  | Requirement                                                               | Verified by                                                                                                                                                                |
-| --- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AC1 | Approved and paid bills give `ok: true`, `difference: 0`                  | e2e `AC1` (bills, payments, a voided payment, credits: 444.0000 both sides); e2e changed-default/legacy journals; unit `AC1`; e2e-army `AC1/AC2`; web page unit spec `AC1` |
-| AC2 | A corrupted subledger balance gives `ok: false` with the exact difference | e2e `AC2` (`balanceDue` +12.34 gives `difference: "12.3400"`); unit `AC2`; web page unit spec unbalanced state                                                             |
-| AC3 | Voided and draft bills are excluded                                       | e2e `AC3` (draft 1138.86 and VOID 885.78 leave 444.0000); e2e bill voided after the cutoff stays in as of the cutoff and drops out afterwards; unit scope tests            |
-| AC4 | Another tenant never affects the result                                   | e2e `AC4` (tenant B +7 corruption, A unchanged); unit scope test (`organizationId` on every query)                                                                         |
-| AC5 | `asOf` filters both sides consistently                                    | e2e `AC5` (day -5, -2, -11); e2e payment dated before its future-dated bill (-40 on both sides at day -5); unit `T3`; e2e-army `AC5`                                       |
-| AC6 | ≤ ~300 lines API production code, no migrations                           | API production diff: service 250 lines, controller 10, module 8, `report-utils.ts` 1; web UI page + hook 120 lines; no file under `prisma/migrations` changed              |
-| AC7 | Web UI accessible with Reconciliation Check link and RTL/LTR              | `apps/web/app/[locale]/(dashboard)/reports/reconciliation/ap/page.tsx` (web spec 3 passed); e2e-army UI scenario                                                           |
+| AC  | Requirement                                                               | Verified by                                                                                        |
+| --- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| AC1 | Approved and paid bills give `ok: true`, `difference: 0`                  | unit `AC1`; API e2e `AC1`; e2e-army `AC5`/`AC1/AC2`                                                |
+| AC2 | A corrupted subledger balance gives `ok: false` with the exact difference | unit `AC2`; API e2e `AC2` (`balanceDue` +12.34 gives `difference: "12.3400"`)                      |
+| AC3 | Voided and draft bills are excluded                                       | unit scope tests; API e2e `AC3`                                                                    |
+| AC4 | Another tenant never affects the result                                   | unit scope test (`organizationId` on every query); API e2e `AC4`                                   |
+| AC5 | `asOf` filters both sides consistently                                    | unit `T3`; API e2e `AC5`; e2e-army `AC5`; invalid `asOf` is 400, anonymous 401 (e2e-army `AC4`)    |
+| AC6 | Small change, no migrations                                               | service 249 lines, controller 10, module 8, `report-utils.ts` 1; nothing under `prisma/migrations` |
 
-Review findings on PR #128 and where they are fixed/tested:
+Review findings and where they are fixed/tested:
 
 | Finding                                          | Fix                                                          | Test                                                       |
 | ------------------------------------------------ | ------------------------------------------------------------ | ---------------------------------------------------------- |
 | One database snapshot                            | `reconcileApControl` runs in a RepeatableRead `$transaction` | unit "reads both sides in one repeatable-read transaction" |
-| Source-less legacy journals / changed AP account | legacy reference branches in `controlBalance`                | unit `T2`; e2e changed-default/legacy                      |
-| Payments before future-dated bills               | `prepaid` aggregate                                          | unit `T3`; e2e prepayment                                  |
-| Return the currency                              | `currencyCode` from `getBaseCurrency`                        | unit `T4`; e2e `AC1`; e2e-army; web metric card            |
-| Bills voided after the cutoff                    | `billsVoidedAfter`                                           | unit "includes a bill voided after asOf"; e2e              |
+| Source-less legacy journals / changed AP account | legacy reference branches in `controlBalance`                | unit `T2`                                                  |
+| Payments before future-dated bills               | `prepaid` aggregate                                          | unit `T3`                                                  |
+| Return the currency                              | `currencyCode` from `getBaseCurrency`                        | unit `T4`                                                  |
+| Bills voided after the cutoff                    | `billsVoidedAfter`                                           | unit "includes a bill voided after asOf"                   |
 | Precision above 20 significant digits            | `Decimal.clone({ precision: 40 })`                           | unit "keeps full precision"                                |
-| Verifier 404 on `/reports/reconciliation/ap`     | Added web page and link on `/reports`                        | web `page.spec.tsx` (3 passed); e2e-army UI navigation     |
+| Verifier looked for a web page (404)             | The verifier now targets the API route; UI deferred          | e2e-army calls `GET /api/reports/reconciliation/ap`        |
 
-Commands and results at current HEAD:
+Commands run in this session:
 
 ```text
-pnpm --filter api exec jest src/modules/reports/services/ap-reconciliation.service.spec.ts   -> Tests: 12 passed
-pnpm --filter web exec jest "reconciliation.*page\.spec\.tsx"                                 -> Tests: 3 passed
-pnpm --filter api type-check                                                                -> exit 0
-pnpm --filter web type-check                                                                -> exit 0
-eslint + prettier --check on all changed files                                              -> clean
+pnpm --filter api exec jest src/modules/reports/services/ap-reconciliation.service.spec.ts -> Tests: 12 passed, exit 0
+eslint apps/api/src/modules/reports test/ap-reconciliation.e2e-spec.ts                     -> no output, exit 0
+tsc --noEmit (apps/api)                                                                    -> only errors: '@mizano/shared-types' not built in this worktree (logger module, not touched); none in reports files
 ```
 
-Bills have no void route today, so the void fixtures set the status and write the reversal journal directly. Posting, approval and payment code is unchanged (#11, #12, #94).
+Not run here: `test/ap-reconciliation.e2e-spec.ts` and the e2e-army test (they need PostgreSQL and the built app; CI and the hub verify job run them).
+Bills have no void route today, so void fixtures set the status and write the reversal journal directly. Posting, approval and payment code is unchanged (#11, #12, #94).

@@ -83,19 +83,3 @@ test(
     expect(anonymous.status).toBe(401);
   },
 );
-
-test(
-  '@issue-125 AC1 UI: navigation from reports displays AP reconciliation check in LTR and RTL',
-  { tags: TAGS },
-  async ({ app, agent, screen }) => {
-    await app.open('/en/login');
-    await agent.act('sign in as {email} with password {pw}', {
-      params: { email: 'admin@mizano.com', pw: 'password123' },
-    });
-    await app.open('/en/reports');
-    await agent.act('click {link}', { params: { link: 'AP Reconciliation' } });
-    await expect(screen.getByText('Reconciliation Check')).toBeVisible();
-    await app.open('/ar/reports/reconciliation/ap');
-    await expect(screen.getByText(/Reconciliation Check|فحص المطابقة/)).toBeVisible();
-  },
-);
