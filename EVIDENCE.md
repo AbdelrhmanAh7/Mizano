@@ -390,7 +390,7 @@ Unset launcher heap_size_limit: 4395630592
 
 # Evidence: #125 AP subledger vs control-account reconciliation
 
-- **Tested SHA**: `9842cf5` (branch `ai/125`, merged with `origin/master` at `1df27af`). Later commits touch only this file.
+- **Tested SHA**: `1b3ba31` (branch `ai/125`, merged with `origin/master` at `1df27af`). Later commits touch only this file.
 - **Implementer**: Claude Code (Sonnet 5.5). Author evidence, not an independent review.
 - **Environment**: macOS, a throwaway PostgreSQL 16 cluster (`prisma migrate deploy`, schema up to date), `REDIS_URL=` blank.
 
