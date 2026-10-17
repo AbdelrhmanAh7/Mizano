@@ -15,7 +15,7 @@ import { CurrentOrg, InvalidateCache, Permissions } from '../../../common/decora
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { BankTransactionQueryDto } from '../dto/bank-transaction-query.dto';
 import { BankAccountQueryDto } from '../dto/bank-account-query.dto';
 import { BankAccountsService } from '../services/bank-accounts.service';
 import { BankTransactionsService } from '../services/bank-transactions.service';
@@ -63,7 +63,7 @@ export class BankAccountsController {
   getTransactions(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
-    @Query() query: PaginationDto & { status?: string },
+    @Query() query: BankTransactionQueryDto,
   ) {
     return this.bankTransactionsService.findAll(orgId, { ...query, bankAccountId: id });
   }

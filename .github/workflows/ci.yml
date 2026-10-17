@@ -1,7 +1,17 @@
 # Mizano ERP - Continuous Integration Pipeline
 # =============================================
-# Runs on all PRs and pushes to master/develop branches.
-# Optimized: shared pnpm cache, parallel jobs, no redundant installs.
+# Runs on all PRs and pushes to master/develop branches on GitHub-hosted runners only (free and
+# unlimited for this public repository). No self-hosted labels and no secrets beyond the automatic GITHUB_TOKEN.
+#
+# Owner rule: every job stays under 5 minutes (timeout-minutes: 5), so the pipeline is split into parallel jobs.
+# The job names are the check names the hub gates and automerge wait for ("Install Dependencies", "Lint & Type Check",
+# "Unit Tests", "Build"): keep them stable. Jobs are independent and each installs from the shared pnpm store cache
+# (setup-node), so none waits for another and a failed install cannot skip the others silently.
+#
+# Fork PRs: this workflow uses `pull_request` (read-only token, no secrets), never `pull_request_target`; first-time
+# fork contributors need an approval in the repository settings before it runs. Leave that setting on.
+#
+# Optimized: shared pnpm cache, parallel jobs, turbo cache via actions/cache, no redundant installs.
 # The multi-arch Docker validation only runs on branch pushes, relevant PR changes, or the
 # "docker" label. It never publishes images; deploy.yml owns publishing.
 
@@ -75,7 +85,7 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      docker-changed: ${{ steps.filter.outputs.docker-changed }}
+      docker-changed: ${{ steps.changed.outputs.docker-changed }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -85,8 +95,10 @@ jobs:
 
       - name: Determine changed files
         id: filter
+        if: github.event_name != 'push' || github.event.before != '0000000000000000000000000000000000000000'
         uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1d284f68b6a3a0 # v3.0.2
         with:
+          base: ${{ github.event_name == 'push' && github.event.before || github.event.pull_request.base.sha }}
           filters: |
             docker-changed:
               - 'apps/api/Dockerfile'
@@ -95,6 +107,21 @@ jobs:
               - 'deploy/**'
               - '.github/workflows/ci.yml'
               - '.github/workflows/deploy.yml'
+
+      - name: Set docker-changed output
+        id: changed
+        env:
+          FILTER_OUTPUT: ${{ steps.filter.outputs.docker-changed }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT_NAME" = "push" ] && [ "$EVENT_BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "docker-changed=true" >> "$GITHUB_OUTPUT"
+          elif [ "$FILTER_OUTPUT" = "true" ]; then
+            echo "docker-changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docker-changed=false" >> "$GITHUB_OUTPUT"
+          fi
 
   # ==========================================
   # Install & Cache Dependencies (shared)
@@ -137,9 +164,6 @@ jobs:
     timeout-minutes: 5
     needs: [gate, install]
     if: needs.gate.outputs.should_run == 'true'
-    env:
-      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -185,42 +209,17 @@ jobs:
         run: pnpm turbo run type-check
 
   # ==========================================
-  # Unit Tests (PostgreSQL and Redis service containers)
+  # Unit Tests (mock-only: no database, no Redis)
   # ==========================================
+  # Every unit test mocks Prisma and Redis (apps/api/src/test/mocks); the suites pass with an unreachable DATABASE_URL, so
+  # the job needs no service containers and no `db:push` (slim-down 2026-10-10, docs/slimdown-plan.md). The real-database
+  # API e2e specs run in nightly.yml.
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [gate, install]
     if: needs.gate.outputs.should_run == 'true'
-    env:
-      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: mizano_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -252,16 +251,12 @@ jobs:
           restore-keys: |
             turbo-test-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
 
-      - name: Push database schema
-        run: pnpm db:push
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/mizano_test
-
       - name: Run unit tests
         run: pnpm test
         env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/mizano_test
-          REDIS_URL: redis://localhost:6379
+          # Placeholders only: nothing connects (unit tests are mock-only).
+          DATABASE_URL: postgresql://unused:unused@127.0.0.1:1/unused
+          REDIS_URL: redis://127.0.0.1:1
           JWT_SECRET: test-jwt-secret-for-ci
           JWT_REFRESH_SECRET: test-jwt-refresh-secret-for-ci
           NODE_ENV: test
@@ -275,9 +270,6 @@ jobs:
     timeout-minutes: 5
     needs: [gate, install]
     if: needs.gate.outputs.should_run == 'true'
-    env:
-      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -300,6 +292,17 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm db:generate
+
+      # Next.js build cache (webpack/SWC artefacts only, never the build output): a warm cache lets `next build` skip
+      # recompiling unchanged modules. PR runs restore the newest cache saved by master.
+      # Keyed on the lockfile plus the web sources, falling back to the newest cache for the same lockfile.
+      - name: Restore Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: apps/web/.next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/app/**', 'apps/web/components/**', 'apps/web/lib/**', 'apps/web/messages/**', 'packages/*/src/**') }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
 
       - name: Cache turbo build cache
         uses: actions/cache@v4
