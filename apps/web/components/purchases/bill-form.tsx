@@ -43,7 +43,8 @@ const OPTIONAL_PERCENT_INPUT = /^(\d{1,3}(\.\d{1,2})?)?$/;
 
 const lineSchema = z.object({
   itemId: z.string().optional(),
-  accountId: z.string().optional(),
+  // The API refuses to approve a bill with any line lacking an account (key under validation).
+  accountId: z.string().min(1, 'accountRequired'),
   description: z.string().min(1, 'Description is required'),
   // Money/quantities must be valid non-negative decimals: never coerce bad input to 0.
   quantity: z
@@ -87,7 +88,13 @@ export interface BillFormDefaultValues {
 interface BillFormProps {
   bill?: Bill | null;
   accounts?: Array<{ id: string; code: string; name: string; type: string }>;
-  items?: Array<{ id: string; name: string; sku: string; costPrice: string }>;
+  items?: Array<{
+    id: string;
+    name: string;
+    sku: string;
+    costPrice: string;
+    purchaseAccountId?: string | null;
+  }>;
   projects?: Array<{ id: string; name: string }>;
   onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
@@ -113,12 +120,13 @@ export function BillForm({
 }: BillFormProps) {
   const isEditing = !!bill;
   const tValidation = useTranslations('purchases.bills.validation');
+  const tForm = useTranslations('purchases.bills.form');
   const tIntake = useTranslations('ai.intake');
   const { data: vendorsData } = useVendors({ limit: 100 });
   const vendors = useMemo(() => vendorsData?.data || [], [vendorsData?.data]);
 
   // Filter accounts
-  const _expenseAccounts = accounts.filter((a) => a.type === 'EXPENSE' || a.type === 'ASSET');
+  const expenseAccounts = accounts.filter((a) => a.type === 'EXPENSE' || a.type === 'ASSET');
 
   const form = useForm<BillFormData>({
     resolver: zodResolver(billSchema),
@@ -132,13 +140,14 @@ export function BillForm({
       projectId: scanDefaults?.projectId || '',
       lines: scanDefaults?.lines?.length
         ? scanDefaults.lines.map((l) => ({
+            accountId: '',
             description: l.description,
             quantity: l.quantity,
             rate: l.rate,
             // Scan review leaves an unresolved tax rate empty; do not default it to 0.
             taxRate: l.taxRate ?? '0',
           }))
-        : [{ description: '', quantity: '1', rate: '', taxRate: '0' }],
+        : [{ accountId: '', description: '', quantity: '1', rate: '', taxRate: '0' }],
     },
   });
 
@@ -164,7 +173,7 @@ export function BillForm({
           quantity: String(line.quantity),
           rate: String(line.rate),
           taxRate: String(line.taxRate || 0),
-        })) || [{ description: '', quantity: '1', rate: '', taxRate: '0' }],
+        })) || [{ accountId: '', description: '', quantity: '1', rate: '', taxRate: '0' }],
       });
     }
   }, [bill, form]);
@@ -252,6 +261,11 @@ export function BillForm({
       form.setValue(`lines.${index}.itemId`, item.id);
       form.setValue(`lines.${index}.description`, item.name);
       form.setValue(`lines.${index}.rate`, item.costPrice);
+      if (item.purchaseAccountId && expenseAccounts.some((a) => a.id === item.purchaseAccountId)) {
+        form.setValue(`lines.${index}.accountId`, item.purchaseAccountId, {
+          shouldValidate: form.formState.isSubmitted,
+        });
+      }
     }
   };
 
@@ -375,7 +389,8 @@ export function BillForm({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[200px]">Item/Account</TableHead>
+                <TableHead className="w-[200px]">Item</TableHead>
+                <TableHead className="w-[200px]">{tForm('expenseAccount')}</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead className="w-[80px]">Qty</TableHead>
                 <TableHead className="w-[110px]">Unit Price</TableHead>
@@ -391,7 +406,7 @@ export function BillForm({
 
                 return (
                   <TableRow key={field.id}>
-                    <TableCell>
+                    <TableCell data-testid={`line-${index}-item`}>
                       <Select
                         value={form.watch(`lines.${index}.itemId`) || 'none'}
                         onValueChange={(value) => handleItemSelect(index, value)}
@@ -404,6 +419,31 @@ export function BillForm({
                           {items.map((item) => (
                             <SelectItem key={item.id} value={item.id}>
                               {item.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell data-testid={`line-${index}-account`}>
+                      <Select
+                        value={form.watch(`lines.${index}.accountId`) || ''}
+                        onValueChange={(value) =>
+                          form.setValue(`lines.${index}.accountId`, value, {
+                            shouldValidate: form.formState.isSubmitted,
+                          })
+                        }
+                      >
+                        <SelectTrigger
+                          className="h-8"
+                          aria-label={tForm('expenseAccount')}
+                          aria-invalid={!!form.formState.errors.lines?.[index]?.accountId}
+                        >
+                          <SelectValue placeholder={tForm('expenseAccountPlaceholder')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {expenseAccounts.map((account) => (
+                            <SelectItem key={account.id} value={account.id}>
+                              {account.code} · {account.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -479,7 +519,9 @@ export function BillForm({
             variant="outline"
             size="sm"
             className="mt-4"
-            onClick={() => append({ description: '', quantity: '1', rate: '', taxRate: '0' })}
+            onClick={() =>
+              append({ accountId: '', description: '', quantity: '1', rate: '', taxRate: '0' })
+            }
           >
             <Plus className="mr-2 h-4 w-4" />
             Add Line

@@ -28,6 +28,8 @@ import {
   type DocumentIntakeResult,
 } from '@/lib/hooks/use-ai-document-intake';
 import { useCreateVendor } from '@/lib/hooks/use-vendors';
+import { useQuery } from '@tanstack/react-query';
+import { accountsApi, itemsApi } from '@/lib/api';
 import { resolveScanLineTaxes, toDecimalString } from '@/lib/document-intake-tax';
 import { BillForm, type BillFormDefaultValues } from '@/components/purchases/bill-form';
 import { cn } from '@/lib/utils';
@@ -83,6 +85,16 @@ export default function ScanBillPage() {
   const intake = useDocumentIntakeStream();
   const confirmIntake = useDocumentIntakeConfirm();
   const createVendor = useCreateVendor();
+
+  // Same account and item pickers as New Bill: every reviewed line needs an expense account.
+  const { data: accountsData } = useQuery({
+    queryKey: ['accounts'],
+    queryFn: async () => (await accountsApi.getAll()).data,
+  });
+  const { data: itemsData } = useQuery({
+    queryKey: ['items'],
+    queryFn: async () => (await itemsApi.getAll()).data,
+  });
 
   // Transition to review when SSE completes
   useEffect(() => {
@@ -812,6 +824,8 @@ export default function ScanBillPage() {
           <BillForm
             key={scanDefaults.vendorId}
             scanDefaults={scanDefaults}
+            accounts={accountsData?.data || []}
+            items={itemsData?.data || []}
             extractedTotals={{
               subtotal: result.extractedFields.subtotal,
               tax: result.extractedFields.tax,
