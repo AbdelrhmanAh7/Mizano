@@ -6,6 +6,7 @@ Run from this directory:  python -m unittest discover -s . -p "test_*.py"
 
 import importlib
 import os
+import re
 import sys
 import tempfile
 import unittest
@@ -81,6 +82,40 @@ class SecretGuardTests(unittest.TestCase):
         left, right = spy.call_args[0]
         self.assertEqual(len(left), 32)
         self.assertEqual(len(right), 32)
+
+
+class DependencyPinTests(unittest.TestCase):
+    """The image and the nightly job must install the same exact versions (requirements.txt)."""
+
+    here = os.path.dirname(os.path.abspath(__file__))
+
+    def read(self, *parts):
+        with open(os.path.join(self.here, *parts), encoding="utf-8") as f:
+            return f.read()
+
+    def test_requirements_pin_exact_versions(self):
+        lines = [
+            ln.strip()
+            for ln in self.read("requirements.txt").splitlines()
+            if ln.strip() and not ln.lstrip().startswith("#")
+        ]
+        names = sorted(ln.split("==")[0] for ln in lines)
+        self.assertEqual(names, ["fastapi", "httpx", "uvicorn"])
+        for ln in lines:
+            self.assertRegex(ln, r"^[a-z]+==\d+(\.\d+)*$")
+
+    def test_dockerfile_installs_from_requirements_file(self):
+        dockerfile = self.read("Dockerfile")
+        self.assertIn("COPY requirements.txt", dockerfile)
+        self.assertIn("pip install --no-cache-dir -r requirements.txt", dockerfile)
+        self.assertNotRegex(dockerfile, r"pip install[^\n]*\b(fastapi|uvicorn|httpx)\b")
+
+    def test_nightly_python_matches_dockerfile_base_image(self):
+        dockerfile = self.read("Dockerfile")
+        workflow = self.read("..", "..", ".github", "workflows", "nightly.yml")
+        image = re.search(r"^FROM python:(\d+\.\d+)", dockerfile, re.M).group(1)
+        self.assertIn(f"python-version: '{image}'", workflow)
+        self.assertIn("pip install -r services/ollama-proxy/requirements.txt", workflow)
 
 
 class WebhookEndpointTests(unittest.TestCase):
