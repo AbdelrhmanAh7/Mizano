@@ -75,3 +75,30 @@ test(
     await agent.assert('each bill line has an expense account select labelled in Arabic');
   },
 );
+
+test(
+  '@issue-216 AC1 (review): switching a line from an item back to Manual Entry drops the item account',
+  { tags: ['feat:mz-purchase-bills', 'lvl:ui'] },
+  async ({ app, agent, screen }) => {
+    await app.open('/en/login');
+    await agent.act('sign in as {email} with password {pw}', { params: LOGIN });
+
+    await app.open('/en/purchases/bills/new');
+    await agent.act('in the Item select of the first line choose {item}', {
+      params: { item: 'Keyboard Mechanical' },
+    });
+    await expect(screen.getByText('5000 · Cost of Goods Sold').first()).toBeVisible();
+    await agent.act('in the Item select of the first line choose "Manual Entry"');
+    await agent.assert(
+      'the Expense account select of the first line is empty again and shows "Choose an expense account"',
+    );
+    await agent.act(
+      'choose any vendor, type the description {desc} and unit price {rate}, then click Create Bill',
+      {
+        params: { desc: `${SEED}-manual-after-item`, rate: '40' },
+      },
+    );
+    await expect(screen.getByText(/Choose an expense account/).first()).toBeVisible();
+    await agent.assert('the new-bill form is still open and no bill was created');
+  },
+);
