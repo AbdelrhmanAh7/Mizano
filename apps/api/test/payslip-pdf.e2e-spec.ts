@@ -32,6 +32,7 @@ describe('Payslip PDF generator (e2e)', () => {
   let payslipBId = '';
   let softDeletedEmployeePayslipId = '';
   let incompletePayslipId = '';
+  let zeroPayPayslipId = '';
 
   const exactBasicSalary = '12345.60';
   const exactHousingAllowance = '1500.50';
@@ -151,7 +152,7 @@ describe('Payslip PDF generator (e2e)', () => {
     const empIncomplete = await prisma.employee.create({
       data: {
         employeeId: `EMP-INC-${uniqueSuffix()}`,
-        name: 'Incomplete Employee',
+        name: '   ',
         dateOfJoining: new Date('2024-02-01'),
         basicSalary: new Prisma.Decimal('0.00'),
         organizationId: tenantA.organizationId,
@@ -175,6 +176,28 @@ describe('Payslip PDF generator (e2e)', () => {
       },
     });
     incompletePayslipId = psInc.id;
+
+    // Valid zero-pay payslip: an exact zero amount is data, not missing data
+    const empZero = await prisma.employee.create({
+      data: {
+        employeeId: `EMP-ZERO-${uniqueSuffix()}`,
+        name: 'Zero Pay Employee',
+        dateOfJoining: new Date('2024-02-01'),
+        basicSalary: new Prisma.Decimal('4000.00'),
+        organizationId: tenantA.organizationId,
+      },
+    });
+    const psZero = await prisma.payslip.create({
+      data: {
+        payrollRunId: runIncomplete.id,
+        employeeId: empZero.id,
+        basicSalary: new Prisma.Decimal('4000.00'),
+        lop: new Prisma.Decimal('4000.00'),
+        grossSalary: new Prisma.Decimal('0.00'),
+        netSalary: new Prisma.Decimal('0.00'),
+      },
+    });
+    zeroPayPayslipId = psZero.id;
   });
 
   afterAll(async () => {
@@ -258,13 +281,20 @@ describe('Payslip PDF generator (e2e)', () => {
   });
 
   it('@e2e @flow:payslip-pdf @issue-115 AC6: missing required data returns 422 with a sanitized reason that contains no values', async () => {
-    // Calling PDF for payslip with missing required basic salary or amount data returns 422
+    // Calling PDF for a payslip whose employee has no name (missing required data) returns 422
     const res = await a.get(`/payslips/${incompletePayslipId}/pdf`);
     expect(res.status).toBe(422);
     // Error message must not contain raw payslip data/values
     const errorBody = typeof res.body === 'object' ? JSON.stringify(res.body) : res.text;
     expect(errorBody).not.toContain(exactBasicSalary);
     expect(errorBody).not.toContain(exactNetSalary);
+  });
+
+  it('@e2e @flow:payslip-pdf @issue-115 AC6b: a zero-pay payslip is valid and returns 200 with a PDF', async () => {
+    const res = await a.get(`/payslips/${zeroPayPayslipId}/pdf?lang=en`).buffer(true);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('application/pdf');
+    expect(res.headers['cache-control']).toContain('no-store');
   });
 
   it('@e2e @flow:payslip-pdf @issue-115 AC7: thrown render errors log only the exception type name and no raw message or payslip data', async () => {

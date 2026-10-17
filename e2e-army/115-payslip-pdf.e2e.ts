@@ -2,7 +2,7 @@ import { test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 
 // Request-level checks of the payslip PDF endpoint (no model calls).
-const PDF_PATH = '/api/hr/payslips/army-115-missing/pdf';
+const PDF_PATH = '/api/payslips/army-115-missing/pdf';
 
 async function loginToken(baseUrl: string): Promise<string> {
   const res = await fetch(new URL('/api/auth/login', baseUrl), {

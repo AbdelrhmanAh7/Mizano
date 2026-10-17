@@ -7,10 +7,18 @@ import {
 } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
+import { Prisma } from '@prisma/client';
 import * as PDFDocument from 'pdfkit';
 import { describeError } from '../../../common/utils/redact';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PayrollService } from './payroll.service';
+
+export interface PayslipLine {
+  labelEn: string;
+  labelAr: string;
+  /** Exact decimal string, already formatted by `formatDecimal`. */
+  amount: string;
+}
 
 export interface PayslipPdfData {
   organizationName: string;
@@ -23,31 +31,36 @@ export interface PayslipPdfData {
     department?: string | null;
     position?: string | null;
   };
-  earnings: {
-    basicSalary: string;
-    housingAllowance?: string | null;
-    transportAllowance?: string | null;
-    otherAllowances?: string | null;
-    overtime?: string | null;
-    bonus?: string | null;
-    grossSalary: string;
-  };
-  deductions: {
-    gosiEmployee?: string | null;
-    incomeTax?: string | null;
-    loanDeduction?: string | null;
-    otherDeductions?: string | null;
-    totalDeductions?: string | null;
-  };
+  earnings: PayslipLine[];
+  deductions: PayslipLine[];
+  grossSalary: string;
+  totalDeductions: string;
   netSalary: string;
+}
+
+/** Rows per column that fit the single page; the rest are rolled into one "Other" row. */
+export const MAX_LINES_PER_COLUMN = 14;
+
+/**
+ * Money columns are Decimal(19,4). Render all four stored places, then trim trailing zeros
+ * but keep at least two decimals (123.4567 stays, 12345.6000 becomes 12345.60).
+ */
+export function formatDecimal(value: Prisma.Decimal.Value): string {
+  const [whole, fraction = ''] = new Prisma.Decimal(value).toFixed(4).split('.');
+  return `${whole}.${fraction.replace(/0+$/, '').padEnd(2, '0')}`;
 }
 
 export function getPinnedFontPath(): string {
   const candidates = [
     path.resolve(process.cwd(), 'apps/api/assets/fonts/Amiri-Regular.ttf'),
     path.resolve(process.cwd(), 'assets/fonts/Amiri-Regular.ttf'),
+    path.resolve(process.cwd(), 'dist/assets/fonts/Amiri-Regular.ttf'),
+    path.resolve(process.cwd(), 'apps/api/dist/assets/fonts/Amiri-Regular.ttf'),
+    // src layout (ts-node/jest) and dist layouts (dist/ or dist/src/)
     path.resolve(__dirname, '../../../../assets/fonts/Amiri-Regular.ttf'),
     path.resolve(__dirname, '../../../../../assets/fonts/Amiri-Regular.ttf'),
+    path.resolve(__dirname, '../../../assets/fonts/Amiri-Regular.ttf'),
+    path.resolve(__dirname, '../../assets/fonts/Amiri-Regular.ttf'),
   ];
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {
@@ -55,6 +68,76 @@ export function getPinnedFontPath(): string {
     }
   }
   throw new Error('Pinned font file not found');
+}
+
+type Doc = InstanceType<typeof import('pdfkit')>;
+
+/** Truncates with an ellipsis so the text never wraps (and never adds a page). */
+function fitText(doc: Doc, text: string, maxWidth: number): string {
+  if (doc.widthOfString(text) <= maxWidth) {
+    return text;
+  }
+  const chars = Array.from(text);
+  // Binary search for the longest prefix that fits with the ellipsis (widthOfString is costly)
+  let low = 0;
+  let high = chars.length - 1;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (doc.widthOfString(`${chars.slice(0, mid).join('')}…`) <= maxWidth) {
+      low = mid;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return `${chars.slice(0, Math.max(low, 1)).join('')}…`;
+}
+
+/**
+ * Draws "label value" as two separate runs. PDFKit does not run the Unicode bidi algorithm,
+ * so mixed Arabic/Latin strings would come out in the wrong visual order. Each run holds a
+ * single script (Arabic label, Latin digits/names) and only the run positions are mirrored.
+ */
+function drawPair(
+  doc: Doc,
+  label: string,
+  value: string,
+  x: number,
+  y: number,
+  width: number,
+  isAr: boolean,
+): void {
+  const gap = 6;
+  const labelWidth = doc.widthOfString(label);
+  const shownValue = fitText(doc, value, Math.max(width - labelWidth - gap, 0));
+  const valueWidth = doc.widthOfString(shownValue);
+  if (isAr) {
+    doc.text(label, x, y, { width, align: 'right', lineBreak: false });
+    doc.text(shownValue, x + width - labelWidth - gap - valueWidth, y, { lineBreak: false });
+  } else {
+    doc.text(label, x, y, { lineBreak: false });
+    doc.text(shownValue, x + labelWidth + gap, y, { lineBreak: false });
+  }
+}
+
+/** One label/amount row inside a column; label and amount are separate runs, mirrored for Arabic. */
+function drawRow(
+  doc: Doc,
+  label: string,
+  amountText: string,
+  colX: number,
+  colWidth: number,
+  y: number,
+  isAr: boolean,
+): void {
+  const half = colWidth / 2 - 10;
+  const shownLabel = fitText(doc, label, half);
+  if (isAr) {
+    doc.text(shownLabel, colX + colWidth / 2, y, { width: half, align: 'right', lineBreak: false });
+    doc.text(amountText, colX + 10, y, { width: half, align: 'left', lineBreak: false });
+  } else {
+    doc.text(shownLabel, colX + 10, y, { width: half, align: 'left', lineBreak: false });
+    doc.text(amountText, colX + colWidth / 2, y, { width: half, align: 'right', lineBreak: false });
+  }
 }
 
 /**
@@ -92,70 +175,86 @@ export function renderPayslipPdf(data: PayslipPdfData, lang: 'ar' | 'en'): Promi
       const pageWidth = 595.28;
       const margin = 40;
       const contentWidth = pageWidth - margin * 2;
+      const money = (amount: string): string => `${amount} ${data.currency}`;
 
       // Header Title
       doc.fontSize(20).fillColor('#1E3A8A');
       doc.text(isAr ? 'مفردات المرتب' : 'PAYSLIP', margin, 40, {
         width: contentWidth,
         align: 'center',
+        lineBreak: false,
       });
 
       // Pay Period
       doc.fontSize(11).fillColor('#64748B');
-      const periodLabel = isAr
-        ? `فترة الراتب: ${data.month}/${data.year}`
-        : `Pay Period: ${data.month}/${data.year}`;
-      doc.text(periodLabel, margin, 68, { width: contentWidth, align: 'center' });
+      drawPair(
+        doc,
+        isAr ? 'فترة الراتب:' : 'Pay Period:',
+        `${data.month}/${data.year}`,
+        margin,
+        68,
+        contentWidth,
+        isAr,
+      );
 
-      // Organization Name
+      // Organization Name (single line, truncated)
       doc.fontSize(13).fillColor('#0F172A');
-      doc.text(data.organizationName, margin, 95, {
+      const orgName = fitText(doc, data.organizationName, contentWidth);
+      doc.text(orgName, margin, 95, {
         width: contentWidth,
         align: isAr ? 'right' : 'left',
+        lineBreak: false,
       });
 
       // Employee Details Card
       const boxY = 120;
+      const innerX = margin + 15;
+      const innerWidth = contentWidth - 30;
       doc.rect(margin, boxY, contentWidth, 70).fillAndStroke('#F8FAFC', '#CBD5E1');
 
       doc.fillColor('#0F172A').fontSize(10);
-      const nameText = isAr
-        ? `اسم الموظف: ${data.employee.name}`
-        : `Employee Name: ${data.employee.name}`;
-      const idText = isAr
-        ? `الرقم الوظيفي: ${data.employee.employeeId}`
-        : `Employee ID: ${data.employee.employeeId}`;
+      drawPair(
+        doc,
+        isAr ? 'اسم الموظف:' : 'Employee Name:',
+        data.employee.name,
+        innerX,
+        boxY + 12,
+        innerWidth,
+        isAr,
+      );
+      drawPair(
+        doc,
+        isAr ? 'الرقم الوظيفي:' : 'Employee ID:',
+        data.employee.employeeId,
+        innerX,
+        boxY + 28,
+        innerWidth,
+        isAr,
+      );
 
-      doc.text(nameText, margin + 15, boxY + 12, {
-        width: contentWidth - 30,
-        align: isAr ? 'right' : 'left',
-        ellipsis: true,
-      });
-      doc.text(idText, margin + 15, boxY + 28, {
-        width: contentWidth - 30,
-        align: isAr ? 'right' : 'left',
-      });
-
-      if (data.employee.department || data.employee.position) {
-        const extraText = isAr
-          ? [
-              data.employee.department ? `القسم: ${data.employee.department}` : '',
-              data.employee.position ? `المسمى الوظيفي: ${data.employee.position}` : '',
-            ]
-              .filter(Boolean)
-              .join(' | ')
-          : [
-              data.employee.department ? `Department: ${data.employee.department}` : '',
-              data.employee.position ? `Position: ${data.employee.position}` : '',
-            ]
-              .filter(Boolean)
-              .join(' | ');
-
-        doc.text(extraText, margin + 15, boxY + 44, {
-          width: contentWidth - 30,
-          align: isAr ? 'right' : 'left',
-          ellipsis: true,
-        });
+      let extraY = boxY + 44;
+      if (data.employee.department) {
+        drawPair(
+          doc,
+          isAr ? 'القسم:' : 'Department:',
+          data.employee.department,
+          innerX,
+          extraY,
+          innerWidth,
+          isAr,
+        );
+        extraY += 14;
+      }
+      if (data.employee.position) {
+        drawPair(
+          doc,
+          isAr ? 'المسمى الوظيفي:' : 'Position:',
+          data.employee.position,
+          innerX,
+          extraY,
+          innerWidth,
+          isAr,
+        );
       }
 
       // Columns for Earnings and Deductions
@@ -176,131 +275,52 @@ export function renderPayslipPdf(data: PayslipPdfData, lang: 'ar' | 'en'): Promi
       doc.text(isAr ? 'الاستحقاقات' : 'Earnings', earningsX + 10, y + 6, {
         width: colWidth - 20,
         align: isAr ? 'right' : 'left',
+        lineBreak: false,
       });
       doc.text(isAr ? 'الاستقطاعات' : 'Deductions', deductionsX + 10, y + 6, {
         width: colWidth - 20,
         align: isAr ? 'right' : 'left',
+        lineBreak: false,
       });
 
       y += 32;
       doc.fontSize(10).fillColor('#334155');
 
-      // Earnings Line Items
-      const earnings: Array<{ label: string; amount: string }> = [
-        { label: isAr ? 'الراتب الأساسي' : 'Basic Salary', amount: data.earnings.basicSalary },
-      ];
-      if (data.earnings.housingAllowance) {
-        earnings.push({
-          label: isAr ? 'بدل السكن' : 'Housing Allowance',
-          amount: data.earnings.housingAllowance,
-        });
-      }
-      if (data.earnings.transportAllowance) {
-        earnings.push({
-          label: isAr ? 'بدل الانتقال' : 'Transport Allowance',
-          amount: data.earnings.transportAllowance,
-        });
-      }
-      if (data.earnings.otherAllowances) {
-        earnings.push({
-          label: isAr ? 'بدلات أخرى' : 'Other Allowances',
-          amount: data.earnings.otherAllowances,
-        });
-      }
-      if (data.earnings.overtime) {
-        earnings.push({
-          label: isAr ? 'العمل الإضافي' : 'Overtime',
-          amount: data.earnings.overtime,
-        });
-      }
-      if (data.earnings.bonus) {
-        earnings.push({
-          label: isAr ? 'المكافآت' : 'Bonus',
-          amount: data.earnings.bonus,
-        });
-      }
-
-      // Deductions Line Items
-      const deductions: Array<{ label: string; amount: string }> = [];
-      if (data.deductions.gosiEmployee) {
-        deductions.push({
-          label: isAr ? 'التأمينات الاجتماعية' : 'Social Insurance',
-          amount: data.deductions.gosiEmployee,
-        });
-      }
-      if (data.deductions.incomeTax) {
-        deductions.push({
-          label: isAr ? 'ضريبة الدخل' : 'Income Tax',
-          amount: data.deductions.incomeTax,
-        });
-      }
-      if (data.deductions.loanDeduction) {
-        deductions.push({
-          label: isAr ? 'خصم السلفة' : 'Loan Deduction',
-          amount: data.deductions.loanDeduction,
-        });
-      }
-      if (data.deductions.otherDeductions) {
-        deductions.push({
-          label: isAr ? 'استقطاعات أخرى' : 'Other Deductions',
-          amount: data.deductions.otherDeductions,
-        });
-      }
-
       let earnY = y;
-      for (const item of earnings) {
-        if (isAr) {
-          doc.text(item.label, earningsX + colWidth / 2, earnY, {
-            width: colWidth / 2 - 10,
-            align: 'right',
-          });
-          doc.text(`${item.amount} ${data.currency}`, earningsX + 10, earnY, {
-            width: colWidth / 2 - 10,
-            align: 'left',
-          });
-        } else {
-          doc.text(item.label, earningsX + 10, earnY, {
-            width: colWidth / 2 - 10,
-            align: 'left',
-          });
-          doc.text(`${item.amount} ${data.currency}`, earningsX + colWidth / 2, earnY, {
-            width: colWidth / 2 - 10,
-            align: 'right',
-          });
-        }
+      for (const item of data.earnings.slice(0, MAX_LINES_PER_COLUMN)) {
+        drawRow(
+          doc,
+          isAr ? item.labelAr : item.labelEn,
+          money(item.amount),
+          earningsX,
+          colWidth,
+          earnY,
+          isAr,
+        );
         earnY += 20;
       }
 
       let dedY = y;
-      if (deductions.length === 0) {
+      if (data.deductions.length === 0) {
         doc.fillColor('#94A3B8');
         doc.text(isAr ? 'لا توجد استقطاعات' : 'No deductions', deductionsX + 10, dedY, {
           width: colWidth - 20,
           align: isAr ? 'right' : 'left',
+          lineBreak: false,
         });
         doc.fillColor('#334155');
         dedY += 20;
       } else {
-        for (const item of deductions) {
-          if (isAr) {
-            doc.text(item.label, deductionsX + colWidth / 2, dedY, {
-              width: colWidth / 2 - 10,
-              align: 'right',
-            });
-            doc.text(`${item.amount} ${data.currency}`, deductionsX + 10, dedY, {
-              width: colWidth / 2 - 10,
-              align: 'left',
-            });
-          } else {
-            doc.text(item.label, deductionsX + 10, dedY, {
-              width: colWidth / 2 - 10,
-              align: 'left',
-            });
-            doc.text(`${item.amount} ${data.currency}`, deductionsX + colWidth / 2, dedY, {
-              width: colWidth / 2 - 10,
-              align: 'right',
-            });
-          }
+        for (const item of data.deductions.slice(0, MAX_LINES_PER_COLUMN)) {
+          drawRow(
+            doc,
+            isAr ? item.labelAr : item.labelEn,
+            money(item.amount),
+            deductionsX,
+            colWidth,
+            dedY,
+            isAr,
+          );
           dedY += 20;
         }
       }
@@ -313,76 +333,52 @@ export function renderPayslipPdf(data: PayslipPdfData, lang: 'ar' | 'en'): Promi
       doc.rect(deductionsX, totalY, colWidth, 22).fill('#F1F5F9');
 
       doc.fillColor('#0F172A').fontSize(10);
-      if (isAr) {
-        doc.text('إجمالي الراتب', earningsX + colWidth / 2, totalY + 5, {
-          width: colWidth / 2 - 10,
-          align: 'right',
-        });
-        doc.text(`${data.earnings.grossSalary} ${data.currency}`, earningsX + 10, totalY + 5, {
-          width: colWidth / 2 - 10,
-          align: 'left',
-        });
-
-        doc.text('إجمالي الاستقطاعات', deductionsX + colWidth / 2, totalY + 5, {
-          width: colWidth / 2 - 10,
-          align: 'right',
-        });
-        doc.text(
-          `${data.deductions.totalDeductions || '0.00'} ${data.currency}`,
-          deductionsX + 10,
-          totalY + 5,
-          { width: colWidth / 2 - 10, align: 'left' },
-        );
-      } else {
-        doc.text('Gross Salary', earningsX + 10, totalY + 5, {
-          width: colWidth / 2 - 10,
-          align: 'left',
-        });
-        doc.text(
-          `${data.earnings.grossSalary} ${data.currency}`,
-          earningsX + colWidth / 2,
-          totalY + 5,
-          { width: colWidth / 2 - 10, align: 'right' },
-        );
-
-        doc.text('Total Deductions', deductionsX + 10, totalY + 5, {
-          width: colWidth / 2 - 10,
-          align: 'left',
-        });
-        doc.text(
-          `${data.deductions.totalDeductions || '0.00'} ${data.currency}`,
-          deductionsX + colWidth / 2,
-          totalY + 5,
-          { width: colWidth / 2 - 10, align: 'right' },
-        );
-      }
+      drawRow(
+        doc,
+        isAr ? 'إجمالي الراتب' : 'Gross Salary',
+        money(data.grossSalary),
+        earningsX,
+        colWidth,
+        totalY + 5,
+        isAr,
+      );
+      drawRow(
+        doc,
+        isAr ? 'إجمالي الاستقطاعات' : 'Total Deductions',
+        money(data.totalDeductions),
+        deductionsX,
+        colWidth,
+        totalY + 5,
+        isAr,
+      );
 
       // Net Pay Highlight Card
       const netY = totalY + 45;
       doc.rect(margin, netY, contentWidth, 50).fill('#0F766E');
       doc.fillColor('#FFFFFF').fontSize(12);
+      const netLabelWidth = contentWidth / 2 - 40;
       if (isAr) {
         doc.text('صافي الراتب المستحق', margin + 30, netY + 16, {
-          width: contentWidth / 2 - 40,
+          width: netLabelWidth,
           align: 'right',
+          lineBreak: false,
         });
-        doc
-          .fontSize(16)
-          .text(`${data.netSalary} ${data.currency}`, margin + contentWidth / 2, netY + 14, {
-            width: contentWidth / 2 - 40,
-            align: 'left',
-          });
+        doc.fontSize(16).text(money(data.netSalary), margin + contentWidth / 2, netY + 14, {
+          width: netLabelWidth,
+          align: 'left',
+          lineBreak: false,
+        });
       } else {
         doc.text('NET PAYABLE SALARY', margin + 30, netY + 16, {
-          width: contentWidth / 2 - 40,
+          width: netLabelWidth,
           align: 'left',
+          lineBreak: false,
         });
-        doc
-          .fontSize(16)
-          .text(`${data.netSalary} ${data.currency}`, margin + contentWidth / 2, netY + 14, {
-            width: contentWidth / 2 - 40,
-            align: 'right',
-          });
+        doc.fontSize(16).text(money(data.netSalary), margin + contentWidth / 2, netY + 14, {
+          width: netLabelWidth,
+          align: 'right',
+          lineBreak: false,
+        });
       }
 
       // Footer notice
@@ -390,13 +386,58 @@ export function renderPayslipPdf(data: PayslipPdfData, lang: 'ar' | 'en'): Promi
       const footerNotice = isAr
         ? 'هذه الوثيقة صادرة آلياً من نظام ميزانو ولا تتطلب توقيعاً'
         : 'This is a computer-generated payslip from Mizano and requires no signature';
-      doc.text(footerNotice, margin, 740, { width: contentWidth, align: 'center' });
+      doc.text(footerNotice, margin, 740, {
+        width: contentWidth,
+        align: 'center',
+        lineBreak: false,
+      });
 
       doc.end();
     } catch (err) {
       reject(err);
     }
   });
+}
+
+type Money = Prisma.Decimal;
+
+/** Persisted JSON line items ({ name: amount }) as non-zero decimals; anything else is ignored. */
+function jsonLines(json: unknown): Array<{ name: string; amount: Money }> {
+  if (!json || typeof json !== 'object' || Array.isArray(json)) {
+    return [];
+  }
+  const lines: Array<{ name: string; amount: Money }> = [];
+  for (const [name, raw] of Object.entries(json as Record<string, unknown>)) {
+    if ((typeof raw === 'number' && Number.isFinite(raw)) || typeof raw === 'string') {
+      try {
+        const amount = new Prisma.Decimal(String(raw));
+        if (!amount.isZero()) {
+          lines.push({ name, amount });
+        }
+      } catch {
+        // non-numeric JSON value: not a money line
+      }
+    }
+  }
+  return lines;
+}
+
+interface RawLine {
+  labelEn: string;
+  labelAr: string;
+  amount: Money;
+}
+
+/** Keeps the page single-page: rows past the cap are summed into one "Other" row. */
+function capLines(lines: RawLine[], other: { labelEn: string; labelAr: string }): RawLine[] {
+  if (lines.length <= MAX_LINES_PER_COLUMN) {
+    return lines;
+  }
+  const kept = lines.slice(0, MAX_LINES_PER_COLUMN - 1);
+  const rest = lines
+    .slice(MAX_LINES_PER_COLUMN - 1)
+    .reduce((sum, l) => sum.add(l.amount), new Prisma.Decimal(0));
+  return [...kept, { ...other, amount: rest }];
 }
 
 @Injectable()
@@ -425,15 +466,16 @@ export class PayslipPdfService {
       // 2. Fetch organization info for currency and company name
       const organization = await this.prisma.organization.findUnique({
         where: { id: organizationId },
-        select: { name: true, currency: true },
+        select: { name: true, baseCurrency: true, currency: true },
       });
 
       if (!organization) {
         throw new NotFoundException('Organization not found');
       }
 
-      // 3. Validate required fields (throw 422 if any required field is missing or zero)
-      if (!organization.currency) {
+      // 3. Reject only absent data. An exact zero amount is valid (zero-pay or net = 0 payslips).
+      const currency = organization.baseCurrency || organization.currency;
+      if (!currency) {
         throw new UnprocessableEntityException('Missing required field: currency');
       }
       if (!payslip.employee?.name?.trim()) {
@@ -442,67 +484,80 @@ export class PayslipPdfService {
       if (!payslip.employee?.employeeId?.trim()) {
         throw new UnprocessableEntityException('Missing required field: employeeId');
       }
-      if (!payslip.basicSalary || payslip.basicSalary.isZero()) {
+      if (payslip.basicSalary == null) {
         throw new UnprocessableEntityException('Missing required field: basicSalary');
       }
-      if (!payslip.grossSalary || payslip.grossSalary.isZero()) {
+      if (payslip.grossSalary == null) {
         throw new UnprocessableEntityException('Missing required field: grossSalary');
       }
-      if (!payslip.netSalary || payslip.netSalary.isZero()) {
+      if (payslip.netSalary == null) {
         throw new UnprocessableEntityException('Missing required field: netSalary');
       }
 
-      // 4. Extract exact decimal strings without float conversion or rounding
-      const basicSalaryStr = payslip.basicSalary.toFixed(2);
-      const grossSalaryStr = payslip.grossSalary.toFixed(2);
-      const netSalaryStr = payslip.netSalary.toFixed(2);
+      // 4. Map the fields payroll actually persists (calculatePayroll writes `lop`, the
+      //    `allowances`/`deductions` JSON and `taxes`; the individual columns are optional
+      //    snapshots) into line items. No float conversion; Decimal stays Decimal.
+      const earnings: RawLine[] = [
+        { labelEn: 'Basic Salary', labelAr: 'الراتب الأساسي', amount: payslip.basicSalary },
+      ];
+      if (payslip.lop && !payslip.lop.isZero()) {
+        earnings.push({
+          labelEn: 'Loss of Pay',
+          labelAr: 'خصم الغياب',
+          amount: payslip.lop.negated(),
+        });
+      }
+      const snapshotEarnings: Array<[Money | null, string, string]> = [
+        [payslip.housingAllowance, 'Housing Allowance', 'بدل السكن'],
+        [payslip.transportAllowance, 'Transport Allowance', 'بدل الانتقال'],
+        [payslip.otherAllowances, 'Other Allowances', 'بدلات أخرى'],
+        [payslip.overtime, 'Overtime', 'العمل الإضافي'],
+        [payslip.bonus, 'Bonus', 'المكافآت'],
+      ];
+      for (const [amount, labelEn, labelAr] of snapshotEarnings) {
+        if (amount && !amount.isZero()) {
+          earnings.push({ labelEn, labelAr, amount });
+        }
+      }
+      for (const { name, amount } of jsonLines(payslip.allowances)) {
+        earnings.push({ labelEn: name, labelAr: name, amount });
+      }
 
-      const housingAllowanceStr =
-        payslip.housingAllowance && !payslip.housingAllowance.isZero()
-          ? payslip.housingAllowance.toFixed(2)
-          : undefined;
+      const deductions: RawLine[] = [];
+      const snapshotDeductions: Array<[Money | null, string, string]> = [
+        [payslip.gosiEmployee, 'Social Insurance', 'التأمينات الاجتماعية'],
+        [payslip.incomeTax, 'Income Tax', 'ضريبة الدخل'],
+        [payslip.loanDeduction, 'Loan Deduction', 'خصم السلفة'],
+        [payslip.otherDeductions, 'Other Deductions', 'استقطاعات أخرى'],
+      ];
+      for (const [amount, labelEn, labelAr] of snapshotDeductions) {
+        if (amount && !amount.isZero()) {
+          deductions.push({ labelEn, labelAr, amount });
+        }
+      }
+      for (const { name, amount } of jsonLines(payslip.deductions)) {
+        deductions.push({ labelEn: name, labelAr: name, amount });
+      }
+      if (payslip.taxes && !payslip.taxes.isZero()) {
+        deductions.push({ labelEn: 'Tax', labelAr: 'الضريبة', amount: payslip.taxes });
+      }
 
-      const transportAllowanceStr =
-        payslip.transportAllowance && !payslip.transportAllowance.isZero()
-          ? payslip.transportAllowance.toFixed(2)
-          : undefined;
+      // Total from the components, never from the `totalDeductions` column (defaults to 0).
+      const totalDeductions = deductions.reduce(
+        (sum, l) => sum.add(l.amount),
+        new Prisma.Decimal(0),
+      );
 
-      const otherAllowancesStr =
-        payslip.otherAllowances && !payslip.otherAllowances.isZero()
-          ? payslip.otherAllowances.toFixed(2)
-          : undefined;
-
-      const overtimeStr =
-        payslip.overtime && !payslip.overtime.isZero() ? payslip.overtime.toFixed(2) : undefined;
-
-      const bonusStr =
-        payslip.bonus && !payslip.bonus.isZero() ? payslip.bonus.toFixed(2) : undefined;
-
-      const gosiEmployeeStr =
-        payslip.gosiEmployee && !payslip.gosiEmployee.isZero()
-          ? payslip.gosiEmployee.toFixed(2)
-          : undefined;
-
-      const incomeTaxStr =
-        payslip.incomeTax && !payslip.incomeTax.isZero() ? payslip.incomeTax.toFixed(2) : undefined;
-
-      const loanDeductionStr =
-        payslip.loanDeduction && !payslip.loanDeduction.isZero()
-          ? payslip.loanDeduction.toFixed(2)
-          : undefined;
-
-      const otherDeductionsStr =
-        payslip.otherDeductions && !payslip.otherDeductions.isZero()
-          ? payslip.otherDeductions.toFixed(2)
-          : undefined;
-
-      const totalDeductionsStr = payslip.totalDeductions
-        ? payslip.totalDeductions.toFixed(2)
-        : '0.00';
+      const toLines = (lines: RawLine[]): PayslipLine[] =>
+        lines.map((l) => ({
+          labelEn: l.labelEn,
+          labelAr: l.labelAr,
+          amount: formatDecimal(l.amount),
+        }));
 
       const data: PayslipPdfData = {
         organizationName: organization.name,
-        currency: organization.currency,
+        currency,
         month: payslip.payrollRun.month,
         year: payslip.payrollRun.year,
         employee: {
@@ -511,23 +566,15 @@ export class PayslipPdfService {
           department: payslip.employee.department,
           position: payslip.employee.position ?? payslip.employee.jobTitle,
         },
-        earnings: {
-          basicSalary: basicSalaryStr,
-          housingAllowance: housingAllowanceStr,
-          transportAllowance: transportAllowanceStr,
-          otherAllowances: otherAllowancesStr,
-          overtime: overtimeStr,
-          bonus: bonusStr,
-          grossSalary: grossSalaryStr,
-        },
-        deductions: {
-          gosiEmployee: gosiEmployeeStr,
-          incomeTax: incomeTaxStr,
-          loanDeduction: loanDeductionStr,
-          otherDeductions: otherDeductionsStr,
-          totalDeductions: totalDeductionsStr,
-        },
-        netSalary: netSalaryStr,
+        earnings: toLines(
+          capLines(earnings, { labelEn: 'Other Earnings', labelAr: 'استحقاقات أخرى' }),
+        ),
+        deductions: toLines(
+          capLines(deductions, { labelEn: 'Other Deductions', labelAr: 'استقطاعات أخرى' }),
+        ),
+        grossSalary: formatDecimal(payslip.grossSalary),
+        totalDeductions: formatDecimal(totalDeductions),
+        netSalary: formatDecimal(payslip.netSalary),
       };
 
       // 5. Render PDF synchronously without network calls

@@ -21,7 +21,7 @@ export class PayslipsController {
   constructor(private readonly payslipPdfService: PayslipPdfService) {}
 
   @Get(':id/pdf')
-  @Permissions('payroll.view')
+  @Permissions('hr.view')
   @ApiOperation({ summary: 'Generate payslip PDF (deterministic Arabic/English export)' })
   @ApiParam({ name: 'id', description: 'Payslip ID' })
   @ApiQuery({
@@ -45,8 +45,10 @@ export class PayslipsController {
 
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename="payslip-${id}.pdf"`,
+      'Content-Disposition': `attachment; filename="payslip-${id}.pdf"`,
       'Content-Length': pdfBuffer.length,
+      // Salary data: never cache in a shared or private browser cache
+      'Cache-Control': 'private, no-store',
     });
 
     res.send(pdfBuffer);
