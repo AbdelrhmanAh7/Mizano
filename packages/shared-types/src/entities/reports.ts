@@ -147,6 +147,8 @@ export const VAT_RETURN_DRAFT_LABEL = 'DRAFT, not for filing' as const;
 
 export interface VatReturnDraft {
   label: typeof VAT_RETURN_DRAFT_LABEL;
+  /** Organization base currency: the currency of every amount in this draft. */
+  currency: string;
   from: string;
   to: string;
   status: 'complete' | 'incomplete';

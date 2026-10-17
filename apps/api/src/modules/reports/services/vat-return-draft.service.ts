@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, HttpException, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
   VAT_RETURN_DRAFT_LABEL,
@@ -9,6 +9,18 @@ import {
 import { PrismaService } from '../../../prisma/prisma.service';
 import { describeError } from '../../../common/utils/redact';
 import { round } from '../../../common/utils/document-totals';
+import {
+  TAXABLE_BILL_STATUSES,
+  TAXABLE_INVOICE_STATUSES,
+  VatReturnsService,
+} from '../../tax/services/vat-returns.service';
+import { MAX_DAYS, parseReportDate, startOfUtcDay, toIsoDate } from '../utils/report-utils';
+
+/** The default 20-digit Decimal context cannot hold 17 integer digits and four decimals. */
+const WideDecimal = Prisma.Decimal.clone({ precision: 40 });
+const DAY_MS = 86_400_000;
+/** Documents read per query while checking them; memory stays flat however long the history is. */
+const SCAN_PAGE_SIZE = 500;
 
 interface TaxedDocument {
   id: string;
@@ -22,14 +34,21 @@ interface TaxedDocument {
 export class VatReturnDraftService {
   private readonly logger = new Logger(VatReturnDraftService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly vatReturns: VatReturnsService,
+  ) {}
 
+  /**
+   * Output and input VAT come from the posted VAT ledger lines through `VatReturnsService`
+   * (invoices, bills, expenses, credit notes, vendor credits and reversals), so the draft equals
+   * the return that would be created for the same dates. The posted invoices and bills of the
+   * period are then checked one by one for what the ledger cannot show: header tax that differs
+   * from the lines (ETA rejects it) and documents that cannot be checked.
+   */
   async getDraft(orgId: string, fromDate: string, toDate: string): Promise<VatReturnDraft> {
     try {
-      const from = new Date(fromDate);
-      const to = new Date(toDate);
-      const where = { organizationId: orgId, date: { gte: from, lte: to }, deletedAt: null };
-      const lines = { select: { amount: true, taxRate: true } };
+      const { from, to } = this.resolveRange(fromDate, toDate);
 
       const org = await this.prisma.organization.findUnique({
         where: { id: orgId },
@@ -38,47 +57,59 @@ export class VatReturnDraftService {
       if (!org) throw new Error('Organization not found');
       const baseCurrency = org.baseCurrency.trim().toUpperCase();
 
-      const invoices = await this.prisma.invoice.findMany({
-        where: { ...where, status: { notIn: ['DRAFT', 'VOID'] } },
-        select: { id: true, invoiceNumber: true, taxAmount: true, currencyCode: true, lines },
-      });
-      const bills = await this.prisma.bill.findMany({
-        where: { ...where, status: { notIn: ['DRAFT', 'VOID'] } },
-        select: { id: true, billNumber: true, taxAmount: true, currencyCode: true, lines },
-      });
+      const summary = await this.vatReturns.getVatSummary(orgId, toIsoDate(from), toIsoDate(to));
+      const outputTax = new WideDecimal(summary.sales.vatCollected);
+      const inputTax = new WideDecimal(summary.purchases.vatPaid);
 
+      const where = {
+        organizationId: orgId,
+        deletedAt: null,
+        date: { gte: from, lt: new Date(to.getTime() + DAY_MS) },
+      };
       const exceptions: VatReturnDraftException[] = [];
       const etaMismatches: VatReturnDraftEtaMismatch[] = [];
-      const sum = (type: 'invoice' | 'bill', docs: TaxedDocument[]): Prisma.Decimal =>
-        docs.reduce((total, doc) => {
-          const ref = { id: doc.id, type, documentNumber: doc.documentNumber };
-          const reason = this.exceptionReason(doc.currencyCode, doc.taxAmount, baseCurrency);
-          if (reason || doc.taxAmount === null) {
-            exceptions.push({ ...ref, reason: reason ?? 'Missing tax amount' });
-            return total;
-          }
-          const lineTax = this.lineTax(doc.lines);
-          if (!lineTax.equals(doc.taxAmount)) {
-            etaMismatches.push({
-              ...ref,
-              headerTax: doc.taxAmount.toFixed(4),
-              lineTax: lineTax.toFixed(4),
-            });
-          }
-          return total.add(doc.taxAmount);
-        }, new Prisma.Decimal(0));
+      const check = (type: 'invoice' | 'bill', doc: TaxedDocument): void => {
+        const ref = { id: doc.id, type, documentNumber: doc.documentNumber };
+        const reason = this.exceptionReason(doc, baseCurrency);
+        if (reason) {
+          exceptions.push({ ...ref, reason });
+          return;
+        }
+        const lineTax = this.lineTax(doc.lines);
+        if (doc.taxAmount && !lineTax.equals(doc.taxAmount)) {
+          etaMismatches.push({
+            ...ref,
+            headerTax: doc.taxAmount.toFixed(4),
+            lineTax: lineTax.toFixed(4),
+          });
+        }
+      };
 
-      const outputTax = sum(
-        'invoice',
-        invoices.map((i) => ({ ...i, documentNumber: i.invoiceNumber })),
+      const lines = { select: { amount: true, taxRate: true } };
+      await this.scan(
+        (page) =>
+          this.prisma.invoice.findMany({
+            where: { ...where, status: { in: TAXABLE_INVOICE_STATUSES } },
+            select: { id: true, invoiceNumber: true, taxAmount: true, currencyCode: true, lines },
+            orderBy: { id: 'asc' },
+            ...page,
+          }),
+        (invoice) => check('invoice', { ...invoice, documentNumber: invoice.invoiceNumber }),
       );
-      const inputTax = sum(
-        'bill',
-        bills.map((b) => ({ ...b, documentNumber: b.billNumber })),
+      await this.scan(
+        (page) =>
+          this.prisma.bill.findMany({
+            where: { ...where, status: { in: TAXABLE_BILL_STATUSES } },
+            select: { id: true, billNumber: true, taxAmount: true, currencyCode: true, lines },
+            orderBy: { id: 'asc' },
+            ...page,
+          }),
+        (bill) => check('bill', { ...bill, documentNumber: bill.billNumber }),
       );
 
       return {
         label: VAT_RETURN_DRAFT_LABEL,
+        currency: baseCurrency,
         from: from.toISOString(),
         to: to.toISOString(),
         status: exceptions.length > 0 || etaMismatches.length > 0 ? 'incomplete' : 'complete',
@@ -89,24 +120,62 @@ export class VatReturnDraftService {
         etaMismatches,
       };
     } catch (error) {
-      this.logger.error(describeError(error, { includeMessage: false }));
+      if (!(error instanceof HttpException)) {
+        this.logger.error(describeError(error, { includeMessage: false }));
+      }
       throw error;
     }
   }
 
   /**
-   * Why a document cannot be summed into the draft, or null when it can. A missing
-   * `currencyCode` means the base currency (the posting guards treat it the same way);
-   * a different code is never converted or added one-for-one.
+   * Inclusive UTC calendar days: a date-only `to` covers its whole day and a timestamp counts as
+   * the day it falls in, like the VAT return dates. Longer than a year is rejected so one request
+   * cannot read an unbounded history.
    */
-  private exceptionReason(
-    currencyCode: string | null,
-    taxAmount: Prisma.Decimal | null,
-    baseCurrency: string,
-  ): string | null {
-    const currency = currencyCode?.trim().toUpperCase();
+  private resolveRange(fromDate: string, toDate: string): { from: Date; to: Date } {
+    const start = parseReportDate(fromDate, 'start', 'from');
+    const end = parseReportDate(toDate, 'end', 'to');
+    if (!start || !end) throw new BadRequestException('from and to are required');
+    const from = startOfUtcDay(start);
+    const to = startOfUtcDay(end);
+    if (from > to) throw new BadRequestException('from date must be before or equal to to date');
+    if ((to.getTime() - from.getTime()) / DAY_MS + 1 > MAX_DAYS) {
+      throw new BadRequestException(`The period must not be longer than ${MAX_DAYS} days`);
+    }
+    return { from, to };
+  }
+
+  /** Cursor-pages a query by id so only `SCAN_PAGE_SIZE` documents are in memory at a time. */
+  private async scan<T extends { id: string }>(
+    fetchPage: (page: { take: number; cursor?: { id: string }; skip?: number }) => Promise<T[]>,
+    visit: (doc: T) => void,
+  ): Promise<void> {
+    let cursor: string | undefined;
+    for (;;) {
+      const page = await fetchPage(
+        cursor
+          ? { take: SCAN_PAGE_SIZE, cursor: { id: cursor }, skip: 1 }
+          : { take: SCAN_PAGE_SIZE },
+      );
+      page.forEach(visit);
+      if (page.length < SCAN_PAGE_SIZE) return;
+      cursor = page[page.length - 1].id;
+    }
+  }
+
+  /**
+   * Why a document cannot be checked against its lines, or null when it can. A missing
+   * `currencyCode` means the base currency (the posting guards treat it the same way); a
+   * different code is never converted or compared one-for-one.
+   */
+  private exceptionReason(doc: TaxedDocument, baseCurrency: string): string | null {
+    const currency = doc.currencyCode?.trim().toUpperCase();
     if (currency && currency !== baseCurrency) return 'Foreign currency';
-    if (taxAmount === null) return 'Missing tax amount';
+    if (doc.taxAmount === null) return 'Missing tax amount';
+    if (doc.taxAmount.isNegative()) return 'Negative tax amount';
+    if (doc.lines.some((l) => l.taxRate.isNegative() || l.taxRate.greaterThan(100))) {
+      return 'Invalid tax rate';
+    }
     return null;
   }
 
@@ -117,8 +186,8 @@ export class VatReturnDraftService {
    */
   private lineTax(lines: TaxedDocument['lines']): Prisma.Decimal {
     return lines.reduce(
-      (total, line) => total.add(round(line.amount.mul(line.taxRate).div(100))),
-      new Prisma.Decimal(0),
+      (total, line) => total.add(round(new WideDecimal(line.amount).mul(line.taxRate).div(100))),
+      new WideDecimal(0),
     );
   }
 }
