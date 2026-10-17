@@ -1,3 +1,5 @@
+import { InventoryMovementQueryDto } from '../dto/inventory-movement-query.dto';
+import { InventoryMovementCursorQueryDto } from '../dto/inventory-movement-cursor-query.dto';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -7,20 +9,7 @@ import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 export class InventoryMovementsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(
-    organizationId: string,
-    query: {
-      page?: number;
-      limit?: number;
-      itemId?: string;
-      warehouseId?: string;
-      type?: string;
-      dateFrom?: string;
-      dateTo?: string;
-      sortBy?: string;
-      sortOrder?: string;
-    },
-  ) {
+  async findAll(organizationId: string, query: InventoryMovementQueryDto) {
     const {
       page = 1,
       limit = 20,
@@ -74,22 +63,7 @@ export class InventoryMovementsService {
     'createdAt',
   ];
 
-  async findAllCursor(
-    organizationId: string,
-    query: {
-      cursor?: string;
-      take?: number;
-      search?: string;
-      itemId?: string;
-      warehouseId?: string;
-      type?: string;
-      source?: string;
-      dateFrom?: string;
-      dateTo?: string;
-      sortBy?: string;
-      sortOrder?: string;
-    },
-  ) {
+  async findAllCursor(organizationId: string, query: InventoryMovementCursorQueryDto) {
     const {
       cursor,
       take,
