@@ -1,7 +1,7 @@
 # Mizano ERP - GCP Production Deployment Pipeline
 # ================================================
 # Builds Docker images, pushes to GHCR, and deploys to GCP VM via SSH.
-# Runs ONLY after CI workflow passes on master, or on manual dispatch.
+# Runs ONLY on manual dispatch (see the note below).
 #
 # Required GitHub Secrets:
 #   DEPLOY_HOST       - Server IP (34.165.73.152)
@@ -9,15 +9,14 @@
 #   DEPLOY_SSH_KEY    - Private SSH key for the deploy user
 #   PRODUCTION_URL    - Public URL (http://34.165.73.152:5001)
 
+#
+# Disabled 2026-10-10: GCP host unreachable since 2026-10-01; re-enable via DEPLOY #25.
+# The automatic run after every green CI on master failed its SSH step and
+# turned master red (MZ #102, #113). Manual dispatch only until then.
+
 name: Deploy to Production
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
-    branches: [master]
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       environment:
