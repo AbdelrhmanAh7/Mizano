@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -8,15 +9,19 @@ import { randomUUID } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
 import { resolveLogLevels } from './modules/logger/log-level';
+import { applyTrustProxy } from './throttler-ip.guard';
 
 async function bootstrap() {
   // Buffer startup logs until LOG_LEVEL (from the env file loaded by ConfigModule) is applied
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
   const configService = app.get(ConfigService);
   app.useLogger(
     resolveLogLevels(configService.get<string>('LOG_LEVEL'), configService.get<string>('NODE_ENV')),
   );
   const logger = new Logger('Bootstrap');
+
+  // req.ip = the real client IP behind Cloudflare / Tailscale serve (local proxies only)
+  applyTrustProxy(app);
 
   // Assign a unique request ID to each incoming request for tracing
   app.use((req: Request, _res: Response, next: NextFunction) => {
