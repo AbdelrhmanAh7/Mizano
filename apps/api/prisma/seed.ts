@@ -1756,6 +1756,8 @@ async function main() {
       },
       update: {},
       create: {
+        // Stable id so the payslip page (/hr/payslips/<id>) can be opened by URL in e2e runs.
+        id: `payslip-feb-2026-${ps.empId}`,
         payrollRunId: payroll.id,
         employeeId: empMap[ps.empId],
         basicSalary: ps.basic,
