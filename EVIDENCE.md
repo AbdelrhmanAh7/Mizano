@@ -1,6 +1,6 @@
 # EVIDENCE: payslip PDF generator (#115)
 
-Branch `ai/115`. Code tested at commit `895cc43` (`6ba8371` after it only restores two docs files to master).
+Branch `ai/115`. Unit/lint results below were run at commit `895cc43` and re-run after the seed change that follows `5d41cfa` (HR specs: 3 suites, 52 tests, 0 failed).
 Date 2026-10-17. Everything below was run in this session; what was not run is listed at the end.
 
 ## Contract
@@ -56,6 +56,16 @@ Root causes found while verifying:
 `bidi-js` 1.1.0 (MIT, pure JS, Unicode bidi algorithm) in `apps/api`. `pnpm add` could not write the pnpm store from the
 sandbox, so `package.json` and `pnpm-lock.yaml` were edited by hand to the entry pnpm printed (same integrity hash) and
 `node_modules/bidi-js` was unpacked from the registry tarball. CI's `pnpm install --frozen-lockfile` will confirm the lockfile.
+
+## Verification round 4 ("Payslip not found")
+
+The last verifier opened `/en/hr/payslips/test-id`, `/ar/hr/payslips/test-id` and `/en/hr/payslips/zero-pay-id`. Those ids do not
+exist in the seeded database, so the page correctly shows its not-found state (AC5); this is not a defect in the download flow.
+The seeded payslips had random cuid ids, so a verifier could not guess a working URL. The seed now gives them stable ids
+(`apps/api/prisma/seed.ts`): `payslip-feb-2026-emp-001`, `-emp-002`, `-emp-003`, all in run `payroll-feb-2026`.
+Open `/en/hr/payslips/payslip-feb-2026-emp-001` (or `/ar/...`) to see a payslip and the "Download PDF" button.
+`e2e-army/115-payslip-pdf.e2e.ts` has a scenario for it. Existing databases keep their old ids (the seed upserts with `update: {}`).
+A zero-pay payslip has no seed row; it is covered by the unit specs only.
 
 ## Not verified
 
