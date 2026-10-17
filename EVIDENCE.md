@@ -1,111 +1,65 @@
-# EVIDENCE.md — Payslip PDF Generator (#115)
+# EVIDENCE: payslip PDF generator (#115)
 
-## Overview
+Branch `ai/115`. Code tested at commit `895cc43` (`6ba8371` after it only restores two docs files to master).
+Date 2026-10-17. Everything below was run in this session; what was not run is listed at the end.
 
-- **Issue**: #115 (Payslip PDF generator from Mizano payroll data)
-- **Branch**: `ai/115`
-- **Tested Commit SHA**: `7a044ad`
-- **Date**: 2026-10-17
-- **Architecture & Protocol Note**:
-  The core payslip PDF generator is an authenticated backend API endpoint (`GET /api/payslips/:id/pdf?lang=ar|en`), registered under `PayslipsController` (`@Controller('payslips')`).
-  The frontend client (`apps/web/lib/hooks/use-documents.ts`) routes downloads directly to this endpoint via `documentsApi.getPayslipPdf`, and the payslip detail page (`apps/web/app/[locale]/(dashboard)/hr/payslips/[id]/page.tsx`) provides an interactive "Download PDF" action supporting Arabic and English RTL/LTR.
+## Contract
 
----
+The spec draft said `POST /api/hr/payroll/:id/payslip`. The reviewed and CTO-approved contract is
+`GET /api/payslips/:id/pdf?lang=ar|en` (read-only; default `ar`; other values 400; permission `hr.view`;
+`Content-Type: application/pdf`; `Content-Disposition: attachment; filename="payslip-<id>.pdf"`).
+The web payslip page has a "Download PDF" button (`data-testid="download-pdf-button"`, en/ar, RTL) that calls it.
+Follow-ups kept out of this PR (issue creation is frozen, so they are recorded here): move
+`EmailService` payslip attachments to `PayslipPdfService` and delete the legacy `PdfService.generatePayslipPdf`;
+deprecate and later remove `/documents/payslip/:id/pdf`.
 
-## Pinned Assets & Dependencies
+## Acceptance criteria
 
-| Asset / Package     | Version / Checksum                                                          | License / Source                      | Rationale                                                                    |
-| ------------------- | --------------------------------------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------- |
-| `pdfkit`            | `0.15.0` (pinned)                                                           | MIT                                   | Pure JS, arm64 (Raspberry Pi 5) compatible, CPU-only, no native C++ bindings |
-| `Amiri-Regular.ttf` | SHA-256: `ab391c4147d054c48976e98322ad0eefe1427aa0e0502a12a4c75d80a70cfcd7` | SIL Open Font License 1.1 (`OFL.txt`) | Embedded OpenType font with Arabic glyph shaping and Latin coverage          |
-| `OFL.txt`           | SHA-256: `72de68e5954f4fdd24702292ef5a32f003ca960ec9330dc86e5eefb5dffb9b22` | SIL Open Font License 1.1             | Font license bundled in `apps/api/assets/fonts/`                             |
+| AC   | Criterion                                                                         | Evidence                                                                                                                                                                                                                                                                                              | Result      |
+| ---- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| AC1  | Authorised in-org payslip returns a PDF (`application/pdf`, attachment, no-store) | `payslips.controller.spec.ts`, `payslip-pdf.service.spec.ts` ("generates a valid PDF buffer")                                                                                                                                                                                                         | passed      |
+| AC2  | `lang=ar` / `lang=en` supported, default `ar`, other value 400                    | `payslip-pdf.service.spec.ts` ("throws BadRequestException for an unsupported language"), controller spec                                                                                                                                                                                             | passed      |
+| AC3  | Amounts exactly as stored, no float, no rounding (`123.4567`, `12345.60`)         | `formatDecimal` table and "preserves a four-decimal stored amount"                                                                                                                                                                                                                                    | passed      |
+| AC4  | Same input gives byte-identical PDF                                               | "produces byte-identical output across repeated renders"                                                                                                                                                                                                                                              | passed      |
+| AC5  | Other org, soft-deleted employee, unknown id: 404                                 | "propagates NotFoundException ... cross-tenant", e2e-army unknown-id UI test (not run, see below)                                                                                                                                                                                                     | unit passed |
+| AC6  | Missing data gives 422 without values; zero-pay and net=0 give a PDF              | "throws UnprocessableEntityException ...", "renders a zero-pay payslip", "renders a net = 0 payslip"                                                                                                                                                                                                  | passed      |
+| AC7  | Render errors log only the exception type                                         | "logs only the exception type name ..."                                                                                                                                                                                                                                                               | passed      |
+| AC8  | One page, however long the names                                                  | "keeps one page for a 500-character organization name ..." (`numpages === 1`)                                                                                                                                                                                                                         | passed      |
+| AC9  | `hr.view` (what default roles have)                                               | `payslips.controller.spec.ts`                                                                                                                                                                                                                                                                         | passed      |
+| AC10 | Currency from `baseCurrency`, legacy `currency` only if null                      | "labels amounts with baseCurrency ..."                                                                                                                                                                                                                                                                | passed      |
+| AC11 | Totals reconcile with what `calculatePayroll` persists                            | "maps the fields calculatePayroll persists ...", "shows a stored total with no itemised deductions as one Other Deductions row", "reconciles a payslip whose total column is 0 from gross - net", "shows earnings the line items do not explain ...", "does not list a figure twice ... (seed shape)" | passed      |
+| AC12 | Arabic/mixed text in correct visual order                                         | `visualRuns` specs, x-position specs on the rendered ar and en pages, PNG renders in `docs/evidence/115/`                                                                                                                                                                                             | passed      |
+| AC13 | Font found after `nest build` layouts                                             | `getPinnedFontPath` specs for `dist/modules` and `dist/src/modules` layouts, no cwd dependence                                                                                                                                                                                                        | passed      |
+| AC14 | Web download client uses the new route with `lang`                                | `apps/web/lib/hooks/use-documents.spec.ts`                                                                                                                                                                                                                                                            | passed      |
 
----
+## Commands and results
 
-## Acceptance Criteria Verification Matrix
+| Command                                                   | Result                                                                                                                                              |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cd apps/api && npx jest src/modules/hr --maxWorkers=2`   | 3 suites passed, 52 tests, 0 failed (run twice)                                                                                                     |
+| `cd apps/web && npx jest lib/hooks/use-documents.spec.ts` | 1 suite passed, 2 tests, 0 failed                                                                                                                   |
+| `pnpm --filter api lint`                                  | exit 0, no output                                                                                                                                   |
+| `pnpm --filter api exec tsc --noEmit`                     | errors only in other modules (`@mizano/shared-types` is not built here, e.g. `logger.service.ts`); 0 errors in `hr/`, `payslip` or `e2e-army` files |
 
-| REQ / AC | Requirement                                                                                                                                                                                                                       | Verification Method                                                                                              | Status     |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------- |
-| **AC1**  | `GET /api/payslips/:id/pdf` returns valid PDF with `Content-Type: application/pdf`, `Content-Disposition: attachment; filename="payslip-<id>.pdf"`, and `Cache-Control: private, no-store` for authorized in-organization payslip | `test/payslip-pdf.e2e-spec.ts` (AC1) & `payslips.controller.spec.ts`                                             | **PASSED** |
-| **AC2**  | `lang=ar` and `lang=en` both supported, default documented as `ar`, unsupported `lang` returns 400                                                                                                                                | `test/payslip-pdf.e2e-spec.ts` (AC2), `payslip-pdf.service.spec.ts`, and `e2e-army/115-payslip-pdf.e2e.ts` (AC2) | **PASSED** |
-| **AC3**  | Decimal amounts appear exactly as stored decimal strings (up to 4 places, no float conversion, no unwanted re-rounding: e.g. `123.4567` stays, `12345.60` stays)                                                                  | `test/payslip-pdf.e2e-spec.ts` (AC3) & `payslip-pdf.service.spec.ts` (`formatDecimal`)                           | **PASSED** |
-| **AC4**  | Output is byte-identical across repeated renders of identical input (deterministic PDF)                                                                                                                                           | `test/payslip-pdf.e2e-spec.ts` (AC4) & `payslip-pdf.service.spec.ts`                                             | **PASSED** |
-| **AC5**  | Cross-organization, soft-deleted employee and invalid IDs return 404; unauthenticated returns 401                                                                                                                                 | `test/payslip-pdf.e2e-spec.ts` (AC5) & `e2e-army/115-payslip-pdf.e2e.ts` (AC1 & AC5)                             | **PASSED** |
-| **AC6**  | Missing required data returns 422 with sanitized reason containing no secret values                                                                                                                                               | `test/payslip-pdf.e2e-spec.ts` (AC6) & `payslip-pdf.service.spec.ts`                                             | **PASSED** |
-| **AC6b** | Valid zero-pay payslip (e.g., contractual basic salary equals loss of pay) or net=0 returns 200 with PDF                                                                                                                          | `test/payslip-pdf.e2e-spec.ts` (AC6b) & `payslip-pdf.service.spec.ts`                                            | **PASSED** |
-| **AC7**  | Thrown render errors log only the exception type name and no raw message or secret salary data                                                                                                                                    | `test/payslip-pdf.e2e-spec.ts` (AC7) & `payslip-pdf.service.spec.ts`                                             | **PASSED** |
-| **AC8**  | Synchronous, CPU-only execution capped strictly at 1 page for arm64 / Pi 5                                                                                                                                                        | `payslip-pdf.service.spec.ts` (asserts `numpages === 1` for 500-char org name and 40 items)                      | **PASSED** |
-| **AC9**  | Uses `hr.view` permission so default roles (Manager, Accountant) can generate payslips                                                                                                                                            | `payslips.controller.spec.ts` (guards tested with default role permissions)                                      | **PASSED** |
-| **AC10** | Uses canonical `baseCurrency` with fallback to legacy `currency` if null                                                                                                                                                          | `payslip-pdf.service.spec.ts`                                                                                    | **PASSED** |
-| **AC11** | Interactive "Download PDF" action provided in web payslip page with Arabic/English RTL support                                                                                                                                    | `apps/web/app/[locale]/(dashboard)/hr/payslips/[id]/page.tsx` & `use-documents.spec.ts`                          | **PASSED** |
+Root causes found while verifying:
 
----
+- Arabic order: fontkit mis-ordered right-to-left runs that mix words and punctuation (`فترة الراتب:` came out
+  as `الراتب: فترة`) and dropped spaces. Fixed by ordering runs with `bidi-js` and drawing Arabic word by word.
+  Seen on a rendered page (macOS `sips`), before and after; final renders: `docs/evidence/115/payslip-ar.png`, `payslip-en.png`.
+- A new spec failed only inside the full file with pdf.js "bad XRef entry". Cause: pdf.js rejects a Node `Buffer` for some
+  documents inside the jest realm; the PDF itself parses in plain Node and renders in `sips`. The spec helper now passes a `Uint8Array`.
+- e2e-army: the verify stack serves only the web origin (API on another port, no `/api` proxy), so the earlier
+  request-level tests could not reach the endpoint. They are replaced by UI tests in `e2e-army/115-payslip-pdf.e2e.ts`.
 
-## Test Execution Evidence
+## Dependency
 
-### 1. API E2E Acceptance Suite (`apps/api/test/payslip-pdf.e2e-spec.ts`)
+`bidi-js` 1.1.0 (MIT, pure JS, Unicode bidi algorithm) in `apps/api`. `pnpm add` could not write the pnpm store from the
+sandbox, so `package.json` and `pnpm-lock.yaml` were edited by hand to the entry pnpm printed (same integrity hash) and
+`node_modules/bidi-js` was unpacked from the registry tarball. CI's `pnpm install --frozen-lockfile` will confirm the lockfile.
 
-```bash
-DATABASE_URL="postgresql://abdelrahmanahmed@localhost:5432/mizano_db?schema=public" REDIS_URL="" pnpm --filter api test:e2e test/payslip-pdf.e2e-spec.ts
-```
+## Not verified
 
-```text
-PASS test/payslip-pdf.e2e-spec.ts (12.357 s)
-  Payslip PDF generator (e2e)
-    ✓ @e2e @flow:payslip-pdf @issue-115 AC1: returns valid PDF for an authorized in-organization payslip (138 ms)
-    ✓ @e2e @flow:payslip-pdf @issue-115 AC2: supports lang=ar and lang=en query parameters with documented default and rejects unsupported lang with 400 (363 ms)
-    ✓ @e2e @flow:payslip-pdf @issue-115 AC3: amounts appear exactly as the stored decimal strings without float conversion or rounding (96 ms)
-    ✓ @e2e @flow:payslip-pdf @issue-115 AC4: output is byte-identical across repeated renders of the same input (222 ms)
-    ✓ @e2e @flow:payslip-pdf @issue-115 AC5: cross-organization, soft-deleted and invalid IDs return 404, unauthenticated returns 401 (22 ms)
-    ✓ @e2e @flow:payslip-pdf @issue-115 AC6: missing required data returns 422 with a sanitized reason that contains no values (5 ms)
-    ✓ @e2e @flow:payslip-pdf @issue-115 AC6b: a zero-pay payslip is valid and returns 200 with a PDF (86 ms)
-    ✓ @e2e @flow:payslip-pdf @issue-115 AC7: thrown render errors log only the exception type name and no raw message or payslip data (3 ms)
-
-Test Suites: 1 passed, 1 total
-Tests:       8 passed, 8 total
-Snapshots:   0 total
-Time:        12.455 s
-```
-
-### 2. Unit Test Suites (`payslip-pdf.service.spec.ts` & `payslips.controller.spec.ts`)
-
-```bash
-pnpm --filter api exec jest src/modules/hr/services/payslip-pdf.service.spec.ts src/modules/hr/controllers/payslips.controller.spec.ts
-```
-
-```text
-PASS src/modules/hr/controllers/payslips.controller.spec.ts
-PASS src/modules/hr/services/payslip-pdf.service.spec.ts
-
-Test Suites: 2 passed, 2 total
-Tests:       33 passed, 33 total
-Snapshots:   0 total
-Time:        4.374 s
-```
-
-### 3. Web Hook Unit Test (`apps/web/lib/hooks/use-documents.spec.ts`)
-
-```bash
-pnpm --filter web test apps/web/lib/hooks/use-documents.spec.ts
-```
-
-```text
-PASS lib/hooks/use-documents.spec.ts
-  use-documents / documentsApi.getPayslipPdf
-    ✓ calls /payslips/:id/pdf with ar default language and blob responseType (1 ms)
-    ✓ calls /payslips/:id/pdf with specified lang=en
-
-Test Suites: 1 passed, 1 total
-Tests:       2 passed, 2 total
-Snapshots:   0 total
-Time:        0.394 s
-```
-
-### 4. TypeScript Type-Check & ESLint
-
-```bash
-pnpm --filter api type-check && pnpm --filter api lint
-pnpm --filter web type-check && pnpm --filter web lint
-```
-
-Output: 0 errors across both packages.
+- `e2e-army/115-payslip-pdf.e2e.ts` was not run: `run-local.sh` needs the Keychain DB password, a database and ports, which are outside this session. It is the first thing to check on CI.
+- `apps/api/test/payslip-pdf.e2e-spec.ts` needs a database and was not run here.
+- Full `pnpm ci:full`, build and the full suites run on CI after the push (owner rule), not locally.
+- Arabic PDF layout was checked on one fixture by eye plus the automated order specs, not on every payslip shape.
