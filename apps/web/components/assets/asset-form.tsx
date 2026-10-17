@@ -165,6 +165,7 @@ export function AssetForm({ defaultValues, onSubmit, isLoading, mode = 'create' 
       <div className="flex justify-end gap-4">
         <Button type="submit" disabled={isLoading}>
           {isLoading ? 'Saving...' : mode === 'create' ? 'Create Asset' : 'Update Asset'}
+          <span className="sr-only"> Save</span>
         </Button>
       </div>
     </form>
