@@ -90,6 +90,13 @@ const items = [
     costPrice: '25',
     purchaseAccountId: 'acc-supplies',
   },
+  {
+    id: 'item-service',
+    name: 'Consulting',
+    sku: 'S-1',
+    costPrice: '100',
+    purchaseAccountId: null,
+  },
 ];
 
 function renderForm(onSubmit = jest.fn()) {
@@ -137,6 +144,63 @@ describe('BillForm expense account per line (#216)', () => {
     expect(
       within(accountPicker(0)).getByRole('option', { name: '6200 · Office Supplies' }),
     ).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('clears accountId when an item without a purchase account is selected', () => {
+    renderForm();
+    fireEvent.click(within(itemPicker(0)).getByRole('option', { name: 'Paper' }));
+    expect(
+      within(accountPicker(0)).getByRole('option', { name: '6200 · Office Supplies' }),
+    ).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.click(within(itemPicker(0)).getByRole('option', { name: 'Consulting' }));
+    expect(
+      within(accountPicker(0)).getByRole('option', { name: '6200 · Office Supplies' }),
+    ).toHaveAttribute('aria-selected', 'false');
+  });
+
+  it('preselects accountId and submits when editing an existing bill', async () => {
+    const onSubmit = jest.fn();
+    const existingBill = {
+      id: 'bill-1',
+      billNumber: 'BILL-001',
+      vendorId: 'vendor-1',
+      date: '2026-10-15T00:00:00Z',
+      dueDate: '2026-11-15T00:00:00Z',
+      status: 'DRAFT',
+      lines: [
+        {
+          id: 'line-1',
+          itemId: '',
+          accountId: 'acc-rent',
+          description: 'Office rent',
+          quantity: 1,
+          rate: 500,
+          taxRate: 0,
+        },
+      ],
+    } as unknown as Parameters<typeof BillForm>[0]['bill'];
+
+    render(
+      <BillForm
+        bill={existingBill}
+        accounts={accounts}
+        items={items}
+        onSubmit={onSubmit}
+        onCancel={jest.fn()}
+      />,
+    );
+    expect(
+      within(accountPicker(0)).getByRole('option', { name: '6100 · Rent Expense' }),
+    ).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Update Bill' }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({
+      lines: [
+        expect.objectContaining({ accountId: 'acc-rent', description: 'Office rent', rate: '500' }),
+      ],
+    });
   });
 
   it('blocks submit and says "Choose an expense account" when a line has none', async () => {

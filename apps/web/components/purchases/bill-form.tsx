@@ -168,7 +168,7 @@ export function BillForm({
         projectId: bill.projectId || '',
         lines: bill.lines?.map((line) => ({
           itemId: line.itemId || '',
-          accountId: line.accountId || '',
+          accountId: line.accountId ?? '',
           description: line.description,
           quantity: String(line.quantity),
           rate: String(line.rate),
@@ -263,6 +263,10 @@ export function BillForm({
       form.setValue(`lines.${index}.rate`, item.costPrice);
       if (item.purchaseAccountId && expenseAccounts.some((a) => a.id === item.purchaseAccountId)) {
         form.setValue(`lines.${index}.accountId`, item.purchaseAccountId, {
+          shouldValidate: form.formState.isSubmitted,
+        });
+      } else {
+        form.setValue(`lines.${index}.accountId`, '', {
           shouldValidate: form.formState.isSubmitted,
         });
       }
