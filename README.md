@@ -93,6 +93,11 @@ The bill scan page accepts `/en/purchases/bills/scan?jobId=<URL-encoded-id>` (or
 Scan regression tests are in the two scan page specs (`apps/web/app/[locale]/(dashboard)/purchases/bills/scan/page.spec.tsx` for job links, `apps/web/lib/scan-bill-page.spec.tsx` for uploads and formats) and `apps/web/lib/hooks/use-ai-document-intake.spec.ts`; API ownership/recovery coverage is in `apps/api/test/intake.e2e-spec.ts`. Run E2E with a dedicated migrated database and Redis. The legacy Windows compatibility runner enables `esModuleInterop`, unlike the standard API Jest config; its callable `csv-parser` namespace import fails in four unchanged import-hardening tests on baseline `1d37f28`. Use the standard Jest configuration to distinguish that runner defect from application regressions; it does not waive the compatibility gate.
 
 Until the shared Turbo input globs include the web `app`, `components`, `lib` and `messages` paths, run `pnpm ci:full --force --concurrency=1` to verify current web files; cached CI output may describe an older patch.
+### Configuration
+
+Runtime environment settings can be configured in `.env.local` or environment-specific files (see `.env.example`):
+
+- `MIZANO_NODE_HEAP_MB`: Optional integer between 128 and 4096. Caps Node V8 heap space (`--max-old-space-size=<n>`) via the start launcher. Because the launcher evaluates this setting to configure Node arguments before the application process boots and before `.env.local` is loaded by NestJS, this variable must be exported in the service/process environment (e.g. shell, systemd, or container environment). In containerized setups, this variable will not reach containers until the compose profile (#39) passes it. When unset, Node default heap limits apply. For Raspberry Pi 5 (8GB) deployments, `1024` (1GB) is a suggested starting value to tune (not a measured benchmark).
 
 ## Repository layout
 
