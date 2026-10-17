@@ -105,13 +105,13 @@ Troubleshooting: `docker ps` to confirm `mizano-postgres`/`mizano-redis`, `redis
 
 ## Testing
 
-| Layer        | Location                                                   | Run                                                     |
-| ------------ | ---------------------------------------------------------- | ------------------------------------------------------- |
-| API unit     | `apps/api/src/**/*.spec.ts`                                | `node apps/api/_run_tests.js [--testPathPattern=…]`     |
-| Web unit     | `apps/web/**/*.spec.ts(x)` (Jest + Testing Library, jsdom) | `cd apps/web && npx jest [--testPathPattern=…]`         |
-| API E2E      | `apps/api/test/*.e2e-spec.ts` (supertest, `jest-e2e.json`) | `pnpm test:e2e` against a seeded database               |
-| Browser E2E  | not wired yet                                              | tracked by the seeded API/browser journey issue         |
-| Script tests | `scripts/test_*.py` (planning sync, rollout scope, turbo)  | `python -m unittest discover -s scripts -p 'test_*.py'` |
+| Layer          | Location                                                   | Run                                                     |
+| -------------- | ---------------------------------------------------------- | ------------------------------------------------------- |
+| API unit       | `apps/api/src/**/*.spec.ts`                                | `node apps/api/_run_tests.js [--testPathPattern=…]`     |
+| Web unit       | `apps/web/**/*.spec.ts(x)` (Jest + Testing Library, jsdom) | `cd apps/web && npx jest [--testPathPattern=…]`         |
+| API E2E        | `apps/api/test/*.e2e-spec.ts` (supertest, `jest-e2e.json`) | `pnpm test:e2e` against a seeded database               |
+| Browser E2E    | not wired yet                                              | tracked by the seeded API/browser journey issue         |
+| Planning tools | `scripts/test_*.py`                                        | `python -m unittest discover -s scripts -p 'test_*.py'` |
 
 `_run_tests.js`, `_jest.config.js` and `_jest_resolver.js` make the API suite resolve pnpm's store on Windows/WSL; use them instead of calling Jest directly.
 
@@ -135,7 +135,7 @@ Checks on PRs and pushes to `master`, by source:
   - **E2E:** `ci.yml` runs no E2E (see `e2e-army` below).
   - **Deployment note:** `deploy.yml` stays disabled / publishes only on `master` pushes with secrets.
 - **Hub `localci` job (Mac mini):** runs the full CI (`pnpm ci:full`: lint, type-check, test, build) locally and posts GitHub commit statuses under the same job names, so the gates see the same check names whichever runner produced them.
-- **`e2e-army` status (hub verify suite):** feature-level E2E for the features a PR touches, run by the hub against a throwaway environment; it is a separate commit status, not a job in `ci.yml`. Locally, Playwright E2E (`pnpm test:e2e`) runs against a seeded database.
+- **`e2e-army` status (hub verify suite):** feature-level E2E for the features a PR touches, run by the hub against a throwaway environment; it is a separate commit status, not a job in `ci.yml`.
 - **Local pre-push hook:** only fast checks (`turbo run type-check test --filter=...[<base>]`, see Git workflow below); full CI, build and E2E are left to the sources above.
 
 ### Pipeline optimizations (`ci.yml`)
@@ -156,7 +156,7 @@ The GitHub Actions workflow includes gating, draft skips, Turbo caching, and con
 2. **filter** (`Path Filter`, timeout 5m) — `dorny/paths-filter` detects changes to Docker-relevant files: `apps/api/Dockerfile`, `apps/web/Dockerfile`, `.dockerignore`, `deploy/**`, `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`. Base is explicitly specified for PRs and push events, and initial pushes with all-zero `before` SHA skip the git diff cleanly.
 3. **install** (`Install Dependencies`, timeout 5m) — shared dependency install (pnpm store cache) and `prisma generate`.
 4. **lint**, **test**, **build** (each timeout 5m) — run in parallel after install. Each lists `gate` and `install` in `needs`. The lint job also runs the `scripts/test_turbo_config.py` guard (see Turbo task inputs below). The build job restores the Next.js build cache.
-5. **docker-build** (`Docker Multi-Arch Build`) — multi-arch Docker **validation**, one matrix leg per architecture (`amd64` on `ubuntu-latest`, `arm64` on the native `ubuntu-24.04-arm` runner). It starts only after lint, test and build passed, and only when the event is a push, or the PR changes a Docker-relevant file (per filter), or the PR has the `docker` label. Adding `docker` to an existing PR starts it without a new commit. The job uses `timeout-minutes: 30` (see exception note below).
+5. **docker-build** (`Docker Multi-Arch Build`) — multi-arch Docker **validation**, one matrix leg per architecture (`amd64` on `ubuntu-latest`, `arm64` on the native `ubuntu-24.04-arm` runner). It starts only after lint, test and build passed, and only when the event is a push, or the PR changes a Docker-relevant file (per filter), or the PR has the `docker` label. Adding `docker` to an existing PR starts it without a new commit. The job uses `timeout-minutes: 30`, a pending owner decision (see the Docker section below).
 
 #### Caching
 
@@ -179,7 +179,7 @@ pnpm turbo run type-check --filter=@mizano/web --dry=json
 
 #### Docker multi-arch validation
 
-The `docker-build` job builds each architecture on a native runner and **never pushes** (`push: false`). The first version emulated arm64 with QEMU on `ubuntu-latest`; `pnpm install --frozen-lockfile` made no progress for the whole 60-minute timeout (the same step took 44 seconds for amd64), so the arm64 leg now runs on `ubuntu-24.04-arm`, which is free for public repositories (this repository is public). Each leg has a 30-minute timeout as an explicit documented exception to the 5-minute job rule (building multi-layer images on native runners takes ~8–12 minutes; see `AI_QUESTIONS.md`). Publishing belongs to `deploy.yml`, which tags the images with the short SHA: the web image bakes `NEXT_PUBLIC_API_URL` in at build time, so an image built in CI with a placeholder URL must not be pushed as `latest`. When registry names are built for a push elsewhere, lower-case the owner (GHCR rejects `ghcr.io/AbdelrhmanAh7/...`).
+The `docker-build` job builds each architecture on a native runner and **never pushes** (`push: false`). The first version emulated arm64 with QEMU on `ubuntu-latest`; `pnpm install --frozen-lockfile` made no progress for the whole 60-minute timeout (the same step took 44 seconds for amd64), so the arm64 leg now runs on `ubuntu-24.04-arm`, which is free for public repositories (this repository is public). Each leg uses `timeout-minutes: 30`, which is a pending owner decision recorded in `AI_QUESTIONS.md`, not an approved exception to the 5-minute job rule (native builds take ~8–12 minutes). Publishing belongs to `deploy.yml`, which tags the images with the short SHA: the web image bakes `NEXT_PUBLIC_API_URL` in at build time, so an image built in CI with a placeholder URL must not be pushed as `latest`. When registry names are built for a push elsewhere, lower-case the owner (GHCR rejects `ghcr.io/AbdelrhmanAh7/...`).
 
 `.github/workflows/demo-planning.yml` validates and syncs `docs/planning/` metadata with `scripts/sync-demo-planning.py`; see the [planning guide](planning/README.md).
 
