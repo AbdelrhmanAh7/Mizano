@@ -1,30 +1,44 @@
 # Mizano ERP - Continuous Integration Pipeline
 # =============================================
-# Runs on all PRs and on pushes to the default branch (master), on GitHub-hosted runners only (ubuntu-latest, free and
+# Runs on all PRs and pushes to master/develop branches on GitHub-hosted runners only (free and
 # unlimited for this public repository). No self-hosted labels and no secrets beyond the automatic GITHUB_TOKEN.
 #
 # Owner rule: every job stays under 5 minutes (timeout-minutes: 5), so the pipeline is split into parallel jobs.
+# The only exception is docker-build (timeout-minutes: 30; native builds take 8-12 min): pending owner decision, see AI_QUESTIONS.md.
 # The job names are the check names the hub gates and automerge wait for ("Install Dependencies", "Lint & Type Check",
 # "Unit Tests", "Build"): keep them stable. Jobs are independent and each installs from the shared pnpm store cache
 # (setup-node), so none waits for another and a failed install cannot skip the others silently.
 #
 # Fork PRs: this workflow uses `pull_request` (read-only token, no secrets), never `pull_request_target`; first-time
 # fork contributors need an approval in the repository settings before it runs. Leave that setting on.
+#
+# Optimized: shared pnpm cache, parallel jobs, turbo cache via actions/cache, no redundant installs.
+# The multi-arch Docker validation only runs on branch pushes, relevant PR changes, or the
+# "docker" label. It never publishes images; deploy.yml owns publishing.
 
 name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, develop]
   pull_request:
     branches: [master, develop]
+    # "labeled" lets an operator start CI on a draft ("ci" label) or request the Docker
+    # validation ("docker" label) without a new commit. Any label change re-runs the real
+    # jobs: a run whose jobs the gate skipped would report under the same check names and
+    # hide a failing run of the same commit.
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
 
 permissions:
   contents: read
 
-# A newer push to the same PR cancels the older run; pushes to master are never cancelled, so every master head gets a result.
+# One run per PR. A newer PR run replaces the older one as a whole, including the expensive
+# Docker job. Branch pushes get one group per commit SHA: GitHub keeps only one pending run
+# per group, so a shared group would drop the middle of two quick pushes. Per-SHA groups never
+# cancel or replace each other, so every master commit keeps a complete result (deploy.yml
+# starts from the CI result of master).
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -33,15 +47,112 @@ env:
 
 jobs:
   # ==========================================
-  # Install: the lockfile installs and the Prisma client generates
+  # Gate: decide whether CI runs for this event
+  # ==========================================
+  gate:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+    steps:
+      - name: Decide whether CI should run
+        id: check
+        # Event data reaches the script through env vars only, never through ${{ }} in the
+        # script body, so a label name cannot inject shell code.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
+          HAS_CI_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'ci') }}
+        run: |
+          should_run=true
+          if [ "$EVENT_NAME" = "pull_request" ] && [ "$IS_DRAFT" = "true" ] && [ "$HAS_CI_LABEL" != "true" ]; then
+            echo "Draft PR without the 'ci' label - skipping CI"
+            should_run=false
+          fi
+          echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
+
+  # ==========================================
+  # Path filter: detect docker-relevant changes
+  # ==========================================
+  filter:
+    name: Path Filter
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: gate
+    if: needs.gate.outputs.should_run == 'true'
+    # paths-filter lists the changed files of a PR through the API.
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      docker-changed: ${{ steps.changed.outputs.docker-changed }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # A push whose `before` commit is missing from the clone (force-push, rewritten history)
+      # makes the git diff inside paths-filter fail, so treat it like a new branch.
+      - name: Check push base commit
+        id: base
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BEFORE: ${{ github.event.before }}
+        run: |
+          usable=true
+          if [ "$EVENT_NAME" = "push" ]; then
+            if [ "$EVENT_BEFORE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${EVENT_BEFORE}^{commit}" 2>/dev/null; then
+              usable=false
+            fi
+          fi
+          echo "usable=$usable" >> "$GITHUB_OUTPUT"
+
+      - name: Determine changed files
+        id: filter
+        if: steps.base.outputs.usable == 'true'
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1d284f68b6a3a0 # v3.0.2
+        with:
+          # Pushes diff against the previous head. PRs leave `base` empty so the action lists the
+          # changed files through the API (pull-requests: read), which needs no local history.
+          base: ${{ github.event_name == 'push' && github.event.before || '' }}
+          filters: |
+            docker-changed:
+              - 'apps/api/Dockerfile'
+              - 'apps/web/Dockerfile'
+              - '.dockerignore'
+              - 'deploy/**'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/deploy.yml'
+
+      - name: Set docker-changed output
+        id: changed
+        env:
+          FILTER_OUTPUT: ${{ steps.filter.outputs.docker-changed }}
+          BASE_USABLE: ${{ steps.base.outputs.usable }}
+        run: |
+          if [ "$BASE_USABLE" != "true" ] || [ "$FILTER_OUTPUT" = "true" ]; then
+            echo "docker-changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docker-changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ==========================================
+  # Install & Cache Dependencies (shared)
   # ==========================================
   install:
     name: Install Dependencies
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    needs: gate
+    if: needs.gate.outputs.should_run == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -67,9 +178,13 @@ jobs:
     name: Lint & Type Check
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    needs: [gate, install]
+    if: needs.gate.outputs.should_run == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -87,6 +202,21 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm db:generate
+
+      # Restores here and saves after the job succeeds, so the cache holds what the Turbo
+      # tasks below produced. Each job has its own key prefix: the tasks differ per job.
+      - name: Cache turbo build cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-lint-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-lint-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
+
+      # A task `inputs` list that skips a source directory (apps/web has no src/) makes
+      # the cache above replay stale results.
+      - name: Check turbo task inputs
+        run: python3 -m unittest discover -s scripts -p 'test_turbo_config.py'
 
       - name: Run ESLint
         run: pnpm lint
@@ -104,9 +234,13 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    needs: [gate, install]
+    if: needs.gate.outputs.should_run == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -124,6 +258,14 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm db:generate
+
+      - name: Cache turbo build cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-test-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-test-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
 
       - name: Run unit tests
         run: pnpm test
@@ -142,9 +284,13 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    needs: [gate, install]
+    if: needs.gate.outputs.should_run == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -174,7 +320,82 @@ jobs:
           restore-keys: |
             next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
 
+      - name: Cache turbo build cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-build-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-build-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
+
       - name: Build all packages
         run: pnpm build
         env:
           NEXT_PUBLIC_API_URL: https://api.example.com
+
+  # ==========================================
+  # Docker Multi-Arch Build (conditional, validation only)
+  # Runs only after lint, test and build passed, and only on:
+  #   - push to master or develop
+  #   - PRs with docker-relevant file changes
+  #   - PRs with the "docker" label
+  # One matrix leg per architecture, each on a native runner, because QEMU emulation of the
+  # arm64 build never finished: `pnpm install` made no progress for 60 minutes (amd64 took
+  # 44 seconds). Nothing is pushed: deploy.yml owns the published images, and the web image
+  # bakes NEXT_PUBLIC_API_URL in at build time, so an image built here with a placeholder
+  # URL must not be tagged for deployment.
+  # ==========================================
+  docker-build:
+    # Static name: GitHub appends the matrix values itself, and a skipped job would
+    # otherwise show the unresolved ${{ matrix.arch }} template as its check name.
+    name: Docker Multi-Arch Build
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    needs: [gate, filter, lint, test, build]
+    if: >-
+      needs.gate.outputs.should_run == 'true' &&
+      (github.event_name == 'push' ||
+      needs.filter.outputs.docker-changed == 'true' ||
+      contains(github.event.pull_request.labels.*.name, 'docker'))
+    strategy:
+      # Both architectures report their own result; an amd64 failure must not hide arm64.
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          # Native arm64 runner, free for public repositories.
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.10.0
+
+      # Every image and architecture has its own cache scope; a shared scope makes the
+      # next build overwrite the cache of the previous one.
+      - name: Build API image (${{ matrix.arch }}, not pushed)
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.15.0
+        with:
+          context: .
+          file: ./apps/api/Dockerfile
+          push: false
+          platforms: linux/${{ matrix.arch }}
+          cache-from: type=gha,scope=api-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=api-${{ matrix.arch }}
+
+      - name: Build Web image (${{ matrix.arch }}, not pushed)
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.15.0
+        with:
+          context: .
+          file: ./apps/web/Dockerfile
+          push: false
+          platforms: linux/${{ matrix.arch }}
+          cache-from: type=gha,scope=web-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=web-${{ matrix.arch }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://api.example.com
