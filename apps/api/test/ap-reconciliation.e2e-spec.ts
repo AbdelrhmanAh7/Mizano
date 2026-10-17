@@ -8,7 +8,7 @@ import { INestApplication } from '@nestjs/common';
 import { ApiHelper } from './helpers/api-client.helper';
 import { createTestApp, getPrisma, uniqueSuffix } from './helpers/app.helper';
 import { registerTenant, TestTenant } from './helpers/tenant.helper';
-import { isoDay } from './helpers/journey.helper';
+import { isoDay, midnightIso } from './helpers/journey.helper';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 interface Setup {
@@ -112,6 +112,7 @@ describe('@e2e @flow:ap-reconciliation @issue-125 AP subledger vs control accoun
     // Open: b1 0 + b2 (456 - 56 - 20) + b3 114 - unapplied credit 50 = 444.
     expect(await recon(a.api)).toEqual({
       asOf: isoDay(0),
+      currencyCode: expect.stringMatching(/^[A-Z]{3}$/),
       subledgerTotal: '444.0000',
       controlBalance: '444.0000',
       difference: '0.0000',
@@ -133,6 +134,7 @@ describe('@e2e @flow:ap-reconciliation @issue-125 AP subledger vs control accoun
     // payments/credits are excluded on both sides.
     expect(await recon(a.api, isoDay(-5))).toEqual({
       asOf: isoDay(-5),
+      currencyCode: expect.stringMatching(/^[A-Z]{3}$/),
       subledgerTotal: '1268.0000',
       controlBalance: '1268.0000',
       difference: '0.0000',
@@ -161,6 +163,7 @@ describe('@e2e @flow:ap-reconciliation @issue-125 AP subledger vs control accoun
     try {
       expect(await recon(a.api)).toEqual({
         asOf: isoDay(0),
+        currencyCode: expect.stringMatching(/^[A-Z]{3}$/),
         subledgerTotal: '456.3400',
         controlBalance: '444.0000',
         difference: '12.3400',
@@ -191,6 +194,89 @@ describe('@e2e @flow:ap-reconciliation @issue-125 AP subledger vs control accoun
     expect(await recon(a.api)).toMatchObject({
       subledgerTotal: '444.0000',
       controlBalance: '444.0000',
+      ok: true,
+    });
+  });
+
+  it('@issue-125 AC5: a payment dated before its future-dated bill ties on both sides', async () => {
+    const c = await setup(await registerTenant(app, 'ApRecPrepay'));
+    const future = await bill(c, '100', isoDay(-2)); // 114 with VAT
+    await pay(c, future, '40', isoDay(-5));
+    // Before the bill exists only the payment's AP debit is in the ledger: -40 on both sides.
+    expect(await recon(c.api, isoDay(-5))).toMatchObject({
+      subledgerTotal: '-40.0000',
+      controlBalance: '-40.0000',
+      difference: '0.0000',
+      ok: true,
+    });
+    expect(await recon(c.api, isoDay(-2))).toMatchObject({ subledgerTotal: '74.0000', ok: true });
+    expect(await recon(c.api)).toMatchObject({ subledgerTotal: '74.0000', ok: true });
+  });
+
+  it('@issue-125 AC1: still ties after the default AP account changed over source-less legacy journals', async () => {
+    const t = await registerTenant(app, 'ApRecLegacy');
+    const d = await setup(t);
+    const billId = await bill(d, '100', isoDay(-3));
+    const { billNumber } = await prisma.bill.findUniqueOrThrow({ where: { id: billId } });
+    // Journals posted before source linking carry only the "Bill <number>" reference.
+    await prisma.journal.updateMany({
+      where: { organizationId: t.organizationId, reference: `Bill ${billNumber}` },
+      data: { sourceType: null, sourceId: null },
+    });
+    const accounts = (await d.api.get('/accounts').query({ limit: 500 })).body.data as Array<{
+      id: string;
+      type: string;
+    }>;
+    const { defaultApAccountId } = await prisma.organization.findUniqueOrThrow({
+      where: { id: t.organizationId },
+      select: { defaultApAccountId: true },
+    });
+    const other = accounts.find((x) => x.type === 'LIABILITY' && x.id !== defaultApAccountId);
+    await prisma.organization.update({
+      where: { id: t.organizationId },
+      data: { defaultApAccountId: other?.id },
+    });
+    expect(await recon(d.api)).toMatchObject({
+      subledgerTotal: '114.0000',
+      controlBalance: '114.0000',
+      ok: true,
+    });
+  });
+
+  it('@issue-125 AC3/AC5: a bill voided after the cutoff stays in the subledger as of the cutoff', async () => {
+    const t = await registerTenant(app, 'ApRecVoidLater');
+    const v = await setup(t);
+    const billId = await bill(v, '100', isoDay(-5));
+    const approval = await prisma.journal.findFirstOrThrow({
+      where: { organizationId: t.organizationId, sourceType: 'BILL_APPROVAL', sourceId: billId },
+      include: { lines: true },
+    });
+    // No bill-void route exists yet, so the reversal a void would post is written directly.
+    await prisma.journal.create({
+      data: {
+        journalNumber: 'REV-125',
+        date: new Date(midnightIso(isoDay(-1))),
+        reversalOfId: approval.id,
+        organizationId: t.organizationId,
+        lines: {
+          create: approval.lines.map((l) => ({
+            accountId: l.accountId,
+            debit: l.credit,
+            credit: l.debit,
+          })),
+        },
+      },
+    });
+    await prisma.bill.update({ where: { id: billId }, data: { status: 'VOID' } });
+
+    expect(await recon(v.api, isoDay(-3))).toMatchObject({
+      subledgerTotal: '114.0000',
+      controlBalance: '114.0000',
+      ok: true,
+    });
+    expect(await recon(v.api)).toMatchObject({
+      subledgerTotal: '0.0000',
+      controlBalance: '0.0000',
       ok: true,
     });
   });
