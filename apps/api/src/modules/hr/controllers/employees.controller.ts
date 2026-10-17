@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { EmployeeQueryDto } from '../dto/employee-query.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CreateEmployeeDto } from '../dto/create-employee.dto';
@@ -26,10 +26,7 @@ export class EmployeesController {
   @Get()
   @Permissions('hr.view')
   @ApiOperation({ summary: 'Get all employees' })
-  findAll(
-    @CurrentOrg() orgId: string,
-    @Query() query: PaginationDto & { status?: string; isActive?: string; department?: string },
-  ) {
+  findAll(@CurrentOrg() orgId: string, @Query() query: EmployeeQueryDto) {
     return this.employeesService.findAll(orgId, query);
   }
 
