@@ -37,6 +37,22 @@ function isTrustedProxy(ip: string | undefined): boolean {
   return ip !== undefined && TRUSTED_PROXIES.check(ip, isIP(ip) === 6 ? 'ipv6' : 'ipv4');
 }
 
+/**
+ * Right-most X-Forwarded-For entry that is not a trusted proxy. Proxies append the peer they saw,
+ * so everything left of it is client-supplied and forgeable: taking the first entry would let a
+ * client pick a fresh bucket per request. Same rule Express applies to req.ip.
+ */
+function clientFromForwardedFor(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const hops = value.split(',').map(normalizeIp);
+  for (let i = hops.length - 1; i >= 0; i--) {
+    const hop = hops[i];
+    if (hop === undefined) return undefined;
+    if (!isTrustedProxy(hop)) return hop;
+  }
+  return hops[0];
+}
+
 function firstHeader(headers: Record<string, unknown> | undefined, name: string): unknown {
   const value = headers?.[name];
   return Array.isArray(value) ? value[0] : value;
@@ -46,7 +62,7 @@ function firstHeader(headers: Record<string, unknown> | undefined, name: string)
  * Behind Cloudflare / Tailscale serve every request arrives from the proxy, so keying the
  * throttler on the socket address put all users in one bucket (one client locked everyone out).
  * Throttles per client IP instead. From a trusted proxy: CF-Connecting-IP (set by Cloudflare),
- * else the client-most X-Forwarded-For entry. Otherwise the socket address, so requests without
+ * else the right-most X-Forwarded-For entry that is not a trusted proxy. Otherwise the socket address, so requests without
  * proxy headers never share one bucket.
  */
 @Injectable()
@@ -59,7 +75,7 @@ export class IpThrottlerGuard extends ThrottlerGuard {
       const forwardedFor = firstHeader(headers, 'x-forwarded-for');
       const client =
         normalizeIp(firstHeader(headers, 'cf-connecting-ip')) ??
-        normalizeIp(typeof forwardedFor === 'string' ? forwardedFor.split(',')[0] : undefined);
+        clientFromForwardedFor(forwardedFor);
       if (client) return client;
     }
     return peer ?? normalizeIp(req.ip) ?? 'unknown';

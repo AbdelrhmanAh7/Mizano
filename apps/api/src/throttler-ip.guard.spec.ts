@@ -59,11 +59,24 @@ describe('IpThrottlerGuard.getTracker', () => {
     expect(tracker).toBe('203.0.113.7');
   });
 
-  it('takes the client-most X-Forwarded-For entry when there is no CF-Connecting-IP', async () => {
+  it('takes the client entry of X-Forwarded-For (right-most non-proxy) when there is no CF-Connecting-IP', async () => {
     const tracker = await guard.tracker(
       req({ 'x-forwarded-for': '198.51.100.9, 172.16.0.1' }, '127.0.0.1'),
     );
     expect(tracker).toBe('198.51.100.9');
+  });
+
+  it('cannot be bypassed by a client-supplied X-Forwarded-For prefix', async () => {
+    const real = '198.51.100.9';
+    const trackers = await Promise.all(
+      ['203.0.113.1', '203.0.113.2', '203.0.113.3'].map((forged) =>
+        guard.tracker(req({ 'x-forwarded-for': `${forged}, ${real}` }, '127.0.0.1')),
+      ),
+    );
+    expect(new Set(trackers)).toEqual(new Set([real]));
+    await expect(
+      guard.tracker(req({ 'x-forwarded-for': `${real}, 203.0.113.1, 172.16.0.1` }, '127.0.0.1')),
+    ).resolves.toBe('203.0.113.1');
   });
 
   it('normalizes IPv4-mapped IPv6, whitespace, quotes and brackets', async () => {
