@@ -9,7 +9,7 @@ import { randomUUID } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
 import { resolveLogLevels } from './modules/logger/log-level';
-import { applyTrustProxy } from './throttler-ip.guard';
+import { applyTrustProxy, trustedProxies } from './throttler-ip.guard';
 
 async function bootstrap() {
   // Buffer startup logs until LOG_LEVEL (from the env file loaded by ConfigModule) is applied
@@ -20,8 +20,9 @@ async function bootstrap() {
   );
   const logger = new Logger('Bootstrap');
 
-  // req.ip = the real client IP behind Cloudflare / Tailscale serve (local proxies only)
+  // req.ip = the real client IP behind loopback + TRUSTED_PROXY_CIDRS proxies (the throttler's list)
   applyTrustProxy(app);
+  logger.log(`Trusted proxies: ${trustedProxies().cidrs.join(', ')}`);
 
   // Assign a unique request ID to each incoming request for tracing
   app.use((req: Request, _res: Response, next: NextFunction) => {
