@@ -551,3 +551,16 @@ Tests:       458 passed, 458 total
 tsc: exit 0 (both projects)
 eslint: exit 0, no warnings
 ```
+
+## #130 — re-verification on `cb858d5` (2026-10-17)
+
+Run by hand in this session (tsc/eslint via `node_modules/.bin`, because the `pnpm`/`tsc` PATH shims queue behind the shared heavy slot):
+
+| Check                                | Command (in `apps/api`)                                                                                                                                                                                      | Result                           |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
+| Unit tests of the changed #130 specs | `jest --maxWorkers=2 src/modules/assets src/modules/hr/services/payroll.service.spec.ts src/modules/manufacturing/services/work-orders.service.spec.ts src/modules/documents/services/email.service.spec.ts` | 5 suites passed, 79 tests passed |
+| Typecheck                            | `tsc --noEmit` and `tsc --noEmit -p test/tsconfig.e2e.json`                                                                                                                                                  | exit 0, exit 0                   |
+| Lint                                 | `eslint src/modules/{assets,hr,manufacturing,accounting,documents} test/system-postings.e2e-spec.ts`                                                                                                         | exit 0                           |
+
+Not re-run here: the DB-backed `system-postings.e2e-spec.ts` and e2e-army (results above, on `08a751a`), the full suite (CI).
+Still open: source-level correction commands for PAYROLL / ASSET_DISPOSAL / COGM journals (see `AI_QUESTIONS.md`).
