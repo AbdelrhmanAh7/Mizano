@@ -390,29 +390,42 @@ Unset launcher heap_size_limit: 4395630592
 
 # Evidence: #125 AP subledger vs control-account reconciliation
 
-- **Tested SHA**: `48855ecb7187b35cb740d22c71d7d69cc705cea0` (branch `ai/125`, base `615060e`). Later commits on the branch only touch this file.
-- **Implementer**: Claude Code (claude-opus-5-5). This is author evidence, not an independent review.
-- **Environment**: macOS, Node v26.10.0, a throwaway PostgreSQL 16 cluster on a fresh database (`prisma migrate deploy`), `REDIS_URL=` blank.
+- **Tested SHA**: `9842cf5` (branch `ai/125`, merged with `origin/master` at `1df27af`). Later commits touch only this file.
+- **Implementer**: Claude Code (Sonnet 5.5). Author evidence, not an independent review.
+- **Environment**: macOS, a throwaway PostgreSQL 16 cluster (`prisma migrate deploy`, schema up to date), `REDIS_URL=` blank.
 
-| AC  | Requirement                                                               | Verified by                                                                                                                                                                                         |
-| --- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AC1 | Approved and paid bills give `ok: true`, `difference: 0`                  | e2e `@issue-125 AC1` (bills, a full payment, a partial payment, a voided payment, applied and unapplied vendor credits: 444.0000 on both sides); unit `AC1` (exact decimals)                        |
-| AC2 | A corrupted subledger balance gives `ok: false` with the exact difference | e2e `@issue-125 AC2` (`balanceDue` +12.34 gives `difference: "12.3400"`); unit `AC2`                                                                                                                |
-| AC3 | Voided and draft bills are excluded                                       | e2e `@issue-125 AC3` (a draft of 1138.86 and a VOID bill of 885.78 hold balances but the total stays 444.0000); unit scope test (status filter is `OPEN, PARTIALLY_PAID, PAID, OVERDUE`)            |
-| AC4 | Another tenant never affects the result                                   | e2e `@issue-125 AC4` (tenant B has a bill and a +7 corruption; A stays 444.0000/ok, B shows 7.0000); unit scope test (`organizationId` on every query)                                              |
-| AC5 | `asOf` filters both sides consistently                                    | e2e `@issue-125 AC5` (as of day −5: 1268.0000; day −2: 1326.0000; day −11: 0; both sides equal, including a payment voided after `asOf`); unit scope test (end of the `asOf` UTC day on both sides) |
-| AC6 | ≤ ~300 lines, no migrations                                               | `git diff --stat master..48855ec`: production code is 153 lines (service 135, controller 10, module 8); the unit and e2e tests add 332 (484 in total). No file under `prisma/migrations` changed    |
+| AC  | Requirement                                                               | Verified by                                                                                                                                                     |
+| --- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | Approved and paid bills give `ok: true`, `difference: 0`                  | e2e `AC1` (bills, payments, a voided payment, credits: 444.0000 both sides); e2e changed-default/legacy journals; unit `AC1`; e2e-army `AC1/AC2`                |
+| AC2 | A corrupted subledger balance gives `ok: false` with the exact difference | e2e `AC2` (`balanceDue` +12.34 gives `difference: "12.3400"`); unit `AC2`                                                                                       |
+| AC3 | Voided and draft bills are excluded                                       | e2e `AC3` (draft 1138.86 and VOID 885.78 leave 444.0000); e2e bill voided after the cutoff stays in as of the cutoff and drops out afterwards; unit scope tests |
+| AC4 | Another tenant never affects the result                                   | e2e `AC4` (tenant B +7 corruption, A unchanged); unit scope test (`organizationId` on every query)                                                              |
+| AC5 | `asOf` filters both sides consistently                                    | e2e `AC5` (day -5, -2, -11); e2e payment dated before its future-dated bill (-40 on both sides at day -5); unit `T3`; e2e-army `AC5`                            |
+| AC6 | ≤ ~300 lines, no migrations                                               | production diff: service 250 lines, controller 10, module 8, `report-utils.ts` 1; no file under `prisma/migrations` changed                                     |
+
+Review findings on PR #128 and where they are fixed/tested:
+
+| Finding                                          | Fix                                                          | Test                                                       |
+| ------------------------------------------------ | ------------------------------------------------------------ | ---------------------------------------------------------- |
+| One database snapshot                            | `reconcileApControl` runs in a RepeatableRead `$transaction` | unit "reads both sides in one repeatable-read transaction" |
+| Source-less legacy journals / changed AP account | legacy reference branches in `controlBalance`                | unit `T2`; e2e changed-default/legacy                      |
+| Payments before future-dated bills               | `prepaid` aggregate                                          | unit `T3`; e2e prepayment                                  |
+| Return the currency                              | `currencyCode` from `getBaseCurrency`                        | unit `T4`; e2e `AC1`; e2e-army                             |
+| Bills voided after the cutoff                    | `billsVoidedAfter`                                           | unit "includes a bill voided after asOf"; e2e              |
+| Precision above 20 significant digits            | `Decimal.clone({ precision: 40 })`                           | unit "keeps full precision"                                |
 
 Commands and results at the tested SHA:
 
 ```text
-npx turbo lint type-check test --force                -> Tasks: 12 successful, 12 total
-  api:test                                            -> Test Suites: 137 passed; Tests: 2202 passed
-  @mizano/web:test                                    -> Test Suites: 48 passed; Tests: 458 passed
-npx jest --config ./test/jest-e2e.json (apps/api)     -> Test Suites: 12 passed; Tests: 263 passed
-  ap-reconciliation.e2e-spec.ts                       -> 6 passed
+npx jest src/modules/reports/services/ap-reconciliation.service.spec.ts   -> Tests: 12 passed
+npx jest src/modules/reports                                              -> Test Suites: 7 passed; Tests: 69 passed
+npx jest --config ./test/jest-e2e.json test/ap-reconciliation.e2e-spec.ts -> Tests: 9 passed
+  same spec against the previous service (5abf04c)                         -> Tests: 6 failed, 3 passed
+npx eslint + prettier --check on the changed files                         -> clean
+npx tsc --noEmit -p test/tsconfig.e2e.json                                 -> exit 0
+npx tsc --noEmit (src)                                                     -> only TS7016 js-yaml in coderabbit-config.spec.ts
 ```
 
-The failing-first commit `3171958` ran before the implementation: the 6 e2e tests failed with HTTP 404, and the unit suite failed to compile because the service did not exist.
+Not verified: the `e2e-army` test (`e2e-army/125-ap-reconciliation.e2e.ts`) was not run locally; it needs the hub's runner. The src `tsc` error is a stale install (`@types/js-yaml` is in `package.json` but not in this worktree's `node_modules`) and exists without this change. The full suites and web tests were not run locally (CI runs them).
 
-Not covered: bills have no void route today, so the VOID-bill fixture sets its status directly on a never-posted bill. Posting, approval and payment code is unchanged (#11, #12, #94).
+Bills have no void route today, so the void fixtures set the status and write the reversal journal directly. Posting, approval and payment code is unchanged (#11, #12, #94).
