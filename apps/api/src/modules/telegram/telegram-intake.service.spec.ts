@@ -645,6 +645,16 @@ describe('TelegramIntakeService', () => {
     expect(sent.at(-1)?.text).toContain('send it again');
   });
 
+  it('sends no failure reply if another processor completed the exhausted delivery first', async () => {
+    const { svc, prisma, jobs, sent } = setup();
+    jobs.createFromUpload.mockRejectedValue(new Error('storage unavailable'));
+    for (let i = 0; i < 5; i += 1) await expect(svc.handleUpdate(upd(doc()))).rejects.toThrow();
+    sent.length = 0;
+    (prisma.telegramDelivery.updateMany as jest.Mock).mockResolvedValueOnce({ count: 0 });
+    await svc.handleUpdate(upd(doc()));
+    expect(sent.some((m) => m.text.includes('send it again'))).toBe(false);
+  });
+
   it('skips ingestion if the attempt increment update claims zero rows', async () => {
     const { svc, prisma, jobs } = setup();
     (prisma.telegramDelivery.updateMany as jest.Mock).mockResolvedValueOnce({ count: 0 });

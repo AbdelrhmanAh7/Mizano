@@ -400,10 +400,12 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
   private async processDelivery(delivery: TelegramDelivery, link: TelegramLink): Promise<void> {
     const where = this.deliveryWhere(delivery);
     if (delivery.attempts >= MAX_DELIVERY_ATTEMPTS) {
-      await this.prisma.telegramDelivery.updateMany({
+      const ended = await this.prisma.telegramDelivery.updateMany({
         where,
         data: { completedAt: new Date(), deferredUntil: null },
       });
+      // Another processor already finished this delivery and owns its reply.
+      if (ended.count === 0) return;
       await this.reply(delivery.chatId, MSG.failed);
       return;
     }
