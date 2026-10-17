@@ -37,6 +37,7 @@ import { RolesModule } from './modules/roles/roles.module';
 import { SalesModule } from './modules/sales/sales.module';
 import { SearchModule } from './modules/search/search.module';
 import { TaxModule } from './modules/tax/tax.module';
+import { TelegramModule } from './modules/telegram/telegram.module';
 import { UserPreferencesModule } from './modules/user-preferences/user-preferences.module';
 import { UsersModule } from './modules/users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -113,6 +114,7 @@ import { IpThrottlerGuard } from './throttler-ip.guard';
 
     // AI & Intelligence
     AiModule,
+    TelegramModule,
 
     // Supporting Services
     NotificationsModule,
