@@ -53,9 +53,12 @@ Browser E2E is not wired yet (no Playwright dependency or config); it is tracked
 ### Run Specific Test File
 
 ```bash
-node apps/api/_run_tests.js --testPathPattern="<pattern>"
+cd apps/api && npx jest --testPathPattern="<pattern>" --runInBand
 cd apps/web && npx jest --testPathPattern="<pattern>"
 ```
+
+`apps/api/_run_tests.js` is a legacy WSL symlink workaround, not the standard runner. Both runners
+compile with `esModuleInterop`; see the testing section of `docs/DEVELOPMENT.md`.
 
 3. Review the test output. If tests fail:
    - Read the error messages

@@ -19,6 +19,25 @@ Core ledger (AP/AR, reports, Arabic/English) + invoice intake (web upload, CPU-o
 
 Each issue carries its own dependencies and acceptance criteria; do not overwrite humans' issue text or reopen completed work. The sprint coordinator records emergent blockers, owns the shared schema and serializes integration. On a slipped milestone, publish the blocked state with the exact remaining issues; do not claim the target met or weaken tests. [Agent operations](agents/README.md).
 
+Issue #44 execution checklist: [Pi live acceptance runbook](../deploy/pi/RUNBOOK.md).
+It covers platform preparation, both intake routes, the English/Arabic accountant journey,
+restore/rollback drills and evidence-bound GO/NO-GO; its existence does not mark P4 complete.
+
+## Repository implementation snapshot (not milestone completion)
+
+At baseline `56b9a59c6d9a40211be9ee7d6234f9fc97039964`, Pi deployment scripts and compose,
+durable intake jobs (PostgreSQL/BullMQ, originals, leases, retry/dead-letter, SSE/polling)
+and rules/Tesseract extraction exist. Rules mode parses native PDF text and image OCR;
+scanned-PDF rendering with Poppler, line-item extraction, pinned offline language packaging,
+server-enforced no-LLM intake and Telegram ingestion remain gaps in this checkout. Confirmation
+creates drafts rather than automatically preparing/posting them. This code audit does not
+verify current GitHub issue status, live Pi readiness or acceptance; see
+[Architecture](ARCHITECTURE.md#pi-invoice-pipeline) and [Pi operations](../deploy/pi/README.md).
+
+Documentation is part of every milestone change: update affected guides and roadmap/status
+in the same PR, with issue and exact-SHA test/deployment evidence. Historical ten-day planning
+metadata does not establish P1–P4 progress.
+
 ## After go-live
 
 Validate value with a small accountant pilot: time to draft, correction time, repeat supplier rate, missing documents and period close friction. Then improve vendor templates, bank reconciliation, multi-client authorization and tax adapters using measured demand. Security, backup restoration and immutable accounting remain release gates. The prior broad roadmap is retained only as [historical context](archive/roadmap-before-2026-09.md).

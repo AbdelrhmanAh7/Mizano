@@ -4,26 +4,27 @@ How the Mizano monorepo is built today, the rules every change must respect, and
 
 ## System overview
 
-| Workspace               | Technology                      | Role                                                                        |
-| ----------------------- | ------------------------------- | --------------------------------------------------------------------------- |
-| `apps/web`              | Next.js 14 App Router, React 18 | Accountant UI on port **5001**, Arabic/English with RTL                     |
-| `apps/api`              | NestJS 10, Prisma 5             | REST + WebSocket API on port **6001**, global prefix `/api`                 |
-| `packages/shared-types` | TypeScript                      | Types shared by web and API (`@mizano/shared-types`)                        |
-| `packages/validators`   | Zod                             | Schemas shared by forms and API (`@mizano/validators`)                      |
-| `services/ollama-proxy` | Python                          | Legacy Colab tunnel proxy still referenced by the AI module; not in compose |
+| Workspace               | Technology                      | Role                                                           |
+| ----------------------- | ------------------------------- | -------------------------------------------------------------- |
+| `apps/web`              | Next.js 14 App Router, React 18 | Accountant UI on port **5001**, Arabic/English with RTL        |
+| `apps/api`              | NestJS 10, Prisma 5             | REST + WebSocket API on port **6001**, global prefix `/api`    |
+| `packages/shared-types` | TypeScript                      | Types shared by web and API (`@mizano/shared-types`)           |
+| `packages/validators`   | Zod                             | Schemas shared by forms and API (`@mizano/validators`)         |
+| `services/ollama-proxy` | Python                          | Historical Colab tunnel proxy; outside the Pi live intake path |
 
 ```
 Browser ──► Next.js (5001)              pages, next-intl, NextAuth session
    │
    └──axios + Bearer JWT──► NestJS /api (6001) ──► PostgreSQL 16 (Prisma, Decimal(19,4))
-                              │                 └─► Redis 7 (cache, throttling)
+                              │                 └─► Redis 7 (cache, throttling, intake queue)
                               ├─ socket.io gateways (notifications, logger)
-                              └─ AI module ──► Ollama (OLLAMA_BASE_URL) / PaddleOCR / tesseract.js
+                              └─ Intake jobs ──► CPU rules (pdf-parse / tesseract.js)
+                              └─ optional legacy AI ──► Ollama / PaddleOCR
 ```
 
-The browser calls NestJS directly (`NEXT_PUBLIC_API_URL`); there is no Next.js BFF proxy. The only Next.js API route is NextAuth (`app/api/auth/[...nextauth]`). In production, Nginx routes `/api/` and `/socket.io/` to the API and everything else to the web container (see [deployment](DEVELOPMENT.md#deployment)).
+The browser calls NestJS directly (`NEXT_PUBLIC_API_URL`); there is no Next.js BFF proxy. The only Next.js API route is NextAuth (`app/api/auth/[...nextauth]`). The legacy VM Nginx config routes `/api/` and `/socket.io/` to the API and everything else to the web container (see [deployment](DEVELOPMENT.md#deployment)). The Pi target uses separate web/API hostnames via Cloudflare Tunnel, avoiding the NextAuth/Nest `/api/auth/` collision; see [Pi operations](../deploy/pi/README.md).
 
-`bullmq` is a declared dependency but no queue is registered yet; schedulers use `@nestjs/schedule` and in-process events use `@nestjs/event-emitter`. The durable intake job queue is planned work in the roadmap.
+`IntakeQueueService` registers a BullMQ queue/worker when `REDIS_URL` is configured; without it, delayed in-process execution is a local/test fallback. PostgreSQL `IntakeJob` rows are authoritative; queue payloads carry only job and organization IDs. The processor runs inside the API, not a separate worker container. Schedulers use `@nestjs/schedule` and in-process events use `@nestjs/event-emitter`.
 
 ## Folder structure
 
@@ -42,7 +43,7 @@ mizano/
 │   │   │   └── test/               unit-test setup, Prisma/Redis mocks, factories
 │   │   ├── test/                   API E2E suites (jest-e2e.json)
 │   │   ├── scripts/                OCR model download helpers
-│   │   └── _run_tests.js, _jest.config.js, _jest_resolver.js   WSL-safe Jest runner
+│   │   └── _run_tests.js, _jest.config.js, _jest_resolver.js   legacy WSL symlink workaround (not the standard test runner)
 │   └── web/
 │       ├── app/[locale]/(auth)/        login, register, onboarding
 │       ├── app/[locale]/(dashboard)/   protected pages per module
@@ -57,7 +58,7 @@ mizano/
 ├── packages/{shared-types,validators}/
 ├── services/ollama-proxy/
 ├── docs/                          this guide, DEVELOPMENT, DESIGN-SYSTEM, roadmap, strategy, planning, agents, archive
-├── scripts/                       demo planning sync + offline tests (used by .github/workflows/demo-planning.yml)
+├── scripts/                       demo planning sync + offline tests (used by .github/workflows/demo-planning.yml); worktree helpers wt-new.sh, wt-clean.sh + test-wt.sh
 ├── nginx/nginx.conf               production reverse proxy (copied by deploy.yml)
 └── docker-compose*.yml            local infra and production stack
 ```
@@ -73,7 +74,7 @@ Known gaps recorded in the review: `JwtAuthGuard` lets `@Public()` routes throug
 
 **Response shapes.** Services return the envelope themselves: lists return `{ data, meta: { page, limit, total, totalPages } }` (cursor lists: `meta.nextCursor`, `meta.hasMore` via `common/utils/cursor-paginate.ts`). Errors are normalized by `AllExceptionsFilter` to `{ statusCode, message, error, details? }`.
 
-**Document numbers.** `common/services/document-number.service.ts` allocates `PREFIX-000123` per organization and prefix with an atomic upsert on `document_sequences`. Prefixes in use: `INV, BILL, JRN, QT, CN, PMT, VPMT, ADJ, WO, DC, VC, AST`.
+**Document numbers.** `common/services/document-number.service.ts` allocates `PREFIX-001` by default (configurable padding) per organization and prefix with an atomic upsert on `document_sequences`. Prefixes in use: `INV, BILL, JRN, QT, CN, PMT, VPMT, ADJ, WO, DC, VC, AST`.
 
 ## Non-negotiable domain rules
 
@@ -87,55 +88,82 @@ These restate [AGENTS.md](../AGENTS.md) and [CLAUDE.md](../CLAUDE.md) in archite
 - **Audit and evidence.** Writes are audited; originals, extraction evidence/version, corrections and approvals are preserved. Never log invoice text, credentials, bot tokens or auth headers.
 - **AI is advisory.** Extraction prepares drafts; explicit authorized batch approval posts them. Uncertain values go to exceptions. No autonomous payment or statutory submission.
 
-## Demo invoice pipeline
+## Pi invoice pipeline
 
-Target journey (see [acceptance](strategy/demo-acceptance.md)): Telegram/web upload → durable original → CPU extraction → validated draft → one batch approval → ledger → payment → reports.
+Target journey (epic #45, P1–P4; [acceptance](strategy/demo-acceptance.md)):
+Telegram/web → durable original → CPU extraction → validated draft → authorized batch
+approval → ledger → payment → reconciled reports. The ten-day demo is historical.
 
-Current code path:
+| Implemented step             | Code                                                                                                                                 |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Upload / scan UI             | `apps/web/app/[locale]/(dashboard)/purchases/bills/scan`, `lib/hooks/use-ai-document-intake.ts`                                      |
+| Intake API                   | `modules/ai/controllers/document-intake.controller.ts`: upload, job list, original, SSE/result, retry, confirm                       |
+| Durable jobs / originals     | `modules/ai/intake/`: tenant/file-hash dedupe, PostgreSQL state, BullMQ queue, leases/heartbeats, backoff and dead-letter recovery   |
+| CPU baseline                 | `modules/ai/extraction/rules-strategy.service.ts` + `rules/`: deterministic header fields from pdf-parse text or Tesseract image OCR |
+| Draft confirmation           | `services/document-intake.service.ts`: explicit review/correction creates a draft bill/invoice; confirmation does not post           |
+| Financial commands / reports | `modules/purchases`, `modules/sales`, `modules/accounting`, `modules/reports`; existing bulk actions reuse financial commands        |
 
-| Step                     | Where                                                                                                                     |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| Upload / scan UI         | `apps/web/app/[locale]/(dashboard)/purchases/bills/scan`, `lib/hooks/use-ai-document-intake.ts`                           |
-| Intake endpoint and jobs | `apps/api/src/modules/ai/controllers/document-intake.controller.ts`, `services/document-intake.service.ts`                |
-| Extraction strategies    | `modules/ai/extraction/` (`vlm`, `ocr-llm`, `hybrid`, chosen by `EXTRACTION_STRATEGY`); PaddleOCR → tesseract.js fallback |
-| Draft bills and approval | `modules/purchases` (bills, payments made), `modules/bulk-operations`                                                     |
-| Ledger and reports       | `modules/accounting` (accounts, journals), `modules/reports` (GL, trial balance, AP aging, P&L, balance sheet)            |
+The live path requires Tesseract/Poppler without Ollama/LLM. Current resolver settings are
+`INTAKE_EXTRACTION_STRATEGY=rules` (no explicit strategy override) and `OLLAMA_ENABLED=false`
+for optional inference. Unset intake mode attempts legacy extraction and falls back to rules;
+`llm` explicitly disables that fallback. The request DTO/UI still accept legacy scan presets,
+which can override rules selection, so the CPU-only restriction is not yet enforced server-side.
 
-The CPU-only extraction worker, Telegram intake and durable queue replace the Ollama/VLM dependency through the planned issues; see [invoice extraction research](strategy/invoice-extraction.md).
+Current limits, verified against the rules strategy, PDF helper, Dockerfile and Pi Compose:
+
+- Native PDFs use `pdf-parse`. Rules mode does not render scanned PDF pages; there are no
+  Poppler calls or Word parser in this intake path.
+- Images use `tesseract.js`, default `eng+ara`. `INTAKE_TESSDATA_DIR` selects local assets;
+  missing assets fail offline. Without it, Tesseract may download language data. The API
+  Dockerfile does not package pinned language assets or Poppler.
+- Rules extract header fields/evidence/confidence/warnings and return null for missing values;
+  line items are empty. The legacy extraction adapter converts Decimal totals to numbers,
+  so extraction transport does not yet satisfy the financial fixed 4-dp string rule.
+- The processor marks results `EXTRACTED` or `NEEDS_REVIEW`; it does not automatically create
+  drafts. Confirmation creates a draft; complete automated draft preparation and batch
+  approval/posting still need acceptance evidence.
+- Pi Compose disables Ollama and mounts originals, but does not pass intake rules/tessdata
+  settings. Its separate 2GB worker is only a commented reservation; extraction runs in the API.
+- Telegram invoice ingestion is pending. Pi `healthcheck.sh` sends Telegram operator alerts;
+  that does not implement inbound invoice ingestion.
+
+Legacy `vlm`, `ocr-llm`, `hybrid`, `fast`, `slow`, `ocr` and `auto` strategies remain in code.
+Colab/proxy infrastructure is historical and must not become a live-path prerequisite.
+See [Pi readiness](../deploy/pi/README.md#cpu-intake-readiness).
 
 ## API modules
 
-All live in `apps/api/src/modules/`. Demo scope is accounting, purchases, AI intake, reports, tax and their dependencies; the other modules exist but are outside demo acceptance and frozen for new scope during the sprint.
+All live in `apps/api/src/modules/`. Pi live acceptance covers AP/AR, accounting, purchases, sales, banking/payment workflows, intake, reports, tax and their dependencies; peripheral modules are frozen for new scope during this sprint.
 
-| Module                  | Key entities / responsibility                                     | Demo |
-| ----------------------- | ----------------------------------------------------------------- | ---- |
-| `auth`                  | Login, register, JWT access/refresh tokens                        | yes  |
-| `organizations`         | Organization profile and settings                                 | yes  |
-| `users`, `roles`        | Users, roles, permission sets                                     | yes  |
-| `accounting`            | Chart of accounts, journals/lines, recurring profiles, lock dates | yes  |
-| `purchases`             | Vendors, bills, expenses, vendor credits, payments made           | yes  |
-| `ai`                    | Document intake/extraction plus ~38 advisory feature controllers  | yes  |
-| `bulk-operations`       | Batch actions across documents                                    | yes  |
-| `reports`               | P&L, balance sheet, cash flow, GL, trial balance, AR/AP aging     | yes  |
-| `tax`                   | Tax rates, VAT returns                                            | yes  |
-| `currency`              | Currencies and exchange rates                                     | yes  |
-| `documents`             | PDF templates (invoice, bill, quote, payslip) and email delivery  | yes  |
-| `audit`                 | Audit log queries                                                 | yes  |
-| `sales`                 | Customers, quotes, invoices, credit notes, payments received      | -    |
-| `banking`               | Bank accounts, transactions, rules, reconciliation                | -    |
-| `inventory`             | Items, warehouses, movements, adjustments, price lists            | -    |
-| `assets`                | Fixed assets, depreciation                                        | -    |
-| `projects`              | Projects, tasks, timesheets                                       | -    |
-| `hr`                    | Employees, attendance, payroll runs, payslips                     | -    |
-| `manufacturing`         | BOMs, work orders                                                 | -    |
-| `crm`                   | Leads, deals, activities                                          | -    |
-| `notifications`         | In-app notifications (socket.io gateway)                          | -    |
-| `import-export`         | CSV/Excel import and export                                       | -    |
-| `search`                | Global search                                                     | -    |
-| `user-preferences`      | Tours, sidebar, theme preferences                                 | -    |
-| `logger`, `performance` | Client log ingestion/streaming, performance metrics               | -    |
+| Module                  | Key entities / responsibility                                     | Pi scope |
+| ----------------------- | ----------------------------------------------------------------- | -------- |
+| `auth`                  | Login, register, JWT access/refresh tokens                        | yes      |
+| `organizations`         | Organization profile and settings                                 | yes      |
+| `users`, `roles`        | Users, roles, permission sets                                     | yes      |
+| `accounting`            | Chart of accounts, journals/lines, recurring profiles, lock dates | yes      |
+| `purchases`             | Vendors, bills, expenses, vendor credits, payments made           | yes      |
+| `ai`                    | Document intake/extraction and optional advisory controllers      | yes      |
+| `bulk-operations`       | Batch actions across documents                                    | yes      |
+| `reports`               | P&L, balance sheet, cash flow, GL, trial balance, AR/AP aging     | yes      |
+| `tax`                   | Tax rates, VAT returns                                            | yes      |
+| `currency`              | Currencies and exchange rates                                     | yes      |
+| `documents`             | PDF templates (invoice, bill, quote, payslip) and email delivery  | yes      |
+| `audit`                 | Audit log queries                                                 | yes      |
+| `sales`                 | Customers, quotes, invoices, credit notes, payments received      | yes      |
+| `banking`               | Bank accounts, transactions, rules, reconciliation                | yes      |
+| `inventory`             | Items, warehouses, movements, adjustments, price lists            | -        |
+| `assets`                | Fixed assets, depreciation                                        | -        |
+| `projects`              | Projects, tasks, timesheets                                       | -        |
+| `hr`                    | Employees, attendance, payroll runs, payslips                     | -        |
+| `manufacturing`         | BOMs, work orders                                                 | -        |
+| `crm`                   | Leads, deals, activities                                          | -        |
+| `notifications`         | In-app notifications (socket.io gateway)                          | -        |
+| `import-export`         | CSV/Excel import and export                                       | -        |
+| `search`                | Global search                                                     | -        |
+| `user-preferences`      | Tours, sidebar, theme preferences                                 | -        |
+| `logger`, `performance` | Client log ingestion/streaming, performance metrics               | -        |
 
-Endpoint details: run the API locally and open Swagger at `http://localhost:6001/api/docs`.
+Endpoint details: run the API locally and open Swagger at `http://127.0.0.1:6001/api/docs`.
 
 ## Web application
 
@@ -149,7 +177,7 @@ Endpoint details: run the API locally and open Swagger at `http://localhost:6001
 
 ## Database conventions
 
-Prisma schema: `apps/api/prisma/schema.prisma` (~87 models).
+Prisma schema: `apps/api/prisma/schema.prisma` (check current models directly).
 
 ```prisma
 model Example {
@@ -194,3 +222,5 @@ apps/web/app/[locale]/(dashboard)/{module}/
 ```
 
 Add the API object to `lib/api.ts`, hooks to `lib/hooks/use-{resource}.ts`, components to `components/{module}/`, translations to both `messages/en` and `messages/ar`. Every page handles loading, error and empty states, RTL and a 375px viewport.
+
+Documentation is part of adding code: update all affected Markdown in the same PR, following [AGENTS.md](../AGENTS.md#documentation-is-part-of-the-change).

@@ -112,3 +112,7 @@ services/vlm-service/models/
 **/*.pt
 **/*.pth
 .claude/worktrees/
+.worktrees/
+
+# Agent run notes belong in PR descriptions, not the repo
+docs/agents/runs/
