@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { AccountType } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { FinancialReportsService } from './financial-reports.service';
@@ -124,6 +125,25 @@ describe('FinancialReportsService', () => {
       expect(report.liabilities.current.total).toBe('1000.0000');
       expect(report.liabilities.longTerm.total).toBe('500.0000');
       expect(report.isBalanced).toBe(true);
+    });
+  });
+
+  describe('assertAccountOwnership (#223)', () => {
+    it('looks the account up scoped to the caller organization and returns it', async () => {
+      prisma.account.findFirst.mockResolvedValue(ACCOUNTS[0] as never);
+      await expect(service.assertAccountOwnership(ORG_ID, 'acc-cash')).resolves.toEqual(
+        ACCOUNTS[0],
+      );
+      expect(prisma.account.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'acc-cash', organizationId: ORG_ID } }),
+      );
+    });
+
+    it('throws NotFoundException when the account is not in the organization', async () => {
+      prisma.account.findFirst.mockResolvedValue(null as never);
+      await expect(service.assertAccountOwnership('org-foreign', 'acc-cash')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

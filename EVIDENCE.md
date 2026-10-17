@@ -385,3 +385,34 @@ Unset launcher heap_size_limit: 4395630592
 # Note: In containerized setups, MIZANO_NODE_HEAP_MB must be passed in the compose profile (#39).
 # MIZANO_NODE_HEAP_MB=1024
 ```
+
+# Issue #223 Verification — General ledger endpoint isolation
+
+## Commits
+
+- Previous review round base: `90d5e24`.
+- Code and test files last changed at `56cdd9e` (`git diff --name-only 56cdd9e af43d36` lists only `EVIDENCE.md`). Every result below that is marked "re-run" was run on `af43d36e4dc877489d71b1b2ceebac7012e34568`, whose code and test tree is identical to `56cdd9e`.
+- The commit that carries this text changes only `EVIDENCE.md`, so the tested code is still `af43d36`/`56cdd9e`.
+
+E2E-army test: `e2e-army/223-general-ledger-isolation.e2e.ts` (request-level, AC3: missing and malformed token → 401, tagged `feat:mz-general-ledger`). Added after `af43d36`; it has NOT been run locally (the gate needs the hub's throwaway stack). 200/404 cases need seeded tenants and stay in the API e2e spec.
+
+## Acceptance criteria
+
+| AC  | What                                       | Covered by                                                                                                                                                                                | Observed                                                                                                       |
+| --- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| AC1 | Owner JWT → 200 + ledger data              | `apps/api/test/general-ledger.isolation-spec.ts` "AC1: the owner gets 200…" and "…trial balance list"                                                                                     | Recorded by the previous round (6 passed). Not reproduced on `af43d36`: no Postgres here, see "Not run".       |
+| AC2 | Foreign-tenant JWT → 404                   | same file, the "AC2" cases (by id, unknown id, list) plus `FinancialReportsService.assertAccountOwnership` unit tests (where clause carries `organizationId`, null → `NotFoundException`) | Unit tests re-run on `af43d36`: pass (below). E2E cases: recorded by the previous round, not reproduced here.  |
+| AC3 | Missing/malformed/wrongly signed JWT → 401 | same file, "AC3" (null, `invalid.jwt.token`, token signed with another secret; by id and list)                                                                                            | Recorded by the previous round, not reproduced here.                                                           |
+| AC4 | Suite fails if behaviour regresses         | `reports.controller.spec.ts`: run against the previous controller (no ownership check) → `Tests: 2 failed, 2 passed`. With this change → pass                                             | Red run recorded by the previous round on the controller without the check; green re-run on `af43d36` (below). |
+| AC5 | Controller coverage +≥1 line               | new `assertAccountOwnership` helper in `reports.controller.ts` executed by the controller spec                                                                                            | The helper is called from the controller spec that passes on `af43d36`. No coverage report was generated.      |
+
+## Commands re-run on `af43d36` (apps/api)
+
+- `jest src/modules/reports/controllers/reports.controller.spec.ts src/modules/reports/services/financial-reports.service.spec.ts` → `Test Suites: 2 passed, 2 total`, `Tests: 10 passed, 10 total`.
+- `tsc --noEmit` and `tsc --noEmit -p test/tsconfig.e2e.json` → no diagnostics printed. The numeric exit code was not captured (the wrapper's exit-code echo printed blank); the background task finished with status completed, exit 0.
+- `eslint` on the 5 changed `.ts` files (controller, controller spec, service, service spec, isolation spec) → no diagnostics printed; same caveat on the exit code.
+
+## Not run on `af43d36`
+
+- `jest --config ./test/jest-e2e.json test/general-ledger.isolation-spec.ts`: the Nest app cannot boot because Postgres at `localhost:5435` is unreachable in this sandbox (`PrismaClientInitializationError: Can't reach database server`). All 6 cases failed in `beforeAll`, so this is not a pass and not a code failure. CI provides the database and runs this spec.
+- The 6-passed e2e result in the AC table was recorded by an earlier round and is not bound to a commit I can confirm. Treat it as unverified until CI runs the spec on the PR head.

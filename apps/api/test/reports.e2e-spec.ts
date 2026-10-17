@@ -575,6 +575,10 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
     it("tenant B sees none of tenant A's figures", async () => {
       expect((await b.get(`/accounts/${acc.bank}/balance`)).status).toBe(404);
       expect((await b.get(`/accounting-reports/general-ledger/${acc.bank}`)).status).toBe(404);
+      expect((await b.get(`/reports/general-ledger/${acc.bank}`)).status).toBe(404);
+      const ownLedger = await a.get(`/reports/general-ledger/${acc.bank}`);
+      expect(ownLedger.status).toBe(200);
+      expect(Array.isArray(ownLedger.body.entries)).toBe(true);
       const foreignStatement = await b.get(`/reports/customer-statement/${customer1}`).query(wide);
       expect(Object.keys(foreignStatement.body)).toHaveLength(0);
 
@@ -603,10 +607,18 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
         '/accounting-reports/trial-balance',
         '/accounts/balances',
         `/accounts/${acc.bank}/balance`,
+        `/accounting-reports/general-ledger/${acc.bank}`,
+        `/reports/general-ledger/${acc.bank}`,
         `/reports/customer-statement/${customer1}`,
       ]) {
         expect((await anon.get(path)).status).toBe(401);
       }
+    });
+
+    it('rejects invalid or malformed tokens with 401', async () => {
+      const invalid = a.withToken('invalid.jwt.token');
+      expect((await invalid.get(`/reports/general-ledger/${acc.bank}`)).status).toBe(401);
+      expect((await invalid.get('/reports/trial-balance')).status).toBe(401);
     });
   });
 });
