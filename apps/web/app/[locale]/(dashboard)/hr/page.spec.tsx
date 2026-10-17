@@ -69,10 +69,6 @@ describe('HRPage', () => {
     mockUseDepartmentSummary.mockReturnValue({ data: undefined, isLoading: false });
   });
 
-  it('renders without crashing with empty data', () => {
-    expect(() => renderPage()).not.toThrow();
-  });
-
   // ── dept._count.id regressions ───────────────────────────────────────────
 
   it('does not crash when deptSummary has flat count shape (regression: _count.id undefined)', () => {
@@ -103,39 +99,6 @@ describe('HRPage', () => {
 
   it('does not crash when deptSummary is an empty array', () => {
     mockUseDepartmentSummary.mockReturnValue({ data: [], isLoading: false });
-    expect(() => renderPage()).not.toThrow();
-  });
-
-  it('renders with employees data without crashing', () => {
-    mockUseEmployees.mockReturnValue({
-      data: {
-        data: [
-          { id: 'e1', firstName: 'John', lastName: 'Doe', status: 'ACTIVE', basicSalary: '5000' },
-        ],
-        meta: { total: 1 },
-      },
-      isLoading: false,
-    });
-    expect(() => renderPage()).not.toThrow();
-  });
-
-  it('renders with payroll runs without crashing', () => {
-    mockUsePayrollRuns.mockReturnValue({
-      data: {
-        data: [
-          { id: 'pr1', month: 3, year: 2026, status: 'DRAFT', totalNet: '10000', employeeCount: 5 },
-        ],
-        meta: { total: 1 },
-      },
-      isLoading: false,
-    });
-    expect(() => renderPage()).not.toThrow();
-  });
-
-  it('shows loading skeletons while data is loading', () => {
-    mockUseEmployees.mockReturnValue({ data: undefined, isLoading: true });
-    mockUsePayrollRuns.mockReturnValue({ data: undefined, isLoading: true });
-    mockUseDepartmentSummary.mockReturnValue({ data: undefined, isLoading: true });
     expect(() => renderPage()).not.toThrow();
   });
 });

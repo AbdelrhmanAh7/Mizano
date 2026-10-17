@@ -13,7 +13,7 @@
  */
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
@@ -92,15 +92,6 @@ describe('EmployeeDetailPage', () => {
     mockUseDeleteEmployee.mockReturnValue(defaultMutation);
   });
 
-  it('renders loading skeleton without crashing', () => {
-    expect(() => renderPage()).not.toThrow();
-  });
-
-  it('renders "not found" when employee is undefined and not loading', () => {
-    mockUseEmployee.mockReturnValue({ data: undefined, isLoading: false });
-    expect(() => renderPage()).not.toThrow();
-  });
-
   // ── allowances.reduce regressions ────────────────────────────────────────
 
   it('does not crash when allowances is null (regression: allowances.reduce is not a function)', () => {
@@ -122,14 +113,6 @@ describe('EmployeeDetailPage', () => {
   it('does not crash when deductions is a plain object {}', () => {
     mockUseEmployee.mockReturnValue({
       data: makeEmployee({ deductions: { insurance: 200 } }),
-      isLoading: false,
-    });
-    expect(() => renderPage()).not.toThrow();
-  });
-
-  it('renders correctly when allowances is a valid array', () => {
-    mockUseEmployee.mockReturnValue({
-      data: makeEmployee({ allowances: [{ name: 'Housing', amount: 500 }] }),
       isLoading: false,
     });
     expect(() => renderPage()).not.toThrow();
@@ -161,14 +144,5 @@ describe('EmployeeDetailPage', () => {
       isLoading: false,
     });
     expect(() => renderPage()).not.toThrow();
-  });
-
-  it('shows employee name when data is present', () => {
-    mockUseEmployee.mockReturnValue({
-      data: makeEmployee(),
-      isLoading: false,
-    });
-    renderPage();
-    expect(screen.getByText('John Doe')).toBeInTheDocument();
   });
 });

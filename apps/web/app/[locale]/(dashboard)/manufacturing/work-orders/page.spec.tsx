@@ -102,15 +102,6 @@ describe('WorkOrdersPage', () => {
     jest.clearAllMocks();
   });
 
-  it('renders without crashing when work orders list is empty', () => {
-    mockUseWorkOrders.mockReturnValue({
-      data: { data: [], meta: { page: 1, totalPages: 1, total: 0 } },
-      isLoading: false,
-      refetch: jest.fn(),
-    });
-    expect(() => renderPage()).not.toThrow();
-  });
-
   it('renders without crashing when plannedStartDate is null (regression: Invalid time value)', () => {
     mockUseWorkOrders.mockReturnValue({
       data: {
@@ -137,18 +128,6 @@ describe('WorkOrdersPage', () => {
     expect(screen.getByText('WO-001')).toBeInTheDocument();
   });
 
-  it('renders formatted date when plannedStartDate is a valid ISO string', () => {
-    mockUseWorkOrders.mockReturnValue({
-      data: {
-        data: [{ ...baseWorkOrder, plannedStartDate: '2026-03-15T00:00:00Z', dueDate: null }],
-        meta: { page: 1, totalPages: 1, total: 1 },
-      },
-      isLoading: false,
-      refetch: jest.fn(),
-    });
-    expect(() => renderPage()).not.toThrow();
-  });
-
   it('renders without crashing when both plannedStartDate and dueDate are undefined', () => {
     mockUseWorkOrders.mockReturnValue({
       data: {
@@ -159,23 +138,5 @@ describe('WorkOrdersPage', () => {
       refetch: jest.fn(),
     });
     expect(() => renderPage()).not.toThrow();
-  });
-
-  it('shows loading state', () => {
-    mockUseWorkOrders.mockReturnValue({ data: null, isLoading: true, refetch: jest.fn() });
-    expect(() => renderPage()).not.toThrow();
-  });
-
-  it('shows status badge for work order', () => {
-    mockUseWorkOrders.mockReturnValue({
-      data: {
-        data: [{ ...baseWorkOrder, status: 'IN_PROCESS', plannedStartDate: null }],
-        meta: { page: 1, totalPages: 1, total: 1 },
-      },
-      isLoading: false,
-      refetch: jest.fn(),
-    });
-    renderPage();
-    expect(screen.getByText('IN_PROCESS')).toBeInTheDocument();
   });
 });

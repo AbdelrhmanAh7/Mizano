@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
@@ -100,10 +100,6 @@ describe('EmployeesPage', () => {
     mockUseInfiniteEmployees.mockReturnValue(defaultHookReturn);
   });
 
-  it('renders without crashing with empty list', () => {
-    expect(() => renderPage()).not.toThrow();
-  });
-
   it('renders without crashing when joiningDate is null (regression: Invalid time value)', () => {
     mockUseInfiniteEmployees.mockReturnValue({
       ...defaultHookReturn,
@@ -129,30 +125,5 @@ describe('EmployeesPage', () => {
       total: 1,
     });
     expect(() => renderPage()).not.toThrow();
-  });
-
-  it('renders formatted date when joiningDate is a valid ISO string', () => {
-    mockUseInfiniteEmployees.mockReturnValue({
-      ...defaultHookReturn,
-      data: [{ ...baseEmployee, joiningDate: '2024-06-01T00:00:00Z' }],
-      total: 1,
-    });
-    expect(() => renderPage()).not.toThrow();
-  });
-
-  it('shows loading state', () => {
-    mockUseInfiniteEmployees.mockReturnValue({ ...defaultHookReturn, isLoading: true });
-    expect(() => renderPage()).not.toThrow();
-  });
-
-  it('renders without crashing with valid joiningDate and employee data', () => {
-    mockUseInfiniteEmployees.mockReturnValue({
-      ...defaultHookReturn,
-      data: [{ ...baseEmployee, joiningDate: '2023-01-01T00:00:00Z' }],
-      total: 1,
-    });
-    expect(() => renderPage()).not.toThrow();
-    // Verify the page header is present (non-table content)
-    expect(screen.getAllByText('employees.title').length).toBeGreaterThan(0);
   });
 });

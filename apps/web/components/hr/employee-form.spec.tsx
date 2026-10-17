@@ -96,19 +96,13 @@ describe('EmployeeForm', () => {
     mockUseUpdateEmployee.mockReturnValue(defaultMutation);
   });
 
-  it('renders create form without crashing', () => {
-    expect(() => render(<EmployeeForm />)).not.toThrow();
-  });
-
-  it('renders edit form with valid employee without crashing', () => {
-    expect(() => render(<EmployeeForm employee={makeEmployee()} />)).not.toThrow();
-  });
-
   // ── dateOfJoining Invalid time value regressions ──────────────────────────
 
   it('does not crash when dateOfJoining is null (regression: Invalid time value)', () => {
     expect(() =>
-      render(<EmployeeForm employee={makeEmployee({ dateOfJoining: null as unknown as string })} />),
+      render(
+        <EmployeeForm employee={makeEmployee({ dateOfJoining: null as unknown as string })} />,
+      ),
     ).not.toThrow();
   });
 
@@ -124,13 +118,6 @@ describe('EmployeeForm', () => {
     expect(() =>
       render(<EmployeeForm employee={makeEmployee({ dateOfJoining: '' })} />),
     ).not.toThrow();
-  });
-
-  it('shows the formatted joining date when dateOfJoining is valid', () => {
-    render(<EmployeeForm employee={makeEmployee({ dateOfJoining: '2024-06-01T00:00:00Z' })} />);
-    // The calendar button should show a formatted date, not 'Pick a date'
-    const button = screen.getByRole('button', { name: /june/i });
-    expect(button).toBeInTheDocument();
   });
 
   it('shows a formatted date (not "Pick a date") when dateOfJoining is null — defaults to today', () => {

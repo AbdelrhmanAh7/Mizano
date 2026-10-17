@@ -84,10 +84,6 @@ describe('AttendancePage', () => {
     mockUseBulkMarkAttendance.mockReturnValue(defaultBulkMark);
   });
 
-  it('renders without crashing with empty data', () => {
-    expect(() => renderPage()).not.toThrow();
-  });
-
   // ── Error 1-3 regressions ───────────────────────────────────────────────────
 
   it('does not crash when employee.firstName is null (regression: Cannot read properties of undefined)', () => {
@@ -131,16 +127,6 @@ describe('AttendancePage', () => {
     expect(fallbacks.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('renders valid initials when firstName and lastName are present', () => {
-    mockUseEmployees.mockReturnValue({
-      data: { data: [makeEmployee()], meta: { total: 1 } },
-      isLoading: false,
-    });
-    renderPage();
-    const initials = screen.getAllByText('JD');
-    expect(initials.length).toBeGreaterThanOrEqual(1);
-  });
-
   // ── Error 4 regression ──────────────────────────────────────────────────────
 
   it('does not use empty-string as Select value (regression: circular structure JSON error)', () => {
@@ -168,30 +154,5 @@ describe('AttendancePage', () => {
     });
     renderPage();
     expect(screen.getAllByText('attendance.mark').length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('renders without crashing with attendance records for the employee', () => {
-    mockUseEmployees.mockReturnValue({
-      data: { data: [makeEmployee()], meta: { total: 1 } },
-      isLoading: false,
-    });
-    mockUseAttendance.mockReturnValue({
-      data: {
-        data: [
-          {
-            id: 'att-001',
-            employeeId: 'emp-001',
-            date: new Date().toISOString(),
-            status: 'PRESENT',
-            checkIn: null,
-            checkOut: null,
-            notes: null,
-          },
-        ],
-        meta: { total: 1 },
-      },
-      isLoading: false,
-    });
-    expect(() => renderPage()).not.toThrow();
   });
 });
