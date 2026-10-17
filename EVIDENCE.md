@@ -394,66 +394,55 @@ Unset launcher heap_size_limit: 4395630592
 
 - **Issue**: #216 (Bill form: add expense-account picker per line so UI-made bills can be approved)
 - **PR**: #230
-- **Tested Head**: `c803914`
-- **Base Commit (`master`)**: `f97241477759b0f44391696089d81dbe598fcb6a`
+- **Tested code commit**: `c803914` (the later commits on this branch change only this file)
+- **Base**: `master` at `f972414`
 - **Date**: 2026-10-17
+- **Sentry**: none. The bug came from the 2026-10-11 demo walkthrough (400 "All bill lines must have an expense account assigned before approval"), not from a Sentry issue.
 
-## Numbered Acceptance Criteria & Verification Matrix
+Status meanings: **local** = run in this worktree, with the exit code shown below. **gate** = covered only by the e2e-army test, which runs in the hub's `e2e-army` check on PR #230 against the app built from this branch. It was not run locally, so no local result is claimed for it.
 
-| AC #    | Acceptance Criterion                                                                                                                                                                           | Verification Method / Covering Test                                                                                                                                                                                                       | Exit Code / Result |
-| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| **AC1** | Render per-line Expense Account picker listing org expense & asset accounts with Arabic label "حساب المصروف"                                                                                   | `apps/web/components/purchases/bill-form.spec.tsx` (`lists the expense and asset accounts...`, `labels the picker and the error in Arabic`), `e2e-army/216-bill-expense-account.e2e.ts`                                                   | PASSED (0)         |
-| **AC2** | Picking an item defaults the line's `accountId` to the item's purchase account, and switching to an item without one clears it                                                                 | `apps/web/components/purchases/bill-form.spec.tsx` (`defaults the account to the picked item purchase account`, `clears accountId when an item without a purchase account is selected`)                                                   | PASSED (0)         |
-| **AC3** | Client-side validation: line without account displays "Choose an expense account" ("اختر حساب المصروف") and blocks submit without firing requests                                              | `apps/web/components/purchases/bill-form.spec.tsx` (`blocks submit and says "Choose an expense account" when a line has none`), `e2e-army/216-bill-expense-account.e2e.ts` (`AC3 (invalid)`)                                              | PASSED (0)         |
-| **AC4** | Creating a bill with manual line and expense account allows "Approve & post" -> 201 Approved, exactly one journal entry; idempotent double-approval, payment recording, balanced trial balance | `e2e-army/216-bill-expense-account.e2e.ts` (`@issue-216 AC1-AC4: a UI bill with an expense account per line approves once...`), `apps/web/components/purchases/bill-form.spec.tsx` (`submits a manual line with the chosen account...`)   | PASSED (0)         |
-| **AC5** | Edit form and scan-bill Review step render expense account picker per line, pass accounts/items with 500 limit, handle loading/error states, and block submit without account                  | `apps/web/components/purchases/bill-form.spec.tsx` (`preselects accountId and submits when editing an existing bill`), `apps/web/components/purchases/bill-form.scan.spec.tsx` (`gives every reviewed line an expense account picker...`) | PASSED (0)         |
-| **AC6** | RTL and LTR support for Arabic: document dir is rtl on `/ar` routes, Arabic labels and errors displayed                                                                                        | `e2e-army/216-bill-expense-account.e2e.ts` (`@issue-216 AC6: the expense account picker is labelled in Arabic and the page is RTL`), `apps/web/components/purchases/bill-form.spec.tsx` (`labels the picker and the error in Arabic`)     | PASSED (0)         |
+## Acceptance criteria (numbered from the issue)
 
-## Verification Commands & Outputs
+| AC      | Criterion (issue #216)                                                                            | Covering test                                                                                                                                                                                                                                                                                                                                                                                         | Status           |
+| ------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| **AC1** | UI bill with a manual line + chosen expense account saves; Approve & post → Approved, one journal | Form side: `bill-form.spec.tsx` › `submits a manual line with the chosen account so the bill can be approved`, `blocks submit and says "Choose an expense account" when a line has none`. API side (unchanged): `bills.service.spec.ts` › `should transition DRAFT to OPEN and post one balanced journal in the same transaction`. End to end: `e2e-army/216-bill-expense-account.e2e.ts` › `AC1-AC4` | local (0) + gate |
+| **AC2** | Double-clicking Approve still yields one journal (#11)                                            | `bills.service.spec.ts` › `should post nothing when a concurrent approval already won`, `should reject approving a non-DRAFT bill`; e2e-army `AC1-AC4` ("click Approve & post twice")                                                                                                                                                                                                                 | local (0) + gate |
+| **AC3** | Record payment on that bill works                                                                 | e2e-army `AC1-AC4` ("record a full payment")                                                                                                                                                                                                                                                                                                                                                          | gate only        |
+| **AC4** | Trial balance stays balanced afterwards                                                           | e2e-army `AC1-AC4` (trial balance debits = credits)                                                                                                                                                                                                                                                                                                                                                   | gate only        |
+| **AC5** | Playwright or component test covering create → choose account → approve                           | `bill-form.spec.tsx` (7 tests: account list, item default, item without an account clears it, edit preselect, blocked submit, submit payload, Arabic); `bill-form.scan.spec.tsx` › `gives every reviewed line an expense account picker and blocks submit until each has one`                                                                                                                         | local (0)        |
+| **AC6** | Works in /ar (RTL)                                                                                | `bill-form.spec.tsx` › `labels the picker and the error in Arabic`; e2e-army `AC6` (`حساب المصروف` visible, `document.documentElement.dir === 'rtl'`)                                                                                                                                                                                                                                                 | local (0) + gate |
 
-### 1. Web Unit & Component Tests
+No Playwright screenshots were taken in this worktree, because the app stack is not started here. The e2e-army gate records its own screen evidence on the PR.
 
-```bash
-pnpm --filter @mizano/web test -- bill-form
-```
+## Changed covering tests
 
-Output:
+- `apps/web/components/purchases/bill-form.spec.tsx` (new)
+- `apps/web/components/purchases/bill-form.scan.spec.tsx` (extended)
+- `e2e-army/216-bill-expense-account.e2e.ts` (new, first commit `f6a0636`)
+
+## Commands and observed results (2026-10-17, worktree at `2638331`; code identical to `c803914`)
 
 ```text
+$ (apps/web) npx jest --maxWorkers=2 components/purchases/bill-form
 PASS components/purchases/bill-form.spec.tsx
 PASS components/purchases/bill-form.scan.spec.tsx
-
 Test Suites: 2 passed, 2 total
 Tests:       13 passed, 13 total
-Snapshots:   0 total
-Time:        0.83 s, estimated 1 s
-Ran all test suites matching /bill-form/i.
+exit 0
+
+$ (apps/api) npx jest --maxWorkers=2 src/modules/purchases/services/bills.service.spec.ts -t "approv|concurrent|expense account"
+✓ should transition DRAFT to OPEN and post one balanced journal in the same transaction
+✓ should post nothing when a concurrent approval already won
+✓ should reject approving a non-DRAFT bill
+Tests: 33 skipped, 10 passed, 43 total
+exit 0
+
+$ (apps/web) tsc --noEmit        # after building packages/shared-types (its dist/ was missing in the worktree)
+exit 0, 0 errors
+
+$ (apps/web) npx next lint --file <the 4 changed web source/spec files>
+✔ No ESLint warnings or errors
+exit 0
 ```
 
-### 2. TypeScript Type Check
-
-```bash
-pnpm --filter @mizano/web type-check
-```
-
-Output:
-
-```text
-> @mizano/web@0.1.0 type-check /Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-216/apps/web
-> tsc --noEmit
-Exit code: 0
-```
-
-### 3. ESLint & Lint-Staged
-
-```bash
-pnpm --filter @mizano/web lint
-```
-
-Output:
-
-```text
-> @mizano/web@0.1.0 lint /Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-216/apps/web
-> next lint
-Exit code: 0
-```
+Not a bug fix in the regression-test sense: the API rule is unchanged. The web form previously never sent `accountId`, and the new specs cover the added picker. So there is no base-fails/head-passes run to show.
