@@ -2,6 +2,7 @@
 
 import { DataTable } from '@/components/data-table/data-table';
 import { ReportFilters } from '@/components/reports/report-filters';
+import { ReportLoadError } from '@/components/reports/report-load-error';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -31,45 +32,47 @@ function SalesByCustomerContent() {
     [dateRange],
   );
 
-  const { data, isLoading } = useSalesByCustomerReport(params);
+  const { data, isLoading, isError, refetch } = useSalesByCustomerReport(params);
+  // Report amounts are labelled with the currency the API returns, never a default.
+  const currencyCode = data?.currencyCode;
 
   const columns: ColumnDef<SalesByCustomerEntry>[] = useMemo(
     () => [
       {
         accessorKey: 'customerName',
-        header: 'Customer',
+        header: t('customer'),
         cell: ({ row }) => <div className="font-medium">{row.original.customerName}</div>,
       },
       {
         accessorKey: 'invoiceCount',
-        header: 'Invoices',
+        header: t('invoices'),
         cell: ({ row }) => row.original.invoiceCount,
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'totalAmount',
-        header: 'Total Amount',
-        cell: ({ row }) => formatCurrency(row.original.totalAmount),
+        header: t('totalAmount'),
+        cell: ({ row }) => formatCurrency(row.original.totalAmount, currencyCode),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'paidAmount',
-        header: 'Paid',
-        cell: ({ row }) => formatCurrency(row.original.paidAmount),
+        header: t('paid'),
+        cell: ({ row }) => formatCurrency(row.original.paidAmount, currencyCode),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'balanceDue',
-        header: 'Balance Due',
+        header: t('balanceDue'),
         cell: ({ row }) => (
           <span className={row.original.balanceDue > 0 ? 'text-red-600 font-medium' : ''}>
-            {formatCurrency(row.original.balanceDue)}
+            {formatCurrency(row.original.balanceDue, currencyCode)}
           </span>
         ),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
     ],
-    [],
+    [currencyCode, t],
   );
 
   return (
@@ -82,42 +85,48 @@ function SalesByCustomerContent() {
       <ReportFilters dateRange={dateRange} onDateRangeChange={setDateRange} showDateRange />
 
       {/* Summary Cards */}
-      {data && (
+      {data && !isError && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {t('salesByCustomer.totalSales')}
+              </CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(data.totalAmount)}</div>
+              <div className="text-2xl font-bold">
+                {formatCurrency(data.totalAmount, currencyCode)}
+              </div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Paid</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('totalPaid')}</CardTitle>
               <Wallet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {formatCurrency(data.totalPaid)}
+                {formatCurrency(data.totalPaid, currencyCode)}
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Outstanding</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('outstanding')}</CardTitle>
               <Receipt className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">
-                {formatCurrency(data.totalBalance)}
+                {formatCurrency(data.totalBalance, currencyCode)}
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Customers</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {t('salesByCustomer.customers')}
+              </CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -127,18 +136,22 @@ function SalesByCustomerContent() {
         </div>
       )}
 
-      <Card>
-        <CardContent className="pt-6">
-          <DataTable
-            columns={columns}
-            data={data?.entries || []}
-            isLoading={isLoading}
-            emptyMessage="No sales data found for the selected period."
-            enableExport
-            exportFilename="sales-by-customer"
-          />
-        </CardContent>
-      </Card>
+      {isError ? (
+        <ReportLoadError onRetry={() => void refetch()} />
+      ) : (
+        <Card>
+          <CardContent className="pt-6">
+            <DataTable
+              columns={columns}
+              data={data?.entries || []}
+              isLoading={isLoading}
+              emptyMessage={t('salesByCustomer.empty')}
+              enableExport
+              exportFilename="sales-by-customer"
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

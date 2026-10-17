@@ -58,10 +58,30 @@ export class OrganizationsService {
     return organization;
   }
 
+  /**
+   * Base (ledger) currency, readable by every authenticated member of the organization: AP/AR
+   * screens need it to label amounts, and it must not require `settings.view`.
+   */
+  async getBaseCurrency(id: string): Promise<{ baseCurrency: string }> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id },
+      select: { baseCurrency: true },
+    });
+
+    if (!organization) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    return { baseCurrency: organization.baseCurrency };
+  }
+
   async update(id: string, updateOrganizationDto: UpdateOrganizationDto) {
+    // Explicit fields only: the currency is changed solely through the guarded settings and
+    // onboarding paths (assertBaseCurrencyChangeAllowed), never through this legacy route.
+    const { name, email, phone, address, taxId } = updateOrganizationDto;
     const organization = await this.prisma.organization.update({
       where: { id },
-      data: updateOrganizationDto,
+      data: { name, email, phone, address, taxId },
       select: {
         id: true,
         name: true,

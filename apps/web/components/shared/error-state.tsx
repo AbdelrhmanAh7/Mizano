@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 interface ErrorStateProps {
   error?: Error & { digest?: string };
   title?: string;
+  retryLabel?: string;
   onRetry?: () => void;
   className?: string;
 }
@@ -14,6 +15,7 @@ interface ErrorStateProps {
 export function ErrorState({
   error,
   title = 'Something went wrong',
+  retryLabel = 'Try again',
   onRetry,
   className,
 }: ErrorStateProps) {
@@ -28,7 +30,7 @@ export function ErrorState({
       )}
       {onRetry && (
         <Button onClick={onRetry} variant="outline" className="mt-4">
-          Try again
+          {retryLabel}
         </Button>
       )}
     </div>

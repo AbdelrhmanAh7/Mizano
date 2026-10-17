@@ -25,6 +25,7 @@ describe('receivables aging', () => {
 
   function build(invoices: unknown[], credits: unknown[]) {
     const prisma = {
+      organization: { findUnique: jest.fn().mockResolvedValue({ baseCurrency: 'EGP' }) },
       invoice: { findMany: jest.fn().mockResolvedValue(invoices) },
       creditNote: { findMany: jest.fn().mockResolvedValue(credits) },
     };
@@ -34,8 +35,10 @@ describe('receivables aging', () => {
   it('queries only issued, non-deleted invoices and unapplied APPLY credit notes of the org', async () => {
     const { prisma, service } = build([], []);
 
-    await service.getReceivablesAging(ORG, '2026-03-31');
+    const report = await service.getReceivablesAging(ORG, '2026-03-31');
 
+    // Amounts are labelled with the org base currency, never a hard-coded one.
+    expect(report.currencyCode).toBe('EGP');
     const invoiceWhere = prisma.invoice.findMany.mock.calls[0][0].where;
     expect(invoiceWhere).toMatchObject({
       organizationId: ORG,

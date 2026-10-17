@@ -123,6 +123,8 @@ export class AuthService {
       organization: {
         id: result.organization.id,
         name: result.organization.name,
+        currency: result.organization.currency,
+        baseCurrency: result.organization.baseCurrency,
       },
       tokens,
     };
@@ -188,6 +190,7 @@ export class AuthService {
         id: user.organization.id,
         name: user.organization.name,
         currency: user.organization.currency,
+        baseCurrency: user.organization.baseCurrency,
       },
       tokens,
     };

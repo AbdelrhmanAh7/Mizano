@@ -35,7 +35,6 @@ import { billsApi } from '@/lib/api';
 import {
   Bill,
   BillStatus,
-  formatCurrency,
   getStatusText,
   getStatusVariant,
   useCloneBill,
@@ -68,11 +67,12 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
-import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useBaseCurrencyQuery } from '@/lib/hooks/use-organization';
+import { BillAmount } from '@/components/purchases/bill-amount';
 
 function BillsPageContent() {
   const t = useTranslations('purchases');
-  const baseCurrency = useBaseCurrency();
+  const currencyQuery = useBaseCurrencyQuery();
   const tCommon = useTranslations('common');
   const { toast } = useToast();
 
@@ -301,11 +301,13 @@ function BillsPageContent() {
         />
       ),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
-      cell: ({ row }) =>
-        formatCurrency(
-          row.original.grandTotal,
-          documentCurrency(row.original.currencyCode, baseCurrency),
-        ),
+      cell: ({ row }) => (
+        <BillAmount
+          amount={row.original.grandTotal}
+          currencyCode={row.original.currencyCode}
+          currencyQuery={currencyQuery}
+        />
+      ),
     },
     {
       accessorKey: 'balanceDue',
@@ -320,7 +322,11 @@ function BillsPageContent() {
               isPositiveDecimal(balanceDue) ? 'text-destructive' : 'text-success',
             )}
           >
-            {formatCurrency(balanceDue, documentCurrency(row.original.currencyCode, baseCurrency))}
+            <BillAmount
+              amount={balanceDue}
+              currencyCode={row.original.currencyCode}
+              currencyQuery={currencyQuery}
+            />
           </span>
         );
       },
