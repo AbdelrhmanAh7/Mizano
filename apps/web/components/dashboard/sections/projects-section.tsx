@@ -7,6 +7,7 @@ import {
   useBillableHours,
   useTaskStatus,
   useProjectProfitability,
+  type DashboardDateRange,
 } from '@/lib/hooks/use-dashboard-sections';
 import { ProjectBudgetsChart } from '@/components/dashboard/charts/project-budgets-chart';
 import { BillableHoursChart } from '@/components/dashboard/charts/billable-hours-chart';
@@ -28,11 +29,12 @@ function ChartSkeleton() {
 
 interface ProjectsSectionProps {
   enabled: boolean;
+  dateRange?: DashboardDateRange;
 }
 
-export function ProjectsSection({ enabled }: ProjectsSectionProps) {
+export function ProjectsSection({ enabled, dateRange }: ProjectsSectionProps) {
   const { data: budgetData } = useProjectBudgets(enabled);
-  const { data: hoursData } = useBillableHours(enabled);
+  const { data: hoursData } = useBillableHours(enabled, dateRange);
   const { data: taskData } = useTaskStatus(enabled);
   const { data: profitData } = useProjectProfitability(enabled);
 

@@ -7,6 +7,7 @@ import {
   useRevenueYoY,
   useAccountBalances,
   useVATSummary,
+  type DashboardDateRange,
 } from '@/lib/hooks/use-dashboard-sections';
 import { useDashboardRevenue } from '@/lib/hooks/use-dashboard';
 import { GrossProfitMarginChart } from '@/components/dashboard/charts/gross-profit-margin-chart';
@@ -30,10 +31,11 @@ function ChartSkeleton() {
 
 interface FinancialSectionProps {
   enabled: boolean;
+  dateRange?: DashboardDateRange;
 }
 
-export function FinancialSection({ enabled }: FinancialSectionProps) {
-  const { data: marginData } = useGrossMarginTrend(enabled);
+export function FinancialSection({ enabled, dateRange }: FinancialSectionProps) {
+  const { data: marginData } = useGrossMarginTrend(enabled, dateRange);
   const { data: revenueData } = useDashboardRevenue(); // reuse existing, always loaded
   const { data: yoyData } = useRevenueYoY(enabled);
   const { data: accountData } = useAccountBalances(enabled);

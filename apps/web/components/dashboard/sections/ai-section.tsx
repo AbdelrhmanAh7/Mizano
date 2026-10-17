@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAnomalyTimeline } from '@/lib/hooks/use-dashboard-sections';
+import { useAnomalyTimeline, type DashboardDateRange } from '@/lib/hooks/use-dashboard-sections';
 import { AnomalyTimelineChart } from '@/components/dashboard/charts/anomaly-timeline-chart';
 import { CashFlowForecastChart } from '@/components/dashboard/cash-flow-forecast-chart';
 import { RevenueForecastChart } from '@/components/dashboard/revenue-forecast-chart';
@@ -22,10 +22,11 @@ function ChartSkeleton() {
 
 interface AISectionProps {
   enabled: boolean;
+  dateRange?: DashboardDateRange;
 }
 
-export function AISection({ enabled }: AISectionProps) {
-  const { data: anomalyData } = useAnomalyTimeline(enabled);
+export function AISection({ enabled, dateRange }: AISectionProps) {
+  const { data: anomalyData } = useAnomalyTimeline(enabled, dateRange);
 
   return (
     <div className="space-y-6">

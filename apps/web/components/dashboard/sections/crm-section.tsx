@@ -7,6 +7,7 @@ import {
   useLeadsBySource,
   useLeadConversionTrend,
   useDealWinRate,
+  type DashboardDateRange,
 } from '@/lib/hooks/use-dashboard-sections';
 import { DealPipelineChart } from '@/components/dashboard/charts/deal-pipeline-chart';
 import { LeadsBySourceChart } from '@/components/dashboard/charts/leads-by-source-chart';
@@ -28,13 +29,14 @@ function ChartSkeleton() {
 
 interface CRMSectionProps {
   enabled: boolean;
+  dateRange?: DashboardDateRange;
 }
 
-export function CRMSection({ enabled }: CRMSectionProps) {
+export function CRMSection({ enabled, dateRange }: CRMSectionProps) {
   const { data: pipelineData } = useDealPipeline(enabled);
   const { data: sourceData } = useLeadsBySource(enabled);
-  const { data: conversionData } = useLeadConversionTrend(enabled);
-  const { data: winRateData } = useDealWinRate(enabled);
+  const { data: conversionData } = useLeadConversionTrend(enabled, dateRange);
+  const { data: winRateData } = useDealWinRate(enabled, dateRange);
 
   return (
     <div className="space-y-6">

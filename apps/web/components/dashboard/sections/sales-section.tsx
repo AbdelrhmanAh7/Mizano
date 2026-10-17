@@ -9,6 +9,7 @@ import {
   usePaymentCollection,
   useChurnRisk,
   useCLVSegments,
+  type DashboardDateRange,
 } from '@/lib/hooks/use-dashboard-sections';
 import { InvoiceStatusChart } from '@/components/dashboard/charts/invoice-status-chart';
 import { QuoteConversionChart } from '@/components/dashboard/charts/quote-conversion-chart';
@@ -32,13 +33,14 @@ function ChartSkeleton() {
 
 interface SalesSectionProps {
   enabled: boolean;
+  dateRange?: DashboardDateRange;
 }
 
-export function SalesSection({ enabled }: SalesSectionProps) {
+export function SalesSection({ enabled, dateRange }: SalesSectionProps) {
   const { data: invoiceStatusData } = useInvoiceStatus(enabled);
   const { data: quoteData } = useQuoteConversion(enabled);
-  const { data: volumeData } = useInvoiceVolume(enabled);
-  const { data: collectionData } = usePaymentCollection(enabled);
+  const { data: volumeData } = useInvoiceVolume(enabled, dateRange);
+  const { data: collectionData } = usePaymentCollection(enabled, dateRange);
   const { data: churnData } = useChurnRisk(enabled);
   const { data: clvData } = useCLVSegments(enabled);
 

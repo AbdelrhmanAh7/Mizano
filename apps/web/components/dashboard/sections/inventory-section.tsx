@@ -8,6 +8,7 @@ import {
   useReorderAlerts,
   useWorkOrderStatus,
   useProductionEfficiency,
+  type DashboardDateRange,
 } from '@/lib/hooks/use-dashboard-sections';
 import { StockLevelsChart } from '@/components/dashboard/charts/stock-levels-chart';
 import { InventoryMovementsChart } from '@/components/dashboard/charts/inventory-movements-chart';
@@ -30,14 +31,15 @@ function ChartSkeleton() {
 
 interface InventorySectionProps {
   enabled: boolean;
+  dateRange?: DashboardDateRange;
 }
 
-export function InventorySection({ enabled }: InventorySectionProps) {
+export function InventorySection({ enabled, dateRange }: InventorySectionProps) {
   const { data: stockData } = useStockLevels(enabled);
-  const { data: movementsData } = useInventoryMovements(enabled);
+  const { data: movementsData } = useInventoryMovements(enabled, dateRange);
   const { data: reorderData } = useReorderAlerts(enabled);
   const { data: workOrderData } = useWorkOrderStatus(enabled);
-  const { data: efficiencyData } = useProductionEfficiency(enabled);
+  const { data: efficiencyData } = useProductionEfficiency(enabled, dateRange);
 
   return (
     <div className="space-y-6">

@@ -8,6 +8,7 @@ import {
   useAttendanceOverview,
   useSalaryDistribution,
   useAttritionRisk,
+  type DashboardDateRange,
 } from '@/lib/hooks/use-dashboard-sections';
 import { PayrollTrendChart } from '@/components/dashboard/charts/payroll-trend-chart';
 import { DepartmentHeadcountChart } from '@/components/dashboard/charts/department-headcount-chart';
@@ -30,12 +31,13 @@ function ChartSkeleton() {
 
 interface HRSectionProps {
   enabled: boolean;
+  dateRange?: DashboardDateRange;
 }
 
-export function HRSection({ enabled }: HRSectionProps) {
-  const { data: payrollData } = usePayrollTrend(enabled);
+export function HRSection({ enabled, dateRange }: HRSectionProps) {
+  const { data: payrollData } = usePayrollTrend(enabled, dateRange);
   const { data: headcountData } = useDepartmentHeadcount(enabled);
-  const { data: attendanceData } = useAttendanceOverview(enabled);
+  const { data: attendanceData } = useAttendanceOverview(enabled, dateRange);
   const { data: salaryData } = useSalaryDistribution(enabled);
   const { data: attritionData } = useAttritionRisk(enabled);
 

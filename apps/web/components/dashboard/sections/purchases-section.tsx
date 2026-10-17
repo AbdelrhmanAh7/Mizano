@@ -8,6 +8,7 @@ import {
   usePurchaseTrend,
   useExpenseTrend,
   useVendorPaymentTime,
+  type DashboardDateRange,
 } from '@/lib/hooks/use-dashboard-sections';
 import { BillStatusChart } from '@/components/dashboard/charts/bill-status-chart';
 import { TopVendorsChart } from '@/components/dashboard/charts/top-vendors-chart';
@@ -30,17 +31,18 @@ function ChartSkeleton() {
 
 interface PurchasesSectionProps {
   enabled: boolean;
+  dateRange?: DashboardDateRange;
 }
 
 // Note: payables-aging-chart exists but needs receivables-aging endpoint data
 // We skip it here since it reuses the existing `/reports/payables-aging` endpoint
 // which returns differently structured data. Can be added later with a dedicated hook.
 
-export function PurchasesSection({ enabled }: PurchasesSectionProps) {
+export function PurchasesSection({ enabled, dateRange }: PurchasesSectionProps) {
   const { data: billStatusData } = useBillStatus(enabled);
   const { data: vendorsData } = useTopVendors(enabled);
-  const { data: purchaseTrendData } = usePurchaseTrend(enabled);
-  const { data: expenseTrendData } = useExpenseTrend(enabled);
+  const { data: purchaseTrendData } = usePurchaseTrend(enabled, dateRange);
+  const { data: expenseTrendData } = useExpenseTrend(enabled, dateRange);
   const { data: paymentTimeData } = useVendorPaymentTime(enabled);
 
   return (

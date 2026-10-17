@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { differenceInCalendarDays, differenceInCalendarMonths } from 'date-fns';
 import { api } from '@/lib/api';
 import { moneyToNumber } from '@/lib/money';
 
@@ -237,16 +238,37 @@ function withMoney<T extends object>(rows: unknown, fields: readonly string[]): 
   });
 }
 
+// ============ Period window ============
+
+export interface DashboardDateRange {
+  from: Date;
+  to: Date;
+}
+
+/**
+ * The section endpoints take a trailing window (`months` / `days` back from today), not
+ * startDate/endDate, so the resolved dashboard range is converted to a window size. The API clamps
+ * the value, which is how "all" (from 2000) becomes the widest window it allows.
+ */
+export function rangeToMonths(range: DashboardDateRange | undefined, fallback: number): number {
+  return range ? Math.max(1, differenceInCalendarMonths(range.to, range.from) + 1) : fallback;
+}
+
+export function rangeToDays(range: DashboardDateRange | undefined, fallback: number): number {
+  return range ? Math.max(1, differenceInCalendarDays(range.to, range.from) + 1) : fallback;
+}
+
 // ============ Hooks ============
 
 const REFETCH_INTERVAL = 60000;
 
 // Financial hooks
-export function useGrossMarginTrend(enabled = true) {
+export function useGrossMarginTrend(enabled = true, dateRange?: DashboardDateRange) {
+  const months = rangeToMonths(dateRange, 6);
   return useQuery({
-    queryKey: ['dashboard', 'gross-margin'],
+    queryKey: ['dashboard', 'gross-margin', months],
     queryFn: async (): Promise<GrossMarginPoint[]> => {
-      const res = await api.get('/reports/dashboard/gross-margin-trend?months=6');
+      const res = await api.get(`/reports/dashboard/gross-margin-trend?months=${months}`);
       return withMoney<GrossMarginPoint>(res.data?.data ?? res.data, ['revenue', 'cogs']);
     },
     enabled,
@@ -324,11 +346,12 @@ export function useQuoteConversion(enabled = true) {
   });
 }
 
-export function useInvoiceVolume(enabled = true) {
+export function useInvoiceVolume(enabled = true, dateRange?: DashboardDateRange) {
+  const months = rangeToMonths(dateRange, 6);
   return useQuery({
-    queryKey: ['dashboard', 'invoice-volume'],
+    queryKey: ['dashboard', 'invoice-volume', months],
     queryFn: async (): Promise<InvoiceVolumePoint[]> => {
-      const res = await api.get('/reports/dashboard/invoice-volume?months=6');
+      const res = await api.get(`/reports/dashboard/invoice-volume?months=${months}`);
       return withMoney<InvoiceVolumePoint>(res.data?.data ?? res.data, ['amount']);
     },
     enabled,
@@ -337,11 +360,12 @@ export function useInvoiceVolume(enabled = true) {
   });
 }
 
-export function usePaymentCollection(enabled = true) {
+export function usePaymentCollection(enabled = true, dateRange?: DashboardDateRange) {
+  const months = rangeToMonths(dateRange, 6);
   return useQuery({
-    queryKey: ['dashboard', 'payment-collection'],
+    queryKey: ['dashboard', 'payment-collection', months],
     queryFn: async (): Promise<PaymentCollectionPoint[]> => {
-      const res = await api.get('/reports/dashboard/payment-collection?months=6');
+      const res = await api.get(`/reports/dashboard/payment-collection?months=${months}`);
       return withMoney<PaymentCollectionPoint>(res.data?.data ?? res.data, ['amount']);
     },
     enabled,
@@ -403,11 +427,12 @@ export function useTopVendors(enabled = true) {
   });
 }
 
-export function usePurchaseTrend(enabled = true) {
+export function usePurchaseTrend(enabled = true, dateRange?: DashboardDateRange) {
+  const months = rangeToMonths(dateRange, 6);
   return useQuery({
-    queryKey: ['dashboard', 'purchase-trend'],
+    queryKey: ['dashboard', 'purchase-trend', months],
     queryFn: async (): Promise<PurchaseTrendPoint[]> => {
-      const res = await api.get('/reports/dashboard/purchase-trend?months=6');
+      const res = await api.get(`/reports/dashboard/purchase-trend?months=${months}`);
       return withMoney<PurchaseTrendPoint>(res.data?.data ?? res.data, [
         'bills',
         'expenses',
@@ -420,11 +445,12 @@ export function usePurchaseTrend(enabled = true) {
   });
 }
 
-export function useExpenseTrend(enabled = true) {
+export function useExpenseTrend(enabled = true, dateRange?: DashboardDateRange) {
+  const months = rangeToMonths(dateRange, 6);
   return useQuery({
-    queryKey: ['dashboard', 'expense-trend'],
+    queryKey: ['dashboard', 'expense-trend', months],
     queryFn: async (): Promise<ExpenseTrendPoint[]> => {
-      const res = await api.get('/reports/dashboard/expense-trend?months=6');
+      const res = await api.get(`/reports/dashboard/expense-trend?months=${months}`);
       return withMoney<ExpenseTrendPoint>(res.data?.data ?? res.data, ['amount']).map((point) => ({
         ...point,
         categories: withMoney<{ name: string; amount: number }>(point.categories, ['amount']),
@@ -450,11 +476,12 @@ export function useVendorPaymentTime(enabled = true) {
 }
 
 // HR hooks
-export function usePayrollTrend(enabled = true) {
+export function usePayrollTrend(enabled = true, dateRange?: DashboardDateRange) {
+  const months = rangeToMonths(dateRange, 6);
   return useQuery({
-    queryKey: ['dashboard', 'payroll-trend'],
+    queryKey: ['dashboard', 'payroll-trend', months],
     queryFn: async (): Promise<PayrollTrendPoint[]> => {
-      const res = await api.get('/reports/dashboard/payroll-trend?months=6');
+      const res = await api.get(`/reports/dashboard/payroll-trend?months=${months}`);
       return res.data?.data ?? res.data ?? [];
     },
     enabled,
@@ -476,11 +503,12 @@ export function useDepartmentHeadcount(enabled = true) {
   });
 }
 
-export function useAttendanceOverview(enabled = true) {
+export function useAttendanceOverview(enabled = true, dateRange?: DashboardDateRange) {
+  const days = rangeToDays(dateRange, 30);
   return useQuery({
-    queryKey: ['dashboard', 'attendance-overview'],
+    queryKey: ['dashboard', 'attendance-overview', days],
     queryFn: async (): Promise<AttendanceOverviewItem[]> => {
-      const res = await api.get('/reports/dashboard/attendance-overview?days=30');
+      const res = await api.get(`/reports/dashboard/attendance-overview?days=${days}`);
       return res.data?.data ?? res.data ?? [];
     },
     enabled,
@@ -529,11 +557,12 @@ export function useStockLevels(enabled = true) {
   });
 }
 
-export function useInventoryMovements(enabled = true) {
+export function useInventoryMovements(enabled = true, dateRange?: DashboardDateRange) {
+  const months = rangeToMonths(dateRange, 6);
   return useQuery({
-    queryKey: ['dashboard', 'inventory-movements'],
+    queryKey: ['dashboard', 'inventory-movements', months],
     queryFn: async (): Promise<InventoryMovementPoint[]> => {
-      const res = await api.get('/reports/dashboard/inventory-movements?months=6');
+      const res = await api.get(`/reports/dashboard/inventory-movements?months=${months}`);
       return res.data?.data ?? res.data ?? [];
     },
     enabled,
@@ -568,11 +597,12 @@ export function useWorkOrderStatus(enabled = true) {
   });
 }
 
-export function useProductionEfficiency(enabled = true) {
+export function useProductionEfficiency(enabled = true, dateRange?: DashboardDateRange) {
+  const months = rangeToMonths(dateRange, 6);
   return useQuery({
-    queryKey: ['dashboard', 'production-efficiency'],
+    queryKey: ['dashboard', 'production-efficiency', months],
     queryFn: async (): Promise<ProductionEfficiencyPoint[]> => {
-      const res = await api.get('/reports/dashboard/production-efficiency?months=6');
+      const res = await api.get(`/reports/dashboard/production-efficiency?months=${months}`);
       return res.data?.data ?? res.data ?? [];
     },
     enabled,
@@ -595,11 +625,12 @@ export function useProjectBudgets(enabled = true) {
   });
 }
 
-export function useBillableHours(enabled = true) {
+export function useBillableHours(enabled = true, dateRange?: DashboardDateRange) {
+  const months = rangeToMonths(dateRange, 6);
   return useQuery({
-    queryKey: ['dashboard', 'billable-hours'],
+    queryKey: ['dashboard', 'billable-hours', months],
     queryFn: async (): Promise<BillableHoursPoint[]> => {
-      const res = await api.get('/reports/dashboard/billable-hours?months=6');
+      const res = await api.get(`/reports/dashboard/billable-hours?months=${months}`);
       return res.data?.data ?? res.data ?? [];
     },
     enabled,
@@ -661,11 +692,12 @@ export function useLeadsBySource(enabled = true) {
   });
 }
 
-export function useLeadConversionTrend(enabled = true) {
+export function useLeadConversionTrend(enabled = true, dateRange?: DashboardDateRange) {
+  const months = rangeToMonths(dateRange, 6);
   return useQuery({
-    queryKey: ['dashboard', 'lead-conversion-trend'],
+    queryKey: ['dashboard', 'lead-conversion-trend', months],
     queryFn: async (): Promise<LeadConversionPoint[]> => {
-      const res = await api.get('/reports/dashboard/lead-conversion-trend?months=6');
+      const res = await api.get(`/reports/dashboard/lead-conversion-trend?months=${months}`);
       return res.data?.data ?? res.data ?? [];
     },
     enabled,
@@ -674,11 +706,12 @@ export function useLeadConversionTrend(enabled = true) {
   });
 }
 
-export function useDealWinRate(enabled = true) {
+export function useDealWinRate(enabled = true, dateRange?: DashboardDateRange) {
+  const months = rangeToMonths(dateRange, 6);
   return useQuery({
-    queryKey: ['dashboard', 'deal-win-rate'],
+    queryKey: ['dashboard', 'deal-win-rate', months],
     queryFn: async (): Promise<DealWinRatePoint[]> => {
-      const res = await api.get('/reports/dashboard/deal-win-rate?months=6');
+      const res = await api.get(`/reports/dashboard/deal-win-rate?months=${months}`);
       return res.data?.data ?? res.data ?? [];
     },
     enabled,
@@ -688,11 +721,12 @@ export function useDealWinRate(enabled = true) {
 }
 
 // AI hooks
-export function useAnomalyTimeline(enabled = true) {
+export function useAnomalyTimeline(enabled = true, dateRange?: DashboardDateRange) {
+  const days = rangeToDays(dateRange, 90);
   return useQuery({
-    queryKey: ['dashboard', 'anomaly-timeline'],
+    queryKey: ['dashboard', 'anomaly-timeline', days],
     queryFn: async (): Promise<AnomalyTimelineItem[]> => {
-      const res = await api.get('/reports/dashboard/anomaly-timeline?days=90');
+      const res = await api.get(`/reports/dashboard/anomaly-timeline?days=${days}`);
       return res.data?.data ?? res.data ?? [];
     },
     enabled,

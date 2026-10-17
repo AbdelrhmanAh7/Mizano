@@ -445,42 +445,42 @@ export function DashboardClient() {
 
         {/* Financial Tab */}
         <TabsContent value="financial" className="mt-6">
-          <FinancialSection enabled={activeTab === 'financial'} />
+          <FinancialSection enabled={activeTab === 'financial'} dateRange={dateRange} />
         </TabsContent>
 
         {/* Sales Tab */}
         <TabsContent value="sales" className="mt-6">
-          <SalesSection enabled={activeTab === 'sales'} />
+          <SalesSection enabled={activeTab === 'sales'} dateRange={dateRange} />
         </TabsContent>
 
         {/* Purchases Tab */}
         <TabsContent value="purchases" className="mt-6">
-          <PurchasesSection enabled={activeTab === 'purchases'} />
+          <PurchasesSection enabled={activeTab === 'purchases'} dateRange={dateRange} />
         </TabsContent>
 
         {/* HR & Payroll Tab */}
         <TabsContent value="hr" className="mt-6">
-          <HRSection enabled={activeTab === 'hr'} />
+          <HRSection enabled={activeTab === 'hr'} dateRange={dateRange} />
         </TabsContent>
 
         {/* Inventory & Manufacturing Tab */}
         <TabsContent value="inventory" className="mt-6">
-          <InventorySection enabled={activeTab === 'inventory'} />
+          <InventorySection enabled={activeTab === 'inventory'} dateRange={dateRange} />
         </TabsContent>
 
         {/* Projects Tab */}
         <TabsContent value="projects" className="mt-6">
-          <ProjectsSection enabled={activeTab === 'projects'} />
+          <ProjectsSection enabled={activeTab === 'projects'} dateRange={dateRange} />
         </TabsContent>
 
         {/* CRM Tab */}
         <TabsContent value="crm" className="mt-6">
-          <CRMSection enabled={activeTab === 'crm'} />
+          <CRMSection enabled={activeTab === 'crm'} dateRange={dateRange} />
         </TabsContent>
 
         {/* AI Analytics Tab */}
         <TabsContent value="ai" className="mt-6">
-          <AISection enabled={activeTab === 'ai'} />
+          <AISection enabled={activeTab === 'ai'} dateRange={dateRange} />
         </TabsContent>
       </Tabs>
     </div>
