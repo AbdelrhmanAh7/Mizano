@@ -423,7 +423,7 @@ Unset launcher heap_size_limit: 4395630592
    ```
 2. **What PR #98 changed:** PR #98 changed only two documentation files (`EVIDENCE.md` and `docs/planning/MERGE-QUEUE.md`), adding 230 lines of text. It contained zero code, config, lockfile, docker, or workflow changes.
 3. **The CI workflow actually passed:** The core `CI` workflow (Install Dependencies, Lint & Type Check, Unit Tests, Build) completed successfully on the merge commit (run `37540682498`).
-4. **Pre-existing infrastructure failure:** The VM behind `DEPLOY_HOST` (34.165.73.152) has been unreachable on TCP port 22 from GitHub Actions runners since 2026-10-01 (run `36854180434`). The last successful deploy was run `33939629464` on 2026-09-05. The same SSH timeout occurred on parent commit `b83d72b` (run `37403603742`) and all 12 prior runs.
+4. **Pre-existing infrastructure failure:** The VM behind `DEPLOY_HOST` has been unreachable on TCP port 22 from GitHub Actions runners since 2026-10-01 (run `36854180434`). The last successful deploy was run `33939629464` on 2026-09-05. The same SSH timeout occurred on parent commit `b83d72b` (run `37403603742`) and all 12 prior runs.
 5. **The trigger flaw:** `deploy.yml` had the trigger:
    ```yaml
    on:
