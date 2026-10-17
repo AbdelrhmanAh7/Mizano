@@ -329,7 +329,7 @@ export class JournalsService {
       // directly would leave the document and the ledger out of sync.
       if (journal.sourceType && !options.source) {
         throw new BadRequestException(
-          'System-generated journals are reversed by voiding their source document',
+          `System-generated ${journal.sourceType} journals are reversed by voiding their source document; a source-level reversal command is required`,
         );
       }
 

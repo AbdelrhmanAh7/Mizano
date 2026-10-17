@@ -490,6 +490,28 @@ describe('JournalsService', () => {
       await expect(service.reverse(ORG_ID, 'j1')).rejects.toThrow('voiding their source document');
     });
 
+    it.each(['PAYROLL', 'ASSET_DISPOSAL', 'COGM'])(
+      'rejects reversing a %s journal without an authorized source and names the source type',
+      async (sourceType) => {
+        prisma.journal.findFirst.mockResolvedValue(
+          createMockJournalEntry({
+            id: 'j1',
+            isPosted: true,
+            sourceType,
+            reversedBy: null,
+            reversalOfId: null,
+            lines: [],
+          }) as any,
+        );
+        const attempt = service.reverse(ORG_ID, 'j1');
+        await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+        await expect(attempt).rejects.toThrow(
+          `System-generated ${sourceType} journals are reversed by voiding their source document; a source-level reversal command is required`,
+        );
+        expect(prisma.journal.create).not.toHaveBeenCalled();
+      },
+    );
+
     it('should reject reversing an already-reversed journal', async () => {
       const journal = createMockJournalEntry({
         id: 'j1',
