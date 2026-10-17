@@ -5,6 +5,8 @@ import { expect } from 'e2e';
 // payslip page the way an accountant does and check the PDF response the page requests.
 // The seeded demo org has the paid run "payroll-feb-2026" with three payslips.
 const RUN_PATH = '/hr/payroll/payroll-feb-2026';
+// The seed gives its payslips stable ids, so a payslip page can be opened by URL.
+const SEEDED_PAYSLIP_ID = 'payslip-feb-2026-emp-001';
 
 /** Demo admin sign-in with locators; next dev may submit the form before hydration, so retry. */
 async function signIn({ app, screen, browser }: any): Promise<void> {
@@ -73,5 +75,23 @@ test(
     await app.open('/en/hr/payslips/army-115-missing');
     await expect(screen.getByText('not found')).toBeVisible();
     await expect(screen.getByTestId('download-pdf-button')).toHaveCount(0);
+  },
+);
+
+test(
+  '@issue-115 AC1: a seeded payslip opens by its stable URL and offers the PDF download',
+  { tags: ['feat:mz-payroll', 'lvl:ui'] },
+  async (fx: any) => {
+    const { app, screen } = fx;
+    await signIn(fx);
+    await app.open(`/en/hr/payslips/${SEEDED_PAYSLIP_ID}`);
+    await expect(screen.getByTestId('download-pdf-button')).toBeVisible();
+
+    const response = fx.browser.waitForResponse(/\/payslips\/[^/?]+\/pdf/);
+    await screen.getByTestId('download-pdf-button').tap();
+    const pdf = await response;
+    expect(pdf.status).toBe(200);
+    expect(pdf.url).toContain(`/payslips/${SEEDED_PAYSLIP_ID}/pdf`);
+    expect(pdf.headers['content-type']).toContain('application/pdf');
   },
 );
