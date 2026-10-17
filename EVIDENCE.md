@@ -148,6 +148,7 @@
 # Evidence for Issue #104: credential-age check and rotation metadata
 
 - **Baseline (`master`)**: `f97241430d4f635e94ef3a262ba3171b4031d6a2`
+- **Tested head**: `9f8593414d0f62b0ce895ceadca249e49c7fe0d0`
 - **Host**: macOS arm64, Node 26, PostgreSQL 16 throwaway cluster on 127.0.0.1:5432 (`mizano_104_e2e`), no Redis (`REDIS_URL=` blank).
 - **First commit** `96f259f` holds only the failing tests; before the implementation all 6 e2e tests failed (missing `smtpPasswordRotatedAt` column, no boot line).
 - **Key names**: `TELEGRAM_BOT_TOKEN_CREDENTIAL_ROTATED_AT` and `CLOUDFLARE_TUNNEL_TOKEN_CREDENTIAL_ROTATED_AT`, so `<NAME>` is the real secret env name, as the Tech Lead plan asks. The rename went test-first: `f0f1072` (AC1/AC2 boot tests failed, entries `undefined`), then `ba7a2f0`.
