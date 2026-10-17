@@ -42,7 +42,7 @@ const customerSchema = z.object({
   shippingAddress: addressSchema.optional(),
 });
 
-type CustomerFormData = z.infer<typeof customerSchema>;
+export type CustomerFormData = z.infer<typeof customerSchema>;
 type AddressFormData = z.infer<typeof addressSchema>;
 
 // Empty inputs become null so an edit can clear a field.
