@@ -829,7 +829,7 @@ export default function ScanBillPage() {
             <Card>
               <CardContent className="py-16 text-center space-y-4">
                 <Loader2 className="h-10 w-10 mx-auto animate-spin text-primary" />
-                <p className="text-muted-foreground">{ts('processingHint')}</p>
+                <p className="text-muted-foreground">{ts('optionsLoading')}</p>
               </CardContent>
             </Card>
           )}
@@ -841,7 +841,7 @@ export default function ScanBillPage() {
                 <div className="flex items-center justify-between text-destructive">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4" />
-                    <p>{ts('createFailed')}</p>
+                    <p>{ts('optionsLoadFailed')}</p>
                   </div>
                   <Button
                     variant="outline"

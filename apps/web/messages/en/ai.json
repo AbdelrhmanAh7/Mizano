@@ -256,6 +256,8 @@
       "taxNotReviewed": "Some tax rates could not be determined from the document. Review the tax % on the flagged lines and tick the confirmation before creating the bill.",
       "currencyMismatch": "The document currency differs from your organization's base currency. Foreign-currency documents are not supported yet.",
       "createFailed": "Failed to create the bill. Please try again.",
+      "optionsLoadFailed": "Could not load accounts or items.",
+      "optionsLoading": "Loading accounts and items...",
       "lineValueInvalid": "Line {line}: {field} must be a non-negative number",
       "fields": {
         "quantity": "quantity",

@@ -178,6 +178,7 @@
       "notes": "Notes",
       "project": "Project",
       "lineItemRequired": "At least one line item is required",
+      "item": "Item",
       "expenseAccount": "Expense account",
       "expenseAccountPlaceholder": "Choose an expense account"
     },

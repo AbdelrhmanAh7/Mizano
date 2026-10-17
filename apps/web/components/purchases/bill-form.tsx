@@ -393,7 +393,7 @@ export function BillForm({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[200px]">Item</TableHead>
+                <TableHead className="w-[200px]">{tForm('item')}</TableHead>
                 <TableHead className="w-[200px]">{tForm('expenseAccount')}</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead className="w-[80px]">Qty</TableHead>

@@ -178,6 +178,7 @@
       "notes": "ملاحظات",
       "project": "المشروع",
       "lineItemRequired": "مطلوب عنصر واحد على الأقل",
+      "item": "الصنف",
       "expenseAccount": "حساب المصروف",
       "expenseAccountPlaceholder": "اختر حساب المصروف"
     },
