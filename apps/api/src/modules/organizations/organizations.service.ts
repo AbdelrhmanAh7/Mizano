@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { lockOrganizationLedger } from '../../common/utils/ledger-lock';
 import { PrismaService } from '../../prisma/prisma.service';
+import { timingSafeStringEqual } from '../ai/utils/secure-compare.util';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { UpdateAccountSettingsDto } from './dto/update-account-settings.dto';
 import {
@@ -370,8 +371,10 @@ export class OrganizationsService {
     return this.prisma.$transaction(async (tx) => {
       const [current] = await tx.$queryRaw<Array<{ smtpPassword: string | null }>>`
         SELECT "smtpPassword" FROM "organizations" WHERE "id" = ${id} FOR UPDATE`;
+      // Constant-time compare (AGENTS.md secret rule); a missing stored password counts as changed.
       const passwordChanged =
-        dto.smtpPassword !== undefined && dto.smtpPassword !== current?.smtpPassword;
+        dto.smtpPassword !== undefined &&
+        !timingSafeStringEqual(dto.smtpPassword, current?.smtpPassword);
       return tx.organization.update({
         where: { id },
         data: {

@@ -232,6 +232,19 @@ describe('Credential rotation (e2e) @issue-104', () => {
     expect(entries.get('CLOUDFLARE_TUNNEL_TOKEN')).toBe('unknown');
   });
 
+  it('@e2e @flow:credential-rotation @issue-104 AC4: an unconfigured Telegram token is left out, the tunnel token is still classified', async () => {
+    setEnv('TELEGRAM_BOT_TOKEN', '');
+    setEnv('TELEGRAM_BOT_TOKEN_CREDENTIAL_ROTATED_AT', '2026-10-08'); // stale date for a disabled bot
+    setEnv('CLOUDFLARE_TUNNEL_TOKEN_CREDENTIAL_ROTATED_AT', '2026-10-08');
+
+    const { level, entries } = await bootAndReadLine();
+
+    expect(level).toBe('warn');
+    expect(entries.has('TELEGRAM_BOT_TOKEN')).toBe(false);
+    expect(entries.get('CLOUDFLARE_TUNNEL_TOKEN')).toBe('ok');
+    setEnv('TELEGRAM_BOT_TOKEN', TELEGRAM_SECRET);
+  });
+
   it('@e2e @flow:credential-rotation @issue-104 AC5: no credential value appears in any log output', () => {
     expect(captured.some((text) => text.includes(LINE_PREFIX))).toBe(true);
     const all = captured.join('\n');
