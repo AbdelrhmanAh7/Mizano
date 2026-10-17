@@ -5,23 +5,29 @@
  */
 import { INestApplication } from '@nestjs/common';
 import { IntakeJobStatus } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { createTestApp, getPrisma, uniqueSuffix } from './helpers/app.helper';
 import { registerTenant, TestTenant } from './helpers/tenant.helper';
 import { eventually } from './helpers/journey.helper';
 import { ApiHelper } from './helpers/api-client.helper';
 import { ExtractionStrategyResolver } from '../src/modules/ai/extraction/extraction-strategy-resolver.service';
+import {
+  INTAKE_DRAFT_ENTITY,
+  IntakeJobsService,
+} from '../src/modules/ai/intake/intake-jobs.service';
 import { IntakeStorage, sha256Hex } from '../src/modules/ai/intake/intake-storage';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 process.env.INTAKE_RETRY_BASE_MS = '50';
 process.env.INTAKE_LEASE_MS = '1000';
 
-const stub = { mode: 'ok' as 'ok' | 'fail', calls: 0 };
+const stub = { mode: 'ok' as 'ok' | 'fail' | 'invalid', calls: 0 };
 
 const stubResolver = {
   resolve: async () => {
     stub.calls += 1;
     if (stub.mode === 'fail') throw new Error('stub extraction failure with INVOICE-TEXT-SECRET');
+    const invalid = stub.mode === 'invalid';
     return {
       strategyUsed: 'ocr',
       totalTimeMs: 1,
@@ -30,15 +36,15 @@ const stubResolver = {
         vendorAddress: null,
         vendorPhone: null,
         vendorEmail: null,
-        vendorTaxId: null,
+        vendorTaxId: invalid ? '123' : null,
         invoiceNumber: 'E2E-1',
         date: '2026-09-01',
         dueDate: null,
-        total: 115,
+        total: invalid ? 130 : 115,
         subtotal: 100,
         tax: 15,
         discount: null,
-        currency: 'EGP',
+        currency: 'USD',
         paymentTerms: null,
         notes: null,
         lineItems: [],
@@ -386,6 +392,33 @@ describe('Document intake (e2e)', () => {
     ).rejects.toThrow();
   });
 
+  it('invalid tax id and totals mismatch route to NEEDS_REVIEW with reason codes', async () => {
+    stub.mode = 'invalid';
+    try {
+      const res = await upload(a, pdfFixture(`INVALID-${uniqueSuffix()}`));
+      expect(res.status).toBe(201);
+      const done = await waitForStatus(res.body.data.jobId, IntakeJobStatus.NEEDS_REVIEW);
+      const validation = (
+        done?.result as {
+          validation: {
+            requiresReview: boolean;
+            blockingFields: string[];
+            fields: Record<string, { status: string; reasons: string[] }>;
+          };
+        }
+      ).validation;
+      expect(validation.requiresReview).toBe(true);
+      expect(validation.fields.vendorTaxId.reasons).toContain('TAX_ID_FORMAT');
+      expect(validation.fields.total.reasons).toContain('TOTALS_MISMATCH');
+      expect(validation.fields.currency.status).toBe('valid');
+      expect(validation.blockingFields).toEqual(
+        expect.arrayContaining(['vendorTaxId', 'total', 'subtotal', 'tax']),
+      );
+    } finally {
+      stub.mode = 'ok';
+    }
+  });
+
   it('a FAILED job is re-enqueued by the periodic sweep and finishes', async () => {
     const bytes = pdfFixture(`SWEEP-${uniqueSuffix()}`);
     const storage = app.get(IntakeStorage);
@@ -406,5 +439,137 @@ describe('Document intake (e2e)', () => {
     });
     const done = await waitForStatus(failed.id, IntakeJobStatus.EXTRACTED);
     expect(done?.attempts).toBe(2);
+  });
+
+  it('recovers an APPROVED job after a crash between approval claim and linking', async () => {
+    const bytes = pdfFixture(`CRASH-APPR-${uniqueSuffix()}`);
+    const res = await upload(a, bytes);
+    const crashJobId = res.body.data.jobId as string;
+    await waitForStatus(crashJobId, IntakeJobStatus.EXTRACTED);
+
+    const vendor = await a.post('/vendors').send({ name: `Crash Vendor ${uniqueSuffix()}` });
+    expect(vendor.status).toBe(201);
+    const vendorId = vendor.body.id;
+
+    // Simulate approval claim that committed: job is APPROVED
+    // and draft was created with AuditLog marker, but process crashed before linking draftDocumentId.
+    const bill = await prisma.bill.create({
+      data: {
+        billNumber: `BILL-CRASH-${uniqueSuffix()}`,
+        vendorId,
+        date: new Date('2026-09-01'),
+        dueDate: new Date('2026-10-01'),
+        subtotal: new Decimal('100.0000'),
+        taxAmount: new Decimal('14.0000'),
+        grandTotal: new Decimal('114.0000'),
+        balanceDue: new Decimal('114.0000'),
+        organizationId: tenantA.organizationId,
+        lines: {
+          create: [
+            {
+              description: 'CPU',
+              quantity: new Decimal('1.0000'),
+              rate: new Decimal('100.0000'),
+              taxRate: new Decimal('14.00'),
+              amount: new Decimal('100.0000'),
+            },
+          ],
+        },
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        organizationId: tenantA.organizationId,
+        userId: tenantA.userId,
+        action: 'CREATE',
+        entityType: INTAKE_DRAFT_ENTITY,
+        entityId: crashJobId,
+        newValues: { draftType: 'bill', draftId: bill.id },
+      },
+    });
+
+    // Job is APPROVED without draftDocumentId, backdated past grace period (5 minutes)
+    await prisma.intakeJob.update({
+      where: { id: crashJobId },
+      data: {
+        status: IntakeJobStatus.APPROVED,
+        draftDocumentId: null,
+        draftDocumentType: null,
+        updatedAt: new Date(Date.now() - 10 * 60 * 1000),
+      },
+    });
+
+    const before = await a.get(`/ai/document-intake/${crashJobId}/result`);
+    expect(before.status).toBe(200);
+    expect(before.body.data.status).toBe('APPROVED');
+    expect(before.body.data.draftDocumentId).toBeNull();
+
+    // Trigger recovery sweep
+    await app.get(IntakeJobsService).recoverJobs();
+
+    // The sweep looked up the marker and linked the draft
+    const after = await a.get(`/ai/document-intake/${crashJobId}/result`);
+    expect(after.status).toBe(200);
+    expect(after.body.data.status).toBe('APPROVED');
+    expect(after.body.data.draftDocumentId).toBe(bill.id);
+    expect(after.body.data.draftDocumentType).toBe('bill');
+  });
+
+  it('reopens an APPROVED job to EXTRACTED when crash happened before draft was created', async () => {
+    const bytes = pdfFixture(`CRASH-REOPEN-${uniqueSuffix()}`);
+    const res = await upload(a, bytes);
+    const noDraftJobId = res.body.data.jobId as string;
+    await waitForStatus(noDraftJobId, IntakeJobStatus.EXTRACTED);
+
+    // Simulate crash after claim: status is APPROVED, but NO draft or marker was created
+    await prisma.intakeJob.update({
+      where: { id: noDraftJobId },
+      data: {
+        status: IntakeJobStatus.APPROVED,
+        draftDocumentId: null,
+        draftDocumentType: null,
+        updatedAt: new Date(Date.now() - 10 * 60 * 1000),
+      },
+    });
+
+    // Recovery sweep finds no draft and reopens to EXTRACTED with redacted lastError
+    await app.get(IntakeJobsService).recoverJobs();
+
+    const reopened = await a.get(`/ai/document-intake/${noDraftJobId}/result`);
+    expect(reopened.status).toBe(200);
+    expect(reopened.body.data.status).toBe('EXTRACTED');
+    expect(reopened.body.data.lastError).toBe(
+      'Approval interrupted before draft creation; ready to confirm again',
+    );
+
+    // The accountant can now confirm again successfully
+    const vendor = await a.post('/vendors').send({ name: `Retry Vendor ${uniqueSuffix()}` });
+    const confirm = await a.post('/ai/document-intake/confirm').send({
+      type: 'BILL',
+      jobId: noDraftJobId,
+      vendorId: vendor.body.id,
+      date: '2026-09-01',
+      dueDate: '2026-10-01',
+      lines: [{ description: 'GPU', quantity: '1', rate: '200', taxRatePercent: '0' }],
+    });
+    expect(confirm.status).toBe(201);
+    expect(confirm.body.data.id).toBeTruthy();
+
+    const finalized = await a.get(`/ai/document-intake/${noDraftJobId}/result`);
+    expect(finalized.body.data.status).toBe('APPROVED');
+    expect(finalized.body.data.draftDocumentId).toBe(confirm.body.data.id);
+
+    // The real confirm path wrote the append-only marker for this job in the same org.
+    const markers = await prisma.auditLog.findMany({
+      where: { entityType: INTAKE_DRAFT_ENTITY, entityId: noDraftJobId },
+      select: { organizationId: true, newValues: true },
+    });
+    expect(markers).toEqual([
+      {
+        organizationId: tenantA.organizationId,
+        newValues: { draftType: 'bill', draftId: confirm.body.data.id },
+      },
+    ]);
   });
 });

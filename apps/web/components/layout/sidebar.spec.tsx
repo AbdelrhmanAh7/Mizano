@@ -41,26 +41,28 @@ jest.mock('next/link', () => {
   );
 });
 
+let mockPermissions = [
+  { module: 'sales', actions: ['view', 'create', 'edit', 'delete'] },
+  { module: 'purchases', actions: ['view', 'create'] },
+  { module: 'accounting', actions: ['view'] },
+  { module: 'inventory', actions: ['view'] },
+  { module: 'banking', actions: ['view'] },
+  { module: 'projects', actions: ['view'] },
+  { module: 'manufacturing', actions: ['view'] },
+  { module: 'hr', actions: ['view'] },
+  { module: 'tax', actions: ['view'] },
+  { module: 'crm', actions: ['view'] },
+  { module: 'reports', actions: ['view'] },
+  { module: 'settings', actions: ['view'] },
+];
+
 // Mock next-auth
 jest.mock('next-auth/react', () => ({
   useSession: () => ({
     data: {
       user: {
         role: {
-          permissions: [
-            { module: 'sales', actions: ['view', 'create', 'edit', 'delete'] },
-            { module: 'purchases', actions: ['view', 'create'] },
-            { module: 'accounting', actions: ['view'] },
-            { module: 'inventory', actions: ['view'] },
-            { module: 'banking', actions: ['view'] },
-            { module: 'projects', actions: ['view'] },
-            { module: 'manufacturing', actions: ['view'] },
-            { module: 'hr', actions: ['view'] },
-            { module: 'tax', actions: ['view'] },
-            { module: 'crm', actions: ['view'] },
-            { module: 'reports', actions: ['view'] },
-            { module: 'settings', actions: ['view'] },
-          ],
+          permissions: mockPermissions,
         },
       },
     },
@@ -152,6 +154,20 @@ describe('Sidebar', () => {
   beforeEach(() => {
     mockPathname = '/en/dashboard';
     mockLocale = 'en';
+    mockPermissions = [
+      { module: 'sales', actions: ['view', 'create', 'edit', 'delete'] },
+      { module: 'purchases', actions: ['view', 'create'] },
+      { module: 'accounting', actions: ['view'] },
+      { module: 'inventory', actions: ['view'] },
+      { module: 'banking', actions: ['view'] },
+      { module: 'projects', actions: ['view'] },
+      { module: 'manufacturing', actions: ['view'] },
+      { module: 'hr', actions: ['view'] },
+      { module: 'tax', actions: ['view'] },
+      { module: 'crm', actions: ['view'] },
+      { module: 'reports', actions: ['view'] },
+      { module: 'settings', actions: ['view'] },
+    ];
   });
 
   it('renders the app name', () => {
@@ -261,5 +277,30 @@ describe('Sidebar', () => {
     render(<Sidebar />);
     const reportsItems = screen.getAllByText('reports');
     expect(reportsItems.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows Purchases with Inbox but not other children when user has purchases.create but not purchases.view', () => {
+    mockPermissions = [{ module: 'purchases', actions: ['create'] }];
+    // We also need dashboard or others? If we don't include them they might not render, but we only care about Purchases here.
+    render(<Sidebar />);
+
+    // Purchases parent should be rendered
+    const purchasesTitle = screen.getAllByText('purchases.title');
+    expect(purchasesTitle.length).toBeGreaterThanOrEqual(1);
+
+    // To see children, we might need to expand it (the test for expand clicks it, or we just check if the DOM has it, wait!
+    // isExpanded is false by default. Let's click to expand.
+    fireEvent.click(purchasesTitle[0]);
+
+    // Inbox should be rendered
+    const inboxItems = screen.queryAllByText('purchases.inbox');
+    expect(inboxItems.length).toBeGreaterThanOrEqual(1);
+
+    // Other children like vendors, expenses should NOT be rendered
+    const vendorsItems = screen.queryAllByText('purchases.vendors');
+    expect(vendorsItems.length).toBe(0);
+
+    const expensesItems = screen.queryAllByText('purchases.expenses');
+    expect(expensesItems.length).toBe(0);
   });
 });

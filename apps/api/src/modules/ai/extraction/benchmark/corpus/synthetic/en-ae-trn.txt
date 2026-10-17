@@ -1,0 +1,9 @@
+SYNTHETIC FIXTURE - NOT A REAL INVOICE
+Marina Cloud Services LLC
+Tax Invoice
+Invoice No. MC-5521
+Date: 7 August 2024
+TRN: 100765432100003
+Subtotal AED 3,400.00
+VAT 5% AED 170.00
+Grand Total AED 3,570.00
