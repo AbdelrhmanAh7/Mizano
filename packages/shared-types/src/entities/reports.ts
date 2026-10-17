@@ -124,3 +124,37 @@ export interface DashboardChartData {
   expensesByCategory: { category: string; amount: number }[];
   receivablesVsPayables: { receivables: number; payables: number };
 }
+
+// --- VAT Return Draft ---
+
+export interface VatReturnDraftException {
+  id: string;
+  type: 'invoice' | 'bill';
+  documentNumber: string;
+  reason: string;
+}
+
+/** A document whose header tax differs from the per-line tax ETA recomputes at submission. */
+export interface VatReturnDraftEtaMismatch {
+  id: string;
+  type: 'invoice' | 'bill';
+  documentNumber: string;
+  headerTax: string;
+  lineTax: string;
+}
+
+export const VAT_RETURN_DRAFT_LABEL = 'DRAFT, not for filing' as const;
+
+export interface VatReturnDraft {
+  label: typeof VAT_RETURN_DRAFT_LABEL;
+  /** Organization base currency: the currency of every amount in this draft. */
+  currency: string;
+  from: string;
+  to: string;
+  status: 'complete' | 'incomplete';
+  outputTax: string;
+  inputTax: string;
+  netPayable: string;
+  exceptions: VatReturnDraftException[];
+  etaMismatches: VatReturnDraftEtaMismatch[];
+}
