@@ -147,8 +147,8 @@
 
 # Evidence for Issue #104: credential-age check and rotation metadata
 
-- **Baseline (`master`)**: `615060ed6294e16375a1f1ea9385cb7e812cd24f`
-- **Tested head**: `ba7a2f0f95f7daf018b7f1eb272b6bf97f803603` (clean tree). The next commit adds only this record.
+- **Baseline (`master`)**: `f97241430d4f635e94ef3a262ba3171b4031d6a2`
+- **Tested head**: `1b76426e3de51fbe458e00cea9e690c62c93be20` (clean tree). The next commit adds only this record.
 - **Host**: macOS arm64, Node 26, PostgreSQL 16 throwaway cluster on 127.0.0.1:55104, no Redis (`REDIS_URL=` blank).
 - **First commit** `96f259f` holds only the failing tests; before the implementation all 6 e2e tests failed (missing `smtpPasswordRotatedAt` column, no boot line).
 - **Key names**: `TELEGRAM_BOT_TOKEN_CREDENTIAL_ROTATED_AT` and `CLOUDFLARE_TUNNEL_TOKEN_CREDENTIAL_ROTATED_AT`, so `<NAME>` is the real secret env name, as the Tech Lead plan asks. The rename went test-first: `f0f1072` (AC1/AC2 boot tests failed, entries `undefined`), then `ba7a2f0`.
@@ -184,9 +184,10 @@ Tests:       263 passed, 263 total
 
 - `@mizano/web:lint` prints 13 warnings that predate this branch; no `apps/web` file changed. An earlier full run hit one timing flake in `intake-processor.service.spec.ts` (lease heartbeat); it passed 3/3 in isolation and in the recorded run.
 - E2E on a reused database is flaky outside this suite: repeat runs on the same database failed in `accountant-journey` (36), `ai` (1 x 401) and, with `credential-rotation` excluded via `--testPathIgnorePatterns`, in `reports` and `multi-tenancy` (16). `accountant-journey` passed 36/36 alone. The recorded run uses a fresh database.
+- Review round 3 (Codex + CodeRabbit threads): SMTP password comparison now uses `timingSafeStringEqual`; an unset `TELEGRAM_BOT_TOKEN` is left out of the line (the tunnel token only reaches cloudflared, which requires it, so it is always classified); a failing SMTP lookup (API started before `prisma migrate deploy` in `.github/workflows/deploy.yml`, which this PR may not edit) still logs the host entries plus `SMTP_PASSWORD=unknown`. Tests: `credential-age-check.service.spec.ts` (4), e2e case `an unconfigured Telegram token is left out` (8/8 pass on a throwaway PostgreSQL 16, migrations deployed, `REDIS_URL` blank); unit run 3 suites / 48 tests pass; `eslint` clean on the touched files; `tsc` only reports `js-yaml` types missing from this sandbox's `node_modules` (declared in `apps/api/package.json`, from master's `coderabbit-config.spec.ts`).
 - Size: 162 changed lines outside tests (the ~300 budget), 304 lines of tests, plus this record.
-- Schema: `Organization.smtpPasswordRotatedAt` (nullable, migration `20261008000000_smtp_password_rotated_at`, no backfill). The brief asks for coordinator sign-off on the schema change; this PR is that request.
-- Root `.env.local/.dev/.sit` are CRLF; the new keys keep CRLF. No CI workflow or secret value was touched.
+- Schema: `Organization.smtpPasswordRotatedAt` (nullable, migration `20261008000100_smtp_password_rotated_at`, ordered after master's `20261008000000_intake_stage_timings`, no backfill). The brief asks for coordinator sign-off on the schema change; this PR is that request.
+- Root `.env.local/.dev/.sit` are not touched (CTO hard rule: secret-bearing env files). The non-Pi stacks therefore report both host tokens as `unknown` until the keys are added there by the owner; the Pi stack carries them in `deploy/pi/.env.pi.example` and `docker-compose.pi.yml`. No CI workflow or secret value was touched.
 
 ---
 
