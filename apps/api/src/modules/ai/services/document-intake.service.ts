@@ -18,6 +18,7 @@ import { levenshteinSimilarity, normalizeText } from '../utils/text-similarity.u
 import { ExtractionValidation, validateExtraction } from '../validation/extraction-validation';
 import { normalizeDigits } from '../extraction/rules/rules-normalize';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
+import { isValidCalendarDate } from '../../../common/utils/calendar-date';
 import { assertTotalsFit } from '../../sales/utils/sales-helpers';
 
 // ---------------------------------------------------------------------------
@@ -551,7 +552,7 @@ export class DocumentIntakeService {
     }
     for (const field of ['date', 'dueDate'] as const) {
       const value = dto[field];
-      if (!value || isNaN(new Date(value).getTime())) {
+      if (!isValidCalendarDate(value)) {
         throw new BadRequestException(`${field} must be a valid date`);
       }
     }

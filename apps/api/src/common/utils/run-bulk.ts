@@ -1,6 +1,8 @@
+import { HttpException, Logger } from '@nestjs/common';
 import { BulkResultDto } from '../dto/bulk-result.dto';
+import { describeError } from './redact';
 
-import { HttpException } from '@nestjs/common';
+const logger = new Logger('runBulk');
 
 /**
  * Runs a single-record command for each id (sequentially, de-duplicated) and reports
@@ -19,7 +21,7 @@ export async function runBulk(
       await command(id);
       processed++;
     } catch (error) {
-      let reason = 'Unknown error';
+      let reason = 'Unexpected error';
       let code: string | undefined;
 
       if (error instanceof HttpException) {
@@ -34,13 +36,14 @@ export async function runBulk(
           typeof response === 'object' && typeof response.code === 'string'
             ? response.code
             : undefined;
-      } else if (error instanceof Error) {
-        reason = error.message;
-        const errObj = error as unknown as Record<string, unknown>;
-        code = typeof errObj.code === 'string' ? errObj.code : undefined;
+      } else {
+        // Non-HTTP errors (Prisma, network) can embed query details; keep them server-side.
+        logger.error(
+          `Bulk command failed for ${id}: ${describeError(error, { includeMessage: false })}`,
+        );
       }
 
-      failures.push({ id, reason, code });
+      failures.push(code ? { id, reason, code } : { id, reason });
     }
   }
   return { processed, total: unique.length, failures };

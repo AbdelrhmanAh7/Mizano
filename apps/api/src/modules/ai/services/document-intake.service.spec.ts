@@ -518,6 +518,29 @@ describe('DocumentIntakeService', () => {
     });
   });
 
+  describe('confirmAndCreate — calendar dates', () => {
+    it.each(['2026-02-30', '2026-13-01', '09/01/2026', 'Sep 1 2026', '2026-9-1'])(
+      'rejects %s as a date and writes nothing',
+      async (date) => {
+        await expect(service.confirmAndCreate(ORG_A, baseBill({ date }))).rejects.toThrow(
+          'date must be a valid date',
+        );
+        await expect(service.confirmAndCreate(ORG_A, baseBill({ dueDate: date }))).rejects.toThrow(
+          'dueDate must be a valid date',
+        );
+      },
+    );
+
+    it('still accepts a date-only value and a full ISO timestamp', async () => {
+      await expect(
+        service.confirmAndCreate(
+          ORG_A,
+          baseBill({ date: '2026-09-01', dueDate: '2026-10-01T00:00:00.000Z' }),
+        ),
+      ).resolves.toBeDefined();
+    });
+  });
+
   describe('confirmAndCreate — tenant ownership of referenced ids', () => {
     const cases: Array<[string, Partial<ConfirmIntakeInput>]> = [
       ['vendorId', { vendorId: 'vendor-b' }],

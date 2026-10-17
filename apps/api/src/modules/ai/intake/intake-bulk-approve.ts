@@ -1,4 +1,5 @@
 import { Decimal } from '@prisma/client/runtime/library';
+import { isValidCalendarDate } from '../../../common/utils/calendar-date';
 import { computeDocumentTotals, round } from '../../../common/utils/document-totals';
 import { DECIMAL_STRING_PATTERN, PERCENT_STRING_PATTERN } from '../dto/document-intake.dto';
 import { DocumentIntakeResult, ConfirmIntakeInput } from '../services/document-intake.service';
@@ -71,20 +72,12 @@ function exactPercent(net: Decimal, tax: Decimal): Decimal | null {
   return rounded;
 }
 
+/** Trimmed `YYYY-MM-DD` naming a real calendar day, else null. */
 function validDate(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
-  if (!m) return null;
-  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
-  if (
-    d.getUTCFullYear() !== Number(m[1]) ||
-    d.getUTCMonth() + 1 !== Number(m[2]) ||
-    d.getUTCDate() !== Number(m[3])
-  ) {
-    return null;
-  }
-  return trimmed;
+  const trimmed = value?.trim();
+  return trimmed && /^\d{4}-\d{2}-\d{2}$/.test(trimmed) && isValidCalendarDate(trimmed)
+    ? trimmed
+    : null;
 }
 
 function normalizeCurrency(value: string | null | undefined): string | null {

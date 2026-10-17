@@ -259,6 +259,14 @@ describe('IntakeJobsService', () => {
         }),
       );
     });
+
+    it('orders the Prisma path by createdAt then id so equal timestamps page stably', async () => {
+      await upload(ORG_A);
+      await service.list(ORG_A, {});
+      expect(table.delegate.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] }),
+      );
+    });
   });
 
   it('marks extracted summaries as exceptions when either currency is unknown', async () => {
