@@ -630,6 +630,7 @@ export class InvoicesService {
             customerId: original.customerId,
             date: today,
             dueDate,
+            currencyCode: original.currencyCode,
             subtotal: original.subtotal,
             taxAmount: original.taxAmount,
             shippingAmount: original.shippingAmount,

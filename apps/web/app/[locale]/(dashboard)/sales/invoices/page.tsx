@@ -168,7 +168,7 @@ function InvoicesPageContent() {
           },
         ]
       : []),
-    ...(canEdit
+    ...(canCreate
       ? [
           {
             label: 'Mark as Paid',

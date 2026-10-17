@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { ArrowLeft, Trash2, Building2, CreditCard, Calendar } from 'lucide-react';
+import { ArrowLeft, Ban, Building2, CreditCard, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -113,15 +113,15 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" className="text-destructive">
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  {tCommon('buttons.delete')}
+                  <Ban className="mr-2 h-4 w-4" />
+                  {t('payments.voidPayment')}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>{t('payments.deleteTitle')}</AlertDialogTitle>
+                  <AlertDialogTitle>{t('payments.voidPaymentTitle')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    {t('payments.deleteConfirmation')}
+                    {t('payments.voidPaymentConfirm', { number: payment.paymentNumber })}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -130,7 +130,7 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
                     onClick={handleDelete}
                     className="bg-destructive hover:bg-destructive/90"
                   >
-                    {tCommon('buttons.delete')}
+                    {t('payments.voidPayment')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
