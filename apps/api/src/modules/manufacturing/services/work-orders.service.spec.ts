@@ -80,6 +80,7 @@ describe('WorkOrdersService COGM posting (#130)', () => {
   beforeEach(() => {
     prisma = createMockPrisma();
     prisma.workOrder.updateMany.mockResolvedValue({ count: 1 });
+    prisma.workOrder.findFirst.mockResolvedValue(workOrder as never);
     prisma.warehouse.findFirst.mockResolvedValue({ id: 'wh-1' } as never);
     prisma.item.findFirst.mockResolvedValue({ inventoryAccountId: 'acc-inventory' } as never);
     prisma.account.findFirst.mockImplementation((({
@@ -109,6 +110,35 @@ describe('WorkOrdersService COGM posting (#130)', () => {
     expect(String(consumed?.[0].data.quantity)).toBe('0.3333');
   });
 
+  it('derives movements and journal from the work order reloaded inside the transaction', async () => {
+    // The pre-check sees the old BOM; an edit lands before the claim, the claimed row is final.
+    const edited = {
+      ...workOrder,
+      bom: {
+        ...workOrder.bom,
+        items: [{ ...workOrder.bom.items[0], item: { costPrice: new Decimal('6.0000') } }],
+      },
+    };
+    prisma.workOrder.findFirst.mockResolvedValue(edited as never);
+
+    await serviceWithLock().completeWorkOrder(ORG, workOrder.id, { quantityProduced: 3 });
+
+    const [journal] = writtenJournals(prisma);
+    expectBalanced(journal.lines);
+    // 3 outputs from outputQuantity 3 consume 1 x 6.00 = 6.00 + 0.50 operations
+    expect(journal.lines.find((l) => l.accountId === 'acc-inventory')?.debit.toFixed(2)).toBe(
+      '6.50',
+    );
+  });
+
+  it('takes the organization ledger lock before claiming the work order', async () => {
+    await serviceWithLock().completeWorkOrder(ORG, workOrder.id, { quantityProduced: 1 });
+
+    expect(prisma.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      prisma.workOrder.updateMany.mock.invocationCallOrder[0],
+    );
+  });
+
   it('rejects the completion when the lock date covers the completion date', async () => {
     const service = serviceWithLock(new Date('2099-01-01T00:00:00.000Z'));
 
@@ -131,9 +161,12 @@ describe('WorkOrdersService COGM posting (#130)', () => {
   describe('bulk completion', () => {
     function bulkService(lockDate: Date | null = null): WorkOrdersService {
       const service = serviceWithLock(lockDate);
-      jest
-        .spyOn(service, 'findOne')
-        .mockImplementation(async (_org: string, id: string) => ({ ...workOrder, id }) as never);
+      const byId = async (_org: string, id: string): Promise<never> =>
+        ({ ...workOrder, id }) as never;
+      jest.spyOn(service, 'findOne').mockImplementation(byId);
+      // the in-transaction reload goes through the transaction client
+      prisma.workOrder.findFirst.mockImplementation((({ where }: { where: { id: string } }) =>
+        Promise.resolve({ ...workOrder, id: where.id })) as never);
       return service;
     }
 

@@ -9,6 +9,7 @@ import { Item, Prisma, WorkOrderStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { round } from '../../../common/utils/document-totals';
+import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 import { runBulk } from '../../../common/utils/run-bulk';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
@@ -128,7 +129,15 @@ export class WorkOrdersService {
   }
 
   async findOne(organizationId: string, id: string) {
-    const workOrder = await this.prisma.workOrder.findFirst({
+    return this.loadWorkOrder(this.prisma, organizationId, id);
+  }
+
+  private async loadWorkOrder(
+    db: Prisma.TransactionClient | PrismaService,
+    organizationId: string,
+    id: string,
+  ) {
+    const workOrder = await db.workOrder.findFirst({
       where: { id, organizationId, deletedAt: null },
       include: {
         bom: {
@@ -246,8 +255,8 @@ export class WorkOrdersService {
     id: string,
     dto: { quantityProduced: number; notes?: string },
   ) {
-    const workOrder = await this.findOne(organizationId, id);
-    if (workOrder.status !== WorkOrderStatus.IN_PROCESS) {
+    const precheck = await this.findOne(organizationId, id);
+    if (precheck.status !== WorkOrderStatus.IN_PROCESS) {
       throw new BadRequestException('Work order is not in process');
     }
 
@@ -255,15 +264,21 @@ export class WorkOrdersService {
     const completedDate = new Date();
 
     return this.prisma.$transaction(async (tx) => {
+      // The ledger lock comes first so the posting accounts and costs read below are serialized
+      // with other ledger-affecting changes; journalsService.create re-takes it re-entrantly.
+      await lockOrganizationLedger(tx, organizationId);
       const { count } = await tx.workOrder.updateMany({
         where: { id, organizationId, status: WorkOrderStatus.IN_PROCESS, deletedAt: null },
-        data: {
-          status: WorkOrderStatus.COMPLETED,
-          completedDate,
-          notes: dto.notes || workOrder.notes,
-        },
+        data: { status: WorkOrderStatus.COMPLETED, completedDate },
       });
       if (count === 0) throw new ConflictException('Work order has already been completed');
+
+      // The claim holds the row, so this snapshot (BOM, quantities, notes) cannot change before
+      // the movements and the journal are derived from it.
+      const workOrder = await this.loadWorkOrder(tx, organizationId, id);
+      if (dto.notes) {
+        await tx.workOrder.update({ where: { id }, data: { notes: dto.notes } });
+      }
 
       // Consume materials proportionally
       await this.consumeMaterials(tx, organizationId, workOrder, quantityProduced);

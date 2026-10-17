@@ -442,6 +442,21 @@ describe('PayrollService run lifecycle (#130)', () => {
     expect(prisma.payslip.deleteMany).not.toHaveBeenCalled();
   });
 
+  it('rejects a single deletion whose guarded claim lost the race to a payment', async () => {
+    prisma.payrollRun.findFirst.mockResolvedValue({ ...run, status: PayrollStatus.DRAFT } as never);
+    prisma.payrollRun.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(service().deletePayrollRun(ORG, run.id)).rejects.toThrow(ConflictException);
+  });
+
+  it('reports a single deletion only when exactly one run was claimed', async () => {
+    prisma.payrollRun.findFirst.mockResolvedValue({ ...run, status: PayrollStatus.DRAFT } as never);
+
+    await expect(service().deletePayrollRun(ORG, run.id)).resolves.toEqual({
+      message: 'Payroll run deleted',
+    });
+  });
+
   it('soft-deletes the payslips of exactly the runs it claimed', async () => {
     prisma.payrollRun.updateMany.mockResolvedValue({ count: 2 });
 

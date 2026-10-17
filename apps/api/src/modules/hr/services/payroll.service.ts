@@ -458,7 +458,9 @@ export class PayrollService {
       throw new BadRequestException('Cannot delete paid payroll');
     }
 
-    await this.softDeleteRuns(organizationId, [id]);
+    const deleted = await this.softDeleteRuns(organizationId, [id]);
+    // The guarded claim can lose to a concurrent pay or delete after the read above.
+    if (deleted !== 1) throw new ConflictException('Payroll run changed and was not deleted');
     return { message: 'Payroll run deleted' };
   }
 
