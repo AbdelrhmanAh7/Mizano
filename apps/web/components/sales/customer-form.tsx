@@ -42,7 +42,7 @@ const customerSchema = z.object({
   shippingAddress: addressSchema.optional(),
 });
 
-type CustomerFormData = z.infer<typeof customerSchema>;
+export type CustomerFormData = z.infer<typeof customerSchema>;
 
 interface CustomerFormProps {
   customer?: Customer | null;
@@ -67,6 +67,36 @@ const paymentTermsOptions = [
   { value: 45, label: 'Net 45' },
   { value: 60, label: 'Net 60' },
 ];
+
+type AddressFormData = z.infer<typeof addressSchema>;
+
+const addressPayload = (address?: AddressFormData) => ({
+  street: address?.street || null,
+  city: address?.city || null,
+  state: address?.state || null,
+  postalCode: address?.postalCode || null,
+  country: address?.country || null,
+});
+
+/**
+ * The create/update body the customers API accepts: nested billingAddress/shippingAddress objects
+ * (CreateCustomerDto). Flat keys like billingStreet are rejected by the API's whitelist (#215).
+ * Empty fields are sent as null so an edit can clear them.
+ */
+export function buildCustomerPayload(data: CustomerFormData): Record<string, unknown> {
+  return {
+    name: data.name,
+    displayName: data.displayName || null,
+    email: data.email || null,
+    phone: data.phone || null,
+    currency: data.currency,
+    taxId: data.taxId || null,
+    paymentTerms: data.paymentTerms || 0,
+    notes: data.notes || null,
+    billingAddress: addressPayload(data.billingAddress),
+    shippingAddress: addressPayload(data.shippingAddress),
+  };
+}
 
 export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: CustomerFormProps) {
   const isEditing = !!customer;
@@ -129,28 +159,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
   }, [customer, form]);
 
   const handleSubmit = (data: CustomerFormData) => {
-    // Flatten addresses for API
-    const submitData = {
-      name: data.name,
-      displayName: data.displayName || null,
-      email: data.email || null,
-      phone: data.phone || null,
-      currency: data.currency,
-      taxId: data.taxId || null,
-      paymentTerms: data.paymentTerms || 0,
-      notes: data.notes || null,
-      billingStreet: data.billingAddress?.street || null,
-      billingCity: data.billingAddress?.city || null,
-      billingState: data.billingAddress?.state || null,
-      billingPostalCode: data.billingAddress?.postalCode || null,
-      billingCountry: data.billingAddress?.country || null,
-      shippingStreet: data.shippingAddress?.street || null,
-      shippingCity: data.shippingAddress?.city || null,
-      shippingState: data.shippingAddress?.state || null,
-      shippingPostalCode: data.shippingAddress?.postalCode || null,
-      shippingCountry: data.shippingAddress?.country || null,
-    };
-    onSubmit(submitData as Record<string, unknown>);
+    onSubmit(buildCustomerPayload(data));
   };
 
   const copyBillingToShipping = () => {
