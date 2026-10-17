@@ -225,7 +225,8 @@ export class AgingReportsService {
         billNumber: bill.billNumber,
         vendorId: bill.vendor.id,
         vendorName: bill.vendor.name,
-        billDate: bill.billDate,
+        // Manual bills use the required accounting date; legacy supplier metadata is optional.
+        billDate: bill.date,
         dueDate: bill.dueDate,
         daysOverdue: Math.max(0, daysOverdue),
         balanceDue,
