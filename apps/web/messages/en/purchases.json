@@ -177,7 +177,10 @@
       "dueDateRequired": "Due date is required",
       "notes": "Notes",
       "project": "Project",
-      "lineItemRequired": "At least one line item is required"
+      "lineItemRequired": "At least one line item is required",
+      "item": "Item",
+      "expenseAccount": "Expense account",
+      "expenseAccountPlaceholder": "Choose an expense account"
     },
     "table": {
       "billNumber": "Bill #",
@@ -215,7 +218,8 @@
       "quantityInvalid": "Quantity must be a non-negative number",
       "quantityPositive": "Quantity must be greater than zero",
       "rateInvalid": "Rate must be a non-negative number",
-      "taxInvalid": "Tax % must be a non-negative number"
+      "taxInvalid": "Tax % must be a non-negative number",
+      "accountRequired": "Choose an expense account"
     },
     "bulkApprove": {
       "title": "Approve and post {count} bills?",

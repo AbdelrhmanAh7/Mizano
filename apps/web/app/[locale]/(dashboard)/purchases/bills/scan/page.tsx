@@ -28,6 +28,8 @@ import {
   type DocumentIntakeResult,
 } from '@/lib/hooks/use-ai-document-intake';
 import { useCreateVendor } from '@/lib/hooks/use-vendors';
+import { useAccounts } from '@/lib/hooks/use-accounts';
+import { useItems } from '@/lib/hooks/use-items';
 import { resolveScanLineTaxes, toDecimalString } from '@/lib/document-intake-tax';
 import { BillForm, type BillFormDefaultValues } from '@/components/purchases/bill-form';
 import { cn } from '@/lib/utils';
@@ -83,6 +85,20 @@ export default function ScanBillPage() {
   const intake = useDocumentIntakeStream();
   const confirmIntake = useDocumentIntakeConfirm();
   const createVendor = useCreateVendor();
+
+  // Same account and item pickers as New Bill: every reviewed line needs an expense account.
+  const {
+    data: accountsData,
+    isLoading: accountsLoading,
+    isError: accountsError,
+    refetch: refetchAccounts,
+  } = useAccounts({ limit: 500 });
+  const {
+    data: itemsData,
+    isLoading: itemsLoading,
+    isError: itemsError,
+    refetch: refetchItems,
+  } = useItems({ limit: 500 });
 
   // Transition to review when SSE completes
   useEffect(() => {
@@ -808,20 +824,58 @@ export default function ScanBillPage() {
             </Card>
           )}
 
-          {/* Bill Form — same as New Bill */}
-          <BillForm
-            key={scanDefaults.vendorId}
-            scanDefaults={scanDefaults}
-            extractedTotals={{
-              subtotal: result.extractedFields.subtotal,
-              tax: result.extractedFields.tax,
-              total: result.extractedFields.total,
-              discount: result.extractedFields.discount,
-            }}
-            onSubmit={handleConfirm}
-            onCancel={handleReupload}
-            isSubmitting={confirmIntake.isPending}
-          />
+          {/* Options Loading State */}
+          {(accountsLoading || itemsLoading) && (
+            <Card>
+              <CardContent className="py-16 text-center space-y-4">
+                <Loader2 className="h-10 w-10 mx-auto animate-spin text-primary" />
+                <p className="text-muted-foreground">{ts('optionsLoading')}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Options Error State */}
+          {(accountsError || itemsError) && (
+            <Card className="border-destructive">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between text-destructive">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    <p>{ts('optionsLoadFailed')}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (accountsError) void refetchAccounts();
+                      if (itemsError) void refetchItems();
+                    }}
+                  >
+                    {t('retry')}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Bill Form — rendered once options are ready without error */}
+          {!accountsLoading && !itemsLoading && !accountsError && !itemsError && (
+            <BillForm
+              key={scanDefaults.vendorId}
+              scanDefaults={scanDefaults}
+              accounts={accountsData?.data || []}
+              items={itemsData?.data || []}
+              extractedTotals={{
+                subtotal: result.extractedFields.subtotal,
+                tax: result.extractedFields.tax,
+                total: result.extractedFields.total,
+                discount: result.extractedFields.discount,
+              }}
+              onSubmit={handleConfirm}
+              onCancel={handleReupload}
+              isSubmitting={confirmIntake.isPending}
+            />
+          )}
         </div>
       )}
 

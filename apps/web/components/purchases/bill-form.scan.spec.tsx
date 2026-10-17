@@ -1,12 +1,16 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { BillForm } from './bill-form';
 import enAi from '@/messages/en/ai.json';
 import arAi from '@/messages/ar/ai.json';
 
 jest.mock('next-intl', () => ({
-  useTranslations: () => (key: string, values?: Record<string, string>) =>
-    values ? `${key}|${Object.values(values).join('|')}` : key,
+  useTranslations: () =>
+    Object.assign(
+      (key: string, values?: Record<string, string>) =>
+        values ? `${key}|${Object.values(values).join('|')}` : key,
+      { has: () => false },
+    ),
 }));
 jest.mock('@/lib/hooks/use-vendors', () => ({
   useVendors: () => ({ data: { data: [] } }),
@@ -65,6 +69,27 @@ describe('BillForm scan review totals', () => {
       expect(input.step).toBe('0.0001');
       expect(input.validity.stepMismatch).toBe(false);
     }
+  });
+
+  it('gives every reviewed line an expense account picker and blocks submit until each has one', async () => {
+    const onSubmit = jest.fn();
+    render(
+      <BillForm
+        scanDefaults={{
+          ...scanDefaults,
+          vendorId: 'vendor-1',
+          lines: [...scanDefaults.lines, { description: 'RAM', quantity: '1', rate: '50' }],
+        }}
+        accounts={[{ id: 'acc-1', code: '6100', name: 'IT Expense', type: 'EXPENSE' }]}
+        onSubmit={onSubmit}
+        onCancel={jest.fn()}
+      />,
+    );
+    expect(screen.getAllByLabelText('expenseAccount')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Create Bill' }));
+    expect(await screen.findByText('line|1|accountRequired')).toBeInTheDocument();
+    expect(screen.getByText('line|2|accountRequired')).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('has the discrepancy copy in English and Arabic', () => {

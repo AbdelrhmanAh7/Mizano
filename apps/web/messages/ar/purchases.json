@@ -177,7 +177,10 @@
       "dueDateRequired": "تاريخ الاستحقاق مطلوب",
       "notes": "ملاحظات",
       "project": "المشروع",
-      "lineItemRequired": "مطلوب عنصر واحد على الأقل"
+      "lineItemRequired": "مطلوب عنصر واحد على الأقل",
+      "item": "الصنف",
+      "expenseAccount": "حساب المصروف",
+      "expenseAccountPlaceholder": "اختر حساب المصروف"
     },
     "table": {
       "billNumber": "رقم الفاتورة",
@@ -215,7 +218,8 @@
       "quantityInvalid": "يجب أن تكون الكمية رقمًا غير سالب",
       "quantityPositive": "يجب أن تكون الكمية أكبر من صفر",
       "rateInvalid": "يجب أن يكون السعر رقمًا غير سالب",
-      "taxInvalid": "يجب أن تكون نسبة الضريبة رقمًا غير سالب"
+      "taxInvalid": "يجب أن تكون نسبة الضريبة رقمًا غير سالب",
+      "accountRequired": "اختر حساب المصروف"
     },
     "bulkApprove": {
       "title": "اعتماد وترحيل {count} فاتورة؟",
