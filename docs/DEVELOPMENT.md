@@ -124,6 +124,12 @@ Rules:
 - Never delete assertions, skip tests or accept a 404 for a required route to get green. Infrastructure failure is reported as blocked, not passed.
 - Demo go/no-go is decided by the [acceptance contract](strategy/demo-acceptance.md), not by unit-test counts or coverage.
 
+### Scan intake regression checks
+
+When integrating upload-format, bill-tax and job-link changes, verify the contracts together: the scan page keeps the original HEIC source, rejects legacy DOC with a DOCX/PDF repair, enforces the shared 20 MiB upload limit, and prepares CPU-only intake without a model-mode selector. Tax amounts remain separate from reviewed percentages; decimal strings survive extraction, review and confirmation at each field's own scale: quantity and rate as fixed 4-dp strings, the tax percentage at most 2-dp, exactly as `ConfirmIntakeLineDto` validates (`document-intake.dto.spec.ts` pins it, because a mocked confirm mutation cannot see a 400). `?jobId=` opens an existing job with distinct loading, error and empty states. A failed job or a rejected upload shows a localized repair only for a known `INTAKE_<CODE>` format error (`INTAKE_REPAIR_KEYS` in the hook) and a generic localized failure otherwise, never server text. Both English and Arabic message files must retain the union of translation keys.
+
+Run the targeted web specs from `apps/web` with `npx jest --runInBand --runTestsByPath "app/[locale]/(dashboard)/purchases/bills/scan/page.spec.tsx" lib/scan-bill-page.spec.tsx lib/hooks/use-ai-document-intake.spec.ts lib/document-intake-upload.spec.ts lib/document-intake-tax.spec.ts lib/money.spec.ts lib/scan-review-error.spec.ts components/purchases/bill-form.scan.spec.tsx`, plus `npx tsc --noEmit` and ESLint with `--max-warnings 0` on edited files, and from `apps/api` `npx jest --runInBand src/modules/ai/dto/document-intake.dto.spec.ts`. On a constrained shared host, the coordinator runs broader acceptance separately. On Windows, use `npx.cmd` when PowerShell blocks `npx.ps1`; the installed executables can also be invoked through `node ../../node_modules/<package>/bin/<entrypoint>` to avoid npm interpreting pnpm-only configuration.
+
 ## CI
 
 Checks on PRs and pushes to `master`, by source:

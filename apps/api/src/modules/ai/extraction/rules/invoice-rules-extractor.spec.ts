@@ -246,13 +246,19 @@ describe('extractInvoiceFields: uncertainty', () => {
 });
 
 describe('toExtractionResult', () => {
-  it('maps rule output to the shared shape with evidence, nulls and 4-dp numbers', () => {
+  it('maps rule output with evidence, nulls and fixed 4-dp money strings', () => {
     const text = fixture('en-eg-invoice.txt');
     const result = toExtractionResult(extractInvoiceFields(text), text, 5);
-    expect(result.total).toBe(1140);
+    expect(result.total).toBe('1140.0000');
     expect(result.lineItems).toEqual([]);
     expect(result.vendorAddress).toBeNull();
     expect(result.fieldEvidence?.total?.lineIndex).toBe(10);
     expect(result.fieldConfidence.total).toBeGreaterThan(0);
+  });
+  it('preserves the fractional digits of large monetary values without a float round-trip', () => {
+    const text = 'Grand total: 123456789012345.1234';
+    expect(toExtractionResult(extractInvoiceFields(text), text, 1).total).toBe(
+      '123456789012345.1234',
+    );
   });
 });

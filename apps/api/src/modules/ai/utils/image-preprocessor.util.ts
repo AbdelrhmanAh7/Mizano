@@ -7,6 +7,9 @@
 
 import { Logger } from '@nestjs/common';
 import { describeError } from '../../../common/utils/redact';
+import * as sharp from 'sharp';
+import { estimateDeskew } from './deskew.util';
+import { IntakeFormatError } from '../intake/format-error';
 
 const logger = new Logger('ImagePreprocessor');
 
@@ -37,8 +40,6 @@ const OCR_JPEG_QUALITY = 95;
 /** Convert HEIC/HEIF buffer to JPEG. Tries sharp first, falls back to heic-convert. */
 export async function convertHeicToJpeg(buffer: Buffer): Promise<Buffer> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const sharp = require('sharp');
     const result = await sharp(buffer).jpeg({ quality: 90 }).toBuffer();
     logger.log(
       `HEIC → JPEG (sharp): ${(buffer.length / 1024).toFixed(0)}KB → ${(result.length / 1024).toFixed(0)}KB`,
@@ -49,18 +50,20 @@ export async function convertHeicToJpeg(buffer: Buffer): Promise<Buffer> {
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const convert = require('heic-convert');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires -- CJS decoder has no bundled TypeScript declarations.
+    const convert = require('heic-convert') as (options: {
+      buffer: Buffer;
+      format: 'JPEG';
+      quality: number;
+    }) => Promise<ArrayBuffer | Uint8Array>;
     const result = await convert({ buffer, format: 'JPEG', quality: 0.9 });
-    const converted = Buffer.from(result);
+    const converted = Buffer.from(result instanceof Uint8Array ? result : new Uint8Array(result));
     logger.log(
       `HEIC → JPEG (heic-convert): ${(buffer.length / 1024).toFixed(0)}KB → ${(converted.length / 1024).toFixed(0)}KB`,
     );
     return converted;
-  } catch (err) {
-    throw new Error(
-      `HEIC conversion failed: ${err instanceof Error ? err.message : err}. Please convert to JPEG before uploading.`,
-    );
+  } catch {
+    throw new IntakeFormatError('CORRUPT');
   }
 }
 
@@ -107,17 +110,24 @@ export async function preprocessForOcr(buffer: Buffer, mimeType: string): Promis
     jpegBuffer = await convertHeicToJpeg(buffer);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  let sharp: ReturnType<typeof require>;
   try {
-    sharp = require('sharp');
-  } catch {
-    logger.warn('sharp not available for OCR preprocessing');
-    return jpegBuffer;
-  }
-
-  try {
-    const result = await sharp(jpegBuffer)
+    const upright = await sharp(jpegBuffer, { limitInputPixels: 24_000_000 })
+      .rotate()
+      .flatten({ background: '#ffffff' })
+      .png()
+      .toBuffer();
+    const preview = await sharp(upright)
+      .resize(600, 600, { fit: 'inside', withoutEnlargement: true })
+      .greyscale()
+      .normalize()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    if (!preview.data.length || preview.data.every((pixel) => pixel === preview.data[0])) {
+      throw new IntakeFormatError('UNREADABLE');
+    }
+    const angle = estimateDeskew(preview.data, preview.info.width, preview.info.height);
+    const result = await sharp(upright)
+      .rotate(angle, { background: '#ffffff' })
       .resize(OCR_MAX_DIM, OCR_MAX_DIM, { fit: 'inside', withoutEnlargement: true })
       .sharpen({ sigma: 1.5 })
       .normalize()
@@ -129,8 +139,11 @@ export async function preprocessForOcr(buffer: Buffer, mimeType: string): Promis
     );
     return result;
   } catch (err) {
-    logger.warn(`OCR preprocessing failed: ${describeError(err)}`);
-    return jpegBuffer;
+    if (err instanceof IntakeFormatError) throw err;
+    logger.warn(`OCR preprocessing failed: ${describeError(err, { includeMessage: false })}`);
+    throw new IntakeFormatError(
+      err instanceof Error && /pixel limit/i.test(err.message) ? 'TOO_LARGE' : 'CORRUPT',
+    );
   }
 }
 
@@ -140,7 +153,7 @@ export async function preprocessForOcr(buffer: Buffer, mimeType: string): Promis
 
 /**
  * Progressively resize and reduce JPEG quality until the image is ≤ maxBytes.
- * Returns null if sharp is unavailable.
+ * Returns null when the image cannot be decoded or compressed.
  */
 async function compressToTarget(
   buffer: Buffer,
@@ -149,15 +162,6 @@ async function compressToTarget(
   initialMaxDim: number,
   initialQuality: number,
 ): Promise<Buffer | null> {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  let sharp: ReturnType<typeof require>;
-  try {
-    sharp = require('sharp');
-  } catch {
-    logger.warn('sharp not available for compression');
-    return null;
-  }
-
   try {
     const meta = await sharp(buffer).metadata();
     const origW = meta.width ?? 0;
@@ -173,7 +177,7 @@ async function compressToTarget(
     let result: Buffer;
     let iteration = 0;
 
-    // eslint-disable-next-line no-constant-condition
+    // eslint-disable-next-line no-constant-condition -- Byte, quality and dimension bounds below terminate the loop.
     while (true) {
       iteration++;
       result = await sharp(buffer)
@@ -203,7 +207,7 @@ async function compressToTarget(
     );
     return result;
   } catch (err) {
-    logger.warn(`compression failed: ${describeError(err)}`);
+    logger.warn(`compression failed: ${describeError(err, { includeMessage: false })}`);
     return null;
   }
 }
@@ -220,8 +224,6 @@ export async function imageToFloat32CHW(
   targetHeight: number,
   bgr = false,
 ): Promise<{ data: Float32Array; width: number; height: number }> {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const sharp = require('sharp');
   const { data, info } = await sharp(buffer)
     .resize(targetWidth, targetHeight, { fit: 'fill' })
     .removeAlpha()
@@ -253,8 +255,6 @@ export async function resizeForRecognition(
   targetHeight: number,
   maxWidth: number,
 ): Promise<{ buffer: Buffer; width: number; height: number }> {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const sharp = require('sharp');
   const meta = await sharp(buffer).metadata();
   const origW = meta.width ?? 1;
   const origH = meta.height ?? 1;
@@ -287,8 +287,6 @@ export async function cropRegion(
   width: number,
   height: number,
 ): Promise<Buffer> {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const sharp = require('sharp');
   return sharp(buffer)
     .extract({
       left: Math.round(left),
@@ -305,8 +303,6 @@ export async function cropRegion(
 export async function getImageDimensions(
   buffer: Buffer,
 ): Promise<{ width: number; height: number }> {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const sharp = require('sharp');
   const meta = await sharp(buffer).metadata();
   return { width: meta.width ?? 0, height: meta.height ?? 0 };
 }
