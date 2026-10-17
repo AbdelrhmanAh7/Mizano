@@ -385,3 +385,177 @@ Unset launcher heap_size_limit: 4395630592
 # Note: In containerized setups, MIZANO_NODE_HEAP_MB must be passed in the compose profile (#39).
 # MIZANO_NODE_HEAP_MB=1024
 ```
+
+---
+
+# Issue #113 Verification — Fix post-merge CI red on master after PR #98 and close MZ #102
+
+## Overview
+
+- **Issue**: #113 (CEO: Fix post-merge CI red on master after PR #98 and close MZ #102)
+- **Related Issues**: MZ #102 (duplicate/closed), DEPLOY #25 (tracks re-enabling automatic deploys), #213 (CI fix split), #214 (canary split)
+- **Base Commit (`origin/master`)**: `f972414`
+- **Tested Commit (`ai/113`)**: HEAD
+- **Date**: 2026-10-17
+- **Scope**: Platform / CI workflow trigger & configuration regression testing (non user-facing; no e2e-army UI test needed)
+
+---
+
+## Requirements Verification Matrix
+
+| REQ ID | Acceptance Criterion                                                                                                   | Verification Method                                                                   | Status |
+| ------ | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------ |
+| REQ-1  | AC1: Root cause identified from failing workflow logs and documented                                                   | Failing run inspection (`gh run view 37540990404`), log comparison with parent commit | PASSED |
+| REQ-2  | AC2: `deploy.yml` neutralized from automatic runs on master (`workflow_dispatch` only) with comment linking DEPLOY #25 | Inspect `.github/workflows/deploy.yml` triggers and header comment                    | PASSED |
+| REQ-3  | AC3: Rollout scope exemption hash updated and verified                                                                 | `python3 scripts/test_demo_rollout_scope.py` (12 tests pass)                          | PASSED |
+| REQ-4  | AC4: Configuration regression test demonstrates red on base and green on head                                          | `pnpm --filter api exec jest apps/api/src/common/utils/deploy-workflow.spec.ts`       | PASSED |
+| REQ-5  | AC5: Workflow states factually documented                                                                              | `gh workflow list --all` and master CI run inspection                                 | PASSED |
+| REQ-6  | AC6: CI canary separated to follow-up issue #214; MZ #102 closed with root cause                                       | Verified MZ #102 closure and CTO split decision comments                              | PASSED |
+| REQ-7  | AC7: Type-check, lint, and tests pass with diff under 300 lines                                                        | `tsc --noEmit`, `eslint`, `jest`, `git diff origin/master..HEAD --stat`               | PASSED |
+
+---
+
+## Root Cause Analysis
+
+1. **What broke:** Immediately after PR #98 merged (`615060ed6294e16375a1f1ea9385cb7e812cd24f`), the `Deploy to Production` workflow (`deploy.yml`, run `37540990404`) failed at the first SSH step:
+   ```text
+   2026/10/06 22:41:56 dial tcp ***:22: i/o timeout
+   ```
+2. **What PR #98 changed:** PR #98 changed only two documentation files (`EVIDENCE.md` and `docs/planning/MERGE-QUEUE.md`), adding 230 lines of text. It contained zero code, config, lockfile, docker, or workflow changes.
+3. **The CI workflow actually passed:** The core `CI` workflow (Install Dependencies, Lint & Type Check, Unit Tests, Build) completed successfully on the merge commit (run `37540682498`).
+4. **Pre-existing infrastructure failure:** The VM behind `DEPLOY_HOST` (34.165.73.152) has been unreachable on TCP port 22 from GitHub Actions runners since 2026-10-01 (run `36854180434`). The last successful deploy was run `33939629464` on 2026-09-05. The same SSH timeout occurred on parent commit `b83d72b` (run `37403603742`) and all 12 prior runs.
+5. **The trigger flaw:** `deploy.yml` had the trigger:
+   ```yaml
+   on:
+     workflow_run:
+       workflows: ['CI']
+       types: [completed]
+       branches: [master]
+   ```
+   Every passing CI run on master automatically spawned a deploy run that timed out and turned master status red.
+6. **The fix:** Changed `deploy.yml` triggers to `workflow_dispatch` only, neutralizing automatic execution until the GCP host is restored under DEPLOY #25. Updated `docs/planning/rollout-exemption.json` with the new file hash.
+
+---
+
+## Regression Test Red-Green Demonstration
+
+Test file: `apps/api/src/common/utils/deploy-workflow.spec.ts`
+
+### Base State (`origin/master`)
+
+On `origin/master`, `deploy.yml` contains:
+
+```yaml
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+    branches: [master]
+  release:
+    types: [published]
+  workflow_dispatch:
+```
+
+- Test 1 (`expect(Object.keys(triggers)).toEqual(['workflow_dispatch'])`): FAILS (received `['workflow_run', 'release', 'workflow_dispatch']`).
+- Test 2 (`expect(content).toMatch(/DEPLOY #25/)`): FAILS (comment absent).
+
+### Head State (`ai/113`)
+
+On `ai/113`, `deploy.yml` contains:
+
+```yaml
+# Disabled 2026-10-10: GCP host unreachable since 2026-10-01; re-enable via DEPLOY #25.
+name: Deploy to Production
+on:
+  workflow_dispatch:
+```
+
+- Test 1: PASSES (triggers equal `['workflow_dispatch']`).
+- Test 2: PASSES (matches `/DEPLOY #25/`).
+
+Command:
+
+```bash
+pnpm --filter api exec jest apps/api/src/common/utils/deploy-workflow.spec.ts
+```
+
+Output:
+
+```text
+PASS src/common/utils/deploy-workflow.spec.ts
+  Deploy workflow triggers
+    ✓ runs only on manual dispatch, never after CI or on push, release or pull request (1 ms)
+    ✓ points to the issue that owns re-enabling automatic deploys (1 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       2 passed, 2 total
+Snapshots:   0 total
+Time:        1.953 s
+```
+
+---
+
+## Rollout Scope Gate Verification
+
+Command:
+
+```bash
+python3 scripts/test_demo_rollout_scope.py
+```
+
+Output:
+
+```text
+............
+----------------------------------------------------------------------
+Ran 12 tests in 0.019s
+
+OK
+```
+
+---
+
+## Pre-Push Checks Execution Evidence
+
+### 1. Type-Check
+
+Command:
+
+```bash
+pnpm --filter api exec tsc --noEmit
+```
+
+Output:
+
+```text
+Exit code: 0 (clean, no errors)
+```
+
+### 2. Lint
+
+Command:
+
+```bash
+pnpm --filter api exec eslint src/common/utils/deploy-workflow.spec.ts
+```
+
+Output:
+
+```text
+Exit code: 0 (clean, no errors)
+```
+
+---
+
+## Workflow Status Record
+
+As of 2026-10-17:
+
+- `CI`: `active` (Passed on master runs 38999036720, 38960010996, 38846328325)
+- `Deploy to Production`: `disabled_manually` (trigger set to `workflow_dispatch` only)
+- `Claude`: `active`
+- `e2e-army`: `active`
+- `Copilot`: `active`
+- `Copilot cloud agent`: `active`
+- `Demo planning metadata`: `disabled_manually`
+- `AI implementers (Claude <-> Codex)`: `disabled_manually`
