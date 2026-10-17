@@ -142,13 +142,25 @@ describe('AccountingReportsService', () => {
           debit: D('0.1'),
           credit: D(0),
           description: 'a',
-          journal: { id: 'j1', journalNumber: 'JRN-1', date: new Date('2026-02-01'), notes: null },
+          journal: {
+            id: 'j1',
+            journalNumber: 'JRN-1',
+            date: new Date('2026-02-01'),
+            notes: null,
+            reference: 'REF-1',
+          },
         },
         {
           debit: D('0.2'),
           credit: D(0),
           description: null,
-          journal: { id: 'j2', journalNumber: 'JRN-2', date: new Date('2026-02-02'), notes: 'n' },
+          journal: {
+            id: 'j2',
+            journalNumber: 'JRN-2',
+            date: new Date('2026-02-02'),
+            notes: 'n',
+            reference: null,
+          },
         },
       ] as never);
 
@@ -158,6 +170,7 @@ describe('AccountingReportsService', () => {
       expect(result.entries.map((e) => e.runningBalance)).toEqual(['5000.6000', '5000.8000']);
       expect(result.closingBalance).toBe('5000.8000');
       expect(result.entries[1].description).toBe('n');
+      expect(result.entries.map((e) => e.reference)).toEqual(['REF-1', null]);
       const prior = prisma.journalLine.groupBy.mock.calls[0][0].where as {
         journal: { date: { lt: Date }; isPosted: boolean };
       };

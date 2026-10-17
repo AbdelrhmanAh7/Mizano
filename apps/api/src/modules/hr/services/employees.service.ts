@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { EmployeeQueryDto } from '../dto/employee-query.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateEmployeeDto } from '../dto/create-employee.dto';
@@ -42,10 +42,7 @@ export class EmployeesService {
     });
   }
 
-  async findAll(
-    organizationId: string,
-    query: PaginationDto & { isActive?: boolean | string; status?: string; department?: string },
-  ) {
+  async findAll(organizationId: string, query: EmployeeQueryDto) {
     const {
       page = 1,
       limit = 50,

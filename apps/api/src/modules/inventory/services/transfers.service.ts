@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, TransferStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { TransferQueryDto } from '../dto/transfer-query.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { TransferCursorQueryDto } from '../dto/transfer-cursor-query.dto';
@@ -73,10 +73,7 @@ export class TransfersService {
     });
   }
 
-  async findAll(
-    organizationId: string,
-    query: PaginationDto & { status?: string; fromWarehouseId?: string; toWarehouseId?: string },
-  ) {
+  async findAll(organizationId: string, query: TransferQueryDto) {
     const {
       page = 1,
       limit = 20,

@@ -68,6 +68,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Money-bearing imports require the same per-entity create permission as the single-record routes.**
 - **Adding auth to a server endpoint or socket changes its contract: update every client in the same PR** (send the token, handle expiry and reconnect). A server-only change silently breaks the client. _(events gateway vs `use-realtime`)_
 
+- **Use concrete DTO classes for `@Query()` parameters.** Intersections erase the runtime metatype, bypassing ValidationPipe transformation and leaving Prisma pagination values as strings. Decorate all service and existing client filters, preserve service defaults, and test through the real pipe options.
+
 ## 8. Voided and deleted records
 
 - **Never un-post a journal (`isPosted = false`) to undo it.** Create a linked reversal and leave the original posted. _(depreciation reversal, #130)_
@@ -96,6 +98,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 12. Caches, tests and scope
 
+- **Finite inputs do not guarantee finite arithmetic results.** Diagnostic timers must validate the elapsed difference and the accumulated safe-integer total before storing them; test subtraction overflow and repeated-stage accumulation. _(intake timings, PR #129)_
 - **Every endpoint that posts or reverses uses one `@InvalidatesLedger(...)`,** imports included, and its controller applies `@UseInterceptors(CacheInvalidationInterceptor)`: the decorator is only metadata, so without the interceptor no cache is cleared. _(#130)_
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
