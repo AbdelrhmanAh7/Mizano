@@ -91,3 +91,12 @@ describe('apps/api/Dockerfile intake directory', () => {
     expect(chownAt).toBeLessThan(dockerfile.search(/^USER nestjs/m));
   });
 });
+
+describe('.github/workflows/deploy.yml', () => {
+  it('starts the intake worker next to the api (enqueue-only api needs it)', () => {
+    const workflow = readFileSync(join(REPO_ROOT, '.github', 'workflows', 'deploy.yml'), 'utf8');
+    expect(workflow).toMatch(
+      /docker compose -f docker-compose\.production\.yml up -d --no-deps intake-worker/,
+    );
+  });
+});

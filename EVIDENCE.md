@@ -152,3 +152,14 @@ Not verified locally: `apps/api/test/*.e2e-spec.ts` (no PostgreSQL/Redis in the 
 ## Round 4 note: verifier UI/CORS findings not acted on
 
 The automated verification of `cfc325a` and `924ccd5` reported missing UI elements ("Upload", "View Jobs", "Start Worker", "Worker Configuration") and CORS errors between `localhost` and `127.0.0.1` ports. #142 changes no screen: the worker split is API/compose-only, so those elements never existed to be found. Commit `52fd0cb` built them (a "Start Worker" button that only flipped local state, a configuration dialog with hard-coded image names, loosened non-production CORS); it is reverted because it fakes worker control in the UI and is out of scope for #142. The `e2e-army` file keeps its request-level checks only (upload 401 / 201 and listed / 400). The CORS message is a verify-runner artifact (page opened on `127.0.0.1`, API calls to `localhost`), not a product change tracked by #142.
+
+---
+
+## Round 4 (deploy wiring, CTO-approved)
+
+- `.github/workflows/deploy.yml`: one added line, `docker compose -f docker-compose.production.yml up -d --no-deps intake-worker`, right after the `api` restart. No secrets, triggers or gates touched.
+- `apps/api/src/modules/ai/worker/worker-deploy-config.spec.ts`: new assertion that deploy.yml starts `intake-worker`; the existing cases cover the production and Pi compose worker (entrypoint, non-HTTP healthcheck, shared volume and Redis, CPU-only strategy) and the Dockerfile `/data/intake` chown.
+- Ran locally: `pnpm --filter api exec jest --maxWorkers=2 src/modules/ai/worker` → 2 suites, 14 tests passed. `eslint src/modules/ai/worker` clean.
+- Not run locally: full `tsc` (fails here on the unbuilt `@mizano/shared-types` package, in files this branch does not touch), and the DB-backed `intake-worker-isolation.e2e-spec.ts` and `e2e-army` file (no Postgres/Redis in the sandbox). CI is the gate for those.
+- `@types/js-yaml` is declared in `apps/api/package.json` and installed; no ts-jest diagnostics were disabled.
+- The verifier's "View Jobs / Start Worker / Upload button" and CORS findings refer to UI and CORS changes that this issue never specified; the fake worker UI and CORS loosening were removed in `d363ff1`.
