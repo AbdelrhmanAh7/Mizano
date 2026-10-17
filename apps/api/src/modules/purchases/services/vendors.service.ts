@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
+import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
+import { runBulk } from '../../../common/utils/run-bulk';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateVendorDto } from '../dto/create-vendor.dto';
 import { UpdateVendorDto } from '../dto/update-vendor.dto';
@@ -102,28 +104,9 @@ export class VendorsService {
     return { message: 'Vendor deleted' };
   }
 
-  async bulkDelete(organizationId: string, ids: string[]) {
-    // Exclude vendors that have bills
-    const vendorsWithBills = await this.prisma.vendor.findMany({
-      where: {
-        id: { in: ids },
-        organizationId,
-        deletedAt: null,
-        bills: { some: { deletedAt: null } },
-      },
-      select: { id: true },
-    });
-    const excludeIds = new Set(vendorsWithBills.map((v) => v.id));
-    const deletableIds = ids.filter((id) => !excludeIds.has(id));
-
-    const result = await this.prisma.vendor.updateMany({
-      where: {
-        id: { in: deletableIds },
-        organizationId,
-        deletedAt: null,
-      },
-      data: { deletedAt: new Date() },
-    });
-    return { deleted: result.count, total: ids.length, skipped: excludeIds.size };
+  // Same command as the single-record route: a vendor with bills or an already deleted one is
+  // reported per record in `failures` instead of being skipped silently.
+  async bulkDelete(organizationId: string, ids: string[]): Promise<BulkResultDto> {
+    return runBulk(ids, (id) => this.remove(organizationId, id));
   }
 }

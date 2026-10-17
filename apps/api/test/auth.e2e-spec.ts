@@ -380,6 +380,34 @@ describe('Logger endpoints and stream (e2e)', () => {
         await throttled.close();
       }
     });
+
+    it('throttles login per forwarded client IP without a global lockout (#184)', async () => {
+      const throttled = (
+        await Test.createTestingModule({ imports: [AppModule] }).compile()
+      ).createNestApplication();
+      await throttled.init();
+      try {
+        const api = ApiHelper.anonymous(throttled);
+        const loginFrom = async (ip: string): Promise<number> =>
+          (
+            await api
+              .post('/auth/login')
+              .set('X-Forwarded-For', ip)
+              .send({ email: 'e2e-throttle-184@mizano.test', password: 'Wrong-password-1' })
+          ).status;
+
+        const burst: number[] = [];
+        for (let i = 0; i < 6; i++) burst.push(await loginFrom('198.51.100.1'));
+        expect(burst.slice(0, 5)).toEqual([401, 401, 401, 401, 401]);
+        expect(burst[5]).toBe(429);
+
+        expect(await loginFrom('198.51.100.2')).toBe(401);
+        expect(await loginFrom('198.51.100.1')).toBe(429);
+        expect(await loginFrom('198.51.100.2')).toBe(401);
+      } finally {
+        await throttled.close();
+      }
+    });
   });
 
   describe('WebSocket /logger', () => {

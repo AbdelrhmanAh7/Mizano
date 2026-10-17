@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AcceptLanguageResolver, HeaderResolver, I18nModule, QueryResolver } from 'nestjs-i18n';
 import * as path from 'path';
 import { CacheModule } from './cache/cache.module';
@@ -41,6 +41,7 @@ import { UserPreferencesModule } from './modules/user-preferences/user-preferenc
 import { UsersModule } from './modules/users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { CommonModule } from './common/common.module';
+import { IpThrottlerGuard } from './throttler-ip.guard';
 
 @Module({
   imports: [
@@ -130,7 +131,7 @@ import { CommonModule } from './common/common.module';
   providers: [
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: IpThrottlerGuard,
     },
     {
       provide: APP_FILTER,
