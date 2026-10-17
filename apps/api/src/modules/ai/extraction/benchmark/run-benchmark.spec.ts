@@ -159,7 +159,11 @@ describe('benchmark runner', () => {
     expect(output).toMatch(/^Benchmark failed: (Error|SyntaxError|Non-Error thrown \(string\))\n$/);
   });
 
-  it.each([{ following: [] }, { following: ['--labels'] }, { following: ['--language', 'eng'] }])(
+  it.each([
+    { following: [] },
+    { following: ['--labels', 'labels.json'] },
+    { following: ['--language', 'eng'] },
+  ])(
     'rejects --out without an operand before extraction or report output (%j)',
     async ({ following }) => {
       process.argv.push('--out', ...following);
