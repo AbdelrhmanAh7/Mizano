@@ -1,8 +1,8 @@
 import { test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 
-// Request-level: GET /reports/reconciliation/ap is an API route, not a page.
-const TAGS = ['feat:mz-financial-reports', 'feat:mz-dashboard'];
+// Covers financial reports, dashboard, and aging reports features.
+const TAGS = ['feat:mz-financial-reports', 'feat:mz-dashboard', 'feat:mz-aging-reports'];
 
 interface Reconciliation {
   asOf: string;
@@ -81,5 +81,21 @@ test(
     expect(bad.status).toBe(400);
     const anonymous = await fetch(`${root}/reports/reconciliation/ap?asOf=2026-03-31`);
     expect(anonymous.status).toBe(401);
+  },
+);
+
+test(
+  '@issue-125 AC1 UI: navigation from reports displays AP reconciliation check in LTR and RTL',
+  { tags: TAGS },
+  async ({ app, agent, screen }) => {
+    await app.open('/en/login');
+    await agent.act('sign in as {email} with password {pw}', {
+      params: { email: 'admin@mizano.com', pw: 'password123' },
+    });
+    await app.open('/en/reports');
+    await agent.act('click {link}', { params: { link: 'AP Reconciliation' } });
+    await expect(screen.getByText('Reconciliation Check')).toBeVisible();
+    await app.open('/ar/reports/reconciliation/ap');
+    await expect(screen.getByText(/Reconciliation Check|فحص المطابقة/)).toBeVisible();
   },
 );

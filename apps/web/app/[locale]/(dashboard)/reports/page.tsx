@@ -60,6 +60,12 @@ export default function ReportsPage() {
           href: '/reports/ap-aging',
           icon: Building2,
         },
+        {
+          name: t('apReconciliation.title'),
+          description: t('apReconciliation.description'),
+          href: '/reports/reconciliation/ap',
+          icon: Calculator,
+        },
       ],
     },
     {

@@ -143,6 +143,8 @@ const reportsApi = {
   getSalesByCustomer: (params: DateRange) => api.get('/reports/sales-by-customer', { params }),
   getSalesByItem: (params: DateRange) => api.get('/reports/sales-by-item', { params }),
   getPurchasesByVendor: (params: DateRange) => api.get('/reports/purchases-by-vendor', { params }),
+  getApReconciliation: (asOf?: string) =>
+    api.get('/reports/reconciliation/ap', { params: asOf ? { asOf } : undefined }),
 };
 
 // --- New report interfaces ---
@@ -745,6 +747,25 @@ export function usePurchasesByVendorReport(params: DateRange) {
       return response.data?.data || response.data;
     },
     enabled: !!params.startDate && !!params.endDate,
+  });
+}
+
+export interface ApReconciliationReport {
+  asOf: string;
+  currencyCode: string;
+  subledgerTotal: string;
+  controlBalance: string;
+  difference: string;
+  ok: boolean;
+}
+
+export function useApReconciliation(asOfDate?: string) {
+  return useQuery<ApReconciliationReport>({
+    queryKey: ['reports', 'reconciliation', 'ap', asOfDate],
+    queryFn: async () => {
+      const response = await reportsApi.getApReconciliation(asOfDate);
+      return response.data?.data || response.data;
+    },
   });
 }
 

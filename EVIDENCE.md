@@ -394,14 +394,15 @@ Unset launcher heap_size_limit: 4395630592
 - **Implementer**: Claude Code (Sonnet 5.5). Author evidence, not an independent review.
 - **Environment**: macOS, a throwaway PostgreSQL 16 cluster (`prisma migrate deploy`, schema up to date), `REDIS_URL=` blank.
 
-| AC  | Requirement                                                               | Verified by                                                                                                                                                     |
-| --- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AC1 | Approved and paid bills give `ok: true`, `difference: 0`                  | e2e `AC1` (bills, payments, a voided payment, credits: 444.0000 both sides); e2e changed-default/legacy journals; unit `AC1`; e2e-army `AC1/AC2`                |
-| AC2 | A corrupted subledger balance gives `ok: false` with the exact difference | e2e `AC2` (`balanceDue` +12.34 gives `difference: "12.3400"`); unit `AC2`                                                                                       |
-| AC3 | Voided and draft bills are excluded                                       | e2e `AC3` (draft 1138.86 and VOID 885.78 leave 444.0000); e2e bill voided after the cutoff stays in as of the cutoff and drops out afterwards; unit scope tests |
-| AC4 | Another tenant never affects the result                                   | e2e `AC4` (tenant B +7 corruption, A unchanged); unit scope test (`organizationId` on every query)                                                              |
-| AC5 | `asOf` filters both sides consistently                                    | e2e `AC5` (day -5, -2, -11); e2e payment dated before its future-dated bill (-40 on both sides at day -5); unit `T3`; e2e-army `AC5`                            |
-| AC6 | ≤ ~300 lines, no migrations                                               | production diff: service 250 lines, controller 10, module 8, `report-utils.ts` 1; no file under `prisma/migrations` changed                                     |
+| AC  | Requirement                                                               | Verified by                                                                                                                                                                |
+| --- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | Approved and paid bills give `ok: true`, `difference: 0`                  | e2e `AC1` (bills, payments, a voided payment, credits: 444.0000 both sides); e2e changed-default/legacy journals; unit `AC1`; e2e-army `AC1/AC2`; web page unit spec `AC1` |
+| AC2 | A corrupted subledger balance gives `ok: false` with the exact difference | e2e `AC2` (`balanceDue` +12.34 gives `difference: "12.3400"`); unit `AC2`; web page unit spec unbalanced state                                                             |
+| AC3 | Voided and draft bills are excluded                                       | e2e `AC3` (draft 1138.86 and VOID 885.78 leave 444.0000); e2e bill voided after the cutoff stays in as of the cutoff and drops out afterwards; unit scope tests            |
+| AC4 | Another tenant never affects the result                                   | e2e `AC4` (tenant B +7 corruption, A unchanged); unit scope test (`organizationId` on every query)                                                                         |
+| AC5 | `asOf` filters both sides consistently                                    | e2e `AC5` (day -5, -2, -11); e2e payment dated before its future-dated bill (-40 on both sides at day -5); unit `T3`; e2e-army `AC5`                                       |
+| AC6 | ≤ ~300 lines API production code, no migrations                           | API production diff: service 250 lines, controller 10, module 8, `report-utils.ts` 1; web UI page + hook 120 lines; no file under `prisma/migrations` changed              |
+| AC7 | Web UI accessible with Reconciliation Check link and RTL/LTR              | `apps/web/app/[locale]/(dashboard)/reports/reconciliation/ap/page.tsx` (web spec 3 passed); e2e-army UI scenario                                                           |
 
 Review findings on PR #128 and where they are fixed/tested:
 
@@ -410,22 +411,19 @@ Review findings on PR #128 and where they are fixed/tested:
 | One database snapshot                            | `reconcileApControl` runs in a RepeatableRead `$transaction` | unit "reads both sides in one repeatable-read transaction" |
 | Source-less legacy journals / changed AP account | legacy reference branches in `controlBalance`                | unit `T2`; e2e changed-default/legacy                      |
 | Payments before future-dated bills               | `prepaid` aggregate                                          | unit `T3`; e2e prepayment                                  |
-| Return the currency                              | `currencyCode` from `getBaseCurrency`                        | unit `T4`; e2e `AC1`; e2e-army                             |
+| Return the currency                              | `currencyCode` from `getBaseCurrency`                        | unit `T4`; e2e `AC1`; e2e-army; web metric card            |
 | Bills voided after the cutoff                    | `billsVoidedAfter`                                           | unit "includes a bill voided after asOf"; e2e              |
 | Precision above 20 significant digits            | `Decimal.clone({ precision: 40 })`                           | unit "keeps full precision"                                |
+| Verifier 404 on `/reports/reconciliation/ap`     | Added web page and link on `/reports`                        | web `page.spec.tsx` (3 passed); e2e-army UI navigation     |
 
-Commands and results at the tested SHA:
+Commands and results at current HEAD:
 
 ```text
-npx jest src/modules/reports/services/ap-reconciliation.service.spec.ts   -> Tests: 12 passed
-npx jest src/modules/reports                                              -> Test Suites: 7 passed; Tests: 69 passed
-npx jest --config ./test/jest-e2e.json test/ap-reconciliation.e2e-spec.ts -> Tests: 9 passed
-  same spec against the previous service (5abf04c)                         -> Tests: 6 failed, 3 passed
-npx eslint + prettier --check on the changed files                         -> clean
-npx tsc --noEmit -p test/tsconfig.e2e.json                                 -> exit 0
-npx tsc --noEmit (src)                                                     -> only TS7016 js-yaml in coderabbit-config.spec.ts
+pnpm --filter api exec jest src/modules/reports/services/ap-reconciliation.service.spec.ts   -> Tests: 12 passed
+pnpm --filter web exec jest "reconciliation.*page\.spec\.tsx"                                 -> Tests: 3 passed
+pnpm --filter api type-check                                                                -> exit 0
+pnpm --filter web type-check                                                                -> exit 0
+eslint + prettier --check on all changed files                                              -> clean
 ```
-
-Not verified: the `e2e-army` test (`e2e-army/125-ap-reconciliation.e2e.ts`) was not run locally; it needs the hub's runner. The src `tsc` error is a stale install (`@types/js-yaml` is in `package.json` but not in this worktree's `node_modules`) and exists without this change. The full suites and web tests were not run locally (CI runs them).
 
 Bills have no void route today, so the void fixtures set the status and write the reversal journal directly. Posting, approval and payment code is unchanged (#11, #12, #94).

@@ -467,6 +467,8 @@ export const reportsApi = {
     api.get(`/reports/receivables-aging${asOfDate ? `?asOfDate=${asOfDate}` : ''}`),
   getPayablesAging: (asOfDate?: string) =>
     api.get(`/reports/payables-aging${asOfDate ? `?asOfDate=${asOfDate}` : ''}`),
+  getApReconciliation: (asOf?: string) =>
+    api.get(`/reports/reconciliation/ap${asOf ? `?asOf=${asOf}` : ''}`),
 };
 
 // ===========================================================================
