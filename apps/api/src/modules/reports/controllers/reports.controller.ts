@@ -505,8 +505,8 @@ export class ReportsController {
   getGeneralLedger(
     @CurrentOrg() orgId: string,
     @Param('accountId') accountId: string,
-    @Query('startDate') startDate: string,
-    @Query('endDate') endDate: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
     return this.financialReportsService.getGeneralLedger(orgId, accountId, startDate, endDate);
   }
