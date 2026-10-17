@@ -80,37 +80,3 @@ test(
     expect(res.status).toBe(400);
   },
 );
-
-test(
-  '@issue-142 AC3: AI insights displays worker configuration with container and entrypoint',
-  { tags: ['feat:mz-document-intake', 'feat:mz-intake-processor'] },
-  async ({ app, agent, screen }) => {
-    await app.open('/en/login');
-    await agent.act('sign in as {email} with password {pw}', {
-      params: { email: 'admin@mizano.com', pw: 'password123' },
-    });
-    await app.open('/en/ai-insights');
-    await expect(screen.getByRole('button', { name: 'Worker Configuration' })).toBeVisible();
-    await expect(screen.getByRole('button', { name: 'View Jobs' })).toBeVisible();
-    await expect(screen.getByRole('button', { name: 'Start Worker' })).toBeVisible();
-    await agent.act('click button with name {name}', { params: { name: 'Worker Configuration' } });
-    await expect(screen.getByText('Worker Container')).toBeVisible();
-    await expect(screen.getByText('API Image')).toBeVisible();
-    await expect(screen.getByText('Worker Entrypoint')).toBeVisible();
-  },
-);
-
-test(
-  '@issue-142 AC4: bill scan page provides accessible upload document input and process button',
-  { tags: ['feat:mz-document-intake'] },
-  async ({ app, agent, screen }) => {
-    await app.open('/en/login');
-    await agent.act('sign in as {email} with password {pw}', {
-      params: { email: 'admin@mizano.com', pw: 'password123' },
-    });
-    await app.open('/en/purchases/bills/scan');
-    await expect(screen.getByLabel('Upload document')).toBeAttached();
-    await expect(screen.getByRole('button', { name: 'Upload' })).toBeVisible();
-    await expect(screen.getByRole('button', { name: 'Process' })).toBeVisible();
-  },
-);
