@@ -94,12 +94,30 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # A push whose `before` commit is missing from the clone (force-push, rewritten history)
+      # makes the git diff inside paths-filter fail, so treat it like a new branch.
+      - name: Check push base commit
+        id: base
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BEFORE: ${{ github.event.before }}
+        run: |
+          usable=true
+          if [ "$EVENT_NAME" = "push" ]; then
+            if [ "$EVENT_BEFORE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${EVENT_BEFORE}^{commit}" 2>/dev/null; then
+              usable=false
+            fi
+          fi
+          echo "usable=$usable" >> "$GITHUB_OUTPUT"
+
       - name: Determine changed files
         id: filter
-        if: github.event_name != 'push' || github.event.before != '0000000000000000000000000000000000000000'
+        if: steps.base.outputs.usable == 'true'
         uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1d284f68b6a3a0 # v3.0.2
         with:
-          base: ${{ github.event_name == 'push' && github.event.before || github.event.pull_request.base.sha }}
+          # Pushes diff against the previous head. PRs leave `base` empty so the action lists the
+          # changed files through the API (pull-requests: read), which needs no local history.
+          base: ${{ github.event_name == 'push' && github.event.before || '' }}
           filters: |
             docker-changed:
               - 'apps/api/Dockerfile'
@@ -113,12 +131,9 @@ jobs:
         id: changed
         env:
           FILTER_OUTPUT: ${{ steps.filter.outputs.docker-changed }}
-          EVENT_NAME: ${{ github.event_name }}
-          EVENT_BEFORE: ${{ github.event.before }}
+          BASE_USABLE: ${{ steps.base.outputs.usable }}
         run: |
-          if [ "$EVENT_NAME" = "push" ] && [ "$EVENT_BEFORE" = "0000000000000000000000000000000000000000" ]; then
-            echo "docker-changed=true" >> "$GITHUB_OUTPUT"
-          elif [ "$FILTER_OUTPUT" = "true" ]; then
+          if [ "$BASE_USABLE" != "true" ] || [ "$FILTER_OUTPUT" = "true" ]; then
             echo "docker-changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "docker-changed=false" >> "$GITHUB_OUTPUT"
