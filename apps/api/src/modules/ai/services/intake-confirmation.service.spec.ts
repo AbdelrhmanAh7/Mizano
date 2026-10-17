@@ -1,15 +1,10 @@
 import { BadRequestException, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { DocumentIntakeService, ConfirmIntakeInput } from './document-intake.service';
-import { OllamaService } from './ollama.service';
-import { DocumentClassificationService } from './document-classification.service';
-import { EntityExtractionService } from './entity-extraction.service';
 import { AiFeedbackService } from './ai-feedback.service';
+import { IntakeConfirmationService, ConfirmIntakeInput } from './intake-confirmation.service';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
 import { BillsService } from '../../purchases/services/bills.service';
-import { ExtractionStrategyResolver } from '../extraction/extraction-strategy-resolver.service';
 
 const ORG_A = 'org-a';
 const ORG_B = 'org-b';
@@ -93,22 +88,17 @@ function baseBill(overrides: Partial<ConfirmIntakeInput> = {}): ConfirmIntakeInp
   };
 }
 
-describe('DocumentIntakeService', () => {
+describe('IntakeConfirmationService', () => {
   let prisma: PrismaMock;
   let feedback: { processFeedback: jest.Mock };
-  let service: DocumentIntakeService;
+  let service: IntakeConfirmationService;
 
   beforeEach(() => {
     prisma = buildPrisma();
     feedback = { processFeedback: jest.fn().mockResolvedValue(undefined) };
-    service = new DocumentIntakeService(
+    service = new IntakeConfirmationService(
       prisma as unknown as PrismaService,
-      {} as OllamaService,
-      { resolve: jest.fn().mockResolvedValue(null) } as unknown as ExtractionStrategyResolver,
-      {} as DocumentClassificationService,
-      {} as EntityExtractionService,
       feedback as unknown as AiFeedbackService,
-      {} as ConfigService,
     );
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
@@ -401,6 +391,42 @@ describe('DocumentIntakeService', () => {
         ),
       ).rejects.toThrow(BadRequestException);
       expect(prisma.bill.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('confirmAndCreate — AI feedback', () => {
+    it('logs ACCEPTED feedback for a bill confirmed without corrections', async () => {
+      await service.confirmAndCreate(ORG_A, baseBill());
+
+      expect(feedback.processFeedback).toHaveBeenCalledWith(ORG_A, {
+        feature: 'DOCUMENT_CLASSIFICATION',
+        aiSuggestion: { type: 'document_intake', documentType: 'BILL' },
+        userAction: 'ACCEPTED',
+        userAnswer: undefined,
+        inputData: { billNumber: 'BILL-001', vendorId: 'vendor-a' },
+      });
+    });
+
+    it('logs CORRECTED feedback with the corrections', async () => {
+      await service.confirmAndCreate(ORG_A, baseBill({ corrections: { vendor: 'Acme' } }));
+
+      expect(feedback.processFeedback).toHaveBeenCalledWith(
+        ORG_A,
+        expect.objectContaining({
+          userAction: 'CORRECTED',
+          userAnswer: JSON.stringify({ vendor: 'Acme' }),
+        }),
+      );
+    });
+
+    it('still creates the bill when feedback logging fails, logging only the error name', async () => {
+      feedback.processFeedback.mockRejectedValue(new TypeError('secret vendor detail'));
+      const warn = jest.spyOn(Logger.prototype, 'warn');
+
+      const result = await service.confirmAndCreate(ORG_A, baseBill());
+
+      expect(result.id).toBe('bill-1');
+      expect(warn).toHaveBeenCalledWith('Failed to log intake feedback: TypeError');
     });
   });
 

@@ -12,7 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import { IntakeJob, IntakeJobStatus, IntakeSource, Prisma } from '@prisma/client';
 import { describeError } from '../../../common/utils/redact';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { IntakeStage } from '../services/document-intake.service';
+import { IntakeStage } from '../services/document-intake.types';
 import { IntakeQueueService } from './intake-queue.service';
 import { buildIntakeStorageKey, IntakeStorage, sha256Hex } from './intake-storage';
 

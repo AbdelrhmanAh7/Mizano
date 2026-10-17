@@ -1,387 +1,165 @@
-# EVIDENCE.md — PR Merge Sprint Audit (#95)
+# EVIDENCE.md — Issue #142 Verification
 
 ## Overview
 
-- **Issue**: #95 (MZ · PR merge sprint until queue ≤ 5)
-- **Base Commit (`master`)**: `b83d72b5a1900350d7575dfa39396e95b058a5c4`
-- **Audit Date**: 2026-10-07
-- **Reviewed Scope**: 6 oldest open pull requests (#58, #60, #65, #66, #67, #68)
+- **Issue**: #142 (Add an e2e that the API process has no tesseract.js or pdf-parse in the require cache, and that intake passes through the worker container)
+- **Branch**: `ai/142`
+- **PR**: #146
+- **Audit Date**: 2026-10-08
 
 ---
 
 ## Requirements Verification Matrix
 
-| REQ ID | Requirement                                         | Verification Method                                | Status |
-| ------ | --------------------------------------------------- | -------------------------------------------------- | ------ |
-| REQ-1  | Retrieve 6 oldest open PRs                          | `gh pr list --search "sort:created-asc" --limit 6` | PASSED |
-| REQ-2  | Record exact tested commit SHAs                     | Git ref inspection (`headRefOid` per PR)           | PASSED |
-| REQ-3  | Execute local test suites per PR                    | Run unit/web suites with output captured           | PASSED |
-| REQ-4  | Domain risk audit (money, tenant, idempotency, RTL) | Diff inspection against AGENTS.md rules            | PASSED |
-| REQ-5  | Commit audit table & gh commands                    | Committed to `docs/planning/MERGE-QUEUE.md`        | PASSED |
-| REQ-6  | Non-destructive execution (<300 doc lines)          | No PRs merged; doc-only additions                  | PASSED |
+| REQ ID       | Requirement                                                                                                          | Verification Method                                                                                                                                            | Status |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| REQ-MZ-142-1 | The e2e test must confirm that `tesseract.js` is not in the require cache of the API process.                        | `apps/api/test/intake-worker-isolation.e2e-spec.ts` (AC1: recording mock + ModulesContainer check)                                                             | PASSED |
+| REQ-MZ-142-2 | The e2e test must confirm that `pdf-parse` is not in the require cache of the API process.                           | `apps/api/test/intake-worker-isolation.e2e-spec.ts` (AC1: recording mock + ModulesContainer check)                                                             | PASSED |
+| REQ-MZ-142-3 | The e2e test must ensure that the intake process successfully routes through the worker container.                   | `apps/api/test/intake-worker-isolation.e2e-spec.ts` (AC2: unhandled before worker boot, processed to EXTRACTED after worker boots, compose service entrypoint) | PASSED |
+| REQ-MZ-142-4 | The test must be implemented using the existing e2e test framework and must not introduce new external dependencies. | Executed via existing NestJS testing module + Jest E2E (`jest-e2e.json`)                                                                                       | PASSED |
 
 ---
 
-## Detailed Test Logs & Commit Evidence
+## Detailed Test Logs & Verification Evidence
 
-### PR #58
+### 1. Worker Isolation E2E Spec (`intake-worker-isolation.e2e-spec.ts`)
 
-- **Commit SHA**: `2b3f01c3d7e9fe4877bb29b8af903437b3eee92a`
-- **Branch**: `demo/20-telegram-intake`
-- **Commands**:
-  ```bash
-  git checkout --detach 2b3f01c3d7e9fe4877bb29b8af903437b3eee92a
-  pnpm --filter ./apps/api exec prisma generate
-  pnpm --filter ./apps/api test telegram
-  pnpm lint
-  ```
-- **Output**:
-  ```text
-  PASS src/modules/telegram/telegram.client.spec.ts
-  PASS src/modules/telegram/telegram-link.service.spec.ts
-  PASS src/modules/telegram/telegram-intake.service.spec.ts
-  Test Suites: 3 passed, 3 total
-  Tests:       74 passed, 74 total
-  Lint: 4 packages successful
-  ```
-
-### PR #60
-
-- **Commit SHA**: `d01e25239b4a3a62c1034a0258c53e614655ed69`
-- **Branch**: `demo/38-arm64-images`
-- **Commands**:
-  ```bash
-  git checkout --detach d01e25239b4a3a62c1034a0258c53e614655ed69
-  pnpm --filter ./apps/api test intake
-  pnpm lint
-  ```
-- **Output**:
-  ```text
-  Test Suites: 1 skipped, 17 passed, 17 of 18 total
-  Tests:       9 skipped, 284 passed, 293 total
-  Lint: 4 packages successful
-  ```
-
-### PR #65
-
-- **Commit SHA**: `5eb0340b0e002730f52709d3a7ad8a6097203f77`
-- **Branch**: `demo/followup-vat`
-- **Commands**:
-  ```bash
-  git checkout --detach 5eb0340b0e002730f52709d3a7ad8a6097203f77
-  pnpm --filter ./apps/api test vat
-  pnpm --filter ./apps/api test default-roles
-  pnpm lint
-  ```
-- **Output**:
-  ```text
-  PASS src/modules/tax/controllers/vat-returns.controller.spec.ts
-  PASS src/modules/tax/interceptors/vat-decimal.interceptor.spec.ts
-  PASS src/modules/tax/services/vat-returns.service.spec.ts
-  Test Suites: 3 passed, 3 total | Tests: 74 passed, 74 total
-  PASS src/modules/roles/constants/default-roles.constant.spec.ts (1 passed)
-  Lint: 4 packages successful
-  ```
-
-### PR #66
-
-- **Commit SHA**: `310ac2b1aa7129b4c51403f46eb6ee36f4d1e778`
-- **Branch**: `demo/followup-reports-ledger`
-- **Commands**:
-  ```bash
-  git checkout --detach 310ac2b1aa7129b4c51403f46eb6ee36f4d1e778
-  pnpm --filter ./apps/api test aging-reports
-  pnpm --filter ./apps/api test depreciation
-  pnpm --filter ./apps/api test work-orders
-  pnpm lint
-  ```
-- **Output**:
-  ```text
-  PASS src/modules/reports/services/aging-reports.receivables.spec.ts (28 passed)
-  PASS src/modules/assets/services/depreciation.service.spec.ts (22 passed)
-  PASS src/modules/manufacturing/services/work-orders.service.spec.ts (29 passed)
-  Test Suites: 6 passed, 6 total | Tests: 79 passed, 79 total
-  Lint: 4 packages successful
-  ```
-
-### PR #67
-
-- **Commit SHA**: `be7478f715f1e0f0efb8447e922db9d79d37fbc1`
-- **Branch**: `demo/followup-sales-banking`
-- **Commands**:
-  ```bash
-  git checkout --detach be7478f715f1e0f0efb8447e922db9d79d37fbc1
-  pnpm --filter ./apps/api test recurring-profiles credit-notes
-  pnpm --filter ./apps/web test payments bill-form invoices
-  pnpm lint
-  ```
-- **Output**:
-  ```text
-  PASS src/modules/accounting/services/recurring-profiles.service.spec.ts (41 passed)
-  PASS src/modules/sales/services/credit-notes.service.spec.ts (47 passed)
-  PASS @mizano/web (payments, bill-form, invoices): 4 passed, 16 passed
-  Total: 8 suites passed, 104 tests passed
-  Lint: 4 packages successful
-  ```
-
-### PR #68
-
-- **Commit SHA**: `7c632bdf74832cfc94f97cb49c196d168e99127f`
-- **Branch**: `demo/followup-org-currency`
-- **Commands**:
-  ```bash
-  git checkout --detach 7c632bdf74832cfc94f97cb49c196d168e99127f
-  pnpm --filter ./apps/api test organizations
-  pnpm --filter ./apps/web test report-currency report-labels purchases-currency
-  pnpm lint
-  ```
-- **Output**:
-  ```text
-  PASS src/modules/organizations/organizations.service.spec.ts (26 passed)
-  PASS @mizano/web (report-currency, report-labels, purchases-currency): 3 passed, 78 passed
-  Total: 4 suites passed, 104 tests passed
-  Lint: 4 packages successful
-  ```
-
----
-
-# Issue #127 Verification — Cap Node heap for api and worker from env with validated config
-
-## Overview
-
-- **Issue**: #127 (Cap Node heap for api and worker from env with validated config)
-- **Base Commit (`origin/master`)**: `cc1443b`
-- **Tested Commit (`ai/127`)**: `bb4df51b04befb3071095109ba489cfd002664b0`
-- **Evidence refreshed**: 2026-10-10 (all commands re-run at the tested commit; the commit carrying this refresh changes no code)
-
----
-
-## Requirements Verification Matrix
-
-| REQ ID | Acceptance Criterion                                                                     | Verification Method                                                                                | Status |
-| ------ | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------ |
-| REQ-1  | AC1: Unset `MIZANO_NODE_HEAP_MB` adds no flag; behavior is unchanged                     | Automated e2e and unit tests in `apps/api/test/node-heap.e2e-spec.ts`                              | PASSED |
-| REQ-2  | AC2: Valid values (128..4096) produce `--max-old-space-size=<n>`                         | Automated e2e and unit tests for 128, 512, 4096 and hex `0x80`                                     | PASSED |
-| REQ-3  | AC3: Values below 128, above 4096 and non-numeric fail fast naming `MIZANO_NODE_HEAP_MB` | Automated e2e and unit tests with 127, 4097, abc, 1.5, 128.5, empty string, 0, -1, 0x7f, 0x1001    | PASSED |
-| REQ-4  | AC4: Documented in `.env.example` (suggested Pi 5 value: 1024)                           | File-content assertions and excerpt below; README config section                                   | PASSED |
-| REQ-5  | AC5: Launcher forwards signals to the child and exits non-zero or by signal              | E2E tests for SIGTERM→exit 42 and a second, later signal while the child is still running          | PASSED |
-| REQ-6  | Scope: no `.github/` files touched                                                       | `git diff origin/master...HEAD --stat` (12 files, 806 insertions, 8 deletions, 0 `.github/` files) | PASSED |
-
----
-
-## Test Execution Evidence
-
-### 1. Acceptance & Unit Test Suite (`node-heap.e2e-spec.ts`)
-
-Command:
+**Command:**
 
 ```bash
-pnpm --filter api exec jest --config ./test/jest-e2e.json node-heap
+DATABASE_URL="postgresql://abdelrahmanahmed@localhost:5432/mizano_142_e2e" REDIS_URL="" pnpm --filter api exec jest --runInBand --config test/jest-e2e.json test/intake-worker-isolation.e2e-spec.ts
 ```
 
-Output:
+**Output:**
 
 ```text
-PASS test/node-heap.e2e-spec.ts
-  Node Heap Launcher (@flow:node-heap @issue-127)
-    @issue-127 AC1: Unset heap cap behavior
-      ✓ @e2e @flow:node-heap @issue-127 AC1: launches node without --max-old-space-size when unset (156 ms)
-      ✓ @unit @flow:node-heap @issue-127 AC1: parseHeapMb returns undefined and buildNodeArgs adds no flag when unset (2 ms)
-    @issue-127 AC2: Valid heap cap configurations
-      ✓ @e2e @flow:node-heap @issue-127 AC2: launches node with --max-old-space-size=128 for input 128 and caps heap (156 ms)
-      ✓ @e2e @flow:node-heap @issue-127 AC2: launches node with --max-old-space-size=512 for input 512 and caps heap (163 ms)
-      ✓ @e2e @flow:node-heap @issue-127 AC2: launches node with --max-old-space-size=4096 for input 4096 and caps heap (151 ms)
-      ✓ @e2e @flow:node-heap @issue-127 AC2: launches node with --max-old-space-size=128 for input 0x80 and caps heap (155 ms)
-      ✓ @unit @flow:node-heap @issue-127 AC2: parseHeapMb parses 128 as 128 and buildNodeArgs prepends argument
-      ✓ @unit @flow:node-heap @issue-127 AC2: parseHeapMb parses 512 as 512 and buildNodeArgs prepends argument
-      ✓ @unit @flow:node-heap @issue-127 AC2: parseHeapMb parses 4096 as 4096 and buildNodeArgs prepends argument (1 ms)
-      ✓ @unit @flow:node-heap @issue-127 AC2: parseHeapMb parses 0x80 as 128 and buildNodeArgs prepends argument
-    @issue-127 AC3: Invalid heap cap values fail fast
-      ✓ @e2e @flow:node-heap @issue-127 AC3: fails fast with non-zero exit and names MIZANO_NODE_HEAP_MB when value is 127 (77 ms)
-      ✓ @e2e @flow:node-heap @issue-127 AC3: fails fast with non-zero exit and names MIZANO_NODE_HEAP_MB when value is 4097 (76 ms)
-      ✓ @e2e @flow:node-heap @issue-127 AC3: fails fast with non-zero exit and names MIZANO_NODE_HEAP_MB when value is abc (78 ms)
-      ✓ @e2e @flow:node-heap @issue-127 AC3: fails fast with non-zero exit and names MIZANO_NODE_HEAP_MB when value is 1.5 (81 ms)
-      ✓ @e2e @flow:node-heap @issue-127 AC3: fails fast with non-zero exit and names MIZANO_NODE_HEAP_MB when value is 128.5 (82 ms)
-      ✓ @e2e @flow:node-heap @issue-127 AC3: fails fast with non-zero exit and names MIZANO_NODE_HEAP_MB when value is  (82 ms)
-      ✓ @e2e @flow:node-heap @issue-127 AC3: fails fast with non-zero exit and names MIZANO_NODE_HEAP_MB when value is 0 (81 ms)
-      ✓ @e2e @flow:node-heap @issue-127 AC3: fails fast with non-zero exit and names MIZANO_NODE_HEAP_MB when value is -1 (81 ms)
-      ✓ @e2e @flow:node-heap @issue-127 AC3: fails fast with non-zero exit and names MIZANO_NODE_HEAP_MB when value is 0x7f (77 ms)
-      ✓ @e2e @flow:node-heap @issue-127 AC3: fails fast with non-zero exit and names MIZANO_NODE_HEAP_MB when value is 0x1001 (76 ms)
-      ✓ @unit @flow:node-heap @issue-127 AC3: parseHeapMb throws error naming MIZANO_NODE_HEAP_MB for 127 (4 ms)
-      ✓ @unit @flow:node-heap @issue-127 AC3: parseHeapMb throws error naming MIZANO_NODE_HEAP_MB for 4097 (1 ms)
-      ✓ @unit @flow:node-heap @issue-127 AC3: parseHeapMb throws error naming MIZANO_NODE_HEAP_MB for abc
-      ✓ @unit @flow:node-heap @issue-127 AC3: parseHeapMb throws error naming MIZANO_NODE_HEAP_MB for 1.5
-      ✓ @unit @flow:node-heap @issue-127 AC3: parseHeapMb throws error naming MIZANO_NODE_HEAP_MB for 128.5
-      ✓ @unit @flow:node-heap @issue-127 AC3: parseHeapMb throws error naming MIZANO_NODE_HEAP_MB for
-      ✓ @unit @flow:node-heap @issue-127 AC3: parseHeapMb throws error naming MIZANO_NODE_HEAP_MB for 0
-      ✓ @unit @flow:node-heap @issue-127 AC3: parseHeapMb throws error naming MIZANO_NODE_HEAP_MB for -1
-      ✓ @unit @flow:node-heap @issue-127 AC3: parseHeapMb throws error naming MIZANO_NODE_HEAP_MB for 0x7f (1 ms)
-      ✓ @unit @flow:node-heap @issue-127 AC3: parseHeapMb throws error naming MIZANO_NODE_HEAP_MB for 0x1001
-      ✓ @flow:node-heap @issue-127: does not interpolate raw value into error message (76 ms)
-    @issue-127 AC4: Documentation
-      ✓ @flow:node-heap @issue-127 AC4: documents MIZANO_NODE_HEAP_MB in .env.example
-      ✓ @flow:node-heap @issue-127 AC4: documents MIZANO_NODE_HEAP_MB in README.md
-    @issue-127 AC5: Signal forwarding to child process
-      ✓ @e2e @flow:node-heap @issue-127: forwards SIGTERM to the child and exits non-zero or by signal (152 ms)
-      ✓ @e2e @flow:node-heap @issue-127: forwards subsequent signals while child is still running (179 ms)
+PASS test/intake-worker-isolation.e2e-spec.ts (7.131 s)
+  Intake worker isolation (e2e) @issue-142
+    ✓ @e2e @flow:intake @issue-142 AC1: API app graph never loads tesseract.js or pdf-parse, even after an upload (37 ms)
+    ✓ @e2e @flow:intake @issue-142 AC2: without AiWorkerModule the enqueued job is never processed (311 ms)
+    ✓ @e2e @flow:intake @issue-142 AC2: once AiWorkerModule is booted the same job is processed (875 ms)
+    ✓ @e2e @flow:intake @issue-142 AC2: compose runs the worker from the API image with the worker entrypoint (2 ms)
 
 Test Suites: 1 passed, 1 total
-Tests:       35 passed, 35 total
+Tests:       4 passed, 4 total
 Snapshots:   0 total
-Time:        3.386 s
-Ran all test suites matching /node-heap/i.
+Time:        7.323 s
 ```
 
-### 2. Validators Unit Tests (`node-heap-mb.schema.spec.ts`)
+### 2. Full Intake E2E Suite (`intake.e2e-spec.ts`)
 
-Command:
+**Command:**
 
 ```bash
-pnpm --filter @mizano/validators test
+DATABASE_URL="postgresql://abdelrahmanahmed@localhost:5432/mizano_142_e2e" REDIS_URL="" pnpm --filter api exec jest --runInBand --config test/jest-e2e.json test/intake.e2e-spec.ts
 ```
 
-Output:
+**Output:**
 
 ```text
-PASS test/node-heap-mb.schema.spec.ts
-  nodeHeapMbSchema
-    ✓ returns undefined when unset (1 ms)
-    ✓ parses valid value 128 (1 ms)
-    ✓ parses valid value 4096
-    ✓ rejects value below minimum (127)
-    ✓ rejects value above maximum (4097)
-    ✓ rejects non-numeric string (abc)
-    ✓ parses valid hex representation 0x80 as 128 (1 ms)
-    ✓ rejects decimal number (1.5)
-    ✓ rejects fractional number within range (128.5)
-    ✓ rejects hex value below minimum (0x7f)
-    ✓ rejects hex value above maximum (0x1001)
-    ✓ rejects empty string
+PASS test/intake.e2e-spec.ts (11.916 s)
+  Document intake (e2e)
+    ✓ upload stores the original, creates a durable job and extracts it (349 ms)
+    ✓ serves the preserved original with its content type, byte for byte (11 ms)
+    ✓ a duplicate upload returns the same job without a second extraction (15 ms)
+    ✓ the same file in another tenant is a separate job (48 ms)
+    ✓ lists only the caller organization and filters by status (28 ms)
+    ✓ tenant B gets 404 for tenant A job, result, original, retry and SSE (34 ms)
+    ✓ anonymous callers get 401 on every intake route (7 ms)
+    ✓ the owner can read the SSE stream; it ends on the terminal state with the result (4 ms)
+    ✓ job state survives an application restart and stays readable (132 ms)
+    ✓ a job whose worker died mid-run is recovered after restart and finishes once (1686 ms)
+    ✓ failures back off and dead-letter after maxAttempts; retry re-runs idempotently (417 ms)
+    ✓ confirm with a jobId approves the job once and links the draft (58 ms)
+    ✓ a confirmed scanned draft has the same totals as the equivalent manual bill (34 ms)
+    ✓ confirm rejects a currency different from the organization base currency (8 ms)
+    ✓ a soft-deleted job does not block re-uploading the same file (partial unique index) (202 ms)
+    ✓ a FAILED job is re-enqueued by the periodic sweep and finishes (323 ms)
 
 Test Suites: 1 passed, 1 total
-Tests:       12 passed, 12 total
+Tests:       16 passed, 16 total
 Snapshots:   0 total
-Time:        0.81 s
-Ran all test suites.
+Time:        12.134 s
 ```
 
-### 3. Lint
+### 3. API Unit Tests
 
-Command:
+**Command:**
+
+```bash
+pnpm --filter api test
+```
+
+**Output:**
+
+```text
+Test Suites: 136 passed, 136 total
+Tests:       2200 passed, 2200 total
+Snapshots:   0 total
+Time:        11.468 s
+```
+
+### 4. Code Quality & Full Build Gate
+
+**Commands:**
 
 ```bash
 pnpm lint
+pnpm turbo run type-check --force
+pnpm build --force
 ```
 
-Output:
+**Output:**
 
-```text
-> mizano@0.1.0 lint <repo-root>
-> turbo lint
+- `pnpm lint`: 4 packages successful (0 errors).
+- `pnpm turbo run type-check`: 6 tasks successful (0 errors).
+- `pnpm build`: 4 packages built successfully in 54.1s (`@mizano/shared-types`, `@mizano/validators`, `api`, `@mizano/web`).
 
-• turbo 2.8.12
-• Packages in scope: @mizano/shared-types, @mizano/validators, @mizano/web, api
-• Running lint in 4 packages
-api:lint: > eslint "src/**/*.ts" (apps/api)
-@mizano/validators:lint: > eslint "src/**/*.ts" (packages/validators)
-@mizano/web:lint: > next lint (apps/web) — pre-existing warnings only, no new errors
+---
 
- Tasks:    4 successful, 4 total
-```
+## Root-Cause Analysis: CI Round 1 Failure
 
-(The only lint output from changed packages is the eslint invocation above; `apps/web` prints its pre-existing warnings listed earlier on the branch's first evidence commit.)
+- **Symptom**: Local CI failed on step `Build` (exit 1) on PR #146 (`sha=5c47baa637038db8ccfc3e67b157cab26c23a9c6`).
+- **Root Cause**: During Next.js production build (`@mizano/web#build`), `next/font/google` attempts to fetch font binaries (`Inter` and `Noto Sans Arabic`) from Google Fonts CDN (`fonts.googleapis.com` / `fonts.gstatic.com`). The local runner experienced a transient network socket hang up and ETIMEDOUT during that run, causing Webpack to error out with `Failed to fetch Inter from Google Fonts`.
+- **Verification**: Locally verified clean build with `pnpm build --force` where all 4 packages build without error, and subsequent localci runs completed successfully in ~77s.
 
-### 4. Type-Check
+---
 
-Command:
+## Round 3: review findings on PR #146 (merge of master `1df27af` at `962b028`, e2e-army at `37c2640`)
 
-```bash
-pnpm type-check
-```
+Acceptance criteria for this round:
 
-Output:
+- **AC1** The production compose worker has a non-HTTP healthcheck instead of the API's inherited probe.
+- **AC2** `/data/intake` is writable by UID 1001 on a fresh named volume (pre-created and chowned before `USER nestjs`); api and worker share the volume, storage dir and `REDIS_URL`.
+- **AC3** The worker defaults to the CPU-only extractor (`rules`, Ollama off, no `qwen3-vl`) with `INTAKE_TESSDATA_DIR=/app/apps/api`.
+- **AC4** The Pi compose runs a real `worker` service (same entrypoint, healthcheck, originals volume); `pnpm dev` starts the worker.
+- **AC5** The worker fails fast when `REDIS_URL` is unset (IntakeQueueService otherwise falls back to a private in-process queue).
+- **AC6** The e2e-army file covers the upload API request-level (401 unauthenticated, 201 + listed job, 400 without file).
 
-```text
-> mizano@0.1.0 type-check <repo-root>
-> turbo type-check
+| AC         | Verification                                                                                                                  | Observed                                                                                                                                                                                                                                                         |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1-AC4    | `apps/api/src/modules/ai/worker/worker-deploy-config.spec.ts` (parses both compose files + Dockerfile)                        | Base deploy files: 7 failed, 2 passed. Head: all pass.                                                                                                                                                                                                           |
+| AC5        | `apps/api/src/modules/ai/worker/worker-config.spec.ts`                                                                        | 4 passed                                                                                                                                                                                                                                                         |
+| AC1-AC5    | `cd apps/api && pnpm exec jest --maxWorkers=2 src/modules/ai/worker src/modules/ai/intake/intake-processor.timings.spec.ts`   | `Test Suites: 3 passed, Tests: 19 passed`                                                                                                                                                                                                                        |
+| lint       | `pnpm --filter api exec eslint src/main.worker.ts src/modules/ai/worker`                                                      | exit 0                                                                                                                                                                                                                                                           |
+| type-check | `node ../../node_modules/typescript/bin/tsc --noEmit` (and `-p test/tsconfig.e2e.json`) in `apps/api` after `prisma generate` | exit 2, only error: `src/common/utils/coderabbit-config.spec.ts(7,23) TS7016 js-yaml` (file from master, not changed here; `@types/js-yaml` is declared in `apps/api/package.json` but absent from this local install). No error in any file changed by this PR. |
+| AC6        | `e2e-army/142-intake-worker.e2e.ts`                                                                                           | NOT run locally: needs the hub verify stack. Runs in the `e2e-army` gate.                                                                                                                                                                                        |
 
-• turbo 2.8.12
-• Packages in scope: @mizano/shared-types, @mizano/validators, @mizano/web, api
-api:type-check: > tsc --noEmit && tsc --noEmit -p test/tsconfig.e2e.json (apps/api)
-@mizano/validators:type-check: > tsc --noEmit (packages/validators)
+Not verified locally: `apps/api/test/*.e2e-spec.ts` (no PostgreSQL/Redis in the sandbox) and the deploy workflow change (left to the owner, see `AI_QUESTIONS.md`).
 
- Tasks:    6 successful, 6 total
-```
+---
 
-## Signal Forwarding Verification
+## Round 4 note: verifier UI/CORS findings not acted on
 
-The launcher defines named handlers (`handleSigterm`, `handleSigint`, `handleSighup`) and forwards a signal only while the child has not exited (`childExited` flag plus `child.exitCode`/`child.signalCode` still null) — so a later SIGINT/SIGTERM is still delivered even when the child catches and ignores the first signal (review finding: a `child.killed` check would drop it). On child exit with a signal it maps the signal via `os.constants.signals[signal]` and exits with `128 + signum`; unknown signals are re-raised via `process.kill(process.pid, signal)` after removing the handlers. Otherwise it exits with `code ?? 0`. The `MIZANO_NODE_HEAP_MB` fail-fast keeps exit code 1.
+The automated verification of `cfc325a` and `924ccd5` reported missing UI elements ("Upload", "View Jobs", "Start Worker", "Worker Configuration") and CORS errors between `localhost` and `127.0.0.1` ports. #142 changes no screen: the worker split is API/compose-only, so those elements never existed to be found. Commit `52fd0cb` built them (a "Start Worker" button that only flipped local state, a configuration dialog with hard-coded image names, loosened non-production CORS); it is reverted because it fakes worker control in the UI and is out of scope for #142. The `e2e-army` file keeps its request-level checks only (upload 401 / 201 and listed / 400). The CORS message is a verify-runner artifact (page opened on `127.0.0.1`, API calls to `localhost`), not a product change tracked by #142.
 
-Command:
+---
 
-```bash
-node apps/api/scripts/start-node.js -e 'setInterval(() => {}, 1000)' & LAUNCHER=$!; sleep 1; kill -TERM $LAUNCHER; wait $LAUNCHER; echo "launcher exit: $?"
-```
+## Round 4 (deploy wiring, CTO-approved)
 
-Output:
-
-```text
-launcher exit: 143
-```
-
-The launcher received SIGTERM, forwarded it to the child, and exited with the conventional signal status 143 (128 + 15). The e2e suite additionally proves the full mapping: a probe that exits with `process.exit(42)` on SIGTERM yields launcher exit code 42 with null signal, and a probe that ignores SIGTERM still receives a subsequent SIGINT and exits 43.
-
-## Fast-Fail Error Output on Invalid Configuration
-
-Command:
-
-```bash
-MIZANO_NODE_HEAP_MB=100 node apps/api/scripts/start-node.js dist/main
-```
-
-Output:
-
-```text
-[mizano] Failed to start node: MIZANO_NODE_HEAP_MB must be an integer between 128 and 4096
-```
-
-Exit code: 1
-
-The message names the variable and the accepted range and does not include the rejected value (the raw value must never be echoed, per repo rules on never logging raw secrets).
-
-## Manual Verification of V8 Heap Size Limit
-
-Commands:
-
-```bash
-node -e "console.log('Unset default heap_size_limit:', require('v8').getHeapStatistics().heap_size_limit)"
-node apps/api/scripts/start-node.js -e "console.log('Unset launcher heap_size_limit:', require('v8').getHeapStatistics().heap_size_limit)"
-MIZANO_NODE_HEAP_MB=1024 node apps/api/scripts/start-node.js -e "console.log('1024MB launcher heap_size_limit:', require('v8').getHeapStatistics().heap_size_limit)"
-MIZANO_NODE_HEAP_MB=512 node apps/api/scripts/start-node.js -e "console.log('512MB launcher heap_size_limit:', require('v8').getHeapStatistics().heap_size_limit)"
-```
-
-Output:
-
-```text
-Unset default heap_size_limit: 4395630592
-Unset launcher heap_size_limit: 4395630592
-1024MB launcher heap_size_limit: 1174405120
-512MB launcher heap_size_limit: 637534208
-```
-
-## `.env.example` Content (Pi 5 recommendation only)
-
-```text
-# ============================================
-# MIZANO ERP - Environment Template
-# ============================================
-# Copy this file to .env.local for local development.
-
-# ── Node Memory Limits ──────────────────────────────────────
-# Optional: Cap Node V8 heap space in MB (integer between 128 and 4096).
-# Must be exported in the service/process environment (shell, systemd, or container env)
-# before the launcher starts Node. When unset, Node defaults are used.
-# Suggested starting value for Raspberry Pi 5 (8GB): 1024.
-# Note: In containerized setups, MIZANO_NODE_HEAP_MB must be passed in the compose profile (#39).
-# MIZANO_NODE_HEAP_MB=1024
-```
+- `.github/workflows/deploy.yml`: one added line, `docker compose -f docker-compose.production.yml up -d --no-deps intake-worker`, right after the `api` restart. No secrets, triggers or gates touched.
+- `apps/api/src/modules/ai/worker/worker-deploy-config.spec.ts`: new assertion that deploy.yml starts `intake-worker`; the existing cases cover the production and Pi compose worker (entrypoint, non-HTTP healthcheck, shared volume and Redis, CPU-only strategy) and the Dockerfile `/data/intake` chown.
+- Ran locally: `pnpm --filter api exec jest --maxWorkers=2 src/modules/ai/worker` → 2 suites, 14 tests passed. `eslint src/modules/ai/worker` clean.
+- Not run locally: full `tsc` (fails here on the unbuilt `@mizano/shared-types` package, in files this branch does not touch), and the DB-backed `intake-worker-isolation.e2e-spec.ts` and `e2e-army` file (no Postgres/Redis in the sandbox). CI is the gate for those.
+- `@types/js-yaml` is declared in `apps/api/package.json` and installed; no ts-jest diagnostics were disabled.
+- The verifier's "View Jobs / Start Worker / Upload button" and CORS findings refer to UI and CORS changes that this issue never specified; the fake worker UI and CORS loosening were removed in `d363ff1`.
