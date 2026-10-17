@@ -30,8 +30,8 @@ describe('CodeRabbit configuration', () => {
     const reviews = config.reviews as Record<string, unknown>;
     const autoReview = reviews.auto_review as Record<string, unknown>;
 
-    // Essentials plan: 5 reviews/hour/repo. One automatic review per PR; follow-up
-    // pushes are re-reviewed only when the hub posts `@coderabbitai review`.
+    // Essentials plan: 5 reviews/hour/repo. Reviews are manual only; every review,
+    // first and follow-up, runs when the hub posts `@coderabbitai review`.
     expect(autoReview.auto_incremental_review).toBe(false);
     // Pausing only applies to automatic incremental reviews, so it must stay unset.
     expect(autoReview).not.toHaveProperty('auto_pause_after_reviewed_commits');
@@ -47,14 +47,16 @@ describe('CodeRabbit configuration', () => {
     expect(requestChangesWorkflow).toBe(true);
   });
 
-  it('should have auto_review enabled for non-draft PRs on master', () => {
+  it('should leave reviews and chat replies to the hub (auto_review and auto_reply off)', () => {
     const fileContents = fs.readFileSync(configPath, 'utf8');
     const config = yaml.load(fileContents) as Record<string, unknown>;
 
     const reviews = config.reviews as Record<string, unknown>;
     const autoReview = reviews.auto_review as Record<string, unknown>;
+    const chat = config.chat as Record<string, unknown>;
 
-    expect(autoReview.enabled).toBe(true);
+    expect(autoReview.enabled).toBe(false);
+    expect(chat.auto_reply).toBe(false);
     expect(autoReview.drafts).toBe(false);
     expect(autoReview.base_branches).toEqual(['master']);
   });
@@ -68,13 +70,26 @@ describe('CodeRabbit configuration', () => {
     const customChecks = preMergeChecks.custom_checks as Array<{ name: string; mode: string }>;
 
     expect(reviews.profile).toBe('assertive');
-    expect(reviews.high_level_summary).toBe(false);
     expect(reviews.poem).toBe(false);
     expect(preMergeChecks.issue_assessment).toEqual({ mode: 'warning' });
     expect(customChecks.length).toBeGreaterThan(0);
     for (const check of customChecks) {
       expect({ name: check.name, mode: check.mode }).toEqual({ name: check.name, mode: 'warning' });
     }
+  });
+
+  it('should include summaries, review details and finishing touches in each review', () => {
+    const fileContents = fs.readFileSync(configPath, 'utf8');
+    const config = yaml.load(fileContents) as Record<string, unknown>;
+
+    const reviews = config.reviews as Record<string, unknown>;
+
+    expect(reviews.high_level_summary).toBe(true);
+    expect(reviews.high_level_summary_in_walkthrough).toBe(true);
+    expect(reviews.review_details).toBe(true);
+    expect(reviews.sequence_diagrams).toBe(true);
+    expect(reviews.assess_linked_issues).toBe(true);
+    expect(reviews.finishing_touches).toEqual({ docstrings: { enabled: true } });
   });
 
   it('should have path_filters configured to skip lockfiles and build output', () => {
