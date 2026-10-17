@@ -394,7 +394,7 @@ Unset launcher heap_size_limit: 4395630592
 - Code and test files last changed at `56cdd9e` (`git diff --name-only 56cdd9e af43d36` lists only `EVIDENCE.md`). Every result below that is marked "re-run" was run on `af43d36e4dc877489d71b1b2ceebac7012e34568`, whose code and test tree is identical to `56cdd9e`.
 - The commit that carries this text changes only `EVIDENCE.md`, so the tested code is still `af43d36`/`56cdd9e`.
 
-E2E-army test: not added. This is a backend read-only route with no UI change. The isolation is proven by the API e2e spec below.
+E2E-army test: `e2e-army/223-general-ledger-isolation.e2e.ts` (request-level, AC3: missing and malformed token → 401, tagged `feat:mz-general-ledger`). Added after `af43d36`; it has NOT been run locally (the gate needs the hub's throwaway stack). 200/404 cases need seeded tenants and stay in the API e2e spec.
 
 ## Acceptance criteria
 
