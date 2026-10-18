@@ -250,3 +250,7 @@ Round 8 (`9d4c20d`, `76ed8e8` and the commit that records this text; CodeRabbit 
 - **No CI coverage for E2E.** `pnpm ci:full` runs no E2E, so this spec needs a Postgres CI job (FLOAT-AUDIT.md, CI suggestions).
 - **Diff size.** The diff is over the ~300-line guide. About 30 lines are production code (`git diff --stat master HEAD -- apps/api/src packages ':!*.spec.ts'`); most of the rest is the evidence tests the issue asked for, plus this file and FLOAT-AUDIT.md.
 - **Sandbox.** Inside the sandbox `pnpm install` cannot write package files, jest cannot write its cache, and `initdb` cannot get shared memory, so those commands ran outside it.
+
+## Round 5 re-run (head `05def4a`)
+
+`posting-integrity.e2e-spec.ts` on a throwaway PostgreSQL (`DEVELOPMENT.md` steps, `prisma migrate deploy` applied): 11 tests, 11 passed, exit 0. The `e2e-army` journal test needs the hub stack and was not run locally.
