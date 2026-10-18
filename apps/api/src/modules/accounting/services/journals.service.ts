@@ -57,6 +57,7 @@ export interface CreateJournalOptions {
 
 type JournalLineInput = CreateJournalDto['lines'][number];
 
+const PLAIN_DECIMAL = /^\d+(\.\d+)?$/;
 const AMOUNT_LIMIT = new Decimal(10).pow(MAX_INTEGER_DIGITS);
 
 const JOURNAL_INCLUDE = {
@@ -73,12 +74,11 @@ type JournalWithLines = Prisma.JournalGetPayload<{ include: typeof JOURNAL_INCLU
 
 function parseAmount(value: string | undefined, field: string): Decimal {
   if (value === undefined || value === null || value === '') return new Decimal(0);
-  let amount: Decimal;
-  try {
-    amount = new Decimal(value);
-  } catch {
+  // Same grammar as the shared validator; Decimal alone also accepts `1e3`, `0x10` and `1_0`.
+  if (!PLAIN_DECIMAL.test(value)) {
     throw new BadRequestException(`${field} must be a valid decimal number`);
   }
+  const amount = new Decimal(value);
   if (!amount.isFinite() || amount.isNegative()) {
     throw new BadRequestException(`${field} must be a non-negative decimal number`);
   }

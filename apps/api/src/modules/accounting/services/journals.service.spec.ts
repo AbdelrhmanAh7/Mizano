@@ -128,6 +128,22 @@ describe('JournalsService', () => {
       expect(prisma.journal.create).not.toHaveBeenCalled();
     });
 
+    it.each(['1e3', '0x10', '1_0', '-5', 'Infinity', '5.'])(
+      'rejects the non-plain-decimal amount %s the shared validator would also refuse',
+      async (amount) => {
+        const dto = {
+          date: '2024-06-15T00:00:00.000Z',
+          lines: [
+            { accountId: 'acc-1', debit: amount },
+            { accountId: 'acc-2', credit: amount },
+          ],
+        };
+
+        await expect(service.create(ORG_ID, dto)).rejects.toThrow('decimal number');
+        expect(prisma.journal.create).not.toHaveBeenCalled();
+      },
+    );
+
     it('rejects amounts beyond Decimal(19, 4) up front and keeps the largest one exact', async () => {
       const lines = (amount: string) => [
         { accountId: 'acc-1', debit: amount },
