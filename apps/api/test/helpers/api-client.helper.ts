@@ -1,5 +1,5 @@
 import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 
 /**
  * Supertest wrapper that sends a real bearer token (see `registerTenant`). There is no default

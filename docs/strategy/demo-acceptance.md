@@ -4,6 +4,25 @@
 
 Target: a tiny live deployment on a Raspberry Pi 5 (8GB, arm64), tracked by epic #45. The ten-day demo target is superseded by the Pi plan (#45). This is a proposed test/release contract, not an assertion of passing results. All checks apply to the exact candidate SHA on the actual CPU demo environment.
 
+## Pi execution and sign-off
+
+Follow the [Pi live acceptance runbook](../../deploy/pi/RUNBOOK.md) (#44, replacing #26 for
+the Pi target) with an operator and accountant. Run on the actual Pi 5 (8GB, arm64), attached
+SSD and final digest-deployed release through HTTPS. Execute the full seeded journey in
+English and Arabic, each at desktop and 375px, including both Telegram and web intake.
+
+Capture AR and AP aging, trial balance, P&L and balance sheet at consistent dates/currency,
+with exact ledger reconciliation and before/after payment figures. Capture originals, extraction
+version, correction/approval audit, timings and restricted synthetic-data screenshots. Record
+all operator interventions; undocumented repair needed to finish the flow fails acceptance.
+
+The supplied DB restore drill alone is insufficient: also restore matching originals in an
+isolated application and verify source-to-ledger links and reports. Demonstrate delivered
+monitoring alerts/recovery and compatible digest rollback, then verify the final candidate.
+Every required gate below must PASS for GO. FAIL, BLOCKED, NOT RUN or missing evidence means
+NO-GO, with the gap, owner and issue recorded. Neither documentation completion nor container
+health is proof that live acceptance passed.
+
 ## Required journey
 
 1. Log in as accountant A; show an independent tenant B cannot see A's records. Verify concurrent refresh isolation.
@@ -12,7 +31,7 @@ Target: a tiny live deployment on a Raspberry Pi 5 (8GB, arm64), tracked by epic
 4. Show supplier matching and duplicate detection. Replay the Telegram update, double-click a web request and restart a worker. Each source must create at most one active draft/posting.
 5. Review sources and fields in one inbox. Correct only flagged values. Approve a selected valid batch in one action. Missing currency, totals mismatch and invalid tenant account references cannot pass.
 6. Demonstrate exact arithmetic: 2 × 100, 14% tax → net 200, tax 28, gross 228 through scan and manual entry. Include discount, decimal and mixed-tax cases; totals reconcile per declared rounding.
-7. Record a partial payment, inspect remaining AP, trial balance and journal. Reverse a posted transaction and show linked corrections without rewriting history. Try a locked-period single/bulk action and concurrent approval; both controls must hold.
+7. Record partial supplier and customer payments, inspect remaining AP/AR, trial balance, P&L, balance sheet and journals. Reverse a posted transaction and show linked corrections without rewriting history. Try a locked-period single/bulk action and concurrent approval; both controls must hold.
 8. Use charts to drill through to the same posted records. Show drafts separately, correct date/as-of filters and EGP denomination.
 9. Restart the CPU instance/worker and recover a queued job; restore backup into an isolated database and verify original-to-ledger links. Display the deployed SHA/digest.
 

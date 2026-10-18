@@ -2,6 +2,17 @@
 
 Applies repository-wide. Read this first, then the provider entrypoint, [current roadmap](docs/roadmap.md), [agent operations](docs/agents/README.md) and the assigned issue. The current user goal supersedes old autonomous-accounting/Colab-first product claims. Do not rewrite instructions to bypass authorization or tests.
 
+## Documentation is part of the change
+
+Every agent and human must update **every affected `.md` file in the same PR**: READMEs,
+`docs/*`, `deploy/pi/README.md`, `AGENTS.md`/`CLAUDE.md` for rule or command changes,
+`docs/agents/review-lessons.md` for new root causes, and roadmap/status for milestone progress.
+Verify claims against current code; separate requirements, implementation and live evidence.
+If behavior changes without a documentation update, the PR body must contain a standalone
+line starting with `Docs: not needed because` followed by the reason. CI `docs-check` gates
+changes under `apps/`, `packages/`, `deploy/` and `.github/`; reviewers assess relevance,
+freshness and exemptions. An unrelated Markdown edit does not meet this rule.
+
 ## Goal
 
 Run a tiny live deployment on a **Raspberry Pi 5 (8GB, arm64)** with the full accountant flow: core ledger (AP/AR, reports, Arabic/English) + invoice intake (web upload, CPU-only extraction, validated drafts, batch approval) + Telegram ingestion. Tracking epic: GitHub issue #45. Milestones: P1 Pi platform, P2 Ledger correctness, P3 Intake & Telegram, P4 Pi go-live. Project board: `Mizano — Pi Live`.
@@ -34,4 +45,4 @@ Use current package scripts; `pnpm ci:full` currently covers lint, type-check an
 
 Pure documentation changes need links/format/content verification and repository-required CI; planning scripts additionally need their offline tests. Do not weaken gates for a pending PR. Bind review and deployment to exact SHAs/digests. A documentation/planning-only change should not redeploy the application. Do not reset existing databases or rotate real secrets without the appropriate operator workflow.
 
-Finish each session with issue/PR links, actual provider/version, tested SHA, commands/results, remaining risks, lease release and next task in a durable checkpoint. The full [acceptance contract](docs/strategy/demo-acceptance.md) decides go/no-go.
+Finish each session with issue/PR links, actual provider/version, tested SHA, commands/results, remaining risks, lease release and next task in a durable checkpoint: the PR description or an issue comment. Never commit run notes or checkpoint files (`docs/agents/runs/`, `*-checkpoint.md`, `CHECKPOINT.md`) to the repo. The full [acceptance contract](docs/strategy/demo-acceptance.md) decides go/no-go.
