@@ -201,7 +201,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const exceptionResponse = exception.getResponse();
 
     let message: string = exception.message;
-    // A 401 always carries error 'Unauthorized', even when the thrower gave no `error` field.
+    // Fallback error for 401 is 'Unauthorized' when the exception response specifies no error field.
     const fallbackError = status === HttpStatus.UNAUTHORIZED ? 'Unauthorized' : 'Error';
     let error: string = fallbackError;
     let details: Record<string, unknown> | undefined;

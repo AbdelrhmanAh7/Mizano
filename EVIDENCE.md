@@ -394,20 +394,20 @@ Unset launcher heap_size_limit: 4395630592
 
 - **Issue**: #219 ([e2e] Authentication and sessions failing on master)
 - **Base Commit (`origin/master`)**: `44b689e6b39a14da19a893cb19408eb62357cddd`
-- **Tested Commit (`ai/219`)**: `02cabdba365b614d27d46778f6bae81acaa59839`
+- **Tested Commit (`ai/219`)**: `48c920cc8ea895dbaf6857c92c6266592338b41f`
 - **Originating Sentry issue**: None (gate failure on hub stable e2e run `mz-auth.3`, not production)
-- **Decision reference**: CTO direction on issue #219 / PR #234 (maintain 'Validation failed' and 'Unauthorized')
+- **Decision reference**: CTO direction on issue #219 (https://github.com/AbdelrhmanAh7/Mizano/issues/219#issuecomment-6246814448, item `q:AbdelrhmanAh7/Mizano#234`): maintain 'Validation failed' and 'Unauthorized'
 
 ---
 
 ## Requirements Verification Matrix
 
-| REQ ID | Acceptance Criterion                                                                               | Verification Method                                                                                                      | Status |
-| ------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------ |
-| REQ-1  | AC1: Registration validation error returns 400 `VALIDATION_ERROR` with uppercase rule in `details` | `http-exception.filter.spec.ts` unit test, `auth.e2e-spec.ts`, `e2e-army/219-auth-error-contract.e2e.ts`                 | PASSED |
-| REQ-2  | AC2: Missing, forged or invalid JWT token returns 401 with `error: 'Unauthorized'`                 | `jwt-auth.guard.spec.ts`, `http-exception.filter.spec.ts`, `auth.e2e-spec.ts`, `e2e-army/219-auth-error-contract.e2e.ts` | PASSED |
-| REQ-3  | AC3: Validation error message is `'Validation failed'` (sentence case, per CTO decision)           | `http-exception.filter.spec.ts`, `http-exception.filter.ts:220`, `auth.e2e-spec.ts`                                      | PASSED |
-| REQ-4  | AC4: 401 error response explicitly provides `error: 'Unauthorized'` fallback                       | `http-exception.filter.ts:205`, `jwt-auth.guard.ts:28`, `http-exception.filter.spec.ts`                                  | PASSED |
+| REQ ID | Acceptance Criterion                                                                                           | Verification Method                                                                                                      | Status |
+| ------ | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------ |
+| REQ-1  | AC1: Registration validation error or invalid login returns 400 `VALIDATION_ERROR` with rule name in `details` | `http-exception.filter.spec.ts` unit tests, `auth.e2e-spec.ts`, `e2e-army/219-auth-error-contract.e2e.ts`                | PASSED |
+| REQ-2  | AC2: Missing, forged or invalid JWT token returns 401 with `error: 'Unauthorized'`                             | `jwt-auth.guard.spec.ts`, `http-exception.filter.spec.ts`, `auth.e2e-spec.ts`, `e2e-army/219-auth-error-contract.e2e.ts` | PASSED |
+| REQ-3  | AC3: Validation error message is `'Validation failed'` (sentence case, per CTO decision)                       | `http-exception.filter.spec.ts`, `http-exception.filter.ts:220`, `auth.e2e-spec.ts`                                      | PASSED |
+| REQ-4  | AC4: 401 error response explicitly provides `error: 'Unauthorized'` fallback                                   | `http-exception.filter.ts:205`, `jwt-auth.guard.ts:28`, `http-exception.filter.spec.ts`                                  | PASSED |
 
 ---
 
@@ -428,7 +428,7 @@ PASS src/common/guards/jwt-auth.guard.spec.ts
 PASS src/common/filters/http-exception.filter.spec.ts
 
 Test Suites: 2 passed, 2 total
-Tests:       12 passed, 12 total
+Tests:       13 passed, 13 total
 Snapshots:   0 total
 ```
 

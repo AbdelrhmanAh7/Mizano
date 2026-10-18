@@ -127,6 +127,15 @@ describe('Auth (e2e)', () => {
       expect(res.status).toBe(401);
     });
 
+    it('rejects an invalid email with VALIDATION_ERROR', async () => {
+      const res = await anon
+        .post('/auth/login')
+        .send({ email: 'not-an-email', password: 'Password123' });
+      expect(res.status).toBe(400);
+      expect(res.body).toMatchObject({ code: 'VALIDATION_ERROR', message: 'Validation failed' });
+      expect(JSON.stringify(res.body.details)).toMatch(/email/i);
+    });
+
     it('rejects a non-existent user', async () => {
       const res = await anon
         .post('/auth/login')

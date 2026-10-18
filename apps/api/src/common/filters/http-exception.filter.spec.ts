@@ -6,6 +6,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { RegisterDto } from '../../modules/auth/dto/register.dto';
+import { LoginDto } from '../../modules/auth/dto/login.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { AllExceptionsFilter } from './http-exception.filter';
 
@@ -94,6 +95,28 @@ describe('AllExceptionsFilter error contract', () => {
     expect(body.details).toEqual({ email: ['email must be an email'] });
   });
 
+  it('renders an invalid login body as VALIDATION_ERROR', async () => {
+    let error: unknown;
+    try {
+      await pipe.transform(
+        { email: 'not-an-email', password: 'password123' },
+        { type: 'body', metatype: LoginDto },
+      );
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(BadRequestException);
+    const { status, body } = render(error);
+    expect(status).toBe(400);
+    expect(body).toMatchObject({
+      statusCode: 400,
+      code: 'VALIDATION_ERROR',
+      message: 'Validation failed',
+      error: 'Bad Request',
+    });
+    expect(JSON.stringify(body.details)).toMatch(/email/i);
+  });
+
   it('renders a missing or invalid JWT as 401 Unauthorized', () => {
     const guard = new JwtAuthGuard({} as never);
     let thrown: unknown;
@@ -107,7 +130,7 @@ describe('AllExceptionsFilter error contract', () => {
     expect(status).toBe(401);
     expect(body).toMatchObject({
       statusCode: 401,
-      message: 'Unauthorized',
+      message: 'Invalid or expired token',
       error: 'Unauthorized',
     });
     expect(body.details).toBeUndefined();
