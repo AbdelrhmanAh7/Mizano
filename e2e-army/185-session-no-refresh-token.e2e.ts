@@ -2,6 +2,11 @@ import { test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 
 const ADMIN = { email: 'admin@mizano.com', password: 'password123' };
+// Each request fails fast instead of stalling the gate's time budget.
+const REQUEST_TIMEOUT_MS = 20_000;
+
+const send = (url: string, init: RequestInit = {}): Promise<Response> =>
+  fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
 
 /** name=value pairs from a response's Set-Cookie headers, merged into the jar. */
 function keepCookies(jar: Map<string, string>, res: Response): void {
@@ -25,15 +30,15 @@ test(
     const jar = new Map<string, string>();
 
     // Signed out: the session endpoint returns an empty object, no tokens at all.
-    const anon = await fetch(web('/api/auth/session'));
+    const anon = await send(web('/api/auth/session'));
     expect(await anon.json()).toEqual({});
 
-    const csrfRes = await fetch(web('/api/auth/csrf'));
+    const csrfRes = await send(web('/api/auth/csrf'));
     expect(csrfRes.status).toBe(200);
     keepCookies(jar, csrfRes);
     const { csrfToken } = (await csrfRes.json()) as { csrfToken: string };
 
-    const signIn = await fetch(web('/api/auth/callback/credentials'), {
+    const signIn = await send(web('/api/auth/callback/credentials'), {
       method: 'POST',
       redirect: 'manual',
       headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: cookieHeader(jar) },
@@ -44,11 +49,13 @@ test(
         json: 'true',
       }),
     });
-    await signIn.text();
+    // json=true: NextAuth answers { url }; a rejected or throttled login points it at ?error=.
+    const { url } = (await signIn.json()) as { url?: string };
+    expect(url ?? '').not.toContain('error=');
     keepCookies(jar, signIn);
     expect([...jar.keys()].some((k) => k.includes('next-auth.session-token'))).toBe(true);
 
-    const res = await fetch(web('/api/auth/session'), { headers: { cookie: cookieHeader(jar) } });
+    const res = await send(web('/api/auth/session'), { headers: { cookie: cookieHeader(jar) } });
     expect(res.status).toBe(200);
     const body = await res.text();
     const session = JSON.parse(body) as { user?: { email?: string } } & Record<string, unknown>;
