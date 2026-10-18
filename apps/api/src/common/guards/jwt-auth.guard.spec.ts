@@ -60,6 +60,20 @@ describe('JwtAuthGuard', () => {
       expect(() => guard.handleRequest(null, null, null)).toThrow('Invalid or expired token');
     });
 
+    it('should reject with a 401 whose error is "Unauthorized"', () => {
+      try {
+        guard.handleRequest(null, false, new Error('jwt malformed'));
+        throw new Error('expected handleRequest to throw');
+      } catch (error) {
+        expect(error).toBeInstanceOf(UnauthorizedException);
+        expect((error as UnauthorizedException).getResponse()).toEqual({
+          statusCode: 401,
+          message: 'Invalid or expired token',
+          error: 'Unauthorized',
+        });
+      }
+    });
+
     it('should propagate original error if present', () => {
       const originalError = new Error('Custom error');
       expect(() => guard.handleRequest(originalError, null, null)).toThrow(originalError);
