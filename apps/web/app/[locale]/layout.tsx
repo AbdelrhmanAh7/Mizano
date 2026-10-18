@@ -4,6 +4,7 @@ import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { locales, localeDirections, type Locale } from '@/i18n/config';
+import { LocaleDirectionProvider } from '@/components/locale-direction-provider';
 import { Providers } from '@/components/providers';
 import { NavigationProgress } from '@/components/navigation-progress';
 
@@ -69,12 +70,14 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <NextIntlClientProvider messages={messages}>
-        <Providers>
-          <Suspense fallback={null}>
-            <NavigationProgress />
-          </Suspense>
-          {children}
-        </Providers>
+        <LocaleDirectionProvider dir={direction}>
+          <Providers>
+            <Suspense fallback={null}>
+              <NavigationProgress />
+            </Suspense>
+            {children}
+          </Providers>
+        </LocaleDirectionProvider>
       </NextIntlClientProvider>
     </div>
   );
