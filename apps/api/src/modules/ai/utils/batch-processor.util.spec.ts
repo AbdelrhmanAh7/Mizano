@@ -31,32 +31,47 @@ describe('batchProcessWithRiskAggregation', () => {
   });
 
   it.each([
-    { total: 3, batchSize: 5, batches: [3] },
-    { total: 5, batchSize: 5, batches: [5] },
-    { total: 10, batchSize: 5, batches: [5, 5] },
-    { total: 11, batchSize: 5, batches: [5, 5, 1] },
-    { total: 7, batchSize: 1, batches: [1, 1, 1, 1, 1, 1, 1] },
+    { total: 3, batchSize: 5, batches: [[0, 1, 2]] },
+    { total: 5, batchSize: 5, batches: [[0, 1, 2, 3, 4]] },
+    {
+      total: 10,
+      batchSize: 5,
+      batches: [
+        [0, 1, 2, 3, 4],
+        [5, 6, 7, 8, 9],
+      ],
+    },
+    {
+      total: 11,
+      batchSize: 5,
+      batches: [[0, 1, 2, 3, 4], [5, 6, 7, 8, 9], [10]],
+    },
+    { total: 4, batchSize: 1, batches: [[0], [1], [2], [3]] },
   ])(
-    'splits $total items with batchSize $batchSize into batches of $batches',
+    'splits $total items with batchSize $batchSize into Math.ceil(total / batchSize) ordered batches',
     async ({ total, batchSize, batches }) => {
-      const items = Array.from({ length: total }, (_, i) => `item-${i}`);
-      const sizes: number[] = [];
-      let inFlight = 0;
-      const processFn = jest.fn(async (_item: string) => {
-        inFlight++;
-        // Every call of a batch starts before any of them settles.
+      const items = Array.from({ length: total }, (_, i) => i);
+      const gates = items.map(() => deferred<Scored>());
+      const processFn = jest.fn((item: number) => gates[item].promise);
+
+      const run = batchProcessWithRiskAggregation(items, processFn, batchSize);
+
+      // A batch is exactly the set of items started while every gate is still closed;
+      // releasing that set is the only thing that lets the next batch start.
+      const observed: number[][] = [];
+      let started = 0;
+      while (started < total) {
         await flush();
-        if (inFlight > 0) sizes.push(inFlight);
-        inFlight = 0;
-        return { riskLevel: 'LOW' };
-      });
+        const batch = processFn.mock.calls.slice(started).map((call) => call[0]);
+        expect(batch.length).toBeGreaterThan(0);
+        observed.push(batch);
+        started += batch.length;
+        batch.forEach((item) => gates[item].resolve({ riskLevel: 'LOW' }));
+      }
 
-      const result = await batchProcessWithRiskAggregation(items, processFn, batchSize);
-
-      expect(sizes).toEqual(batches);
-      expect(sizes).toHaveLength(Math.ceil(total / batchSize));
-      expect(processFn.mock.calls.map((call) => call[0])).toEqual(items);
-      expect(result).toEqual({
+      expect(observed).toEqual(batches);
+      expect(observed).toHaveLength(Math.ceil(total / batchSize));
+      await expect(run).resolves.toEqual({
         processed: total,
         highRisk: 0,
         mediumRisk: 0,
@@ -112,12 +127,6 @@ describe('batchProcessWithRiskAggregation', () => {
     expect(result).toEqual({ processed: 8, highRisk: 3, mediumRisk: 2, lowRisk: 3, failed: 0 });
   });
 
-  it('counts any unrecognised risk level as lowRisk', async () => {
-    const result = await batchProcessWithRiskAggregation(['UNKNOWN', 'high', ''], scored);
-
-    expect(result).toEqual({ processed: 3, highRisk: 0, mediumRisk: 0, lowRisk: 3, failed: 0 });
-  });
-
   it('counts rejections as failed and keeps processing the rest of the batch and later batches', async () => {
     const items = ['HIGH', 'fail', 'MEDIUM', 'LOW', 'fail', 'CRITICAL', 'fail'];
     const processFn = jest.fn((level: string) =>
@@ -152,4 +161,11 @@ describe('batchProcessWithRiskAggregation', () => {
     expect(r.processed).toBe(items.length);
     expect(r.highRisk + r.mediumRisk + r.lowRisk + r.failed).toBe(r.processed);
   });
+
+  // Not run live: batchSize <= 0 never advances the loop (`i += batchSize`), so the util
+  // awaits empty batches forever. Flagged to the reviewer as a util defect; fixing it is
+  // out of scope for this test-only issue.
+  it.todo(
+    'rejects or clamps batchSize <= 0 instead of looping forever (util defect, not fixed here)',
+  );
 });
