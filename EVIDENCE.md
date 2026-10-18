@@ -165,3 +165,26 @@ tsc --noEmit (src + e2e), eslint, prettier --check   clean
 ```
 
 Not run: the full API suite and a real container start of the worker image (no Docker on this machine). `dist/intake-worker.js` is only compiled by `tsc`.
+
+## Issue #141 — round 2 (CTO review T1/T2 and the IntakeModule slice)
+
+Tested on top of `47e55211` plus the working-tree changes of the commit that adds this section. Local sandbox: no Postgres (`localhost:5435` unreachable) and no Docker, so `test/intake-worker.e2e-spec.ts` was **not** re-run here; it runs on CI.
+
+| REQ                                                                      | Verified by                                                                                                                          |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| T1 deploy fails when the worker is unhealthy                             | `src/deploy-worker-gating.spec.ts`: real `wait_healthy` with a fake `docker`; red with `worker` removed from the loop, green with it |
+| T1 periodic check reports the worker                                     | same spec, asserts `healthcheck.sh` has `check_worker`, `worker-down`, `worker-unhealthy`                                            |
+| T2 `CacheService` closes its Redis client (safe when `REDIS_URL` blank)  | `src/cache/cache.service.spec.ts` `onModuleDestroy` (no-op, quit once, disconnect fallback)                                          |
+| T2 worker ends the process after close (0 ok, 1 error), once only        | `src/modules/ai/intake/intake.worker.spec.ts` `registerGracefulShutdown`                                                             |
+| Slice AC1 `IntakeModule` exports resolve                                 | `intake.worker.spec.ts` `IntakeModule` (processor, queue, jobs service, owner guard, storage)                                        |
+| Slice AC2/AC3 `createIntakeWorker()` has no HTTP adapter or port, closes | `intake.worker.spec.ts` `createIntakeWorker` (no `getHttpServer`, TCPServerWrap count unchanged, `close()` resolves)                 |
+| Slice AC4 existing intake specs unchanged                                | `intake-processor`, `intake-jobs`, `intake-storage` specs pass unmodified                                                            |
+
+```
+npx jest --detectOpenHandles src/deploy-worker-gating.spec.ts src/modules/ai/intake src/cache   7 suites, 62 tests passed, exits without --forceExit
+npx jest --findRelatedTests <changed src files>                                                  6 suites, 87 tests passed
+tsc --noEmit (src, test/tsconfig.e2e.json) exit 0; eslint on touched paths exit 0; prettier --check clean
+shellcheck lib.sh healthcheck.sh: only the existing SC1091 info (sourced file)
+```
+
+Behaviour notes: `IntakeWorkerModule` now gets the processor from `IntakeModule`, which also provides `IntakeJobsService`, so the worker runs the startup/periodic recovery sweep too (queue job ids collapse duplicates with the API's sweep). `AiOperationsModule` is unchanged in this round.

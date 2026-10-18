@@ -1,17 +1,16 @@
 import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
 import { writeFile, unlink } from 'fs/promises';
 import { describeError } from './common/utils/redact';
 import { WORKER_HEARTBEAT_FILE } from './intake-worker-healthcheck';
-import { IntakeWorkerModule } from './intake-worker.module';
+import { createIntakeWorker, registerGracefulShutdown } from './modules/ai/intake/intake.worker';
 import { PrismaService } from './prisma/prisma.service';
 import { IntakeQueueService } from './modules/ai/intake/intake-queue.service';
 
 const HEARTBEAT_INTERVAL_MS = 5000;
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.createApplicationContext(IntakeWorkerModule);
+  const app = await createIntakeWorker();
   const prisma = app.get(PrismaService);
   const queue = app.get(IntakeQueueService);
   let probing = false;
@@ -31,24 +30,14 @@ async function bootstrap(): Promise<void> {
   const timer = setInterval(() => void probe(), HEARTBEAT_INTERVAL_MS);
   timer.unref();
   await probe();
-  let stopping = false;
-  const shutdown = async (): Promise<void> => {
-    if (stopping) return;
-    stopping = true;
+  registerGracefulShutdown(async () => {
     clearInterval(timer);
     // Stop fetching and let the active job finish; Prisma stays connected until it does,
     // because the result or failure write still needs the database.
     await queue.onModuleDestroy();
     await app.close();
     await unlink(WORKER_HEARTBEAT_FILE).catch(() => undefined);
-  };
-  const stop = (): void => {
-    void shutdown().catch(() => {
-      process.exitCode = 1;
-    });
-  };
-  process.once('SIGTERM', stop);
-  process.once('SIGINT', stop);
+  });
 }
 
 void bootstrap().catch((error: unknown) => {
