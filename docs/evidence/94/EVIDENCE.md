@@ -10,6 +10,25 @@ Gate items: "Decimal arithmetic correct" and "Atomic, idempotent posting".
 - **Host:** Darwin arm64, Node v26.10.0, pnpm 8.14.0, PostgreSQL 16.15 (Homebrew).
 - **Database:** a throwaway cluster started by this session (`initdb`, port 55595, `fsync=off`), dropped and re-created with `prisma migrate deploy` before each e2e run, `REDIS_URL` blank. No mocks, SQLite or in-memory database were used for the database tests. This is the implementer's own evidence, not an independent review.
 
+## Re-verification at head `e1d4a478e5233ca505d9ee037a3583e30b50b539` (2026-10-18)
+
+The branch was merged with `origin/master` (0 commits behind, 25 ahead) and every check below was run again on that clean tree. The commit that records this section changes only this file. Same host as above; the throwaway cluster ran on port 55631 and was empty before `prisma migrate deploy`.
+
+| Check                                                                                                                    | Exit | Result line                                  |
+| ------------------------------------------------------------------------------------------------------------------------ | ---- | -------------------------------------------- |
+| `jest --config ./test/jest-e2e.json --runInBand test/posting-integrity.e2e-spec.ts` (`DATABASE_URL` on the throwaway DB) | 0    | `Tests: 11 passed, 11 total`                 |
+| `jest src/common/dto src/common/utils/document-totals.spec.ts src/modules/accounting/services/journals.service.spec.ts`  | 0    | `Test Suites: 7 passed`, `Tests: 119 passed` |
+| `pnpm --filter @mizano/validators test`                                                                                  | 0    | `Tests: 12 passed, 12 total`                 |
+| `pnpm run type-check` (turbo, includes `tsc -p test/tsconfig.e2e.json`)                                                  | 0    | `Tasks: 6 successful, 6 total`               |
+| `pnpm --filter api lint`, `pnpm --filter @mizano/validators lint`                                                        | 0    | no output                                    |
+
+Notes:
+
+- In the e2e run, the `prisma:error` and `Nest ERROR` lines are the expected ones: unique-key conflicts from replayed posts and the injected "failure after the journal insert". The tests that provoke them pass.
+- A fresh worktree needs `pnpm --filter @mizano/shared-types build`, `pnpm --filter @mizano/validators build` and `pnpm --filter api exec prisma generate` before these commands, and `@types/js-yaml` (declared in `apps/api/package.json`, pinned in `pnpm-lock.yaml`) installed. None of those outputs is tracked.
+- The `initdb` and `pg_ctl` start, and the commands that connect to the cluster, ran outside the agent sandbox (it blocks shared memory and local TCP).
+- Not re-run at this head: the e2e-army test `e2e-army/94-journal-decimal-posting.e2e.ts` (needs the hub's verify stack), the red comparison on master's code, and the full seeded E2E suite and `pnpm ci:full` listed below.
+
 ## What changed, from the history
 
 `git log --oneline --no-merges origin/master..HEAD` lists the branch's own commits (`10b0e2f`, `9a37475`, `078cc09` and `9d4c20d` are merges of master). Production code changed in two commits and two files only:
