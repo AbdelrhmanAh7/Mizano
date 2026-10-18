@@ -1,6 +1,6 @@
 # Evidence: Issue #114, VAT return draft generated from the Mizano ledger
 
-**Tested code head**: `dfb07c6` (`ai/114`). Every result below was run on that tree; the commit that adds this file changes only `docs/`.
+**Tested code head**: `c7be5790` (`ai/114`). Every result below was run on that tree; the commit that adds this file changes only `docs/`.
 
 The root `EVIDENCE.md` is unchanged from `master`.
 
@@ -31,11 +31,12 @@ All tests carry `@issue-114`. The endpoint is `GET /api/reports/vat-return-draft
 | AC6 | ETA mismatches flagged before filing                                   | e2e: header changed to `139.99` and `139.5` are listed with the line tax `140.0000`, the ledger total stays `140.0000`. Unit: per-line rounding, no lines, zero-amount, large-line precision.                                  |
 | AC7 | Period capped at 366 days, bounded scan                                | e2e: 366 days `200`, 367 days `400`. Unit: same boundary; cursor paging with `take: 500`, `skip: 1`.                                                                                                                           |
 
-## Commands run on `dfb07c6`
+## Commands run on `c7be5790`
 
-- `npx jest --findRelatedTests` (apps/api) on the changed source files: 3 suites, 67 tests passed (`vat-return-draft.service.spec`, `vat-return-draft.controller.spec`, `vat-returns.service.spec`).
-- `npx jest --config ./test/jest-e2e.json --runInBand test/reports.e2e-spec.ts` with `REDIS_URL=` on a freshly migrated throwaway Postgres 16: 1 suite, 22 tests passed (before the fix the same suite had 3 failures on the old document-sum totals).
+- `pnpm --filter api exec jest --maxWorkers=2 src/modules/reports/services/vat-return-draft.service.spec.ts src/modules/reports/controllers/vat-return-draft.controller.spec.ts`: 2 suites, 29 tests passed.
+- `pnpm --filter api exec jest --maxWorkers=2 --config ./test/jest-e2e.json test/reports.e2e-spec.ts` with `REDIS_URL=` on a freshly migrated Postgres 16: 1 suite, 22 tests passed (including 7 VAT return draft tests for AC1–AC7).
 - `pnpm --filter @mizano/shared-types type-check`, `pnpm --filter api type-check` (includes the e2e tsconfig) and `pnpm --filter api lint`: exit 0, no output beyond the command banner.
+- `pnpm --filter @mizano/validators test`: 1 suite, 12 tests passed.
 
 ## Not verified
 
