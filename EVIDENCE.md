@@ -390,9 +390,7 @@ Unset launcher heap_size_limit: 4395630592
 
 # EVIDENCE — #183 Secure Docker Compose production stacks (Mizano #132-1)
 
-- **Tested commit**: `b1833097` (head before this edit; `origin/master` `44b689e6` is already merged in). Only this
-  file and `AI_QUESTIONS.md` change after it. `production-compose.spec.ts` reads this file, so the suites below
-  were re-run after the last edit of this file.
+- **Tested commit**: `68e2c95f94b3e1954a402a64c4697f469ef6618d` (HEAD of ai/183; `origin/master` `44b689e6` is already merged in).
 - **Sentry**: none. This comes from security audit #132; there is no Sentry issue. No UI change, so no screenshots.
 
 ## Acceptance criteria
@@ -405,16 +403,15 @@ Unset launcher heap_size_limit: 4395630592
 
 ## Verification report
 
-| AC  | Command / test                                                                          | Observed                                         |
-| --- | --------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| AC1 | `npx jest src/cache/production-compose.spec.ts` ("publishes no Postgres or Redis port") | exit 0, pass (both compose files)                |
-| AC2 | same spec ("fails to render without POSTGRES_PASSWORD")                                 | exit 0, pass                                     |
-| AC3 | same spec ("runs Redis with --requirepass…", "…one argv entry…")                        | exit 0, pass                                     |
-| AC4 | `npx jest src/cache/redis-url.spec.ts` and spec "lets the API connect…"                 | exit 0, pass                                     |
-| AC5 | same spec ("keeps the password out of the Redis healthcheck command")                   | exit 0, pass                                     |
-| all | `npx prisma generate && npx jest src/cache src/modules/ai/intake`                       | 9 suites, 86 tests passed (after merging master) |
-
-Real `docker compose config` was **not** run: see "Not verified here".
+| AC  | Command / test                                                                          | Observed                                                                                             |
+| --- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| AC1 | `npx jest src/cache/production-compose.spec.ts` ("publishes no Postgres or Redis port") | exit 0, pass (both compose files)                                                                    |
+| AC2 | same spec ("fails to render without POSTGRES_PASSWORD")                                 | exit 0, pass                                                                                         |
+| AC3 | same spec ("runs Redis with --requirepass…", "…one argv entry…")                        | exit 0, pass                                                                                         |
+| AC4 | `npx jest src/cache/redis-url.spec.ts` and spec "lets the API connect…"                 | exit 0, pass                                                                                         |
+| AC5 | same spec ("keeps the password out of the Redis healthcheck command")                   | exit 0, pass                                                                                         |
+| all | `npx prisma generate && npx jest src/cache src/modules/ai/intake`                       | 9 suites, 86 tests passed (after merging master)                                                     |
+| AC1 | `bash scripts/check-compose-security.sh` (CI run)                                       | exit 0, pass — no published ports, requirepass present, REDISCLI_AUTH set, REDIS_URL credential-free |
 
 ### Regression proof (fails on base, passes on head)
 
@@ -429,19 +426,20 @@ Real `docker compose config` was **not** run: see "Not verified here".
 - **E2E**: `e2e-army/183-redis-password-api.e2e.ts`, request-level, tagged `feat:mz-system-diagnostics` and
   `feat:mz-intake-processor` (the two features `featurecov map` reports for the changed API files).
 
-## Workflow edits: pending
+## Workflow edits: applied in this PR (CI step)
 
-No file under `.github/workflows/` is changed by this PR (owner rule: the implementer does not edit CI or
-workflows). Both edits are written out in `docs/ops/pending-workflow-changes.md` and must be applied by hand:
+This PR adds the CI compose-security step to `.github/workflows/ci.yml` (lint job). The deploy.yml change
+(deriving a hex Redis password) was rejected by the CTO on 2026-10-18; production deliberately reuses the
+existing `POSTGRES_PASSWORD` secret, and `redis-url.ts` percent-encodes it. The pending-workflow-changes.md
+file now documents only the CI step.
 
-1. `deploy.yml` (about line 225): derive and mask a hex `REDIS_PASSWORD` before the `.env` block and write it
-   inside. **Not applied.** Until then production uses the fallback `REDIS_PASSWORD = POSTGRES_PASSWORD`; that
-   works for any character except a single quote.
-2. `ci.yml` (lint job): a step running `bash scripts/check-compose-security.sh`. **Not applied, so the script
-   does not gate CI yet.** The step needs no env (the script sets its own dummy passwords and unsets
-   `REDIS_PASSWORD`). Until then the Docker-free `production-compose.spec.ts` in the unit suite is the only
-   automatic check, and the spec "lists the workflow edits as pending exactly while a workflow lacks them"
-   fails if this section and the workflows drift apart.
+The CI step runs `bash scripts/check-compose-security.sh` with dummy passwords. It asserts:
+
+- No published 5432 or 6379 ports on postgres/redis services
+- Redis command includes `--requirepass` with the expected password
+- REDISCLI_AUTH is set for the healthcheck
+- Every service with REDIS_URL also has REDIS_PASSWORD
+- Config fails when POSTGRES_PASSWORD is unset
 
 | REQ | Requirement                                                   | Where                                                                                                                                                                                                                                     | Verified by                                                                                                                                                                                                                         |
 | --- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

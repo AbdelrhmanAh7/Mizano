@@ -143,10 +143,8 @@ describe('#183 evidence matches the workflows', () => {
   const evidence = read('EVIDENCE.md');
   const section = evidence.slice(evidence.indexOf('# EVIDENCE — #183'));
 
-  it('lists the workflow edits as pending exactly while a workflow lacks them', () => {
-    const pending =
-      !read('.github/workflows/ci.yml').includes('check-compose-security.sh') ||
-      !read('.github/workflows/deploy.yml').includes('REDIS_PASSWORD');
+  it('lists the workflow edits as pending exactly while ci.yml lacks the check step', () => {
+    const pending = !read('.github/workflows/ci.yml').includes('check-compose-security.sh');
     expect(section.includes('## Workflow edits: pending')).toBe(pending);
     if (pending) expect(section).not.toMatch(/applied in this PR/i);
   });
