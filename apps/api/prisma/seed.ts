@@ -1831,7 +1831,23 @@ async function main() {
       organizationId: orgId,
     },
   });
-  console.log('  ✓ 1 BOM, 1 work order, 1 production entry');
+  // A second in-process order so the demo can bulk-complete two work orders (#165).
+  await prisma.workOrder.upsert({
+    where: { workOrderNumber_organizationId: { workOrderNumber: 'WO-002', organizationId: orgId } },
+    update: {},
+    create: {
+      id: 'wo-002',
+      workOrderNumber: 'WO-002',
+      bomId: bom.id,
+      quantity: 2,
+      status: WorkOrderStatus.IN_PROCESS,
+      plannedStartDate: daysAgo(4),
+      actualStartDate: daysAgo(3),
+      notes: 'Workstation batch for branch office',
+      organizationId: orgId,
+    },
+  });
+  console.log('  ✓ 1 BOM, 2 work orders, 1 production entry');
 
   // ─────────────────────────────────────────────────────────
   // 37. PROJECTS + TASKS + TIMESHEETS
