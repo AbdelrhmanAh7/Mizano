@@ -390,9 +390,9 @@ Unset launcher heap_size_limit: 4395630592
 
 # EVIDENCE — #183 Secure Docker Compose production stacks (Mizano #132-1)
 
-- **Tested commit**: `8cda9cf4` (merge of `origin/master` into `ai/183`, tree identical to the final head except
-  this file and `AI_QUESTIONS.md`). `production-compose.spec.ts` reads this file, so it was re-run after the last
-  edit of this file (output below).
+- **Tested commit**: `b1833097` (head before this edit; `origin/master` `44b689e6` is already merged in). Only this
+  file and `AI_QUESTIONS.md` change after it. `production-compose.spec.ts` reads this file, so the suites below
+  were re-run after the last edit of this file.
 - **Sentry**: none. This comes from security audit #132; there is no Sentry issue. No UI change, so no screenshots.
 
 ## Acceptance criteria
@@ -489,8 +489,11 @@ intake suites failed to compile for that reason only.)
   pending CI step.
 - The e2e-army test: not run locally. `run-local.sh` needs a pushed ref, and the implementer does not push.
   The verify job runs it.
-- `tsc --noEmit -p apps/api`: exit 1 with errors only in files this PR does not touch (missing
-  `@types/js-yaml` in `coderabbit-config.spec.ts`, `common/filters/http-exception.filter.ts`,
-  `modules/logger/logger.service.ts`, all arriving from master). No error mentions `src/cache` or
-  `intake-queue.service.ts`. `cache.module.ts` is compiled by this run; the e2e-army file is not in the API project.
+- `tsc --noEmit -p apps/api`: **exit 0, no errors** once the workspace package `@mizano/shared-types` is built
+  (`cd packages/shared-types && npx tsc -p .`, output in gitignored `dist/`). Without that build the worktree's
+  partial install reports 10 errors, all `Cannot find module '@mizano/shared-types'` or the cascade from it in
+  `logger.service.ts`; none in `src/cache` or `intake-queue.service.ts`. `@types/js-yaml` is already declared in
+  `apps/api/package.json` and `pnpm-lock.yaml`, so no dependency change is needed. The e2e-army file is not in the
+  API project, so `tsc` does not compile it.
+- `npx eslint src/cache src/modules/ai/intake/intake-queue.service.ts`: exit 0.
 - The full suite: runs on GitHub CI after the push. Per instructions, it was not run locally.
