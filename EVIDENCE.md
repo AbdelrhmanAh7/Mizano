@@ -385,3 +385,69 @@ Unset launcher heap_size_limit: 4395630592
 # Note: In containerized setups, MIZANO_NODE_HEAP_MB must be passed in the compose profile (#39).
 # MIZANO_NODE_HEAP_MB=1024
 ```
+
+---
+
+# Issue #219 Verification — Authentication and Sessions Error Contract (`mz-auth`)
+
+## Overview
+
+- **Issue**: #219 ([e2e] Authentication and sessions failing on master)
+- **Base Commit (`origin/master`)**: `44b689e6b39a14da19a893cb19408eb62357cddd`
+- **Tested Commit (`ai/219`)**: `02cabdba365b614d27d46778f6bae81acaa59839`
+- **Originating Sentry issue**: None (gate failure on hub stable e2e run `mz-auth.3`, not production)
+- **Decision reference**: CTO direction on issue #219 / PR #234 (maintain 'Validation failed' and 'Unauthorized')
+
+---
+
+## Requirements Verification Matrix
+
+| REQ ID | Acceptance Criterion                                                                               | Verification Method                                                                                                      | Status |
+| ------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------ |
+| REQ-1  | AC1: Registration validation error returns 400 `VALIDATION_ERROR` with uppercase rule in `details` | `http-exception.filter.spec.ts` unit test, `auth.e2e-spec.ts`, `e2e-army/219-auth-error-contract.e2e.ts`                 | PASSED |
+| REQ-2  | AC2: Missing, forged or invalid JWT token returns 401 with `error: 'Unauthorized'`                 | `jwt-auth.guard.spec.ts`, `http-exception.filter.spec.ts`, `auth.e2e-spec.ts`, `e2e-army/219-auth-error-contract.e2e.ts` | PASSED |
+| REQ-3  | AC3: Validation error message is `'Validation failed'` (sentence case, per CTO decision)           | `http-exception.filter.spec.ts`, `http-exception.filter.ts:220`, `auth.e2e-spec.ts`                                      | PASSED |
+| REQ-4  | AC4: 401 error response explicitly provides `error: 'Unauthorized'` fallback                       | `http-exception.filter.ts:205`, `jwt-auth.guard.ts:28`, `http-exception.filter.spec.ts`                                  | PASSED |
+
+---
+
+## Test Execution Evidence
+
+### 1. Jest Unit Tests (Changed Specs)
+
+Command:
+
+```bash
+nice -n 10 pnpm --filter api exec jest --maxWorkers=2 src/common/filters/http-exception.filter.spec.ts src/common/guards/jwt-auth.guard.spec.ts
+```
+
+Output:
+
+```text
+PASS src/common/guards/jwt-auth.guard.spec.ts
+PASS src/common/filters/http-exception.filter.spec.ts
+
+Test Suites: 2 passed, 2 total
+Tests:       12 passed, 12 total
+Snapshots:   0 total
+```
+
+Exit code: 0
+
+### 2. Type-Check and Lint
+
+Command:
+
+```bash
+pnpm --filter api type-check && pnpm --filter api lint
+```
+
+Output:
+Exit code: 0 (0 errors, 0 warnings in changed code)
+
+### 3. Base vs Head Regression Test Demonstration
+
+Test: `http-exception.filter.spec.ts` -> `falls back to error "Unauthorized" for a 401 that carries no error field`
+
+- On `origin/master` (`44b689e`): FAILS because unadorned 401 HttpException defaulted to `error: 'Error'`.
+- On `HEAD`: PASSES because `AllExceptionsFilter` fallback maps status 401 to `error: 'Unauthorized'`.

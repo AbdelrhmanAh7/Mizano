@@ -66,6 +66,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **Use concrete DTO classes for `@Query()` parameters.** Intersections erase the runtime metatype, bypassing ValidationPipe transformation and leaving Prisma pagination values as strings. Decorate all service and existing client filters, preserve service defaults, and test through the real pipe options.
 
+- **Enforce API error contracts in product filters and guards.** Explicitly map error codes and casing (e.g. 401 `error: 'Unauthorized'`, validation errors `code: 'VALIDATION_ERROR'`) in `AllExceptionsFilter` and authentication guards instead of relying on implicit framework defaults or tests alone.
+
 ## 8. Voided and deleted records
 
 - **Posted documents that were voided stay readable** (read-only, with `deletedAt` set) on their detail endpoint so journal source links resolve. Lists exclude them. Deleted drafts, which never posted, return 404.
