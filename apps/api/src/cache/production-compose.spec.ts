@@ -148,4 +148,19 @@ describe('#183 evidence matches the workflows', () => {
     expect(section.includes('## Workflow edits: pending')).toBe(pending);
     if (pending) expect(section).not.toMatch(/applied in this PR/i);
   });
+
+  it('claims no CI run of the check script while the CI step is pending', () => {
+    const pending = !read('.github/workflows/ci.yml').includes('check-compose-security.sh');
+    if (!pending) return;
+    expect(section).not.toMatch(/\(CI run\)|CI run of|The CI step runs/i);
+    expect(read('docs/ops/pending-workflow-changes.md')).toContain(
+      'run: bash scripts/check-compose-security.sh',
+    );
+    expect(read('docs/DEVELOPMENT.md')).toContain('until the CI step');
+  });
+
+  it('describes no derived or hex Redis password', () => {
+    expect(section).not.toMatch(/hex|REDIS_PASS_HEX|add-mask/i);
+    expect(read('docs/ops/pending-workflow-changes.md')).not.toMatch(/hex|REDIS_PASS_HEX/i);
+  });
 });
