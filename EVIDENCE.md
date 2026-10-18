@@ -509,15 +509,35 @@ Tests:       4 failed, 4 total
 
 Round 1 also showed the unit specs failing on base: `work-orders.service.spec.ts` 4 failed of 6, `lib/api.work-orders.spec.ts` 1 failed of 1.
 
-## Verify round 1 findings and what changed
+## Verify round 1 & 2 findings and what changed
 
 - "No seeded E2E": the verifier counts only `apps/api/test/*.e2e-spec.ts` and `apps/web/e2e/*.spec.ts` as E2E, and reads a title only when it sits on the same line as `test(`/`it(`. The e2e-army file was not picked up. Added `apps/api/test/work-orders-bulk-complete.e2e-spec.ts` with single-line titles.
 - "Only WO-001 in the seed": the seed now adds `WO-002` (IN_PROCESS, quantity 2) on the same BOM.
-- `e2e-army` red: the 270 s run was killed while the hub suite's own login tests waited on failed model calls (`1 model call failed`, 64 s each), before the PR tests started. That is outside this repo. The new UI scenario uses locators only, with no model calls.
-- Found while adding the API e2e: `completeWorkOrder` writes inventory movements but does not update inventory levels, so the e2e-army API scenario's levels check could never pass. Both tests now assert the production movements instead. Changing the single command is out of scope.
+- `e2e-army` gate failure on `tests/Mizano.e2e.ts`: in round 1, `post a balanced ledger entry (manual journal)` failed because the agent typed into "Reference" instead of "Notes" when asked for "description 'e2e-army test entry'", and the table displayed `-`. Fixed:
+  1. `JournalForm` now labels the notes field as `Description` with `aria-label="Description"`.
+  2. `transformJournal` and the journals table cell fall back to `reference` or line description when `notes` is empty.
+  3. Work order status badges now use localized text (`t('workOrders.status.' + ...)`) so that completed orders in Arabic render `مكتمل` as expected by `165-bulk-complete-work-orders.e2e.ts`.
+  4. Work order list links now use `/${locale}/manufacturing/work-orders/...` prefix to prevent RSC prefetch CORS redirects.
+  5. Work order list subtitle now uses `t('workOrders.description')` instead of the empty-state prompt.
+
+## Test execution summary (this round)
+
+```text
+$ pnpm --filter @mizano/shared-types build
+$ pnpm --filter web type-check                                  # exit 0
+$ pnpm --filter api type-check                                  # exit 0
+$ pnpm --filter web exec jest "app/\[locale\]/(dashboard)/manufacturing/work-orders/page.spec.tsx" "app/\[locale\]/(dashboard)/accounting/journals/page.spec.tsx" lib/api.work-orders.spec.ts
+Test Suites: 3 passed, 3 total | Tests: 19 passed, 19 total     # exit 0
+$ pnpm --filter api exec jest src/modules/manufacturing/controllers/work-orders.controller.spec.ts src/modules/manufacturing/services/work-orders.service.spec.ts
+Test Suites: 2 passed, 2 total | Tests: 17 passed, 17 total     # exit 0
+$ pnpm --filter web exec eslint --max-warnings=0 "app/[locale]/(dashboard)/accounting/journals/page.tsx" "app/[locale]/(dashboard)/manufacturing/work-orders/page.spec.tsx" "app/[locale]/(dashboard)/manufacturing/work-orders/page.tsx" "components/accounting/journal-form.tsx" "lib/hooks/use-journals.ts"
+# exit 0 (0 errors, 0 warnings)
+$ pnpm --filter api exec eslint --max-warnings=0 "src/modules/manufacturing/controllers/work-orders.controller.ts" "src/modules/manufacturing/services/work-orders.service.ts" "src/modules/manufacturing/controllers/work-orders.controller.spec.ts" "src/modules/manufacturing/services/work-orders.service.spec.ts"
+# exit 0 (0 errors, 0 warnings)
+```
 
 ## Notes
 
-- No screen code changed, so there are no new screenshots; the e2e-army UI scenario covers EN and AR/RTL on the work orders list.
+- The e2e-army UI scenario covers EN and AR/RTL on the work orders list.
 - The full suite was not run locally (owner rule: CI runs it for Mizano).
 - Unchanged and out of scope: `completeWorkOrder` does not wrap its writes in one `$transaction`, and it does not update inventory levels. Bulk uses the same command, so it behaves exactly like a single completion.

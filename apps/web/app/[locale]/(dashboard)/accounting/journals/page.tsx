@@ -236,7 +236,7 @@ function JournalsPageContent() {
       accessorKey: 'description',
       header: t('journals.form.description'),
       meta: { cellClassName: 'max-w-[300px] truncate' },
-      cell: ({ row }) => row.original.description || '-',
+      cell: ({ row }) => row.original.description || row.original.reference || '-',
     },
     {
       id: 'amount',

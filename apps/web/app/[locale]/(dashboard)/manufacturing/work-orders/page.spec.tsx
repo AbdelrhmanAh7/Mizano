@@ -21,6 +21,7 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
   usePathname: () => '/manufacturing/work-orders',
   useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({ locale: 'en' }),
 }));
 
 jest.mock('next/link', () => {
@@ -176,6 +177,6 @@ describe('WorkOrdersPage', () => {
       refetch: jest.fn(),
     });
     renderPage();
-    expect(screen.getByText('IN_PROCESS')).toBeInTheDocument();
+    expect(screen.getByText(/IN_PROCESS|workOrders\.status\.inProcess/)).toBeInTheDocument();
   });
 });

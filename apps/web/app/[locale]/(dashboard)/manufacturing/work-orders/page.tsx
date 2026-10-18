@@ -45,10 +45,13 @@ import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { CheckCircle, Eye, Filter, Play, Plus, RefreshCw, Trash2, XCircle } from 'lucide-react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
 
 function WorkOrdersPageContent() {
+  const params = useParams();
+  const locale = (params?.locale as string) || 'en';
   const t = useTranslations('manufacturing');
   const tCommon = useTranslations('common');
   const { toast } = useToast();
@@ -190,7 +193,7 @@ function WorkOrdersPageContent() {
       ),
       cell: ({ row }) => (
         <Link
-          href={`/manufacturing/work-orders/${row.original.id}`}
+          href={`/${locale}/manufacturing/work-orders/${row.original.id}`}
           className="font-medium hover:underline"
         >
           {row.original.workOrderNumber}
@@ -243,11 +246,19 @@ function WorkOrdersPageContent() {
     {
       accessorKey: 'status',
       header: t('workOrders.table.status'),
-      cell: ({ row }) => (
-        <Badge className={getWorkOrderStatusColor(row.original.status)}>
-          {getWorkOrderStatusLabel(row.original.status)}
-        </Badge>
-      ),
+      cell: ({ row }) => {
+        const statusMap: Record<WorkOrder['status'], string> = {
+          DRAFT: t('workOrders.status.draft'),
+          IN_PROCESS: t('workOrders.status.inProcess'),
+          COMPLETED: t('workOrders.status.completed'),
+          CANCELLED: t('workOrders.status.cancelled'),
+        };
+        return (
+          <Badge className={getWorkOrderStatusColor(row.original.status)}>
+            {statusMap[row.original.status] || getWorkOrderStatusLabel(row.original.status)}
+          </Badge>
+        );
+      },
     },
     {
       id: 'actions',
@@ -264,7 +275,7 @@ function WorkOrdersPageContent() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem asChild>
-                <Link href={`/manufacturing/work-orders/${wo.id}`}>
+                <Link href={`/${locale}/manufacturing/work-orders/${wo.id}`}>
                   <Eye className="mr-2 h-4 w-4" />
                   {tCommon('buttons.view')}
                 </Link>
@@ -291,12 +302,12 @@ function WorkOrdersPageContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('workOrders.title')}</h1>
-          <p className="text-muted-foreground">{t('workOrders.empty.description')}</p>
+          <p className="text-muted-foreground">{t('workOrders.description')}</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
             <Button asChild>
-              <Link href="/manufacturing/work-orders/new">
+              <Link href={`/${locale}/manufacturing/work-orders/new`}>
                 <Plus className="mr-2 h-4 w-4" />
                 {t('workOrders.newWorkOrder')}
               </Link>
@@ -356,7 +367,7 @@ function WorkOrdersPageContent() {
             emptyAction={
               canCreate ? (
                 <Button asChild>
-                  <Link href="/manufacturing/work-orders/new">
+                  <Link href={`/${locale}/manufacturing/work-orders/new`}>
                     <Plus className="mr-2 h-4 w-4" />
                     {t('workOrders.newWorkOrder')}
                   </Link>

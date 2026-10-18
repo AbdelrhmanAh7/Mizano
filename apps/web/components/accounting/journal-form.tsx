@@ -146,8 +146,13 @@ export function JournalForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="notes">Notes</Label>
-          <Input id="notes" placeholder="Optional notes" {...form.register('notes')} />
+          <Label htmlFor="notes">Description</Label>
+          <Input
+            id="notes"
+            placeholder="Optional notes or description"
+            aria-label="Description"
+            {...form.register('notes')}
+          />
         </div>
       </div>
 

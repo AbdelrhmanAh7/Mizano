@@ -48,6 +48,7 @@
   },
   "workOrders": {
     "title": "أوامر العمل",
+    "description": "إدارة أوامر التصنيع وتتبع الإنتاج",
     "newWorkOrder": "أمر عمل جديد",
     "editWorkOrder": "تعديل أمر العمل",
     "deleteWorkOrder": "حذف أمر العمل",
