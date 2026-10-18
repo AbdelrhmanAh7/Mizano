@@ -4,6 +4,8 @@ import { expect } from 'e2e';
 // The auth error contract the stable gate (mz-auth.3) relies on: a class-validator rejection is
 // { code: 'VALIDATION_ERROR', message: 'Validation failed', details: { <Field>: [constraint texts] } },
 // and a bad bearer token is a 401 with error 'Unauthorized'. Fixed seed data, no tenant is created.
+// Casing is sentence case on purpose: the CTO kept 'Validation failed' over the drafted spec's
+// Title Case AC3 (see docs/agents/219-auth-error-contract.md).
 const WEAK = {
   email: 'army-219-weak@army-e2e.test',
   password: 'alllowercase1',
@@ -11,6 +13,12 @@ const WEAK = {
   lastName: 'Weak',
   organizationName: 'Army 219 Weak Org',
 };
+
+// Each request may hang or wait out the shared 5-per-minute auth limit (up to RATE_WAIT_MS).
+const REQUEST_TIMEOUT_MS = 15_000;
+const RATE_WAIT_MS = 85_000;
+// Two calls per test, each a request plus a possible rate-limit wait, with headroom.
+const TEST_TIMEOUT_MS = 2 * (REQUEST_TIMEOUT_MS + RATE_WAIT_MS) + 40_000;
 
 interface Res {
   status: number;
@@ -22,7 +30,7 @@ function apiBase(baseUrl: string): string {
 }
 
 async function send(url: string, init: RequestInit): Promise<Res> {
-  const res = await fetch(url, init);
+  const res = await fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   const text = await res.text();
   let body: Record<string, unknown> = {};
   try {
@@ -38,7 +46,10 @@ async function call(url: string, init: RequestInit): Promise<Res> {
   let res = await send(url, init);
   if (res.status === 429) {
     await expect
-      .poll(async () => (res = await send(url, init)).status, { timeout: 85_000, interval: 5_000 })
+      .poll(async () => (res = await send(url, init)).status, {
+        timeout: RATE_WAIT_MS,
+        interval: 5_000,
+      })
       .not.toBe(429);
   }
   return res;
@@ -52,7 +63,7 @@ const json = (body: unknown): RequestInit => ({
 
 test(
   '@issue-219 AC1 AC3: a weak registration password is a VALIDATION_ERROR whose details name the uppercase rule',
-  { tags: ['feat:mz-auth', 'lvl:api'] },
+  { tags: ['feat:mz-auth', 'lvl:api'], timeout: TEST_TIMEOUT_MS },
   async ({ app }) => {
     const api = apiBase(String(app.baseUrl));
 
@@ -77,7 +88,7 @@ test(
 
 test(
   '@issue-219 AC2 AC4: a protected auth route refuses a missing or forged bearer token with 401 Unauthorized',
-  { tags: ['feat:mz-auth', 'lvl:api'] },
+  { tags: ['feat:mz-auth', 'lvl:api'], timeout: TEST_TIMEOUT_MS },
   async ({ app }) => {
     const api = apiBase(String(app.baseUrl));
 
