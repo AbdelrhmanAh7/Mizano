@@ -234,6 +234,13 @@ export class JournalsService {
       if (dateFrom) where.date.gte = new Date(dateFrom);
       if (dateTo) where.date.lte = new Date(dateTo);
     }
+    // A cursor must belong to this organization, else Prisma pages from a foreign row (cross-tenant).
+    if (cursor) {
+      const owned = await this.prisma.journal.count({
+        where: { id: cursor, organizationId, deletedAt: null },
+      });
+      if (owned === 0) throw new NotFoundException('Journal not found');
+    }
     return cursorPaginate(
       this.prisma.journal,
       where,
