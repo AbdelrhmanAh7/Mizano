@@ -414,7 +414,7 @@ Test Suites: 1 passed, 1 total   Tests: 11 passed, 11 total
 $ node node_modules/jest/bin/jest.js --maxWorkers=2 src/modules/sales/services/invoices.service.spec.ts \
     src/modules/purchases/services/bills.service.spec.ts src/modules/accounting/services/journals.service.spec.ts
 Test Suites: 3 passed, 3 total   Tests: 155 passed, 155 total
-$ pnpm exec tsc --noEmit && pnpm exec tsc --noEmit -p test/tsconfig.e2e.json   # 1 error, not ours: src/common/utils/coderabbit-config.spec.ts (TS7016, no @types/js-yaml in this install; file comes from master)
+$ pnpm exec tsc --noEmit && pnpm exec tsc --noEmit -p test/tsconfig.e2e.json   # exit 0 (first run had 1 TS7016 error in coderabbit-config.spec.ts: @types/js-yaml, declared in package.json, was missing from this worktree's node_modules; fixed by `pnpm install --offline --frozen-lockfile`, no repo change)
 $ pnpm exec eslint "{src,test}/**/*.ts"                                        # exit 0
 ```
 
