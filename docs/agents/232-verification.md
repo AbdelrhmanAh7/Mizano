@@ -32,7 +32,7 @@ Read from the GitHub commit statuses API (`GET /repos/AbdelrhmanAh7/Mizano/commi
 
 | Head SHA                                   | `e2e-army` status                                                   | `verify` status                                                                                |
 | ------------------------------------------ | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `2c4cf0671e1fa247cd6fb2c172a4803eefc06f7d` | `error` at 10:40:17Z: "tester-army/e2e over the time budget · 270s" | n/a                                                                                            |
+| `2c4cf0671e1fa247cd6fb2c172a4803eefc06f7d` | `error` at 10:40:17Z: "tester-army/e2e over the time budget · 270s" | not checked                                                                                    |
 | `f15d4ff9e52884fd53652f5702ea0d8ea1016f14` | none posted                                                         | `pending` since 14:14:33Z: "starting the app from f15d4ff in a throwaway worktree (attempt 1)" |
 
 The seeded E2E has not produced a result on `f15d4ff`, so the #232 spec has no passing run on any head yet. **The E2E gate stays blocked** until `e2e-army` reports `success` on the PR's current head.
