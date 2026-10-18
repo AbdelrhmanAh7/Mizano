@@ -254,3 +254,16 @@ Round 8 (`9d4c20d`, `76ed8e8` and the commit that records this text; CodeRabbit 
 ## Round 5 re-run (head `05def4a`)
 
 `posting-integrity.e2e-spec.ts` on a throwaway PostgreSQL (`DEVELOPMENT.md` steps, `prisma migrate deploy` applied): 11 tests, 11 passed, exit 0. The `e2e-army` journal test needs the hub stack and was not run locally.
+
+## Round 6 re-run (head `b518012`, master `2fc63724` merged)
+
+The merge conflicted only in the root `EVIDENCE.md` (the #95 audit); master's text was kept and the one-line #94 index re-added. Both open review threads (`journals.service.ts` amount bound, `packages/validators` exact balance check) describe code that is already on this branch and was not changed in this round. Commands run on `b518012`:
+
+| Check                                                                             | Command                                                                                                                                    | Result                          |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------- |
+| E2E on throwaway PostgreSQL 16 (`DEVELOPMENT.md` steps, `migrate deploy` applied) | `cd apps/api && npx jest --config ./test/jest-e2e.json --runInBand test/posting-integrity.e2e-spec.ts`                                     | 11 tests, 11 passed, exit 0     |
+| Unit tests of the changed specs                                                   | `cd apps/api && npx jest src/common/dto src/common/utils/document-totals.spec.ts src/modules/accounting/services/journals.service.spec.ts` | 7 suites, 125 tests, 125 passed |
+| Types                                                                             | `pnpm --filter api type-check`, `pnpm --filter @mizano/validators type-check`                                                              | exit 0, no output               |
+| Lint                                                                              | `pnpm --filter api lint`, `pnpm --filter @mizano/validators lint`                                                                          | exit 0, no warnings             |
+
+The `e2e-army` journal test needs the hub stack and was not run locally.
