@@ -597,10 +597,21 @@ export class WorkOrdersService {
     return { started: result.count, total: ids.length };
   }
 
-  /** Completes each order through completeWorkOrder (materials, finished goods, COGM) at its planned quantity. */
+  /**
+   * Completes each order through completeWorkOrder (materials, finished goods, COGM) at its planned quantity.
+   * Orders with partial production already moved stock for those units, so they must be completed one by one.
+   */
   async bulkComplete(organizationId: string, ids: string[]): Promise<BulkResultDto> {
     return runBulk(ids, async (id) => {
       const { quantity } = await this.findOne(organizationId, id);
+      const recorded = await this.prisma.productionEntry.count({
+        where: { workOrderId: id, organizationId },
+      });
+      if (recorded > 0) {
+        throw new BadRequestException(
+          'Work order has recorded production; complete it individually with the produced quantity',
+        );
+      }
       return this.completeWorkOrder(organizationId, id, { quantityProduced: quantity });
     });
   }
