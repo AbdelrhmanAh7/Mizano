@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { BulkIdsDto } from '../../../common/dto/bulk-ids.dto';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -146,8 +147,8 @@ export class WorkOrdersController {
 
   @Post('bulk-complete')
   @Permissions('manufacturing.edit')
-  @ApiOperation({ summary: 'Bulk complete work orders' })
-  bulkComplete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+  @ApiOperation({ summary: 'Bulk complete in-process work orders at planned quantity (COGM)' })
+  bulkComplete(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.workOrdersService.bulkComplete(orgId, dto.ids);
   }
 

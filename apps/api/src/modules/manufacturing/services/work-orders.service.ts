@@ -3,6 +3,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Item, Prisma, WorkOrderStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
+import { runBulk } from '../../../common/utils/run-bulk';
 
 export interface CreateWorkOrderData {
   bomId: string;
@@ -595,16 +597,12 @@ export class WorkOrdersService {
     return { started: result.count, total: ids.length };
   }
 
-  async bulkComplete(organizationId: string, ids: string[]) {
-    const result = await this.prisma.workOrder.updateMany({
-      where: {
-        id: { in: ids },
-        organizationId,
-        status: WorkOrderStatus.IN_PROCESS,
-      },
-      data: { status: WorkOrderStatus.COMPLETED, completedDate: new Date() },
+  /** Completes each order through completeWorkOrder (materials, finished goods, COGM) at its planned quantity. */
+  async bulkComplete(organizationId: string, ids: string[]): Promise<BulkResultDto> {
+    return runBulk(ids, async (id) => {
+      const { quantity } = await this.findOne(organizationId, id);
+      return this.completeWorkOrder(organizationId, id, { quantityProduced: quantity });
     });
-    return { completed: result.count, total: ids.length };
   }
 
   async bulkCancel(organizationId: string, ids: string[]) {

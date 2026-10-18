@@ -628,7 +628,7 @@ export const workOrdersApi = {
     api.post(`/work-orders/${id}/cancel`, data),
   bulkDelete: (ids: string[]) => api.post('/work-orders/bulk-delete', { ids }),
   bulkStart: (ids: string[]) => api.post('/work-orders/bulk-start', { ids }),
-  bulkComplete: (ids: string[]) => api.post('/work-orders/bulk-complete', { ids }),
+  bulkComplete: (ids: string[]) => api.post('/manufacturing/work-orders/bulk-complete', { ids }),
   bulkCancel: (ids: string[]) => api.post('/work-orders/bulk-cancel', { ids }),
 };
 
