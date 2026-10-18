@@ -1,9 +1,12 @@
 # Verification report — #182 slice 1 (offset mapping after normalization)
 
 Sentry issue: none (no originating Sentry issue; GitHub issue #182, part 2/2 of #109).
-Tested code commit: `2b25d24ea5ad6eb078aa025c45cd6bad268acb50` (all 4 extraction test suites passing).
-Scope: first slice only. The async T3 path and PDF fixtures are deferred (see `AI_QUESTIONS.md`).
-e2e-army: no test added. Internal extraction change, no screen or HTTP contract changes; the only callers read `RulesExtraction` fields, and the new fields (`start`, `end`, `originalText`) are additive.
+Scope: entity offset mapping for amounts, dates, invoice numbers, tax IDs, and line-indexed vendors back to original document text.
+Follow-up issues:
+
+- #182-B: restore async entity-extraction path (T3) in service/controller/DTO
+- #182-C: update E2E PDF fixtures for Unicode length/offsets and full E2E validation
+  e2e-army: no test added. Internal extraction change, no screen or HTTP contract changes; the only callers read `RulesExtraction` fields, and the new fields (`start`, `end`, `originalText`) are additive.
 
 ## Acceptance criteria
 
@@ -15,8 +18,9 @@ e2e-army: no test added. Internal extraction change, no screen or HTTP contract 
 | AC4 | Emoji prefix shifts offsets by 2 (UTF-16), not the normalized length                                                | › "shifts by the emoji UTF-16 length, not the normalized length"                                                                                                   | pass   |
 | AC5 | ASCII input: identity map, `mapSpanToOriginal` returns the span unchanged                                           | `rules-normalize.spec.ts` › "is the identity for ASCII"; extractor spec › "keeps ASCII spans identical"                                                            | pass   |
 | AC6 | Every returned span satisfies `0 <= start < end <= originalText.length`                                             | extractor spec › "keeps ASCII spans identical and inside the text"; "accounts for dropped marks and earlier lines" (CRLF, bidi mark, Arabic separators)            | pass   |
+| AC7 | Round-trip offsets for date, dueDate, invoiceNumber, taxId, and line-indexed vendor                                 | extractor spec › "slices invoice number...", "slices date and dueDate...", "slices tax ID...", "slices line-matched vendor...", "leaves start/end undefined..."    | pass   |
 
-Not covered in this slice (deferred, in `AI_QUESTIONS.md`): async extraction path restore, E2E PDF fixtures, full E2E run, offsets for date/vendor/tax id.
+Deferred to follow-up issues: #182-B (T3 async extraction path) and #182-C (E2E PDF fixtures).
 
 ## Commands and observed results
 
@@ -31,12 +35,12 @@ $ pnpm --filter api lint
 exit 0 (eslint "{src,apps,libs,test}/**/*.ts")
 
 $ pnpm --filter api exec jest --maxWorkers=2 src/modules/ai/extraction
-Test Suites: 4 passed, 4 total   Tests: 63 passed, 63 total        (exit 0)
+Test Suites: 4 passed, 4 total   Tests: 68 passed, 68 total        (exit 0)
 ```
 
 ## Regression on base
 
-Ran the two new specs against the base (`origin/master`) versions of `rules-normalize.ts` and `invoice-rules-extractor.ts`, then restored HEAD:
+Ran the new specs against the base (`origin/master`) versions of `rules-normalize.ts` and `invoice-rules-extractor.ts`, then restored HEAD:
 
 ```text
 FAIL src/modules/ai/extraction/rules/invoice-rules-extractor.spec.ts
@@ -50,4 +54,4 @@ FAIL src/modules/ai/extraction/rules/rules-normalize.spec.ts
 Test Suites: 2 failed, 1 passed, 3 total   Tests: 7 passed, 7 total (exit 1)
 ```
 
-They fail on base because the new specs import symbols/fields that do not exist there (`normalizeWithOffsets`, `mapSpanToOriginal`, `originalText`, `start`/`end`), so TypeScript compilation stops before any test runs. On HEAD all suites pass (63/63 passed, exit 0).
+They fail on base because the new specs import symbols/fields that do not exist there (`normalizeWithOffsets`, `mapSpanToOriginal`, `originalText`, `start`/`end`), so TypeScript compilation stops before any test runs. On HEAD all suites pass (68/68 passed, exit 0).

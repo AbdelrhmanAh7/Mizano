@@ -294,4 +294,43 @@ describe('extractInvoiceFields offsets map back to the original text', () => {
       }
     }
   });
+
+  it('slices invoice number with Arabic-Indic digits', () => {
+    const text = 'Invoice No: INV-٢٠٢٤-٠٠٤٢';
+    const r = run(text);
+    expect(r.invoiceNumber?.value).toBe('INV-2024-0042');
+    expect(text.slice(r.invoiceNumber?.start, r.invoiceNumber?.end)).toBe('INV-٢٠٢٤-٠٠٤٢');
+  });
+
+  it('slices date and dueDate with Arabic-Indic and Eastern Arabic digits', () => {
+    const text = 'Date: ١٥/٠٣/٢٠٢٤\nDue Date: ۰۱-۰۴-۲۰۲۴';
+    const r = run(text);
+    expect(r.date?.value).toBe('2024-03-15');
+    expect(text.slice(r.date?.start, r.date?.end)).toBe('١٥/٠٣/٢٠٢٤');
+    expect(r.dueDate?.value).toBe('2024-04-01');
+    expect(text.slice(r.dueDate?.start, r.dueDate?.end)).toBe('۰۱-۰۴-۲۰۲۴');
+  });
+
+  it('slices tax ID with Arabic-Indic digits', () => {
+    const text = 'الرقم الضريبي: ٣٠٠١٢٣٤٥٦٧٠٠٠٠٣';
+    const r = run(text);
+    expect(r.vendorTaxId?.value).toBe('300123456700003');
+    expect(text.slice(r.vendorTaxId?.start, r.vendorTaxId?.end)).toBe('٣٠٠١٢٣٤٥٦٧٠٠٠٠٣');
+  });
+
+  it('slices line-matched vendor and accounts for multi-code-unit emoji cluster', () => {
+    const text = 'Invoice\n😀\nSupplier: شركة الأمل';
+    const r = run(text);
+    expect(r.vendorName?.value).toBe('شركة الأمل');
+    expect(text.slice(r.vendorName?.start, r.vendorName?.end)).toBe('شركة الأمل');
+    expect(r.vendorName?.start).toBe('Invoice\n'.length + 2 + '\nSupplier: '.length);
+  });
+
+  it('leaves start/end undefined for heuristic vendor', () => {
+    const text = 'شركة الأمل\nTotal: 100';
+    const r = run(text);
+    expect(r.vendorName?.value).toBe('شركة الأمل');
+    expect(r.vendorName?.start).toBeUndefined();
+    expect(r.vendorName?.end).toBeUndefined();
+  });
 });
