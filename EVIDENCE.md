@@ -143,8 +143,6 @@
   Lint: 4 packages successful
   ```
 
-<<<<<<< HEAD
-
 # Issue #141 — intake worker entrypoint, processor out of the API, Pi compose worker
 
 Tested commit: `57f9a0d` (branch `ai/141`; this file is committed after it). Fresh Postgres 16, `REDIS_URL=` blank, in band.
@@ -189,7 +187,7 @@ tsc --noEmit (src, test/tsconfig.e2e.json) exit 0; eslint on touched paths exit 
 shellcheck lib.sh healthcheck.sh: only the existing SC1091 info (sourced file)
 ```
 
-# Behaviour notes: `IntakeWorkerModule` now gets the processor from `IntakeModule`, which also provides `IntakeJobsService`, so the worker runs the startup/periodic recovery sweep too (queue job ids collapse duplicates with the API's sweep). `AiOperationsModule` is unchanged in this round.
+Behaviour notes: `IntakeWorkerModule` now gets the processor from `IntakeModule`, which also provides `IntakeJobsService`, so the worker runs the startup/periodic recovery sweep too (queue job ids collapse duplicates with the API's sweep). `AiOperationsModule` is unchanged in this round.
 
 ---
 

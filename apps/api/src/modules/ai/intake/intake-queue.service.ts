@@ -16,7 +16,8 @@ export type IntakeQueueHandler = (payload: IntakeQueuePayload) => Promise<void>;
  * BullMQ transport for intake jobs. The job row in PostgreSQL is the source of
  * truth; the queue only carries `{ jobId, organizationId }` so a lost queue
  * entry can always be rebuilt from the database. Without REDIS_URL (unit
- * tests, bare local runs) jobs run in-process after the delay.
+ * tests, bare local runs) jobs run in-process after the delay, but only in a process that
+ * registered the handler; an API without a handler throws on enqueue.
  */
 /** BullMQ owns its Redis connections; hand it plain options parsed from REDIS_URL. */
 export function connectionFromUrl(url: string): ConnectionOptions {
@@ -92,6 +93,13 @@ export class IntakeQueueService implements OnModuleDestroy {
   async enqueue(payload: IntakeQueuePayload, queueJobId: string, delayMs = 0): Promise<void> {
     const url = this.redisUrl;
     if (!url) {
+      // The consumer lives in the worker process; an in-process queue is only visible to a
+      // process that registered a handler. Refuse instead of leaving the job QUEUED forever.
+      if (!this.handler) {
+        throw new Error(
+          'Intake queue requires REDIS_URL: the worker runs in a separate process and cannot see an in-process queue',
+        );
+      }
       if (this.timers.has(queueJobId)) return;
       const timer = setTimeout(() => {
         this.timers.delete(queueJobId);
