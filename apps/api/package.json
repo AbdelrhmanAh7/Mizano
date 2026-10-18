@@ -135,6 +135,9 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@mizano/validators$": "<rootDir>/../../../packages/validators/src/index.ts"
+    },
     "setupFilesAfterEnv": [
       "<rootDir>/test/setup.ts"
     ]
