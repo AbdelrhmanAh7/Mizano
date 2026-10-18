@@ -70,7 +70,7 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <NextIntlClientProvider messages={messages}>
-        <LocaleDirectionProvider dir={direction}>
+        <LocaleDirectionProvider dir={direction} lang={locale}>
           <Providers>
             <Suspense fallback={null}>
               <NavigationProgress />
