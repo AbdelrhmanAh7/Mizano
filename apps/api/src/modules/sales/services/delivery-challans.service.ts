@@ -165,7 +165,7 @@ export class DeliveryChallansService {
         },
       });
       if (res.count !== 1) {
-        return this.rejectTransition(
+        await this.rejectTransition(
           tx,
           organizationId,
           id,
