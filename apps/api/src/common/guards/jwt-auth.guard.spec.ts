@@ -57,7 +57,7 @@ describe('JwtAuthGuard', () => {
     });
 
     it('should throw UnauthorizedException with message when no user', () => {
-      expect(() => guard.handleRequest(null, null, null)).toThrow('Invalid or expired token');
+      expect(() => guard.handleRequest(null, null, null)).toThrow('Unauthorized');
     });
 
     it('should reject with a 401 whose error is "Unauthorized"', () => {
@@ -68,7 +68,7 @@ describe('JwtAuthGuard', () => {
         expect(error).toBeInstanceOf(UnauthorizedException);
         expect((error as UnauthorizedException).getResponse()).toEqual({
           statusCode: 401,
-          message: 'Invalid or expired token',
+          message: 'Unauthorized',
           error: 'Unauthorized',
         });
       }

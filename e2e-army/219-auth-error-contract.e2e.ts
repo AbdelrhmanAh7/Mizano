@@ -4,8 +4,7 @@ import { expect } from 'e2e';
 // The auth error contract the stable gate (mz-auth.3) relies on: a class-validator rejection is
 // { code: 'VALIDATION_ERROR', message: 'Validation failed', details: { <Field>: [constraint texts] } },
 // and a bad bearer token is a 401 with error 'Unauthorized'. Fixed seed data, no tenant is created.
-// Casing is sentence case on purpose: the CTO kept 'Validation failed' over the drafted spec's
-// Title Case AC3 (see docs/agents/219-auth-error-contract.md).
+// Casing is sentence case on purpose: 'Validation failed' is the established API contract.
 const WEAK = {
   email: 'army-219-weak@army-e2e.test',
   password: 'alllowercase1',

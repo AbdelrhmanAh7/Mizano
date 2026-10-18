@@ -201,14 +201,16 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const exceptionResponse = exception.getResponse();
 
     let message: string = exception.message;
-    let error: string = 'Error';
+    let error: string = status === HttpStatus.UNAUTHORIZED ? 'Unauthorized' : 'Error';
     let details: Record<string, unknown> | undefined;
     let code: string | undefined;
 
     if (typeof exceptionResponse === 'object') {
       const responseObj = exceptionResponse as Record<string, unknown>;
       message = (responseObj.message as string) || exception.message;
-      error = (responseObj.error as string) || 'Error';
+      error =
+        (responseObj.error as string) ||
+        (status === HttpStatus.UNAUTHORIZED ? 'Unauthorized' : 'Error');
       code = responseObj.code as string | undefined;
       details = responseObj.details as Record<string, unknown> | undefined;
 
@@ -217,9 +219,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
         details = this.formatValidationErrors(responseObj.message);
         message = 'Validation failed';
         code = 'VALIDATION_ERROR';
+        error = (responseObj.error as string) || 'Bad Request';
       }
     } else if (typeof exceptionResponse === 'string') {
       message = exceptionResponse;
+    }
+
+    if (status === HttpStatus.UNAUTHORIZED && (error === 'Error' || !error)) {
+      error = 'Unauthorized';
     }
 
     return {

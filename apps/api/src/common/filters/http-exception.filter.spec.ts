@@ -101,7 +101,7 @@ describe('AllExceptionsFilter error contract', () => {
     expect(status).toBe(401);
     expect(body).toMatchObject({
       statusCode: 401,
-      message: 'Invalid or expired token',
+      message: 'Unauthorized',
       error: 'Unauthorized',
     });
     expect(body.details).toBeUndefined();

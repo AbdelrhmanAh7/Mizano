@@ -96,7 +96,7 @@ describe('Auth (e2e)', () => {
       expect(res.status).toBe(400);
     });
 
-    // Sentence-case 'Validation failed' is the contract the CTO kept (docs/agents/219-auth-error-contract.md).
+    // Sentence-case 'Validation failed' is the API contract for validation errors (#219).
     it('names the failed password rule in details of a VALIDATION_ERROR (#219)', async () => {
       const res = await anon.post('/auth/register').send({
         ...testUser,
