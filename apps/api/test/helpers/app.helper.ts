@@ -1,4 +1,4 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, ModuleMetadata, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModuleBuilder } from '@nestjs/testing';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module';
@@ -19,11 +19,13 @@ class UnlimitedThrottlerStorage implements ThrottlerStorage {
  * Boots the real AppModule in-process with the same global validation pipe as `src/main.ts`,
  * so request validation and response shapes match production. The `/api` global prefix is not
  * applied: routes are addressed as `/bills`, `/journals`, ...
+ * `extraImports` boots more modules into the same Nest app (e.g. the intake worker module).
  */
 export async function createTestApp(
   configure: (builder: TestingModuleBuilder) => TestingModuleBuilder = (builder) => builder,
+  extraImports: NonNullable<ModuleMetadata['imports']> = [],
 ): Promise<INestApplication> {
-  const builder = Test.createTestingModule({ imports: [AppModule] })
+  const builder = Test.createTestingModule({ imports: [AppModule, ...extraImports] })
     .overrideProvider(ThrottlerStorage)
     .useValue(new UnlimitedThrottlerStorage());
   const moduleFixture = await configure(builder).compile();

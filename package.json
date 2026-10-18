@@ -5,9 +5,10 @@
   "description": "AI-powered ERP system - Autonomous Accounting Platform",
   "scripts": {
     "// — Development ——————————————————": "",
-    "dev": "docker-compose up -d && turbo dev",
+    "dev": "docker-compose up -d && turbo dev dev:worker",
     "dev:local": "APP_ENV=local pnpm dev",
     "dev:api": "pnpm --filter api dev",
+    "dev:worker": "pnpm --filter api dev:worker",
     "dev:web": "pnpm --filter @mizano/web dev",
     "// — Build ————————————————————————": "",
     "build": "turbo build",

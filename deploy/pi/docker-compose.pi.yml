@@ -118,9 +118,43 @@ services:
     logging: *logging
     networks: [internal]
 
-  # Reserved for the CPU extraction worker (2048m budget); enable when it exists.
-  # worker:
-  #   mem_limit: 2048m
+  # CPU extraction worker (2048m budget). The API only enqueues; OCR/PDF extraction runs here.
+  # It opens no HTTP port, so it overrides the image's API healthcheck.
+  worker:
+    image: ${MIZANO_API_IMAGE:?set MIZANO_API_IMAGE}
+    restart: unless-stopped
+    mem_limit: 2048m
+    command: ['node', 'dist/main.worker.js']
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET}
+      CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN}
+      FRONTEND_URL: ${CORS_ORIGIN:?set CORS_ORIGIN}
+      OLLAMA_ENABLED: 'false'
+      EXTRACTION_STRATEGY: rules
+      INTAKE_EXTRACTION_STRATEGY: rules
+      INTAKE_TESSDATA_DIR: /app/apps/api
+      INTAKE_STORAGE_DIR: /data/originals
+    volumes:
+      - ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/originals:/data/originals
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ['CMD-SHELL', 'grep -q main.worker /proc/1/cmdline']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging: *logging
+    networks: [internal]
 
   web:
     image: ${MIZANO_WEB_IMAGE:?set MIZANO_WEB_IMAGE}

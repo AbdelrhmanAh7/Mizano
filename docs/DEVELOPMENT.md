@@ -18,7 +18,7 @@ pnpm db:generate
 pnpm docker:up          # PostgreSQL :5435, Redis :6380
 pnpm db:migrate         # dedicated local database only
 pnpm db:seed
-pnpm dev                # docker-compose up -d && turbo dev → web :5001, API :6001
+pnpm dev                # docker-compose up -d && turbo dev dev:worker → web :5001, API :6001, intake worker
 ```
 
 Never initialize, migrate or reset a shared or production database from a workstation. AI routes need an inference backend (`OLLAMA_BASE_URL`) until the CPU extraction work lands; they return errors rather than fake results when it is missing.
@@ -36,7 +36,7 @@ Health: `GET /api/health`, `/api/health/ready`, `/api/health/live`.
 
 | Area      | Command                                                                                              | Notes                                   |
 | --------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| Dev       | `pnpm dev`, `pnpm dev:api`, `pnpm dev:web`                                                           | `dev:local` forces `APP_ENV=local`      |
+| Dev       | `pnpm dev`, `pnpm dev:api`, `pnpm dev:web`, `pnpm dev:worker`                                        | `dev:local` forces `APP_ENV=local`      |
 | Build     | `pnpm build`, `pnpm build:{dev,sit,prod}`                                                            | sets `APP_ENV` for the build            |
 | Quality   | `pnpm lint`, `pnpm lint:fix`, `pnpm type-check`, `pnpm format:check`                                 | `pnpm format` rewrites files            |
 | Tests     | `pnpm test`, `pnpm test:api`, `pnpm test:web`, `pnpm test:cov`, `pnpm test:e2e`                      | E2E needs a seeded database             |
@@ -114,6 +114,14 @@ Troubleshooting: `docker ps` to confirm `mizano-postgres`/`mizano-redis`, `redis
 | Planning tools | `scripts/test_*.py`                                        | `python -m unittest discover -s scripts -p 'test_*.py'` |
 
 `_run_tests.js`, `_jest.config.js` and `_jest_resolver.js` make the API suite resolve pnpm's store on Windows/WSL; use them instead of calling Jest directly.
+
+The API only enqueues intake jobs; OCR/PDF extraction runs in the worker (`pnpm dev:worker`, included in `pnpm dev`; `docker-compose.production.yml` `intake-worker` and the Pi compose `worker` service). The worker needs `REDIS_URL` (the same queue as the API) and refuses to start without it. Deploy-file checks (healthcheck, shared volume, CPU-only extractor) run in the unit suite: `pnpm --filter api exec jest src/modules/ai/worker`.
+
+To run the intake worker isolation e2e test (#142):
+
+```bash
+DATABASE_URL="postgresql://mizano:mizano_secret@localhost:5435/mizano_db" REDIS_URL="" pnpm --filter api exec jest --runInBand --config test/jest-e2e.json test/intake-worker-isolation.e2e-spec.ts
+```
 
 Unit-test infrastructure lives in `apps/api/src/test/`: `mocks/prisma.mock.ts` (deep Prisma mock, transactions call back with the mock), `mocks/redis.mock.ts` (in-memory cache), `mocks/{sharp,tesseract}.mock.js` (heavy native/OCR libraries), `helpers/test-utils.ts` (typed factories) and `helpers/decimal.helpers.ts`. Unit tests must not need Redis, PostgreSQL, Ollama or the network.
 
