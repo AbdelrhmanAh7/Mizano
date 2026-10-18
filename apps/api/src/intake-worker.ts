@@ -30,14 +30,22 @@ async function bootstrap(): Promise<void> {
   const timer = setInterval(() => void probe(), HEARTBEAT_INTERVAL_MS);
   timer.unref();
   await probe();
-  registerGracefulShutdown(async () => {
-    clearInterval(timer);
-    // Stop fetching and let the active job finish; Prisma stays connected until it does,
-    // because the result or failure write still needs the database.
-    await queue.onModuleDestroy();
-    await app.close();
-    await unlink(WORKER_HEARTBEAT_FILE).catch(() => undefined);
-  });
+  registerGracefulShutdown(
+    async () => {
+      clearInterval(timer);
+      // Stop fetching and let the active job finish; Prisma stays connected until it does,
+      // because the result or failure write still needs the database.
+      await queue.onModuleDestroy();
+      await app.close();
+      await unlink(WORKER_HEARTBEAT_FILE).catch(() => undefined);
+    },
+    {
+      exit: (code) => {
+        // Explicit exit ensures the process terminates even if sockets leak.
+        process.exit(code);
+      },
+    },
+  );
 }
 
 void bootstrap().catch((error: unknown) => {
