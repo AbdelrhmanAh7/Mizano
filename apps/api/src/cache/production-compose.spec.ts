@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { connectionFromUrl } from '../modules/ai/intake/intake-queue.service';
 import { resolveRedisUrl } from './redis-url';
@@ -105,6 +105,26 @@ describe.each(FILES)('%s (#183)', (file) => {
     expect(envOf(api, 'REDIS_PASSWORD')).toBe(REDIS_PASS);
   });
 
+  it('keeps REDIS_URL overridable for an external Redis and still sends the password', () => {
+    const rendered = render(file, {
+      POSTGRES_PASSWORD: PG_PASS,
+      REDIS_PASSWORD: REDIS_PASS,
+      REDIS_URL: 'redis://cache.internal:6380/2',
+    });
+    const api = service(rendered, 'api');
+    const env = {
+      REDIS_URL: envOf(api, 'REDIS_URL'),
+      REDIS_PASSWORD: envOf(api, 'REDIS_PASSWORD'),
+    };
+    expect(env.REDIS_URL).toBe('redis://cache.internal:6380/2');
+    const url = resolveRedisUrl({ get: (key) => env[key as keyof typeof env] });
+    expect(connectionFromUrl(url as string)).toMatchObject({
+      host: 'cache.internal',
+      port: 6380,
+      password: REDIS_PASS,
+    });
+  });
+
   it('lets the API connect with a fallback POSTGRES_PASSWORD full of URL-special characters', () => {
     const special = 'army183/pg+=@:%?';
     const api = service(render(file, { POSTGRES_PASSWORD: special }), 'api');
@@ -162,5 +182,12 @@ describe('#183 evidence matches the workflows', () => {
   it('describes no derived or hex Redis password', () => {
     expect(section).not.toMatch(/hex|REDIS_PASS_HEX|add-mask/i);
     expect(read('docs/ops/pending-workflow-changes.md')).not.toMatch(/hex|REDIS_PASS_HEX/i);
+  });
+
+  it('keeps the unrelated docs it claims to have restored', () => {
+    // An auto-commit (78d904b) deleted both files while this section said they were restored.
+    for (const doc of ['docs/vision.md', 'docs/backlog-restructure.md']) {
+      expect(existsSync(join(ROOT, doc))).toBe(true);
+    }
   });
 });
