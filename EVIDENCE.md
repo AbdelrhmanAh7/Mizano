@@ -390,7 +390,7 @@ Unset launcher heap_size_limit: 4395630592
 
 # EVIDENCE — #183 Secure Docker Compose production stacks (Mizano #132-1)
 
-- **Tested commit**: `224e128fa98b41860629b1272c7a9cfd347eb70a` (ai/183; `origin/master` `44b689e6` is already merged in). Only this line changes after it; the spec that reads this file was re-run on the final head.
+- **Tested commit**: `5ff032821cbca81fb1da0edf3ad2e55d25e79d6f` (ai/183; `origin/master` `44b689e6` is already merged in). Only this line changes after it; the spec that reads this file was re-run on the final head.
 - **Sentry**: none. This comes from security audit #132; there is no Sentry issue. No UI change, so no screenshots.
 
 ## Acceptance criteria
