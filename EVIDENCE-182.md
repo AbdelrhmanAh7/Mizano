@@ -1,6 +1,7 @@
 # Verification report — #182 slice 1 (offset mapping after normalization)
 
 Sentry issue: none (no originating Sentry issue; GitHub issue #182, part 2/2 of #109).
+Tested code commit: `2a9bfc26` (all 4 extraction test suites passing, 68/68 passed).
 Scope: entity offset mapping for amounts, dates, invoice numbers, tax IDs, and line-indexed vendors back to original document text.
 Follow-up issues:
 
