@@ -586,5 +586,10 @@ Command: `nice -n 10 pnpm --filter api exec jest --maxWorkers=2 src/modules/sale
 ## Local Checks
 
 - Linter: `pnpm --filter api lint` (exit code 0, clean).
-- Typecheck: `pnpm --filter api type-check` (10 pre-existing errors in `logger.service.ts` etc. already present on base; 0 errors in delivery-challans files).
+- Typecheck: `pnpm --filter api type-check` (exit code 0, 0 error TS lines).
 - Changed unit test: `nice -n 10 pnpm --filter api exec jest --maxWorkers=2 src/modules/sales/services/delivery-challans.service.spec.ts` (26 passed, exit code 0).
+
+### Implementation Note (count > 1)
+
+Where the `count > 1` `ConflictException` comes from: `update` calls `await this.rejectTransition(...)` for any `count !== 1` (`delivery-challans.service.ts`, `rejectTransition`). That helper re-reads the challan in the same transaction: missing -> 404, status not `DRAFT` -> 400, otherwise (still `DRAFT`) falls through to `throw new ConflictException`. In the `count: 2` test the re-read mock returns the `DRAFT` challan, so the 409 is `rejectTransition`'s last line, not a hard-coded throw. The transaction aborts with this error, guaranteeing line `deleteMany`/`createMany` mutations never execute.
+
