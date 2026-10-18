@@ -114,8 +114,7 @@ export class BillsService {
       };
     }
 
-    // A caller-supplied cursor must belong to this organization: Prisma would otherwise position
-    // the page on a foreign row and silently reorder the caller's own rows (cross-tenant isolation).
+    // A cursor must belong to this organization, else Prisma pages from a foreign row (cross-tenant).
     if (cursor) {
       const owned = await this.prisma.bill.count({
         where: { id: cursor, organizationId, deletedAt: null },
