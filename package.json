@@ -46,7 +46,7 @@
     "docker:dev": "docker-compose --env-file .env.dev up -d",
     "docker:sit": "docker-compose --env-file .env.sit -f docker-compose.yml -f docker-compose.sit.yml up -d",
     "docker:prod": "docker-compose --env-file .env.prod -f docker-compose.production.yml up -d --build",
-    "docker:prod:down": "docker-compose -f docker-compose.production.yml down",
+    "docker:prod:down": "docker-compose --env-file .env.prod -f docker-compose.production.yml down",
     "status": "docker-compose ps",
     "// — Utilities ————————————————————": "",
     "env:check": "node -e \"const e=process.env.APP_ENV||'local';const f='.env.'+e;require('fs').existsSync(f)?console.log('Using: '+f):console.error('Missing: '+f)\"",

@@ -385,3 +385,115 @@ Unset launcher heap_size_limit: 4395630592
 # Note: In containerized setups, MIZANO_NODE_HEAP_MB must be passed in the compose profile (#39).
 # MIZANO_NODE_HEAP_MB=1024
 ```
+
+---
+
+# EVIDENCE — #183 Secure Docker Compose production stacks (Mizano #132-1)
+
+- **Tested commit**: `b1833097` (head before this edit; `origin/master` `44b689e6` is already merged in). Only this
+  file and `AI_QUESTIONS.md` change after it. `production-compose.spec.ts` reads this file, so the suites below
+  were re-run after the last edit of this file.
+- **Sentry**: none. This comes from security audit #132; there is no Sentry issue. No UI change, so no screenshots.
+
+## Acceptance criteria
+
+1. **AC1** `docker compose config` shows no published 5432/6379 (postgres and redis have no `ports:`).
+2. **AC2** `POSTGRES_PASSWORD` is required via `${POSTGRES_PASSWORD:?}`; config fails without it.
+3. **AC3** Redis runs with `--requirepass`, in array form (one argv entry).
+4. **AC4** The API authenticates to Redis, whatever characters the password has.
+5. **AC5** The Redis healthcheck authenticates without the password in its command.
+
+## Verification report
+
+| AC  | Command / test                                                                          | Observed                                         |
+| --- | --------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| AC1 | `npx jest src/cache/production-compose.spec.ts` ("publishes no Postgres or Redis port") | exit 0, pass (both compose files)                |
+| AC2 | same spec ("fails to render without POSTGRES_PASSWORD")                                 | exit 0, pass                                     |
+| AC3 | same spec ("runs Redis with --requirepass…", "…one argv entry…")                        | exit 0, pass                                     |
+| AC4 | `npx jest src/cache/redis-url.spec.ts` and spec "lets the API connect…"                 | exit 0, pass                                     |
+| AC5 | same spec ("keeps the password out of the Redis healthcheck command")                   | exit 0, pass                                     |
+| all | `npx prisma generate && npx jest src/cache src/modules/ai/intake`                       | 9 suites, 86 tests passed (after merging master) |
+
+Real `docker compose config` was **not** run: see "Not verified here".
+
+### Regression proof (fails on base, passes on head)
+
+`production-compose.spec.ts` and `redis-url.ts` copied onto a detached worktree of `origin/master`, then
+`npx jest src/cache/production-compose.spec.ts`: **exit 1, 12 failed / 3 passed** (the 3 passes are "keeps the password out of the Redis healthcheck command" for both files and "publishes no Postgres or Redis port" for one file). On the head: all pass.
+
+- **Scope**: `docker-compose.production.yml`, `deploy/pi/docker-compose.pi.yml`, `apps/api/src/cache/redis-url.ts`
+  and its three callers (`cache.module.ts`, `cache.service.ts`, `modules/ai/intake/intake-queue.service.ts`),
+  `scripts/check-compose-security.sh`, `apps/api/src/cache/{production-compose,redis-url}.spec.ts`,
+  `e2e-army/183-redis-password-api.e2e.ts`, `.env.example`, `deploy/pi/.env.pi.example`, `package.json`
+  (`docker:prod:down` reads `.env.prod`), `docs/DEVELOPMENT.md`, `docs/ops/pending-workflow-changes.md`.
+- **E2E**: `e2e-army/183-redis-password-api.e2e.ts`, request-level, tagged `feat:mz-system-diagnostics` and
+  `feat:mz-intake-processor` (the two features `featurecov map` reports for the changed API files).
+
+## Workflow edits: pending
+
+No file under `.github/workflows/` is changed by this PR (owner rule: the implementer does not edit CI or
+workflows). Both edits are written out in `docs/ops/pending-workflow-changes.md` and must be applied by hand:
+
+1. `deploy.yml` (about line 225): derive and mask a hex `REDIS_PASSWORD` before the `.env` block and write it
+   inside. **Not applied.** Until then production uses the fallback `REDIS_PASSWORD = POSTGRES_PASSWORD`; that
+   works for any character except a single quote.
+2. `ci.yml` (lint job): a step running `bash scripts/check-compose-security.sh`. **Not applied, so the script
+   does not gate CI yet.** The step needs no env (the script sets its own dummy passwords and unsets
+   `REDIS_PASSWORD`). Until then the Docker-free `production-compose.spec.ts` in the unit suite is the only
+   automatic check, and the spec "lists the workflow edits as pending exactly while a workflow lacks them"
+   fails if this section and the workflows drift apart.
+
+| REQ | Requirement                                                   | Where                                                                                                                                                                                                                                     | Verified by                                                                                                                                                                                                                         |
+| --- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R1  | No published 5432/6379                                        | postgres and redis services have no `ports:` in either file                                                                                                                                                                               | spec "publishes no Postgres or Redis port"; script fails on any `ports` entry of either service (`check-compose-security.sh`, "Any ports entry" check)                                                                              |
+| R2  | `POSTGRES_PASSWORD` is required (`:?`)                        | `docker-compose.production.yml:104`, `deploy/pi/docker-compose.pi.yml:20`; no `mizano_secret` fallback                                                                                                                                    | spec "fails to render without POSTGRES_PASSWORD"; script negative case                                                                                                                                                              |
+| R3  | Redis requires a password (`--requirepass`)                   | `docker-compose.production.yml:139-153`, `deploy/pi/docker-compose.pi.yml:50-63`; both use the array form of `command:`                                                                                                                   | spec "runs Redis with --requirepass…"; spec "passes the Redis password as one argv entry…" (`production-compose.spec.ts`; fails on the old string-form command, passes on the array form); script checks `--requirepass <expected>` |
+| R4  | The API authenticates with any password                       | compose passes a credential-free `REDIS_URL` plus the raw `REDIS_PASSWORD` (`docker-compose.production.yml:23-24`, `deploy/pi/docker-compose.pi.yml:98-99`); `apps/api/src/cache/redis-url.ts` percent-encodes it for all three consumers | `redis-url.spec.ts`; spec "lets the API connect with a fallback POSTGRES_PASSWORD full of URL-special characters"; script rejects credentials in `REDIS_URL`                                                                        |
+| R5  | Healthcheck authenticates without the password in its command | `REDISCLI_AUTH` env; `redis-cli --no-auth-warning ping`                                                                                                                                                                                   | spec "keeps the password out…"; script checks `REDISCLI_AUTH`                                                                                                                                                                       |
+
+## Review findings addressed (round on `93b37f7`)
+
+- **EVIDENCE.md claimed the workflow edits were applied** (QA a42f2ea977c5, d2b36d1b2e4e): root cause was that
+  the evidence was written while the workflow patches were applied, and not updated when `93b37f7` reverted
+  them. This section now states they are pending, and the spec above ties the claim to the workflow files so
+  it cannot drift again. The CI step is described once, in `docs/ops/pending-workflow-changes.md`.
+- **Redis `command:` in string form** (QA 016078fa18f9): a space or quote in the fallback password was split
+  into extra `redis-server` arguments. `docker-compose.production.yml` now uses the array form like the Pi
+  file. The one character YAML cannot carry there is a single quote; this is documented in `.env.example`,
+  `.env.pi.example` and `docs/DEVELOPMENT.md`.
+- **Compose warnings in the JSON stream** (Codex P2): `check-compose-security.sh` now captures stderr
+  separately from `docker compose config --format json`.
+- **`pnpm docker:prod:down` without the env file** (Codex P2): `package.json` passes `--env-file .env.prod`.
+- **`::add-mask::` inside the `.env` redirect** (Codex P1): the pending patch now derives and masks the value
+  before the redirected block.
+- **Mutable tested revision** (Codex P2): the literal SHA is recorded above.
+- Earlier threads (URL-encoding in `REDIS_URL`; port check by `ports` length) are fixed by `redis-url.ts` and
+  `8ec7d95`, unchanged here.
+
+## Test output on the head (`cd apps/api && npx prisma generate && npx jest src/cache src/modules/ai/intake`)
+
+```text
+Test Suites: 9 passed, 9 total
+Tests:       86 passed, 86 total
+```
+
+(The Prisma client had to be regenerated after merging master's `stageTimingsMs` migration; before that three
+intake suites failed to compile for that reason only.)
+
+## Not verified here
+
+- **`docker compose config` has not been run against real Compose.** Docker is not installed on this machine, so
+  `scripts/check-compose-security.sh` was checked only with `bash -n` and by running its `jq` filters on a
+  hand-written config; no real `docker compose -f docker-compose.production.yml config` output is attached.
+  The Docker-free spec renders the same interpolation subset. Real output needs a machine with Docker, or the
+  pending CI step.
+- The e2e-army test: not run locally. `run-local.sh` needs a pushed ref, and the implementer does not push.
+  The verify job runs it.
+- `tsc --noEmit -p apps/api`: **exit 0, no errors** once the workspace package `@mizano/shared-types` is built
+  (`cd packages/shared-types && npx tsc -p .`, output in gitignored `dist/`). Without that build the worktree's
+  partial install reports 10 errors, all `Cannot find module '@mizano/shared-types'` or the cascade from it in
+  `logger.service.ts`; none in `src/cache` or `intake-queue.service.ts`. `@types/js-yaml` is already declared in
+  `apps/api/package.json` and `pnpm-lock.yaml`, so no dependency change is needed. The e2e-army file is not in the
+  API project, so `tsc` does not compile it.
+- `npx eslint src/cache src/modules/ai/intake/intake-queue.service.ts`: exit 0.
+- The full suite: runs on GitHub CI after the push. Per instructions, it was not run locally.
