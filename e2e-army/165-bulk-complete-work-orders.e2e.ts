@@ -182,15 +182,85 @@ test(
     // Empty selection is rejected by validation.
     expect((await a.post(`${WO}/bulk-complete`, { ids: [] })).status).toBe(400);
 
-    // Planned quantity was produced: 4 orders x 3 units out, 4 x 3 x 2 components consumed.
-    const levels = rows(await a.get(`/inventory-levels?warehouseId=${wh.body.id}`));
-    const qty = (id: string) =>
-      Number(levels.find((l: any) => l.itemId === id || l.item?.id === id)?.quantity ?? 0);
-    expect(qty(output)).toBe(12);
-    expect(qty(component)).toBe(6);
+    // Planned quantity was produced: 4 orders x 3 units in, 4 x 3 x 2 components out.
+    const moves = rows(await a.get('/inventory-movements?type=production&limit=100'));
+    const moved = (id: string, dir: string) =>
+      moves
+        .filter((m: any) => m.itemId === id && m.movementType === dir)
+        .reduce((sum: number, m: any) => sum + Number(m.quantity), 0);
+    expect(moved(output, 'IN')).toBe(12);
+    expect(moved(component, 'OUT')).toBe(24);
 
     // Trial balance still balances.
     const tb = (await a.get('/accounting-reports/trial-balance')).body;
     expect(tb.totals.totalDebits).toBe(tb.totals.totalCredits);
+  },
+);
+
+// Seeded demo org: WO-001 and WO-002 are In Process. Select both in the list, press Complete, and each gets the
+// COGM journal completeWorkOrder posts (planned quantity x component cost + operations cost); the trial balance balances.
+test(
+  '@issue-165 AC1 AC3: seeded demo, select WO-001 and WO-002, Complete posts a COGM journal for both',
+  { tags: ['feat:mz-work-orders', 'lvl:ui'], timeout: 180_000 },
+  async ({ app, screen, browser }) => {
+    // Demo admin sign-in, retried like the hub suite: a submit before hydration is a plain GET.
+    for (let i = 0; i < 3; i++) {
+      await app.open('/en/login');
+      await screen.getByRole('textbox', 'Email').fill('admin@mizano.com');
+      await screen.getByRole('textbox', 'Password').fill('password123');
+      await screen.getByRole('button', 'Sign In').tap();
+      try {
+        await expect(browser).toHaveURL(/\/en\/(dashboard|onboarding|accounting|sales)/, {
+          timeout: 40_000,
+        });
+        break;
+      } catch (e) {
+        if (i === 2) throw e;
+      }
+    }
+    await app.open('/en/manufacturing/work-orders');
+    for (const number of ['WO-001', 'WO-002']) {
+      const row = screen.getByRole('row').filter({ hasText: number });
+      await expect(row).toContainText('In Process');
+      await row.getByRole('checkbox', 'Select row').tap();
+    }
+    await screen.getByRole('button', 'Complete', { visible: true }).tap();
+    await screen.getByRole('button', 'Complete 2 work orders').tap();
+    await expect(screen.getByRole('alertdialog')).toBeHidden({ timeout: 30_000 });
+
+    const api = client(apiBase(String(app.baseUrl)));
+    const login = await api.post('/auth/login', {
+      email: 'admin@mizano.com',
+      password: 'password123',
+    });
+    expect(login.status).toBe(200);
+    const a = client(apiBase(String(app.baseUrl)), login.body.tokens.accessToken);
+    for (const id of ['wo-001', 'wo-002']) {
+      const wo = (await a.get(`${WO}/${id}`)).body;
+      expect(wo.status).toBe('COMPLETED');
+      expect(wo.journalId).toBeTruthy();
+      const bom = wo.bom;
+      const materials = bom.items.reduce(
+        (sum: number, l: any) =>
+          sum +
+          Math.round((Number(l.quantity) * wo.quantity) / bom.outputQuantity) *
+            Number(l.item.costPrice),
+        0,
+      );
+      const lines = (await a.get(`/journals/${wo.journalId}`)).body.lines;
+      const total = (key: 'debit' | 'credit') =>
+        lines.reduce((s: number, l: any) => s + Number(l[key]), 0);
+      expect(total('debit')).toBeCloseTo(materials + Number(bom.operationsCost), 4);
+      expect(total('credit')).toBeCloseTo(total('debit'), 4);
+    }
+    const tb = (await a.get('/accounting-reports/trial-balance')).body;
+    expect(tb.totals.totalDebits).toBe(tb.totals.totalCredits);
+
+    // Arabic: the list renders right-to-left and both orders read Completed (مكتمل).
+    await app.open('/ar/manufacturing/work-orders');
+    expect(await browser.evaluate(() => document.documentElement.dir)).toBe('rtl');
+    for (const number of ['WO-001', 'WO-002']) {
+      await expect(screen.getByRole('row').filter({ hasText: number })).toContainText('مكتمل');
+    }
   },
 );
