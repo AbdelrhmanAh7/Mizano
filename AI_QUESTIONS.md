@@ -1,10 +1,9 @@
-# Questions / follow-ups for #185 (refresh token removed from the client-visible session)
+# Questions / follow-ups for #186 (CI config is owner-only, so nothing was changed there)
 
-1. Spec AC3 says "grep for 'refreshToken' in apps/web/lib/auth.ts returns zero matches". That cannot hold
-   without breaking token refresh: the encrypted, server-side NextAuth JWT must keep the refresh token
-   (`jwt` callback, `refreshAccessToken`, `signOut` revocation, `authorize` mapping, and the `User` / `JWT`
-   module augmentations). Moving that code out of `auth.ts` would refactor the refresh flow, which the
-   spec puts out of scope. What I did instead: the only client-visible path is gone. `session.refreshToken`
-   has zero matches, the `Session` type has no `refreshToken` member (a probe `s.refreshToken` fails with
-   TS2339), and unit tests plus the e2e-army test check the session JSON. If the literal zero-grep is still
-   wanted, that is a follow-up: move `requestTokenRefresh`/`refreshAccessToken` into `auth-refresh.ts`.
+1. `.github/workflows/deploy.yml:325` runs `docker exec mizano-api npx prisma db seed ... || true` after
+   every production rollout. With this guard (container `NODE_ENV=production`) that step now prints the
+   refusal and exits 1, which `|| true` swallows, so deploys keep working and no demo admin is created.
+   Decision needed: leave as is (recommended, the intended outcome of #186), or remove the now-pointless
+   seed step from the workflow, or export `SEED_ALLOW_PROD=1` there if a production seed is still wanted.
+2. The issue text says `npm run seed`, but `apps/api/package.json` only had `prisma.seed`, no `seed` script.
+   Added `"seed": "ts-node prisma/seed.ts"` so `pnpm --filter api seed` works as the acceptance criteria state.
