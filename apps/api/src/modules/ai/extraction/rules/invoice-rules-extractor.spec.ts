@@ -256,3 +256,42 @@ describe('toExtractionResult', () => {
     expect(result.fieldConfidence.total).toBeGreaterThan(0);
   });
 });
+
+describe('extractInvoiceFields offsets map back to the original text', () => {
+  const run = (text: string) => extractInvoiceFields(text);
+
+  it('slices Arabic-Indic digits from the original text', () => {
+    const text = 'total ٤٢٠٠ USD';
+    const r = run(text);
+    expect(r.total?.value.toString()).toBe('4200');
+    expect(text.slice(r.total?.start, r.total?.end)).toBe('٤٢٠٠');
+    expect(r.originalText).toBe(text);
+  });
+
+  it('shifts by the emoji UTF-16 length, not the normalized length', () => {
+    const text = '😀 total ٤٢٠٠ USD';
+    const r = run(text);
+    expect(r.total?.start).toBe(2 + ' total '.length);
+    expect(text.slice(r.total?.start, r.total?.end)).toBe('٤٢٠٠');
+  });
+
+  it('accounts for dropped marks and earlier lines', () => {
+    const text = 'Invoice\r\n‏Subtotal: ١٬٠٠٠٫٥٠\nTotal: 1,150.50';
+    const r = run(text);
+    expect(text.slice(r.subtotal?.start, r.subtotal?.end)).toBe('١٬٠٠٠٫٥٠');
+    expect(text.slice(r.total?.start, r.total?.end)).toBe('1,150.50');
+  });
+
+  it('keeps ASCII spans identical and inside the text', () => {
+    const text = 'Total: 12.50';
+    const r = run(text);
+    expect([r.total?.start, r.total?.end]).toEqual([7, 12]);
+    for (const f of [r.subtotal, r.tax, r.total]) {
+      if (f) {
+        expect(f.start).toBeGreaterThanOrEqual(0);
+        expect(f.end).toBeGreaterThan(f.start as number);
+        expect(f.end).toBeLessThanOrEqual(text.length);
+      }
+    }
+  });
+});

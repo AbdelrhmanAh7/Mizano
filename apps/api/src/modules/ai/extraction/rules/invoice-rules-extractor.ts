@@ -1,7 +1,12 @@
 import Decimal from 'decimal.js';
 import { findAmounts, AmountMatch } from './rules-amounts';
 import { parseDate } from './rules-dates';
-import { foldForMatch, normalizeDigits, splitLines } from './rules-normalize';
+import {
+  foldForMatch,
+  mapSpanToOriginal,
+  normalizeWithOffsets,
+  splitLines,
+} from './rules-normalize';
 
 export interface Evidence {
   /** The source line (trimmed, capped). Document content: never log it. */
@@ -14,6 +19,9 @@ export interface RuleField<T> {
   /** 0..1. Never invented: derived from how the value was found and cross-checks. */
   confidence: number;
   evidence: Evidence;
+  /** `[start, end)` of the value in `RulesExtraction.originalText`; set for amounts only. */
+  start?: number;
+  end?: number;
 }
 
 export type TaxIdCountry = 'EG' | 'SA' | 'AE';
@@ -33,6 +41,8 @@ export interface RulesExtraction {
   warnings: string[];
   /** 0..1; capped below the review threshold when a consistency check fails. */
   overallConfidence: number;
+  /** The raw input: `originalText.slice(field.start, field.end)` is the matched value. */
+  originalText: string;
 }
 
 const TOLERANCE = new Decimal('0.01');
@@ -98,6 +108,7 @@ function findLabeledAmounts(
   lines: string[],
   folded: string[],
   scaleFactor: number,
+  span: (lineIndex: number, index: number, end: number) => { start: number; end: number },
 ): Record<AmountKey, RuleField<Decimal> | null> {
   const found: Record<AmountKey, RuleField<Decimal> | null> = {
     subtotal: null,
@@ -128,6 +139,7 @@ function findLabeledAmounts(
       value: hit.value,
       confidence: base * scaleFactor,
       evidence: evidence(lines, lineIndex),
+      ...span(lineIndex, hit.index, hit.index + hit.raw.length),
     };
   }
   return found;
@@ -425,12 +437,26 @@ function checkConsistency(
  * @param textConfidence 0..1 confidence of the text source (OCR); defaults to 1
  */
 export function extractInvoiceFields(rawText: string, textConfidence = 1): RulesExtraction {
-  const lines = splitLines(normalizeDigits(rawText));
+  const { normalized, toOriginal } = normalizeWithOffsets(rawText);
+  const lines = splitLines(normalized);
+  const lineStarts: number[] = [];
+  for (let at = 0, i = 0; i < lines.length; i++) {
+    lineStarts.push(at);
+    at += lines[i].length;
+    at += normalized.startsWith('\r\n', at) ? 2 : 1;
+  }
+  const span = (lineIndex: number, index: number, end: number): { start: number; end: number } =>
+    mapSpanToOriginal(
+      lineStarts[lineIndex] + index,
+      lineStarts[lineIndex] + end,
+      toOriginal,
+      rawText.length,
+    );
   const folded = lines.map(foldForMatch);
   const factor = scale(textConfidence);
   const warnings: string[] = [];
 
-  const amounts = findLabeledAmounts(lines, folded, factor);
+  const amounts = findLabeledAmounts(lines, folded, factor, span);
   const { date, dueDate, dateAmbiguous } = extractDates(lines, folded, factor);
   if (dateAmbiguous) warnings.push('DATE_AMBIGUOUS');
   const result: RulesExtraction = {
@@ -445,6 +471,7 @@ export function extractInvoiceFields(rawText: string, textConfidence = 1): Rules
     currency: extractCurrency(lines, folded, factor),
     warnings,
     overallConfidence: 0,
+    originalText: rawText,
   };
 
   const consistent = checkConsistency(result);
