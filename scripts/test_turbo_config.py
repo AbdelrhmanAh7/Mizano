@@ -25,7 +25,8 @@ def restrictive_inputs(tasks):
     return sorted(
         name
         for name, task in tasks.items()
-        if "inputs" in task and DEFAULT_INPUTS not in task["inputs"]
+        if "inputs" in task
+        and (not task.get("inputs") or task["inputs"][0] != DEFAULT_INPUTS)
     )
 
 

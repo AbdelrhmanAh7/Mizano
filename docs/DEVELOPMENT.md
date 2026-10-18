@@ -133,7 +133,7 @@ Checks on PRs and pushes to `master`, by source:
   - **Stable check names:** their names are the exact check names the hub gates and automerge wait for, so they must stay stable.
   - **Fork PRs:** this workflow uses `pull_request` (read-only token, no secrets), never `pull_request_target`; first-time fork contributors need an approval in repository settings before it runs.
   - **E2E:** `ci.yml` runs no E2E (see `e2e-army` below).
-  - **Deployment note:** `deploy.yml` stays disabled / publishes only on `master` pushes with secrets.
+  - **Deployment note:** `deploy.yml` publishes production images on pushes to `master` (not PRs).
 - **Hub `localci` job (Mac mini):** runs the full CI (`pnpm ci:full`: lint, type-check, test, build) locally and posts GitHub commit statuses under the same job names, so the gates see the same check names whichever runner produced them.
 - **`e2e-army` status (hub verify suite):** feature-level E2E for the features a PR touches, run by the hub against a throwaway environment; it is a separate commit status, not a job in `ci.yml`.
 - **Local pre-push hook:** only fast checks (`turbo run type-check test --filter=...[<base>]`, see Git workflow below); full CI, build and E2E are left to the sources above.
@@ -153,10 +153,10 @@ The GitHub Actions workflow includes gating, draft skips, Turbo caching, and con
 #### Job flow
 
 1. **gate** (`CI Gate`, timeout 5m) — sets `should_run`. Event data reaches the script as environment variables, never through `${{ }}` inside the script, so a label name cannot inject shell code.
-2. **filter** (`Path Filter`, timeout 5m) — `dorny/paths-filter` detects changes to Docker-relevant files: `apps/api/Dockerfile`, `apps/web/Dockerfile`, `.dockerignore`, `deploy/**`, `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`. Base is explicitly specified for PRs and push events, and initial pushes with all-zero `before` SHA skip the git diff cleanly.
+2. **filter** (`Path Filter`, timeout 5m) — `dorny/paths-filter` detects changes to Docker-relevant files: `apps/api/Dockerfile`, `apps/web/Dockerfile`, `.dockerignore`, `deploy/**`, `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`. Base is set only for pushes (`github.event.before`); PRs leave `base` empty so the action queries the GitHub API (`pull-requests: read`). A push whose `before` commit is all-zeros or missing from the clone treats Docker files as changed.
 3. **install** (`Install Dependencies`, timeout 5m) — shared dependency install (pnpm store cache) and `prisma generate`.
 4. **lint**, **test**, **build** (each timeout 5m) — run in parallel after install. Each lists `gate` and `install` in `needs`. The lint job also runs the `scripts/test_turbo_config.py` guard (see Turbo task inputs below). The build job restores the Next.js build cache.
-5. **docker-build** (`Docker Multi-Arch Build`) — multi-arch Docker **validation**, one matrix leg per architecture (`amd64` on `ubuntu-latest`, `arm64` on the native `ubuntu-24.04-arm` runner). It starts only after lint, test and build passed, and only when the event is a push, or the PR changes a Docker-relevant file (per filter), or the PR has the `docker` label. Adding `docker` to an existing PR starts it without a new commit. The job uses `timeout-minutes: 30`, a pending owner decision (see the Docker section below).
+5. **docker-build** (`Docker Multi-Arch Build`, timeout 5m) — multi-arch Docker **validation**, split into parallel matrix legs per image and architecture (`api`/`web` on `amd64`/`arm64`). It starts only after lint, test and build passed, and only when the event is a push, or the PR changes a Docker-relevant file (per filter), or the PR has the `docker` label. Adding `docker` to an existing PR starts it without a new commit. Every leg strictly adheres to `timeout-minutes: 5` by building images independently and leveraging native runners and layer caches.
 
 #### Caching
 
@@ -179,7 +179,7 @@ pnpm turbo run type-check --filter=@mizano/web --dry=json
 
 #### Docker multi-arch validation
 
-The `docker-build` job builds each architecture on a native runner and **never pushes** (`push: false`). The first version emulated arm64 with QEMU on `ubuntu-latest`; `pnpm install --frozen-lockfile` made no progress for the whole 60-minute timeout (the same step took 44 seconds for amd64), so the arm64 leg now runs on `ubuntu-24.04-arm`, which is free for public repositories (this repository is public). Each leg uses `timeout-minutes: 30`, which is a pending owner decision recorded in `AI_QUESTIONS.md`, not an approved exception to the 5-minute job rule (native builds take ~8–12 minutes). Publishing belongs to `deploy.yml`, which tags the images with the short SHA: the web image bakes `NEXT_PUBLIC_API_URL` in at build time, so an image built in CI with a placeholder URL must not be pushed as `latest`. When registry names are built for a push elsewhere, lower-case the owner (GHCR rejects `ghcr.io/AbdelrhmanAh7/...`).
+The `docker-build` job builds each image and architecture independently in parallel on native runners under the 5-minute limit (`timeout-minutes: 5`), and **never pushes** (`push: false`). The first version emulated arm64 with QEMU on `ubuntu-latest`; `pnpm install --frozen-lockfile` made no progress for the whole 60-minute timeout (the same step took 44 seconds for amd64), so the arm64 leg now runs on `ubuntu-24.04-arm`, which is free for public repositories (this repository is public). Publishing belongs to `deploy.yml`, which tags the images with the short SHA: the web image bakes `NEXT_PUBLIC_API_URL` in at build time, so an image built in CI with a placeholder URL must not be pushed as `latest`. When registry names are built for a push elsewhere, lower-case the owner (GHCR rejects `ghcr.io/AbdelrhmanAh7/...`).
 
 `.github/workflows/demo-planning.yml` validates and syncs `docs/planning/` metadata with `scripts/sync-demo-planning.py`; see the [planning guide](planning/README.md).
 

@@ -4,7 +4,6 @@
 # unlimited for this public repository). No self-hosted labels and no secrets beyond the automatic GITHUB_TOKEN.
 #
 # Owner rule: every job stays under 5 minutes (timeout-minutes: 5), so the pipeline is split into parallel jobs.
-# The only exception is docker-build (timeout-minutes: 30; native builds take 8-12 min): pending owner decision, see AI_QUESTIONS.md.
 # The job names are the check names the hub gates and automerge wait for ("Install Dependencies", "Lint & Type Check",
 # "Unit Tests", "Build"): keep them stable. Jobs are independent and each installs from the shared pnpm store cache
 # (setup-node), so none waits for another and a failed install cannot skip the others silently.
@@ -339,18 +338,16 @@ jobs:
   #   - push to master or develop
   #   - PRs with docker-relevant file changes
   #   - PRs with the "docker" label
-  # One matrix leg per architecture, each on a native runner, because QEMU emulation of the
-  # arm64 build never finished: `pnpm install` made no progress for 60 minutes (amd64 took
-  # 44 seconds). Nothing is pushed: deploy.yml owns the published images, and the web image
-  # bakes NEXT_PUBLIC_API_URL in at build time, so an image built here with a placeholder
-  # URL must not be tagged for deployment.
+  # Split into parallel matrix jobs per image and architecture, each on a native runner
+  # and capped under the 5-minute owner rule (timeout-minutes: 5). Nothing is pushed:
+  # deploy.yml owns publishing.
   # ==========================================
   docker-build:
     # Static name: GitHub appends the matrix values itself, and a skipped job would
-    # otherwise show the unresolved ${{ matrix.arch }} template as its check name.
+    # otherwise show the unresolved template as its check name.
     name: Docker Multi-Arch Build
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 5
     needs: [gate, filter, lint, test, build]
     if: >-
       needs.gate.outputs.should_run == 'true' &&
@@ -358,14 +355,26 @@ jobs:
       needs.filter.outputs.docker-changed == 'true' ||
       contains(github.event.pull_request.labels.*.name, 'docker'))
     strategy:
-      # Both architectures report their own result; an amd64 failure must not hide arm64.
+      # Each leg reports its own result; an amd64 failure must not hide arm64.
       fail-fast: false
       matrix:
         include:
-          - arch: amd64
+          - image: api
+            file: ./apps/api/Dockerfile
+            arch: amd64
             runner: ubuntu-latest
           # Native arm64 runner, free for public repositories.
-          - arch: arm64
+          - image: api
+            file: ./apps/api/Dockerfile
+            arch: arm64
+            runner: ubuntu-24.04-arm
+          - image: web
+            file: ./apps/web/Dockerfile
+            arch: amd64
+            runner: ubuntu-latest
+          - image: web
+            file: ./apps/web/Dockerfile
+            arch: arm64
             runner: ubuntu-24.04-arm
     steps:
       - name: Checkout code
@@ -378,24 +387,13 @@ jobs:
 
       # Every image and architecture has its own cache scope; a shared scope makes the
       # next build overwrite the cache of the previous one.
-      - name: Build API image (${{ matrix.arch }}, not pushed)
+      - name: Build ${{ matrix.image }} image (${{ matrix.arch }}, not pushed)
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.15.0
         with:
           context: .
-          file: ./apps/api/Dockerfile
+          file: ${{ matrix.file }}
           push: false
           platforms: linux/${{ matrix.arch }}
-          cache-from: type=gha,scope=api-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=api-${{ matrix.arch }}
-
-      - name: Build Web image (${{ matrix.arch }}, not pushed)
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.15.0
-        with:
-          context: .
-          file: ./apps/web/Dockerfile
-          push: false
-          platforms: linux/${{ matrix.arch }}
-          cache-from: type=gha,scope=web-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=web-${{ matrix.arch }}
-          build-args: |
-            NEXT_PUBLIC_API_URL=https://api.example.com
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
+          build-args: ${{ matrix.image == 'web' && 'NEXT_PUBLIC_API_URL=https://api.example.com' || '' }}
