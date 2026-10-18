@@ -97,6 +97,8 @@ services:
       OLLAMA_ENABLED: ${OLLAMA_ENABLED:-false}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       INTAKE_STORAGE_DIR: /data/originals
+      # Only cloudflared may set X-Forwarded-For (login throttling keys on it); loopback is built in.
+      TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-172.30.184.250/32}
     volumes:
       - ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/originals:/data/originals
     depends_on:
@@ -155,8 +157,14 @@ services:
       web:
         condition: service_healthy
     logging: *logging
-    networks: [internal]
+    networks:
+      internal:
+        # Fixed so the api can trust exactly this peer (TRUSTED_PROXY_CIDRS).
+        ipv4_address: 172.30.184.250
 
 networks:
   internal:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.184.0/24

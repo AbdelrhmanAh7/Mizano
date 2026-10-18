@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ChallanStatus, ChallanType } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { DeliveryChallansService } from './delivery-challans.service';
@@ -150,6 +150,45 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
       await expect(service[method](ORG, 'dc-1')).rejects.toThrow(ConflictException);
       expect(prisma.inventoryMovement.create).not.toHaveBeenCalled();
     });
+
+    it('answers 404 for a challan of another organization (or none)', async () => {
+      prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 0 } as never);
+      prisma.deliveryChallan.findFirst.mockResolvedValue(null);
+      await expect(service[method](ORG, 'dc-1')).rejects.toThrow(NotFoundException);
+      expect(prisma.inventoryMovement.create).not.toHaveBeenCalled();
+    });
+
+    it('answers 400 when the challan is in another status', async () => {
+      const other = status === ChallanStatus.DRAFT ? ChallanStatus.ISSUED : ChallanStatus.RETURNED;
+      prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 0 } as never);
+      prisma.deliveryChallan.findFirst.mockResolvedValue(
+        challan(other, { itemId: 'item-b', warehouseId: null }) as never,
+      );
+      await expect(service[method](ORG, 'dc-1')).rejects.toThrow(BadRequestException);
+      expect(prisma.inventoryMovement.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe.each([
+    ['bulkDelete', 'remove'],
+    ['bulkIssue', 'issue'],
+  ] as const)('%s', (bulk, single) => {
+    it(`runs ${single} per record and reports per-record failures`, async () => {
+      const spy = jest
+        .spyOn(service, single)
+        .mockResolvedValueOnce({} as never)
+        .mockRejectedValueOnce(new NotFoundException('Delivery challan not found'));
+      await expect(service[bulk](ORG, ['dc-1', 'dc-2', 'dc-1'])).resolves.toEqual({
+        processed: 1,
+        total: 2,
+        failures: [{ id: 'dc-2', reason: 'Delivery challan not found' }],
+      });
+      expect(spy.mock.calls).toEqual([
+        [ORG, 'dc-1'],
+        [ORG, 'dc-2'],
+      ]);
+      expect(prisma.deliveryChallan.updateMany).not.toHaveBeenCalled();
+    });
   });
 
   it('reads stock for the issue check within the org only', async () => {
@@ -167,5 +206,49 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
     expect(prisma.inventoryLevel.aggregate).toHaveBeenCalledWith(
       expect.objectContaining({ where: { itemId: 'item-b', organizationId: ORG } }),
     );
+  });
+
+  describe('item stock total', () => {
+    const tracked = (status: ChallanStatus, quantity: number) => {
+      const c = challan(status, { itemId: 'item-b', warehouseId: 'wh-b' });
+      c.lines[0].quantity = new Decimal(quantity);
+      prisma.deliveryChallan.findFirst.mockResolvedValue(c as never);
+      prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 1 } as never);
+      prisma.item.findFirst.mockResolvedValue({ id: 'item-b', trackInventory: true } as never);
+      prisma.warehouse.findFirst.mockResolvedValue({ id: 'wh-b' } as never);
+      prisma.inventoryLevel.aggregate.mockResolvedValue({
+        _sum: { quantity: new Decimal(10) },
+      } as never);
+      prisma.inventoryLevel.findFirst.mockResolvedValue({
+        id: 'lvl-1',
+        warehouseId: 'wh-b',
+      } as never);
+      prisma.item.updateMany.mockResolvedValue({ count: 1 } as never);
+    };
+
+    it('issue takes the quantity off the item total as well as the warehouse level', async () => {
+      tracked(ChallanStatus.DRAFT, 2);
+      await service.issue(ORG, 'dc-1');
+      expect(prisma.item.updateMany).toHaveBeenCalledWith({
+        where: { id: 'item-b', organizationId: ORG },
+        data: { currentStock: { decrement: 2 } },
+      });
+    });
+
+    it('mark-returned puts the quantity back on the item total', async () => {
+      tracked(ChallanStatus.ISSUED, 2);
+      await service.markReturned(ORG, 'dc-1');
+      expect(prisma.item.updateMany).toHaveBeenCalledWith({
+        where: { id: 'item-b', organizationId: ORG },
+        data: { currentStock: { increment: 2 } },
+      });
+    });
+
+    it('refuses a fractional quantity of a stock-tracked item (stock is kept in whole units)', async () => {
+      tracked(ChallanStatus.DRAFT, 1.5);
+      await expect(service.issue(ORG, 'dc-1')).rejects.toThrow(BadRequestException);
+      expect(prisma.inventoryMovement.create).not.toHaveBeenCalled();
+      expect(prisma.item.updateMany).not.toHaveBeenCalled();
+    });
   });
 });
