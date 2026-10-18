@@ -7,6 +7,7 @@ import { tmpdir } from 'os';
 import { join, resolve } from 'path';
 import { INestApplication, INestApplicationContext } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { HttpStatus } from '@nestjs/common';
 import { IntakeJobStatus } from '@prisma/client';
 import { createTestApp, getPrisma, uniqueSuffix } from './helpers/app.helper';
 import { registerTenant, TestTenant } from './helpers/tenant.helper';
@@ -79,7 +80,7 @@ describe('@e2e @flow:intake-worker @issue-141 Intake worker entrypoint', () => {
     await app.close();
   });
 
-  it('@issue-141 AC1: the API does not resolve IntakeProcessorService; an upload stays QUEUED', async () => {
+  it('@issue-141 AC1: the API does not resolve IntakeProcessorService; upload fails without REDIS_URL', async () => {
     expect(() => app.get(IntakeProcessorService, { strict: false })).toThrow();
 
     const res = await tenant.api
@@ -88,12 +89,10 @@ describe('@e2e @flow:intake-worker @issue-141 Intake worker entrypoint', () => {
         filename: 'inv.pdf',
         contentType: 'application/pdf',
       });
-    expect(res.status).toBe(201);
-    const job = await prisma.intakeJob.findFirstOrThrow({
-      where: { id: res.body.data.jobId, organizationId: tenant.organizationId },
-    });
-    expect(job.status).toBe(IntakeJobStatus.QUEUED);
-    expect(job.attempts).toBe(0);
+    // Without REDIS_URL and no local processor, the API must fail fast with a clear error
+    expect(res.status).toBe(HttpStatus.SERVICE_UNAVAILABLE);
+    expect(res.body.code).toBe('INTAKE_QUEUE_UNAVAILABLE');
+    expect(res.body.message).toContain('REDIS_URL');
   });
 
   it('@issue-141 AC2: IntakeWorkerModule boots headless and processes a QUEUED job', async () => {

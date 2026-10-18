@@ -15,6 +15,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { IntakeStage } from '../services/document-intake.service';
 import { IntakeQueueService } from './intake-queue.service';
 import { buildIntakeStorageKey, IntakeStorage, sha256Hex } from './intake-storage';
+import { IntakeQueueUnavailableException } from '../../../common/exceptions';
 
 /** Never exposes `storageKey` or the deletion marker. */
 export type IntakeJobView = Omit<IntakeJob, 'storageKey' | 'deletedAt' | 'result'> & {
@@ -226,7 +227,17 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
       throw error;
     }
 
-    await this.enqueueSafely(job);
+    try {
+      await this.enqueueSafely(job);
+    } catch (error) {
+      // If the queue is unavailable, clean up the job and storage
+      if (error instanceof IntakeQueueUnavailableException) {
+        await this.prisma.intakeJob.delete({ where: { id: job.id } }).catch(() => undefined);
+        await this.storage.delete(storageKey).catch(() => undefined);
+        throw error;
+      }
+      throw error;
+    }
     return { job, duplicate: false };
   }
 
@@ -241,6 +252,10 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
       this.logger.error(
         `Enqueue failed for intake job ${job.id}: ${describeError(error, { includeMessage: false })}`,
       );
+      // Re-throw IntakeQueueUnavailableException so the upload fails fast with a clear error
+      if (error instanceof IntakeQueueUnavailableException) {
+        throw error;
+      }
     }
   }
 

@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ConnectionOptions, Queue, Worker } from 'bullmq';
 import { describeError } from '../../../common/utils/redact';
+import { IntakeQueueUnavailableException } from '../../../common/exceptions';
 
 export const INTAKE_QUEUE_NAME = 'intake';
 
@@ -96,9 +97,7 @@ export class IntakeQueueService implements OnModuleDestroy {
       // The consumer lives in the worker process; an in-process queue is only visible to a
       // process that registered a handler. Refuse instead of leaving the job QUEUED forever.
       if (!this.handler) {
-        throw new Error(
-          'Intake queue requires REDIS_URL: the worker runs in a separate process and cannot see an in-process queue',
-        );
+        throw new IntakeQueueUnavailableException();
       }
       if (this.timers.has(queueJobId)) return;
       const timer = setTimeout(() => {
