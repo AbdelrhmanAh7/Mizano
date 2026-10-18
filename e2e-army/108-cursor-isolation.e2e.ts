@@ -1,7 +1,7 @@
 // @issue-108 Cross-tenant isolation of the cursor-paginated ledger and invoice lists.
 // On the verify stack the seeded demo organization (admin@mizano.com) is the other tenant: a freshly
-// registered tenant must get 404 when it passes the demo tenant's real invoice, bill or journal id as
-// cursor, and its own cursor lists must hold none of the demo tenant's rows. lvl:api, no model.
+// registered tenant must get 404, and no rows, when it passes the demo tenant's real invoice, bill or
+// journal id as cursor. The own-rows side is covered by apps/api/test/tenant-isolation.e2e-spec.ts. lvl:api.
 import { test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 import { createHash } from 'node:crypto';
@@ -34,11 +34,6 @@ async function raw(method: string, path: string, token: string | null, body?: un
   return { status: res.status, body: parsed as Record<string, any> };
 }
 
-interface Res {
-  status: number;
-  body: Record<string, any>;
-}
-
 /** Fresh organization + admin user, registered then logged in through the public auth API. */
 async function tenantToken(): Promise<string> {
   const email = seededEmail('mz-cursor-isolation');
@@ -50,7 +45,7 @@ async function tenantToken(): Promise<string> {
     lastName: 'Cursor',
     organizationName: 'Army Cursor Co',
   };
-  let res: Res = await raw('POST', '/auth/register', null, payload);
+  let res = await raw('POST', '/auth/register', null, payload);
   if (res.status === 429) {
     // AuthController is throttled even on the verify stack: poll for a free slot, never blind-retry.
     await expect
@@ -81,7 +76,7 @@ async function demoToken(): Promise<string> {
   return res.body.tokens.accessToken as string;
 }
 
-// One login each per process: the two tests share the tokens, keeping auth calls inside the 5/60s budget.
+// One login each per process, keeping auth calls inside the 5/60s throttle budget.
 let tokenPromise: Promise<string> | null = null;
 let demoPromise: Promise<string> | null = null;
 const token = () => (tokenPromise ??= tenantToken());
@@ -108,24 +103,6 @@ test(
       const res = await raw('GET', `${path}?cursor=${encodeURIComponent(foreign)}`, t);
       expect({ path, status: res.status }).toEqual({ path, status: 404 });
       expect({ path, rows: res.body.data }).toEqual({ path, rows: undefined });
-    }
-  },
-);
-
-test(
-  "@issue-108 AC2: a new tenant's cursor lists answer 200 and hold none of the demo tenant's rows",
-  { tags: ['feat:mz-sales-invoices', 'feat:mz-purchase-bills', 'feat:mz-journals', 'lvl:api'] },
-  async () => {
-    const t = await token();
-    for (const path of PATHS) {
-      const foreign = await demoIds(path);
-      const res = await raw('GET', path, t);
-      expect({ path, status: res.status }).toEqual({ path, status: 200 });
-      const ids = (res.body.data as Array<{ id: string }>).map((r) => r.id);
-      expect({ path, leaked: ids.filter((id) => foreign.includes(id)) }).toEqual({
-        path,
-        leaked: [],
-      });
     }
   },
 );
