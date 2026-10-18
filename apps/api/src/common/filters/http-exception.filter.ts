@@ -201,16 +201,16 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const exceptionResponse = exception.getResponse();
 
     let message: string = exception.message;
-    let error: string = status === HttpStatus.UNAUTHORIZED ? 'Unauthorized' : 'Error';
+    // A 401 always carries error 'Unauthorized', even when the thrower gave no `error` field.
+    const fallbackError = status === HttpStatus.UNAUTHORIZED ? 'Unauthorized' : 'Error';
+    let error: string = fallbackError;
     let details: Record<string, unknown> | undefined;
     let code: string | undefined;
 
     if (typeof exceptionResponse === 'object') {
       const responseObj = exceptionResponse as Record<string, unknown>;
       message = (responseObj.message as string) || exception.message;
-      error =
-        (responseObj.error as string) ||
-        (status === HttpStatus.UNAUTHORIZED ? 'Unauthorized' : 'Error');
+      error = (responseObj.error as string) || fallbackError;
       code = responseObj.code as string | undefined;
       details = responseObj.details as Record<string, unknown> | undefined;
 
@@ -223,10 +223,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }
     } else if (typeof exceptionResponse === 'string') {
       message = exceptionResponse;
-    }
-
-    if (status === HttpStatus.UNAUTHORIZED && (error === 'Error' || !error)) {
-      error = 'Unauthorized';
     }
 
     return {

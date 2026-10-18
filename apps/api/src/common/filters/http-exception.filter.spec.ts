@@ -1,4 +1,10 @@
-import { ArgumentsHost, BadRequestException, Logger, ValidationPipe } from '@nestjs/common';
+import {
+  ArgumentsHost,
+  BadRequestException,
+  HttpException,
+  Logger,
+  ValidationPipe,
+} from '@nestjs/common';
 import { RegisterDto } from '../../modules/auth/dto/register.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { AllExceptionsFilter } from './http-exception.filter';
@@ -105,5 +111,17 @@ describe('AllExceptionsFilter error contract', () => {
       error: 'Unauthorized',
     });
     expect(body.details).toBeUndefined();
+  });
+
+  it('falls back to error "Unauthorized" for a 401 that carries no error field', () => {
+    const { status, body } = render(new HttpException({ message: 'Session expired' }, 401));
+    expect(status).toBe(401);
+    expect(body).toMatchObject({ message: 'Session expired', error: 'Unauthorized' });
+
+    const plain = render(new HttpException('Session expired', 401));
+    expect(plain.body).toMatchObject({ message: 'Session expired', error: 'Unauthorized' });
+
+    const other = render(new HttpException({ message: 'Teapot' }, 418));
+    expect(other.body).toMatchObject({ error: 'Error' });
   });
 });
