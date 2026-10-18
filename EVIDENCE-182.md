@@ -1,7 +1,7 @@
 # Verification report — #182 slice 1 (offset mapping after normalization)
 
 Sentry issue: none (no originating Sentry issue; GitHub issue #182, part 2/2 of #109).
-Tested code commit: `e66a43fb` (source files under `extraction/rules/` are unchanged from `2f5edb7c`; later commits touch only docs/evidence and merges from master).
+Tested code commit: `2b25d24ea5ad6eb078aa025c45cd6bad268acb50` (all 4 extraction test suites passing).
 Scope: first slice only. The async T3 path and PDF fixtures are deferred (see `AI_QUESTIONS.md`).
 e2e-army: no test added. Internal extraction change, no screen or HTTP contract changes; the only callers read `RulesExtraction` fields, and the new fields (`start`, `end`, `originalText`) are additive.
 
@@ -21,16 +21,17 @@ Not covered in this slice (deferred, in `AI_QUESTIONS.md`): async extraction pat
 ## Commands and observed results
 
 ```text
-$ cd apps/api && pnpm exec jest --maxWorkers=2 src/modules/ai/extraction
-Test Suites: 4 passed, 4 total   Tests: 63 passed, 63 total        (exit 0)
-
-$ pnpm exec eslint --max-warnings 0 <4 changed files in extraction/rules>
+$ pnpm --filter @mizano/shared-types build
 exit 0
 
-$ pnpm exec tsc --noEmit
-10 errors, none under extraction/rules. All in src/common/filters/http-exception.filter.ts
-and src/modules/logger/* (files not touched here); cause: @mizano/shared-types is not built in
-this worktree. Not caused by this change; not re-checked on a clean base build.
+$ pnpm --filter api type-check
+exit 0 (tsc --noEmit && tsc --noEmit -p test/tsconfig.e2e.json)
+
+$ pnpm --filter api lint
+exit 0 (eslint "{src,apps,libs,test}/**/*.ts")
+
+$ pnpm --filter api exec jest --maxWorkers=2 src/modules/ai/extraction
+Test Suites: 4 passed, 4 total   Tests: 63 passed, 63 total        (exit 0)
 ```
 
 ## Regression on base
@@ -38,9 +39,15 @@ this worktree. Not caused by this change; not re-checked on a clean base build.
 Ran the two new specs against the base (`origin/master`) versions of `rules-normalize.ts` and `invoice-rules-extractor.ts`, then restored HEAD:
 
 ```text
-FAIL rules-normalize.spec.ts
-FAIL invoice-rules-extractor.spec.ts
-Test Suites: 2 failed, 2 total   Tests: 0 total
+FAIL src/modules/ai/extraction/rules/invoice-rules-extractor.spec.ts
+  ● Test suite failed to run
+    Property 'start' does not exist on type 'RuleField<Decimal>'.
+    Property 'originalText' does not exist on type 'RulesExtraction'.
+FAIL src/modules/ai/extraction/rules/rules-normalize.spec.ts
+  ● Test suite failed to run
+    Module '"./rules-normalize"' has no exported member 'mapSpanToOriginal'.
+    Module '"./rules-normalize"' has no exported member 'normalizeWithOffsets'.
+Test Suites: 2 failed, 1 passed, 3 total   Tests: 7 passed, 7 total (exit 1)
 ```
 
-They fail on base because the new specs import symbols/fields that do not exist there (`normalizeWithOffsets`, `mapSpanToOriginal`, `originalText`, `start`/`end`), so TypeScript compilation stops before any test runs. No assertion-level failure on base was observed. On HEAD both suites pass (command above).
+They fail on base because the new specs import symbols/fields that do not exist there (`normalizeWithOffsets`, `mapSpanToOriginal`, `originalText`, `start`/`end`), so TypeScript compilation stops before any test runs. On HEAD all suites pass (63/63 passed, exit 0).
