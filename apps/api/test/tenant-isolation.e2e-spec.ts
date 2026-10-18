@@ -1,8 +1,7 @@
 /**
- * @issue-108 Cross-tenant isolation of the ledger and invoice read endpoints. Tenants A and B each
- * get a sent invoice, an approved bill, a manual journal and a distinct unapplied vendor credit.
- * Every list, cursor, get-by-id and report endpoint is read with each tenant's real token and
- * checked against that tenant's own database rows; anonymous and expired tokens get 401.
+ * @issue-108 Cross-tenant isolation of ledger and invoice reads. Tenants A and B each get an invoice,
+ * a bill, a journal and a distinct unapplied vendor credit; every list, cursor, get-by-id and
+ * report endpoint is read with each tenant's token and checked against that tenant's own rows.
  */
 import { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -102,6 +101,8 @@ describe('Tenant isolation of ledger and invoice reads (e2e) @issue-108', () => 
 
   beforeAll(async () => {
     app = await createTestApp();
+    // One bound port: a fresh ephemeral port per request can be claimed by another process.
+    await app.listen(0, '127.0.0.1');
     prisma = getPrisma(app);
     tenantA = await registerTenant(app, 'IsoA');
     tenantB = await registerTenant(app, 'IsoB');
