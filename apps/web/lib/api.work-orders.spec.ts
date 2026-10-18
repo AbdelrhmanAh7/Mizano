@@ -20,4 +20,37 @@ describe('workOrdersApi.bulkComplete', () => {
     );
     request.mockRestore();
   });
+
+  it('routes bulkStart, bulkCancel and bulkDelete through /manufacturing/work-orders', async () => {
+    const request = jest.spyOn(axios.Axios.prototype, 'request').mockResolvedValue({ data: {} });
+
+    await workOrdersApi.bulkStart(['wo-1']);
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'post',
+        url: '/manufacturing/work-orders/bulk-start',
+        data: { ids: ['wo-1'] },
+      }),
+    );
+
+    await workOrdersApi.bulkCancel(['wo-1']);
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'post',
+        url: '/manufacturing/work-orders/bulk-cancel',
+        data: { ids: ['wo-1'] },
+      }),
+    );
+
+    await workOrdersApi.bulkDelete(['wo-1']);
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'post',
+        url: '/manufacturing/work-orders/bulk-delete',
+        data: { ids: ['wo-1'] },
+      }),
+    );
+
+    request.mockRestore();
+  });
 });

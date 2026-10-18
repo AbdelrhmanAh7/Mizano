@@ -79,59 +79,79 @@ test(
     const a = client(base, auth.body.tokens.accessToken);
 
     // Inventory account, default warehouse and a stocked component (cost 10, 2 per output unit).
-    const inventory = await a.post('/accounts', {
-      code: '1490',
-      name: 'E2E Inventory',
-      type: 'ASSET',
-    });
-    expect(inventory.status).toBe(201);
-    const shrink = await a.post('/accounts', {
-      code: '6790',
-      name: 'E2E Shrinkage',
-      type: 'EXPENSE',
-    });
-    expect(shrink.status).toBe(201);
-    const wh = await a.post('/warehouses', {
-      code: 'WH165',
-      name: `${SEED} default`,
-      isDefault: true,
-    });
-    expect(wh.status).toBe(201);
-    const item = async (tag: string, costPrice: string) => {
-      const r = await a.post('/items', {
+    const getOrCreateAccount = async (code: string, name: string, type: string) => {
+      const res = await a.post('/accounts', { code, name, type });
+      if (res.status === 201) return res.body.id as string;
+      const list = rows(await a.get('/accounts'));
+      const found = list.find((acc: any) => acc.code === code);
+      if (found) return found.id as string;
+      expect(res.status).toBe(201);
+      return res.body.id as string;
+    };
+    const inventoryId = await getOrCreateAccount('1490', 'E2E Inventory', 'ASSET');
+    const shrinkId = await getOrCreateAccount('6790', 'E2E Shrinkage', 'EXPENSE');
+
+    const getOrCreateWarehouse = async (code: string, name: string) => {
+      const res = await a.post('/warehouses', { code, name, isDefault: true });
+      if (res.status === 201) return res.body.id as string;
+      const list = rows(await a.get('/warehouses'));
+      const found = list.find((w: any) => w.code === code);
+      if (found) return found.id as string;
+      expect(res.status).toBe(201);
+      return res.body.id as string;
+    };
+    const whId = await getOrCreateWarehouse('WH165', `${SEED} default`);
+
+    const getOrCreateItem = async (tag: string, costPrice: string) => {
+      const sku = `${SEED}-${tag}`.toUpperCase();
+      const res = await a.post('/items', {
         name: `${SEED} ${tag}`,
-        sku: `${SEED}-${tag}`.toUpperCase(),
+        sku,
         type: 'GOODS',
         sellingPrice: '50.00',
         costPrice,
-        inventoryAccountId: inventory.body.id,
+        inventoryAccountId: inventoryId,
       });
-      expect(r.status).toBe(201);
-      return r.body.id as string;
+      if (res.status === 201) return res.body.id as string;
+      const list = rows(await a.get('/items'));
+      const found = list.find((it: any) => it.sku === sku);
+      if (found) return found.id as string;
+      expect(res.status).toBe(201);
+      return res.body.id as string;
     };
-    const component = await item('component', '10.00');
-    const output = await item('output', '0');
-    const stocked = await a.post('/inventory-adjustments', {
+    const component = await getOrCreateItem('component', '10.00');
+    const output = await getOrCreateItem('output', '0');
+
+    // Ensure stocked components for production
+    await a.post('/inventory-adjustments', {
       date: '2026-03-10',
-      warehouseId: wh.body.id,
+      warehouseId: whId,
       itemId: component,
       type: 'INCREASE',
       quantity: 30,
       reason: 'STOCKTAKE',
-      accountId: shrink.body.id,
+      accountId: shrinkId,
     });
-    expect(stocked.status).toBe(201);
-    const bom = await a.post('/manufacturing/bom', {
-      name: `${SEED} BOM`,
-      outputItemId: output,
-      outputQuantity: 1,
-      operationsCost: '0',
-      components: [{ itemId: component, quantity: 2 }],
-    });
-    expect(bom.status).toBe(201);
+
+    const getOrCreateBom = async () => {
+      const res = await a.post('/manufacturing/bom', {
+        name: `${SEED} BOM`,
+        outputItemId: output,
+        outputQuantity: 1,
+        operationsCost: '0',
+        components: [{ itemId: component, quantity: 2 }],
+      });
+      if (res.status === 201) return res.body.id as string;
+      const list = rows(await a.get('/manufacturing/bom'));
+      const found = list.find((b: any) => b.outputItemId === output);
+      if (found) return found.id as string;
+      expect(res.status).toBe(201);
+      return res.body.id as string;
+    };
+    const bomId = await getOrCreateBom();
 
     const workOrder = async (quantity: number, start: boolean) => {
-      const r = await a.post(WO, { bomId: bom.body.id, quantity });
+      const r = await a.post(WO, { bomId, quantity });
       expect(r.status).toBe(201);
       if (start) expect((await a.post(`${WO}/${r.body.id}/start`)).status).toBe(201);
       return r.body.id as string;
@@ -162,7 +182,7 @@ test(
     // Reference: finished goods (the output item's inventory account) debited 3 x 2 x 10 = 60, raw materials credited 60.
     const reference = await journalLines(single);
     expect(reference).toHaveLength(2);
-    expect(reference).toContain(`${inventory.body.id}|60.0000|0.0000`);
+    expect(reference).toContain(`${inventoryId}|60.0000|0.0000`);
     expect(reference.some((sig) => sig.endsWith('|0.0000|60.0000'))).toBe(true);
     expect(await journalLines(bulkA)).toEqual(reference);
     expect(await journalLines(bulkB)).toEqual(reference);
@@ -183,10 +203,16 @@ test(
     expect((await a.post(`${WO}/bulk-complete`, { ids: [] })).status).toBe(400);
 
     // Planned quantity was produced: 4 orders x 3 units in, 4 x 3 x 2 components out.
+    const completedBatch = [single, bulkA, bulkB, later];
     const moves = rows(await a.get('/inventory-movements?type=production&limit=100'));
     const moved = (id: string, dir: string) =>
       moves
-        .filter((m: any) => m.itemId === id && m.movementType === dir)
+        .filter(
+          (m: any) =>
+            m.itemId === id &&
+            m.movementType === dir &&
+            (!m.referenceId || completedBatch.includes(m.referenceId)),
+        )
         .reduce((sum: number, m: any) => sum + Number(m.quantity), 0);
     expect(moved(output, 'IN')).toBe(12);
     expect(moved(component, 'OUT')).toBe(24);

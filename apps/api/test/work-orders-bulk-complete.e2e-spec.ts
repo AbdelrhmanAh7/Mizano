@@ -28,6 +28,7 @@ describe('Work orders bulk complete (e2e) @issue-165', () => {
   let componentId: string;
   let outputId: string;
   let bomId: string;
+  const completedOrders: string[] = [];
 
   async function workOrder(quantity: number, start = true): Promise<string> {
     const created = await api.post(WO).send({ bomId, quantity });
@@ -101,6 +102,7 @@ describe('Work orders bulk complete (e2e) @issue-165', () => {
     const bulk = await api.post(`${WO}/bulk-complete`).send({ ids: [bulkA, bulkB] });
     expect(bulk.status).toBe(201);
     expect(bulk.body).toEqual({ processed: 2, total: 2, failures: [] });
+    completedOrders.push(single, bulkA, bulkB);
 
     // 3 units x 2 components x cost 10 = 60 into finished goods, 60 out of raw materials.
     const reference = await journalOf(single);
@@ -117,6 +119,7 @@ describe('Work orders bulk complete (e2e) @issue-165', () => {
     expect(res.status).toBe(201);
     expect(res.body.processed).toBe(1);
     expect(res.body.total).toBe(3);
+    completedOrders.push(ok);
     expect(res.body.failures).toEqual(
       expect.arrayContaining([
         { id: draft, reason: 'Work order is not in process' },
@@ -134,14 +137,23 @@ describe('Work orders bulk complete (e2e) @issue-165', () => {
   it('produced the planned quantities and the trial balance still balances', async () => {
     // 4 orders completed at 3 units each: 12 output units in, 24 components out.
     const moves = await api.get('/inventory-movements').query({ type: 'production', limit: 100 });
-    const rows: Array<{ itemId: string; movementType: string; quantity: unknown }> =
-      moves.body.data;
+    const rows: Array<{
+      itemId: string;
+      movementType: string;
+      quantity: unknown;
+      referenceId?: string;
+    }> = moves.body.data;
     const moved = (id: string, dir: string): number =>
       rows
-        .filter((m) => m.itemId === id && m.movementType === dir)
+        .filter(
+          (m) =>
+            m.itemId === id &&
+            m.movementType === dir &&
+            (!m.referenceId || completedOrders.includes(m.referenceId)),
+        )
         .reduce((sum, m) => sum + Number(m.quantity), 0);
-    expect(moved(outputId, 'IN')).toBe(12);
-    expect(moved(componentId, 'OUT')).toBe(24);
+    expect(moved(outputId, 'IN')).toBe(completedOrders.length * 3);
+    expect(moved(componentId, 'OUT')).toBe(completedOrders.length * 3 * 2);
 
     const tb = await api.get('/accounting-reports/trial-balance');
     expect(tb.status).toBe(200);

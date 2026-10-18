@@ -520,19 +520,31 @@ Round 1 also showed the unit specs failing on base: `work-orders.service.spec.ts
   4. Work order list links now use `/${locale}/manufacturing/work-orders/...` prefix to prevent RSC prefetch CORS redirects.
   5. Work order list subtitle now uses `t('workOrders.description')` instead of the empty-state prompt.
 
-## Test execution summary (this round)
+## Round 3 — CodeRabbit & reviewer resolutions
+
+1. **Transactional & Idempotent Completion**:
+   - `completeWorkOrder` now runs atomically inside `this.prisma.$transaction(async (tx) => { ... })`.
+   - `consumeMaterials`, `addFinishedGoods`, and `createCOGMJournal` execute on `tx`. If any step fails, all inventory movements and journals roll back cleanly.
+   - Journal creation now includes `sourceType: JournalSourceType.WORK_ORDER_COMPLETION` and `sourceId: workOrder.id`, protected by the schema's `@@unique([organizationId, sourceType, sourceId])` constraint to guarantee idempotency.
+2. **Work Orders Client Routes**:
+   - `apps/web/lib/api.ts` `workOrdersApi` now prefixes all routes (`start`, `complete`, `cancel`, `bulkStart`, `bulkCancel`, `bulkDelete`, `bulkComplete`) with `/manufacturing/work-orders` and uses `patch` for update, matching the Nest controller mount point.
+   - `apps/web/lib/api.work-orders.spec.ts` tests `bulkStart`, `bulkCancel`, and `bulkDelete` alongside `bulkComplete`.
+3. **Idempotent E2E Tests**:
+   - `e2e-army/165-bulk-complete-work-orders.e2e.ts` now gracefully looks up existing entities on repeat runs when registration returns 409, and scopes inventory movement totals to the orders completed in the run (`completedBatch`).
+   - `apps/api/test/work-orders-bulk-complete.e2e-spec.ts` tracks `completedOrders` and computes movement assertion quantities dynamically.
+
+## Test execution summary (round 3)
 
 ```text
-$ pnpm --filter @mizano/shared-types build
-$ pnpm --filter web type-check                                  # exit 0
-$ pnpm --filter api type-check                                  # exit 0
-$ pnpm --filter web exec jest "app/\[locale\]/(dashboard)/manufacturing/work-orders/page.spec.tsx" "app/\[locale\]/(dashboard)/accounting/journals/page.spec.tsx" lib/api.work-orders.spec.ts
-Test Suites: 3 passed, 3 total | Tests: 19 passed, 19 total     # exit 0
-$ pnpm --filter api exec jest src/modules/manufacturing/controllers/work-orders.controller.spec.ts src/modules/manufacturing/services/work-orders.service.spec.ts
-Test Suites: 2 passed, 2 total | Tests: 17 passed, 17 total     # exit 0
-$ pnpm --filter web exec eslint --max-warnings=0 "app/[locale]/(dashboard)/accounting/journals/page.tsx" "app/[locale]/(dashboard)/manufacturing/work-orders/page.spec.tsx" "app/[locale]/(dashboard)/manufacturing/work-orders/page.tsx" "components/accounting/journal-form.tsx" "lib/hooks/use-journals.ts"
+$ pnpm --filter api type-check                                              # exit 0 (src + test/tsconfig.e2e.json)
+$ pnpm --filter web type-check                                              # exit 0
+$ pnpm --filter api exec jest --maxWorkers=2 src/modules/manufacturing/services/work-orders.service.spec.ts src/modules/manufacturing/controllers/work-orders.controller.spec.ts
+Test Suites: 2 passed, 2 total | Tests: 17 passed, 17 total                 # exit 0
+$ pnpm --filter web exec jest --maxWorkers=2 lib/api.work-orders.spec.ts "manufacturing/work-orders/page.spec.tsx"
+Test Suites: 2 passed, 2 total | Tests: 9 passed, 9 total                   # exit 0
+$ pnpm --filter api exec eslint "src/modules/accounting/services/journals.service.ts" "src/modules/manufacturing/services/work-orders.service.ts" "test/work-orders-bulk-complete.e2e-spec.ts"
 # exit 0 (0 errors, 0 warnings)
-$ pnpm --filter api exec eslint --max-warnings=0 "src/modules/manufacturing/controllers/work-orders.controller.ts" "src/modules/manufacturing/services/work-orders.service.ts" "src/modules/manufacturing/controllers/work-orders.controller.spec.ts" "src/modules/manufacturing/services/work-orders.service.spec.ts"
+$ pnpm --filter web exec eslint "lib/api.ts" "lib/api.work-orders.spec.ts"
 # exit 0 (0 errors, 0 warnings)
 ```
 
@@ -540,4 +552,3 @@ $ pnpm --filter api exec eslint --max-warnings=0 "src/modules/manufacturing/cont
 
 - The e2e-army UI scenario covers EN and AR/RTL on the work orders list.
 - The full suite was not run locally (owner rule: CI runs it for Mizano).
-- Unchanged and out of scope: `completeWorkOrder` does not wrap its writes in one `$transaction`, and it does not update inventory levels. Bulk uses the same command, so it behaves exactly like a single completion.

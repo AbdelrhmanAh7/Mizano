@@ -620,16 +620,16 @@ export const departmentsApi = {
 // ===========================================================================
 
 export const workOrdersApi = {
-  ...crud('/work-orders', { updateMethod: 'put', hasCursor: false }),
-  start: (id: string) => api.post(`/work-orders/${id}/start`),
+  ...crud('/manufacturing/work-orders', { updateMethod: 'patch', hasCursor: false }),
+  start: (id: string) => api.post(`/manufacturing/work-orders/${id}/start`),
   complete: (id: string, data: Record<string, unknown>) =>
-    api.post(`/work-orders/${id}/complete`, data),
+    api.post(`/manufacturing/work-orders/${id}/complete`, data),
   cancel: (id: string, data: Record<string, unknown>) =>
-    api.post(`/work-orders/${id}/cancel`, data),
-  bulkDelete: (ids: string[]) => api.post('/work-orders/bulk-delete', { ids }),
-  bulkStart: (ids: string[]) => api.post('/work-orders/bulk-start', { ids }),
+    api.post(`/manufacturing/work-orders/${id}/cancel`, data),
+  bulkDelete: (ids: string[]) => api.post('/manufacturing/work-orders/bulk-delete', { ids }),
+  bulkStart: (ids: string[]) => api.post('/manufacturing/work-orders/bulk-start', { ids }),
   bulkComplete: (ids: string[]) => api.post('/manufacturing/work-orders/bulk-complete', { ids }),
-  bulkCancel: (ids: string[]) => api.post('/work-orders/bulk-cancel', { ids }),
+  bulkCancel: (ids: string[]) => api.post('/manufacturing/work-orders/bulk-cancel', { ids }),
 };
 
 // ===========================================================================
