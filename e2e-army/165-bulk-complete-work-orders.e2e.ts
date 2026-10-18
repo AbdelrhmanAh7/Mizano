@@ -5,7 +5,7 @@ import { expect } from 'e2e';
 // single route (materials out, finished goods in, COGM journal), default quantityProduced to the planned
 // quantity, and report { processed, total, failures } per order.
 const SEED = 'army-165';
-const TENANT = { email: `${SEED}@army-e2e.test`, password: 'ArmyE2e2026x' };
+const PASSWORD = 'ArmyE2e2026x';
 const WO = '/manufacturing/work-orders';
 
 interface Res {
@@ -68,14 +68,20 @@ test(
   async ({ app }) => {
     const base = apiBase(String(app.baseUrl));
     const anon = client(base);
-    let auth = await anon.post('/auth/register', {
-      ...TENANT,
-      firstName: 'E2E',
-      lastName: 'Bulk',
-      organizationName: `${SEED} Manufacturing`,
-    });
-    if (auth.status === 409) auth = await anon.post('/auth/login', TENANT);
-    expect([200, 201]).toContain(auth.status);
+    // A fresh tenant per run (the next numbered email when a rerun on the same database finds one taken),
+    // so the fixed account codes, SKUs and stock expectations below always start from zero.
+    let auth: Res = { status: 0, body: null };
+    for (let n = 1; n <= 5 && auth.status !== 201; n++) {
+      auth = await anon.post('/auth/register', {
+        email: `${SEED}-${n}@army-e2e.test`,
+        password: PASSWORD,
+        firstName: 'E2E',
+        lastName: 'Bulk',
+        organizationName: `${SEED} Manufacturing ${n}`,
+      });
+      if (auth.status !== 201) expect(auth.status).toBe(409);
+    }
+    expect(auth.status).toBe(201);
     const a = client(base, auth.body.tokens.accessToken);
 
     // Inventory account, default warehouse and a stocked component (cost 10, 2 per output unit).
@@ -143,6 +149,8 @@ test(
       await workOrder(3, true),
     ];
     const draft = await workOrder(1, false);
+    const partial = await workOrder(3, true);
+    expect((await a.post(`${WO}/${partial}/production`, { quantityProduced: 1 })).status).toBe(201);
 
     // One by one (the reference), then two orders in bulk without a quantity.
     expect((await a.post(`${WO}/${single}/complete`, { quantityProduced: 3 })).status).toBe(201);
@@ -167,29 +175,31 @@ test(
     expect(await journalLines(bulkA)).toEqual(reference);
     expect(await journalLines(bulkB)).toEqual(reference);
 
-    // AC2: per-order failures; only the startable order is processed; re-running a completed order is refused.
+    // AC2: per-order failures; only the in-process order is completed. A draft, an unknown id, an already
+    // completed order (re-run) and an order with recorded production (its stock already moved) are refused.
     const mixed = await a.post(`${WO}/bulk-complete`, {
-      ids: [later, draft, `${SEED}-ghost`, bulkA],
+      ids: [later, draft, `${SEED}-ghost`, bulkA, partial],
     });
     expect(mixed.status).toBe(201);
     expect(mixed.body.processed).toBe(1);
-    expect(mixed.body.total).toBe(4);
+    expect(mixed.body.total).toBe(5);
     expect(mixed.body.failures.map((f: { id: string }) => f.id).sort()).toEqual(
-      [draft, `${SEED}-ghost`, bulkA].sort(),
+      [draft, `${SEED}-ghost`, bulkA, partial].sort(),
     );
     expect((await a.get(`${WO}/${draft}`)).body.status).toBe('DRAFT');
+    expect((await a.get(`${WO}/${partial}`)).body.status).toBe('IN_PROCESS');
 
     // Empty selection is rejected by validation.
     expect((await a.post(`${WO}/bulk-complete`, { ids: [] })).status).toBe(400);
 
-    // Planned quantity was produced: 4 orders x 3 units in, 4 x 3 x 2 components out.
+    // Planned quantity was produced: 4 completed orders x 3 units + 1 recorded unit in; (12 + 1) x 2 components out.
     const moves = rows(await a.get('/inventory-movements?type=production&limit=100'));
     const moved = (id: string, dir: string) =>
       moves
         .filter((m: any) => m.itemId === id && m.movementType === dir)
         .reduce((sum: number, m: any) => sum + Number(m.quantity), 0);
-    expect(moved(output, 'IN')).toBe(12);
-    expect(moved(component, 'OUT')).toBe(24);
+    expect(moved(output, 'IN')).toBe(13);
+    expect(moved(component, 'OUT')).toBe(26);
 
     // Trial balance still balances.
     const tb = (await a.get('/accounting-reports/trial-balance')).body;

@@ -65,6 +65,7 @@ describe('WorkOrdersService.bulkComplete', () => {
     prisma.journal.findFirst.mockResolvedValue(null);
     prisma.journal.create.mockResolvedValue({ id: 'jrn' } as never);
     prisma.workOrder.update.mockResolvedValue({} as never);
+    prisma.productionEntry.count.mockResolvedValue(0);
     return { prisma, service };
   }
 
@@ -138,6 +139,23 @@ describe('WorkOrdersService.bulkComplete', () => {
     });
     expect(prisma.journal.create).toHaveBeenCalledTimes(1);
     expect(prisma.workOrder.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('refuses orders with recorded production so their stock is not moved twice', async () => {
+    const { prisma, service } = setup({ partial: workOrder('partial') });
+    prisma.productionEntry.count.mockResolvedValue(1);
+
+    const result = await service.bulkComplete(ORG, ['partial']);
+
+    expect(result.processed).toBe(0);
+    expect(result.failures).toEqual([
+      { id: 'partial', reason: expect.stringContaining('recorded production') },
+    ]);
+    expect(prisma.productionEntry.count).toHaveBeenCalledWith({
+      where: { workOrderId: 'partial', organizationId: ORG },
+    });
+    expect(prisma.inventoryMovement.create).not.toHaveBeenCalled();
+    expect(prisma.journal.create).not.toHaveBeenCalled();
   });
 
   it('only looks up orders of the caller organization', async () => {
