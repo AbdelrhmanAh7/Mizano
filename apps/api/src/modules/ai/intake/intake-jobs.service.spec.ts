@@ -53,6 +53,29 @@ describe('IntakeJobsService', () => {
     );
   });
 
+  it('handles the unhandled IntakeQueueService without REDIS_URL (no-Redis API upload path)', async () => {
+    const unhandledQueue = new IntakeQueueService({
+      get: () => undefined,
+    } as unknown as ConfigService);
+    const serviceWithRealQueue = new IntakeJobsService(
+      { intakeJob: table.delegate } as unknown as PrismaService,
+      storage,
+      unhandledQueue,
+      config as unknown as ConfigService,
+    );
+    const { job, duplicate } = await serviceWithRealQueue.createFromUpload({
+      organizationId: ORG_A,
+      userId: 'u1',
+      buffer: Buffer.from('pdf-bytes'),
+      mimeType: 'application/pdf',
+      fileName: 'a.pdf',
+    });
+    expect(duplicate).toBe(false);
+    expect(job.status).toBe(IntakeJobStatus.QUEUED);
+    expect(job.attempts).toBe(0);
+    await unhandledQueue.onModuleDestroy();
+  });
+
   it('deduplicates the same file within an organization (one upload, one enqueue)', async () => {
     const first = await upload(ORG_A);
     const second = await upload(ORG_A);

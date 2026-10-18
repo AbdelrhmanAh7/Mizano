@@ -189,6 +189,25 @@ shellcheck lib.sh healthcheck.sh: only the existing SC1091 info (sourced file)
 
 Behaviour notes: `IntakeWorkerModule` now gets the processor from `IntakeModule`, which also provides `IntakeJobsService`, so the worker runs the startup/periodic recovery sweep too (queue job ids collapse duplicates with the API's sweep). `AiOperationsModule` is unchanged in this round.
 
+### PR #237 Review Resolution (Round 2 — No-Redis API path & Redis requirement documentation)
+
+- **Finding**: Removing `IntakeProcessorService` from `AiOperationsModule` means the API process without `REDIS_URL` has an in-process queue without a handler; jobs cannot be seen by the standalone worker process.
+- **Fix**:
+  1. `IntakeQueueService.enqueue()` fails fast with clear error when `!redisUrl` and no local handler is registered (`Intake queue requires REDIS_URL: the worker runs in a separate process and cannot see an in-process queue`).
+  2. `IntakeJobsService.createFromUpload()` catches queue errors in `enqueueSafely()`, safely keeping the DB record in `QUEUED` status with `attempts: 0` for recovery once Redis/worker is available.
+  3. Documented in `docs/DEVELOPMENT.md` that Redis (`REDIS_URL`) is required for document intake processing.
+  4. Covered by regression tests in `src/modules/ai/intake/intake-queue.service.spec.ts` and `src/modules/ai/intake/intake-jobs.service.spec.ts`.
+
+| Check                | Command                                                                          | Result         |
+| -------------------- | -------------------------------------------------------------------------------- | -------------- |
+| Queue no-Redis spec  | `pnpm --filter api exec jest src/modules/ai/intake/intake-queue.service.spec.ts` | 2 passed       |
+| Jobs API upload spec | `pnpm --filter api exec jest src/modules/ai/intake/intake-jobs.service.spec.ts`  | 25 passed      |
+| Worker context spec  | `pnpm --filter api exec jest src/modules/ai/intake/intake.worker.spec.ts`        | 4 passed       |
+| Deploy gating spec   | `pnpm --filter api exec jest src/deploy-worker-gating.spec.ts`                   | 3 passed       |
+| Cache shutdown spec  | `pnpm --filter api exec jest src/cache/cache.service.spec.ts`                    | 6 passed       |
+| Type check           | `pnpm --filter api type-check`                                                   | Clean (exit 0) |
+| Lint                 | `pnpm --filter api lint`                                                         | Clean (exit 0) |
+
 ---
 
 # Issue #127 Verification — Cap Node heap for api and worker from env with validated config
