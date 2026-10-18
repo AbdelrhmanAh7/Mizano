@@ -445,6 +445,7 @@ Each trial balance has two tenant filters: the account list and the line totals.
 
 - **Issue**: #212 (Follow-up: findings merged under an open CHANGES_REQUESTED (#162, #143, #107))
 - **Scope**: Slice 1 (#162 items 1–2: p0 delivery-challan org-scoping fix and test hardening)
+- **Tested commit**: `90f6da41`
 - **Originating Sentry issue**: none
 - **UI screenshots / e2e-army**: none (API-only service change, no user-facing UI flow)
 
