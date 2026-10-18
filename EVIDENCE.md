@@ -438,3 +438,68 @@ Each trial balance has two tenant filters: the account list and the line totals.
 **Size (AC5).** `git diff --numstat origin/master HEAD -- apps/api e2e-army` at the tested commit: `tenant-isolation.e2e-spec.ts` 285, three services 23, e2e-army 0 = 308 added lines of test and source. The earlier 501 came from a 367-line spec and a 108-line e2e-army file; the e2e-army file was removed and the three AC2 list tests were merged. All four earlier reviewer requests stay covered: second general-ledger route, `meta.total`, vendor-credit netting in AP aging, foreign cursor ids.
 
 **Suite stability.** Before `34a8ca9c` the unmutated suite failed in about 1 of 7 to 16 consecutive runs on this shared machine, always while seeding or on one request (405 on `POST /bills/:id/approve`, 404 on `POST /vendor-credits`, `socket hang up`), never in an assertion. Cause: supertest binds and releases a fresh ephemeral port per request, and another process can claim it in between. `beforeAll` now calls `app.listen(0, '127.0.0.1')` once. After the change, 60 consecutive runs passed. The cause is inferred from the pattern and the fix, not traced to a specific foreign process.
+
+---
+
+# EVIDENCE.md — Bulk work order completion through completeWorkOrder (#165)
+
+- **Tested commit**: `0b52b08c` (branch `ai/165`, origin/master merged in). The commit that adds this section changes only this file.
+- **Sentry**: no Sentry issue for this bug. Code review found it: `bulkComplete` called `updateMany` to set COMPLETED and posted no journal.
+- **Change**: `WorkOrdersService.bulkComplete` runs each id through `completeWorkOrder` via `runBulk`, using the order's planned `quantity`, and returns `{ processed, total, failures }`. The route body is `BulkIdsDto` (1 to 100 string ids). The web client now posts to `/manufacturing/work-orders/bulk-complete`; the old path returned 404.
+- **Library**: none added. It reuses `common/utils/run-bulk.ts` and `common/dto/bulk-ids.dto.ts`.
+
+## Acceptance criteria
+
+1. **AC1**: bulk completing 2 orders posts the same COGM journal, material and finished-goods movements as completing them one by one.
+2. **AC2**: failures are reported per order (id and reason), and `processed` counts only successful orders.
+3. **AC3**: a seeded e2e-army test covers bulk completion.
+4. **AC4**: `POST /manufacturing/work-orders/bulk-complete` with 2 valid ids returns `{ processed: 2, total: 2, failures: [] }`.
+5. **AC5**: when no quantity is supplied, `quantityProduced` is each order's planned quantity.
+6. **AC6**: invalid bodies (empty list, non-string ids, missing `ids`) are rejected.
+
+| AC  | Evidence                                                                                                                      | Result                                                                    |
+| --- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| AC1 | `work-orders.service.spec.ts` "posts the same journal, movements and completion as completing one by one"; e2e-army AC1 block | PASS (unit)                                                               |
+| AC2 | `work-orders.service.spec.ts` "reports failures per order and processes the rest" (DRAFT, unknown id, duplicate id)           | PASS (unit)                                                               |
+| AC3 | `e2e-army/165-bulk-complete-work-orders.e2e.ts` (`@issue-165`, `feat:mz-work-orders`, `lvl:api`) on a fresh tenant            | Not run locally (needs the hub verify stack); runs in the `e2e-army` gate |
+| AC4 | `work-orders.controller.spec.ts` "returns the per-order summary of the service"; e2e-army `bulk.body` assertion               | PASS (unit)                                                               |
+| AC5 | `work-orders.service.spec.ts` "defaults quantityProduced to the planned quantity of each order"                               | PASS (unit)                                                               |
+| AC6 | `work-orders.controller.spec.ts` "rejects an empty or malformed id list"; e2e-army `ids: []` gives 400                        | PASS (unit)                                                               |
+| —   | Tenant scope: "only looks up orders of the caller organization"; web path: `apps/web/lib/api.work-orders.spec.ts`             | PASS                                                                      |
+
+## Commands (this session, at `0b52b08c`)
+
+```text
+$ pnpm --filter @mizano/shared-types build   # dist was missing in this worktree; without it both type-checks fail on TS2307
+$ pnpm --filter api type-check               # exit 0
+$ pnpm --filter @mizano/web type-check       # exit 0
+$ (apps/api) npx eslint --max-warnings 0 <4 changed manufacturing files>   # exit 0
+$ (apps/web) npx eslint --max-warnings 0 lib/api.ts lib/api.work-orders.spec.ts   # exit 0
+$ (apps/api) npx jest --maxWorkers=2 src/modules/manufacturing
+Test Suites: 4 passed, 4 total   Tests: 27 passed, 27 total
+$ (apps/web) npx jest --maxWorkers=2 lib/api.work-orders.spec.ts
+Test Suites: 1 passed, 1 total   Tests: 1 passed, 1 total
+```
+
+## Regression: fails on base, passes on head
+
+The service and web client sources were swapped for their `origin/master` versions (specs kept from head), then restored with `git checkout HEAD`:
+
+```text
+FAIL src/modules/manufacturing/services/work-orders.service.spec.ts
+    ✕ posts the same journal, movements and completion as completing one by one
+    ✕ defaults quantityProduced to the planned quantity of each order
+    ✕ reports failures per order and processes the rest
+    ✕ only looks up orders of the caller organization
+Tests:       4 failed, 2 passed, 6 total
+FAIL lib/api.work-orders.spec.ts
+    ✕ posts the selected ids to the manufacturing work orders bulk-complete route
+Tests:       1 failed, 1 total
+```
+
+## Notes
+
+- No UI change, so there are no screenshots. The e2e-army test runs at request level.
+- The full suite was not run locally (owner rule: CI runs it for Mizano).
+- Unchanged and out of scope: `completeWorkOrder` itself does not wrap its writes in one `$transaction`. Bulk uses the same command, so it behaves exactly like a single completion.
+- Diff vs origin/master: 389 changed lines in 7 files. 196 are the e2e-army test; code and unit tests are 193.
