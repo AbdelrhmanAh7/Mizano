@@ -25,6 +25,7 @@ jest.mock('@/components/ui/select', () => ({
 }));
 
 import { buildCustomerPayload, CustomerForm } from './customer-form';
+import formPayloadFixture from './customer-form-payload.fixture.json';
 
 const FLAT_KEYS = [
   'billingStreet',
@@ -52,30 +53,8 @@ describe('buildCustomerPayload', () => {
       shippingAddress: { street: '9 Port Rd', city: 'Alexandria', country: 'EG' },
     });
 
-    expect(payload).toEqual({
-      name: 'Nile Traders',
-      displayName: null,
-      email: 'billing@nile.example',
-      phone: '+201000000215',
-      currency: 'EGP',
-      taxId: null,
-      paymentTerms: 30,
-      notes: 'Prefers invoices by e-mail',
-      billingAddress: {
-        street: '1 Nile St',
-        city: 'Cairo',
-        state: null,
-        postalCode: '11511',
-        country: 'EG',
-      },
-      shippingAddress: {
-        street: '9 Port Rd',
-        city: 'Alexandria',
-        state: null,
-        postalCode: null,
-        country: 'EG',
-      },
-    });
+    // The API spec validates this same fixture against Create/UpdateCustomerDto.
+    expect(payload).toEqual(formPayloadFixture);
     for (const key of FLAT_KEYS) expect(payload).not.toHaveProperty(key);
   });
 

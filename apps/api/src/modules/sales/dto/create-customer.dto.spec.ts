@@ -1,4 +1,6 @@
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { CreateCustomerDto } from './create-customer.dto';
 import { UpdateCustomerDto } from './update-customer.dto';
 
@@ -13,25 +15,14 @@ const pipe = new ValidationPipe({
 const validate = (dto: typeof CreateCustomerDto | typeof UpdateCustomerDto, body: unknown) =>
   pipe.transform(body, { type: 'body', metatype: dto });
 
-// Mirrors buildCustomerPayload() in apps/web/components/sales/customer-form.tsx; keep the two in sync.
-const formPayload = {
-  name: 'Nile Traders',
-  displayName: null,
-  email: 'billing@nile.example',
-  phone: '+201000000215',
-  currency: 'EGP',
-  taxId: null,
-  paymentTerms: 30,
-  notes: 'Prefers invoices by e-mail',
-  billingAddress: {
-    street: '1 Nile St',
-    city: 'Cairo',
-    state: null,
-    postalCode: '11511',
-    country: 'EG',
-  },
-  shippingAddress: { street: null, city: null, state: null, postalCode: null, country: null },
-};
+// Exactly what buildCustomerPayload() in apps/web/components/sales/customer-form.tsx returns:
+// customer-form.spec.tsx asserts the builder's output equals this file, so the two sides cannot drift.
+const formPayload = JSON.parse(
+  readFileSync(
+    join(__dirname, '../../../../../web/components/sales/customer-form-payload.fixture.json'),
+    'utf8',
+  ),
+) as Record<string, unknown>;
 
 describe('Customer DTOs accept the payload the customer form builds (#215)', () => {
   it.each([
@@ -41,21 +32,35 @@ describe('Customer DTOs accept the payload the customer form builds (#215)', () 
     await expect(validate(dto, formPayload)).resolves.toMatchObject({
       notes: 'Prefers invoices by e-mail',
       billingAddress: { street: '1 Nile St', city: 'Cairo' },
+      shippingAddress: { street: '9 Port Rd', city: 'Alexandria' },
     });
     await expect(validate(dto, { ...formPayload, notes: null })).resolves.toBeDefined();
     const { notes: _notes, ...withoutNotes } = formPayload;
     await expect(validate(dto, withoutNotes)).resolves.toBeDefined();
   });
 
-  it('rejects the legacy flat address payload the form used to send', async () => {
-    const legacy = {
-      name: 'Nile Traders',
-      notes: 'x',
-      billingStreet: '1 Nile St',
-      billingCity: 'Cairo',
-    };
-    await expect(validate(CreateCustomerDto, legacy)).rejects.toBeInstanceOf(BadRequestException);
+  it('UpdateCustomerDto inherits notes: an edit that only changes or clears notes is accepted', async () => {
+    await expect(validate(UpdateCustomerDto, { notes: 'Call before delivery' })).resolves.toEqual({
+      notes: 'Call before delivery',
+    });
+    await expect(validate(UpdateCustomerDto, { notes: null })).resolves.toEqual({ notes: null });
   });
+
+  it.each([
+    ['CreateCustomerDto', CreateCustomerDto],
+    ['UpdateCustomerDto', UpdateCustomerDto],
+  ] as const)(
+    '%s rejects the legacy flat address payload the form used to send',
+    async (_name, dto) => {
+      const legacy = {
+        name: 'Nile Traders',
+        notes: 'x',
+        billingStreet: '1 Nile St',
+        billingCity: 'Cairo',
+      };
+      await expect(validate(dto, legacy)).rejects.toBeInstanceOf(BadRequestException);
+    },
+  );
 
   it('rejects notes longer than 2000 characters', async () => {
     await expect(

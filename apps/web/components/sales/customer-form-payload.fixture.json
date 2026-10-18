@@ -1,0 +1,24 @@
+{
+  "name": "Nile Traders",
+  "displayName": null,
+  "email": "billing@nile.example",
+  "phone": "+201000000215",
+  "currency": "EGP",
+  "taxId": null,
+  "paymentTerms": 30,
+  "notes": "Prefers invoices by e-mail",
+  "billingAddress": {
+    "street": "1 Nile St",
+    "city": "Cairo",
+    "state": null,
+    "postalCode": "11511",
+    "country": "EG"
+  },
+  "shippingAddress": {
+    "street": "9 Port Rd",
+    "city": "Alexandria",
+    "state": null,
+    "postalCode": null,
+    "country": "EG"
+  }
+}
