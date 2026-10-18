@@ -57,8 +57,8 @@ mizano/
 ├── packages/{shared-types,validators}/
 ├── services/ollama-proxy/
 ├── docs/                          this guide, DEVELOPMENT, DESIGN-SYSTEM, roadmap, strategy, planning, agents, archive
-├── scripts/                       demo planning sync + offline tests (used by .github/workflows/demo-planning.yml)
-├── nginx/nginx.conf               production reverse proxy (copied by deploy.yml)
+├── scripts/                       offline planning tests (the demo-planning.yml sync workflow was retired, see slimdown-plan.md)
+├── nginx/nginx.conf               production reverse proxy (the old deploy.yml that copied it was retired)
 └── docker-compose*.yml            local infra and production stack
 ```
 
