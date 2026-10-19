@@ -32,7 +32,8 @@ export async function extractTextFromPdf(buffer: Buffer): Promise<PdfExtractionR
 
   // v1 API: pdfParse(buffer) → { text, numpages }
   const pdfParse = pdfParseModule.default || pdfParseModule;
-  const result = await pdfParse(buffer);
+  const uint8 = new Uint8Array(buffer);
+  const result = await pdfParse(uint8);
   const text = (result.text || '').trim();
   const pageCount = result.numpages || 1;
   const isNativeText = text.length > pageCount * 50;
