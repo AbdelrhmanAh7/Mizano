@@ -5,8 +5,8 @@ This file covers issue #94 only. It lives in `docs/evidence/94/` (council ruling
 Gate items: "Decimal arithmetic correct" and "Atomic, idempotent posting".
 
 - **Base:** `master` at `fcaed262cd11876a9876c921f9dc4d04a351a0ed`, merged into this branch in `9d4c20d` (the only conflict was the root `EVIDENCE.md` index, resolved by taking master's text plus the index). The merge brings no change to the two production files of this PR; master's changes under `apps/api/src` and `packages` are delivery-challan scoping (#131) and the `MIZANO_NODE_HEAP_MB` config (#127).
-- **Tested head:** `76ed8e8f2d30a1796a7c8893459f81d2f8d6e504`, clean tree, on 2026-10-11 (review round 8). The output under "Red" and "Green at the tested head" was produced there. The commit that records this file changes only `docs/evidence/94/` (`git diff --stat 76ed8e8 HEAD`).
-- **Older output:** the full seeded E2E run (12 suites, 268 tests) and `pnpm ci:full` were run at `7955496` on 2026-10-08 and were not repeated at `76ed8e8`; they are kept below, marked with that SHA. GitHub CI runs the unit suite on the pushed head; no CI job runs the E2E specs.
+- **Tested head:** `76ed8e8f2d30a1796a7c8893459f81d2f8d6e504`, clean tree, on 2026-10-11 (review round 8; see re-verifications at `e1d4a47` and `cf6f625` below). The unit, narrow e2e (`posting-integrity.e2e-spec.ts`), and type-check outputs under "Red" and "Green at `76ed8e8`" were produced there. Full seeded E2E and `pnpm ci:full` were not run on this head or subsequent heads (`e1d4a47`, `cf6f625`, `451cc181`); their results on the tested head are unknown.
+- **Older output at `7955496`:** The full seeded E2E run (12 suites, 268 tests) and `pnpm ci:full` were run only at `7955496` (2026-10-08) and were not repeated at `76ed8e8`, `e1d4a47`, `cf6f625`, `451cc181`, or any later head. Full seeded E2E and `pnpm ci:full` are unknown at every head after `7955496`. Those runs do not verify `e1d4a47` or later heads; on all later heads, full seeded E2E and `pnpm ci:full` results remain unknown. GitHub CI runs the unit suite on the pushed head; no CI job runs the full E2E specs.
 - **Host:** Darwin arm64, Node v26.10.0, pnpm 8.14.0, PostgreSQL 16.15 (Homebrew).
 - **Database:** a throwaway cluster started by this session (`initdb`, port 55595, `fsync=off`), dropped and re-created with `prisma migrate deploy` before each e2e run, `REDIS_URL` blank. No mocks, SQLite or in-memory database were used for the database tests. This is the implementer's own evidence, not an independent review.
 
@@ -91,7 +91,7 @@ export DATABASE_URL=postgresql://mizano@127.0.0.1:55594/mizano_e2e APP_ENV=e2e94
 
 `APP_ENV=e2e94` has no `.env` file, so no developer env is loaded, and the blank `REDIS_URL` keeps the cache in memory.
 
-### Red: the new tests against master's code
+### Red: the new tests against master's code, run at `76ed8e8`
 
 The red run happens in a disposable worktree, so this checkout and its index are never touched. The worktree has this branch's tests and master's two production files:
 
@@ -137,9 +137,9 @@ $ psql ... -c 'SELECT j."journalNumber", sum(l.debit), sum(l.credit) FROM journa
 JRN-006|0.0002|0.0001
 ```
 
-The first failure of each pair is the stored-scale bug (a journal that does not balance reached the database); the validator pair is the float sum. The idempotency, concurrency and rollback tests pass on master's code, so those properties held before this PR; the PR adds the proof.
+The first failure of each pair is the stored-scale bug (a journal that does not balance reached the database); the validator pair is the float sum. The idempotency, concurrency and rollback tests pass on master's code, so those properties held before this PR; the PR adds the proof. Full seeded E2E and `pnpm ci:full` were not run against master's code; those results are unknown.
 
-### Green at the tested head
+### Green at `76ed8e8`
 
 ```text
 $ git status --short            # (empty)
@@ -163,7 +163,11 @@ $ psql ... duplicate (sourceType, sourceId) -> 0
 $ npx tsc --noEmit -p apps/api/tsconfig.json   -> exit 0
 ```
 
-At `7955496` (2026-10-08, not repeated at `76ed8e8`):
+Full seeded E2E (12 suites) and `pnpm ci:full` were not run at tested head `76ed8e8` (or subsequent heads `e1d4a47`, `cf6f625`, `451cc181`); their results at the tested head are **unknown**.
+
+### Historical reference runs at `7955496` (result unknown at `e1d4a47`, `cf6f625`, `451cc181`)
+
+These historical runs are recorded strictly for commit `7955496` (2026-10-08). They do not verify `76ed8e8`, `e1d4a47`, `cf6f625`, `451cc181`, or any later head; on all subsequent heads, full seeded E2E and `pnpm ci:full` results remain unknown.
 
 ```text
 $ npx jest --config ./test/jest-e2e.json --runInBand      # every seeded E2E suite, fresh database
@@ -192,7 +196,7 @@ Cached:    0 cached, 12 total
 ci:full exit=0
 ```
 
-`pnpm ci:full` printed 13 `no-unused-vars` and `exhaustive-deps` warnings from `apps/web` files that this branch does not touch, plus Turbo's "no output files found" notices for `api#lint` and `api#test`. Both already exist on master and are not caused by this PR.
+`pnpm ci:full` at `7955496` printed 13 `no-unused-vars` and `exhaustive-deps` warnings from `apps/web` files that this branch does not touch, plus Turbo's "no output files found" notices for `api#lint` and `api#test`. Both already exist on master and are not caused by this PR.
 
 The 11 tests of `posting-integrity.e2e-spec.ts` (all pass at `76ed8e8`):
 
