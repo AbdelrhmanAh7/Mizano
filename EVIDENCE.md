@@ -447,24 +447,26 @@ Each trial balance has two tenant filters: the account list and the line totals.
 
 - **Issue**: #185 (Mizano #132‑3: Remove Refresh Token Leakage from Session), PR #242, branch `ai/185`
 - **Base commit** (`git merge-base origin/master HEAD`): `9a9d15bd1f560dee8a1b7b4bc1bd074a1436f5c2`
-- **Local test head**: `ba3b5b09` (last commit that changes code or tests; adds the full session shape assertion to `route.spec.ts`). Every local result below was produced at this commit. Later commits on the branch are not the tested head: `git diff --name-only ba3b5b09 HEAD -- apps packages e2e-army` prints nothing (exit 0), and `git diff --name-only ba3b5b09 HEAD` lists only `AI_QUESTIONS.md` and `EVIDENCE.md`, so the code under test is the same at any later head.
+- **Local test head**: `bc66db6d` (adds the compile-time `Session` probe to `lib/auth.spec.ts`; the earlier code head `ba3b5b09` added the full-shape assertion to `route.spec.ts`). Every local result below was produced at `bc66db6d`. Later commits that only edit this file do not change the code under test: check with `git diff --name-only bc66db6d HEAD -- apps packages e2e-army`, which must print nothing.
 - **Gate results at later heads**: none recorded in this file. CI and `e2e-army` results belong to the exact head SHA that GitHub reports on PR #242, read from `gh pr checks`; they are not copied here because each new head would make them stale.
 - **Verification date**: 2026-10-19
-- **Not run locally**: the full `@mizano/web` suite, `pnpm lint` over the monorepo, and the e2e-army test (CI and the hub verify job run those, per the owner's speed rule for Mizano). No Sentry issue is linked to #185. No UI changed, so there are no screenshots and no RTL/LTR captures.
+- **Not run locally**: the full `@mizano/web` suite, `pnpm lint` over the monorepo, and the e2e-army test (CI and the hub verify job run those, per the owner's speed rule for Mizano; `gh pr checks` is unreachable from this sandbox). No Sentry issue is linked to #185. No UI changed, so there are no screenshots and no RTL/LTR captures.
 
 ## Acceptance criteria
 
-| AC  | Criterion                                                  | Verified by                                                                                                                              | Result                               |
-| --- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| AC1 | `/api/auth/session` JSON has no `refreshToken` key         | `route.spec.ts` (real NextAuth `GET` handler, JWT cookie that holds a refresh token); e2e-army `@issue-185 AC1` (not run locally)        | route test PASS; e2e-army pending CI |
-| AC2 | `Session` type has no `refreshToken` member                | `pnpm type-check` in `apps/web` exits 0; `grep -rn "session\.refreshToken" apps/web` exits 1 (no matches)                                | PASS                                 |
-| AC3 | zero `refreshToken` matches in `apps/web/lib/auth.ts`      | Not met. The file still uses the token server-side (jwt callback, refresh, signOut revoke). CTO decision: only client visibility matters | DEFERRED by CTO                      |
-| AC4 | unit test: `callbacks.session` output omits `refreshToken` | `lib/auth.spec.ts` › `session callback (client-visible session)` › `never copies the refresh token into the session`                     | PASS                                 |
-| AC5 | `pnpm --filter @mizano/web test` green                     | Not run locally; runs on CI                                                                                                              | pending CI                           |
+| AC  | Criterion                                                  | Verified by                                                                                                                                                                                                       | Result                               |
+| --- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| AC1 | `/api/auth/session` JSON has no `refreshToken` key         | `route.spec.ts` (real NextAuth `GET` handler, JWT cookie that holds a refresh token); e2e-army `@issue-185 AC1` (not run locally)                                                                                 | route test PASS; e2e-army pending CI |
+| AC2 | `Session` type has no `refreshToken` member                | `lib/auth.spec.ts` › `has no refreshToken member on the Session type (compile-time)`: a `@ts-expect-error` probe, so `pnpm type-check` in `apps/web` fails with TS2578 if the member returns (mutation run below) | PASS                                 |
+| AC3 | no client-visible `refreshToken` in `apps/web/lib/auth.ts` | **Amended, see below.** Literal "zero matches" is not met: 13 lines still mention the token for server-side use                                                                                                   | AMENDED (CTO, see below)             |
+| AC4 | unit test: `callbacks.session` output omits `refreshToken` | `lib/auth.spec.ts` › `session callback (client-visible session)` › `never copies the refresh token into the session`                                                                                              | PASS                                 |
+| AC5 | `pnpm --filter @mizano/web test` green                     | New spec is collected by the default config (`jest --listTests`, below); full suite runs on CI for the pushed head                                                                                                | specs PASS locally; full suite on CI |
+
+**AC3 amendment.** The spec's "zero `refreshToken` matches in `auth.ts`" cannot hold: the file's jwt callback stores the token in the encrypted JWT cookie, `requestTokenRefresh` sends it to the API, and `signOut` revokes it. Removing every match would mean renaming the JWT field (invalidating live cookies) or moving the rotation logic with no change in what the browser sees. The CTO decided on PR #242 (comment `nql-cto decision=answer`, head `0b6389fe`): only client visibility is in scope, and moving the server-side logic to `auth-refresh.ts` is a follow-up. The criterion is therefore read as "the token is not copied into the client-visible session or the `Session` type", which AC1, AC2 and AC4 prove. The match list is `grep -n refreshToken apps/web/lib/auth.ts` → lines 28 32 35 42 46 63 68 109 132 175 188 226 238, none of them in the session callback and none in the `Session` augmentation (`interface User` at 226 and `interface JWT` at 238 are server-side types).
 
 ## Commands and observed output (THIS SESSION — 2026-10-19)
 
-Specs for the changed files (`cd apps/web && npx jest --maxWorkers=2 lib/auth.spec.ts app/api/auth --verbose`), exit 0:
+Specs for the changed files at the earlier head `ba3b5b09` (`cd apps/web && npx jest --maxWorkers=2 lib/auth.spec.ts app/api/auth --verbose`), exit 0; the re-run at `bc66db6d` below has one more test (21):
 
 ```text
 PASS app/api/auth/[...nextauth]/route.spec.ts
@@ -479,6 +481,19 @@ Test Suites: 2 passed, 2 total
 Tests:       20 passed, 20 total
 ```
 
+Collection and type checks at `bc66db6d`:
+
+```text
+$ cd apps/web && npx jest --listTests | grep -E "auth(\.spec|/)"
+.../apps/web/app/api/auth/[...nextauth]/route.spec.ts
+.../apps/web/lib/auth.spec.ts
+$ npx jest --maxWorkers=2 lib/auth.spec.ts app/api/auth        # exit 0
+Test Suites: 2 passed, 2 total   Tests: 21 passed, 21 total
+$ pnpm type-check                                              # exit 0
+```
+
+Compile-time mutation (AC2): with `refreshToken: string;` added to `interface Session` in `lib/auth.ts`, `pnpm type-check` reports `lib/auth.spec.ts(405,5): error TS2578: Unused '@ts-expect-error' directive.` The file was restored afterwards (`git status` shows only the committed spec change).
+
 Regression proof: with `apps/web/lib/auth.ts` replaced by `git show origin/master:apps/web/lib/auth.ts`, the same command reports `Tests: 4 failed, 16 passed, 20 total` (both suites FAIL). Restored with `git checkout apps/web/lib/auth.ts`, it reports `20 passed, 20 total`.
 
 Other checks (this session):
@@ -490,6 +505,10 @@ Other checks (this session):
 ## What changed (this PR)
 
 - `apps/web/lib/auth.ts`: removed `session.refreshToken = token.refreshToken as string;` from the session callback (it stays in the encrypted JWT cookie) and removed `refreshToken` from the `Session` type augmentation. `JWT` and `User` keep it (server-side only).
-- `apps/web/lib/auth.spec.ts`: three tests under `session callback (client-visible session)`.
+- `apps/web/lib/auth.spec.ts`: three tests under `session callback (client-visible session)` plus the compile-time `Session` probe.
 - `apps/web/app/api/auth/[...nextauth]/route.spec.ts`: drives the real NextAuth handler with a JWT cookie and asserts the body has no `refreshToken` key or value. **Updated in `ba3b5b09` to assert the complete signed-in session shape (all user fields, `accessToken`, string `expires`) so any dropped or added field fails the test.**
 - `e2e-army/185-session-no-refresh-token.e2e.ts`: request-level test (CSRF, credentials sign-in, `GET /api/auth/session`); it asserts the user email and `accessToken` are present and `refreshToken` is absent. Hardened with 20s request timeout and explicit error check on sign-in response.
+
+## Notes on test credentials
+
+`e2e-army/185-session-no-refresh-token.e2e.ts` signs in as the seeded demo admin (`admin@mizano.com` / `password123`), the account the e2e-army skill prescribes for Mizano's throwaway DB. The production seed now aborts unless explicitly allowed (#186, commit `fd19dc16`, an ancestor of this branch: `git merge-base --is-ancestor fd19dc16 HEAD` exits 0), so this account is not created in a deployed environment by default. `route.spec.ts` uses a literal test-only secret that never leaves the test process.
