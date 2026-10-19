@@ -533,8 +533,19 @@ Hub-side follow-up (outside this repository): the verify job copies up to 8 top-
 - **EVIDENCE table formatting (Finding 8e72688af869)**: Verified closed code spans and balanced backticks in REQ-8 row.
 - **Unit test coverage**: Ran all 22 service and DTO unit test suites covering the modified modules (`pnpm --filter api exec jest ...`): 22 suites passed, 192 tests passed, 0 failed.
 - **Static checks**:
-  - `pnpm type-check`: 6/6 tasks successful.
-  - `pnpm lint`: 4/4 packages successful.
+
+## Round 5 (Rebase on master and conflict resolution, #153)
+
+- **Merge SHA**: `99abae33` (clean merge of `origin/master`).
+- **Conflict resolution**: Cleanly resolved conflicts in `delivery-challans.service.ts`, `delivery-challans.service.spec.ts`, `employees.service.ts`, `inventory-movements.controller.ts`, `transfers.controller.ts`, `inventory-movement-query.dto.ts`, `transfer-query.dto.ts`, and `EVIDENCE.md`.
+- **Preserved evidence**: Archived #108 cross-tenant isolation evidence to `docs/evidence/108/EVIDENCE.md` and indexed in `EVIDENCE.md`.
+- **Static verification**:
+  - `pnpm type-check`: 6/6 tasks successful (0 errors).
+  - `pnpm lint`: 4/4 packages successful (0 errors, 0 warnings in API).
+  - Pre-commit lint-staged hooks passed cleanly on commit.
+- **Unit test coverage**:
+  - Ran all 22 service and DTO unit test suites covering the modified modules (`pnpm --filter api exec jest ...`): 22 suites passed, 199 tests passed, 0 failed.
+  - Core accounting ledger tests: `journals.service.spec.ts` 49 passed, 0 failed.
 
 ---
 
