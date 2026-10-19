@@ -5,6 +5,7 @@ Supersedes part of #235.
 
 - **Base commit (`origin/master`)**: `451cc181`
 - **First commit (e2e-army test)**: `fa64140c` (`test(e2e): add customer form e2e-army test for #254`)
+- **Tested HEAD commit**: `2e6a001e`
 - **Host**: Darwin arm64 (macOS), Node v26.10.0, pnpm 8.14.0
 - **Originating Sentry issue**: None (no Sentry issue exists; never invent evidence)
 - **UI Screenshots**: None captured locally (headless browser stack is not running on this host; verified via Jest unit specs and the e2e-army test `e2e-army/254-customer-payload.e2e.ts` which runs on verify and includes RTL evaluation; never invent screenshots)
