@@ -544,7 +544,7 @@ Each trial balance has two tenant filters: the account list and the line totals.
 
 # EVIDENCE.md — Issue #87: pdf-parse and zero-offset Buffers
 
-- **Tested commit**: `9c773505` (branch `ai/87`).
+- **Tested commit**: `22c873fb` (branch `ai/87`, merged with `origin/master`).
 - **Originating Sentry issue**: None (none linked in the issue brief).
 - **User-facing flow / E2E**: Not user-facing (internal intake parsing utility). `E2E: not needed — pure internal utility fix, no user-facing flow or schema change.`
 - **Changed covering tests**: `apps/api/src/modules/ai/utils/pdf-extractor.util.spec.ts` (new spec, 3 tests).
