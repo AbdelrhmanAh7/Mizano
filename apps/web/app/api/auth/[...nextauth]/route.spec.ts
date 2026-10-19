@@ -68,6 +68,47 @@ describe('GET /api/auth/session (NextAuth route)', () => {
     });
     // AC2: the refresh token must NOT appear in the client-visible session.
     expect(Object.keys(session)).not.toContain('refreshToken');
+    expect(Object.keys(session.user as Record<string, unknown>)).not.toContain('refreshToken');
+    expect(body).not.toContain('refreshToken');
+    expect(body).not.toContain('secret-refresh-token');
+  });
+
+  it('includes error in the session when token.error is present', async () => {
+    const token: JWT = {
+      email: 'admin@mizano.com',
+      name: 'Admin User',
+      id: 'user-1',
+      firstName: 'Admin',
+      lastName: 'User',
+      organizationId: 'org-1',
+      role: 'admin',
+      accessToken: 'access-token-1',
+      refreshToken: 'secret-refresh-token',
+      accessTokenExpires: Date.now() + 10 * 60 * 1000,
+      error: 'RefreshAccessTokenError',
+    };
+    cookieJar.set('next-auth.session-token', await encode({ token, secret: SECRET }));
+
+    const { status, body } = await getSession();
+    const session = JSON.parse(body) as Record<string, unknown>;
+
+    expect(status).toBe(200);
+    expect(session).toEqual({
+      user: {
+        name: 'Admin User',
+        email: 'admin@mizano.com',
+        id: 'user-1',
+        firstName: 'Admin',
+        lastName: 'User',
+        organizationId: 'org-1',
+        role: 'admin',
+      },
+      accessToken: 'access-token-1',
+      expires: expect.any(String),
+      error: 'RefreshAccessTokenError',
+    });
+    expect(Object.keys(session)).not.toContain('refreshToken');
+    expect(Object.keys(session.user as Record<string, unknown>)).not.toContain('refreshToken');
     expect(body).not.toContain('refreshToken');
     expect(body).not.toContain('secret-refresh-token');
   });
