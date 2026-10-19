@@ -445,189 +445,50 @@ Each trial balance has two tenant filters: the account list and the line totals.
 
 ## Overview
 
-- **Issue**: #185 (Mizano #132‑3: Remove Refresh Token Leakage from Session)
-- **Base Commit (`master`)**: `44b689e6`
-- **Tested Commit (`ai/185`)**: `1f17a686`
-- **Verification Date**: 2026-10-19
+- **Issue**: #185 (Mizano #132‑3: Remove Refresh Token Leakage from Session), PR #242, branch `ai/185`
+- **Base commit** (`git merge-base origin/master HEAD`): `9a9d15bd1f560dee8a1b7b4bc1bd074a1436f5c2`
+- **Code under test**: `1f17a686` (the later commit only adds this file; no source changed)
+- **Verification date**: 2026-10-19
+- **Not run locally**: the full `@mizano/web` suite, `pnpm lint` over the monorepo, and the e2e-army test (CI and the hub verify job run those, per the owner's speed rule for Mizano). No Sentry issue is linked to #185. No UI changed, so there are no screenshots and no RTL/LTR captures.
 
----
+## Acceptance criteria
 
-## Requirements Verification Matrix
+| AC  | Criterion                                                  | Verified by                                                                                                                              | Result                               |
+| --- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| AC1 | `/api/auth/session` JSON has no `refreshToken` key         | `route.spec.ts` (real NextAuth `GET` handler, JWT cookie that holds a refresh token); e2e-army `@issue-185 AC1` (not run locally)        | route test PASS; e2e-army pending CI |
+| AC2 | `Session` type has no `refreshToken` member                | `pnpm type-check` in `apps/web` exits 0; `grep -rn "session\.refreshToken" apps/web` exits 1 (no matches)                                | PASS                                 |
+| AC3 | zero `refreshToken` matches in `apps/web/lib/auth.ts`      | Not met. The file still uses the token server-side (jwt callback, refresh, signOut revoke). CTO decision: only client visibility matters | DEFERRED by CTO                      |
+| AC4 | unit test: `callbacks.session` output omits `refreshToken` | `lib/auth.spec.ts` › `session callback (client-visible session)` › `never copies the refresh token into the session`                     | PASS                                 |
+| AC5 | `pnpm --filter @mizano/web test` green                     | Not run locally; runs on CI                                                                                                              | pending CI                           |
 
-| REQ ID | Acceptance Criterion                                                                                | Verification Method                                                                                                                         | Status   |
-| ------ | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| AC1    | GET /api/auth/session on an authenticated session returns a JSON body with no refreshToken key      | Unit test `route.spec.ts`: `returns the signed-in session without the refresh token kept in the JWT cookie`; e2e-army test `@issue-185 AC1` | PASSED   |
-| AC2    | The Session type has no refreshToken member; TypeScript fails if code accesses session.refreshToken | `pnpm type-check` exits 0; `grep -r "session\.refreshToken" apps/web/` returns no matches                                                   | PASSED   |
-| AC3    | grep for 'refreshToken' in apps/web/lib/auth.ts returns zero matches                                | CTO decision: not required for this task; refresh token logic remains in JWT/internal callbacks only                                        | DEFERRED |
-| AC4    | Unit test asserting callbacks.session output omits refreshToken passes                              | `lib/auth.spec.ts`: `session callback (client-visible session)` → `never copies the refresh token into the session`                         | PASSED   |
-| AC5    | pnpm --filter @mizano/web test passes with all existing tests green                                 | `pnpm --filter @mizano/web test` → 463 tests passed                                                                                         | PASSED   |
+## Commands and observed output
 
----
-
-## Test Execution Evidence
-
-### 1. Session Callback Unit Tests (`lib/auth.spec.ts`)
-
-Command:
-
-```bash
-pnpm --filter @mizano/web test lib/auth.spec.ts -t "session callback"
-```
-
-Output:
+Specs for the changed files (`cd apps/web && npx jest --maxWorkers=2 lib/auth.spec.ts app/api/auth --verbose`), exit 0:
 
 ```text
+PASS app/api/auth/[...nextauth]/route.spec.ts
+  ✓ returns the signed-in session without the refresh token kept in the JWT cookie
+  ✓ returns an empty object when signed out
 PASS lib/auth.spec.ts
   session callback (client-visible session)
     ✓ never copies the refresh token into the session
     ✓ keeps the user fields, access token and expiry
     ✓ passes a refresh error through without the refresh token
-
-Test Suites: 1 passed, 1 total
-Tests:       3 passed, 3 total
-Snapshots:   0 total
-Time:        0.186 s
+Test Suites: 2 passed, 2 total
+Tests:       20 passed, 20 total
 ```
 
-### 2. NextAuth Route Tests (`route.spec.ts`)
+Regression proof: with `apps/web/lib/auth.ts` replaced by `git show origin/master:apps/web/lib/auth.ts`, the same command reports `Tests: 4 failed, 16 passed, 20 total` (both suites FAIL). Restored with `git checkout apps/web/lib/auth.ts`, it reports `20 passed, 20 total`.
 
-Command:
+Other checks:
 
-```bash
-pnpm --filter @mizano/web test route.spec.ts
-```
+- `grep -rn "session\.refreshToken" apps/web --include='*.ts' --include='*.tsx' --exclude-dir=node_modules --exclude-dir=.next` → no output, exit 1.
+- `cd apps/web && pnpm type-check` → exit 0. It needs `pnpm --filter @mizano/shared-types build` first: that package's gitignored `dist/` was missing in this worktree and, without it, `tsc` fails with `TS2307: Cannot find module '@mizano/shared-types'` in `components/logger/*` and `lib/hooks/*` (files this PR does not touch).
+- `npx eslint lib/auth.ts lib/auth.spec.ts "app/api/auth/[...nextauth]/route.spec.ts"` → exit 0. `npx prettier --check` on those files and `e2e-army/185-session-no-refresh-token.e2e.ts` → all clean.
 
-Output:
+## What changed
 
-```text
-PASS app/api/auth/[...nextauth]/route.spec.ts
-  GET /api/auth/session (NextAuth route)
-    ✓ returns the signed-in session without the refresh token kept in the JWT cookie (48 ms)
-    ✓ returns an empty object when signed out
-
-Test Suites: 1 passed, 1 total
-Tests:       2 passed, 2 total
-Snapshots:   0 total
-Time:        0.192 s
-```
-
-### 3. Full Web Test Suite
-
-Command:
-
-```bash
-pnpm --filter @mizano/web test
-```
-
-Output:
-
-```text
-Test Suites: 49 passed, 49 total
-Tests:       463 passed, 463 total
-Snapshots:   0 total
-Time:        6.742 s
-```
-
-### 4. Type-Check
-
-Command:
-
-```bash
-pnpm type-check
-```
-
-Output:
-
-```text
-Tasks:    6 successful, 6 total
-Cached:    6 cached, 6 total
-  Time:    544ms >>> FULL TURBO
-```
-
-### 5. Lint
-
-Command:
-
-```bash
-pnpm lint
-```
-
-Output:
-
-```text
-Tasks:    4 successful, 4 total
-Cached:    0 cached, 4 total
-  Time:    40.304s
-```
-
-(Only pre-existing warnings, no new errors)
-
-### 6. Client-Side Session.refreshToken Usage Check
-
-Command:
-
-```bash
-grep -r "session\.refreshToken" apps/web/
-```
-
-Output:
-
-```text
-(no output)  # Exit code 1 = no matches found
-```
-
----
-
-## Changes Made
-
-### `apps/web/lib/auth.ts`
-
-1. **Removed line 156** that copied `refreshToken` into the client-visible session:
-
-   ```diff
-   - session.refreshToken = token.refreshToken as string;
-   + // The refresh token stays in the encrypted JWT cookie (server-side only); /api/auth/session must not expose it.
-   ```
-
-2. **Removed `refreshToken` from the `Session` type** (NextAuth module augmentation):
-
-   ```diff
-   declare module 'next-auth' {
-     interface Session {
-       user: { ... };
-       accessToken: string;
-   -   refreshToken: string;
-       error?: string;
-     }
-   }
-   ```
-
-   The `refreshToken` remains in the `JWT` and `User` interfaces (server-side only), preserving the token refresh functionality.
-
-### `apps/web/lib/auth.spec.ts`
-
-Added test suite `session callback (client-visible session)` with three tests:
-
-- `never copies the refresh token into the session`
-- `keeps the user fields, access token and expiry`
-- `passes a refresh error through without the refresh token`
-
-### `apps/web/app/api/auth/[...nextauth]/route.spec.ts`
-
-Added test `returns the signed-in session without the refresh token kept in the JWT cookie` that:
-
-- Creates a JWT with a `refreshToken` field
-- Encodes it into a NextAuth session cookie
-- Calls `GET /api/auth/session`
-- Asserts the response JSON has no `refreshToken` key and the body doesn't contain the refresh token value
-
-### `e2e-army/185-session-no-refresh-token.e2e.ts`
-
-Request-level e2e test (no browser) that:
-
-1. Verifies signed-out session returns `{}`
-2. Signs in via NextAuth credentials endpoints (`/api/auth/csrf`, `/api/auth/callback/credentials`)
-3. Calls `GET /api/auth/session` with the session cookie
-4. Asserts the response has `user.email`, `accessToken`, but no `refreshToken` key or value
-
-All tests pass at commit `1f17a686`.
+- `apps/web/lib/auth.ts`: removed `session.refreshToken = token.refreshToken as string;` from the session callback (it stays in the encrypted JWT cookie) and removed `refreshToken` from the `Session` type augmentation. `JWT` and `User` keep it (server-side only).
+- `apps/web/lib/auth.spec.ts`: three tests under `session callback (client-visible session)`.
+- `apps/web/app/api/auth/[...nextauth]/route.spec.ts`: drives the real NextAuth handler with a JWT cookie and asserts the body has no `refreshToken` key or value.
+- `e2e-army/185-session-no-refresh-token.e2e.ts`: request-level test (CSRF, credentials sign-in, `GET /api/auth/session`); it asserts the user email and `accessToken` are present and `refreshToken` is absent.
