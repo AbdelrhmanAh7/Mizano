@@ -114,6 +114,14 @@ export class BillsService {
       };
     }
 
+    // A cursor must belong to this organization, else Prisma pages from a foreign row (cross-tenant).
+    if (cursor) {
+      const owned = await this.prisma.bill.count({
+        where: { id: cursor, organizationId, deletedAt: null },
+      });
+      if (owned === 0) throw new NotFoundException('Bill not found');
+    }
+
     return cursorPaginate(
       this.prisma.bill,
       where,
