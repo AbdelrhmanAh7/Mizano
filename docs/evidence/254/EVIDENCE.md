@@ -3,8 +3,9 @@
 This evidence document accompanies GitHub issue #254 (split from PR #235, parent issue #215).
 Supersedes part of #235.
 
-- **Base commit (`origin/master`)**: `451cc181`
+- **Base commit (`origin/master`)**: `5a8be028`
 - **First commit (e2e-army test)**: `fa64140c` (`test(e2e): add customer form e2e-army test for #254`)
+- **Tested commit (`HEAD`)**: `659f10e0`
 - **Host**: Darwin arm64 (macOS), Node v26.10.0, pnpm 8.14.0
 - **Originating Sentry issue**: None (no Sentry issue exists; never invent evidence)
 - **UI Screenshots**: None captured locally (headless browser stack is not running on this host; verified via Jest unit specs and the e2e-army test `e2e-army/254-customer-payload.e2e.ts` which runs on verify and includes RTL evaluation; never invent screenshots)
