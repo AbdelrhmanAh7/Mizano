@@ -147,9 +147,9 @@ const workOrderApi = {
     const response = await api.post(`/manufacturing/work-orders/${id}/start`);
     return response.data;
   },
-  complete: async (id: string, producedQuantity: number) => {
+  complete: async (id: string, quantityProduced: number) => {
     const response = await api.post(`/manufacturing/work-orders/${id}/complete`, {
-      quantityProduced: producedQuantity,
+      quantityProduced,
     });
     return response.data;
   },
@@ -342,18 +342,8 @@ export function useStartWorkOrder() {
 export function useCompleteWorkOrder() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      id,
-      producedQuantity,
-      quantityProduced,
-    }: {
-      id: string;
-      producedQuantity?: number;
-      quantityProduced?: number;
-    }) => {
-      const quantity = quantityProduced ?? producedQuantity ?? 0;
-      return workOrderApi.complete(id, quantity);
-    },
+    mutationFn: ({ id, quantityProduced }: { id: string; quantityProduced: number }) =>
+      workOrderApi.complete(id, quantityProduced),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       queryClient.invalidateQueries({ queryKey: ['work-orders', variables.id] });
