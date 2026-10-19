@@ -19,23 +19,27 @@ describe('VatReturnDraftController', () => {
   });
 
   it('@issue-114 AC5: accepts a single-day range where from equals to', async () => {
+    getDraft.mockResolvedValue({ outputTax: '0.0000' });
     await controller.getVatReturnDraft('org_1', { from: '2023-01-15', to: '2023-01-15' });
     expect(getDraft).toHaveBeenCalledWith('org_1', '2023-01-15', '2023-01-15');
   });
 
-  it('@issue-114 AC3: accepts a same-day timestamp range where from is midday and to is date-only', async () => {
+  it('@issue-114 AC3: passes a same-day timestamp through to the service unchanged (service resolveRange validates using UTC calendar days)', async () => {
+    getDraft.mockResolvedValue({ outputTax: '0.0000' });
     await controller.getVatReturnDraft('org_1', {
       from: '2026-01-31T12:00:00Z',
       to: '2026-01-31',
     });
+    // Controller delegates range validation to the service; both args are forwarded as-is.
     expect(getDraft).toHaveBeenCalledWith('org_1', '2026-01-31T12:00:00Z', '2026-01-31');
   });
 
-  it('@issue-114 AC5: rejects from > to with 400 and never queries the ledger', () => {
-    const call = (): unknown =>
-      controller.getVatReturnDraft('org_1', { from: '2023-02-01', to: '2023-01-31' });
-    expect(call).toThrow(BadRequestException);
-    expect(call).toThrow('from date must be before or equal to to date');
-    expect(getDraft).not.toHaveBeenCalled();
+  it('@issue-114 AC5: from > to is forwarded to the service (service rejects it with 400)', async () => {
+    getDraft.mockRejectedValue(
+      new BadRequestException('from date must be before or equal to to date'),
+    );
+    const call = controller.getVatReturnDraft('org_1', { from: '2023-02-01', to: '2023-01-31' });
+    await expect(call).rejects.toThrow(BadRequestException);
+    expect(getDraft).toHaveBeenCalledWith('org_1', '2023-02-01', '2023-01-31');
   });
 });

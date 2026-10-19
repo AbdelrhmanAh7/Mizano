@@ -1,11 +1,10 @@
-import { Controller, Get, Query, UseGuards, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { VatReturnDraftService } from '../services/vat-return-draft.service';
 import { VatReturnDraftQueryDto } from '../dto/vat-return-draft-query.dto';
-import { parseReportDate, startOfUtcDay } from '../utils/report-utils';
 
 @ApiTags('Reports')
 @ApiBearerAuth()
@@ -18,11 +17,8 @@ export class VatReturnDraftController {
   @Permissions('reports.view')
   @ApiOperation({ summary: 'Get VAT return draft for a period' })
   getVatReturnDraft(@CurrentOrg() orgId: string, @Query() query: VatReturnDraftQueryDto) {
-    const fromDate = parseReportDate(query.from, 'start', 'from');
-    const toDate = parseReportDate(query.to, 'end', 'to');
-    if (fromDate && toDate && startOfUtcDay(fromDate) > startOfUtcDay(toDate)) {
-      throw new BadRequestException('from date must be before or equal to to date');
-    }
+    // Date-order validation is handled by VatReturnDraftService.resolveRange
+    // using UTC calendar-day comparison, which correctly accepts same-day timestamps.
     return this.vatReturnDraftService.getDraft(orgId, query.from, query.to);
   }
 }
