@@ -77,6 +77,21 @@ describe('PriceListsService', () => {
     });
   });
 
+  it('lists all price lists for the organization regardless of active status', async () => {
+    prisma.priceList.findMany.mockResolvedValue([
+      { id: 'pl-1', isActive: true },
+      { id: 'pl-2', isActive: false },
+    ] as never);
+
+    const result = await service.findAll(ORG);
+
+    expect(prisma.priceList.findMany).toHaveBeenCalledWith({
+      where: { organizationId: ORG },
+      orderBy: { name: 'asc' },
+    });
+    expect(result).toHaveLength(2);
+  });
+
   it("returns 404 for another organization's list", async () => {
     prisma.priceList.findFirst.mockResolvedValue(null);
 

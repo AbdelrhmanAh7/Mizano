@@ -180,6 +180,9 @@ describe('PayrollService.calculatePayroll (Decimal arithmetic)', () => {
 
     const result = await service.calculatePayroll('org-a', 'run-1');
 
+    expect(prisma.employee.findMany).toHaveBeenCalledWith({
+      where: { organizationId: 'org-a', isActive: true, deletedAt: null },
+    });
     const slip = prisma.payslip.create.mock.calls[0][0].data;
     expect(String(slip.grossSalary)).toBe('5500');
     expect(String(slip.taxes)).toBe('825');

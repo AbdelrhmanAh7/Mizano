@@ -160,14 +160,18 @@ export class AttendanceService {
   async getAttendanceByEmployee(
     organizationId: string,
     employeeId: string,
-    startDate: string,
-    endDate: string,
+    startDate?: string,
+    endDate?: string,
   ) {
+    const dateFilter: Prisma.DateTimeFilter = {};
+    if (startDate) dateFilter.gte = new Date(startDate);
+    if (endDate) dateFilter.lte = new Date(endDate);
+
     return this.prisma.attendance.findMany({
       where: {
         employeeId,
         organizationId,
-        date: { gte: new Date(startDate), lte: new Date(endDate) },
+        ...(Object.keys(dateFilter).length > 0 ? { date: dateFilter } : {}),
       },
       orderBy: { date: 'desc' },
     });
@@ -193,11 +197,24 @@ export class AttendanceService {
   async getAttendanceSummary(
     organizationId: string,
     employeeId: string,
-    month: number,
-    year: number,
+    month?: number,
+    year?: number,
+    startDateStr?: string,
+    endDateStr?: string,
   ) {
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0);
+    let startDate: Date;
+    let endDate: Date;
+
+    if (startDateStr && endDateStr) {
+      startDate = new Date(startDateStr);
+      endDate = new Date(endDateStr);
+    } else {
+      const now = new Date();
+      const m = typeof month === 'number' && !isNaN(month) ? month : now.getMonth() + 1;
+      const y = typeof year === 'number' && !isNaN(year) ? year : now.getFullYear();
+      startDate = new Date(y, m - 1, 1);
+      endDate = new Date(y, m, 0);
+    }
 
     const records = await this.prisma.attendance.findMany({
       where: {

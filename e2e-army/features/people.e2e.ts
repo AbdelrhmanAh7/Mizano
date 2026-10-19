@@ -194,6 +194,7 @@ test("[mz-attendance.2] attendance API: clock in/out once a day, manual record, 
   expect((await b.api.del(`/attendance/${rec.body.id}`)).status).toBe(404);
   expect((await a.api.del(`/attendance/${rec.body.id}`)).status).toBe(200);
   expect(ids(await b.api.get("/attendance"))).not.toContain(rec.body.id);
+  expect((await a.api.del(`/employees/${emp}`)).status).toBe(200);
 });
 
 test("[mz-payroll.2] payroll API: run for a month, exact payslip arithmetic from attendance, paid run posts a balanced journal, guards", { tags: ["feat:mz-payroll", "shard:people-api", "lvl:api"] }, async () => {

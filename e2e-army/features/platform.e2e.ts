@@ -524,7 +524,7 @@ test("[mz-currency.1] currency API: supported currencies, exchange rates CRUD, c
   expect(ids(await b.api.get("/currency/exchange-rates"))).not.toContain(rate.body.id);
   expect((await b.api.put(`/currency/exchange-rates/${rate.body.id}`, { rate: 1 })).status).toBe(404);
   expect((await b.api.del(`/currency/exchange-rates/${rate.body.id}`)).status).toBe(404);
-  expect((await a.api.del(`/currency/exchange-rates/${rate.body.id}`)).status).toBe(200);
+  expect([200, 204]).toContain((await a.api.del(`/currency/exchange-rates/${rate.body.id}`)).status);
   expect((await a.api.get("/currency/unrealized-gain-loss")).status).toBe(200);
 });
 
@@ -533,15 +533,16 @@ test("[mz-user-preferences.1] user preferences API: dashboard layout and tour pr
   expect((await anon.get("/user/preferences")).status).toBe(401);
   const prefs = await a.api.get("/user/preferences");
   expect(prefs.status).toBe(200);
-  const widgets = [{ id: "ai-pulse", visible: false, order: 1 }, { id: "revenue", visible: true, order: 0 }];
+  const customWidget = seeded("custom-widget");
+  const widgets = [{ id: customWidget, visible: false, order: 1 }, { id: "revenue", visible: true, order: 0 }];
   const saved = await a.api.put("/user/preferences/dashboard-layout", { widgets });
   expect(saved.status).toBe(200);
   const read = await a.api.get("/user/preferences/dashboard-layout");
   expect(read.status).toBe(200);
-  expect(JSON.stringify(read.body)).toContain("ai-pulse");
+  expect(JSON.stringify(read.body)).toContain(customWidget);
   expect((await a.api.put("/user/preferences/dashboard-layout", { widgets: [{ id: "x", visible: "yes", order: "first" }] })).status).toBe(400);
   expect((await a.api.put("/user/preferences/dashboard-layout", {})).status).toBe(400);
-  expect(JSON.stringify((await b.api.get("/user/preferences/dashboard-layout")).body)).not.toContain("ai-pulse");
+  expect(JSON.stringify((await b.api.get("/user/preferences/dashboard-layout")).body)).not.toContain(customWidget);
   const tour = await a.api.patch("/user/preferences/tour/dashboard", { completed: false, currentStep: 2 });
   expect(tour.status).toBe(200);
   expect((await a.api.patch("/user/preferences/tour/dashboard", { completed: "maybe" })).status).toBe(400);

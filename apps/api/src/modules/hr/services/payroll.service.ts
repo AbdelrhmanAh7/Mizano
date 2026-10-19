@@ -62,7 +62,7 @@ export class PayrollService {
 
     // Get all active employees
     const employees = await this.prisma.employee.findMany({
-      where: { organizationId, isActive: true },
+      where: { organizationId, isActive: true, deletedAt: null },
     });
 
     const payslips = [];

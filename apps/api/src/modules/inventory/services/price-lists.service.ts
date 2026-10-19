@@ -31,7 +31,7 @@ export class PriceListsService {
 
   async findAll(organizationId: string) {
     return this.prisma.priceList.findMany({
-      where: { organizationId, isActive: true },
+      where: { organizationId },
       orderBy: { name: 'asc' },
     });
   }

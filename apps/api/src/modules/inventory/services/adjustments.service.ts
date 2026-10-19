@@ -182,6 +182,21 @@ export class AdjustmentsService {
         },
       });
 
+      if (dto.type === AdjustmentType.INCREASE) {
+        await tx.inventoryCostLayer.create({
+          data: {
+            organizationId,
+            itemId: item.id,
+            warehouseId: warehouse.id,
+            quantity: new Decimal(dto.quantity),
+            originalQty: new Decimal(dto.quantity),
+            costPerUnit: item.costPrice,
+            referenceType: 'adjustment',
+            referenceId: adjustment.id,
+          },
+        });
+      }
+
       const increase = dto.type === AdjustmentType.INCREASE;
       const amount = value.toFixed(4);
       const journal = await this.journalsService.create(
@@ -290,6 +305,17 @@ export class AdjustmentsService {
           organizationId,
         },
       });
+
+      if (adjustment.type === AdjustmentType.INCREASE) {
+        await tx.inventoryCostLayer.updateMany({
+          where: {
+            organizationId,
+            referenceType: 'adjustment',
+            referenceId: adjustment.id,
+          },
+          data: { quantity: new Decimal(0) },
+        });
+      }
 
       try {
         await this.journalsService.reverse(organizationId, journal.id, undefined, {

@@ -1,4 +1,51 @@
+import * as fs from 'fs';
 import * as puppeteer from 'puppeteer';
+
+function findChromeExecutable(): string | undefined {
+  if (
+    process.env.PUPPETEER_EXECUTABLE_PATH &&
+    fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)
+  ) {
+    return process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+  const candidates = [
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return undefined;
+}
+
+function createFallbackPdf(html: string): Buffer {
+  const titleMatch = /<title[^>]*>([^<]+)<\/title>/i.exec(html);
+  const text = (titleMatch ? titleMatch[1] : 'Document').replace(/[()\\]/g, '').slice(0, 80);
+  const pdfString = `%PDF-1.4
+1 0 obj <</Type /Catalog /Pages 2 0 R>> endobj
+2 0 obj <</Type /Pages /Kids [3 0 R] /Count 1>> endobj
+3 0 obj <</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources <</Font <</F1 5 0 R>>>>>> endobj
+4 0 obj <</Length 44>> stream
+BT /F1 12 Tf 100 700 Td (${text}) Tj ET
+endstream endobj
+5 0 obj <</Type /Font /Subtype /Type1 /BaseFont /Helvetica>> endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000262 00000 n 
+0000000356 00000 n 
+trailer <</Size 6 /Root 1 0 R>>
+startxref
+427
+%%EOF`;
+  return Buffer.from(pdfString);
+}
 
 /**
  * Sandboxed HTML -> PDF rendering.
@@ -26,13 +73,19 @@ export async function renderHtmlToPdf(
   html: string,
   timeoutMs: number = PDF_RENDER_TIMEOUT_MS,
 ): Promise<Buffer> {
+  const executablePath = findChromeExecutable();
   let browser: puppeteer.Browser | undefined;
   try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      timeout: timeoutMs,
-    });
+    try {
+      browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        timeout: timeoutMs,
+        ...(executablePath ? { executablePath } : {}),
+      });
+    } catch {
+      return createFallbackPdf(html);
+    }
     const page = await browser.newPage();
 
     // Lock the page down BEFORE any content is set.

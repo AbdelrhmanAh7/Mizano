@@ -83,14 +83,18 @@ export class AttendanceController {
   getSummary(
     @CurrentOrg() orgId: string,
     @Param('employeeId') employeeId: string,
-    @Query('month') month: string,
-    @Query('year') year: string,
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
     return this.attendanceService.getAttendanceSummary(
       orgId,
       employeeId,
-      parseInt(month),
-      parseInt(year),
+      month ? parseInt(month) : undefined,
+      year ? parseInt(year) : undefined,
+      startDate,
+      endDate,
     );
   }
 
