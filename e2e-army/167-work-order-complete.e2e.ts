@@ -30,7 +30,9 @@ async function createStartedWorkOrder(baseUrl: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: 'admin@mizano.com', password: 'password123' }),
   });
-  const { accessToken } = (await login.json()) as { accessToken: string };
+  expect(login.status, 'POST /auth/login').toBeLessThan(300);
+  const { accessToken } = (await login.json()) as { accessToken?: string };
+  expect(accessToken, 'accessToken from POST /auth/login').toBeTruthy();
   const headers = { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` };
 
   const item = (code: string) => ({
@@ -53,16 +55,14 @@ async function createStartedWorkOrder(baseUrl: string): Promise<string> {
     bomId,
     quantity: 5,
   });
-  await post(api, `/manufacturing/work-orders/${workOrderId}/start`, headers).catch(
-    () => undefined,
-  );
+  await post(api, `/manufacturing/work-orders/${workOrderId}/start`, headers);
   return workOrderId;
 }
 
 test(
   '@issue-167 AC1 AC2: completing a started work order with a quantity from the UI succeeds (no 400)',
   { tags: ['feat:mz-work-orders', 'lvl:ui'] },
-  async ({ app, agent, browser }) => {
+  async ({ app, agent }) => {
     const workOrderId = await createStartedWorkOrder(String(app.baseUrl));
 
     await app.open('/en/login');
@@ -83,6 +83,6 @@ test(
 
     // Arabic page of the same work order renders right-to-left.
     await app.open(`/ar/manufacturing/work-orders/${workOrderId}`);
-    expect(await browser.evaluate(() => document.documentElement.dir)).toBe('rtl');
+    await agent.assert('the page layout is right-to-left');
   },
 );

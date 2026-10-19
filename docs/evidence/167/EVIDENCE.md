@@ -10,15 +10,13 @@ Sentry issue: none found.
 
 ## Verification
 
-| AC  | Check                                                                                                                                                                                            | Result                                         |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
-| AC1 | `workOrderApi.complete` posts `{ quantityProduced }` (`apps/web/lib/hooks/use-manufacturing.ts`); `useCompleteWorkOrder` takes `{ id, quantityProduced }` only and the work-order page passes it | head run below, exit 0                         |
-| AC2 | `cd apps/web && npx jest lib/hooks/use-manufacturing.spec.ts --maxWorkers=2`                                                                                                                     | base exit 1 (2 failed), head exit 0 (2 passed) |
-| AC3 | `git diff origin/master HEAD --stat -- apps/api packages` shows no change from this fix                                                                                                          | see note                                       |
-| all | `pnpm --filter web type-check`                                                                                                                                                                   | exit 0                                         |
-| all | `pnpm --filter web exec eslint` on the 3 changed web files                                                                                                                                       | exit 0                                         |
-
-Note on AC3: the fix touches only `apps/web`. The branch also contains merged master work, so compare against the merge base of this fix, not against an old local `master`.
+| AC  | Check                                                                                                                                                                             | Result                                         |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| AC1 | `grep -n "quantityProduced\|producedQuantity" apps/web/lib/hooks/use-manufacturing.ts` shows `complete` posts `{ quantityProduced }` (line 152) and no `producedQuantity` remains | exit 0                                         |
+| AC2 | `cd apps/web && npx jest lib/hooks/use-manufacturing.spec.ts --maxWorkers=2`                                                                                                      | base exit 1 (2 failed), head exit 0 (2 passed) |
+| AC3 | `git diff 451cc181 HEAD --stat -- apps/api packages` (451cc181 = `git merge-base HEAD origin/master`) prints nothing: zero diff                                                   | exit 0                                         |
+| all | `pnpm --filter web type-check`                                                                                                                                                    | exit 0                                         |
+| all | `cd apps/web && npx eslint lib/hooks/use-manufacturing.ts lib/hooks/use-manufacturing.spec.ts`                                                                                    | exit 0                                         |
 
 ## Regression proof
 
@@ -102,4 +100,4 @@ Time:        0.227 s, estimated 1 s
 Ran all test suites matching /lib\/hooks\/use-manufacturing.spec.ts/i.
 ```
 
-The e2e-army scenario (`e2e-army/167-work-order-complete.e2e.ts`) was not run locally: it needs the hub's throwaway stack (`ops/verify/e2e-army/run-local.sh`). Its API setup calls and UI selectors are therefore unverified until the `e2e-army` gate runs.
+The e2e-army scenario (`e2e-army/167-work-order-complete.e2e.ts`) was not run locally: it needs the hub's throwaway stack (`ops/verify/e2e-army/run-local.sh`). Its API setup calls and UI selectors (including the final right-to-left `agent.assert`) are therefore unverified until the `e2e-army` gate runs.
