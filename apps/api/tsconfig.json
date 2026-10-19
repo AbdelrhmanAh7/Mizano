@@ -20,7 +20,8 @@
     "paths": {
       "@/*": ["src/*"],
       "@modules/*": ["src/modules/*"],
-      "@common/*": ["src/common/*"]
+      "@common/*": ["src/common/*"],
+      "@mizano/validators": ["../../packages/validators/src/index.ts"]
     }
   },
   "include": ["src/**/*", "prisma/**/*"],
