@@ -1,7 +1,12 @@
 import Decimal from 'decimal.js';
 import { findAmounts, AmountMatch } from './rules-amounts';
 import { parseDate } from './rules-dates';
-import { foldForMatch, normalizeDigits, splitLines } from './rules-normalize';
+import {
+  foldForMatch,
+  mapSpanToOriginal,
+  normalizeWithOffsets,
+  splitLines,
+} from './rules-normalize';
 
 export interface Evidence {
   /** The source line (trimmed, capped). Document content: never log it. */
@@ -14,7 +19,12 @@ export interface RuleField<T> {
   /** 0..1. Never invented: derived from how the value was found and cross-checks. */
   confidence: number;
   evidence: Evidence;
+  /** `[start, end)` of the value in `RulesExtraction.originalText`. */
+  start?: number;
+  end?: number;
 }
+
+type SpanFn = (lineIndex: number, index: number, end: number) => { start: number; end: number };
 
 export type TaxIdCountry = 'EG' | 'SA' | 'AE';
 export type CurrencyCode = 'EGP' | 'SAR' | 'AED';
@@ -33,6 +43,7 @@ export interface RulesExtraction {
   warnings: string[];
   /** 0..1; capped below the review threshold when a consistency check fails. */
   overallConfidence: number;
+  originalText?: string;
 }
 
 const TOLERANCE = new Decimal('0.01');
@@ -98,6 +109,7 @@ function findLabeledAmounts(
   lines: string[],
   folded: string[],
   scaleFactor: number,
+  span: SpanFn,
 ): Record<AmountKey, RuleField<Decimal> | null> {
   const found: Record<AmountKey, RuleField<Decimal> | null> = {
     subtotal: null,
@@ -128,6 +140,7 @@ function findLabeledAmounts(
       value: hit.value,
       confidence: base * scaleFactor,
       evidence: evidence(lines, lineIndex),
+      ...span(lineIndex, hit.index, hit.end),
     };
   }
   return found;
@@ -147,6 +160,7 @@ function extractInvoiceNumber(
   lines: string[],
   folded: string[],
   scaleFactor: number,
+  span: SpanFn,
 ): RuleField<string> | null {
   for (let i = 0; i < lines.length; i++) {
     for (const re of [INVOICE_NO_AFTER_RE, INVOICE_NO_BEFORE_RE]) {
@@ -160,15 +174,19 @@ function extractInvoiceNumber(
         value: cleanToken(lines[i].slice(at, at + m[1].length)),
         confidence: CONF_SAME_LINE * scaleFactor,
         evidence: evidence(lines, i),
+        ...span(i, at, at + token.length),
       };
     }
     if (INVOICE_NO_LABEL_ONLY_RE.test(folded[i]) && i + 1 < lines.length) {
       const t = lines[i + 1].trim();
       if (/^[A-Za-z0-9][A-Za-z0-9\-/_.]{0,30}$/.test(t) && /\d/.test(t)) {
+        const at = lines[i + 1].indexOf(t);
+        const startInLine = at >= 0 ? at : 0;
         return {
           value: cleanToken(t),
           confidence: CONF_NEXT_LINE * scaleFactor,
           evidence: evidence(lines, i + 1),
+          ...span(i + 1, startInLine, startInLine + t.length),
         };
       }
     }
@@ -184,6 +202,7 @@ function extractDates(
   lines: string[],
   folded: string[],
   scaleFactor: number,
+  span: SpanFn,
 ): {
   date: RuleField<string> | null;
   dueDate: RuleField<string> | null;
@@ -196,12 +215,14 @@ function extractDates(
     const d = parseDate(lines[i]);
     if (!d) return null;
     if (d.ambiguous) ambiguousLines.add(i);
+    const offsets = span(i, d.start, d.end);
     return {
       value: d.iso,
       confidence: d.ambiguous
         ? Math.min(AMBIGUOUS_DATE_CAP, base * scaleFactor)
         : base * scaleFactor,
       evidence: evidence(lines, i),
+      ...offsets,
     };
   };
   for (let i = 0; i < lines.length && !(date && dueDate); i++) {
@@ -250,8 +271,15 @@ function extractTaxId(
   folded: string[],
   warnings: string[],
   scaleFactor: number,
+  span: SpanFn,
 ): RulesExtraction['vendorTaxId'] {
-  const candidates: Array<{ digits: string; line: number; labeled: boolean }> = [];
+  const candidates: Array<{
+    digits: string;
+    line: number;
+    labeled: boolean;
+    at: number;
+    len: number;
+  }> = [];
   for (let i = 0; i < lines.length; i++) {
     if (!TAX_ID_LABEL_RE.test(folded[i])) continue;
     const before = candidates.length;
@@ -259,30 +287,45 @@ function extractTaxId(
     const afterLabel = lines[i].replace(/%/g, ' ');
     for (const m of afterLabel.matchAll(TAX_ID_GROUP_RE)) {
       const digits = m[0].replace(/\D/g, '');
+      const matchIndex = m.index ?? 0;
       if (classifyTaxId(digits)) {
-        candidates.push({ digits, line: i, labeled: true });
+        candidates.push({ digits, line: i, labeled: true, at: matchIndex, len: m[0].length });
         continue;
       }
       // The group may have swallowed an adjacent date or phone: try its parts.
+      let partOffset = matchIndex;
       for (const part of m[0].split(/\s+/)) {
         const partDigits = part.replace(/\D/g, '');
-        if (classifyTaxId(partDigits))
-          candidates.push({ digits: partDigits, line: i, labeled: true });
+        const actualPartIndex = m[0].indexOf(part, partOffset - matchIndex);
+        const at = actualPartIndex >= 0 ? matchIndex + actualPartIndex : partOffset;
+        if (classifyTaxId(partDigits)) {
+          candidates.push({ digits: partDigits, line: i, labeled: true, at, len: part.length });
+        }
+        partOffset = at + part.length;
       }
     }
     if (candidates.length === before) {
       const next = lines[i + 1]?.trim();
       if (next && /^\d[\d\s-]{7,24}\d$/.test(next)) {
         const digits = next.replace(/\D/g, '');
-        if (classifyTaxId(digits)) candidates.push({ digits, line: i + 1, labeled: true });
+        if (classifyTaxId(digits)) {
+          const at = lines[i + 1].indexOf(next);
+          candidates.push({
+            digits,
+            line: i + 1,
+            labeled: true,
+            at: at >= 0 ? at : 0,
+            len: next.length,
+          });
+        }
       }
     }
   }
   if (candidates.length === 0) {
     for (let i = 0; i < lines.length; i++) {
       const m = lines[i].match(/(?<!\d)3\d{13}3(?!\d)/);
-      if (m) {
-        candidates.push({ digits: m[0], line: i, labeled: false });
+      if (m && m.index !== undefined) {
+        candidates.push({ digits: m[0], line: i, labeled: false, at: m.index, len: m[0].length });
         break;
       }
     }
@@ -302,6 +345,7 @@ function extractTaxId(
     country: cls.country,
     confidence,
     evidence: evidence(lines, first.line),
+    ...span(first.line, first.at, first.at + first.len),
   };
 }
 
@@ -346,6 +390,7 @@ function extractVendor(
   lines: string[],
   folded: string[],
   scaleFactor: number,
+  span: SpanFn,
 ): RuleField<string> | null {
   for (let i = 0; i < lines.length; i++) {
     const m = folded[i].match(VENDOR_LABEL_RE);
@@ -353,19 +398,27 @@ function extractVendor(
     const value = (m[1] ?? m[2] ?? '').trim();
     if (value.length >= 2) {
       // Folding preserves length, so slice the original line at the same offset.
-      const original = lines[i].slice(folded[i].length - (m[1] ?? m[2] ?? '').length).trim();
+      const matchText = m[1] ?? m[2] ?? '';
+      const at = lines[i].length - matchText.length;
+      const original = lines[i].slice(at).trim();
+      const trimmedAt = lines[i].indexOf(original, at);
+      const startInLine = trimmedAt >= 0 ? trimmedAt : at;
       return {
         value: original.length >= 2 ? original : value,
         confidence: CONF_SAME_LINE * scaleFactor,
         evidence: evidence(lines, i),
+        ...span(i, startInLine, startInLine + original.length),
       };
     }
     const next = lines[i + 1]?.trim();
     if (next && next.length >= 2 && !/\d{4,}/.test(next)) {
+      const at = lines[i + 1].indexOf(next);
+      const startInLine = at >= 0 ? at : 0;
       return {
         value: next,
         confidence: CONF_NEXT_LINE * scaleFactor,
         evidence: evidence(lines, i + 1),
+        ...span(i + 1, startInLine, startInLine + next.length),
       };
     }
   }
@@ -425,26 +478,45 @@ function checkConsistency(
  * @param textConfidence 0..1 confidence of the text source (OCR); defaults to 1
  */
 export function extractInvoiceFields(rawText: string, textConfidence = 1): RulesExtraction {
-  const lines = splitLines(normalizeDigits(rawText));
+  const { normalized, toOriginal } = normalizeWithOffsets(rawText);
+  const lines = splitLines(normalized);
+  const lineStarts: number[] = [];
+  for (let at = 0, i = 0; i < lines.length; i++) {
+    lineStarts.push(at);
+    at += lines[i].length;
+    at += normalized.startsWith('\r\n', at) ? 2 : 1;
+  }
+  const span: SpanFn = (
+    lineIndex: number,
+    index: number,
+    end: number,
+  ): { start: number; end: number } =>
+    mapSpanToOriginal(
+      lineStarts[lineIndex] + index,
+      lineStarts[lineIndex] + end,
+      toOriginal,
+      rawText.length,
+    );
   const folded = lines.map(foldForMatch);
   const factor = scale(textConfidence);
   const warnings: string[] = [];
 
-  const amounts = findLabeledAmounts(lines, folded, factor);
-  const { date, dueDate, dateAmbiguous } = extractDates(lines, folded, factor);
+  const amounts = findLabeledAmounts(lines, folded, factor, span);
+  const { date, dueDate, dateAmbiguous } = extractDates(lines, folded, factor, span);
   if (dateAmbiguous) warnings.push('DATE_AMBIGUOUS');
   const result: RulesExtraction = {
-    invoiceNumber: extractInvoiceNumber(lines, folded, factor),
+    invoiceNumber: extractInvoiceNumber(lines, folded, factor, span),
     date,
     dueDate,
-    vendorName: extractVendor(lines, folded, factor),
-    vendorTaxId: extractTaxId(lines, folded, warnings, factor),
+    vendorName: extractVendor(lines, folded, factor, span),
+    vendorTaxId: extractTaxId(lines, folded, warnings, factor, span),
     subtotal: amounts.subtotal,
     tax: amounts.tax,
     total: amounts.total,
     currency: extractCurrency(lines, folded, factor),
     warnings,
     overallConfidence: 0,
+    originalText: rawText,
   };
 
   const consistent = checkConsistency(result);
