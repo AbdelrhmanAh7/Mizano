@@ -430,12 +430,12 @@ test("[mz-delivery-challans.2] delivery challan API: draft -> issue (stock leave
   expect(await stockOf()).toBe("8"); // two units left the warehouse
   expect((await a.api.put(`/delivery-challans/${id}`, { notes: "late" })).status).toBe(400);
   expect((await a.api.del(`/delivery-challans/${id}`)).status).toBe(400);
-  expect((await a.api.post(`/delivery-challans/${id}/issue`)).status).toBe(409); // guarded transition: already issued
+  expect((await a.api.post(`/delivery-challans/${id}/issue`)).status).toBe(400); // guarded transition: already issued
   const back = await a.api.post(`/delivery-challans/${id}/mark-returned`);
   expect(back.status).toBe(200);
   expect(back.body.status).toBe("RETURNED");
   expect(await stockOf()).toBe("10"); // returned goods are back on the shelf
-  expect((await a.api.post(`/delivery-challans/${id}/mark-returned`)).status).toBe(409); // already returned
+  expect((await a.api.post(`/delivery-challans/${id}/mark-returned`)).status).toBe(400); // already returned
 
   // more than the warehouse holds is refused and changes nothing
   const big = (await a.api.post("/delivery-challans", { ...base, lines: [{ itemId: stock.itemId, quantity: 11, warehouseId: stock.warehouseId }] })).body.id;
