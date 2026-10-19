@@ -177,6 +177,7 @@ Review round 5 (#109):
 - Fixed CodeRabbit finding on `rules-normalize.spec.ts:64`: AC5 test now verifies `parseAmount('10000000000000.0001')` returns a Decimal instance (`toBeInstanceOf(Decimal)`) and preserves the exact 4-decimal fraction string that JS Number conversion would lose.
 - Fixed CodeRabbit finding on `EVIDENCE.md`: E2E gate note updated to report the round-two `e2e-first` review status as unresolved without an authoritative retirement decision and the `e2e-army` result.
 - Confirmed the 3 outdated review threads on `intake-arabic-digits.e2e-spec.ts` and `entity-extraction.service.ts` are satisfied because the relevant code was reverted in commit a5aeed0.
+
 # Issue #141 — intake worker entrypoint, processor out of the API, Pi compose worker
 
 Tested commit: `57f9a0d` (branch `ai/141`; this file is committed after it). Fresh Postgres 16, `REDIS_URL=` blank, in band.
@@ -544,3 +545,67 @@ Each trial balance has two tenant filters: the account list and the line totals.
 ## Index: other issues
 
 - Issue #94 (decimal money math and idempotent posting): [docs/evidence/94/EVIDENCE.md](docs/evidence/94/EVIDENCE.md).
+
+---
+
+# EVIDENCE — Issue #252: assert full session shape, drop refresh token
+
+**Tested SHA:** a261fca4
+**Branch:** ai/252 (based on master at 451cc181)
+
+## Acceptance Criteria
+
+| AC  | Description                                                                                                                                                                                                            | Verification                                                                                                                                                                                              | Result                          |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| AC1 | route.spec.ts verifies the complete session shape: all user fields (id, email, name, firstName, lastName, organizationId, role), accessToken, and a string `expires` value; missing or unexpected fields fail the test | `npx jest --findRelatedTests app/api/auth/[...nextauth]/route.spec.ts` — test "returns the signed-in session with all user fields, accessToken and a string expires" uses `toEqual` for exact shape match | ✅ PASS (2/2 tests, 0 failures) |
+| AC2 | Explicit refresh-token checks retained: the session response must NOT contain `refreshToken` or the raw token value                                                                                                    | Same test asserts `Object.keys(session)` does not contain `refreshToken`, `body` does not contain `refreshToken` or `secret-refresh-token`                                                                | ✅ PASS                         |
+
+## Regression Test
+
+| Step         | Command                                               | Result                                                                      |
+| ------------ | ----------------------------------------------------- | --------------------------------------------------------------------------- |
+| FAIL on base | `git stash && npx jest route.spec.ts` (before fix)    | ✖ 1 failed: `toEqual` received extra `refreshToken: "secret-refresh-token"` |
+| PASS on head | `git stash pop && npx jest route.spec.ts` (after fix) | ✓ 2 passed, 0 failed (exit code 0)                                          |
+
+**Root cause:** `apps/web/lib/auth.ts` session callback line `session.refreshToken = token.refreshToken as string;` copied the long-lived refresh token into the client-visible session object returned by `GET /api/auth/session`.
+
+**Fix:** Removed the line and the `refreshToken` member from the `Session` type declaration. The token remains in the encrypted JWT cookie for server-side refresh and logout.
+
+## Pre-existing Failures
+
+- **Typecheck:** 15 pre-existing TS errors in `logger-dashboard.tsx` and `use-logger-store.ts` (module `@mizano/shared-types` not found). Same count on master. 0 new errors from this PR.
+- **Lint:** Warnings only, all pre-existing (unused vars, exhaustive-deps). 0 new warnings.
+
+## Test Commands and Output
+
+```
+# route.spec.ts (head) — 2 passed, 0 failed
+$ cd apps/web && npx jest --maxWorkers=2 --findRelatedTests 'app/api/auth/[...nextauth]/route.spec.ts'
+PASS app/api/auth/[...nextauth]/route.spec.ts
+  GET /api/auth/session (NextAuth route)
+    ✓ returns the signed-in session with all user fields, accessToken and a string expires (131 ms)
+    ✓ returns an empty object when signed out
+Tests: 2 passed, 2 total
+
+# auth.spec.ts (head) — 15 passed, 0 failed
+$ cd apps/web && npx jest --maxWorkers=2 --findRelatedTests lib/auth.spec.ts
+PASS lib/auth.spec.ts
+  refreshAccessToken (per-session isolation): 6 passed
+  logout clears session state: 5 passed
+  createTokenRefresher: 4 passed
+Tests: 15 passed, 15 total
+```
+
+## Changed Files → Covering Tests
+
+| Changed file                                        | Covering test(s)                                                                                     |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `apps/web/lib/auth.ts`                              | `apps/web/lib/auth.spec.ts` (15/15 ✅), `apps/web/app/api/auth/[...nextauth]/route.spec.ts` (2/2 ✅) |
+| `apps/web/app/api/auth/[...nextauth]/route.spec.ts` | Self (test file)                                                                                     |
+| `e2e-army/252-session-shape.e2e.ts`                 | Self (e2e test file, runs in verify job)                                                             |
+
+## Skills Used
+
+- test-first engineering (failing test first, then fix)
+- systematic-debugging (identified root cause in session callback)
+- verification-before-completion (all claims backed by fresh command output)
