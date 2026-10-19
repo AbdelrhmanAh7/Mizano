@@ -19,6 +19,8 @@ export interface ExtractionContext {
   /** true if PDF has native embedded text (not a scanned image) */
   pdfIsNativeText?: boolean;
   pdfPageCount?: number;
+  pdfPages?: Array<{ page: number; text: string; isNativeText: boolean }>;
+  documentText?: string;
   /** Override the Ollama model used for extraction (set by fast/slow mode). */
   modelOverride?: string;
 }
@@ -27,8 +29,18 @@ export interface ExtractionContext {
 export type ExtractionSubPath = 'ocr-fast' | 'vlm-fallback';
 
 /** Result wrapper with metadata about which strategy was used. */
+export type CpuDocumentExtractionResult = Omit<
+  DocumentExtractionResult,
+  'total' | 'subtotal' | 'tax' | 'discount'
+> & {
+  total: string | null;
+  subtotal: string | null;
+  tax: string | null;
+  discount: string | null;
+};
+
 export interface StrategyExtractionResult {
-  extraction: DocumentExtractionResult;
+  extraction: DocumentExtractionResult | CpuDocumentExtractionResult;
   strategyUsed: ExtractionStrategyName;
   /** For hybrid: which sub-path was taken */
   subPathUsed?: ExtractionSubPath;

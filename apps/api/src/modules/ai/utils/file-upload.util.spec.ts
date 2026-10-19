@@ -9,8 +9,8 @@ import {
 
 describe('file-upload.util', () => {
   describe('OCR_ALLOWED_MIMES', () => {
-    it('should contain 12 MIME types', () => {
-      expect(OCR_ALLOWED_MIMES).toHaveLength(12);
+    it('should contain 13 MIME types', () => {
+      expect(OCR_ALLOWED_MIMES).toHaveLength(13);
     });
 
     it.each([
@@ -28,21 +28,25 @@ describe('file-upload.util', () => {
   });
 
   describe('OCR_FILE_TYPE_ERROR', () => {
-    it('should mention HEIC in the error message', () => {
-      expect(OCR_FILE_TYPE_ERROR).toContain('HEIC');
+    it('contains readable Arabic repair text', () => {
+      expect(OCR_FILE_TYPE_ERROR).toContain('صورة مدعومة');
+      expect(OCR_FILE_TYPE_ERROR).not.toContain('???');
+    });
+    it('should mention DOCX in the error message', () => {
+      expect(OCR_FILE_TYPE_ERROR).toContain('DOCX');
     });
 
     it('should mention all major formats', () => {
-      expect(OCR_FILE_TYPE_ERROR).toContain('JPEG');
-      expect(OCR_FILE_TYPE_ERROR).toContain('PNG');
+      expect(OCR_FILE_TYPE_ERROR).toContain('supported image');
+      expect(OCR_FILE_TYPE_ERROR).toContain('DOCX');
       expect(OCR_FILE_TYPE_ERROR).toContain('PDF');
-      expect(OCR_FILE_TYPE_ERROR).toContain('TIFF');
+      expect(OCR_FILE_TYPE_ERROR).toContain('PDF');
     });
   });
 
   describe('EXTENSION_TO_MIME', () => {
-    it('should have 13 entries', () => {
-      expect(Object.keys(EXTENSION_TO_MIME)).toHaveLength(13);
+    it('should have 15 entries', () => {
+      expect(Object.keys(EXTENSION_TO_MIME)).toHaveLength(15);
     });
 
     it.each([
@@ -135,6 +139,31 @@ describe('file-upload.util', () => {
       },
     );
 
+    it.each([
+      ['application/msword', 'legacy.doc'],
+      ['application/octet-stream', 'legacy.DOC'],
+      ['', 'legacy.doc'],
+      ['application/pdf', 'legacy.doc'],
+    ])('rejects legacy %s/%s with bilingual repair', (mime, name) => {
+      const cb = jest.fn();
+      filter({}, createFile(mime, name), cb);
+      expect(cb).toHaveBeenCalledWith(expect.any(BadRequestException), false);
+      expect((cb.mock.calls[0][0] as Error).message).toContain('INTAKE_UNSUPPORTED_LEGACY_DOC');
+      expect((cb.mock.calls[0][0] as Error).message).toContain('Save the file as DOCX or PDF');
+      expect((cb.mock.calls[0][0] as Error).message).toMatch(/[\u0600-\u06ff]/);
+    });
+    it('sniffs an OLE buffer when supplied to the filter', () => {
+      const cb = jest.fn();
+      filter(
+        {},
+        {
+          ...createFile('application/pdf', 'forged.pdf'),
+          buffer: Buffer.from('d0cf11e0a1b11ae1', 'hex'),
+        },
+        cb,
+      );
+      expect(cb).toHaveBeenCalledWith(expect.any(BadRequestException), false);
+    });
     describe('extension-based MIME fallback', () => {
       it.each([
         ['.heic', 'image/heic'],
@@ -168,7 +197,7 @@ describe('file-upload.util', () => {
         let callbackErr: unknown = 'not-called';
         let callbackAccepted: boolean | undefined;
 
-        filter({}, file, (err: any, accepted: boolean) => {
+        filter({}, file, (err: unknown, accepted: boolean) => {
           callbackErr = err;
           callbackAccepted = accepted;
         });
@@ -216,7 +245,7 @@ describe('file-upload.util', () => {
         let callbackErr: unknown = 'not-called';
         let callbackAccepted: boolean | undefined;
 
-        filter({}, createFile('video/mp4', 'fake.heic'), (err: any, accepted: boolean) => {
+        filter({}, createFile('video/mp4', 'fake.heic'), (err: unknown, accepted: boolean) => {
           callbackErr = err;
           callbackAccepted = accepted;
         });
@@ -230,7 +259,7 @@ describe('file-upload.util', () => {
         let callbackErr: unknown = 'not-called';
         let callbackAccepted: boolean | undefined;
 
-        filter({}, file, (err: any, accepted: boolean) => {
+        filter({}, file, (err: unknown, accepted: boolean) => {
           callbackErr = err;
           callbackAccepted = accepted;
         });
