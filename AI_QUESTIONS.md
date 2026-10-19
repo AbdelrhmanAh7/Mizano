@@ -10,20 +10,13 @@
 
 # Questions / follow-ups for #206 (inventory costing service spec)
 
-## Follow-up: back cost-layer idempotency with a unique index
+## Cost-layer idempotency backed by unique index
 
-`CostingService.addCostLayer` now returns the existing layer when the same
+`CostingService.addCostLayer` returns the existing layer when the same
 `referenceType` + `referenceId` arrives again for one organization, item and
-warehouse (AC3). The check is read-then-write, so it covers sequential retries
-only. Two concurrent deliveries of the same event can both insert.
-
-Proposed follow-up (needs a migration, so it was kept out of this test PR):
-
-- `@@unique([organizationId, itemId, warehouseId, referenceType, referenceId])`
-  on `InventoryCostLayer`. Postgres treats NULLs as distinct, so layers that
-  have no reference are unaffected.
-- Before migrating, check production for existing duplicates on those columns.
-- `addCostLayer` then catches `P2002` and returns the existing row.
+warehouse (AC3). Sequential retries are caught via `findFirst` and concurrent retries
+via `inventory_cost_layers_source_event_key` catching `P2002` (implemented in the base PR
+via migration `20261019124000_inventory_cost_layer_unique_source_event`).
 
 Not reachable today: nothing in `apps/api/src` calls `addCostLayer` or
 `consumeFIFO`. Only `getInventoryValuation` is wired, through

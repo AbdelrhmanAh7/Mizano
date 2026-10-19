@@ -11,8 +11,7 @@ export class CostingService {
    * Add a new FIFO cost layer when inventory comes in (purchase, production, adjustment, opening).
    * Idempotent per source event: when referenceType + referenceId are given, a retry returns the
    * existing layer instead of adding stock twice. Pass a line-level referenceId for documents that
-   * receive the same item into the same warehouse on several lines. This guards sequential retries
-   * only; two concurrent deliveries can still both insert until a unique index backs it.
+   * receive the same item into the same warehouse on several lines.
    */
   async addCostLayer(
     organizationId: string,

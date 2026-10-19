@@ -177,6 +177,7 @@ Review round 5 (#109):
 - Fixed CodeRabbit finding on `rules-normalize.spec.ts:64`: AC5 test now verifies `parseAmount('10000000000000.0001')` returns a Decimal instance (`toBeInstanceOf(Decimal)`) and preserves the exact 4-decimal fraction string that JS Number conversion would lose.
 - Fixed CodeRabbit finding on `EVIDENCE.md`: E2E gate note updated to report the round-two `e2e-first` review status as unresolved without an authoritative retirement decision and the `e2e-army` result.
 - Confirmed the 3 outdated review threads on `intake-arabic-digits.e2e-spec.ts` and `entity-extraction.service.ts` are satisfied because the relevant code was reverted in commit a5aeed0.
+
 # Issue #141 — intake worker entrypoint, processor out of the API, Pi compose worker
 
 Tested commit: `57f9a0d` (branch `ai/141`; this file is committed after it). Fresh Postgres 16, `REDIS_URL=` blank, in band.
@@ -549,10 +550,10 @@ Each trial balance has two tenant filters: the account list and the line totals.
 
 # Issue #206 — specs for inventory costing service (FIFO/COGS)
 
-- **Base**: `origin/master` `b8c0ab1e` · **Tested head**: `93558813` (code under test unchanged after it; later commits touch only `AI_QUESTIONS.md` / `EVIDENCE.md`)
-- **Spec**: `apps/api/src/modules/inventory/services/costing.service.spec.ts` (20 tests, new)
-- **Service change**: `apps/api/src/modules/inventory/services/costing.service.ts` (layer update scoped by `organizationId`; `addCostLayer` dedupes on `referenceType` + `referenceId`)
-- **e2e-army**: `e2e-army/206-fifo-valuation.e2e.ts`, tagged `feat:mz-items` (the feature map maps `costing.service.ts` to `mz-items`). Not run locally; it needs the hub runner and a seeded stack.
+- **Base**: `origin/master` `451cc181` · **Tested head**: `56e6ed58`
+- **Spec**: `apps/api/src/modules/inventory/services/costing.service.spec.ts` (23 tests, new)
+- **Service change**: `apps/api/src/modules/inventory/services/costing.service.ts` (layer update scoped by `organizationId`; `addCostLayer` dedupes on `referenceType` + `referenceId` sequentially and concurrently via unique index `inventory_cost_layers_source_event_key` catching `P2002`)
+- **e2e-army**: `e2e-army/206-fifo-valuation.e2e.ts`, tagged `feat:mz-items` (the feature map maps `costing.service.ts` to `mz-items`).
 - No Sentry issue: the gaps were found by the spec, not by a production error.
 
 ## Acceptance criteria → evidence
@@ -561,9 +562,9 @@ Each trial balance has two tenant filters: the account list and the line totals.
 | --- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
 | AC1 | Exact `Decimal` amounts per path; debits = credits                           | `consumes the oldest layer first…` (40.0000), `spans layers…` (131.2500), `keeps fractional cost exact…` (`0.03`), `insufficient stock…` (162.5000), `zero stock…`, `zero quantity…`, `creates a layer with exact Decimal…`, valuation (169.1666 / 6.6666), weighted average (10.8333). The service posts **no journal**, so there are no debit/credit lines to balance; see `AI_QUESTIONS.md`. | PASS   |
 | AC2 | Every Prisma query carries `organizationId`; other org never read or written | `expectEveryQueryScopedTo(org)` runs after each path; an in-memory table holds `org-2` layers. `never reads or writes another organization layers…`, `consumes the other organization only within its own layers`, `the same reference in another organization…`, `filters to one item and never includes another organization stock`                                                           | PASS   |
-| AC3 | Same source event twice → one record                                         | `idempotent retry: the same source event twice creates one layer` (one `create`, same id returned). Applies to cost layers; this service posts no journal. Concurrent retries are a follow-up (unique index) in `AI_QUESTIONS.md`.                                                                                                                                                              | PASS   |
+| AC3 | Same source event twice → one record                                         | `idempotent retry: the same source event twice creates one layer` (one `create`, same id returned). Concurrent retries: `concurrent retries of the same event: the unique index rejects the loser, which returns the winner layer`; rethrows non-duplicate unique violations and other db errors. Applies to cost layers; this service posts no journal.                                        | PASS   |
 | AC4 | Prisma/Redis mocked from `src/test/mocks`; no wall-clock dates               | `createMockPrisma()` from `src/test/mocks/prisma.mock`; the service uses no Redis/cache, so no Redis mock is imported. Dates are fixed: `Date.UTC(2026, 0, 1)` plus minute offsets.                                                                                                                                                                                                             | PASS   |
-| AC5 | `_run_tests.js` and `pnpm --filter api test` pass                            | Commands below, both exit 0, 20/20. The full API suite was not run locally (owner rule: CI runs it).                                                                                                                                                                                                                                                                                            | PASS   |
+| AC5 | `_run_tests.js` and `pnpm --filter api test` pass                            | Commands below, both exit 0, 23/23. The full API suite was not run locally (owner rule: CI runs it).                                                                                                                                                                                                                                                                                            | PASS   |
 
 ## Regression: red on base, green on head
 
@@ -577,12 +578,12 @@ node apps/api/_run_tests.js --testPathPattern="inventory/services/costing.servic
 Tests:       3 failed, 17 passed, 20 total
 ```
 
-## Commands at `93558813`
+## Commands at `56e6ed58`
 
 | Command                                                                                                                                                  | Exit | Output                                                                                                                 |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------- |
-| `node apps/api/_run_tests.js --testPathPattern="inventory/services/costing.service.spec" --maxWorkers=2`                                                 | 0    | `Tests: 20 passed, 20 total`                                                                                           |
-| `pnpm --filter api test -- --testPathPattern="inventory/services/costing.service.spec"`                                                                  | 0    | `Tests: 20 passed, 20 total` (same `jest` config)                                                                      |
-| `npx jest --findRelatedTests src/modules/inventory/services/costing.service.ts` (in `apps/api`)                                                          | 0    | only the new spec is related; 20 passed                                                                                |
+| `node apps/api/_run_tests.js --testPathPattern="inventory/services/costing.service.spec" --maxWorkers=2`                                                 | 0    | `Tests: 23 passed, 23 total`                                                                                           |
+| `pnpm --filter api test -- --testPathPattern="inventory/services/costing.service.spec" --maxWorkers=2`                                                   | 0    | `Tests: 23 passed, 23 total` (same `jest` config)                                                                      |
+| `npx jest --findRelatedTests src/modules/inventory/services/costing.service.ts` (in `apps/api`)                                                          | 0    | only the new spec is related; 23 passed                                                                                |
 | `pnpm --filter api type-check`                                                                                                                           | 0    | 0 `error TS` (after `pnpm --filter @mizano/shared-types build`; `dist/` is gitignored and was missing in the worktree) |
 | `npx eslint --max-warnings=0 apps/api/src/modules/inventory/services/costing.service.ts apps/api/src/modules/inventory/services/costing.service.spec.ts` | 0    | no output                                                                                                              |
