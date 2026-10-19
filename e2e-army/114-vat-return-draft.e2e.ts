@@ -46,13 +46,33 @@ test(
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.label).toBe('DRAFT, not for filing');
     expect(body.currency).toEqual(expect.stringMatching(/^[A-Z]{3}$/));
-    for (const key of ['outputTax', 'inputTax', 'netPayable']) {
+    for (const key of ['outputTax', 'inputTax', 'netPayable', 'outputVat', 'inputVat', 'netVat', 'totalSales', 'totalPurchases']) {
       expect(body[key]).toEqual(expect.stringMatching(/^-?\d+\.\d{4}$/));
     }
     expect(Array.isArray(body.exceptions)).toBe(true);
     expect(Array.isArray(body.etaMismatches)).toBe(true);
+    expect(Array.isArray(body.mismatches)).toBe(true);
   },
 );
+
+test(
+  '@issue-114 AC1: GET /tax/vat-returns/draft returns 200 with draft figures and mismatches',
+  { tags: TAGS },
+  async ({ app }) => {
+    const token = await signIn(app.baseUrl);
+    const url = new URL('/api/tax/vat-returns/draft', app.baseUrl);
+    url.searchParams.set('periodStart', '2026-01-01');
+    url.searchParams.set('periodEnd', '2026-01-31');
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    for (const key of ['outputVat', 'inputVat', 'netVat', 'totalSales', 'totalPurchases']) {
+      expect(body[key]).toEqual(expect.stringMatching(/^-?\d+\.\d{4}$/));
+    }
+    expect(Array.isArray(body.mismatches)).toBe(true);
+  },
+);
+
 
 test(
   '@issue-114 AC3: a date-only end date covers the whole day',

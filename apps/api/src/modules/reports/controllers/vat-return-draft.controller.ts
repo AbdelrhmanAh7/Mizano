@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { VatReturnDraftService } from '../services/vat-return-draft.service';
 import { VatReturnDraftQueryDto } from '../dto/vat-return-draft-query.dto';
+import { parseReportDate, startOfUtcDay } from '../utils/report-utils';
 
 @ApiTags('Reports')
 @ApiBearerAuth()
@@ -17,7 +18,9 @@ export class VatReturnDraftController {
   @Permissions('reports.view')
   @ApiOperation({ summary: 'Get VAT return draft for a period' })
   getVatReturnDraft(@CurrentOrg() orgId: string, @Query() query: VatReturnDraftQueryDto) {
-    if (new Date(query.from) > new Date(query.to)) {
+    const fromDate = parseReportDate(query.from, 'start', 'from');
+    const toDate = parseReportDate(query.to, 'end', 'to');
+    if (fromDate && toDate && startOfUtcDay(fromDate) > startOfUtcDay(toDate)) {
       throw new BadRequestException('from date must be before or equal to to date');
     }
     return this.vatReturnDraftService.getDraft(orgId, query.from, query.to);

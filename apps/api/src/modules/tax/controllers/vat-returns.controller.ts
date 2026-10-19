@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -17,13 +18,13 @@ import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 import { CreateVatReturnDto } from '../dto/create-vat-return.dto';
 import { RecordVatPaymentDto } from '../dto/record-vat-payment.dto';
-import { VatReturnQueryDto } from '../dto/vat-return-query.dto';
+import { VatReturnDraftQueryDto, VatReturnQueryDto } from '../dto/vat-return-query.dto';
 import { VatSummaryQueryDto } from '../dto/vat-summary-query.dto';
 import { VatReturnsService } from '../services/vat-returns.service';
 
 @ApiTags('VAT Returns')
 @ApiBearerAuth()
-@Controller('vat-returns')
+@Controller(['vat-returns', 'tax/vat-returns'])
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @UseInterceptors(CacheInvalidationInterceptor)
 export class VatReturnsController {
@@ -55,6 +56,18 @@ export class VatReturnsController {
   @ApiOperation({ summary: 'Get the live VAT position for a period (from the posted ledger)' })
   getSummary(@CurrentOrg() orgId: string, @Query() query: VatSummaryQueryDto) {
     return this.vatReturnsService.getVatSummary(orgId, query.startDate, query.endDate);
+  }
+
+  @Get('draft')
+  @Permissions('tax.view')
+  @ApiOperation({ summary: 'Compute VAT return draft from the ledger' })
+  draft(@CurrentOrg() orgId: string, @Query() query: VatReturnDraftQueryDto) {
+    const start = query.periodStart ?? query.from;
+    const end = query.periodEnd ?? query.to;
+    if (!start || !end) {
+      throw new BadRequestException('periodStart and periodEnd are required');
+    }
+    return this.vatReturnsService.computeDraftFromLedger(orgId, start, end);
   }
 
   @Get('payment-accounts')

@@ -23,6 +23,14 @@ describe('VatReturnDraftController', () => {
     expect(getDraft).toHaveBeenCalledWith('org_1', '2023-01-15', '2023-01-15');
   });
 
+  it('@issue-114 AC3: accepts a same-day timestamp range where from is midday and to is date-only', async () => {
+    await controller.getVatReturnDraft('org_1', {
+      from: '2026-01-31T12:00:00Z',
+      to: '2026-01-31',
+    });
+    expect(getDraft).toHaveBeenCalledWith('org_1', '2026-01-31T12:00:00Z', '2026-01-31');
+  });
+
   it('@issue-114 AC5: rejects from > to with 400 and never queries the ledger', () => {
     const call = (): unknown =>
       controller.getVatReturnDraft('org_1', { from: '2023-02-01', to: '2023-01-31' });

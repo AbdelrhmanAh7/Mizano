@@ -143,6 +143,13 @@ export interface VatReturnDraftEtaMismatch {
   lineTax: string;
 }
 
+/** Discrepancy between computed figures and a stored VAT return for the same period. */
+export interface VatReturnDraftMismatch {
+  field: string;
+  computed: string;
+  recorded: string;
+}
+
 export const VAT_RETURN_DRAFT_LABEL = 'DRAFT, not for filing' as const;
 
 export interface VatReturnDraft {
@@ -151,10 +158,18 @@ export interface VatReturnDraft {
   currency: string;
   from: string;
   to: string;
+  periodStart?: string;
+  periodEnd?: string;
   status: 'complete' | 'incomplete';
   outputTax: string;
   inputTax: string;
   netPayable: string;
+  outputVat: string;
+  inputVat: string;
+  netVat: string;
+  totalSales: string;
+  totalPurchases: string;
+  mismatches: VatReturnDraftMismatch[];
   exceptions: VatReturnDraftException[];
   etaMismatches: VatReturnDraftEtaMismatch[];
 }

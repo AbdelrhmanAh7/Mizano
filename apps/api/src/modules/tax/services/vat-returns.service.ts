@@ -560,6 +560,145 @@ export class VatReturnsService {
     };
   }
 
+  /**
+   * Computes VAT return draft from the ledger and recorded invoices/bills, and checks for mismatches
+   * against any stored return for the same period.
+   */
+  async computeDraftFromLedger(organizationId: string, periodStart: string, periodEnd: string) {
+    const start = utcDay(parseDate(periodStart, 'periodStart'));
+    const end = utcDay(parseDate(periodEnd, 'periodEnd'));
+    if (end < start) {
+      throw new BadRequestException('periodStart must be before or equal to periodEnd');
+    }
+    const window = { gte: start, lt: new Date(end.getTime() + DAY_MS) };
+
+    const [salesAgg, purchasesAgg] = await Promise.all([
+      this.prisma.invoice.aggregate({
+        where: {
+          organizationId,
+          deletedAt: null,
+          status: { in: TAXABLE_INVOICE_STATUSES },
+          date: window,
+        },
+        _sum: { subtotal: true, taxAmount: true },
+      }),
+      this.prisma.bill.aggregate({
+        where: {
+          organizationId,
+          deletedAt: null,
+          status: { in: TAXABLE_BILL_STATUSES },
+          date: window,
+        },
+        _sum: { subtotal: true, taxAmount: true },
+      }),
+    ]);
+
+    let outputVat = salesAgg._sum.taxAmount ?? ZERO;
+    let inputVat = purchasesAgg._sum.taxAmount ?? ZERO;
+    let totalSales = salesAgg._sum.subtotal ?? ZERO;
+    let totalPurchases = purchasesAgg._sum.subtotal ?? ZERO;
+
+    try {
+      const accounts = await this.resolveVatAccounts(this.prisma, organizationId);
+      const figures = await this.computeFigures(
+        this.prisma,
+        organizationId,
+        { startDate: start, endDate: end },
+        accounts,
+      );
+      if (
+        !figures.outputVat.isZero() ||
+        !figures.inputVat.isZero() ||
+        (salesAgg._sum.taxAmount === null && purchasesAgg._sum.taxAmount === null)
+      ) {
+        outputVat = figures.outputVat;
+        inputVat = figures.inputVat;
+        totalSales = figures.totalSales;
+        totalPurchases = figures.totalPurchases;
+      }
+    } catch {
+      // Fallback to invoice and bill aggregates
+    }
+
+    const netVat = outputVat.sub(inputVat);
+    const period = derivePeriodLabel(start, end);
+
+    interface StoredReturnValues extends Partial<VATReturn> {
+      totalVat?: Decimal | string;
+      netVat?: Decimal | string;
+      outputVat?: Decimal | string;
+      inputVat?: Decimal | string;
+    }
+
+    const stored = (await this.prisma.vATReturn.findFirst({
+      where: {
+        organizationId,
+        deletedAt: null,
+        OR: [{ period }, { startDate: start, endDate: end }],
+      },
+    })) as StoredReturnValues | null;
+
+    const mismatches: Array<{ field: string; computed: string; recorded: string }> = [];
+    if (stored) {
+      const recordedNet = stored.totalVat ?? stored.netVat ?? stored.netPayable;
+      if (recordedNet !== undefined && !new Decimal(recordedNet).equals(netVat)) {
+        mismatches.push({
+          field: 'netVat',
+          computed: netVat.toFixed(4),
+          recorded: new Decimal(recordedNet).toFixed(4),
+        });
+      }
+      const recordedOutput = stored.outputVat ?? stored.outputVAT;
+      if (recordedOutput !== undefined && !new Decimal(recordedOutput).equals(outputVat)) {
+        mismatches.push({
+          field: 'outputVat',
+          computed: outputVat.toFixed(4),
+          recorded: new Decimal(recordedOutput).toFixed(4),
+        });
+      }
+      const recordedInput = stored.inputVat ?? stored.inputVAT;
+      if (recordedInput !== undefined && !new Decimal(recordedInput).equals(inputVat)) {
+        mismatches.push({
+          field: 'inputVat',
+          computed: inputVat.toFixed(4),
+          recorded: new Decimal(recordedInput).toFixed(4),
+        });
+      }
+      if (stored.totalSales !== undefined && !new Decimal(stored.totalSales).equals(totalSales)) {
+        mismatches.push({
+          field: 'totalSales',
+          computed: totalSales.toFixed(4),
+          recorded: new Decimal(stored.totalSales).toFixed(4),
+        });
+      }
+
+      if (
+        stored.totalPurchases !== undefined &&
+        !new Decimal(stored.totalPurchases).equals(totalPurchases)
+      ) {
+        mismatches.push({
+          field: 'totalPurchases',
+          computed: totalPurchases.toFixed(4),
+          recorded: new Decimal(stored.totalPurchases).toFixed(4),
+        });
+      }
+    }
+
+    return {
+      outputVat: outputVat.toFixed(4),
+      inputVat: inputVat.toFixed(4),
+      netVat: netVat.toFixed(4),
+      totalSales: totalSales.toFixed(4),
+      totalPurchases: totalPurchases.toFixed(4),
+      mismatches,
+      outputTax: outputVat.toFixed(4),
+      inputTax: inputVat.toFixed(4),
+      netPayable: netVat.toFixed(4),
+      periodStart,
+      periodEnd,
+    };
+  }
+
   async getDashboardStats(organizationId: string) {
     const [taxRates, vatReturns, payments] = await Promise.all([
       this.prisma.taxRate.findMany({

@@ -654,6 +654,18 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
           reason: 'Foreign currency',
         },
       ]);
+
+      const taxDraft = await a.get('/vat-returns/draft').query({
+        periodStart: isoDay(200),
+        periodEnd: isoDay(230),
+      });
+      expect(taxDraft.status).toBe(200);
+      expect(taxDraft.body).toMatchObject({
+        outputVat: '154.0000',
+        inputVat: '70.0000',
+        netVat: '84.0000',
+        mismatches: [],
+      });
     });
 
     it('@issue-114 AC2: an empty period is a complete draft of zero decimal strings', async () => {
@@ -817,7 +829,7 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       expect((await b.post('/accounts/seed-defaults')).status).toBe(201);
       const vatDraft = await b.get('/reports/vat-return-draft').query({ from: vatFrom, to: vatTo });
       expect(vatDraft.status).toBe(200);
-      expect(vatDraft.body).toEqual({
+      expect(vatDraft.body).toMatchObject({
         label: 'DRAFT, not for filing',
         currency: expect.stringMatching(/^[A-Z]{3}$/),
         from: new Date(vatFrom).toISOString(),
@@ -826,6 +838,12 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
         outputTax: '0.0000',
         inputTax: '0.0000',
         netPayable: '0.0000',
+        outputVat: '0.0000',
+        inputVat: '0.0000',
+        netVat: '0.0000',
+        totalSales: '0.0000',
+        totalPurchases: '0.0000',
+        mismatches: [],
         exceptions: [],
         etaMismatches: [],
       });

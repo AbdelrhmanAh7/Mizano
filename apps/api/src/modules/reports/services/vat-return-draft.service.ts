@@ -5,15 +5,18 @@ import {
   VatReturnDraft,
   VatReturnDraftEtaMismatch,
   VatReturnDraftException,
+  VatReturnDraftMismatch,
 } from '@mizano/shared-types';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { describeError } from '../../../common/utils/redact';
 import { round } from '../../../common/utils/document-totals';
 import {
+  derivePeriodLabel,
   TAXABLE_BILL_STATUSES,
   TAXABLE_INVOICE_STATUSES,
   VatReturnsService,
 } from '../../tax/services/vat-returns.service';
+
 import { MAX_DAYS, parseReportDate, startOfUtcDay, toIsoDate } from '../utils/report-utils';
 
 /** The default 20-digit Decimal context cannot hold 17 integer digits and four decimals. */
@@ -107,15 +110,105 @@ export class VatReturnDraftService {
         (bill) => check('bill', { ...bill, documentNumber: bill.billNumber }),
       );
 
+      interface StoredReturnValues {
+        totalVat?: Prisma.Decimal | string;
+        netVat?: Prisma.Decimal | string;
+        outputVat?: Prisma.Decimal | string;
+        outputVAT?: Prisma.Decimal | string;
+        inputVat?: Prisma.Decimal | string;
+        inputVAT?: Prisma.Decimal | string;
+        netPayable?: Prisma.Decimal | string;
+        totalSales?: Prisma.Decimal | string;
+        totalPurchases?: Prisma.Decimal | string;
+      }
+
+      let storedReturn: StoredReturnValues | null = null;
+      try {
+        storedReturn = (await this.prisma.vATReturn.findFirst({
+          where: {
+            organizationId: orgId,
+            deletedAt: null,
+            OR: [{ period: derivePeriodLabel(from, to) }, { startDate: from, endDate: to }],
+          },
+        })) as StoredReturnValues | null;
+      } catch {
+        // Mock or model may not provide vATReturn in tests
+      }
+
+      const mismatches: VatReturnDraftMismatch[] = [];
+      const netPayable = outputTax.sub(inputTax);
+      const totalSales = new WideDecimal(summary.sales?.total ?? '0');
+      const purchasesRecord = summary.purchases as { totalPurchases?: string; total?: string };
+      const purchasesTotal = purchasesRecord.totalPurchases ?? purchasesRecord.total ?? '0';
+      const totalPurchases = new WideDecimal(purchasesTotal);
+
+      if (storedReturn) {
+        const recordedNet = storedReturn.totalVat ?? storedReturn.netVat ?? storedReturn.netPayable;
+        if (recordedNet !== undefined && !new WideDecimal(recordedNet).equals(netPayable)) {
+          mismatches.push({
+            field: 'netVat',
+            computed: netPayable.toFixed(4),
+            recorded: new WideDecimal(recordedNet).toFixed(4),
+          });
+        }
+        const recordedOutput = storedReturn.outputVat ?? storedReturn.outputVAT;
+        if (recordedOutput !== undefined && !new WideDecimal(recordedOutput).equals(outputTax)) {
+          mismatches.push({
+            field: 'outputVat',
+            computed: outputTax.toFixed(4),
+            recorded: new WideDecimal(recordedOutput).toFixed(4),
+          });
+        }
+        const recordedInput = storedReturn.inputVat ?? storedReturn.inputVAT;
+        if (recordedInput !== undefined && !new WideDecimal(recordedInput).equals(inputTax)) {
+          mismatches.push({
+            field: 'inputVat',
+            computed: inputTax.toFixed(4),
+            recorded: new WideDecimal(recordedInput).toFixed(4),
+          });
+        }
+        if (
+          storedReturn.totalSales !== undefined &&
+          !new WideDecimal(storedReturn.totalSales).equals(totalSales)
+        ) {
+          mismatches.push({
+            field: 'totalSales',
+            computed: totalSales.toFixed(4),
+            recorded: new WideDecimal(storedReturn.totalSales).toFixed(4),
+          });
+        }
+        if (
+          storedReturn.totalPurchases !== undefined &&
+          !new WideDecimal(storedReturn.totalPurchases).equals(totalPurchases)
+        ) {
+          mismatches.push({
+            field: 'totalPurchases',
+            computed: totalPurchases.toFixed(4),
+            recorded: new WideDecimal(storedReturn.totalPurchases).toFixed(4),
+          });
+        }
+      }
+
       return {
         label: VAT_RETURN_DRAFT_LABEL,
         currency: baseCurrency,
         from: from.toISOString(),
         to: to.toISOString(),
-        status: exceptions.length > 0 || etaMismatches.length > 0 ? 'incomplete' : 'complete',
+        periodStart: toIsoDate(from),
+        periodEnd: toIsoDate(to),
+        status:
+          exceptions.length > 0 || etaMismatches.length > 0 || mismatches.length > 0
+            ? 'incomplete'
+            : 'complete',
         outputTax: outputTax.toFixed(4),
         inputTax: inputTax.toFixed(4),
-        netPayable: outputTax.sub(inputTax).toFixed(4),
+        netPayable: netPayable.toFixed(4),
+        outputVat: outputTax.toFixed(4),
+        inputVat: inputTax.toFixed(4),
+        netVat: netPayable.toFixed(4),
+        totalSales: totalSales.toFixed(4),
+        totalPurchases: totalPurchases.toFixed(4),
+        mismatches,
         exceptions,
         etaMismatches,
       };

@@ -34,6 +34,7 @@ describe('VatReturnDraftService', () => {
     organization: { findUnique: jest.fn() },
     invoice: { findMany: jest.fn() },
     bill: { findMany: jest.fn() },
+    vATReturn: { findFirst: jest.fn() },
   };
   const getVatSummary = jest.fn();
   const service = new VatReturnDraftService(
@@ -45,17 +46,24 @@ describe('VatReturnDraftService', () => {
   const draft = (from = '2023-01-01', to = '2023-01-31') => service.getDraft('org_1', from, to);
   /** Ledger VAT as `getVatSummary` returns it, plus the posted documents the checks read. */
   const given = (
-    ledger: { output: string; input: string } = { output: '0.0000', input: '0.0000' },
+    ledger: { output: string; input: string; sales?: string; purchases?: string } = {
+      output: '0.0000',
+      input: '0.0000',
+      sales: '0.0000',
+      purchases: '0.0000',
+    },
     invoices: unknown[] = [],
     bills: unknown[] = [],
+    storedReturn: unknown = null,
   ): void => {
     prisma.organization.findUnique.mockResolvedValue({ baseCurrency: 'EGP' });
     getVatSummary.mockResolvedValue({
-      sales: { vatCollected: ledger.output },
-      purchases: { vatPaid: ledger.input },
+      sales: { vatCollected: ledger.output, total: ledger.sales ?? '0.0000' },
+      purchases: { vatPaid: ledger.input, totalPurchases: ledger.purchases ?? '0.0000' },
     });
     prisma.invoice.findMany.mockResolvedValue(invoices);
     prisma.bill.findMany.mockResolvedValue(bills);
+    prisma.vATReturn.findFirst.mockResolvedValue(storedReturn);
   };
 
   beforeEach(() => jest.resetAllMocks());
@@ -309,6 +317,41 @@ describe('VatReturnDraftService', () => {
         ]),
       ]);
       expect(await draft()).toMatchObject({ status: 'complete', etaMismatches: [] });
+    });
+  });
+
+  describe('stored return mismatches', () => {
+    it('@issue-114 AC3: when no stored VAT return exists for the period, mismatches is an empty array', async () => {
+      given({ output: '100.0000', input: '30.0000', sales: '1000.0000', purchases: '300.0000' });
+      const result = await draft();
+      expect(result.mismatches).toEqual([]);
+      expect(result.totalSales).toBe('1000.0000');
+      expect(result.totalPurchases).toBe('300.0000');
+      expect(result.outputVat).toBe('100.0000');
+      expect(result.inputVat).toBe('30.0000');
+      expect(result.netVat).toBe('70.0000');
+    });
+
+    it('@issue-114 AC4: reports a mismatch when a stored VAT return has different netVat', async () => {
+      given(
+        { output: '140.0000', input: '70.0000', sales: '1000.0000', purchases: '500.0000' },
+        [],
+        [],
+        {
+          totalVat: new Prisma.Decimal('50.0000'),
+          outputVAT: new Prisma.Decimal('140.0000'),
+          inputVAT: new Prisma.Decimal('70.0000'),
+          totalSales: new Prisma.Decimal('1000.0000'),
+          totalPurchases: new Prisma.Decimal('500.0000'),
+        },
+      );
+      const result = await draft();
+      expect(result.mismatches).toContainEqual({
+        field: 'netVat',
+        computed: '70.0000',
+        recorded: '50.0000',
+      });
+      expect(result.status).toBe('incomplete');
     });
   });
 
