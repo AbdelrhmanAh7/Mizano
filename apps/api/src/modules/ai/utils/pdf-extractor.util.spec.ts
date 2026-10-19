@@ -1,87 +1,81 @@
 import { extractTextFromPdf } from './pdf-extractor.util';
 
-// Minimal valid PDF with "Hello World" text (PDF 1.4, single page, Helvetica font)
-const MINIMAL_PDF_BASE64 = [
-  'JVBERi0xLjQK', // %PDF-1.4
-  'MSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBv', // 1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-  'iagoCjw8Ci9UeXBlIC9QYWdlcwovS2lkcyBbMyAwIFJdCi9Db3VudCAxCj4+CmVuZG9iago', // 2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-  'MyAwIG9iago8PAovVHlwZSAvUGFnZQovUGFyZW50IDIgMCBSCi9NZWRpYUJveCBbMCAwIDYx', // 3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]
-  'MiA3OTJdCi9Db250ZW50cyA0IDAgUgovUmVzb3VyY2VzIDw8Ci9Gb250IDw8Ci9GMSA1IDAg', // /Contents 4 0 R /Resources << /Font << /F1 5 0 R
-  'Uj4+Pj4+PgplbmRvYmoKNCAwIG9iago8PAovTGVuZ3RoIDQ0Cj4+CnN0cmVhbQpCVC9GMSAx', // 4 0 obj << /Length 44 >> stream BT/F1 1
-  'MiBUZiAxMDAgNzAwIFRkIChIZWxsbyBXb3JsZCkgVGogRVRlbmRzdHJlYW0KZW5kb2JqC', // 2 Tf 100 700 Td (Hello World) Tj ET endstream endobj
-  'TIG9iago8PAovVHlwZSAvRm9udAovU3VidHlwZSAvVHlwZTEKL0Jhc2VGb250IC9IZWx2', // 5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj
-  'ZXRpY2EKPj4KZW5kb2JqCnhyZWYKMCA2CjAwMDAwMDAwMDAgNjU1MzUgZgowMDAwMDAwMD', // xref 0 6 ... trailer
-  'A5IDAgbgowMDAwMDAwMDkgMDAwMDAgbgowMDAwMDAwNTggMDAwMDAgbgowMDAwMDAwMTE1', // truncated xref for brevity
-  'IDAgbgowMDAwMDAwMjU2IDAwMDAwIG4KdHJhaWxlcgo8PAovU2l6ZSA2Ci9Sb290IDEgMC', // trailer << /Size 6 /Root 1 0 R
-  'BSPj4Kc3RhcnR4cmVmCjQzMwolJUVPRgo=', // startxref 433 %%EOF
-].join('');
+// Wrap (not replace) the real pdf-parse so the tests exercise real pdf.js parsing
+// and can still inspect what the extractor passed in.
+jest.mock('pdf-parse', () =>
+  jest.fn(jest.requireActual<(data: Uint8Array) => Promise<unknown>>('pdf-parse')),
+);
+const pdfParse = jest.requireMock<jest.Mock>('pdf-parse');
 
-const MINIMAL_PDF_BUFFER = Buffer.from(MINIMAL_PDF_BASE64, 'base64');
-const EXPECTED_TEXT =
-  'Hello World. This is a test PDF with enough text content to pass the native text detection threshold.';
+const PDF_TEXT = 'Invoice INV-001 total 1500.00 EGP VAT 14 percent issued by Mizano Trading LLC';
 
-// Mock pdf-parse at the module level - return an object with default export
-jest.mock('pdf-parse', () => {
-  const mockFn = jest.fn<Promise<{ text: string; numpages: number }>, [Buffer | Uint8Array]>(
-    async () => ({ text: EXPECTED_TEXT, numpages: 1 }),
-  );
-  return { default: mockFn };
-});
+/** Build a minimal single-page PDF with a real text layer and a valid xref table. */
+function buildTextPdf(text: string): Buffer {
+  const stream = `BT /F1 12 Tf 50 700 Td (${text}) Tj ET`;
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  let body = '%PDF-1.4\n';
+  const offsets = objects.map((obj, i) => {
+    const offset = body.length;
+    body += `${i + 1} 0 obj\n${obj}\nendobj\n`;
+    return offset;
+  });
+  const xrefOffset = body.length;
+  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  body += offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('');
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  return Buffer.from(body, 'latin1');
+}
 
-// Import the mocked function to access mock calls
-import pdfParse from 'pdf-parse';
+/** Copy `source` into a larger pool at a non-zero offset and return the Buffer view of it. */
+function sliceFromPool(source: Buffer, offset = 50): Buffer {
+  const pool = Buffer.alloc(source.length + offset + 100, 0xff);
+  source.copy(pool, offset);
+  return pool.subarray(offset, offset + source.length);
+}
 
 describe('extractTextFromPdf - zero-offset buffer handling', () => {
+  const pdf = buildTextPdf(PDF_TEXT);
+
   beforeEach(() => {
-    (pdfParse as jest.Mock).mockClear();
+    pdfParse.mockClear();
   });
 
-  it('extracts text from a Buffer with non-zero byteOffset (sliced from larger pool)', async () => {
-    // Create a larger buffer pool and slice our PDF from it, creating non-zero byteOffset
-    const pool = Buffer.alloc(MINIMAL_PDF_BUFFER.length + 100);
-    // Write some dummy data at the start
-    pool.fill(0xff, 0, 50);
-    // Copy our PDF at offset 50
-    MINIMAL_PDF_BUFFER.copy(pool, 50);
-    // Slice to get a Buffer with byteOffset = 50
-    const slicedBuffer = pool.subarray(50, 50 + MINIMAL_PDF_BUFFER.length);
+  it('extracts text from a Buffer with non-zero byteOffset (sliced from a larger pool)', async () => {
+    const sliced = sliceFromPool(pdf);
+    expect(sliced.byteOffset).toBe(50);
+    expect(sliced.buffer.byteLength).toBeGreaterThan(sliced.length);
 
-    // Verify the sliced buffer has non-zero byteOffset
-    expect(slicedBuffer.byteOffset).toBe(50);
-    expect(slicedBuffer.length).toBe(MINIMAL_PDF_BUFFER.length);
+    const result = await extractTextFromPdf(sliced);
 
-    // This should work correctly after the fix (passes Uint8Array copy to pdf-parse)
-    const result = await extractTextFromPdf(slicedBuffer);
-
-    expect(result.text).toBe(EXPECTED_TEXT);
+    expect(result.text).toBe(PDF_TEXT);
     expect(result.pageCount).toBe(1);
     expect(result.isNativeText).toBe(true);
   });
 
-  it('extracts text from a regular Buffer (zero byteOffset)', async () => {
-    // Regular buffer created directly from base64
-    const regularBuffer = Buffer.from(MINIMAL_PDF_BASE64, 'base64');
+  it('hands pdf-parse a fresh zero-offset copy that covers only the PDF bytes', async () => {
+    const sliced = sliceFromPool(pdf);
 
-    const result = await extractTextFromPdf(regularBuffer);
+    await extractTextFromPdf(sliced);
 
-    expect(result.text).toBe(EXPECTED_TEXT);
-    expect(result.pageCount).toBe(1);
-    expect(result.isNativeText).toBe(true);
-  });
-
-  it('passes a Uint8Array with byteOffset === 0 to pdf-parse v1 API', async () => {
-    const pool = Buffer.alloc(MINIMAL_PDF_BUFFER.length + 100);
-    pool.fill(0xff, 0, 50);
-    MINIMAL_PDF_BUFFER.copy(pool, 50);
-    const slicedBuffer = pool.subarray(50, 50 + MINIMAL_PDF_BUFFER.length);
-
-    await extractTextFromPdf(slicedBuffer);
-
-    // Verify pdf-parse was called with a Uint8Array that has byteOffset === 0
     expect(pdfParse).toHaveBeenCalledTimes(1);
-    const calledWith = (pdfParse as jest.Mock).mock.calls[0][0] as Uint8Array;
-    expect(calledWith).toBeInstanceOf(Uint8Array);
-    expect(calledWith.byteOffset).toBe(0);
-    expect(calledWith.length).toBe(MINIMAL_PDF_BUFFER.length);
+    const passed = pdfParse.mock.calls[0][0] as Uint8Array;
+    expect(passed).toBeInstanceOf(Uint8Array);
+    expect(passed.byteOffset).toBe(0);
+    expect(passed.buffer.byteLength).toBe(pdf.length);
+    expect(passed.buffer).not.toBe(sliced.buffer);
+    expect(Buffer.from(passed).equals(pdf)).toBe(true);
+  });
+
+  it('extracts the same text from a plain zero-offset Buffer', async () => {
+    const result = await extractTextFromPdf(Buffer.from(pdf));
+
+    expect(result.text).toBe(PDF_TEXT);
+    expect(result.isNativeText).toBe(true);
   });
 });
