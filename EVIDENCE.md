@@ -447,7 +447,8 @@ Each trial balance has two tenant filters: the account list and the line totals.
 
 - **Issue**: #185 (Mizano #132‑3: Remove Refresh Token Leakage from Session), PR #242, branch `ai/185`
 - **Base commit** (`git merge-base origin/master HEAD`): `9a9d15bd1f560dee8a1b7b4bc1bd074a1436f5c2`
-- **Code under test**: `ba3b5b09` (latest commit on branch; adds full session shape assertion to route.spec.ts)
+- **Local test head**: `ba3b5b09` (last commit that changes code or tests; adds the full session shape assertion to `route.spec.ts`). Every local result below was produced at this commit. Later commits on the branch are not the tested head: `git diff --name-only ba3b5b09 HEAD -- apps packages e2e-army` prints nothing (exit 0), and `git diff --name-only ba3b5b09 HEAD` lists only `AI_QUESTIONS.md` and `EVIDENCE.md`, so the code under test is the same at any later head.
+- **Gate results at later heads**: none recorded in this file. CI and `e2e-army` results belong to the exact head SHA that GitHub reports on PR #242, read from `gh pr checks`; they are not copied here because each new head would make them stale.
 - **Verification date**: 2026-10-19
 - **Not run locally**: the full `@mizano/web` suite, `pnpm lint` over the monorepo, and the e2e-army test (CI and the hub verify job run those, per the owner's speed rule for Mizano). No Sentry issue is linked to #185. No UI changed, so there are no screenshots and no RTL/LTR captures.
 
