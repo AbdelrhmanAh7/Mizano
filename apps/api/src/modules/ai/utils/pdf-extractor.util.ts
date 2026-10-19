@@ -19,7 +19,9 @@ export interface PdfExtractionResult {
 export async function extractTextFromPdf(buffer: Buffer): Promise<PdfExtractionResult> {
   // pdf.js can misread a pooled Buffer (byteOffset > 0) on newer Node versions; hand it a
   // fresh copy whose ArrayBuffer starts at offset 0 and holds only the PDF bytes.
-  const uint8 = new Uint8Array(buffer);
+  // Create a fresh zero-offset copy of the buffer to avoid pdf.js misreading pooled buffers
+  const freshBuffer = Buffer.from(buffer);
+  const uint8 = new Uint8Array(freshBuffer);
 
   // pdf-parse v2 exports { PDFParse } as a named class
   if (pdfParseModule.PDFParse && typeof pdfParseModule.PDFParse === 'function') {
