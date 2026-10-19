@@ -40,6 +40,9 @@ export APP_ENV=e2e-army NEXT_TELEMETRY_DISABLED=1 TURBO_TELEMETRY_DISABLED=1 E2E
 export REDIS_URL="" OLLAMA_ENABLED=false VLM_ENABLED=false
 export OLLAMA_BASE_URL=http://127.0.0.1:9 VLM_SERVICE_URL=http://127.0.0.1:9 OCR_SERVICE_URL=http://127.0.0.1:9
 unset SMTP_HOST SMTP_USER SMTP_PASSWORD TELEGRAM_BOT_TOKEN TELEGRAM_ALERT_CHAT_ID PADDLE_OCR_API_URL PADDLE_OCR_API_TOKEN
+if [ -z "${E2E_ARMY_MODEL_URL:-}" ] && [ -z "${E2E_ARMY_CLI:-}" ]; then
+  export E2E_ARMY_NOAGENT=1
+fi
 secret() { node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64url"))'; }
 SECRET1="$(secret)" SECRET2="$(secret)" SECRET3="$(secret)"
 mkdir -p .e2e

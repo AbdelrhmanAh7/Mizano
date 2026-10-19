@@ -43,6 +43,9 @@ export class BankAccountsService {
     organizationId: string,
     linkedAccountId: string,
   ): Promise<void> {
+    if (!linkedAccountId) {
+      throw new BadRequestException('Linked ledger account not found');
+    }
     const linked = await this.prisma.account.findFirst({
       where: { id: linkedAccountId, organizationId, deletedAt: null },
       select: { id: true },

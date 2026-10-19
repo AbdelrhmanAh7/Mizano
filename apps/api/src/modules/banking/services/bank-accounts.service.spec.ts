@@ -94,4 +94,12 @@ describe('BankAccountsService.update linked account ownership', () => {
 
     expect(prisma.bankAccount.update).toHaveBeenCalledTimes(1);
   });
+
+  it('rejects (400) when linkedAccountId is null', async () => {
+    await expect(service.update(ORG, 'ba-1', { linkedAccountId: null as never })).rejects.toThrow(
+      /Linked ledger account/,
+    );
+    expect(prisma.account.findFirst).not.toHaveBeenCalled();
+    expect(prisma.bankAccount.update).not.toHaveBeenCalled();
+  });
 });
