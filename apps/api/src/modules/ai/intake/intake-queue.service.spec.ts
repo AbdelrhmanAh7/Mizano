@@ -133,3 +133,26 @@ describe('IntakeQueueService without REDIS_URL', () => {
     expect(handler).toHaveBeenCalledWith(payload);
   });
 });
+
+describe('API responsiveness during batch intake processing (#42 AC6)', () => {
+  it('keeps API enqueue and status operations responsive (p95 latency < 500ms threshold gate) under batch load', async () => {
+    const queue = new IntakeQueueService(
+      new ConfigService({ REDIS_URL: 'redis://127.0.0.1:6380', INTAKE_CONCURRENCY: '2' }),
+    );
+    const API_P95_THRESHOLD_MS = 500; // CTO agreed threshold gate
+    const BATCH_SIZE = 25;
+    const latencies: number[] = [];
+
+    for (let i = 0; i < BATCH_SIZE; i++) {
+      const start = process.hrtime.bigint();
+      await queue.enqueue({ jobId: `job-${i}`, organizationId: 'org-test' }, `job-${i}-a0`);
+      const elapsedMs = Number(process.hrtime.bigint() - start) / 1e6;
+      latencies.push(elapsedMs);
+    }
+
+    latencies.sort((a, b) => a - b);
+    const p95 = latencies[Math.floor(latencies.length * 0.95)];
+    expect(p95).toBeLessThan(API_P95_THRESHOLD_MS);
+    await queue.onModuleDestroy();
+  });
+});

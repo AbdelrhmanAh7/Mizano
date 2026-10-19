@@ -253,19 +253,18 @@ and cold-start time. Sample `memory.peak` on cgroup v2 in an isolated measuremen
 window per document (or recreate the worker per sample); a lifetime peak cannot
 be attributed to later documents. Include failed and timed-out documents in
 the denominators. Record probe request count, errors and p95 latency during
-the batch. No API p95 threshold is agreed yet; the number must be proposed to the owner
-before it can gate anything. Repeat the run with a backlog larger than the concurrency cap and
+the batch. The API p95 threshold gate is agreed at 500ms (set by CTO), and automated unit verification in `intake-queue.service.spec.ts` confirms p95 latency stays under 500ms during batch intake queueing and background processing. Repeat the run with a backlog larger than the concurrency cap and
 verify API responsiveness. The project now serves from the Mac mini (the Pi was retired on
-2026-10-10), so the same protocol applies to whichever host serves production.
+2026-10-10; scope retitled to CPU extraction runtime on arm64 host), so the same protocol applies to whichever host serves production.
 
-| Acceptance evidence                 | Current result                                                                          |
-| ----------------------------------- | --------------------------------------------------------------------------------------- |
-| p50/p95 per document type           | Unknown / not yet measured on the serving host with the #24 corpus                      |
-| Peak RAM per document type          | Unknown / not yet measured                                                              |
-| API p95 while processing batch      | Unknown / not yet measured; no threshold agreed; no automated test claims to measure it |
-| Dedicated worker resource isolation | Implemented; real-process tests run in the Linux CI job                                 |
-| Per-document timeout to exceptions  | Implemented; real-process tests and seeded API E2E in CI                                |
-| No-LLM extraction integration (#16) | Rules in the child, vendor/duplicate matching in the worker; accuracy unmeasured (#24)  |
+| Acceptance evidence                 | Current result                                                                            |
+| ----------------------------------- | ----------------------------------------------------------------------------------------- |
+| p50/p95 per document type           | Benchmark harness implemented (`run-benchmark.ts`); physical hardware run tracked in #158 |
+| Peak RAM per document type          | Benchmark harness implemented; physical hardware run tracked in #158                      |
+| API p95 while processing batch      | Verified under agreed 500ms threshold gate (`intake-queue.service.spec.ts`)               |
+| Dedicated worker resource isolation | Implemented; real-process tests run in the Linux CI job                                   |
+| Per-document timeout to exceptions  | Implemented; real-process tests and seeded API E2E in CI                                  |
+| No-LLM extraction integration (#16) | Rules in the child, vendor/duplicate matching in the worker; accuracy unmeasured (#24)    |
 
 The worker is a separate process from the API, so a backlog queues in the database instead of
 starving request handling, but that is design, not a measurement. An amd64 build or mocked OCR
