@@ -48,11 +48,22 @@ describe('GET /api/auth/session (NextAuth route)', () => {
     cookieJar.set('next-auth.session-token', await encode({ token, secret: SECRET }));
 
     const { status, body } = await getSession();
-    const session = JSON.parse(body) as Record<string, unknown> & { user?: { email?: string } };
+    const session = JSON.parse(body) as Record<string, unknown>;
 
     expect(status).toBe(200);
-    expect(session.user?.email).toBe('admin@mizano.com');
-    expect(session.accessToken).toBe('access-token-1');
+    expect(session).toEqual({
+      user: {
+        name: 'Admin User',
+        email: 'admin@mizano.com',
+        id: 'user-1',
+        firstName: 'Admin',
+        lastName: 'User',
+        organizationId: 'org-1',
+        role: 'admin',
+      },
+      accessToken: 'access-token-1',
+      expires: expect.any(String),
+    });
     expect(Object.keys(session)).not.toContain('refreshToken');
     expect(body).not.toContain('refreshToken');
     expect(body).not.toContain('secret-refresh-token');
