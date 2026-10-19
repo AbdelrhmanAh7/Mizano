@@ -143,6 +143,40 @@
   Lint: 4 packages successful
   ```
 
+## Issue #109 — Arabic-Indic/Persian digit normalization
+
+Tested code head: `65a635172907434efa52bec650fbd54fa4f87777` (this file is committed after it; only EVIDENCE.md differs).
+
+`normalizeDigits` (`apps/api/src/modules/ai/extraction/rules/rules-normalize.ts`) and its use in the intake rules extractor already exist on master. This PR only adds the acceptance spec `rules-normalize.spec.ts` (tagged `@issue-109`); no production code changes remain. An earlier attempt that also wired the helper into `entity-extraction.service.ts` and `ollama.service.ts` was reverted because dropped bidi marks shift entity offsets.
+
+| REQ                                         | Verified by                                                                       |
+| ------------------------------------------- | --------------------------------------------------------------------------------- |
+| AC1 `١٢٣٫٤٥` → 123.45, `١٬٢٣٤٫٥٠` → 1234.50 | `normalizeDigits` + `findAmounts` cases in rules-normalize.spec.ts                |
+| AC2 `٠٧/١٠/٢٠٢٦` = `07/10/2026`             | `parseDate` cases (Arabic-Indic and Persian)                                      |
+| AC3 mixed script `EGP ١٢٠٠`                 | mixed-script `normalizeDigits` and `extractInvoiceFields` cases                   |
+| AC4 English tests unchanged                 | `invoice-rules-extractor.spec.ts`, `rules-strategy.spec.ts` untouched and passing |
+| AC5 no float math                           | `parseAmount` returns Decimal and preserves precision (asserted)                  |
+| AC6 ≤ ~200 lines                            | no production code in the diff                                                    |
+
+Commands run (sandbox off, local):
+
+- `npx jest src/modules/ai/extraction/rules` in apps/api: 3 suites passed, 66 tests passed
+- `npx tsc --noEmit -p .` in apps/api: no errors
+- `prettier --check` on the spec: clean
+
+Not run: the seeded PDF e2e (removed; see commit a5aeed0).
+
+E2E gate note (#109): this PR changes no production code and no UI or user-flow files, only the unit acceptance spec `rules-normalize.spec.ts`. The round-two `e2e-first` review still reports “E2E-first rule not met” because no E2E or acceptance tests were added or changed. Record the gate as unresolved unless an authoritative retirement decision and the `e2e-army` result are available.
+
+Review round 3 (#109): the PDF-fixture, offset-preservation and async-path threads target code removed in a5aeed0 (no e2e PDF spec, no wiring in `entity-extraction.service.ts` / `ollama.service.ts`), so nothing remains to fix there. CodeRabbit's spec notes are fixed in `rules-normalize.spec.ts`: amount tests now pass `normalizeDigits(...)` output into `parseAmount`, the European-format case is renamed, and the Decimal(19,4) bound test covers 15/16 integer digits and 4/5 decimals. `npx jest src/modules/ai/extraction/rules` in apps/api: 3 suites, 66 tests passed.
+
+Review round 4 (#109): the three code threads (Unicode PDF fixtures, original-text offsets, async entity-extraction path) are all OUTDATED. They target the e2e PDF spec and the `entity-extraction.service.ts` / `ollama.service.ts` wiring, which were removed in a5aeed0 and are not on this branch, so no code change is needed. The EVIDENCE.md e2e note is reworded to the `E2E: not needed — <reason>` waiver form. The spec fixes from round 3 (aed8cb7) are unchanged.
+
+Review round 5 (#109):
+
+- Fixed CodeRabbit finding on `rules-normalize.spec.ts:64`: AC5 test now verifies `parseAmount('10000000000000.0001')` returns a Decimal instance (`toBeInstanceOf(Decimal)`) and preserves the exact 4-decimal fraction string that JS Number conversion would lose.
+- Fixed CodeRabbit finding on `EVIDENCE.md`: E2E gate note updated to report the round-two `e2e-first` review status as unresolved without an authoritative retirement decision and the `e2e-army` result.
+- Confirmed the 3 outdated review threads on `intake-arabic-digits.e2e-spec.ts` and `entity-extraction.service.ts` are satisfied because the relevant code was reverted in commit a5aeed0.
 # Issue #141 — intake worker entrypoint, processor out of the API, Pi compose worker
 
 Tested commit: `57f9a0d` (branch `ai/141`; this file is committed after it). Fresh Postgres 16, `REDIS_URL=` blank, in band.
@@ -504,3 +538,9 @@ Each trial balance has two tenant filters: the account list and the line totals.
 **Size (AC5).** `git diff --numstat origin/master HEAD -- apps/api e2e-army` at the tested commit: `tenant-isolation.e2e-spec.ts` 285, three services 23, e2e-army 0 = 308 added lines of test and source. The earlier 501 came from a 367-line spec and a 108-line e2e-army file; the e2e-army file was removed and the three AC2 list tests were merged. All four earlier reviewer requests stay covered: second general-ledger route, `meta.total`, vendor-credit netting in AP aging, foreign cursor ids.
 
 **Suite stability.** Before `34a8ca9c` the unmutated suite failed in about 1 of 7 to 16 consecutive runs on this shared machine, always while seeding or on one request (405 on `POST /bills/:id/approve`, 404 on `POST /vendor-credits`, `socket hang up`), never in an assertion. Cause: supertest binds and releases a fresh ephemeral port per request, and another process can claim it in between. `beforeAll` now calls `app.listen(0, '127.0.0.1')` once. After the change, 60 consecutive runs passed. The cause is inferred from the pattern and the fix, not traced to a specific foreign process.
+
+---
+
+## Index: other issues
+
+- Issue #94 (decimal money math and idempotent posting): [docs/evidence/94/EVIDENCE.md](docs/evidence/94/EVIDENCE.md).
