@@ -26,12 +26,13 @@ log() {
   printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
 }
 
-# Wait until api and web report healthy. $1 = timeout in seconds.
+# Wait until api, web and the intake worker (no HTTP port; heartbeat healthcheck) report healthy.
+# A dead worker fails the deploy so the existing rollback path runs. $1 = timeout in seconds.
 wait_healthy() {
   local deadline=$((SECONDS + ${1:-240})) svc cid status ok
   while [ "$SECONDS" -lt "$deadline" ]; do
     ok=1
-    for svc in api web; do
+    for svc in api web worker; do
       cid="$(dc ps -q "$svc" 2>/dev/null || true)"
       status=""
       if [ -n "$cid" ]; then

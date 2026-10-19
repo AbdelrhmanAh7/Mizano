@@ -4,12 +4,19 @@ language: en-US
 reviews:
   profile: assertive
   request_changes_workflow: true
-  high_level_summary: false
+  high_level_summary: true
   poem: false
+  high_level_summary_in_walkthrough: true
+  review_details: true
+  sequence_diagrams: true
+  assess_linked_issues: true
+  finishing_touches:
+    docstrings:
+      enabled: true
   auto_review:
-    enabled: true
+    enabled: false
     drafts: false
-    auto_incremental_review: false   # one automatic review per PR (5 reviews/hour quota); the hub requests @coderabbitai review after each fix push
+    auto_incremental_review: false   # reviews are manual only (5 reviews/hour quota); the hub posts @coderabbitai review after marking a PR ready and after each fix push
     base_branches:
       - master
   path_filters:
@@ -82,4 +89,4 @@ knowledge_base:
       - CLAUDE.md
       - docs/agents/review-lessons.md
 chat:
-  auto_reply: true
+  auto_reply: false

@@ -21,7 +21,7 @@ pnpm db:seed
 pnpm dev                # docker-compose up -d && turbo dev → web :5001, API :6001
 ```
 
-Never initialize, migrate or reset a shared or production database from a workstation. AI routes need an inference backend (`OLLAMA_BASE_URL`) until the CPU extraction work lands; they return errors rather than fake results when it is missing.
+Never initialize, migrate or reset a shared or production database from a workstation. AI routes need an inference backend (`OLLAMA_BASE_URL`) until the CPU extraction work lands; they return errors rather than fake results when it is missing. Document intake processing requires Redis (`REDIS_URL`) and the intake worker (`intake-worker.ts`); without Redis, the API fails fast with a clear error instead of leaving uploads queued indefinitely.
 
 | Service    | Local port | URL                                                |
 | ---------- | ---------- | -------------------------------------------------- |
@@ -151,7 +151,7 @@ Zero-tolerance policy: `pnpm ci:full` must pass with no warnings or errors (no `
 1. skips the rollout only for the reviewed planning-only paths in `docs/planning/rollout-exemption.json`;
 2. builds `apps/api/Dockerfile` and `apps/web/Dockerfile`, pushing `ghcr.io/abdelrhmanah7/mizano-{api,web}` tagged with the short SHA and `latest`;
 3. copies `docker-compose.production.yml`, `apps/api/prisma/` and `nginx/` to the VM, writes `~/mizano/.env` from repository secrets;
-4. starts PostgreSQL/Redis, syncs the DB password, restarts `api`, `web`, `nginx`, then runs `prisma migrate deploy` and the idempotent seed;
+4. starts PostgreSQL/Redis, syncs the DB password, restarts `api`, `web`, `nginx`, then runs `prisma migrate deploy` and the seed (which aborts with exit 1 under `NODE_ENV=production` unless `SEED_ALLOW_PROD=1`, so demo users are never created in production by accident);
 5. checks `GET /api/health` over SSH.
 
 Required secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `PRODUCTION_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `NEXTAUTH_SECRET`.
