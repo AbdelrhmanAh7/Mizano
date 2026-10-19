@@ -544,29 +544,33 @@ Each trial balance has two tenant filters: the account list and the line totals.
 
 # EVIDENCE.md — Issue #87: pdf-parse and zero-offset Buffers
 
-Not user-facing (internal intake utility), so no e2e-army test. Sentry issue: none linked in the brief.
+- **Tested commit**: `0e42c2ba` (branch `ai/87`, merged with `origin/master`).
+- **Originating Sentry issue**: None (none linked in the brief).
+- **User-facing flow / E2E**: Not user-facing (internal intake parsing utility), so no e2e-army test (`E2E: not needed — internal utility parsing fix without user-facing flow or schema change`).
+- **Changed covering tests**: `apps/api/src/modules/ai/utils/pdf-extractor.util.spec.ts` (new spec with 3 tests).
 
 ## Acceptance criteria
 
-1. **AC1** Every pdf-parse call site passes a fresh `Uint8Array` copy (or equivalent zero-offset buffer). Find them all: `grep -rn pdf-parse apps/api/src`.
-2. **AC2** Add a unit test that feeds a Buffer sliced from a larger pool (non-zero `byteOffset`) and asserts the text is extracted.
-3. **AC3** Add one line to `docs/agents/review-lessons.md` about zero-offset buffers for pdf.js.
+1. **AC1**: Every pdf-parse call site passes a fresh `Uint8Array` copy (or equivalent zero-offset buffer).
+2. **AC2**: Unit test feeds a Buffer sliced from a larger pool (non-zero `byteOffset`) and asserts the text is extracted.
+3. **AC3**: One line added to `docs/agents/review-lessons.md` about zero-offset buffers for pdf.js.
 
-## Verification (run on this branch)
+## Verification Matrix
 
-| AC  | Evidence                                                                                                                                                                                      | Exit |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
-| AC1 | `grep -rn pdf-parse apps/api/src`: the only call site is `extractTextFromPdf` in `pdf-extractor.util.ts`; it builds `new Uint8Array(buffer)` once and uses it in both the v1 and v2 branches. | 0    |
-| AC2 | `cd apps/api && npx jest src/modules/ai/utils/pdf-extractor.util.spec.ts`: 3 tests pass against real pdf-parse 1.1.1 (a PDF built in the spec, slice at `byteOffset` 50 of a larger pool).    | 0    |
-| AC3 | `git diff origin/master -- docs/agents/review-lessons.md`: one bullet added to `docs/agents/review-lessons.md`.                                                                               | 0    |
-| —   | `pnpm --filter api typecheck` (after `pnpm --filter @mizano/shared-types build`)                                                                                                              | 0    |
-| —   | `pnpm --filter api lint` (`pnpm --filter api exec eslint src/modules/ai/utils --max-warnings 0`)                                                                                              | 0    |
-| —   | `pnpm --filter api exec jest src/modules/ai/utils/pdf-extractor.util.spec.ts src/modules/ai/services/document-intake.service.spec.ts`: 2 suites, 29 tests pass                                | 0    |
+| AC  | Requirement Description                                                | Evidence / Command                                                                                                                                                                          | Exit Code | Status |
+| --- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
+| AC1 | Every pdf-parse call site passes a fresh `Uint8Array` copy             | `grep -rn pdf-parse apps/api/src`: only call site is `extractTextFromPdf` in `pdf-extractor.util.ts`; builds `new Uint8Array(buffer)` once and passes to both v1 and v2 APIs                | 0         | PASSED |
+| AC2 | Unit test feeds Buffer with non-zero byteOffset and asserts extraction | `nice -n 10 pnpm --filter api exec jest --maxWorkers=2 src/modules/ai/utils/pdf-extractor.util.spec.ts`: 3 tests pass with real pdf-parse 1.1.1 (real PDF built, sliced at `byteOffset` 50) | 0         | PASSED |
+| AC3 | One line in review lessons                                             | `git diff origin/master -- docs/agents/review-lessons.md`: 1 bullet added                                                                                                                   | 0         | PASSED |
+| —   | Type check                                                             | `pnpm --filter @mizano/shared-types build && pnpm --filter api type-check`                                                                                                                  | 0         | PASSED |
+| —   | Lint                                                                   | `pnpm --filter api lint`                                                                                                                                                                    | 0         | PASSED |
+| —   | Regression / caller suite                                              | `nice -n 10 pnpm --filter api exec jest --maxWorkers=2 src/modules/ai/utils/pdf-extractor.util.spec.ts src/modules/ai/services/document-intake.service.spec.ts`: 2 suites, 29 passed        | 0         | PASSED |
 
-## Regression check against master
+## Regression Check Against Base (origin/master)
 
-With master's `pdf-extractor.util.ts` (raw `Buffer` passed to pdf-parse) and this branch's spec:
-
-- Test "hands pdf-parse a fresh zero-offset copy that covers only the PDF bytes" FAILS (`Expected: 0, Received: 50` for byteOffset, and buffer identity fails).
-- Tests feeding raw Buffer fail inside Jest with `UnknownErrorException: Promise was rejected with a falsy value` from pdf.js.
-  With the fix (`new Uint8Array(buffer)`), all 3 tests pass cleanly.
+- **On base (`origin/master` passing raw `Buffer` to pdf-parse)**:
+  `src/modules/ai/utils/pdf-extractor.util.spec.ts` fails with exit code 1.
+  All 3 tests fail: pdf.js throws `UnknownErrorExceptionClosure: Promise was rejected with a falsy value` inside Jest, and `passed.byteOffset` is 50 instead of 0.
+- **On head (passing `new Uint8Array(buffer)`)**:
+  All 3 unit tests in `src/modules/ai/utils/pdf-extractor.util.spec.ts` pass with exit code 0.
+  Caller test `document-intake.service.spec.ts` (26 tests) also passes with exit code 0.
