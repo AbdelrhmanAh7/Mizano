@@ -24,10 +24,20 @@ check_service() { # name port path
     problems+=("$1-unhealthy|$1 unhealthy")
   fi
 }
+# The worker has no HTTP port; its compose healthcheck (fresh DB + Redis heartbeat) is the signal.
+check_worker() {
+  local cid status
+  cid="$(dc ps -q worker 2>/dev/null || true)"
+  if [ -z "$cid" ]; then
+    problems+=("worker-down|worker not running")
+    return
+  fi
+  status="$(docker inspect -f '{{.State.Health.Status}}' "$cid" 2>/dev/null || true)"
+  [ "$status" = "healthy" ] || problems+=("worker-unhealthy|worker unhealthy")
+}
 check_service api 6001
 check_service web 5001 /robots.txt
-# The intake worker has no HTTP endpoint; its container healthcheck probes DB and Redis.
-check_service_health worker
+check_worker
 
 used="$(df --output=pcent "$DATA_DIR" | tail -n 1 | tr -dc '0-9')"
 [ "${used:-0}" -le 80 ] || problems+=("disk|disk ${used}% used")

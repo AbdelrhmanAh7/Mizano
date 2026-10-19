@@ -13,7 +13,12 @@ const ORG_B = 'org-b';
 describe('IntakeJobsService', () => {
   let table: FakeIntakeJobTable;
   let storage: MemoryIntakeStorage;
-  let queue: { enqueue: jest.Mock; cancel: jest.Mock };
+  let queue: {
+    enqueue: jest.Mock;
+    cancel: jest.Mock;
+    assertAvailable: jest.Mock;
+    isAvailable: jest.Mock;
+  };
   let config: { get: jest.Mock };
   let service: IntakeJobsService;
 
@@ -23,6 +28,8 @@ describe('IntakeJobsService', () => {
     queue = {
       enqueue: jest.fn().mockResolvedValue(undefined),
       cancel: jest.fn().mockResolvedValue(undefined),
+      assertAvailable: jest.fn(),
+      isAvailable: jest.fn().mockReturnValue(true),
     };
     config = { get: jest.fn() };
     service = new IntakeJobsService(
@@ -52,6 +59,55 @@ describe('IntakeJobsService', () => {
       { jobId: job.id, organizationId: ORG_A },
       `${job.id}-a0`,
     );
+  });
+
+  describe('without a consumable queue (API process, no REDIS_URL, no handler)', () => {
+    const unavailable = (): IntakeJobsService => {
+      const realQueue = new IntakeQueueService({
+        get: () => undefined,
+      } as unknown as ConfigService);
+      return new IntakeJobsService(
+        { intakeJob: table.delegate } as unknown as PrismaService,
+        storage,
+        realQueue,
+        config as unknown as ConfigService,
+      );
+    };
+
+    it('rejects the upload with 503 before storing a file or creating a row', async () => {
+      const failing = unavailable();
+      await expect(
+        failing.createFromUpload({
+          organizationId: ORG_A,
+          userId: 'u1',
+          buffer: Buffer.from('pdf-bytes'),
+          mimeType: 'application/pdf',
+          fileName: 'a.pdf',
+        }),
+      ).rejects.toMatchObject({ status: 503 });
+      expect(storage.objects.size).toBe(0);
+      expect(table.rows).toHaveLength(0);
+    });
+
+    it('keeps a QUEUED row untouched when a retry is refused', async () => {
+      const { job } = await upload(ORG_A);
+      table.rows[0].status = IntakeJobStatus.FAILED;
+      await expect(unavailable().retry(job.id, ORG_A)).rejects.toMatchObject({ status: 503 });
+      expect(table.rows[0].status).toBe(IntakeJobStatus.FAILED);
+    });
+
+    it('skips the recovery sweep quietly instead of failing on the first row', async () => {
+      await upload(ORG_A);
+      expect(await unavailable().recoverJobs()).toBe(0);
+    });
+  });
+
+  it('keeps the row QUEUED for recovery when the Redis enqueue itself fails', async () => {
+    queue.enqueue.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+    const { job } = await upload(ORG_A);
+    expect(job.status).toBe(IntakeJobStatus.QUEUED);
+    expect(table.rows).toHaveLength(1);
+    expect(storage.objects.has(job.storageKey)).toBe(true);
   });
 
   it('deduplicates the same file within an organization (one upload, one enqueue)', async () => {

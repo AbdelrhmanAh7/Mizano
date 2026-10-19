@@ -99,6 +99,8 @@ services:
       OLLAMA_ENABLED: ${OLLAMA_ENABLED:-false}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       INTAKE_STORAGE_DIR: /data/originals
+      # Only cloudflared may set X-Forwarded-For (login throttling keys on it); loopback is built in.
+      TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-172.30.184.250/32}
     volumes:
       - ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/originals:/data/originals
     depends_on:
@@ -125,18 +127,21 @@ services:
     memswap_limit: 2048m
     cpus: 2.0
     pids_limit: 128
+    # Lets an in-flight document finish; an interrupted one is reclaimed after its lease.
     stop_grace_period: 30s
-    command: ['node', '--max-old-space-size=256', 'dist/intake-worker.js']
+    working_dir: /app/apps/api
+    command: ['node', '--max-old-space-size=1536', 'dist/intake-worker.js']
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
       DATABASE_POOL_SIZE: '3'
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      OLLAMA_ENABLED: ${OLLAMA_ENABLED:-false}
       INTAKE_STORAGE_DIR: /data/originals
       INTAKE_CONCURRENCY: ${INTAKE_CONCURRENCY:-1}
       INTAKE_JOB_DEADLINE_MS: ${INTAKE_JOB_DEADLINE_MS:-120000}
-      OLLAMA_ENABLED: 'false'
     volumes:
+      # The worker only reads originals; the api writes them.
       - ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/originals:/data/originals:ro
     depends_on:
       postgres:
@@ -146,9 +151,10 @@ services:
       migrate:
         condition: service_completed_successfully
     healthcheck:
-      test: ['CMD', 'node', '/app/apps/api/dist/intake-worker-healthcheck.js']
-      interval: 10s
-      timeout: 5s
+      # No HTTP server: a fresh heartbeat file proves the database and queue are reachable.
+      test: ['CMD', 'node', 'dist/intake-worker-healthcheck.js']
+      interval: 30s
+      timeout: 10s
       retries: 3
       start_period: 30s
     logging: *logging
@@ -189,8 +195,14 @@ services:
       web:
         condition: service_healthy
     logging: *logging
-    networks: [internal]
+    networks:
+      internal:
+        # Fixed so the api can trust exactly this peer (TRUSTED_PROXY_CIDRS).
+        ipv4_address: 172.30.184.250
 
 networks:
   internal:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.184.0/24

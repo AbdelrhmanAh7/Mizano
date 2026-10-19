@@ -1,10 +1,9 @@
 import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
 import { writeFile, unlink } from 'fs/promises';
 import { describeError } from './common/utils/redact';
 import { WORKER_HEARTBEAT_FILE } from './intake-worker-healthcheck';
-import { IntakeWorkerModule } from './intake-worker.module';
+import { createIntakeWorker, registerGracefulShutdown } from './modules/ai/intake/intake.worker';
 import { PrismaService } from './prisma/prisma.service';
 import { IntakeQueueService } from './modules/ai/intake/intake-queue.service';
 import { IntakeExecutorService } from './modules/ai/intake/intake-executor.service';
@@ -12,7 +11,7 @@ import { IntakeExecutorService } from './modules/ai/intake/intake-executor.servi
 const HEARTBEAT_INTERVAL_MS = 5000;
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.createApplicationContext(IntakeWorkerModule);
+  const app = await createIntakeWorker();
   const prisma = app.get(PrismaService);
   const queue = app.get(IntakeQueueService);
   let probing = false;
@@ -32,27 +31,29 @@ async function bootstrap(): Promise<void> {
   const timer = setInterval(() => void probe(), HEARTBEAT_INTERVAL_MS);
   timer.unref();
   await probe();
-  let stopping = false;
-  const shutdown = async (): Promise<void> => {
-    if (stopping) return;
-    stopping = true;
-    clearInterval(timer);
-    // Stop fetching first, so no new job is claimed once the executor refuses work, then kill
-    // the active child so the drain finishes inside the container's stop grace period.
-    // Prisma stays connected until the drain ends: the failure write still needs the database.
-    const draining = queue.onModuleDestroy();
-    app.get(IntakeExecutorService).onModuleDestroy();
-    await draining;
-    await app.close();
-    await unlink(WORKER_HEARTBEAT_FILE).catch(() => undefined);
-  };
-  const stop = (): void => {
-    void shutdown().catch(() => {
-      process.exitCode = 1;
-    });
-  };
-  process.once('SIGTERM', stop);
-  process.once('SIGINT', stop);
+  registerGracefulShutdown(
+    async () => {
+      clearInterval(timer);
+      // Stop fetching first, so no new job is claimed once the executor refuses work, then kill
+      // the active child so the drain finishes inside the container's stop grace period.
+      // Prisma stays connected until the drain ends: the failure write still needs the database.
+      const draining = queue.onModuleDestroy();
+      try {
+        app.get(IntakeExecutorService, { strict: false })?.onModuleDestroy();
+      } catch {
+        /* optional if executor not registered */
+      }
+      await draining;
+      await app.close();
+      await unlink(WORKER_HEARTBEAT_FILE).catch(() => undefined);
+    },
+    {
+      exit: (code) => {
+        // Explicit exit ensures the process terminates even if sockets leak.
+        process.exit(code);
+      },
+    },
+  );
 }
 
 void bootstrap().catch((error: unknown) => {

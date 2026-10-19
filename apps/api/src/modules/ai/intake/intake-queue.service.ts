@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ConnectionOptions, Queue, Worker } from 'bullmq';
 import { describeError } from '../../../common/utils/redact';
 import { intakeConcurrency } from './intake-runtime';
+import { IntakeQueueUnavailableException } from '../../../common/exceptions';
 
 export const INTAKE_QUEUE_NAME = 'intake';
 
@@ -13,6 +14,13 @@ export interface IntakeQueuePayload {
 
 export type IntakeQueueHandler = (payload: IntakeQueuePayload) => Promise<void>;
 
+/**
+ * BullMQ transport for intake jobs. The job row in PostgreSQL is the source of
+ * truth; the queue only carries `{ jobId, organizationId }` so a lost queue
+ * entry can always be rebuilt from the database. Without REDIS_URL (unit
+ * tests, bare local runs) jobs run in-process after the delay, but only in a process that
+ * registered the handler; an API without a handler throws on enqueue.
+ */
 /** BullMQ owns its Redis connections; hand it plain options parsed from REDIS_URL. */
 export function connectionFromUrl(url: string): ConnectionOptions {
   const parsed = new URL(url);
@@ -28,17 +36,14 @@ export function connectionFromUrl(url: string): ConnectionOptions {
   };
 }
 
-/**
- * BullMQ transport for intake jobs. The job row in PostgreSQL is the source of truth; the
- * queue only carries `{ jobId, organizationId }` so a lost queue entry can always be rebuilt
- * from the database. The API only produces: only the dedicated worker calls `registerHandler`.
- * Redis is required; there is no inline extraction fallback.
- */
 @Injectable()
 export class IntakeQueueService implements OnModuleDestroy {
   private readonly logger = new Logger(IntakeQueueService.name);
   private queue: Queue<IntakeQueuePayload> | null = null;
   private worker: Worker<IntakeQueuePayload> | null = null;
+  private handler: IntakeQueueHandler | null = null;
+  /** In-process fallback timers keyed by queue job id (same dedup semantics as BullMQ). */
+  private readonly timers = new Map<string, NodeJS.Timeout>();
 
   constructor(private readonly config: ConfigService) {}
 
@@ -52,9 +57,9 @@ export class IntakeQueueService implements OnModuleDestroy {
 
   /** Called once by the processor; starts consuming. */
   registerHandler(handler: IntakeQueueHandler): void {
+    this.handler = handler;
     const url = this.redisUrl;
-    if (!url) throw new Error('REDIS_URL is required for the intake worker');
-    if (this.worker) return;
+    if (!url || this.worker) return;
     this.worker = new Worker<IntakeQueuePayload>(
       INTAKE_QUEUE_NAME,
       async (job) => {
@@ -83,17 +88,51 @@ export class IntakeQueueService implements OnModuleDestroy {
   }
 
   /**
+   * Without Redis the queue is in-process, so only a process that registered a handler can run
+   * a job. The API process registers none: it needs REDIS_URL to reach the worker container.
+   */
+  isAvailable(): boolean {
+    return Boolean(this.redisUrl) || this.handler !== null;
+  }
+
+  /** Throws before any side effect when a job enqueued now could never be consumed. */
+  assertAvailable(): void {
+    if (!this.isAvailable()) throw new IntakeQueueUnavailableException();
+  }
+
+  /**
    * Enqueue a job. `queueJobId` must be stable per logical attempt so a
    * duplicate enqueue (boot-time recovery) collapses into one queue entry.
    */
   async enqueue(payload: IntakeQueuePayload, queueJobId: string, delayMs = 0): Promise<void> {
     const url = this.redisUrl;
-    if (!url) throw new Error('REDIS_URL is required for intake');
+    if (!url) {
+      this.assertAvailable();
+      if (this.timers.has(queueJobId)) return;
+      const timer = setTimeout(() => {
+        this.timers.delete(queueJobId);
+        const handler = this.handler;
+        if (!handler) return;
+        handler(payload).catch((error: unknown) => {
+          this.logger.error(
+            `Inline intake run failed: ${describeError(error, { includeMessage: false })}`,
+          );
+        });
+      }, delayMs);
+      timer.unref();
+      this.timers.set(queueJobId, timer);
+      return;
+    }
     await this.getQueue(url).add('process', payload, { jobId: queueJobId, delay: delayMs });
   }
 
   /** Drop a pending (delayed/waiting) queue entry, e.g. a backoff retry superseded by a manual retry. */
   async cancel(queueJobId: string): Promise<void> {
+    const timer = this.timers.get(queueJobId);
+    if (timer) {
+      clearTimeout(timer);
+      this.timers.delete(queueJobId);
+    }
     const url = this.redisUrl;
     if (!url) return;
     try {
@@ -103,14 +142,22 @@ export class IntakeQueueService implements OnModuleDestroy {
     }
   }
 
-  async isHealthy(): Promise<boolean> {
-    return !!this.worker?.isRunning() && (await (await this.worker.client).ping()) === 'PONG';
-  }
-
   async onModuleDestroy(): Promise<void> {
+    this.timers.forEach((t) => clearTimeout(t));
+    this.timers.clear();
     await this.worker?.close();
     await this.queue?.close();
     this.worker = null;
     this.queue = null;
+  }
+
+  /** True when Redis answers on the consumer (or producer) connection; always true without REDIS_URL. */
+  async isHealthy(): Promise<boolean> {
+    if (!this.redisUrl) return true;
+    if (this.worker && !this.worker.isRunning()) return false;
+    const client = await (this.worker ?? this.queue)?.client;
+    if (!client) return false;
+    const res = await client.ping();
+    return res === 'PONG';
   }
 }

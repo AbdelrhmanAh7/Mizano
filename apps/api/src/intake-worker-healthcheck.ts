@@ -4,10 +4,10 @@ import { readFileSync } from 'fs';
 export const WORKER_HEARTBEAT_FILE = '/tmp/mizano-worker-health';
 const MAX_HEARTBEAT_AGE_MS = 20_000;
 
-export function workerHeartbeatHealthy(): boolean {
+export function workerHeartbeatHealthy(file = WORKER_HEARTBEAT_FILE, now = Date.now()): boolean {
   try {
-    const heartbeat = Number(readFileSync(WORKER_HEARTBEAT_FILE, 'utf8'));
-    const age = Date.now() - heartbeat;
+    const heartbeat = Number(readFileSync(file, 'utf8'));
+    const age = now - heartbeat;
     return Number.isFinite(heartbeat) && age >= 0 && age <= MAX_HEARTBEAT_AGE_MS;
   } catch {
     return false;

@@ -35,6 +35,7 @@ function makeJob(overrides: Partial<IntakeJob> = {}): IntakeJob {
     maxAttempts: 3,
     lastError: null,
     result: { documentType: 'BILL' },
+    stageTimingsMs: null,
     forceType: null,
     strategy: null,
     language: null,
