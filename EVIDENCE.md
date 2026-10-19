@@ -551,12 +551,17 @@ Each trial balance has two tenant filters: the account list and the line totals.
 
 ## Issue #258 — Auth error contract and response casing enforcement
 
+- **Base Commit (`master`)**: `451cc181`
+- **Tested Commit (`ai/258`)**: `d13d4e0c`
+- **PR Relation**: Supersedes part of #234 (parent issue #219, split #258).
+- **UI / RTL Scope**: N/A (pure backend auth API contract and response error casing; no UI screens modified).
+
 ### Acceptance Criteria
 
 - **AC1**: Validation failure on auth endpoints (`/auth/register`, `/auth/login`) returns HTTP 400 with `code: 'VALIDATION_ERROR'`, `error: 'Bad Request'`, structured `details` naming constraint rules (e.g. uppercase password requirement), and no leakage of sensitive properties (`passwordHash`).
 - **AC2**: Missing, invalid, or forged bearer token on protected routes returns HTTP 401 with `error: 'Unauthorized'` and descriptive message (`'Invalid or expired token'`).
-- **AC3**: Validation error response message is explicitly set to `'Validation Failed'` (Title Case) in `AllExceptionsFilter`.
-- **AC4**: 401 Unauthorized responses consistently return `error: 'Unauthorized'` as fallback in `AllExceptionsFilter` and are documented with `@ApiResponse({ status: 401, description: 'Unauthorized' })` in `AuthController`.
+- **AC3**: Validation error response message is explicitly set to `'Validation Failed'` (Title Case) across all validation sources in `AllExceptionsFilter`.
+- **AC4**: 401 Unauthorized responses consistently return `error: 'Unauthorized'` as fallback in `AllExceptionsFilter`, in `JwtAuthGuard`, `AuthService`, and `AuthController`, documented with `@ApiResponse({ status: 401, description: 'Unauthorized' })`.
 - **AC5**: `formatValidationErrors` normalizes extracted field keys with initial lowercase (`password` instead of `Password`, preserving camelCase like `firstName`), eliminating key casing inconsistencies in `details`.
 
 ### Originating Sentry issue
