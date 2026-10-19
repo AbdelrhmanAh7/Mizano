@@ -39,4 +39,5 @@ export class CreateCustomerDto {
   shippingAddress?: AddressDto;
   @ApiProperty({ required: false }) @IsInt() @Min(0) @Max(365) @IsOptional() paymentTerms?: number;
   @ApiProperty({ required: false }) @IsString() @IsOptional() priceListId?: string;
+  @ApiProperty({ required: false }) @IsString() @IsOptional() @MaxLength(2000) notes?: string;
 }

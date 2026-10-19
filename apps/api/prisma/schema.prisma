@@ -855,6 +855,7 @@ model Customer {
   shippingCountry    String?
   paymentTerms       Int       @default(0)
   priceListId        String?
+  notes              String?
   organizationId     String
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
