@@ -37,3 +37,17 @@ test(
     await agent.assert('the sign-in form is shown and no bill upload control is available');
   },
 );
+
+test(
+  '@issue-42 AC4: the bill scan page exposes a file selector and scan button',
+  { tags: ['feat:mz-bill-scan'] },
+  async ({ app, agent }) => {
+    await app.open('/en/login');
+    await agent.act('sign in as {email} with password {pw}', {
+      params: { email: 'admin@mizano.com', pw: 'password123' },
+    });
+    await app.open('/en/purchases/bills/scan');
+    await agent.assert('there is a Select file control and a Scan button');
+  },
+);
+

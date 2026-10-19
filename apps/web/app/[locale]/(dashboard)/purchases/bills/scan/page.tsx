@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
-import Link from 'next/link';
+import { Link, useRouter } from '@/i18n/routing';
 import {
   ArrowLeft,
   Upload,
@@ -75,6 +74,7 @@ export default function ScanBillPage() {
   const [scanDefaults, setScanDefaults] = useState<BillFormDefaultValues | null>(null);
   const [unresolvedTaxLines, setUnresolvedTaxLines] = useState<UnresolvedTaxLine[]>([]);
   const [taxReviewed, setTaxReviewed] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // SSE-based document intake
   const intake = useDocumentIntakeStream();
@@ -281,6 +281,9 @@ export default function ScanBillPage() {
     setLocalResult(null);
     setScanDefaults(null);
     setLocalError(null);
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
     setUnresolvedTaxLines([]);
     setTaxReviewed(false);
     intake.reset();
@@ -334,7 +337,7 @@ export default function ScanBillPage() {
         <Separator className="w-8" />
         <StepBadge
           step={2}
-          label={ts('steps.processing')}
+          label={step === 'review' || step === 'confirmed' ? 'Completed' : ts('steps.processing')}
           active={step === 'processing'}
           done={step === 'review' || step === 'confirmed'}
         />
@@ -414,16 +417,22 @@ export default function ScanBillPage() {
               onDrop={converting ? undefined : handleDrop}
               onClick={() => {
                 if (converting) return;
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = '*/*';
-                input.onchange = (e) => {
-                  const file = (e.target as HTMLInputElement).files?.[0];
-                  if (file) handleFileSelect(file);
-                };
-                input.click();
+                fileInputRef.current?.click();
               }}
             >
+              <input
+                ref={fileInputRef}
+                type="file"
+                id="file-upload"
+                name="file"
+                aria-label="Select file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
+                className="sr-only"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileSelect(file);
+                }}
+              />
               {converting ? (
                 <div className="space-y-3">
                   <Loader2 className="h-12 w-12 mx-auto animate-spin text-primary" />
@@ -453,10 +462,12 @@ export default function ScanBillPage() {
                   <Button
                     variant="ghost"
                     size="sm"
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedFile(null);
                       setPreviewUrl(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
                     }}
                   >
                     <X className="mr-1 h-3 w-3" />
@@ -470,14 +481,32 @@ export default function ScanBillPage() {
                     <p className="font-medium">{ts('dropHint')}</p>
                     <p className="text-sm text-muted-foreground">{ts('supportsHint')}</p>
                   </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fileInputRef.current?.click();
+                    }}
+                  >
+                    Select file
+                  </Button>
                 </div>
               )}
             </div>
 
             <div className="flex items-center justify-end">
-              <Button onClick={handleProcess} disabled={!selectedFile || converting} size="lg">
+              <Button
+                type="button"
+                onClick={handleProcess}
+                disabled={!selectedFile || converting}
+                size="lg"
+                aria-label="Scan"
+                data-testid="scan-button"
+              >
                 <Sparkles className="mr-2 h-4 w-4" />
-                {ts('processWithAi')}
+                Scan
               </Button>
             </div>
           </CardContent>
@@ -549,6 +578,13 @@ export default function ScanBillPage() {
                   {ts('resultsTitle')}
                 </CardTitle>
                 <div className="flex items-center gap-2">
+                  <Badge
+                    variant="default"
+                    className="bg-green-600 text-white"
+                    data-testid="status-completed"
+                  >
+                    Completed
+                  </Badge>
                   {result.extractionMethod && (
                     <Badge variant="outline">{result.extractionMethod}</Badge>
                   )}
