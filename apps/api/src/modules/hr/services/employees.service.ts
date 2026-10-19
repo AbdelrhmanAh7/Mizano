@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { EmployeeQueryDto } from '../dto/employee-query.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateEmployeeDto } from '../dto/create-employee.dto';
@@ -42,13 +42,8 @@ export class EmployeesService {
     });
   }
 
-  async findAll(
-    organizationId: string,
-    query: PaginationDto & { isActive?: boolean | string; status?: string; department?: string },
-  ) {
+  async findAll(organizationId: string, query: EmployeeQueryDto) {
     const { sortBy = 'name', sortOrder = 'asc', isActive, status, department } = query;
-    // The controller's query type is an intersection (no runtime class), so ValidationPipe does not
-    // transform it: page and limit arrive as strings and must be numbers for skip / take.
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 50;
     const where: Prisma.EmployeeWhereInput = { organizationId, deletedAt: null };

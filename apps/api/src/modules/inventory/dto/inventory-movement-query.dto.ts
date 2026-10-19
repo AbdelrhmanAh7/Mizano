@@ -20,6 +20,11 @@ export class InventoryMovementQueryDto extends PaginationDto {
 
   @ApiProperty({ required: false })
   @IsOptional()
+  @IsString()
+  type?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsDateString()
   dateFrom?: string;
 
@@ -27,4 +32,10 @@ export class InventoryMovementQueryDto extends PaginationDto {
   @IsOptional()
   @IsDateString()
   dateTo?: string;
+
+  // Accepted by existing frontend filters; filtering behavior remains in the service.
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  source?: string;
 }

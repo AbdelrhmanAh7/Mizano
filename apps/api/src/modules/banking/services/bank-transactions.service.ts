@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { BankTransactionQueryDto } from '../dto/bank-transaction-query.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { BankTransactionCursorQueryDto } from '../dto/bank-transaction-cursor-query.dto';
@@ -77,17 +77,7 @@ export class BankTransactionsService {
     return { imported: created.count };
   }
 
-  async findAll(
-    organizationId: string,
-    query: PaginationDto & {
-      bankAccountId?: string;
-      status?: Prisma.EnumReconciliationStatusFilter | string;
-      dateFrom?: string;
-      dateTo?: string;
-      amountMin?: string;
-      amountMax?: string;
-    },
-  ) {
+  async findAll(organizationId: string, query: BankTransactionQueryDto) {
     const {
       sortBy = 'date',
       sortOrder = 'desc',

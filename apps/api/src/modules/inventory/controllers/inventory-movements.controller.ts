@@ -1,11 +1,11 @@
+import { InventoryMovementQueryDto } from '../dto/inventory-movement-query.dto';
+import { InventoryMovementCursorQueryDto } from '../dto/inventory-movement-cursor-query.dto';
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
-import { InventoryMovementQueryDto } from '../dto/inventory-movement-query.dto';
 import { InventoryMovementsService } from '../services/inventory-movements.service';
-import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 
 @ApiTags('Inventory Movements')
 @ApiBearerAuth()
@@ -27,14 +27,7 @@ export class InventoryMovementsController {
   findAllCursor(
     @CurrentOrg() orgId: string,
     @Query()
-    query: CursorPaginationDto & {
-      itemId?: string;
-      warehouseId?: string;
-      type?: string;
-      source?: string;
-      dateFrom?: string;
-      dateTo?: string;
-    },
+    query: InventoryMovementCursorQueryDto,
   ) {
     return this.inventoryMovementsService.findAllCursor(orgId, query);
   }
