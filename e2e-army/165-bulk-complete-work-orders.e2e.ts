@@ -42,7 +42,7 @@ function client(api: string, token?: string) {
     if (res.status === 429) {
       await expect
         .poll(async () => (res = await once(method, path, body)).status, {
-          timeout: 85_000,
+          timeout: 65_000,
           interval: 5_000,
         })
         .not.toBe(429);
@@ -64,7 +64,7 @@ const lineSig = (journal: any): string[] =>
 
 test(
   '@issue-165 AC1 AC2 AC3: bulk completing work orders posts the same COGM journals as one by one and reports failures per order',
-  { tags: ['feat:mz-work-orders', 'lvl:api'], timeout: 240_000 },
+  { tags: ['feat:mz-work-orders', 'lvl:api'], timeout: 120_000 },
   async ({ app }) => {
     const base = apiBase(String(app.baseUrl));
     const anon = client(base);
@@ -227,7 +227,7 @@ test(
 // COGM journal completeWorkOrder posts (planned quantity x component cost + operations cost); the trial balance balances.
 test(
   '@issue-165 AC1 AC3: seeded demo, select WO-001 and WO-002, Complete posts a COGM journal for both',
-  { tags: ['feat:mz-work-orders', 'lvl:ui'], timeout: 180_000 },
+  { tags: ['feat:mz-work-orders', 'lvl:ui'], timeout: 130_000 },
   async ({ app, screen, browser }) => {
     // Demo admin sign-in, retried like the hub suite: a submit before hydration is a plain GET.
     for (let i = 0; i < 3; i++) {
@@ -237,7 +237,7 @@ test(
       await screen.getByRole('button', 'Sign In').tap();
       try {
         await expect(browser).toHaveURL(/\/en\/(dashboard|onboarding|accounting|sales)/, {
-          timeout: 40_000,
+          timeout: 25_000,
         });
         break;
       } catch (e) {
