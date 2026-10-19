@@ -177,6 +177,7 @@ Review round 5 (#109):
 - Fixed CodeRabbit finding on `rules-normalize.spec.ts:64`: AC5 test now verifies `parseAmount('10000000000000.0001')` returns a Decimal instance (`toBeInstanceOf(Decimal)`) and preserves the exact 4-decimal fraction string that JS Number conversion would lose.
 - Fixed CodeRabbit finding on `EVIDENCE.md`: E2E gate note updated to report the round-two `e2e-first` review status as unresolved without an authoritative retirement decision and the `e2e-army` result.
 - Confirmed the 3 outdated review threads on `intake-arabic-digits.e2e-spec.ts` and `entity-extraction.service.ts` are satisfied because the relevant code was reverted in commit a5aeed0.
+
 # Issue #141 — intake worker entrypoint, processor out of the API, Pi compose worker
 
 Tested commit: `57f9a0d` (branch `ai/141`; this file is committed after it). Fresh Postgres 16, `REDIS_URL=` blank, in band.
@@ -544,3 +545,82 @@ Each trial balance has two tenant filters: the account list and the line totals.
 ## Index: other issues
 
 - Issue #94 (decimal money math and idempotent posting): [docs/evidence/94/EVIDENCE.md](docs/evidence/94/EVIDENCE.md).
+
+---
+
+# Issue #253 Verification — Guard against leftover merge-conflict markers in markdown
+
+- **Issue**: #253 (fix: qa finding: EVIDENCE.md leftover merge-conflict marker, split from #237)
+- **Base Commit (`origin/master`)**: `451cc181`
+- **Tested Commit (`ai/253`)**: `b350b3903275a077290ea434fa8cf7ebf1e36df0`
+- **Originating Sentry issue**: None (internal QA finding on PR #237, item `finding:7d58c29ac8ff`)
+- **Scope**: Resolve leftover conflict marker `> > > > > > > origin/master` and add automated guard against raw and prettier-escaped merge-conflict markers in tracked markdown files.
+
+---
+
+## Acceptance Criteria & Verification Matrix
+
+| AC ID | Acceptance Criterion                                                                   | Verification Method                                                                              | Exit Code | Status |
+| ----- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------- | ------ |
+| AC1   | No leftover merge-conflict marker exists in `EVIDENCE.md` or any tracked markdown file | `python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py'`                       | 0         | PASSED |
+| AC2   | Automated regression guard test exists and passes cleanly on head                      | `nice -n 10 python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v`         | 0         | PASSED |
+| AC3   | Planted marker causes the regression guard test to fail fast naming file:line          | Planted marker (`> > > > > > > origin/master`) in `EVIDENCE.md` causes test failure on that line | 1         | PASSED |
+
+---
+
+## Verification Evidence
+
+### AC1 & AC2: Guard test execution on clean repository head
+
+Command:
+
+```bash
+nice -n 10 python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v
+```
+
+Output:
+
+```text
+test_full_conflict_block_detected (test_no_conflict_markers.ConflictMarkerMatcherTests.test_full_conflict_block_detected) ... ok
+test_normal_heading_underline_passes (test_no_conflict_markers.ConflictMarkerMatcherTests.test_normal_heading_underline_passes) ... ok
+test_planted_prettier_escaped_markers_fail (test_no_conflict_markers.ConflictMarkerMatcherTests.test_planted_prettier_escaped_markers_fail) ... ok
+test_planted_raw_markers_fail (test_no_conflict_markers.ConflictMarkerMatcherTests.test_planted_raw_markers_fail) ... ok
+test_prettier_escaped_leftover_marker_detected (test_no_conflict_markers.ConflictMarkerMatcherTests.test_prettier_escaped_leftover_marker_detected) ... ok
+test_no_conflict_markers_in_tracked_markdown (test_no_conflict_markers.TrackedMarkdownConflictMarkerTests.test_no_conflict_markers_in_tracked_markdown) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.022s
+
+OK
+```
+
+Exit code: 0
+
+### AC3: Planted regression test failure demonstration
+
+Note on base comparison: The base commit `451cc181` is already clean because the leftover marker was removed during the PR #237 merge on master. To demonstrate regression detection, the marker was temporarily planted in `EVIDENCE.md`.
+
+Command:
+
+```bash
+echo "> > > > > > > origin/master" >> EVIDENCE.md && python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v
+```
+
+Output:
+
+```text
+FAIL: test_no_conflict_markers_in_tracked_markdown (test_no_conflict_markers.TrackedMarkdownConflictMarkerTests.test_no_conflict_markers_in_tracked_markdown)
+AssertionError: Lists differ: ['EVIDENCE.md:548: > > > > > > > origin/master'] != []
+First list contains 1 additional elements.
+First extra element 0:
+'EVIDENCE.md:548: > > > > > > > origin/master'
+- ['EVIDENCE.md:548: > > > > > > > origin/master']
++ [] : Merge conflict markers found in tracked markdown files:
+EVIDENCE.md:548: > > > > > > > origin/master
+----------------------------------------------------------------------
+Ran 6 tests in 0.017s
+
+FAILED (failures=1)
+```
+
+Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDENCE.md`).
