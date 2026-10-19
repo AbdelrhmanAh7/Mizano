@@ -21,7 +21,7 @@ pnpm db:seed
 pnpm dev                # docker-compose up -d && turbo dev → web :5001, API :6001
 ```
 
-Never initialize, migrate or reset a shared or production database from a workstation. AI routes need an inference backend (`OLLAMA_BASE_URL`) until the CPU extraction work lands; they return errors rather than fake results when it is missing.
+Never initialize, migrate or reset a shared or production database from a workstation. AI routes need an inference backend (`OLLAMA_BASE_URL`) until the CPU extraction work lands; they return errors rather than fake results when it is missing. Document intake processing requires Redis (`REDIS_URL`) and the intake worker (`intake-worker.ts`); without Redis, the API fails fast with a clear error instead of leaving uploads queued indefinitely.
 
 | Service    | Local port | URL                                                |
 | ---------- | ---------- | -------------------------------------------------- |
