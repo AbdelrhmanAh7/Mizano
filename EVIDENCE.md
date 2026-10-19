@@ -544,33 +544,49 @@ Each trial balance has two tenant filters: the account list and the line totals.
 
 # EVIDENCE.md — Issue #87: pdf-parse and zero-offset Buffers
 
-- **Tested commit**: `0e42c2ba` (branch `ai/87`, merged with `origin/master`).
-- **Originating Sentry issue**: None (none linked in the brief).
-- **User-facing flow / E2E**: Not user-facing (internal intake parsing utility), so no e2e-army test (`E2E: not needed — internal utility parsing fix without user-facing flow or schema change`).
-- **Changed covering tests**: `apps/api/src/modules/ai/utils/pdf-extractor.util.spec.ts` (new spec with 3 tests).
+- **Tested commit**: `9c773505` (branch `ai/87`).
+- **Originating Sentry issue**: None (none linked in the issue brief).
+- **User-facing flow / E2E**: Not user-facing (internal intake parsing utility). `E2E: not needed — pure internal utility fix, no user-facing flow or schema change.`
+- **Changed covering tests**: `apps/api/src/modules/ai/utils/pdf-extractor.util.spec.ts` (new spec, 3 tests).
 
 ## Acceptance criteria
 
-1. **AC1**: Every pdf-parse call site passes a fresh `Uint8Array` copy (or equivalent zero-offset buffer).
-2. **AC2**: Unit test feeds a Buffer sliced from a larger pool (non-zero `byteOffset`) and asserts the text is extracted.
+1. **AC1**: Every pdf-parse call site passes a fresh `Uint8Array` copy (zero-offset, covers only the PDF bytes). Find all sites with `grep -rn pdf-parse apps/api/src`.
+2. **AC2**: Unit test feeds a `Buffer` sliced from a larger pool (non-zero `byteOffset`) and asserts the text is correctly extracted.
 3. **AC3**: One line added to `docs/agents/review-lessons.md` about zero-offset buffers for pdf.js.
 
 ## Verification Matrix
 
-| AC  | Requirement Description                                                | Evidence / Command                                                                                                                                                                          | Exit Code | Status |
-| --- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
-| AC1 | Every pdf-parse call site passes a fresh `Uint8Array` copy             | `grep -rn pdf-parse apps/api/src`: only call site is `extractTextFromPdf` in `pdf-extractor.util.ts`; builds `new Uint8Array(buffer)` once and passes to both v1 and v2 APIs                | 0         | PASSED |
-| AC2 | Unit test feeds Buffer with non-zero byteOffset and asserts extraction | `nice -n 10 pnpm --filter api exec jest --maxWorkers=2 src/modules/ai/utils/pdf-extractor.util.spec.ts`: 3 tests pass with real pdf-parse 1.1.1 (real PDF built, sliced at `byteOffset` 50) | 0         | PASSED |
-| AC3 | One line in review lessons                                             | `git diff origin/master -- docs/agents/review-lessons.md`: 1 bullet added                                                                                                                   | 0         | PASSED |
-| —   | Type check                                                             | `pnpm --filter @mizano/shared-types build && pnpm --filter api type-check`                                                                                                                  | 0         | PASSED |
-| —   | Lint                                                                   | `pnpm --filter api lint`                                                                                                                                                                    | 0         | PASSED |
-| —   | Regression / caller suite                                              | `nice -n 10 pnpm --filter api exec jest --maxWorkers=2 src/modules/ai/utils/pdf-extractor.util.spec.ts src/modules/ai/services/document-intake.service.spec.ts`: 2 suites, 29 passed        | 0         | PASSED |
+| AC  | Requirement Description                                               | Evidence / Command                                                                                                                                                            | Exit Code | Status |
+| --- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
+| AC1 | Every pdf-parse call site passes a fresh `Uint8Array` copy            | `grep -rn pdf-parse apps/api/src` → single call site `pdf-extractor.util.ts`; line 22 creates `new Uint8Array(buffer)` and passes it to both v1 and v2 code paths             | 0         | PASSED |
+| AC2 | Unit test feeds Buffer with non-zero `byteOffset` and asserts text    | `npx jest --testPathPattern="pdf-extractor.util.spec" --no-coverage` from `apps/api/`: 3 tests PASS — sliced buffer (byteOffset=50), zero-offset assertion, plain buffer path | 0         | PASSED |
+| AC3 | One line in `docs/agents/review-lessons.md` about zero-offset buffers | `git diff master -- docs/agents/review-lessons.md` → one bullet added: "Give pdf.js a zero-offset copy…" _(#87)_                                                              | 0         | PASSED |
+| —   | Type check                                                            | `pnpm --filter api type-check`                                                                                                                                                | 0         | PASSED |
+| —   | Lint                                                                  | `pnpm --filter api lint`                                                                                                                                                      | 0         | PASSED |
 
-## Regression Check Against Base (origin/master)
+## Regression demonstration (bug fix: test fails on base, passes on head)
 
-- **On base (`origin/master` passing raw `Buffer` to pdf-parse)**:
-  `src/modules/ai/utils/pdf-extractor.util.spec.ts` fails with exit code 1.
-  All 3 tests fail: pdf.js throws `UnknownErrorExceptionClosure: Promise was rejected with a falsy value` inside Jest, and `passed.byteOffset` is 50 instead of 0.
-- **On head (passing `new Uint8Array(buffer)`)**:
-  All 3 unit tests in `src/modules/ai/utils/pdf-extractor.util.spec.ts` pass with exit code 0.
-  Caller test `document-intake.service.spec.ts` (26 tests) also passes with exit code 0.
+Run on `origin/master` (before fix — pdf-parse receives raw sliced `Buffer`):
+
+```
+FAIL src/modules/ai/utils/pdf-extractor.util.spec.ts
+  ✕ hands pdf-parse a fresh zero-offset copy that covers only the PDF bytes
+    Expected: 0  (byteOffset)
+    Received: 50
+Exit code 1
+```
+
+Run on `ai/87` HEAD (after fix — pdf-parse receives `new Uint8Array(buffer)`):
+
+```
+PASS src/modules/ai/utils/pdf-extractor.util.spec.ts
+  ✓ extracts text from a Buffer with non-zero byteOffset (sliced from a larger pool)
+  ✓ hands pdf-parse a fresh zero-offset copy that covers only the PDF bytes
+  ✓ extracts the same text from a plain zero-offset Buffer
+Tests: 3 passed, 3 total  Exit code 0
+```
+
+## Index: other issues
+
+- Issue #94 (decimal money math and idempotent posting): [docs/evidence/94/EVIDENCE.md](docs/evidence/94/EVIDENCE.md).

@@ -17,11 +17,10 @@ export interface PdfExtractionResult {
  * and the caller should fall back to OCR (tesseract.js).
  */
 export async function extractTextFromPdf(buffer: Buffer): Promise<PdfExtractionResult> {
-  // pdf.js can misread a pooled Buffer (byteOffset > 0) on newer Node versions; hand it a
-  // fresh copy whose ArrayBuffer starts at offset 0 and holds only the PDF bytes.
-  // Create a fresh zero-offset copy of the buffer to avoid pdf.js misreading pooled buffers
-  const freshBuffer = Buffer.from(buffer);
-  const uint8 = new Uint8Array(freshBuffer);
+  // pdf.js (pdf-parse v1) can misread a pooled Buffer whose byteOffset > 0 on Node 25+.
+  // new Uint8Array(buffer) treats the Buffer as ArrayLike and copies into a fresh ArrayBuffer
+  // whose byteOffset is 0 and byteLength equals buffer.length exactly. (#87)
+  const uint8 = new Uint8Array(buffer);
 
   // pdf-parse v2 exports { PDFParse } as a named class
   if (pdfParseModule.PDFParse && typeof pdfParseModule.PDFParse === 'function') {
