@@ -54,6 +54,7 @@ import {
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { Decimal } from '@prisma/client/runtime/library';
+import { seedBlockedReason } from './seed-guard';
 
 const prisma = new PrismaClient();
 const DEFAULT_PASSWORD = 'password123';
@@ -2940,6 +2941,12 @@ async function main() {
   console.log('  Password: password123');
   console.log('\nOther users: manager@, accountant@, sales@, storekeeper@, hr@mizano.com');
   console.log('='.repeat(60));
+}
+
+const blockedReason = seedBlockedReason(process.env);
+if (blockedReason) {
+  console.error(blockedReason);
+  process.exit(1);
 }
 
 main()
