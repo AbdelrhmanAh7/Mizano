@@ -552,19 +552,23 @@ Each trial balance has two tenant filters: the account list and the line totals.
 
 - **Issue**: #253 (fix: qa finding: EVIDENCE.md leftover merge-conflict marker, split from #237)
 - **Base Commit (`origin/master`)**: `451cc181`
-- **Tested Commit (`ai/253`)**: `b350b3903275a077290ea434fa8cf7ebf1e36df0`
+- **Tested Head (`ai/253`)**: `8ab78121`
 - **Originating Sentry issue**: None (internal QA finding on PR #237, item `finding:7d58c29ac8ff`)
-- **Scope**: Resolve leftover conflict marker `> > > > > > > origin/master` and add automated guard against raw and prettier-escaped merge-conflict markers in tracked markdown files.
+- **Scope & Context**:
+  - In PR #237 (branch `ai/141`), a leftover merge-conflict marker `> > > > > > > origin/master` was committed after the #127 section in `EVIDENCE.md`.
+  - That leftover marker was already resolved and removed when PR #237 landed on `master` (commit `b8c0ab1e8b2dc8b348edabdf4fdd009ac7c3aa65`).
+  - Confirmed on the final repository head that no conflict marker exists in `EVIDENCE.md` or any tracked markdown file.
+  - This PR supersedes part of #237 by introducing the automated regression guard test (`scripts/test_no_conflict_markers.py`) to prevent leftover git merge-conflict markers (both standard git markers and prettier-reformatted markers) from entering tracked markdown files.
 
 ---
 
 ## Acceptance Criteria & Verification Matrix
 
-| AC ID | Acceptance Criterion                                                                   | Verification Method                                                                              | Exit Code | Status |
-| ----- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------- | ------ |
-| AC1   | No leftover merge-conflict marker exists in `EVIDENCE.md` or any tracked markdown file | `python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py'`                       | 0         | PASSED |
-| AC2   | Automated regression guard test exists and passes cleanly on head                      | `nice -n 10 python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v`         | 0         | PASSED |
-| AC3   | Planted marker causes the regression guard test to fail fast naming file:line          | Planted marker (`> > > > > > > origin/master`) in `EVIDENCE.md` causes test failure on that line | 1         | PASSED |
+| AC ID | Acceptance Criterion                                                                                     | Verification Method                                                                                                               | Exit Code | Status |
+| ----- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
+| AC1   | No leftover merge-conflict marker exists in `EVIDENCE.md` or any tracked markdown file                   | Confirmed on head: 0 markers in 47 tracked markdown files via `scripts/test_no_conflict_markers.py`                               | 0         | PASSED |
+| AC2   | Automated regression guard test exists, handles code fences/headings/banners, and passes cleanly on head | `nice -n 10 python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v`                                          | 0         | PASSED |
+| AC3   | Planted marker causes the regression guard test to fail fast naming exact file:line                      | Planted marker (`> > > > > > > origin/master`) at end of `EVIDENCE.md` causes test failure on that line with immediate clean exit | 1         | PASSED |
 
 ---
 
@@ -581,15 +585,19 @@ nice -n 10 python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.
 Output:
 
 ```text
+test_bare_seven_equals_outside_heading_flagged (test_no_conflict_markers.ConflictMarkerMatcherTests.test_bare_seven_equals_outside_heading_flagged) ... ok
 test_full_conflict_block_detected (test_no_conflict_markers.ConflictMarkerMatcherTests.test_full_conflict_block_detected) ... ok
+test_long_equals_lines_not_flagged (test_no_conflict_markers.ConflictMarkerMatcherTests.test_long_equals_lines_not_flagged) ... ok
+test_markers_inside_fenced_code_blocks_ignored (test_no_conflict_markers.ConflictMarkerMatcherTests.test_markers_inside_fenced_code_blocks_ignored) ... ok
 test_normal_heading_underline_passes (test_no_conflict_markers.ConflictMarkerMatcherTests.test_normal_heading_underline_passes) ... ok
 test_planted_prettier_escaped_markers_fail (test_no_conflict_markers.ConflictMarkerMatcherTests.test_planted_prettier_escaped_markers_fail) ... ok
 test_planted_raw_markers_fail (test_no_conflict_markers.ConflictMarkerMatcherTests.test_planted_raw_markers_fail) ... ok
 test_prettier_escaped_leftover_marker_detected (test_no_conflict_markers.ConflictMarkerMatcherTests.test_prettier_escaped_leftover_marker_detected) ... ok
+test_setext_heading_underline_after_markdown_syntax (test_no_conflict_markers.ConflictMarkerMatcherTests.test_setext_heading_underline_after_markdown_syntax) ... ok
 test_no_conflict_markers_in_tracked_markdown (test_no_conflict_markers.TrackedMarkdownConflictMarkerTests.test_no_conflict_markers_in_tracked_markdown) ... ok
 
 ----------------------------------------------------------------------
-Ran 6 tests in 0.022s
+Ran 10 tests in 0.026s
 
 OK
 ```
@@ -598,7 +606,7 @@ Exit code: 0
 
 ### AC3: Planted regression test failure demonstration
 
-Note on base comparison: The base commit `451cc181` is already clean because the leftover marker was removed during the PR #237 merge on master. To demonstrate regression detection, the marker was temporarily planted in `EVIDENCE.md`.
+Note on base comparison: The leftover marker from PR #237 was already removed during merge into master. To demonstrate regression detection on the current head, the marker was temporarily planted by appending to `EVIDENCE.md`.
 
 Command:
 
@@ -610,15 +618,15 @@ Output:
 
 ```text
 FAIL: test_no_conflict_markers_in_tracked_markdown (test_no_conflict_markers.TrackedMarkdownConflictMarkerTests.test_no_conflict_markers_in_tracked_markdown)
-AssertionError: Lists differ: ['EVIDENCE.md:548: > > > > > > > origin/master'] != []
+AssertionError: Lists differ: ['EVIDENCE.md:635: > > > > > > > origin/master'] != []
 First list contains 1 additional elements.
 First extra element 0:
-'EVIDENCE.md:548: > > > > > > > origin/master'
-- ['EVIDENCE.md:548: > > > > > > > origin/master']
+'EVIDENCE.md:635: > > > > > > > origin/master'
+- ['EVIDENCE.md:635: > > > > > > > origin/master']
 + [] : Merge conflict markers found in tracked markdown files:
-EVIDENCE.md:548: > > > > > > > origin/master
+EVIDENCE.md:635: > > > > > > > origin/master
 ----------------------------------------------------------------------
-Ran 6 tests in 0.017s
+Ran 10 tests in 0.016s
 
 FAILED (failures=1)
 ```
