@@ -545,6 +545,7 @@ Each trial balance has two tenant filters: the account list and the line totals.
 ## Index: other issues
 
 - Issue #94 (decimal money math and idempotent posting): [docs/evidence/94/EVIDENCE.md](docs/evidence/94/EVIDENCE.md).
+- Issue #253 (guard against leftover conflict markers): [Issue #253 Verification](#issue-253-verification--guard-against-leftover-merge-conflict-markers-in-markdown).
 
 ---
 
@@ -618,13 +619,13 @@ Output:
 
 ```text
 FAIL: test_no_conflict_markers_in_tracked_markdown (test_no_conflict_markers.TrackedMarkdownConflictMarkerTests.test_no_conflict_markers_in_tracked_markdown)
-AssertionError: Lists differ: ['EVIDENCE.md:635: > > > > > > > origin/master'] != []
+AssertionError: Lists differ: ['EVIDENCE.md:636: > > > > > > > origin/master'] != []
 First list contains 1 additional elements.
 First extra element 0:
-'EVIDENCE.md:635: > > > > > > > origin/master'
-- ['EVIDENCE.md:635: > > > > > > > origin/master']
+'EVIDENCE.md:636: > > > > > > > origin/master'
+- ['EVIDENCE.md:636: > > > > > > > origin/master']
 + [] : Merge conflict markers found in tracked markdown files:
-EVIDENCE.md:635: > > > > > > > origin/master
+EVIDENCE.md:636: > > > > > > > origin/master
 ----------------------------------------------------------------------
 Ran 10 tests in 0.016s
 
