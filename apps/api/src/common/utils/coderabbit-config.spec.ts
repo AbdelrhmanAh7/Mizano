@@ -4,7 +4,6 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-// @ts-expect-error js-yaml types not installed in api
 import * as yaml from 'js-yaml';
 
 describe('CodeRabbit configuration', () => {
