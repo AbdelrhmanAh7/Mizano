@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 import axios from 'axios';
+import type { Session } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import { refreshAccessToken, tokenRefresher } from './auth';
 import { createTokenRefresher, sessionRefreshKey, type RefreshedTokens } from './auth-refresh';
@@ -397,5 +398,11 @@ describe('session callback (client-visible session)', () => {
     });
     expect(session.error).toBe('RefreshAccessTokenError');
     expect(session).not.toHaveProperty('refreshToken');
+  });
+
+  it('has no refreshToken member on the Session type (compile-time)', () => {
+    const session = {} as Session;
+    // @ts-expect-error the client-visible Session must not expose refreshToken; type-check fails if it returns
+    expect(session.refreshToken).toBeUndefined();
   });
 });
