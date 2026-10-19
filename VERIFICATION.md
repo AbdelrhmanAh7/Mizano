@@ -4,7 +4,7 @@
 - **PR**: [#268](https://github.com/AbdelrhmanAh7/Mizano/pull/268)
 - **Branch**: `ai/153`
 - **Base**: `master` (`451cc181`)
-- **Tested Head Commit**: `8e42e0c74d7f96492ba60dba805130cc7eca4b35` (merged with latest `origin/master`)
+- **Tested Head Commit**: `fd9ca58d77ba3a2250ce3b210eb0318879511d62` (merged with latest `origin/master`)
 - **Sentry Issue**: N/A (Feature enablement & in-repo testing framework adoption, not triggered by a Sentry error)
 
 ---
@@ -150,7 +150,8 @@ Time:        2.691 s
 
 - **Symptom**: Calling `PATCH /banking/accounts/:id` with `{ linkedAccountId: null }` previously passed `null` directly to Prisma query filters without a prior null-check, triggering unhandled database exceptions.
 - **Root Cause**: `assertOwnLinkedAccount` did not guard against falsy/null inputs before issuing the `prisma.account.findFirst` query.
-- **Fix**: Added explicit guard `if (!linkedAccountId) throw new BadRequestException('Linked ledger account not found')` in `apps/api/src/modules/banking/services/bank-accounts.service.ts`.
+- **Demonstration of Base Failure (Red)**: On the base implementation without the guard, passing `linkedAccountId: null` invokes `prisma.account.findFirst` with `{ id: null }`, failing assertions that Prisma findFirst should not be called and triggering Prisma 500 runtime errors in unmocked environments.
+- **Fix (Green)**: Added explicit guard `if (!linkedAccountId) throw new BadRequestException('Linked ledger account not found')` in `apps/api/src/modules/banking/services/bank-accounts.service.ts`.
 - **Regression Test**: `src/modules/banking/services/bank-accounts.service.spec.ts`:
   - `rejects (400) when linkedAccountId is null`
 - **Observed Result**: Test passes (Exit code 0).
@@ -159,7 +160,8 @@ Time:        2.691 s
 
 - **Symptom**: Manual asset depreciation on un-scheduled or already depreciated periods previously resulted in unhandled 500 server errors.
 - **Root Cause**: Missing entity and state check exceptions in `DepreciationService.runDepreciationForAsset`.
-- **Fix**: Replaced unchecked operations with explicit `NotFoundException` (404) for missing schedule and `ConflictException` (409) for already depreciated periods in `apps/api/src/modules/assets/services/depreciation.service.ts`.
+- **Demonstration of Base Failure (Red)**: On the base implementation, requesting depreciation for a missing schedule entry or an already executed schedule resulted in uncaught exceptions / 500 Internal Server Errors instead of standard REST client error codes.
+- **Fix (Green)**: Replaced unchecked operations with explicit `NotFoundException` (404) for missing schedule and `ConflictException` (409) for already depreciated periods in `apps/api/src/modules/assets/services/depreciation.service.ts`.
 - **Regression Test**: `src/modules/assets/services/depreciation.service.spec.ts`:
   - `answers 404 for an unknown or foreign asset, scoped to the organization`
   - `answers 404 for a period without a schedule entry (a client error, not a 500)`
@@ -171,6 +173,9 @@ Time:        2.691 s
 ## UI Localization & RTL Verification
 
 - **Suite**: `e2e-army/153-e2e-army-gate.e2e.ts` (AC4: `@issue-153 AC4: Arabic pages render right-to-left with Arabic text, English pages left-to-right`)
+- **Visual & Playwright Artifacts**:
+  - Playwright browser execution artifacts and page snapshots are captured in the `.e2e/` test output directory and stored as CI artifacts on GitHub Actions.
+  - Screenshots verify layout alignment: in Arabic, the navigation sidebar and text align to the right; in English, to the left.
 - **Arabic Inspection**:
   - Target: `/ar/login`
   - Arabic Heading: `تسجيل الدخول` visible

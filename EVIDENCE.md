@@ -491,9 +491,9 @@ Unset launcher heap_size_limit: 4395630592
 
 # EVIDENCE — Adopt tester-army/e2e in-repo as the E2E gate (#153)
 
-- **Base (`origin/master`)**: `cc1443bfe31d5ca3e97f53dc5d4275738bfcd435`
-- **Tested code SHA**: `8364be19342a72f6195145758e9d1d9638cc937e` (final test code; the only later commit is this file). The first round ran at `ac21ae8`; `82e7381` then re-synced `features/` with the hub (the port had dropped the hub's `timeout: 240_000` on 61 browser tests) and `8364be1` gave the gate test's AC1 the same 240 s budget
-- **Date**: 2026-10-08, Mac mini (Node 26, pnpm 8.14.0), throwaway PostgreSQL 16 cluster (`mizano_e2e_army`), runs through the hub's suite governor
+- **Base (`origin/master`)**: `451cc181` (clean merge via `99abae33`)
+- **Tested code SHA**: `b874df3a` (last code change; 22 unit suites and e2e-army gate pass), current branch HEAD `fd9ca58d` (verification and evidence reports)
+- **Date**: 2026-10-19 / 2026-10-20, Mac mini (Node 22 / Node 26, pnpm 8.14.0), throwaway PostgreSQL 16 cluster (`mizano_e2e_army`), runs through the hub's suite governor
 
 | REQ   | Requirement                                                                         | How it is verified                                                                                                                                                                                 | Result                                        |
 | ----- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
@@ -532,7 +532,7 @@ Hub-side follow-up (outside this repository): the verify job copies up to 8 top-
 - **Deals service expectedAmount invariant (Finding 4f8dd5dc74e3)**: Verified that `expectedAmount` is required by `CreateDealDto`, `createDealSchema` in `@mizano/validators`, and `deal-form.tsx` UI form (with asterisk and `min(0)` requirement).
 - **EVIDENCE table formatting (Finding 8e72688af869)**: Verified closed code spans and balanced backticks in REQ-8 row.
 - **Unit test coverage**: Ran all 22 service and DTO unit test suites covering the modified modules (`pnpm --filter api exec jest ...`): 22 suites passed, 192 tests passed, 0 failed.
-- **Static checks**:
+- **Static checks**: Verified turbo static checks: `pnpm type-check` (6/6 tasks passed), `pnpm lint` (4/4 packages passed, 0 errors).
 
 ## Round 5 (Rebase on master and conflict resolution, #153)
 
