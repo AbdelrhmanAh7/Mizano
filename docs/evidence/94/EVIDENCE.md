@@ -29,6 +29,20 @@ Notes:
 - The `initdb` and `pg_ctl` start, and the commands that connect to the cluster, ran outside the agent sandbox (it blocks shared memory and local TCP).
 - Not re-run at this head: the e2e-army test `e2e-army/94-journal-decimal-posting.e2e.ts` (needs the hub's verify stack), the red comparison on master's code, and the full seeded E2E suite and `pnpm ci:full` listed below.
 
+## Re-verification at head `cf6f62546ee8eb08e4635cb693bc0d53ac2bfad6` (2026-10-19)
+
+The branch is 0 commits behind `origin/master` (`git rev-list --left-right --count origin/master...HEAD` gives `0 32`). The checks below ran on this clean tree; the commit that records this section changes only this file. Same host as above; a new throwaway cluster on port 55777 (`initdb`, `fsync=off`, `REDIS_URL` blank), `prisma migrate deploy` first, stopped and deleted afterwards. The cluster start ran outside the agent sandbox (it blocks shared memory: `shmget … Operation not permitted`).
+
+| Check                                                                                                                    | Exit | Result line                                  |
+| ------------------------------------------------------------------------------------------------------------------------ | ---- | -------------------------------------------- |
+| `jest --config ./test/jest-e2e.json --runInBand test/posting-integrity.e2e-spec.ts` (`DATABASE_URL` on the throwaway DB) | 0    | `Tests: 11 passed, 11 total`                 |
+| `jest src/common/dto src/common/utils/document-totals.spec.ts src/modules/accounting/services/journals.service.spec.ts`  | 0    | `Test Suites: 7 passed`, `Tests: 125 passed` |
+| `pnpm --filter @mizano/validators test`                                                                                  | 0    | `Tests: 12 passed, 12 total`                 |
+| `pnpm run type-check` (turbo)                                                                                            | 0    | `Tasks: 6 successful, 6 total`               |
+| `pnpm --filter api lint`, `pnpm --filter @mizano/validators lint`                                                        | 0, 0 | no output                                    |
+
+Not run at this head, so their result stays unknown here: the e2e-army test `e2e-army/94-journal-decimal-posting.e2e.ts` (needs the hub's verify stack, which runs it on the pushed head), the red comparison on master's code, the full seeded E2E suite and `pnpm ci:full` (the full suite runs on GitHub CI after the push, per the owner's speed rule). The older runs of those below stay bound to the SHAs named there (`7955496` for the 12-suite E2E run and `ci:full`, `76ed8e8` for the red/green comparison). The `e1d4a478` section above is superseded by this one for the checks listed in the table.
+
 ## What changed, from the history
 
 `git log --oneline --no-merges origin/master..HEAD` lists the branch's own commits (`10b0e2f`, `9a37475`, `078cc09` and `9d4c20d` are merges of master). Production code changed in two commits and two files only:
