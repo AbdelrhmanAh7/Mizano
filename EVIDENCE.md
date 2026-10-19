@@ -562,73 +562,134 @@ Each trial balance has two tenant filters: the account list and the line totals.
 
 ### Numbered Acceptance Criteria (AC)
 
-| AC ID | Acceptance Criteria                                                                                                                                                                     | Verification Method                                                                             | Status | Exit Code |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------ | --------- |
-| AC1   | `POST /customers` accepts form-shaped payload with nested `billingAddress`/`shippingAddress` and optional `notes`, persisting notes to the database and flattening addresses to columns | `create-customer.dto.spec.ts`, `customers.service.spec.ts`, `e2e-army/260-customer-form.e2e.ts` | PASSED | 0         |
-| AC2   | `PATCH /customers/:id` accepts form-shaped payload with nested addresses and `notes` (including clearing notes with `null`), updating columns appropriately                             | `create-customer.dto.spec.ts`, `customers.service.spec.ts`, `e2e-army/260-customer-form.e2e.ts` | PASSED | 0         |
-| AC3   | API rejects legacy flat address keys (`billingStreet`, `billingCity`, etc.) with `400 Bad Request` via global `ValidationPipe` (`forbidNonWhitelisted: true`)                           | `create-customer.dto.spec.ts`, `e2e-army/260-customer-form.e2e.ts`                              | PASSED | 0         |
-| AC4   | `CustomerForm` (`apps/web/components/sales/customer-form.tsx`) emits nested `billingAddress` and `shippingAddress` with `notes` via `buildCustomerPayload`, omitting flat address keys  | `apps/web/components/sales/customer-form.spec.tsx`                                              | PASSED | 0         |
-| AC5   | `UpdateCustomerDto` inherits `notes` and nested address validation from `CreateCustomerDto` via `PartialType`                                                                           | `create-customer.dto.spec.ts`, `update-customer.dto.ts`                                         | PASSED | 0         |
-| AC6   | E2E test `e2e-army/260-customer-form.e2e.ts` tagged `feat:mz-customers` executes the full create, list, edit, get round-trip with nested addresses and notes                            | `e2e-army/260-customer-form.e2e.ts`                                                             | PASSED | 0         |
+| AC ID | Acceptance Criteria                                                                                                                                                                     | Verification Method                                                                    | Status          | Exit Code |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | --------------- | --------- |
+| AC1   | `POST /customers` accepts form-shaped payload with nested `billingAddress`/`shippingAddress` and optional `notes`, persisting notes to the database and flattening addresses to columns | `create-customer.dto.spec.ts`, `customers.service.spec.ts`                             | PASSED          | 0         |
+| AC2   | `PATCH /customers/:id` accepts form-shaped payload with nested addresses and `notes` (including clearing notes with `null`), updating columns appropriately                             | `create-customer.dto.spec.ts`, `customers.service.spec.ts`                             | PASSED          | 0         |
+| AC3   | API rejects legacy flat address keys (`billingStreet`, `billingCity`, etc.) with `400 Bad Request` via global `ValidationPipe` (`forbidNonWhitelisted: true`)                           | `create-customer.dto.spec.ts`                                                          | PASSED          | 0         |
+| AC4   | `CustomerForm` (`apps/web/components/sales/customer-form.tsx`) emits nested `billingAddress` and `shippingAddress` with `notes` via `buildCustomerPayload`, omitting flat address keys  | `apps/web/components/sales/customer-form.spec.tsx`                                     | PASSED          | 0         |
+| AC5   | `UpdateCustomerDto` inherits `notes` and nested address validation from `CreateCustomerDto` via `PartialType`                                                                           | `create-customer.dto.spec.ts`, `update-customer.dto.ts`                                | PASSED          | 0         |
+| AC6   | E2E test `e2e-army/260-customer-form.e2e.ts` covers the full create, list, edit, get round-trip with nested addresses and notes                                                         | `e2e-army/260-customer-form.e2e.ts` (syntactically complete; runs on hub verify stack) | NOT RUN LOCALLY | N/A       |
 
 ### Changed Covering Tests
 
 - `apps/api/src/modules/sales/dto/create-customer.dto.spec.ts` (6 tests: CreateCustomerDto + UpdateCustomerDto contract)
 - `apps/api/src/modules/sales/services/customers.service.spec.ts` (2 tests: Prisma column mapping + isolation)
 - `apps/web/components/sales/customer-form.spec.tsx` (3 tests: payload nesting + submit handling)
+- `apps/web/components/sales/customer-form-payload.fixture.json` (shared form payload fixture)
 - `e2e-army/260-customer-form.e2e.ts` (1 request-level e2e-army test: API create/list/patch/get round-trip)
 
-### Bug Fix Regression Demonstration
+### Real Bug Reproduction on Master (`451cc181`)
 
-- **On Base (`master`)**:
-  - `CreateCustomerDto` had no `notes` field -> `validate(CreateCustomerDto, formPayload)` threw `BadRequestException: property notes should not exist` (FAIL).
-  - `UpdateCustomerDto` had no `notes` field -> `validate(UpdateCustomerDto, formPayload)` threw `BadRequestException: property notes should not exist` (FAIL).
-  - `Customer` schema had no `notes` column (FAIL).
-  - `customer-form.tsx` sent flat `billingStreet`, `billingCity`, etc., which was rejected by the API with 400 (FAIL).
-- **On Head (`ai/260`)**:
-  - `CreateCustomerDto` and `UpdateCustomerDto` accept `formPayload` with `notes` (PASS).
-  - `Customer` schema has `notes String?` and migration `20261017000000_customer_notes` (PASS).
-  - `buildCustomerPayload` constructs nested `billingAddress` and `shippingAddress` (PASS).
-  - Legacy flat address keys are rejected with 400 (PASS).
-  - All 8 API unit/contract tests and 3 Web unit tests pass (exit code 0).
+Spec files and fixture checked out directly on top of `master` source to prove regression:
 
-### Verification Commands and Observed Outputs
+1. **`create-customer.dto.spec.ts` on master**:
+   Command: `nice -n 10 pnpm --filter api test -- src/modules/sales/dto/create-customer.dto.spec.ts`
+   Result: **FAIL** (exit status 1, 3 failed, 3 passed, 6 total)
+   - `CreateCustomerDto accepts the form payload with and without notes`: Promise rejected with `BadRequestException: Bad Request Exception` (property `notes` is forbidden by `forbidNonWhitelisted: true`).
+   - `UpdateCustomerDto accepts the form payload with and without notes`: Promise rejected with `BadRequestException: Bad Request Exception`.
+   - `UpdateCustomerDto inherits notes: an edit that only changes or clears notes is accepted`: Promise rejected with `BadRequestException: Bad Request Exception`.
 
-```bash
-# 1. API unit & contract tests
-$ nice -n 10 pnpm --filter api exec jest apps/api/src/modules/sales/dto/create-customer.dto.spec.ts apps/api/src/modules/sales/services/customers.service.spec.ts
-PASS src/modules/sales/services/customers.service.spec.ts
-PASS src/modules/sales/dto/create-customer.dto.spec.ts
-Test Suites: 2 passed, 2 total
-Tests:       8 passed, 8 total
-Snapshots:   0 total
-Time:        2.715 s
-Exit code: 0
+2. **`customers.service.spec.ts` on master**:
+   Command: `nice -n 10 pnpm --filter api test -- src/modules/sales/services/customers.service.spec.ts`
+   Result: **FAIL** (exit status 1, 0 passed, suite failed to run)
+   - TypeScript compilation error TS2353: Object literal may only specify known properties, and 'notes' does not exist in type 'CreateCustomerDto' / 'UpdateCustomerDto'.
+   - Furthermore, master `CustomersService` passed `...createCustomerDto` / `...updateCustomerDto` directly into Prisma `data` without omitting nested address objects.
 
-# 2. Web unit tests
-$ nice -n 10 pnpm --filter web test apps/web/components/sales/customer-form.spec.tsx
-PASS components/sales/customer-form.spec.tsx
-  buildCustomerPayload
-    ✓ nests the addresses and keeps notes, with no flat address keys (2 ms)
-    ✓ sends empty inputs as null so an edit can clear them (1 ms)
-  CustomerForm submit
-    ✓ passes the nested payload to onSubmit (87 ms)
-Test Suites: 1 passed, 1 total
-Tests:       3 passed, 3 total
-Snapshots:   0 total
-Time:        0.819 s
-Exit code: 0
+3. **`customer-form.spec.tsx` on master**:
+   Command: `nice -n 10 pnpm --filter @mizano/web test -- components/sales/customer-form.spec.tsx`
+   Result: **FAIL** (exit status 1, 3 failed, 3 total)
+   - `TypeError: (0 , _customerform.buildCustomerPayload) is not a function`: on master `buildCustomerPayload` did not exist as an exported helper.
+   - `CustomerForm submit passes the nested payload to onSubmit`: failed with `expect(received).toMatchObject(expected)` because master emitted flat keys (`billingStreet`, `shippingStreet`) instead of nested `billingAddress` and `shippingAddress`.
 
-# 3. API typecheck & lint
-$ pnpm --filter api type-check && pnpm --filter api lint
-Exit code: 0
+### Verification on Head (`ai/260`)
 
-# 4. Web typecheck & lint
-$ pnpm --filter web type-check && pnpm --filter web lint
-Exit code: 0
-```
+1. **API DTO contract tests**:
 
-### Originating Sentry Issue / UI Notes
+   ```bash
+   nice -n 10 pnpm --filter api test -- src/modules/sales/dto/create-customer.dto.spec.ts
+   ```
 
-- **Originating Sentry Issue**: None (task split from PR #233, parent issue #215).
-- **UI / Playwright**: Playwright E2E gate is retired per owner directive 2026-10-08 in favor of `e2e-army`. Form payload and user submit interaction verified via Testing Library component tests (`customer-form.spec.tsx`). RTL and Arabic form localization preserved without disruption.
+   Output:
+
+   ```text
+   PASS src/modules/sales/dto/create-customer.dto.spec.ts
+     Customer DTOs accept the payload the customer form builds (#260)
+       ✓ CreateCustomerDto accepts the form payload with and without notes (15 ms)
+       ✓ UpdateCustomerDto accepts the form payload with and without notes
+       ✓ UpdateCustomerDto inherits notes: an edit that only changes or clears notes is accepted (1 ms)
+       ✓ CreateCustomerDto rejects the legacy flat address payload the form used to send
+       ✓ UpdateCustomerDto rejects the legacy flat address payload the form used to send
+       ✓ rejects notes longer than 2000 characters
+
+   Test Suites: 1 passed, 1 total
+   Tests:       6 passed, 6 total
+   Time:        2.848 s
+   Exit code: 0
+   ```
+
+2. **API service unit tests**:
+
+   ```bash
+   nice -n 10 pnpm --filter api test -- src/modules/sales/services/customers.service.spec.ts
+   ```
+
+   Output:
+
+   ```text
+   PASS src/modules/sales/services/customers.service.spec.ts
+     CustomersService address mapping (#260)
+       ✓ create stores nested addresses as columns and keeps notes, without passing the nested objects to Prisma (1 ms)
+       ✓ update maps nested addresses to columns, scoped to the organization
+
+   Test Suites: 1 passed, 1 total
+   Tests:       2 passed, 2 total
+   Time:        2.388 s
+   Exit code: 0
+   ```
+
+3. **Web component tests**:
+
+   ```bash
+   nice -n 10 pnpm --filter @mizano/web test -- components/sales/customer-form.spec.tsx
+   ```
+
+   Output:
+
+   ```text
+   PASS components/sales/customer-form.spec.tsx
+     buildCustomerPayload
+       ✓ nests the addresses and keeps notes, with no flat address keys (2 ms)
+       ✓ sends empty inputs as null so an edit can clear them
+     CustomerForm submit
+       ✓ passes the nested payload to onSubmit (85 ms)
+
+   Test Suites: 1 passed, 1 total
+   Tests:       3 passed, 3 total
+   Time:        0.636 s
+   Exit code: 0
+   ```
+
+4. **API typecheck & lint**:
+
+   ```bash
+   pnpm --filter api type-check && pnpm --filter api lint
+   ```
+
+   - `tsc --noEmit && tsc --noEmit -p test/tsconfig.e2e.json`: exit code 0
+   - `eslint "{src,apps,libs,test}/**/*.ts"`: exit code 0
+
+5. **Web typecheck & lint**:
+
+   ```bash
+   pnpm --filter @mizano/web type-check && pnpm --filter @mizano/web lint
+   ```
+
+   - `tsc --noEmit`: exit code 0
+   - `next lint`: exit code 0 (pre-existing unused variable warnings in other dashboard pages only, 0 errors)
+
+### Sentry Issue & Gate Status
+
+- **Sentry**: no Sentry issue (GitHub issue #260 contains no Sentry link; task split from PR #233 on parent issue #215).
+- **Component Tests**: Form payload and user submit interaction verified via React Testing Library (`customer-form.spec.tsx`). RTL and Arabic form localization preserved without disruption.
+- **e2e-army**: `e2e-army/260-customer-form.e2e.ts` is syntactically complete (`pnpm exec tsc --noEmit --skipLibCheck --noResolve e2e-army/260-customer-form.e2e.ts` confirms valid syntax) and carries `@issue-260 AC1...` in title. It was not run locally because `@e2e-dev/web` and `e2e` packages are provided by the remote hub verify environment and are not local workspace dependencies (`Cannot find module '@e2e-dev/web'`). The hub verify suite executes it upon push.
