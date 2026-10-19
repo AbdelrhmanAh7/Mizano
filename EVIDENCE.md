@@ -595,62 +595,95 @@ Tests: 3 passed, 3 total  Exit code 0
 
 # EVIDENCE — Issue #252: assert full session shape, drop refresh token
 
-**Tested SHA:** a261fca4
-**Branch:** ai/252 (based on master at 451cc181)
+- **Tested SHA:** `0664cfbb`
+- **Branch:** `ai/252` (based on master at `0e12286d`)
+- **Originating Sentry issue:** None (split from PR #242 / issue #185; no Sentry issue linked)
+- **User-facing flow / E2E:** `e2e-army/252-session-shape.e2e.ts` tagged `feat:mz-auth`, `lvl:ui`.
 
 ## Acceptance Criteria
 
-| AC  | Description                                                                                                                                                                                                            | Verification                                                                                                                                                                                              | Result                          |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| AC1 | route.spec.ts verifies the complete session shape: all user fields (id, email, name, firstName, lastName, organizationId, role), accessToken, and a string `expires` value; missing or unexpected fields fail the test | `npx jest --findRelatedTests app/api/auth/[...nextauth]/route.spec.ts` — test "returns the signed-in session with all user fields, accessToken and a string expires" uses `toEqual` for exact shape match | ✅ PASS (2/2 tests, 0 failures) |
-| AC2 | Explicit refresh-token checks retained: the session response must NOT contain `refreshToken` or the raw token value                                                                                                    | Same test asserts `Object.keys(session)` does not contain `refreshToken`, `body` does not contain `refreshToken` or `secret-refresh-token`                                                                | ✅ PASS                         |
+| AC  | Description                                                                                                                                                                                                                                          | Verification Method                                                                                                       | Exit Code | Status |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
+| AC1 | Complete session shape: `route.spec.ts` verifies all reachable user fields (`id`, `email`, `name`, `firstName`, `lastName`, `organizationId`, `role`), `accessToken`, and string `expires`; missing or unexpected fields fail the test via `toEqual` | `cd apps/web && pnpm exec jest --maxWorkers=2 --findRelatedTests 'app/api/auth/[...nextauth]/route.spec.ts'` (test 1)     | 0         | PASSED |
+| AC2 | Retain explicit refresh-token checks: session response does NOT contain `refreshToken` or raw token value at top level, in `session.user`, or in raw JSON text                                                                                       | `cd apps/web && pnpm exec jest --maxWorkers=2 --findRelatedTests 'app/api/auth/[...nextauth]/route.spec.ts'` (tests 1, 2) | 0         | PASSED |
+| AC3 | Error session shape: when `token.error` is present (e.g. `RefreshAccessTokenError`), session includes the `error` property and preserves full user shape with no `refreshToken`                                                                      | `cd apps/web && pnpm exec jest --maxWorkers=2 --findRelatedTests 'app/api/auth/[...nextauth]/route.spec.ts'` (test 2)     | 0         | PASSED |
+| AC4 | Signed-out session: `GET /api/auth/session` returns 200 with an empty object `{}`                                                                                                                                                                    | `cd apps/web && pnpm exec jest --maxWorkers=2 --findRelatedTests 'app/api/auth/[...nextauth]/route.spec.ts'` (test 3)     | 0         | PASSED |
 
-## Regression Test
+## Verification Matrix
 
-| Step         | Command                                               | Result                                                                      |
-| ------------ | ----------------------------------------------------- | --------------------------------------------------------------------------- |
-| FAIL on base | `git stash && npx jest route.spec.ts` (before fix)    | ✖ 1 failed: `toEqual` received extra `refreshToken: "secret-refresh-token"` |
-| PASS on head | `git stash pop && npx jest route.spec.ts` (after fix) | ✓ 2 passed, 0 failed (exit code 0)                                          |
+| Check               | Command                                                                                                      | Observed Exit Code | Output Summary                             | Status |
+| ------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------ | ------------------------------------------ | ------ |
+| AC1-AC4 route tests | `cd apps/web && pnpm exec jest --maxWorkers=2 --findRelatedTests 'app/api/auth/[...nextauth]/route.spec.ts'` | 0                  | 1 suite passed, 3 tests passed             | PASSED |
+| Auth unit suite     | `cd apps/web && pnpm exec jest --maxWorkers=2 --findRelatedTests lib/auth.spec.ts`                           | 0                  | 1 suite passed, 15 tests passed            | PASSED |
+| Type-check          | `pnpm --filter @mizano/web type-check`                                                                       | 0                  | `tsc --noEmit` clean (0 errors)            | PASSED |
+| Lint                | `pnpm --filter @mizano/web lint`                                                                             | 0                  | Warnings only (all pre-existing), 0 errors | PASSED |
 
-**Root cause:** `apps/web/lib/auth.ts` session callback line `session.refreshToken = token.refreshToken as string;` copied the long-lived refresh token into the client-visible session object returned by `GET /api/auth/session`.
+## Regression Test (Bug fix: fails on base, passes on head)
 
-**Fix:** Removed the line and the `refreshToken` member from the `Session` type declaration. The token remains in the encrypted JWT cookie for server-side refresh and logout.
+- **Root cause:** In `apps/web/lib/auth.ts`, the NextAuth `session` callback had `session.refreshToken = token.refreshToken as string;`, copying the long-lived refresh token into the client-facing session object returned by `GET /api/auth/session`.
+- **Fix:** Removed the assignment and the `refreshToken` property from the `Session` interface. The refresh token remains strictly server-side in the encrypted JWT cookie.
 
-## Pre-existing Failures
+### FAIL on base (with `session.refreshToken = token.refreshToken as string;` restored):
 
-- **Typecheck:** 15 pre-existing TS errors in `logger-dashboard.tsx` and `use-logger-store.ts` (module `@mizano/shared-types` not found). Same count on master. 0 new errors from this PR.
-- **Lint:** Warnings only, all pre-existing (unused vars, exhaustive-deps). 0 new warnings.
+```text
+FAIL app/api/auth/[...nextauth]/route.spec.ts
+  GET /api/auth/session (NextAuth route)
+    ✕ returns the signed-in session with all user fields, accessToken and a string expires
+    ✕ includes error in the session when token.error is present
+    ✓ returns an empty object when signed out
 
-## Test Commands and Output
+  ● GET /api/auth/session (NextAuth route) › returns the signed-in session with all user fields, accessToken and a string expires
 
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 0
+    + Received  + 1
+
+    @@ -1,8 +1,9 @@
+      Object {
+        "accessToken": "access-token-1",
+        "expires": Any<String>,
+    +   "refreshToken": "secret-refresh-token",
+        "user": Object {
+          "email": "admin@mizano.com",
+          "firstName": "Admin",
+          "id": "user-1",
+          "lastName": "User",
+
+      at Object.toEqual (app/api/auth/[...nextauth]/route.spec.ts:56:21)
+
+Test Suites: 1 failed, 1 total
+Tests:       2 failed, 1 passed, 3 total
+Exit code: 1
 ```
-# route.spec.ts (head) — 2 passed, 0 failed
-$ cd apps/web && npx jest --maxWorkers=2 --findRelatedTests 'app/api/auth/[...nextauth]/route.spec.ts'
+
+### PASS on head:
+
+```text
 PASS app/api/auth/[...nextauth]/route.spec.ts
   GET /api/auth/session (NextAuth route)
-    ✓ returns the signed-in session with all user fields, accessToken and a string expires (131 ms)
-    ✓ returns an empty object when signed out
-Tests: 2 passed, 2 total
+    ✓ returns the signed-in session with all user fields, accessToken and a string expires (358 ms)
+    ✓ includes error in the session when token.error is present (2 ms)
+    ✓ returns an empty object when signed out (1 ms)
 
-# auth.spec.ts (head) — 15 passed, 0 failed
-$ cd apps/web && npx jest --maxWorkers=2 --findRelatedTests lib/auth.spec.ts
-PASS lib/auth.spec.ts
-  refreshAccessToken (per-session isolation): 6 passed
-  logout clears session state: 5 passed
-  createTokenRefresher: 4 passed
-Tests: 15 passed, 15 total
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        1.156 s
+Exit code: 0
 ```
 
 ## Changed Files → Covering Tests
 
-| Changed file                                        | Covering test(s)                                                                                     |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `apps/web/lib/auth.ts`                              | `apps/web/lib/auth.spec.ts` (15/15 ✅), `apps/web/app/api/auth/[...nextauth]/route.spec.ts` (2/2 ✅) |
-| `apps/web/app/api/auth/[...nextauth]/route.spec.ts` | Self (test file)                                                                                     |
-| `e2e-army/252-session-shape.e2e.ts`                 | Self (e2e test file, runs in verify job)                                                             |
+| Changed File                                        | Covering Test(s)                                                                 | Results                         |
+| --------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------- |
+| `apps/web/lib/auth.ts`                              | `apps/web/lib/auth.spec.ts`, `apps/web/app/api/auth/[...nextauth]/route.spec.ts` | 15/15 passed, 3/3 passed        |
+| `apps/web/app/api/auth/[...nextauth]/route.spec.ts` | Self (`route.spec.ts`)                                                           | 3/3 passed                      |
+| `e2e-army/252-session-shape.e2e.ts`                 | Self (verified by verify job e2e-army gate)                                      | Tagged `feat:mz-auth`, `lvl:ui` |
 
 ## Skills Used
 
-- test-first engineering (failing test first, then fix)
-- systematic-debugging (identified root cause in session callback)
-- verification-before-completion (all claims backed by fresh command output)
+- `e2e-army`: verified e2e test tagging and structure for `feat:mz-auth`
+- `test-first engineering`: failing test reproduces leak on base, passes cleanly on head
+- `systematic-debugging`: isolated root cause to NextAuth session callback property assignment
+- `verification-before-completion`: all verification commands executed fresh in session with observed exit code 0
