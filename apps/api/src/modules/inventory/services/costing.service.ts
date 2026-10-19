@@ -8,6 +8,9 @@ export class CostingService {
 
   /**
    * Add a new FIFO cost layer when inventory comes in (purchase, production, adjustment, opening).
+   * Idempotent per source event: when referenceType + referenceId are given, a retry returns the
+   * existing layer instead of adding stock twice. Pass a line-level referenceId for documents that
+   * receive the same item into the same warehouse on several lines.
    */
   async addCostLayer(
     organizationId: string,
@@ -22,6 +25,13 @@ export class CostingService {
     const cost = new Decimal(costPerUnit.toString());
 
     if (qty.lte(0)) return null;
+
+    if (referenceType && referenceId) {
+      const existing = await this.prisma.inventoryCostLayer.findFirst({
+        where: { organizationId, itemId, warehouseId, referenceType, referenceId },
+      });
+      if (existing) return existing;
+    }
 
     return this.prisma.inventoryCostLayer.create({
       data: {
@@ -75,7 +85,7 @@ export class CostingService {
         layersConsumed++;
 
         await this.prisma.inventoryCostLayer.update({
-          where: { id: layer.id },
+          where: { id: layer.id, organizationId },
           data: { quantity: new Decimal(0) },
         });
       } else {
@@ -84,7 +94,7 @@ export class CostingService {
         layersConsumed++;
 
         await this.prisma.inventoryCostLayer.update({
-          where: { id: layer.id },
+          where: { id: layer.id, organizationId },
           data: { quantity: layerQty.sub(remaining) },
         });
         remaining = new Decimal(0);
