@@ -20,6 +20,9 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Customer } from '@/lib/hooks/use-customers';
+import { buildCustomerPayload } from './customer-payload';
+
+export { buildCustomerPayload } from './customer-payload';
 
 const addressSchema = z.object({
   street: z.string().optional(),
@@ -129,28 +132,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
   }, [customer, form]);
 
   const handleSubmit = (data: CustomerFormData) => {
-    // Flatten addresses for API
-    const submitData = {
-      name: data.name,
-      displayName: data.displayName || null,
-      email: data.email || null,
-      phone: data.phone || null,
-      currency: data.currency,
-      taxId: data.taxId || null,
-      paymentTerms: data.paymentTerms || 0,
-      notes: data.notes || null,
-      billingStreet: data.billingAddress?.street || null,
-      billingCity: data.billingAddress?.city || null,
-      billingState: data.billingAddress?.state || null,
-      billingPostalCode: data.billingAddress?.postalCode || null,
-      billingCountry: data.billingAddress?.country || null,
-      shippingStreet: data.shippingAddress?.street || null,
-      shippingCity: data.shippingAddress?.city || null,
-      shippingState: data.shippingAddress?.state || null,
-      shippingPostalCode: data.shippingAddress?.postalCode || null,
-      shippingCountry: data.shippingAddress?.country || null,
-    };
-    onSubmit(submitData as Record<string, unknown>);
+    onSubmit(buildCustomerPayload(data) as unknown as Record<string, unknown>);
   };
 
   const copyBillingToShipping = () => {
