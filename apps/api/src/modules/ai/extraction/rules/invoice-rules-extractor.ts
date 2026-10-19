@@ -199,16 +199,6 @@ const DUE_LABEL_RE = /due\s*date|payment\s*due|تاريخ\s*الاستحقاق|�
 const DATE_LABEL_RE =
   /invoice\s*date|issue\s*date|date\s*of\s*issue|\bdate\b|تاريخ\s*الفاتوره|تاريخ\s*الاصدار|التاريخ|تاريخ/;
 
-function findDateSpanInLine(line: string): { start: number; end: number } | null {
-  const m =
-    line.match(/(?<!\d)\d{4}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{1,2}(?!\d)/) ??
-    line.match(/(?<!\d)\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*(?:\d{4}|\d{2})(?!\d)/) ??
-    line.match(
-      /(?<!\d)\d{1,2}\s*(?:st|nd|rd|th)?\s+[^\d\s,]+\s*(?:[^\d\s,]+\s*)?,?\s*\d{2,4}(?!\d)/i,
-    );
-  return m && m.index !== undefined ? { start: m.index, end: m.index + m[0].length } : null;
-}
-
 function extractDates(
   lines: string[],
   folded: string[],
@@ -226,8 +216,7 @@ function extractDates(
     const d = parseDate(lines[i]);
     if (!d) return null;
     if (d.ambiguous) ambiguousLines.add(i);
-    const dateSpan = findDateSpanInLine(lines[i]);
-    const offsets = dateSpan ? span(i, dateSpan.start, dateSpan.end) : {};
+    const offsets = span(i, d.start, d.end);
     return {
       value: d.iso,
       confidence: d.ambiguous

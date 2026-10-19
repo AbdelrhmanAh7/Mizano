@@ -4,6 +4,9 @@ export interface DateMatch {
   iso: string;
   /** Day and month were both <= 12 in a numeric date, so day-first is an assumption. */
   ambiguous: boolean;
+  /** [start, end) of the substring that produced `iso`, in the coordinates of the parsed line. */
+  start: number;
+  end: number;
 }
 
 const MONTHS: Array<[number, string[]]> = [
@@ -50,14 +53,31 @@ const NAMED_RE = new RegExp(
   'i',
 );
 
+/** Collapse whitespace runs to one space, keeping the line index of every kept character. */
+function collapseWhitespace(input: string): { text: string; toLine: number[] } {
+  let text = '';
+  const toLine: number[] = [];
+  for (let i = 0; i < input.length; i++) {
+    const isSpace = /\s/.test(input[i]);
+    if (isSpace && text.endsWith(' ')) continue;
+    text += isSpace ? ' ' : input[i];
+    toLine.push(i);
+  }
+  return { text, toLine };
+}
+
 /** First date found in a digit-normalized line, or null. */
 export function parseDate(line: string): DateMatch | null {
   // Collapse whitespace runs so adjacent \s* / \s+ in the patterns cannot backtrack quadratically.
-  const folded = foldForMatch(line).replace(/\s+/g, ' ');
+  const { text: folded, toLine } = collapseWhitespace(foldForMatch(line));
+  const at = (m: RegExpMatchArray): { start: number; end: number } => ({
+    start: toLine[m.index ?? 0],
+    end: toLine[(m.index ?? 0) + m[0].length - 1] + 1,
+  });
   const ymd = folded.match(/(?<!\d)(\d{4})\s*[-/.]\s*(\d{1,2})\s*[-/.]\s*(\d{1,2})(?!\d)/);
   if (ymd) {
     const iso = validIso(Number(ymd[1]), Number(ymd[2]), Number(ymd[3]));
-    if (iso) return { iso, ambiguous: false }; // year-first is always year-month-day
+    if (iso) return { iso, ambiguous: false, ...at(ymd) }; // year-first is always year-month-day
   }
   const dmy = folded.match(/(?<!\d)(\d{1,2})\s*[-/.]\s*(\d{1,2})\s*[-/.]\s*(\d{4}|\d{2})(?!\d)/);
   if (dmy) {
@@ -66,13 +86,13 @@ export function parseDate(line: string): DateMatch | null {
     const y = fullYear(Number(dmy[3]), dmy[3].length);
     if (a > 12) {
       const iso = validIso(y, b, a);
-      if (iso) return { iso, ambiguous: false };
+      if (iso) return { iso, ambiguous: false, ...at(dmy) };
     } else if (b > 12) {
       const iso = validIso(y, a, b);
-      if (iso) return { iso, ambiguous: false };
+      if (iso) return { iso, ambiguous: false, ...at(dmy) };
     } else {
       const iso = validIso(y, b, a); // day-first
-      if (iso) return { iso, ambiguous: a !== b };
+      if (iso) return { iso, ambiguous: a !== b, ...at(dmy) };
     }
   }
   const named = folded.match(NAMED_RE);
@@ -80,7 +100,7 @@ export function parseDate(line: string): DateMatch | null {
     const month = monthByName(named[2]);
     if (month) {
       const iso = validIso(fullYear(Number(named[3]), named[3].length), month, Number(named[1]));
-      if (iso) return { iso, ambiguous: false };
+      if (iso) return { iso, ambiguous: false, ...at(named) };
     }
   }
   return null;
