@@ -4,7 +4,7 @@
 - **PR**: [#268](https://github.com/AbdelrhmanAh7/Mizano/pull/268)
 - **Branch**: `ai/153`
 - **Base**: `master` (`451cc181`)
-- **Tested Head Commit**: `99abae33` (merged with latest `origin/master`)
+- **Tested Head Commit**: `8e42e0c74d7f96492ba60dba805130cc7eca4b35` (merged with latest `origin/master`)
 - **Sentry Issue**: N/A (Feature enablement & in-repo testing framework adoption, not triggered by a Sentry error)
 
 ---
@@ -29,11 +29,11 @@
 | **AC1** | Form sign-in & dashboard navigation      | `e2e-army/153-e2e-army-gate.e2e.ts` (test: AC1 demo accountant signs in)                                                                                                 |         0          | **PASSED** |
 | **AC2** | Ledger entry balance & rejection         | `e2e-army/153-e2e-army-gate.e2e.ts` (test: AC2 balanced ledger entry); `pnpm --filter api exec jest src/modules/accounting/services/journals.service.spec.ts` (49 tests) |         0          | **PASSED** |
 | **AC3** | Draft invoice creation & line validation | `e2e-army/153-e2e-army-gate.e2e.ts` (test: AC3 sales invoice created as draft); `pnpm --filter api exec jest src/modules/sales/services/invoices.service.spec.ts`        |         0          | **PASSED** |
-| **AC4** | Arabic RTL & English LTR layouts         | `e2e-army/153-e2e-army-gate.e2e.ts` (test: AC4 Arabic pages render right-to-left)                                                                                        |         0          | **PASSED** |
+| **AC4** | Arabic RTL & English LTR layouts         | `e2e-army/153-e2e-army-gate.e2e.ts` (test: AC4 Arabic pages render right-to-left, English left-to-right)                                                                 |         0          | **PASSED** |
 | **AC5** | Sharded CI configuration (≤ 5 min)       | `.github/workflows/e2e-army.yml` inspection: `jq -c '["pr"] + [.shards[].id]' e2e-army/shards.json`, `timeout-minutes: 5`                                                |         0          | **PASSED** |
 | **AC6** | Service unit test coverage               | `pnpm --filter api exec jest <22 service spec files>` (22 suites / 199 tests passed, 0 failed)                                                                           |         0          | **PASSED** |
 | **AC7** | Zero committed secrets                   | `git diff origin/master -- e2e.config.ts e2e-army/cli-model.ts` inspection: reads `process.env` and Keychain only                                                        |         0          | **PASSED** |
-| **AC8** | Rebase & pre-push checks                 | `git merge origin/master`, `pnpm type-check` (6/6 tasks passed), `pnpm --filter api lint` (0 errors)                                                                     |         0          | **PASSED** |
+| **AC8** | Rebase & pre-push checks                 | `git merge origin/master`, `pnpm type-check` (6/6 tasks passed), `pnpm lint` (4/4 packages passed, 0 errors)                                                             |         0          | **PASSED** |
 
 ---
 
@@ -77,7 +77,7 @@ $ pnpm type-check
 • turbo 2.8.12
 • Packages in scope: @mizano/shared-types, @mizano/validators, @mizano/web, api
  Tasks:    6 successful, 6 total
- Time:    1m0.721s
+ Time:    27.63s
 ```
 
 **Exit Code**: 0
@@ -85,10 +85,11 @@ $ pnpm type-check
 ### 2. Linting
 
 ```text
-$ pnpm --filter api lint
-> api@0.1.0 lint /Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-153/apps/api
-> eslint "{src,apps,libs,test}/**/*.ts"
-✨ Done in 22.8s. (0 errors, 0 warnings)
+$ pnpm lint
+• turbo 2.8.12
+• Packages in scope: @mizano/shared-types, @mizano/validators, @mizano/web, api
+ Tasks:    4 successful, 4 total
+ Time:    33.141s (0 errors)
 ```
 
 **Exit Code**: 0
@@ -136,7 +137,48 @@ PASS src/modules/accounting/services/journals.service.spec.ts
 Test Suites: 1 passed, 1 total
 Tests:       49 passed, 49 total
 Snapshots:   0 total
-Time:        7.774 s
+Time:        2.691 s
 ```
 
 **Exit Code**: 0
+
+---
+
+## Bug Fix & Regression Proof (Red-Green Cycle)
+
+### 1. Bank Accounts Null-Safety Bug Fix (`Finding 5867d6948416`)
+
+- **Symptom**: Calling `PATCH /banking/accounts/:id` with `{ linkedAccountId: null }` previously passed `null` directly to Prisma query filters without a prior null-check, triggering unhandled database exceptions.
+- **Root Cause**: `assertOwnLinkedAccount` did not guard against falsy/null inputs before issuing the `prisma.account.findFirst` query.
+- **Fix**: Added explicit guard `if (!linkedAccountId) throw new BadRequestException('Linked ledger account not found')` in `apps/api/src/modules/banking/services/bank-accounts.service.ts`.
+- **Regression Test**: `src/modules/banking/services/bank-accounts.service.spec.ts`:
+  - `rejects (400) when linkedAccountId is null`
+- **Observed Result**: Test passes (Exit code 0).
+
+### 2. Manual Depreciation Error Codes Bug Fix (`6eff9ac6`)
+
+- **Symptom**: Manual asset depreciation on un-scheduled or already depreciated periods previously resulted in unhandled 500 server errors.
+- **Root Cause**: Missing entity and state check exceptions in `DepreciationService.runDepreciationForAsset`.
+- **Fix**: Replaced unchecked operations with explicit `NotFoundException` (404) for missing schedule and `ConflictException` (409) for already depreciated periods in `apps/api/src/modules/assets/services/depreciation.service.ts`.
+- **Regression Test**: `src/modules/assets/services/depreciation.service.spec.ts`:
+  - `answers 404 for an unknown or foreign asset, scoped to the organization`
+  - `answers 404 for a period without a schedule entry (a client error, not a 500)`
+  - `answers 409 when the period was already depreciated`
+- **Observed Result**: 3/3 passed (Exit code 0).
+
+---
+
+## UI Localization & RTL Verification
+
+- **Suite**: `e2e-army/153-e2e-army-gate.e2e.ts` (AC4: `@issue-153 AC4: Arabic pages render right-to-left with Arabic text, English pages left-to-right`)
+- **Arabic Inspection**:
+  - Target: `/ar/login`
+  - Arabic Heading: `تسجيل الدخول` visible
+  - Direction: `document.documentElement.dir === 'rtl'`
+  - Language: `document.documentElement.lang === 'ar'`
+- **English Inspection**:
+  - Target: `/en/login`
+  - English Heading: `Sign In` visible
+  - Direction: `document.documentElement.dir === 'ltr'`
+  - Language: `document.documentElement.lang === 'en'`
+- **Observed Result**: Verified in gate suite; exit code 0.
