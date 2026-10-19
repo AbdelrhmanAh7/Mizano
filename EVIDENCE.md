@@ -552,7 +552,7 @@ Each trial balance has two tenant filters: the account list and the line totals.
 ## Issue #258 — Auth error contract and response casing enforcement
 
 - **Base Commit (`master`)**: `451cc181`
-- **Tested Commit (`ai/258`)**: `d13d4e0c`
+- **Tested Code Head (`ai/258`)**: `6e3c940d` (all product & spec code committed; this file committed after it)
 - **PR Relation**: Supersedes part of #234 (parent issue #219, split #258).
 - **UI / RTL Scope**: N/A (pure backend auth API contract and response error casing; no UI screens modified).
 
