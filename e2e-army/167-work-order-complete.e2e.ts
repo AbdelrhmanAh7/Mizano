@@ -107,7 +107,7 @@ async function createBomAndWorkOrder(
 
 test(
   '@issue-167 AC1 AC2: completing a work order with a quantity succeeds via API',
-  { tags: ['feat:mz-work-orders', 'lvl:api'] },
+  { tags: ['feat:mz-bom', 'feat:mz-work-orders', 'lvl:api'] },
   async ({ app }) => {
     const token = await loginAndGetToken(app);
     const api = apiBase(String(app.baseUrl));
@@ -136,7 +136,7 @@ test(
 
 test(
   '@issue-167 AC1 AC2: the API contract is unchanged: the legacy producedQuantity field is not accepted',
-  { tags: ['feat:mz-work-orders', 'lvl:api'] },
+  { tags: ['feat:mz-bom', 'feat:mz-work-orders', 'lvl:api'] },
   async ({ app }) => {
     const token = await loginAndGetToken(app);
     const api = apiBase(String(app.baseUrl));
@@ -162,7 +162,7 @@ test(
 
 test(
   '@issue-167 AC1 AC2: completing a work order from the web UI succeeds',
-  { tags: ['feat:mz-work-orders', 'lvl:ui'] },
+  { tags: ['feat:mz-bom', 'feat:mz-work-orders', 'lvl:ui'] },
   async ({ app, agent, screen }) => {
     await app.open('/en/login');
     await agent.act('sign in as {email} with password {pw}', {

@@ -43,11 +43,11 @@ describe('useCompleteWorkOrder', () => {
     mockApiPost.mockResolvedValue({ data: { id: 'wo1', status: 'COMPLETED' } });
   });
 
-  it('calls api.post with quantityProduced (not producedQuantity)', async () => {
+  it('calls api.post with quantityProduced when called with quantityProduced parameter', async () => {
     const { result } = renderHook(() => useCompleteWorkOrder(), { wrapper: createWrapper() });
 
     await act(async () => {
-      await result.current.mutateAsync({ id: 'wo1', producedQuantity: 5 });
+      await result.current.mutateAsync({ id: 'wo1', quantityProduced: 5 });
     });
 
     // The API should be called with quantityProduced, not producedQuantity
@@ -57,28 +57,30 @@ describe('useCompleteWorkOrder', () => {
     expect(mockApiPost).toHaveBeenCalledTimes(1);
   });
 
-  it('sends the correct payload structure to the API', async () => {
+  it('maintains backward compatibility when called with producedQuantity parameter', async () => {
     const { result } = renderHook(() => useCompleteWorkOrder(), { wrapper: createWrapper() });
 
     await act(async () => {
       await result.current.mutateAsync({ id: 'wo1', producedQuantity: 10 });
     });
 
-    // Verify the payload sent to the API has quantityProduced
+    // Verify the payload sent to the API is still quantityProduced
     const calledWith = mockApiPost.mock.calls[0];
     expect(calledWith[0]).toBe('/manufacturing/work-orders/wo1/complete');
     expect(calledWith[1]).toEqual({ quantityProduced: 10 });
+    expect(mockApiPost).toHaveBeenCalledTimes(1);
   });
 
   it('handles completion with zero quantity', async () => {
     const { result } = renderHook(() => useCompleteWorkOrder(), { wrapper: createWrapper() });
 
     await act(async () => {
-      await result.current.mutateAsync({ id: 'wo1', producedQuantity: 0 });
+      await result.current.mutateAsync({ id: 'wo1', quantityProduced: 0 });
     });
 
     expect(mockApiPost).toHaveBeenCalledWith('/manufacturing/work-orders/wo1/complete', {
       quantityProduced: 0,
     });
+    expect(mockApiPost).toHaveBeenCalledTimes(1);
   });
 });
