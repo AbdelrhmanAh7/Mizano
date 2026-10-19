@@ -69,6 +69,8 @@ import { OllamaTunnelController } from '../controllers/ollama-tunnel.controller'
     PaddleOcrService,
     ExtractionStrategyResolver,
     DocumentIntakeService,
+    IntakeJobsService,
+    IntakeJobOwnerGuard,
     IntakeQueueService,
     IntakeStorage,
     ReorderPointsService,

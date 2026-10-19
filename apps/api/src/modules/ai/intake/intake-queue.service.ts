@@ -88,17 +88,26 @@ export class IntakeQueueService implements OnModuleDestroy {
   }
 
   /**
+   * Without Redis the queue is in-process, so only a process that registered a handler can run
+   * a job. The API process registers none: it needs REDIS_URL to reach the worker container.
+   */
+  isAvailable(): boolean {
+    return Boolean(this.redisUrl) || this.handler !== null;
+  }
+
+  /** Throws before any side effect when a job enqueued now could never be consumed. */
+  assertAvailable(): void {
+    if (!this.isAvailable()) throw new IntakeQueueUnavailableException();
+  }
+
+  /**
    * Enqueue a job. `queueJobId` must be stable per logical attempt so a
    * duplicate enqueue (boot-time recovery) collapses into one queue entry.
    */
   async enqueue(payload: IntakeQueuePayload, queueJobId: string, delayMs = 0): Promise<void> {
     const url = this.redisUrl;
     if (!url) {
-      // The consumer lives in the worker process; an in-process queue is only visible to a
-      // process that registered a handler. Refuse instead of leaving the job QUEUED forever.
-      if (!this.handler) {
-        throw new IntakeQueueUnavailableException();
-      }
+      this.assertAvailable();
       if (this.timers.has(queueJobId)) return;
       const timer = setTimeout(() => {
         this.timers.delete(queueJobId);

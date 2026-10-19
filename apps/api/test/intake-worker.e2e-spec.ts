@@ -93,6 +93,10 @@ describe('@e2e @flow:intake-worker @issue-141 Intake worker entrypoint', () => {
     expect(res.status).toBe(HttpStatus.SERVICE_UNAVAILABLE);
     expect(res.body.code).toBe('INTAKE_QUEUE_UNAVAILABLE');
     expect(res.body.message).toContain('REDIS_URL');
+    // Refused before any side effect: no orphan row for the tenant.
+    expect(await prisma.intakeJob.count({ where: { organizationId: tenant.organizationId } })).toBe(
+      0,
+    );
   });
 
   it('@issue-141 AC2: IntakeWorkerModule boots headless and processes a QUEUED job', async () => {

@@ -15,7 +15,6 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { IntakeStage } from '../services/document-intake.service';
 import { IntakeQueueService } from './intake-queue.service';
 import { buildIntakeStorageKey, IntakeStorage, sha256Hex } from './intake-storage';
-import { IntakeQueueUnavailableException } from '../../../common/exceptions';
 
 /** Never exposes `storageKey` or the deletion marker. */
 export type IntakeJobView = Omit<IntakeJob, 'storageKey' | 'deletedAt' | 'result'> & {
@@ -108,6 +107,8 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
    * Pages through all recoverable rows. Returns the number of jobs enqueued.
    */
   async recoverJobs(): Promise<number> {
+    // An API process without Redis cannot hand rows to the worker; the worker's own sweep does it.
+    if (!this.queue.isAvailable()) return 0;
     let enqueued = 0;
     try {
       let after = '';
@@ -179,6 +180,9 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
     });
     if (existing) return { job: existing, duplicate: true };
 
+    // Fail before any side effect (stored file, DB row): a job nothing can consume must not exist.
+    this.queue.assertAvailable();
+
     const configured = Number(this.config.get<string>('INTAKE_MAX_ACTIVE_JOBS'));
     const maxActive =
       Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MAX_ACTIVE_PER_ORG;
@@ -227,17 +231,7 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
       throw error;
     }
 
-    try {
-      await this.enqueueSafely(job);
-    } catch (error) {
-      // If the queue is unavailable, clean up the job and storage
-      if (error instanceof IntakeQueueUnavailableException) {
-        await this.prisma.intakeJob.delete({ where: { id: job.id } }).catch(() => undefined);
-        await this.storage.delete(storageKey).catch(() => undefined);
-        throw error;
-      }
-      throw error;
-    }
+    await this.enqueueSafely(job);
     return { job, duplicate: false };
   }
 
@@ -252,10 +246,6 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
       this.logger.error(
         `Enqueue failed for intake job ${job.id}: ${describeError(error, { includeMessage: false })}`,
       );
-      // Re-throw IntakeQueueUnavailableException so the upload fails fast with a clear error
-      if (error instanceof IntakeQueueUnavailableException) {
-        throw error;
-      }
     }
   }
 
@@ -309,6 +299,7 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
 
   /** FAILED/DEAD_LETTER -> QUEUED as a guarded transition; dead letters get a fresh attempt budget. */
   async retry(jobId: string, organizationId: string): Promise<IntakeJob> {
+    this.queue.assertAvailable();
     const before = await this.getForOrg(jobId, organizationId);
     const pendingQueueId = queueJobId(before.id, before.attempts);
     const fromDead = await this.prisma.intakeJob.updateMany({

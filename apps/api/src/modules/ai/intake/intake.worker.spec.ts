@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
@@ -30,25 +31,42 @@ describe('IntakeModule', () => {
   afterEach(() => spies.forEach((spy) => spy.mockRestore()));
 
   it('exports the processor, queue, jobs service, owner guard and storage without redeclaration', async () => {
+    const tokens = [
+      IntakeProcessorService,
+      IntakeQueueService,
+      IntakeJobsService,
+      IntakeJobOwnerGuard,
+      IntakeStorage,
+    ];
+    // A consumer that injects each token can only see what IntakeModule exports; resolving it
+    // strictly from the consumer proves the exports, not a global lookup.
+    @Module({
+      imports: [IntakeModule],
+      providers: [
+        {
+          provide: 'CONSUMED',
+          inject: tokens,
+          useFactory: (...resolved: unknown[]): unknown[] => resolved,
+        },
+      ],
+    })
+    class ConsumerModule {}
+
     const moduleRef = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),
         EventEmitterModule.forRoot(),
         CacheModule,
-        IntakeModule,
+        ConsumerModule,
       ],
     }).compile();
     const app = await moduleRef.init();
     try {
-      for (const token of [
-        IntakeProcessorService,
-        IntakeQueueService,
-        IntakeJobsService,
-        IntakeJobOwnerGuard,
-        IntakeStorage,
-      ]) {
-        expect(app.get(token, { strict: false })).toBeDefined();
-      }
+      const consumed = app.select(ConsumerModule).get<unknown[]>('CONSUMED', { strict: true });
+      expect(consumed).toHaveLength(tokens.length);
+      consumed.forEach((instance) => expect(instance).toBeDefined());
+      // One IntakeJobsService means one startup recovery sweep.
+      expect(IntakeJobsService.prototype.recoverJobs).toHaveBeenCalledTimes(1);
     } finally {
       await app.close();
     }

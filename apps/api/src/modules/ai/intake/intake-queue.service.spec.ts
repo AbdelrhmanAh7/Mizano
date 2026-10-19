@@ -17,6 +17,14 @@ describe('IntakeQueueService without REDIS_URL', () => {
     await expect(queue.enqueue(payload, 'job-1-a0')).rejects.toThrow(/REDIS_URL/);
   });
 
+  it('reports unavailable and asserts with 503 until a handler is registered', () => {
+    expect(queue.isAvailable()).toBe(false);
+    expect(() => queue.assertAvailable()).toThrow(/REDIS_URL/);
+    queue.registerHandler(jest.fn());
+    expect(queue.isAvailable()).toBe(true);
+    expect(() => queue.assertAvailable()).not.toThrow();
+  });
+
   it('runs inline when the same process registered the handler', async () => {
     const handler = jest.fn().mockResolvedValue(undefined);
     queue.registerHandler(handler);

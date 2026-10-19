@@ -18,6 +18,7 @@
     "test:cov": "jest --coverage --maxWorkers=2",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "seed": "ts-node prisma/seed.ts",
     "download-ocr-models": "bash scripts/download-paddle-models.sh"
   },
   "dependencies": {
