@@ -4,6 +4,7 @@ Run: python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py'
 """
 
 from pathlib import Path
+import re
 import subprocess
 import unittest
 
@@ -14,13 +15,35 @@ def find_conflict_markers(content: str) -> list[tuple[int, str]]:
     """Scan text for git conflict markers and prettier-escaped markers.
 
     Returns a list of (1-based line_number, line_text) for each detected marker.
-    Distinguishes conflict separators from Markdown Setext heading underlines.
+    Distinguishes conflict separators from Markdown Setext heading underlines and
+    skips content inside fenced code blocks.
     """
     markers = []
     lines = content.splitlines()
     in_conflict = False
+    in_fence = False
+    fence_char = ""
+    fence_len = 0
 
     for idx, line in enumerate(lines, start=1):
+        # Handle fenced code blocks (``` or ~~~)
+        if not in_fence:
+            fence_match = re.match(r"^[ ]{0,3}(`{3,}|~{3,})", line)
+            if fence_match:
+                in_fence = True
+                fence_str = fence_match.group(1)
+                fence_char = fence_str[0]
+                fence_len = len(fence_str)
+                continue
+        else:
+            close_match = re.match(r"^[ ]{0,3}(`{3,}|~{3,})\s*$", line)
+            if close_match:
+                close_str = close_match.group(1)
+                if close_str[0] == fence_char and len(close_str) >= fence_len:
+                    in_fence = False
+            continue
+
+        stripped = line.strip()
         lstripped = line.lstrip()
         prev = lines[idx - 2].strip() if idx > 1 else None
 
@@ -35,19 +58,18 @@ def find_conflict_markers(content: str) -> list[tuple[int, str]]:
         # Git diff3 conflict base markers: |||||||
         elif lstripped.startswith("||||||| ") or lstripped == "|||||||":
             markers.append((idx, line))
-        # Git conflict middle marker: =======
-        elif lstripped.startswith("======="):
+        # Git conflict middle marker: exactly 7 '=' characters
+        elif re.fullmatch(r"=+", stripped) and len(stripped) == 7:
             # A markdown Setext H1 underline is a sequence of '=' following a text line.
             # It cannot be a heading underline if:
             # - We are inside a conflict block (in_conflict is True)
             # - There is no previous line (start of document)
             # - The previous line is blank
-            # - The previous line is a conflict marker or markdown block syntax (headers, rules, etc.)
+            # - The previous line is a conflict marker
             is_heading_underline = (
                 not in_conflict
                 and prev is not None
                 and prev != ""
-                and not prev.startswith(("#", "-", "*", ">", "`", "<", "|"))
                 and not any(prev.startswith(m) for m in ("<<<<<<<", ">>>>>>>", "|||||||", "< < < < < < <", "> > > > > > >"))
             )
             if not is_heading_underline:
@@ -93,6 +115,56 @@ class ConflictMarkerMatcherTests(unittest.TestCase):
         self.assertEqual(find_conflict_markers("Heading\n=======\n"), [])
         self.assertEqual(find_conflict_markers("Document Title\n========================\n"), [])
         self.assertEqual(find_conflict_markers("# Section\n\nSubheading\n=======\n\nText"), [])
+
+    def test_setext_heading_underline_after_markdown_syntax(self):
+        # Headings after formatting, blockquote, or table lines
+        content = (
+            "*Italicized Heading*\n"
+            "=======\n\n"
+            "- List Item Heading\n"
+            "=======\n\n"
+            "> Blockquote Heading\n"
+            "=======\n\n"
+            "| Table Heading |\n"
+            "=======\n"
+        )
+        self.assertEqual(find_conflict_markers(content), [])
+
+    def test_long_equals_lines_not_flagged(self):
+        # Decorative lines or banners with more than 7 '='
+        content = (
+            "============================================\n"
+            "Title banner\n"
+            "============================================\n"
+        )
+        self.assertEqual(find_conflict_markers(content), [])
+
+    def test_markers_inside_fenced_code_blocks_ignored(self):
+        # Conflict marker examples in documentation code fences must not trigger
+        content = (
+            "# Documentation with conflict marker example\n\n"
+            "```text\n"
+            "<<<<<<< HEAD\n"
+            "foo\n"
+            "=======\n"
+            "bar\n"
+            ">>>>>>> origin/master\n"
+            "```\n\n"
+            "~~~markdown\n"
+            "> > > > > > > origin/master\n"
+            "~~~\n"
+        )
+        self.assertEqual(find_conflict_markers(content), [])
+
+    def test_bare_seven_equals_outside_heading_flagged(self):
+        content = (
+            "Some text\n\n"
+            "=======\n\n"
+            "More text\n"
+        )
+        markers = find_conflict_markers(content)
+        self.assertEqual(len(markers), 1)
+        self.assertEqual(markers[0], (3, "======="))
 
     def test_full_conflict_block_detected(self):
         content = (
