@@ -24,26 +24,80 @@
 
 ## Detailed Test Logs & Commit Evidence
 
-### PR #58
+### PR #58: Telegram Long-Polling Ingestion into Intake Jobs (Issue #20)
 
-- **Commit SHA**: `2b3f01c3d7e9fe4877bb29b8af903437b3eee92a`
-- **Branch**: `demo/20-telegram-intake`
-- **Commands**:
-  ```bash
-  git checkout --detach 2b3f01c3d7e9fe4877bb29b8af903437b3eee92a
-  pnpm --filter ./apps/api exec prisma generate
-  pnpm --filter ./apps/api test telegram
-  pnpm lint
-  ```
-- **Output**:
-  ```text
-  PASS src/modules/telegram/telegram.client.spec.ts
-  PASS src/modules/telegram/telegram-link.service.spec.ts
-  PASS src/modules/telegram/telegram-intake.service.spec.ts
-  Test Suites: 3 passed, 3 total
-  Tests:       74 passed, 74 total
-  Lint: 4 packages successful
-  ```
+- **Branch**: `demo/20-telegram-intake` (rebased & merged with `master`)
+- **Tested Head SHA**: `04d1c7e8029b2397d8a01b3ff92c6e48ac8c553c`
+- **Related Issue**: #20 (milestone P3: Ingest Telegram channel invoices into durable CPU queue)
+
+#### Acceptance Criteria & Verification Matrix
+
+| AC #    | Acceptance Criterion                                                                                                                                                                                                                                                                                                                                         | Verification Method / Covering Tests                                                                                                                                                                                                          | Status                   |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| **AC1** | **Schema & Cursor Durability**: `TelegramLink` (unique `chatId`), `TelegramLinkCode` (SHA-256, 15m expiry, single-use), `TelegramPollState` (durable BIGINT cursor across restarts), `TelegramDelivery` (status, attempts, durable deferral).                                                                                                                | Unit specs: `telegram-link.service.spec.ts` (14 tests), `telegram-intake.service.spec.ts` (48 tests); Migrations: `20261004000000_telegram_links`, `20261004010000_telegram_deliveries`.                                                      | **PASSED** (exit code 0) |
+| **AC2** | **Long-Polling & Token Gating**: Ingestion operates via plain HTTP fetch without inbound webhooks; disabled gracefully when `TELEGRAM_BOT_TOKEN` is unset/empty without crashing boot. Offset advances sequentially with BIGINT support.                                                                                                                     | Unit specs: `telegram.client.spec.ts` (13 tests: disabled when token unset, sequential polling, exponential backoff).                                                                                                                         | **PASSED** (exit code 0) |
+| **AC3** | **Tenant Isolation & Link Codes**: Admin generates one-time link code (`POST /telegram/link-code`, `settings.edit`). `/link <code>` accepted only in private chats; cross-org relinking rejected; unlinked messages refused without saving; audit logged on unlink.                                                                                          | Controller & link specs: `telegram.controller.ts`, `telegram-link.service.spec.ts` (tenant-scoped links, audit entry creation, private chat verification).                                                                                    | **PASSED** (exit code 0) |
+| **AC4** | **Intake Ingestion & Privacy**: Documents/photos (PDF, JPEG, PNG, DOCX up to 15 MB) routed via `IntakeJobsService` (source: `TELEGRAM`, deduplicated). No tokens, auth headers, captions, or document content leaked in logs.                                                                                                                                | Unit specs: `telegram-intake.service.spec.ts` (sanitization assertions, deduplication, oversized file rejection).                                                                                                                             | **PASSED** (exit code 0) |
+| **AC5** | **Rate Limiting & Durable Deferral**: Per-chat rate limit (10 docs/min) does NOT block bot cursor or stall other tenants. Excess documents recorded as durable deferred `TelegramDelivery` rows; `drainDeferred()` resumes them when window opens; attempt refunds on deferral/shutdown; defensive terminal update check prevents duplicate failure replies. | Unit specs: `telegram-intake.service.spec.ts` ("does not block another chat or the cursor behind a rate-limited chat", "refunds attempts on deferral", "sends no failure reply if another processor completed the exhausted delivery first"). | **PASSED** (exit code 0) |
+| **AC6** | **Bilingual Responses**: All user-facing bot messages (`MSG.rateLimited`, `MSG.notLinked`, `MSG.privateLink`, `MSG.hint`, `MSG.failed`, `MSG.retrying`, etc.) provide clear Arabic and English instructions.                                                                                                                                                 | Unit specs: `telegram-intake.service.spec.ts` (validates `MSG` dictionary contents).                                                                                                                                                          | **PASSED** (exit code 0) |
+
+#### Test Commands & Observed Outputs
+
+1. **Telegram Unit Suites (Jest)**:
+
+   ```bash
+   nice -n 10 pnpm --filter api test -- \
+     apps/api/src/modules/telegram/telegram-intake.service.spec.ts \
+     apps/api/src/modules/telegram/telegram-link.service.spec.ts \
+     apps/api/src/modules/telegram/telegram.client.spec.ts --maxWorkers=2
+   ```
+
+   **Output**:
+
+   ```text
+   PASS src/modules/telegram/telegram-link.service.spec.ts
+   PASS src/modules/telegram/telegram.client.spec.ts
+   PASS src/modules/telegram/telegram-intake.service.spec.ts
+
+   Test Suites: 3 passed, 3 total
+   Tests:       75 passed, 75 total
+   Snapshots:   0 total
+   Time:        3.764 s
+   ```
+
+   Exit code: `0`
+
+2. **TypeScript Type Check (API & E2E Specs)**:
+
+   ```bash
+   pnpm --filter api exec tsc --noEmit
+   pnpm --filter api exec tsc --noEmit -p test/tsconfig.e2e.json
+   ```
+
+   Exit code: `0` (clean, 0 errors)
+
+3. **Linter (ESLint)**:
+   ```bash
+   pnpm --filter api exec eslint "src/modules/telegram/**/*.ts"
+   ```
+   Exit code: `0` (clean, 0 warnings, 0 errors)
+
+#### Regression & Bug Fix Evidence
+
+- **Terminal Update Race Guard (Commit `e2e20835`)**:
+  - _Symptom_: When a delivery reached max attempts, `processDelivery` marked it completed and sent `MSG.failed` without checking `updateMany` return count, potentially causing duplicate failure replies during race conditions.
+  - _Fix_: Check `ended.count === 0` after `updateMany` and return early if another invocation completed it.
+  - _Regression Test_: `sends no failure reply if another processor completed the exhausted delivery first` in `telegram-intake.service.spec.ts`.
+  - _Result_: Test failed on base code (1 failed, 49 passed) and passes on head (75/75 passed).
+- **Per-Chat Rate Limiting Stall (Commit `aafb50a4`)**:
+  - _Symptom_: When one linked chat exceeded rate limit, `TelegramRateLimitError` was thrown, halting the shared cursor in `pollOnce` and delaying all tenants by ≥ 60s.
+  - _Fix_: Record update as durable deferred `TelegramDelivery`, reply with bilingual rate-limit warning once, advance cursor, and drain deferred updates asynchronously.
+  - _Regression Test_: `does not block another chat or the cursor behind a rate-limited chat`.
+  - _Result_: Verified passing; cursor moves past throttled chat to immediately process updates for other chats.
+- **Environment & Secrets Guard (Commit `10367113`)**:
+  - _Symptom_: Hard-rule violation for modifying `.env.*` configuration files with `TELEGRAM_BOT_TOKEN`.
+  - _Fix_: Removed changes to `.env.local`, `.env.dev`, `.env.sit`, `.env.prod`. Documented variable solely in `docs/telegram-intake.md`, `docs/DEVELOPMENT.md`, and `deploy/pi/.env.pi.example`. Poller gracefully disabled when variable is unset.
+  - _Result_: Verified clean working tree with no secret leaks in tracked environment files.
 
 ### PR #60
 

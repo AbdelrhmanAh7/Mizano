@@ -404,7 +404,7 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
         where,
         data: { completedAt: new Date(), deferredUntil: null },
       });
-      // Another processor already finished this delivery and owns its reply.
+      // Defensive guard: another processor/attempt already finished this delivery and owns its reply.
       if (ended.count === 0) return;
       await this.reply(delivery.chatId, MSG.failed);
       return;
