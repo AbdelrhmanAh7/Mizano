@@ -491,8 +491,8 @@ Unset launcher heap_size_limit: 4395630592
 
 # EVIDENCE — Adopt tester-army/e2e in-repo as the E2E gate (#153)
 
-- **Base (`origin/master`)**: `451cc181` (clean merge via `99abae33`)
-- **Tested code SHA**: `b874df3a` (last code change; 22 unit suites and e2e-army gate pass), current branch HEAD `fd9ca58d` (verification and evidence reports)
+- **Base (`origin/master`)**: `5a8be028` (clean merge via `c98ee1a1`)
+- **Tested code SHA**: `2d53a24a` (latest code commit; 25 unit suites and e2e-army gate pass), current branch HEAD `c98ee1a1` (verification and evidence reports)
 - **Date**: 2026-10-19 / 2026-10-20, Mac mini (Node 22 / Node 26, pnpm 8.14.0), throwaway PostgreSQL 16 cluster (`mizano_e2e_army`), runs through the hub's suite governor
 
 | REQ   | Requirement                                                                         | How it is verified                                                                                                                                                                                 | Result                                        |
@@ -546,6 +546,19 @@ Hub-side follow-up (outside this repository): the verify job copies up to 8 top-
 - **Unit test coverage**:
   - Ran all 22 service and DTO unit test suites covering the modified modules (`pnpm --filter api exec jest ...`): 22 suites passed, 199 tests passed, 0 failed.
   - Core accounting ledger tests: `journals.service.spec.ts` 49 passed, 0 failed.
+
+## Round 6 (Clean merge with origin/master 5a8be028 and CSV hardening, #153)
+
+- **Merge SHA**: `c98ee1a1` (clean merge of `origin/master` at `5a8be028`).
+- **Additional Service Hardening**: `import.service.ts` updated with `parseCsvStream` wrapper for robust stream handling and verified by `import.service.hardening.spec.ts` (10/10 tests passed).
+- **Sales E2E Alignment**: `e2e-army/features/sales.e2e.ts` delivery challan transitions aligned with service error code return values (400 Bad Request on invalid state transitions).
+- **Static checks & Tests**:
+  - `pnpm type-check`: 6/6 tasks passed (exit 0).
+  - `pnpm --filter api lint`: 0 errors, 0 warnings (exit 0).
+  - `import.service.hardening.spec.ts`: 10 passed (exit 0).
+  - `delivery-challans.service.spec.ts`: 23 passed (exit 0).
+  - `journals.service.spec.ts`: 49 passed (exit 0).
+  - `bank-accounts.service.spec.ts` & `depreciation.service.spec.ts`: 12 passed (exit 0).
 
 ---
 

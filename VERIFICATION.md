@@ -3,8 +3,8 @@
 - **Issue**: [#153](https://github.com/AbdelrhmanAh7/Mizano/issues/153)
 - **PR**: [#268](https://github.com/AbdelrhmanAh7/Mizano/pull/268)
 - **Branch**: `ai/153`
-- **Base**: `master` (`451cc181`)
-- **Tested Head Commit**: `fd9ca58d77ba3a2250ce3b210eb0318879511d62` (merged with latest `origin/master`)
+- **Base**: `master` (`5a8be028`)
+- **Tested Head Commit**: `c98ee1a1a26602487f11dba13aa8331a86182b3e` (merged with latest `origin/master`)
 - **Sentry Issue**: N/A (Feature enablement & in-repo testing framework adoption, not triggered by a Sentry error)
 
 ---
@@ -39,7 +39,7 @@
 
 ## Changed Covering Tests
 
-The following 24 test suites directly cover the changed application behavior and gates:
+The following 25 test suites directly cover the changed application behavior and gates:
 
 1. `e2e-army/153-e2e-army-gate.e2e.ts` (E2E-first gate suite covering AC1, AC2, AC3, AC4)
 2. `apps/api/src/modules/accounting/services/journals.service.spec.ts` (AC2 ledger validation and idempotent posting)
@@ -55,16 +55,17 @@ The following 24 test suites directly cover the changed application behavior and
 12. `apps/api/src/modules/hr/services/employees.service.spec.ts`
 13. `apps/api/src/modules/hr/services/payroll.service.spec.ts`
 14. `apps/api/src/modules/import-export/controllers/import.controller.spec.ts`
-15. `apps/api/src/modules/inventory/dto/inventory-dtos.spec.ts`
-16. `apps/api/src/modules/inventory/services/price-lists.service.spec.ts`
-17. `apps/api/src/modules/inventory/services/warehouses.service.spec.ts`
-18. `apps/api/src/modules/logger/logger.controller.spec.ts`
-19. `apps/api/src/modules/manufacturing/services/bom.service.spec.ts`
-20. `apps/api/src/modules/manufacturing/services/work-orders.service.spec.ts`
-21. `apps/api/src/modules/projects/services/timesheets.service.spec.ts`
-22. `apps/api/src/modules/reports/controllers/reports.controller.spec.ts`
-23. `apps/api/src/modules/sales/services/delivery-challans.service.spec.ts`
-24. `apps/api/src/modules/tax/services/tax-rates.service.spec.ts`
+15. `apps/api/src/modules/import-export/services/import.service.hardening.spec.ts`
+16. `apps/api/src/modules/inventory/dto/inventory-dtos.spec.ts`
+17. `apps/api/src/modules/inventory/services/price-lists.service.spec.ts`
+18. `apps/api/src/modules/inventory/services/warehouses.service.spec.ts`
+19. `apps/api/src/modules/logger/logger.controller.spec.ts`
+20. `apps/api/src/modules/manufacturing/services/bom.service.spec.ts`
+21. `apps/api/src/modules/manufacturing/services/work-orders.service.spec.ts`
+22. `apps/api/src/modules/projects/services/timesheets.service.spec.ts`
+23. `apps/api/src/modules/reports/controllers/reports.controller.spec.ts`
+24. `apps/api/src/modules/sales/services/delivery-challans.service.spec.ts`
+25. `apps/api/src/modules/tax/services/tax-rates.service.spec.ts`
 
 ---
 
