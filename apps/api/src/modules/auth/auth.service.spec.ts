@@ -134,4 +134,24 @@ describe('AuthService refresh rotation', () => {
       });
     }
   });
+
+  it('rejects missing or null credentials with VALIDATION_ERROR and Validation Failed', async () => {
+    await expect(service.login(null as never)).rejects.toMatchObject({
+      response: {
+        statusCode: 400,
+        code: 'VALIDATION_ERROR',
+        message: 'Validation Failed',
+        error: 'Bad Request',
+      },
+    });
+
+    await expect(service.register(null as never)).rejects.toMatchObject({
+      response: {
+        statusCode: 400,
+        code: 'VALIDATION_ERROR',
+        message: 'Validation Failed',
+        error: 'Bad Request',
+      },
+    });
+  });
 });

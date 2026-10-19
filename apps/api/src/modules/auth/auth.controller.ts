@@ -1,4 +1,13 @@
-import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
@@ -22,6 +31,14 @@ export class AuthController {
   @ApiResponse({ status: 201, description: 'User and organization registered successfully' })
   @ApiResponse({ status: 400, description: 'Validation Failed' })
   async register(@Body() registerDto: RegisterDto) {
+    if (!registerDto) {
+      throw new BadRequestException({
+        statusCode: HttpStatus.BAD_REQUEST,
+        code: 'VALIDATION_ERROR',
+        message: 'Validation Failed',
+        error: 'Bad Request',
+      });
+    }
     return this.authService.register(registerDto);
   }
 
@@ -33,6 +50,14 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Validation Failed' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async login(@Body() loginDto: LoginDto) {
+    if (!loginDto) {
+      throw new BadRequestException({
+        statusCode: HttpStatus.BAD_REQUEST,
+        code: 'VALIDATION_ERROR',
+        message: 'Validation Failed',
+        error: 'Bad Request',
+      });
+    }
     return this.authService.login(loginDto);
   }
 
@@ -49,6 +74,13 @@ export class AuthController {
     @CurrentUser() user: CurrentUserData,
     @Body() refreshTokenDto: RefreshTokenDto,
   ) {
+    if (!user || !user.id || !refreshTokenDto?.refreshToken) {
+      throw new UnauthorizedException({
+        statusCode: HttpStatus.UNAUTHORIZED,
+        message: 'Invalid refresh token',
+        error: 'Unauthorized',
+      });
+    }
     return this.authService.refreshTokens(user.id, refreshTokenDto.refreshToken);
   }
 
@@ -60,6 +92,13 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Logout successful' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async logout(@CurrentUser() user: CurrentUserData) {
+    if (!user || !user.id) {
+      throw new UnauthorizedException({
+        statusCode: HttpStatus.UNAUTHORIZED,
+        message: 'Invalid or expired token',
+        error: 'Unauthorized',
+      });
+    }
     return this.authService.logout(user.id);
   }
 }

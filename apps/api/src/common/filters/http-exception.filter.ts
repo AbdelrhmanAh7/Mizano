@@ -73,9 +73,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       const isProduction = process.env.NODE_ENV === 'production';
       return {
         statusCode: HttpStatus.BAD_REQUEST,
-        code: 'PRISMA_VALIDATION_ERROR',
-        message: 'Database validation error',
-        error: 'Validation Error',
+        code: 'VALIDATION_ERROR',
+        message: 'Validation Failed',
+        error: 'Bad Request',
         details: isProduction
           ? undefined
           : { prismaError: exception.message.split('\n').slice(-2).join(' ').trim() },
@@ -212,17 +212,33 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message = (responseObj.message as string) || exception.message;
       error = (responseObj.error as string) || fallbackError;
       code = responseObj.code as string | undefined;
-      details = responseObj.details as Record<string, unknown> | undefined;
+      details = (responseObj.details || responseObj.errors) as Record<string, unknown> | undefined;
 
-      // Handle validation errors from class-validator
-      if (Array.isArray(responseObj.message)) {
-        details = this.formatValidationErrors(responseObj.message);
+      // Handle all validation errors (from class-validator, direct exceptions, or services)
+      const isValidationError =
+        status === HttpStatus.BAD_REQUEST &&
+        (Array.isArray(responseObj.message) ||
+          code === 'VALIDATION_ERROR' ||
+          responseObj.code === 'VALIDATION_ERROR' ||
+          (typeof message === 'string' && message.toLowerCase().includes('validation')) ||
+          (typeof responseObj.message === 'string' &&
+            responseObj.message.toLowerCase().includes('validation')));
+
+      if (isValidationError) {
+        if (Array.isArray(responseObj.message)) {
+          details = this.formatValidationErrors(responseObj.message);
+        }
         message = 'Validation Failed';
         code = 'VALIDATION_ERROR';
         error = (responseObj.error as string) || 'Bad Request';
       }
     } else if (typeof exceptionResponse === 'string') {
       message = exceptionResponse;
+      if (status === HttpStatus.BAD_REQUEST && message.toLowerCase().includes('validation')) {
+        message = 'Validation Failed';
+        code = 'VALIDATION_ERROR';
+        error = 'Bad Request';
+      }
     }
 
     return {

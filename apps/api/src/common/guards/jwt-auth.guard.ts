@@ -1,4 +1,4 @@
-import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { Injectable, ExecutionContext, UnauthorizedException, HttpStatus } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
@@ -24,8 +24,15 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   handleRequest(err: any, user: any, _info: any): any {
-    if (err || !user) {
-      throw err || new UnauthorizedException('Invalid or expired token');
+    if (err) {
+      throw err;
+    }
+    if (!user) {
+      throw new UnauthorizedException({
+        statusCode: HttpStatus.UNAUTHORIZED,
+        message: 'Invalid or expired token',
+        error: 'Unauthorized',
+      });
     }
     return user;
   }

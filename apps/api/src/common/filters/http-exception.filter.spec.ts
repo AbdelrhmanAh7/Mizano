@@ -100,6 +100,26 @@ describe('AllExceptionsFilter (auth error contract)', () => {
     expect(JSON.stringify(body.details)).toMatch(/email/i);
   });
 
+  it('normalizes direct non-class-validator validation errors to Validation Failed and VALIDATION_ERROR', () => {
+    const stringEx = render(new BadRequestException('Validation failed'));
+    expect(stringEx.status).toBe(HttpStatus.BAD_REQUEST);
+    expect(stringEx.body.code).toBe('VALIDATION_ERROR');
+    expect(stringEx.body.message).toBe('Validation Failed');
+    expect(stringEx.body.error).toBe('Bad Request');
+
+    const objEx = render(
+      new BadRequestException({
+        message: 'Validation failed',
+        errors: { amount: ['Amount must be positive'] },
+      }),
+    );
+    expect(objEx.status).toBe(HttpStatus.BAD_REQUEST);
+    expect(objEx.body.code).toBe('VALIDATION_ERROR');
+    expect(objEx.body.message).toBe('Validation Failed');
+    expect(objEx.body.error).toBe('Bad Request');
+    expect(objEx.body.details).toEqual({ amount: ['Amount must be positive'] });
+  });
+
   it('renders a missing or invalid JWT as 401 Unauthorized', () => {
     const guard = new JwtAuthGuard({} as never);
     let thrown: unknown;
