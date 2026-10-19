@@ -552,7 +552,7 @@ Each trial balance has two tenant filters: the account list and the line totals.
 
 - **Issue**: #212 (Follow-up: findings merged under an open CHANGES_REQUESTED (#162, #143, #107))
 - **Scope**: Slice 1 — #162 items 1–2: p0 delivery-challan org-scoping fix and test hardening
-- **Tested commit**: `2f5b7898` (HEAD of `ai/212`)
+- **Tested commit**: `afb64e8c` (HEAD of `ai/212`; code unchanged from `2f5b7898`, `afb64e8c` is a docs-only update)
 - **Base commit**: `5a8be028` (`origin/master`)
 - **Originating Sentry issue**: none
 - **UI screenshots**: none (API-only service change, no user-facing UI flow)
@@ -619,11 +619,11 @@ Tests: 26 passed, 26 total
 
 **Root cause on base**: line 168 threw a hard-coded `ConflictException` for any `count !== 1`, making no distinction between a missing record (should be 404), a status mismatch (should be 400), and a genuine race condition (409). The fix delegates to `rejectTransition`, which re-reads the record in the same transaction and throws the appropriate exception.
 
-## Local Checks
+## Local Checks (re-run on HEAD `afb64e8c`)
 
 - **Linter**: `pnpm --filter api lint` — exit code 0, clean.
-- **Typecheck**: `pnpm --filter api type-check` — 10 pre-existing errors in `logger.service.ts` and `@mizano/shared-types`, identically present on base (`origin/master`); 0 errors in the changed delivery-challans files.
-- **Unit tests**: `nice -n 10 pnpm --filter api exec jest --maxWorkers=2 src/modules/sales/services/delivery-challans.service.spec.ts` — 26 passed, exit code 0.
+- **Typecheck**: `pnpm --filter api type-check` — exit code 0, clean (pre-existing errors on base eliminated by earlier work; 0 errors in the changed delivery-challans files).
+- **Unit tests**: `nice -n 10 pnpm --filter api exec jest --maxWorkers=2 src/modules/sales/services/delivery-challans.service.spec.ts` — 26 passed, exit code 0, 9.903 s.
 
 ## Out of scope (follow-ups for #212)
 
