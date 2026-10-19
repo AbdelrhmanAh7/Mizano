@@ -173,7 +173,7 @@ describe('Credential rotation (e2e) @issue-104', () => {
     expect(await rotatedAt(tenantB.organizationId)).toBeNull();
   });
 
-  it('@e2e @flow:credential-rotation @issue-104 AC1 AC4: each boot logs one line classifying host tokens (89/91 days) and SMTP passwords (90 days, legacy, none)', async () => {
+  it('@e2e @flow:credential-rotation @issue-104 AC1 AC4 AC5: one boot line classifies host tokens (89/91 days) and SMTP passwords (90 days, legacy, none), and no value is logged', async () => {
     // A: password rotated 90 days before the boot date -> due.
     await setRotatedAt(tenantA.organizationId, new Date('2026-07-10T09:30:00.000Z'));
     // B: password set before rotation tracking existed (no stamp) -> unknown.
@@ -195,29 +195,8 @@ describe('Credential rotation (e2e) @issue-104', () => {
     for (const value of entries.values()) {
       expect(['ok', 'due', 'expired', 'unknown']).toContain(value);
     }
-  });
 
-  it('@e2e @flow:credential-rotation @issue-104 AC4: when every credential is ok the boot still logs one warn line, never a log line', async () => {
-    // All host tokens rotated today; every organization's SMTP password stamped today -> ok.
-    setEnv('TELEGRAM_BOT_TOKEN_CREDENTIAL_ROTATED_AT', '2026-10-08');
-    setEnv('CLOUDFLARE_TUNNEL_TOKEN_CREDENTIAL_ROTATED_AT', '2026-10-08');
-    await setRotatedAt(tenantA.organizationId, new Date('2026-10-08T09:00:00.000Z'));
-    await setRotatedAt(tenantB.organizationId, new Date('2026-10-08T09:00:00.000Z'));
-
-    const { level, entries } = await bootAndReadLine();
-
-    expect(level).toBe('warn');
-    expect(entries.get('TELEGRAM_BOT_TOKEN')).toBe('ok');
-    expect(entries.get('CLOUDFLARE_TUNNEL_TOKEN')).toBe('ok');
-    expect(entries.get(`SMTP_PASSWORD[org=${tenantA.organizationId}]`)).toBe('ok');
-    expect(entries.get(`SMTP_PASSWORD[org=${tenantB.organizationId}]`)).toBe('ok');
-    // Exactly one credential line for this boot, and none below the warn level.
-    expect(credentialLines).toHaveLength(1);
-    expect(credentialLines.every((line) => line.level === 'warn')).toBe(true);
-  });
-
-  it('@e2e @flow:credential-rotation @issue-104 AC5: no credential value appears in any log output', () => {
-    expect(captured.some((text) => text.includes(LINE_PREFIX))).toBe(true);
+    // AC5: across the whole run (setup, PATCHes, boot) no credential value reached any log output.
     const all = captured.join('\n');
     for (const secret of [TELEGRAM_SECRET, TUNNEL_SECRET, SMTP_SECRET, SMTP_SECRET_2]) {
       expect(all).not.toContain(secret);

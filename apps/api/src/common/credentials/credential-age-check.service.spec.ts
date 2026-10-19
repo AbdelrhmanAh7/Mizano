@@ -64,6 +64,11 @@ describe('CredentialAgeCheckService (@issue-104)', () => {
       'TELEGRAM_BOT_TOKEN=ok, CLOUDFLARE_TUNNEL_TOKEN=expired, SMTP_PASSWORD=unknown',
     );
     expect(error).toHaveBeenCalledTimes(1);
+    // The lookup error text (which carries a secret-looking value) must not reach any log call.
+    const output = JSON.stringify([...warn.mock.calls, ...error.mock.calls, ...log.mock.calls]);
+    expect(output).not.toContain(TUNNEL_SECRET);
+    expect(output).not.toContain(TELEGRAM_SECRET);
+    expect(output).not.toContain('missing');
   });
 
   it('logs exactly one warn line and no value, even when every credential is ok', async () => {
