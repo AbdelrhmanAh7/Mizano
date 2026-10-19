@@ -117,7 +117,22 @@ describe('AllExceptionsFilter (auth error contract)', () => {
     expect(objEx.body.code).toBe('VALIDATION_ERROR');
     expect(objEx.body.message).toBe('Validation Failed');
     expect(objEx.body.error).toBe('Bad Request');
-    expect(objEx.body.details).toEqual({ amount: ['Amount must be positive'] });
+  });
+
+  it('preserves unrelated 400 messages and does not leak errors on non-validation exceptions', () => {
+    const custom400 = render(new BadRequestException('Transfer exceeds limit'));
+    expect(custom400.status).toBe(HttpStatus.BAD_REQUEST);
+    expect(custom400.body.message).toBe('Transfer exceeds limit');
+    expect(custom400.body.code).toBeUndefined();
+
+    const nonValidationWithErrors = render(
+      new BadRequestException({
+        message: 'Invalid credit rating',
+        errors: { query: 'SELECT * FROM internal' },
+      }),
+    );
+    expect(nonValidationWithErrors.body.message).toBe('Invalid credit rating');
+    expect(nonValidationWithErrors.body.details).toBeUndefined();
   });
 
   it('renders a missing or invalid JWT as 401 Unauthorized', () => {

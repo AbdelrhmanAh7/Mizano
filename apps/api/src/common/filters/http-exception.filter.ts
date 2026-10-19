@@ -212,21 +212,27 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message = (responseObj.message as string) || exception.message;
       error = (responseObj.error as string) || fallbackError;
       code = responseObj.code as string | undefined;
-      details = (responseObj.details || responseObj.errors) as Record<string, unknown> | undefined;
+      details = responseObj.details as Record<string, unknown> | undefined;
 
-      // Handle all validation errors (from class-validator, direct exceptions, or services)
+      // Handle validation errors from class-validator or explicit validation rejections
       const isValidationError =
         status === HttpStatus.BAD_REQUEST &&
         (Array.isArray(responseObj.message) ||
           code === 'VALIDATION_ERROR' ||
           responseObj.code === 'VALIDATION_ERROR' ||
-          (typeof message === 'string' && message.toLowerCase().includes('validation')) ||
+          (typeof message === 'string' &&
+            (message.toLowerCase() === 'validation failed' ||
+              message.toLowerCase() === 'validation error')) ||
           (typeof responseObj.message === 'string' &&
-            responseObj.message.toLowerCase().includes('validation')));
+            (responseObj.message.toLowerCase() === 'validation failed' ||
+              responseObj.message.toLowerCase() === 'validation error')));
 
       if (isValidationError) {
         if (Array.isArray(responseObj.message)) {
           details = this.formatValidationErrors(responseObj.message);
+        } else if (responseObj.errors && typeof responseObj.errors === 'object') {
+          // Limit errors field mapping strictly to validation errors only
+          details = responseObj.errors as Record<string, unknown>;
         }
         message = 'Validation Failed';
         code = 'VALIDATION_ERROR';
@@ -234,7 +240,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }
     } else if (typeof exceptionResponse === 'string') {
       message = exceptionResponse;
-      if (status === HttpStatus.BAD_REQUEST && message.toLowerCase().includes('validation')) {
+      if (
+        status === HttpStatus.BAD_REQUEST &&
+        (message.toLowerCase() === 'validation failed' ||
+          message.toLowerCase() === 'validation error')
+      ) {
         message = 'Validation Failed';
         code = 'VALIDATION_ERROR';
         error = 'Bad Request';
