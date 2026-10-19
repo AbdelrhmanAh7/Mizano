@@ -552,8 +552,8 @@ Each trial balance has two tenant filters: the account list and the line totals.
 # Issue #253 Verification — Guard against leftover merge-conflict markers in markdown
 
 - **Issue**: #253 (fix: qa finding: EVIDENCE.md leftover merge-conflict marker, split from #237)
-- **Base Commit (`origin/master`)**: `451cc181`
-- **Tested Head (`ai/253`)**: `8ab78121`
+- **Base Commit (`origin/master`)**: `5a8be028`
+- **Tested Head (`ai/253`)**: `ad7fa04b`
 - **Originating Sentry issue**: None (internal QA finding on PR #237, item `finding:7d58c29ac8ff`)
 - **Scope & Context**:
   - In PR #237 (branch `ai/141`), a leftover merge-conflict marker `> > > > > > > origin/master` was committed after the #127 section in `EVIDENCE.md`.
