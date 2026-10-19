@@ -4,7 +4,7 @@ Part of #42 (not "Closes"): the measurement acceptance has **not** been run, see
 Complements #16 and #24. The Raspberry Pi was retired on 2026-10-10; the project is served from the
 Mac mini, so nothing in this file claims a Pi result.
 
-- **Tested commit**: `015d32a2e88eb6e7d656941f4ca1b07a1029cd85` (code; this file is committed afterwards and changes no code).
+- **Tested commit**: `2d8f789d992401cf032480bb1fbb2d4838a227b6` (code; this file is committed afterwards and changes no code).
 - **Environment of the checks below**: macOS arm64 developer machine, no PostgreSQL, Redis, Docker or
   `prlimit`. Anything that needs them (the seeded API e2e specs, the Linux `prlimit` process suite,
   the arm64 image build) was **not run locally**; GitHub-hosted CI runs them after the push.
