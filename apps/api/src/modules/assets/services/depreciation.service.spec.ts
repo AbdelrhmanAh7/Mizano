@@ -110,24 +110,52 @@ describe('DepreciationService', () => {
       async ({ where }) => assets.find((a) => a.id === where.id && live(a, where)) ?? null,
     );
     mock(prisma.asset.update).mockImplementation(async ({ where, data }) =>
-      Object.assign(assets.find((a) => a.id === where.id)!, data),
+      Object.assign(
+        assets.find((a) => a.id === where.id && a.organizationId === where.organizationId)!,
+        data,
+      ),
     );
-    mock(prisma.depreciationSchedule.findUnique).mockImplementation(async ({ where }) => {
-      const key = where.assetId_month_year;
-      return (
-        schedules.find(
-          (s) => s.assetId === key.assetId && s.month === key.month && s.year === key.year,
-        ) ?? null
-      );
-    });
+    // Serves both lookups: by period (assetId, month, year) and by id (reverse).
     mock(prisma.depreciationSchedule.findFirst).mockImplementation(async ({ where }) => {
-      const s = schedules.find(
-        (r) => r.id === where.id && r.organizationId === where.organizationId,
+      const hit = schedules.find(
+        (s) =>
+          s.organizationId === where.organizationId &&
+          (where.id === undefined || s.id === where.id) &&
+          (where.assetId === undefined ||
+            (s.assetId === where.assetId && s.month === where.month && s.year === where.year)),
       );
-      return s ? { ...s, asset: assets.find((a) => a.id === s.assetId), journal: null } : null;
+      return hit
+        ? { ...hit, asset: assets.find((a) => a.id === hit.assetId), journal: null }
+        : null;
+    });
+    mock(prisma.depreciationSchedule.findMany).mockImplementation(async ({ where }) =>
+      schedules
+        .filter(
+          (s) =>
+            s.organizationId === where.organizationId &&
+            (where.assetId === undefined || s.assetId === where.assetId) &&
+            (where.month === undefined || (s.month === where.month && s.year === where.year)) &&
+            (where.executedAt === null ? s.executedAt === null : s.executedAt !== null),
+        )
+        .map((s) => ({ ...s, asset: assets.find((a) => a.id === s.assetId) })),
+    );
+    mock(prisma.journal.update).mockResolvedValue({} as never);
+    mock(prisma.depreciationSchedule.updateMany).mockImplementation(async ({ where, data }) => {
+      // Atomic compare-and-set, like the DB: matches only unexecuted rows of this org.
+      const hit = schedules.find(
+        (s) =>
+          s.id === where.id &&
+          s.organizationId === where.organizationId &&
+          (where.executedAt !== null || s.executedAt === null),
+      );
+      if (hit) Object.assign(hit, data);
+      return { count: hit ? 1 : 0 };
     });
     mock(prisma.depreciationSchedule.update).mockImplementation(async ({ where, data }) =>
-      Object.assign(schedules.find((s) => s.id === where.id)!, data),
+      Object.assign(
+        schedules.find((s) => s.id === where.id && s.organizationId === where.organizationId)!,
+        data,
+      ),
     );
     mock(prisma.journal.findFirst).mockImplementation(async () => ({
       journalNumber: `JRN-${String(journalSeq).padStart(3, '0')}`,
@@ -250,10 +278,40 @@ describe('DepreciationService', () => {
       expect(prisma.journal.create).toHaveBeenCalledTimes(3);
     });
 
-    // Bug, not fixed here (CTO rule on #208): the executedAt check runs before the
-    // $transaction and the update has no `executedAt: null` guard, so two concurrent
-    // runs for one period both post a journal. Follow-up listed in AI_QUESTIONS.md.
-    it.todo('two concurrent runs for the same asset and period create one journal');
+    // Root cause was the executedAt check outside the $transaction: both runs read
+    // executedAt = null, both posted. The period is now claimed by an in-transaction
+    // updateMany({ executedAt: null }) and the loser aborts.
+    it('two concurrent manual runs for the same asset and period create one journal', async () => {
+      const results = await Promise.allSettled([
+        service.runDepreciationForAsset(ORG_A, 'sl', 3, 2026),
+        service.runDepreciationForAsset(ORG_A, 'sl', 3, 2026),
+      ]);
+
+      expect(results.map((r) => r.status).sort()).toEqual(['fulfilled', 'rejected']);
+      expect(
+        (results.find((r) => r.status === 'rejected') as PromiseRejectedResult).reason,
+      ).toEqual(new Error('Depreciation already executed for this period'));
+      expect(prisma.journal.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('a monthly run racing a manual run for one period posts one journal', async () => {
+      const [monthly, manual] = await Promise.allSettled([
+        service.runMonthlyDepreciation(ORG_A),
+        service.runDepreciationForAsset(ORG_A, 'sl', 3, 2026),
+      ]);
+
+      const slJournals = mock(prisma.journal.create).mock.calls.filter(
+        ([a]) => a.data.reference === 'DEP-FA-sl-2026-03',
+      );
+      expect(slJournals).toHaveLength(1);
+      expect(monthly.status).toBe('fulfilled');
+      // Whichever lost reports it: monthly skips the asset, manual rejects.
+      if (manual.status === 'fulfilled') {
+        expect((monthly as PromiseFulfilledResult<{ processed: number }>).value.processed).toBe(2);
+      } else {
+        expect((monthly as PromiseFulfilledResult<{ processed: number }>).value.processed).toBe(3);
+      }
+    });
 
     it('the cron only posts on the last day of the month', async () => {
       mock(prisma.organization.findMany).mockResolvedValue([{ id: ORG_A }]);
@@ -279,9 +337,7 @@ describe('DepreciationService', () => {
         expect(arg.data.organizationId).toBe(ORG_A);
       }
       const touched = [
-        ...mock(prisma.depreciationSchedule.findUnique).mock.calls.map(
-          ([a]) => a.where.assetId_month_year.assetId,
-        ),
+        ...mock(prisma.depreciationSchedule.findFirst).mock.calls.map(([a]) => a.where.assetId),
         ...mock(prisma.depreciationSchedule.update).mock.calls.map(([a]) => a.where.id),
         ...mock(prisma.asset.update).mock.calls.map(([a]) => a.where.id),
       ];
@@ -299,7 +355,7 @@ describe('DepreciationService', () => {
         id: 'other',
         organizationId: ORG_A,
       });
-      expect(prisma.depreciationSchedule.findUnique).not.toHaveBeenCalled();
+      expect(prisma.depreciationSchedule.findFirst).not.toHaveBeenCalled();
       expect(prisma.journal.create).not.toHaveBeenCalled();
     });
 
@@ -317,9 +373,41 @@ describe('DepreciationService', () => {
       expect(prisma.journal.update).not.toHaveBeenCalled();
     });
 
-    // Gap, not fixed here: depreciationSchedule.findUnique/update/findMany and asset.update
-    // are keyed by id only. They are safe today because the asset is first read with
-    // organizationId, but the queries themselves carry no organizationId (#134 follow-up).
-    it.todo('every depreciationSchedule and asset write query carries organizationId');
+    // Every query on the org-owned models must itself carry organizationId, not rely on
+    // a previous read having been scoped.
+    it('every schedule, asset and journal query on monthly, manual and reverse paths is org-scoped', async () => {
+      schedules.push(
+        schedule('sl', '37.5000', '1012.5000', '1487.5000', {
+          id: 'sch-sl-2026-02',
+          month: 2,
+          executedAt: new Date(2026, 1, 28),
+          journalId: 'jrn-old',
+        }),
+      );
+      await service.runMonthlyDepreciation(ORG_A);
+      await service.runDepreciationForAsset(ORG_A, 'sl', 3, 2026).catch(() => undefined);
+      await service.reverseDepreciation(ORG_A, 'sch-sl-2026-02');
+      await service.getDepreciationForecast(ORG_A, 1);
+
+      const wheres = [
+        prisma.asset.findMany,
+        prisma.asset.findFirst,
+        prisma.asset.update,
+        prisma.depreciationSchedule.findFirst,
+        prisma.depreciationSchedule.findMany,
+        prisma.depreciationSchedule.updateMany,
+        prisma.depreciationSchedule.update,
+        prisma.journal.findFirst,
+        prisma.journal.update,
+      ].flatMap((fn) => mock(fn).mock.calls.map(([arg]) => ({ fn, where: arg.where })));
+
+      expect(wheres.length).toBeGreaterThan(10);
+      for (const { where } of wheres) {
+        expect(where.organizationId).toBe(ORG_A);
+      }
+      for (const [arg] of mock(prisma.journal.create).mock.calls) {
+        expect(arg.data.organizationId).toBe(ORG_A);
+      }
+    });
   });
 });
