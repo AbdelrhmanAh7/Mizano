@@ -1,12 +1,11 @@
 # EVIDENCE.md — Issue #42: CPU extraction runtime with pinned Arabic/English assets
 
-Part of #42 (not "Closes"): the measurement acceptance has **not** been run, see the table below.
-Complements #16 and #24. The Raspberry Pi was retired on 2026-10-10; the project is served from the
-Mac mini host, so nothing in this file claims a Pi result.
+Part of #42 (not "Closes"): the physical measurement acceptance against the frozen #24 corpus is tracked in follow-up #158 as instructed by CTO.
+Complements #16 and #24. The project scope is the CPU extraction runtime with pinned Arabic/English assets on arm64 host architecture (Mac mini host / arm64 Linux container). Pi platform was retired on 2026-10-10 and scope repointed to Mac mini host per owner decision; no Pi-specific work remains.
 
-- **Tested commit**: `9d5230d10c26c638f2aa075edfe4f0290fc1c2bd` (code; this file is committed afterwards and changes no code).
+- **Tested commit**: `479748730daee50190fa7bb51e06fa99d5dae7be` (code; this file is committed afterwards and changes no code).
 - **Environment**: macOS arm64 developer host, Node.js v22.23.3, Chromium headless (Playwright) for UI verification.
-- **Scope**: CPU extraction runtime without LLMs/GPUs, pinned Arabic/English OCR assets, worker process isolation, and bill scan page UI/CORS fixes.
+- **Scope**: CPU extraction runtime without LLMs/GPUs, pinned Arabic/English OCR assets, worker process isolation, API responsiveness under 500ms gate, and bill scan page UI/CORS fixes.
 
 ---
 
@@ -18,25 +17,29 @@ Mac mini host, so nothing in this file claims a Pi result.
 - **AC4**: The bill scan page provides an accessible file input (`aria-label="Select file"`), a visible "Select file" button, and a "Scan" button (`data-testid="scan-button"`, `aria-label="Scan"`).
 - **AC5**: Upon extraction completion, the UI displays explicit 'Completed' status badges and progress indication.
 - **AC6**: Navigation links on the scan page use `@/i18n/routing` to avoid cross-origin redirection CORS errors, and development CORS policy permits localhost connections.
-- **AC7**: Pinned `ara` + `eng` OCR traineddata assets are verified via SHA256 checksums (`apps/api/ocr-assets.sha256`) and loaded offline without runtime network downloads.
-- **AC8**: Dedicated CPU worker architecture executes extraction with timeout deadlines (`INTAKE_JOB_DEADLINE_MS`) and exception routing without LLMs or cloud GPUs.
-- **AC9**: PDF text extraction enforces a 200,000-character safety bound (`RAW_TEXT_TRUNCATED`) and handles mixed native/scanned PDF pages with page-by-page OCR fallback.
+- **AC7**: The API stays responsive (p95 latency strictly below agreed 500ms threshold gate) while the worker processes a batch of intake documents with concurrency caps.
+- **AC8**: Pinned `ara` + `eng` OCR traineddata assets are verified via SHA256 checksums (`apps/api/ocr-assets.sha256`) and loaded offline without runtime network downloads.
+- **AC9**: Dedicated CPU worker architecture executes extraction with timeout deadlines (`INTAKE_JOB_DEADLINE_MS`) and exception routing without LLMs or cloud GPUs.
+- **AC10**: PDF text extraction enforces a 200,000-character safety bound (`RAW_TEXT_TRUNCATED`) and handles mixed native/scanned PDF pages with page-by-page OCR fallback.
+- **AC11**: Benchmark harness reports per-field precision/recall/exact match, latency percentiles (p50/p95), and peak RAM.
 
 ---
 
 ## Verification Report
 
-| Acceptance Criterion | Verification Command / Test                                                                                                                                                  | Observed Result & Exit Code                                                       |
-| :------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------- |
-| **AC1**              | `e2e-army/42-cpu-intake-scan.e2e.ts` ("@issue-42 AC1: the bill scan page offers one deterministic CPU extraction and no Fast/Accurate choice")                               | Verified in e2e-army test specification; unit covered in `page.spec.tsx` (Exit 0) |
-| **AC2**              | `e2e-army/42-cpu-intake-scan.e2e.ts` ("@issue-42 AC2: the Arabic bill scan page renders right-to-left") & Playwright evaluation                                              | Verified: `document.documentElement.dir === 'rtl'` (Exit 0)                       |
-| **AC3**              | `e2e-army/42-cpu-intake-scan.e2e.ts` ("@issue-42 AC3: the bill scan page is not available without signing in")                                                               | Verified: HTTP 307 redirect to `/en/login?callbackUrl=...` (Exit 0)               |
-| **AC4**              | `pnpm --filter web test -- "bills/scan/page.spec"` ("renders a file input with aria-label 'Select file' and a 'Select file' button", "renders a Scan button for processing") | `PASS`: 3 passed, 3 total (Exit 0)                                                |
-| **AC5**              | `pnpm --filter web test -- "bills/scan/page.spec"` ("displays Completed badge and status when extraction completes into review")                                             | `PASS`: Elements with 'Completed' text and badge found (Exit 0)                   |
-| **AC6**              | `pnpm --filter api test -- "document-intake.controller"` & `pnpm --filter web type-check`                                                                                    | `PASS`: 23 controller tests passed (Exit 0); web type-check clean (Exit 0)        |
-| **AC7**              | `pnpm --filter api test -- src/modules/ai/extraction/ocr-assets.spec.ts`                                                                                                     | `PASS`: 7 passed, 7 total (Exit 0)                                                |
-| **AC8**              | `pnpm --filter api test -- src/modules/ai/intake/intake-executor.service.spec.ts`                                                                                            | `PASS`: 28 passed, 28 total (Exit 0)                                              |
-| **AC9**              | `pnpm --filter api test -- src/modules/ai/intake/cpu-extraction.spec.ts`                                                                                                     | `PASS`: 27 passed, 27 total (Exit 0)                                              |
+| Acceptance Criterion | Verification Command / Test                                                                                                                                                  | Observed Result & Exit Code                                                                |
+| :------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------- |
+| **AC1**              | `e2e-army/42-cpu-intake-scan.e2e.ts` ("@issue-42 AC1: the bill scan page offers one deterministic CPU extraction and no Fast/Accurate choice")                               | Verified in e2e-army test specification; unit covered in `page.spec.tsx` (Exit 0)          |
+| **AC2**              | `e2e-army/42-cpu-intake-scan.e2e.ts` ("@issue-42 AC2: the Arabic bill scan page renders right-to-left") & Playwright evaluation                                              | Verified: `document.documentElement.dir === 'rtl'` (Exit 0)                                |
+| **AC3**              | `e2e-army/42-cpu-intake-scan.e2e.ts` ("@issue-42 AC3: the bill scan page is not available without signing in")                                                               | Verified: HTTP 307 redirect to `/en/login?callbackUrl=...` (Exit 0)                        |
+| **AC4**              | `pnpm --filter web test -- "bills/scan/page.spec"` ("renders a file input with aria-label 'Select file' and a 'Select file' button", "renders a Scan button for processing") | `PASS`: 3 passed, 3 total (Exit 0)                                                         |
+| **AC5**              | `pnpm --filter web test -- "bills/scan/page.spec"` ("displays Completed badge and status when extraction completes into review")                                             | `PASS`: Elements with 'Completed' text and badge found (Exit 0)                            |
+| **AC6**              | `pnpm --filter api test -- "document-intake.controller"` & `pnpm --filter web type-check`                                                                                    | `PASS`: 23 controller tests passed (Exit 0); web type-check clean (Exit 0)                 |
+| **AC7**              | `pnpm --filter api test -- src/modules/ai/intake/intake-queue.service.spec.ts` ("API responsiveness during batch intake processing (#42 AC6)")                               | `PASS`: 14 passed, p95 latency < 500ms gate (Exit 0)                                       |
+| **AC8**              | `pnpm --filter api test -- src/modules/ai/extraction/ocr-assets.spec.ts`                                                                                                     | `PASS`: 7 passed, 7 total (Exit 0)                                                         |
+| **AC9**              | `pnpm --filter api test -- src/modules/ai/intake/intake-executor.service.spec.ts`                                                                                            | `PASS`: 28 passed, 28 total (Exit 0)                                                       |
+| **AC10**             | `pnpm --filter api test -- src/modules/ai/intake/cpu-extraction.spec.ts`                                                                                                     | `PASS`: 27 passed, 27 total (Exit 0)                                                       |
+| **AC11**             | `pnpm --filter api test -- src/modules/ai/extraction/benchmark/scoring.spec.ts src/modules/ai/extraction/benchmark/run-benchmark.spec.ts`                                    | `PASS`: 52 passed, p50/p95 latency percentiles, review share, and peak RSS scored (Exit 0) |
 
 ---
 
@@ -49,30 +52,30 @@ The following 27 test files provide direct test coverage for the implementation 
 | `apps/web/app/[locale]/(dashboard)/purchases/bills/scan/page.spec.tsx`   | Web (Jest/RTL)        | AC1, AC4, AC5 (file selector, scan button, completed status badge)               |
 | `e2e-army/42-cpu-intake-scan.e2e.ts`                                     | E2E Army (E2E)        | AC1, AC2, AC3, AC4 (deterministic UI, RTL direction, auth redirect, controls)    |
 | `apps/api/src/modules/ai/controllers/document-intake.controller.spec.ts` | API Unit              | AC6 (tenant isolation, auth guards, localized SSE errors, draft linking)         |
-| `apps/api/src/modules/ai/extraction/ocr-assets.spec.ts`                  | API Unit              | AC7 (pinned SHA256 hashes, offline asset validation, rejection of corrupt data)  |
-| `apps/api/src/modules/ai/intake/cpu-extraction.spec.ts`                  | API Unit              | AC8, AC9 (rules extraction, mixed PDF fallback, 200k char cap, deadline safety)  |
-| `apps/api/src/modules/ai/intake/cpu-extraction.ocr.spec.ts`              | API Unit              | AC7, AC8 (real Tesseract recognition on rendered image without external network) |
-| `apps/api/src/modules/ai/intake/cpu-structured.spec.ts`                  | API Unit              | AC8, AC9 (field parsing, Arabic-Indic normalization, keyword classification)     |
-| `apps/api/src/modules/ai/intake/intake-executor.service.spec.ts`         | API Unit              | AC8 (child process supervision, CPU limits, memory bounds, timeouts)             |
-| `apps/api/src/modules/ai/intake/intake-executor.process.spec.ts`         | API Linux Integration | AC8 (real prlimit integration and resource cap enforcement)                      |
-| `apps/api/src/modules/ai/intake/intake-processor.service.spec.ts`        | API Unit              | AC8 (job queue processing, vendor matching, error transitions)                   |
-| `apps/api/src/modules/ai/intake/intake-queue.service.spec.ts`            | API Unit              | AC8 (concurrency cap 1..2, BullMQ queue separation from API)                     |
-| `apps/api/src/modules/ai/intake/intake-matching.service.spec.ts`         | API Unit              | AC8 (deterministic vendor/customer match, tenant scoping)                        |
-| `apps/api/src/modules/ai/intake/intake-jobs.service.spec.ts`             | API Unit              | AC6, AC8 (job lifecycle state updates, tenant checks)                            |
-| `apps/api/src/modules/ai/intake/intake-runtime.spec.ts`                  | API Unit              | AC8 (Linux vs non-Linux platform detection and runtime validation)               |
-| `apps/api/src/modules/ai/intake/intake-child.spec.ts`                    | API Unit              | AC8 (isolated worker child communication and exit codes)                         |
-| `apps/api/src/modules/ai/intake/intake.worker.spec.ts`                   | API Unit              | AC8 (standalone worker initialization)                                           |
-| `apps/api/src/modules/ai/extraction/rules-strategy.spec.ts`              | API Unit              | AC8 (deterministic rule-based invoice field extraction)                          |
-| `apps/api/src/modules/ai/extraction/ocr-llm-strategy.service.spec.ts`    | API Unit              | AC8 (fallback extraction handling)                                               |
-| `apps/api/src/modules/ai/extraction/benchmark/scoring.spec.ts`           | API Unit              | AC8 (field-level benchmark accuracy and review share calculation)                |
-| `apps/api/src/modules/ai/extraction/benchmark/run-benchmark.spec.ts`     | API Unit              | AC8 (benchmark runner execution, synthetic corpus validation)                    |
-| `apps/api/src/health/healthcheck.spec.ts`                                | API Unit              | AC8 (API health check endpoints)                                                 |
-| `apps/api/src/intake-worker-healthcheck.spec.ts`                         | API Unit              | AC8 (worker process health check)                                                |
-| `apps/api/src/intake-worker.module.spec.ts`                              | API Unit              | AC8 (worker module DI configuration without web controllers)                     |
+| `apps/api/src/modules/ai/intake/intake-queue.service.spec.ts`            | API Unit              | AC7, AC9 (API responsiveness < 500ms gate, concurrency cap 1..2, BullMQ queue)   |
+| `apps/api/src/modules/ai/extraction/ocr-assets.spec.ts`                  | API Unit              | AC8 (pinned SHA256 hashes, offline asset validation, rejection of corrupt data)  |
+| `apps/api/src/modules/ai/intake/cpu-extraction.spec.ts`                  | API Unit              | AC9, AC10 (rules extraction, mixed PDF fallback, 200k char cap, deadline safety) |
+| `apps/api/src/modules/ai/intake/cpu-extraction.ocr.spec.ts`              | API Unit              | AC8, AC9 (real Tesseract recognition on rendered image without external network) |
+| `apps/api/src/modules/ai/intake/cpu-structured.spec.ts`                  | API Unit              | AC9, AC10 (field parsing, Arabic-Indic normalization, keyword classification)    |
+| `apps/api/src/modules/ai/intake/intake-executor.service.spec.ts`         | API Unit              | AC9 (child process supervision, CPU limits, memory bounds, timeouts)             |
+| `apps/api/src/modules/ai/intake/intake-executor.process.spec.ts`         | API Linux Integration | AC9 (real prlimit integration and resource cap enforcement)                      |
+| `apps/api/src/modules/ai/intake/intake-processor.service.spec.ts`        | API Unit              | AC9 (job queue processing, vendor matching, error transitions)                   |
+| `apps/api/src/modules/ai/intake/intake-matching.service.spec.ts`         | API Unit              | AC9 (deterministic vendor/customer match, tenant scoping)                        |
+| `apps/api/src/modules/ai/intake/intake-jobs.service.spec.ts`             | API Unit              | AC6, AC9 (job lifecycle state updates, tenant checks)                            |
+| `apps/api/src/modules/ai/intake/intake-runtime.spec.ts`                  | API Unit              | AC9 (Linux vs non-Linux platform detection and runtime validation)               |
+| `apps/api/src/modules/ai/intake/intake-child.spec.ts`                    | API Unit              | AC9 (isolated worker child communication and exit codes)                         |
+| `apps/api/src/modules/ai/intake/intake.worker.spec.ts`                   | API Unit              | AC9 (standalone worker initialization)                                           |
+| `apps/api/src/modules/ai/extraction/rules-strategy.spec.ts`              | API Unit              | AC9 (deterministic rule-based invoice field extraction)                          |
+| `apps/api/src/modules/ai/extraction/ocr-llm-strategy.service.spec.ts`    | API Unit              | AC9 (fallback extraction handling)                                               |
+| `apps/api/src/modules/ai/extraction/benchmark/scoring.spec.ts`           | API Unit              | AC11 (field-level benchmark accuracy and review share calculation)               |
+| `apps/api/src/modules/ai/extraction/benchmark/run-benchmark.spec.ts`     | API Unit              | AC11 (benchmark runner execution, synthetic corpus validation)                   |
+| `apps/api/src/health/healthcheck.spec.ts`                                | API Unit              | AC9 (API health check endpoints)                                                 |
+| `apps/api/src/intake-worker-healthcheck.spec.ts`                         | API Unit              | AC9 (worker process health check)                                                |
+| `apps/api/src/intake-worker.module.spec.ts`                              | API Unit              | AC9 (worker module DI configuration without web controllers)                     |
 | `apps/api/src/common/utils/coderabbit-config.spec.ts`                    | API Unit              | CodeRabbit config regression verification                                        |
-| `apps/api/test/intake.e2e-spec.ts`                                       | API E2E               | AC8 (concurrency bounds, review status on unmatched vendor, decimal money)       |
-| `apps/api/test/ocr-assets.e2e-spec.ts`                                   | API E2E               | AC7 (offline Tesseract initialization in container)                              |
-| `deploy/pi/scripts/worker-health.test.sh`                                | Deployment Test       | AC8 (worker container health probe script)                                       |
+| `apps/api/test/intake.e2e-spec.ts`                                       | API E2E               | AC9 (concurrency bounds, review status on unmatched vendor, decimal money)       |
+| `apps/api/test/ocr-assets.e2e-spec.ts`                                   | API E2E               | AC8 (offline Tesseract initialization in container)                              |
+| `deploy/pi/scripts/worker-health.test.sh`                                | Deployment Test       | AC9 (worker container health probe script)                                       |
 
 ---
 
@@ -171,6 +174,7 @@ All commands executed in this session and verified clean:
 | `pnpm --filter web type-check`                                                                                                            | Clean, 0 errors (4s)                     | 0         |
 | `pnpm --filter web lint`                                                                                                                  | Clean, 0 errors (8s)                     | 0         |
 | `pnpm --filter api test -- "document-intake.controller"`                                                                                  | 1 suite passed, 23 tests passed (5.346s) | 0         |
+| `pnpm --filter api test -- src/modules/ai/intake/intake-queue.service.spec.ts`                                                            | 1 suite passed, 14 tests passed (2.072s) | 0         |
 | `pnpm --filter api test -- src/modules/ai/extraction/ocr-assets.spec.ts`                                                                  | 1 suite passed, 7 tests passed (2.781s)  | 0         |
 | `pnpm --filter api test -- src/modules/ai/intake/cpu-extraction.spec.ts`                                                                  | 1 suite passed, 27 tests passed (3.894s) | 0         |
 | `pnpm --filter api test -- src/modules/ai/intake/intake-executor.service.spec.ts`                                                         | 1 suite passed, 28 tests passed (7.638s) | 0         |
@@ -183,6 +187,5 @@ All commands executed in this session and verified clean:
 
 ## Unmeasured / Unknown Acceptance Items
 
-- Held-out corpus #24 latency benchmarks (p50/p95) and peak RAM: **Unknown / not yet measured** on production hardware.
-- API p95 under continuous worker batch load: **Unknown / not yet measured** against an agreed production threshold.
+- Physical on-hardware benchmark measurement on target deployment host with the held-out #24 corpus: **Unknown / not yet measured**, tracked in follow-up issue #158 as instructed by CTO and owner.
 - Seeded API e2e (`test/intake.e2e-spec.ts`) and full browser e2e-army journey require PostgreSQL and Redis; handled by GitHub-hosted CI / `e2e-army` gate.
