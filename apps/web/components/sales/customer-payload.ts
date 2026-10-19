@@ -4,7 +4,8 @@
  * - Builds nested billingAddress and shippingAddress objects
  * - Leaves out empty and whitespace strings (undefined, not null)
  * - Drops an address when all of its fields are blank
- * - Drops notes because CreateCustomerDto does not accept notes (forbidNonWhitelisted: true)
+ * - Drops notes because CreateCustomerDto does not accept notes (forbidNonWhitelisted: true).
+ *   Follow-up API issue will add notes (@IsOptional, @IsString, @MaxLength(2000)) to CreateCustomerDto / UpdateCustomerDto and persist it.
  * - Only sends fields allowed by the DTO
  */
 

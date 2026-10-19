@@ -140,6 +140,33 @@ describe('buildCustomerPayload', () => {
     expect((payload as unknown as Record<string, unknown>).notes).toBeUndefined();
   });
 
+  it('AC4: payload contains nested address and no notes key (follow-up API issue will persist notes)', () => {
+    const input: CustomerFormInput = {
+      name: 'Nile Corp',
+      notes: 'Internal customer note',
+      billingAddress: {
+        street: '123 Corniche El Nil',
+        city: 'Cairo',
+      },
+    };
+
+    const payload = buildCustomerPayload(input);
+
+    expect(payload).toEqual({
+      name: 'Nile Corp',
+      billingAddress: {
+        street: '123 Corniche El Nil',
+        city: 'Cairo',
+      },
+    });
+    expect(payload.billingAddress).toEqual({
+      street: '123 Corniche El Nil',
+      city: 'Cairo',
+    });
+    expect(payload).not.toHaveProperty('notes');
+    expect((payload as unknown as Record<string, unknown>).notes).toBeUndefined();
+  });
+
   it('AC5: preserves valid numeric paymentTerms including 0 (Due on Receipt)', () => {
     const payloadDueOnReceipt = buildCustomerPayload({
       name: 'Instant Pay Co',

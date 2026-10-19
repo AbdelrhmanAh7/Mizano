@@ -25,15 +25,15 @@ Supersedes part of #235.
 
 ## Verification Matrix
 
-| AC  | Verification Test / Command                                                      | Exit Code | Result                                                                               |
-| --- | -------------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------ |
-| AC1 | `pnpm --filter web exec jest components/sales/customer-payload.spec.ts -t "AC1"` | 0         | `PASS` (nested `billingAddress` and `shippingAddress`, no flat keys)                 |
-| AC2 | `pnpm --filter web exec jest components/sales/customer-payload.spec.ts -t "AC2"` | 0         | `PASS` (empty strings omitted as `undefined`, not `null`)                            |
-| AC3 | `pnpm --filter web exec jest components/sales/customer-payload.spec.ts -t "AC3"` | 0         | `PASS` (blank address dropped completely)                                            |
-| AC4 | `pnpm --filter web exec jest components/sales/customer-payload.spec.ts -t "AC4"` | 0         | `PASS` (`notes` property not present in payload)                                     |
-| AC5 | `pnpm --filter web exec jest components/sales/customer-payload.spec.ts -t "AC5"` | 0         | `PASS` (`paymentTerms: 0` kept, strings trimmed, empty priceListId omitted)          |
-| AC6 | `pnpm --filter web exec jest components/sales/customer-payload.spec.ts -t "AC6"` | 0         | `PASS` (`customer-form` exports `buildCustomerPayload` and delegates `handleSubmit`) |
-| AC7 | `e2e-army/254-customer-payload.e2e.ts`                                           | —         | First commit `fa64140c`, tagged `feat:mz-sales-customers`, runs on verify runner     |
+| AC  | Verification Test / Command                                                      | Exit Code | Result                                                                             |
+| --- | -------------------------------------------------------------------------------- | --------- | ---------------------------------------------------------------------------------- |
+| AC1 | `pnpm --filter web exec jest components/sales/customer-payload.spec.ts -t "AC1"` | 0         | `PASS` (nested `billingAddress` and `shippingAddress`, no flat keys)               |
+| AC2 | `pnpm --filter web exec jest components/sales/customer-payload.spec.ts -t "AC2"` | 0         | `PASS` (empty strings omitted as `undefined`, not `null`)                          |
+| AC3 | `pnpm --filter web exec jest components/sales/customer-payload.spec.ts -t "AC3"` | 0         | `PASS` (blank address dropped completely)                                          |
+| AC4 | `pnpm --filter web exec jest components/sales/customer-payload.spec.ts -t "AC4"` | 0         | `PASS` (`notes` dropped; nested address present with no `notes` key)               |
+| AC5 | `pnpm --filter web exec jest components/sales/customer-payload.spec.ts -t "AC5"` | 0         | `PASS` (`paymentTerms: 0` kept, strings trimmed, empty priceListId omitted)        |
+| AC6 | `pnpm --filter web exec jest components/sales/customer-payload.spec.ts -t "AC6"` | 0         | `PASS` (`customer-form` exports buildCustomerPayload and delegates `handleSubmit`) |
+| AC7 | `e2e-army/254-customer-payload.e2e.ts`                                           | —         | First commit `fa64140c`, tagged `feat:mz-sales-customers`, runs on verify runner   |
 
 ---
 
@@ -73,11 +73,12 @@ Output:
 ```
 PASS components/sales/customer-payload.spec.ts
   buildCustomerPayload
-    ✓ AC1: transforms flat form data with nested addresses into DTO structure (1 ms)
+    ✓ AC1: transforms flat form data with nested addresses into DTO structure (2 ms)
     ✓ AC2: leaves out empty and whitespace-only strings as undefined (not null)
-    ✓ AC3: drops an address completely when all its fields are blank
+    ✓ AC3: drops an address completely when all its fields are blank (4 ms)
     ✓ AC4: drops notes from the API payload (DTO does not accept notes)
-    ✓ AC5: preserves valid numeric paymentTerms including 0 (Due on Receipt) (1 ms)
+    ✓ AC4: payload contains nested address and no notes key (follow-up API issue will persist notes) (1 ms)
+    ✓ AC5: preserves valid numeric paymentTerms including 0 (Due on Receipt)
     ✓ AC5: trims string fields and excludes empty optional priceListId
   buildAddressPayload
     ✓ returns undefined for undefined or null address input
@@ -87,11 +88,19 @@ PASS components/sales/customer-payload.spec.ts
     ✓ AC6: customer-form exports buildCustomerPayload matching customer-payload
 
 Test Suites: 1 passed, 1 total
-Tests:       10 passed, 10 total
+Tests:       11 passed, 11 total
 Snapshots:   0 total
-Time:        0.672 s
+Time:        0.697 s
 Exit status 0
 ```
+
+---
+
+## Follow-up API Issue (Per CTO Decision)
+
+`CustomerForm` in `apps/web/components/sales/customer-form.tsx` contains an input for internal notes, and Prisma schema defines a `notes` column on `Customer`. However, `CreateCustomerDto` and `UpdateCustomerDto` in `apps/api/src/modules/sales/dto/` do not currently whitelist `notes`. Because the NestJS API enforces `forbidNonWhitelisted: true`, `buildCustomerPayload` drops `notes` from the payload to prevent 400 Bad Request errors.
+
+Per CTO decision, a separate follow-up API issue will be filed to add optional `notes` (`@IsOptional()`, `@IsString()`, `@MaxLength(2000)`) to `CreateCustomerDto` and `UpdateCustomerDto` and persist it in the sales service.
 
 ---
 
@@ -101,7 +110,7 @@ Exit status 0
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | --------------------------- |
 | Type-check         | `pnpm --filter web type-check`                                                                                                                                                               | 0         | Clean, no TypeScript errors |
 | Linter             | `pnpm --filter web lint`                                                                                                                                                                     | 0         | Clean, 0 errors             |
-| Related Unit Tests | `nice -n 10 pnpm --filter web exec jest --maxWorkers=2 --findRelatedTests components/sales/customer-form.tsx components/sales/customer-payload.ts components/sales/customer-payload.spec.ts` | 0         | 10 passed, 10 total         |
+| Related Unit Tests | `nice -n 10 pnpm --filter web exec jest --maxWorkers=2 --findRelatedTests components/sales/customer-form.tsx components/sales/customer-payload.ts components/sales/customer-payload.spec.ts` | 0         | 11 passed, 11 total         |
 
 ---
 
