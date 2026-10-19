@@ -3,9 +3,9 @@
 Part of #42 (not "Closes"): the physical measurement acceptance against the frozen #24 corpus is tracked in follow-up #158 as instructed by CTO.
 Complements #16 and #24. The project scope is the CPU extraction runtime with pinned Arabic/English assets on arm64 host architecture (Mac mini host / arm64 Linux container). Pi platform was retired on 2026-10-10 and scope repointed to Mac mini host per owner decision; no Pi-specific work remains.
 
-- **Tested commit**: `479748730daee50190fa7bb51e06fa99d5dae7be` (code; this file is committed afterwards and changes no code).
+- **Tested commit**: `6f21dd8459f143715c0e488102ffeb23e3e0e716` (code; this file is committed afterwards and changes no code).
 - **Environment**: macOS arm64 developer host, Node.js v22.23.3, Chromium headless (Playwright) for UI verification.
-- **Scope**: CPU extraction runtime without LLMs/GPUs, pinned Arabic/English OCR assets, worker process isolation, API responsiveness under 500ms gate, and bill scan page UI/CORS fixes.
+- **Scope**: CPU extraction runtime without LLMs/GPUs, admission control policy module, pinned Arabic/English OCR asset manifest, worker process isolation, API responsiveness under 500ms gate, and bill scan page UI/CORS fixes.
 
 ---
 
@@ -17,11 +17,13 @@ Complements #16 and #24. The project scope is the CPU extraction runtime with pi
 - **AC4**: The bill scan page provides an accessible file input (`aria-label="Select file"`), a visible "Select file" button, and a "Scan" button (`data-testid="scan-button"`, `aria-label="Scan"`).
 - **AC5**: Upon extraction completion, the UI displays explicit 'Completed' status badges and progress indication.
 - **AC6**: Navigation links on the scan page use `@/i18n/routing` to avoid cross-origin redirection CORS errors, and development CORS policy permits localhost connections.
-- **AC7**: The API stays responsive (p95 latency strictly below agreed 500ms threshold gate) while the worker processes a batch of intake documents with concurrency caps.
-- **AC8**: Pinned `ara` + `eng` OCR traineddata assets are verified via SHA256 checksums (`apps/api/ocr-assets.sha256`) and loaded offline without runtime network downloads.
-- **AC9**: Dedicated CPU worker architecture executes extraction with timeout deadlines (`INTAKE_JOB_DEADLINE_MS`) and exception routing without LLMs or cloud GPUs.
-- **AC10**: PDF text extraction enforces a 200,000-character safety bound (`RAW_TEXT_TRUNCATED`) and handles mixed native/scanned PDF pages with page-by-page OCR fallback.
-- **AC11**: Benchmark harness reports per-field precision/recall/exact match, latency percentiles (p50/p95), and peak RAM.
+- **AC7**: Pure extraction admission planning (`planAdmission`) enforces API-priority job admission first, maxConcurrency cap (1–2), and memory budget cap (2GB) skipping oversized jobs.
+- **AC8**: Latency classification (`classifyLatency`) evaluates elapsed processing time against per-document-type budgets (invoice 30s, receipt 20s, unknown 60s) routing jobs exceeding budget to exceptions with reason `'latency_budget_exceeded'`.
+- **AC9**: Pinned OCR asset manifest (`PINNED_MANIFEST`) pins exact `ara` and `eng` traineddata files with 64-character lowercase hex SHA-256 digests and fail-fast validator (`assertPinnedAssets`), refusing unpinned or corrupted assets.
+- **AC10**: Dedicated CPU worker architecture executes extraction with timeout deadlines (`INTAKE_JOB_DEADLINE_MS`), memory limits, and exception routing without LLMs or cloud GPUs.
+- **AC11**: PDF text extraction enforces a 200,000-character safety bound (`RAW_TEXT_TRUNCATED`) and handles mixed native/scanned PDF pages with page-by-page OCR fallback.
+- **AC12**: The API stays responsive (p95 latency strictly below agreed 500ms threshold gate) while the worker processes a batch of intake documents with concurrency caps.
+- **AC13**: Benchmark harness reports per-field precision/recall/exact match, latency percentiles (p50/p95), and peak RAM.
 
 ---
 
@@ -35,47 +37,51 @@ Complements #16 and #24. The project scope is the CPU extraction runtime with pi
 | **AC4**              | `pnpm --filter web test -- "bills/scan/page.spec"` ("renders a file input with aria-label 'Select file' and a 'Select file' button", "renders a Scan button for processing") | `PASS`: 3 passed, 3 total (Exit 0)                                                         |
 | **AC5**              | `pnpm --filter web test -- "bills/scan/page.spec"` ("displays Completed badge and status when extraction completes into review")                                             | `PASS`: Elements with 'Completed' text and badge found (Exit 0)                            |
 | **AC6**              | `pnpm --filter api test -- "document-intake.controller"` & `pnpm --filter web type-check`                                                                                    | `PASS`: 23 controller tests passed (Exit 0); web type-check clean (Exit 0)                 |
-| **AC7**              | `pnpm --filter api test -- src/modules/ai/intake/intake-queue.service.spec.ts` ("API responsiveness during batch intake processing (#42 AC6)")                               | `PASS`: 14 passed, p95 latency < 500ms gate (Exit 0)                                       |
-| **AC8**              | `pnpm --filter api test -- src/modules/ai/extraction/ocr-assets.spec.ts`                                                                                                     | `PASS`: 7 passed, 7 total (Exit 0)                                                         |
-| **AC9**              | `pnpm --filter api test -- src/modules/ai/intake/intake-executor.service.spec.ts`                                                                                            | `PASS`: 28 passed, 28 total (Exit 0)                                                       |
-| **AC10**             | `pnpm --filter api test -- src/modules/ai/intake/cpu-extraction.spec.ts`                                                                                                     | `PASS`: 27 passed, 27 total (Exit 0)                                                       |
-| **AC11**             | `pnpm --filter api test -- src/modules/ai/extraction/benchmark/scoring.spec.ts src/modules/ai/extraction/benchmark/run-benchmark.spec.ts`                                    | `PASS`: 52 passed, p50/p95 latency percentiles, review share, and peak RSS scored (Exit 0) |
+| **AC7**              | `pnpm --filter api test -- src/modules/ai/extraction/extraction-runtime-policy.spec.ts` ("planAdmission")                                                                    | `PASS`: 16 passed, respects priority, maxConcurrency, and 2GB memory budget (Exit 0)       |
+| **AC8**              | `pnpm --filter api test -- src/modules/ai/extraction/extraction-runtime-policy.spec.ts` ("classifyLatency")                                                                  | `PASS`: 10 passed, completed at/below budget, exception 'latency_budget_exceeded' (Exit 0) |
+| **AC9**              | `pnpm --filter api test -- src/modules/ai/extraction/ocr-asset-manifest.spec.ts` & `ocr-assets.spec.ts`                                                                      | `PASS`: 18 passed, valid ara+eng manifest validated, corrupt/missing assets throw (Exit 0) |
+| **AC10**             | `pnpm --filter api test -- src/modules/ai/intake/intake-executor.service.spec.ts`                                                                                            | `PASS`: 28 passed, 28 total (Exit 0)                                                       |
+| **AC11**             | `pnpm --filter api test -- src/modules/ai/intake/cpu-extraction.spec.ts`                                                                                                     | `PASS`: 27 passed, 27 total (Exit 0)                                                       |
+| **AC12**             | `pnpm --filter api test -- src/modules/ai/intake/intake-queue.service.spec.ts` ("API responsiveness during batch intake processing (#42 AC6)")                               | `PASS`: 14 passed, p95 latency < 500ms gate (Exit 0)                                       |
+| **AC13**             | `pnpm --filter api test -- src/modules/ai/extraction/benchmark/scoring.spec.ts src/modules/ai/extraction/benchmark/run-benchmark.spec.ts`                                    | `PASS`: 52 passed, p50/p95 latency percentiles, review share, and peak RSS scored (Exit 0) |
 
 ---
 
 ## Changed Covering Tests (Docs/Chores Exempt)
 
-The following 27 test files provide direct test coverage for the implementation across backend worker, controller, extraction strategies, UI, and e2e:
+The following 29 test files provide direct test coverage for the implementation across backend worker, extraction policy, manifest, controller, extraction strategies, UI, and e2e:
 
-| Test File                                                                | Package / Scope       | Covered AC / Requirement                                                         |
-| :----------------------------------------------------------------------- | :-------------------- | :------------------------------------------------------------------------------- |
-| `apps/web/app/[locale]/(dashboard)/purchases/bills/scan/page.spec.tsx`   | Web (Jest/RTL)        | AC1, AC4, AC5 (file selector, scan button, completed status badge)               |
-| `e2e-army/42-cpu-intake-scan.e2e.ts`                                     | E2E Army (E2E)        | AC1, AC2, AC3, AC4 (deterministic UI, RTL direction, auth redirect, controls)    |
-| `apps/api/src/modules/ai/controllers/document-intake.controller.spec.ts` | API Unit              | AC6 (tenant isolation, auth guards, localized SSE errors, draft linking)         |
-| `apps/api/src/modules/ai/intake/intake-queue.service.spec.ts`            | API Unit              | AC7, AC9 (API responsiveness < 500ms gate, concurrency cap 1..2, BullMQ queue)   |
-| `apps/api/src/modules/ai/extraction/ocr-assets.spec.ts`                  | API Unit              | AC8 (pinned SHA256 hashes, offline asset validation, rejection of corrupt data)  |
-| `apps/api/src/modules/ai/intake/cpu-extraction.spec.ts`                  | API Unit              | AC9, AC10 (rules extraction, mixed PDF fallback, 200k char cap, deadline safety) |
-| `apps/api/src/modules/ai/intake/cpu-extraction.ocr.spec.ts`              | API Unit              | AC8, AC9 (real Tesseract recognition on rendered image without external network) |
-| `apps/api/src/modules/ai/intake/cpu-structured.spec.ts`                  | API Unit              | AC9, AC10 (field parsing, Arabic-Indic normalization, keyword classification)    |
-| `apps/api/src/modules/ai/intake/intake-executor.service.spec.ts`         | API Unit              | AC9 (child process supervision, CPU limits, memory bounds, timeouts)             |
-| `apps/api/src/modules/ai/intake/intake-executor.process.spec.ts`         | API Linux Integration | AC9 (real prlimit integration and resource cap enforcement)                      |
-| `apps/api/src/modules/ai/intake/intake-processor.service.spec.ts`        | API Unit              | AC9 (job queue processing, vendor matching, error transitions)                   |
-| `apps/api/src/modules/ai/intake/intake-matching.service.spec.ts`         | API Unit              | AC9 (deterministic vendor/customer match, tenant scoping)                        |
-| `apps/api/src/modules/ai/intake/intake-jobs.service.spec.ts`             | API Unit              | AC6, AC9 (job lifecycle state updates, tenant checks)                            |
-| `apps/api/src/modules/ai/intake/intake-runtime.spec.ts`                  | API Unit              | AC9 (Linux vs non-Linux platform detection and runtime validation)               |
-| `apps/api/src/modules/ai/intake/intake-child.spec.ts`                    | API Unit              | AC9 (isolated worker child communication and exit codes)                         |
-| `apps/api/src/modules/ai/intake/intake.worker.spec.ts`                   | API Unit              | AC9 (standalone worker initialization)                                           |
-| `apps/api/src/modules/ai/extraction/rules-strategy.spec.ts`              | API Unit              | AC9 (deterministic rule-based invoice field extraction)                          |
-| `apps/api/src/modules/ai/extraction/ocr-llm-strategy.service.spec.ts`    | API Unit              | AC9 (fallback extraction handling)                                               |
-| `apps/api/src/modules/ai/extraction/benchmark/scoring.spec.ts`           | API Unit              | AC11 (field-level benchmark accuracy and review share calculation)               |
-| `apps/api/src/modules/ai/extraction/benchmark/run-benchmark.spec.ts`     | API Unit              | AC11 (benchmark runner execution, synthetic corpus validation)                   |
-| `apps/api/src/health/healthcheck.spec.ts`                                | API Unit              | AC9 (API health check endpoints)                                                 |
-| `apps/api/src/intake-worker-healthcheck.spec.ts`                         | API Unit              | AC9 (worker process health check)                                                |
-| `apps/api/src/intake-worker.module.spec.ts`                              | API Unit              | AC9 (worker module DI configuration without web controllers)                     |
-| `apps/api/src/common/utils/coderabbit-config.spec.ts`                    | API Unit              | CodeRabbit config regression verification                                        |
-| `apps/api/test/intake.e2e-spec.ts`                                       | API E2E               | AC9 (concurrency bounds, review status on unmatched vendor, decimal money)       |
-| `apps/api/test/ocr-assets.e2e-spec.ts`                                   | API E2E               | AC8 (offline Tesseract initialization in container)                              |
-| `deploy/pi/scripts/worker-health.test.sh`                                | Deployment Test       | AC9 (worker container health probe script)                                       |
+| Test File                                                                | Package / Scope       | Covered AC / Requirement                                                                   |
+| :----------------------------------------------------------------------- | :-------------------- | :----------------------------------------------------------------------------------------- |
+| `apps/web/app/[locale]/(dashboard)/purchases/bills/scan/page.spec.tsx`   | Web (Jest/RTL)        | AC1, AC4, AC5 (file selector, scan button, completed status badge)                         |
+| `e2e-army/42-cpu-intake-scan.e2e.ts`                                     | E2E Army (E2E)        | AC1, AC2, AC3, AC4 (deterministic UI, RTL direction, auth redirect, controls)              |
+| `apps/api/src/modules/ai/extraction/extraction-runtime-policy.spec.ts`   | API Unit              | AC7, AC8 (planAdmission ordering, concurrency cap, memory budget, classifyLatency budgets) |
+| `apps/api/src/modules/ai/extraction/ocr-asset-manifest.spec.ts`          | API Unit              | AC9 (PINNED_MANIFEST sha256 validation, assertPinnedAssets fail-fast checks)               |
+| `apps/api/src/modules/ai/controllers/document-intake.controller.spec.ts` | API Unit              | AC6 (tenant isolation, auth guards, localized SSE errors, draft linking)                   |
+| `apps/api/src/modules/ai/intake/intake-queue.service.spec.ts`            | API Unit              | AC10, AC12 (API responsiveness < 500ms gate, concurrency cap 1..2, BullMQ queue)           |
+| `apps/api/src/modules/ai/extraction/ocr-assets.spec.ts`                  | API Unit              | AC9 (pinned SHA256 hashes, offline asset validation, rejection of corrupt data)            |
+| `apps/api/src/modules/ai/intake/cpu-extraction.spec.ts`                  | API Unit              | AC10, AC11 (rules extraction, mixed PDF fallback, 200k char cap, deadline safety)          |
+| `apps/api/src/modules/ai/intake/cpu-extraction.ocr.spec.ts`              | API Unit              | AC9, AC10 (real Tesseract recognition on rendered image without external network)          |
+| `apps/api/src/modules/ai/intake/cpu-structured.spec.ts`                  | API Unit              | AC10, AC11 (field parsing, Arabic-Indic normalization, keyword classification)             |
+| `apps/api/src/modules/ai/intake/intake-executor.service.spec.ts`         | API Unit              | AC10 (child process supervision, CPU limits, memory bounds, timeouts)                      |
+| `apps/api/src/modules/ai/intake/intake-executor.process.spec.ts`         | API Linux Integration | AC10 (real prlimit integration and resource cap enforcement)                               |
+| `apps/api/src/modules/ai/intake/intake-processor.service.spec.ts`        | API Unit              | AC10 (job queue processing, vendor matching, error transitions)                            |
+| `apps/api/src/modules/ai/intake/intake-matching.service.spec.ts`         | API Unit              | AC10 (deterministic vendor/customer match, tenant scoping)                                 |
+| `apps/api/src/modules/ai/intake/intake-jobs.service.spec.ts`             | API Unit              | AC6, AC10 (job lifecycle state updates, tenant checks)                                     |
+| `apps/api/src/modules/ai/intake/intake-runtime.spec.ts`                  | API Unit              | AC10 (Linux vs non-Linux platform detection and runtime validation)                        |
+| `apps/api/src/modules/ai/intake/intake-child.spec.ts`                    | API Unit              | AC10 (isolated worker child communication and exit codes)                                  |
+| `apps/api/src/modules/ai/intake/intake.worker.spec.ts`                   | API Unit              | AC10 (standalone worker initialization)                                                    |
+| `apps/api/src/modules/ai/extraction/rules-strategy.spec.ts`              | API Unit              | AC10 (deterministic rule-based invoice field extraction)                                   |
+| `apps/api/src/modules/ai/extraction/ocr-llm-strategy.service.spec.ts`    | API Unit              | AC10 (fallback extraction handling)                                                        |
+| `apps/api/src/modules/ai/extraction/benchmark/scoring.spec.ts`           | API Unit              | AC13 (field-level benchmark accuracy and review share calculation)                         |
+| `apps/api/src/modules/ai/extraction/benchmark/run-benchmark.spec.ts`     | API Unit              | AC13 (benchmark runner execution, synthetic corpus validation)                             |
+| `apps/api/src/health/healthcheck.spec.ts`                                | API Unit              | AC10 (API health check endpoints)                                                          |
+| `apps/api/src/intake-worker-healthcheck.spec.ts`                         | API Unit              | AC10 (worker process health check)                                                         |
+| `apps/api/src/intake-worker.module.spec.ts`                              | API Unit              | AC10 (worker module DI configuration without web controllers)                              |
+| `apps/api/src/common/utils/coderabbit-config.spec.ts`                    | API Unit              | CodeRabbit config regression verification                                                  |
+| `apps/api/test/intake.e2e-spec.ts`                                       | API E2E               | AC10 (concurrency bounds, review status on unmatched vendor, decimal money)                |
+| `apps/api/test/ocr-assets.e2e-spec.ts`                                   | API E2E               | AC9 (offline Tesseract initialization in container)                                        |
+| `deploy/pi/scripts/worker-health.test.sh`                                | Deployment Test       | AC10 (worker container health probe script)                                                |
 
 ---
 
@@ -168,20 +174,21 @@ const { chromium } = require('/Users/abdelrahmanahmed/agents/hub-live/node_modul
 
 All commands executed in this session and verified clean:
 
-| Command (run from repo root)                                                                                                              | Result & Execution Time                  | Exit Code |
-| :---------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------- | :-------- |
-| `pnpm --filter web test -- "bills/scan/page.spec"`                                                                                        | 1 suite passed, 3 tests passed (0.597s)  | 0         |
-| `pnpm --filter web type-check`                                                                                                            | Clean, 0 errors (4s)                     | 0         |
-| `pnpm --filter web lint`                                                                                                                  | Clean, 0 errors (8s)                     | 0         |
-| `pnpm --filter api test -- "document-intake.controller"`                                                                                  | 1 suite passed, 23 tests passed (5.346s) | 0         |
-| `pnpm --filter api test -- src/modules/ai/intake/intake-queue.service.spec.ts`                                                            | 1 suite passed, 14 tests passed (2.072s) | 0         |
-| `pnpm --filter api test -- src/modules/ai/extraction/ocr-assets.spec.ts`                                                                  | 1 suite passed, 7 tests passed (2.781s)  | 0         |
-| `pnpm --filter api test -- src/modules/ai/intake/cpu-extraction.spec.ts`                                                                  | 1 suite passed, 27 tests passed (3.894s) | 0         |
-| `pnpm --filter api test -- src/modules/ai/intake/intake-executor.service.spec.ts`                                                         | 1 suite passed, 28 tests passed (7.638s) | 0         |
-| `pnpm --filter api test -- src/modules/ai/intake/cpu-structured.spec.ts`                                                                  | 1 suite passed, 27 tests passed (4.003s) | 0         |
-| `pnpm --filter api test -- src/modules/ai/extraction/benchmark/scoring.spec.ts src/modules/ai/extraction/benchmark/run-benchmark.spec.ts` | 2 suites passed, 52 tests passed (2.59s) | 0         |
-| `pnpm --filter api type-check`                                                                                                            | Clean, 0 errors (29s)                    | 0         |
-| `pnpm --filter api lint`                                                                                                                  | Clean, 0 errors (25s)                    | 0         |
+| Command (run from repo root)                                                                                                                 | Result & Execution Time                  | Exit Code |
+| :------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------- | :-------- |
+| `pnpm --filter web test -- "bills/scan/page.spec"`                                                                                           | 1 suite passed, 3 tests passed (0.597s)  | 0         |
+| `pnpm --filter web type-check`                                                                                                               | Clean, 0 errors (4s)                     | 0         |
+| `pnpm --filter web lint`                                                                                                                     | Clean, 0 errors (8s)                     | 0         |
+| `pnpm --filter api test -- src/modules/ai/extraction/extraction-runtime-policy.spec.ts src/modules/ai/extraction/ocr-asset-manifest.spec.ts` | 2 suites passed, 26 tests passed (2.95s) | 0         |
+| `pnpm --filter api test -- "document-intake.controller"`                                                                                     | 1 suite passed, 23 tests passed (5.346s) | 0         |
+| `pnpm --filter api test -- src/modules/ai/intake/intake-queue.service.spec.ts`                                                               | 1 suite passed, 14 tests passed (2.072s) | 0         |
+| `pnpm --filter api test -- src/modules/ai/extraction/ocr-assets.spec.ts`                                                                     | 1 suite passed, 7 tests passed (2.781s)  | 0         |
+| `pnpm --filter api test -- src/modules/ai/intake/cpu-extraction.spec.ts`                                                                     | 1 suite passed, 27 tests passed (3.894s) | 0         |
+| `pnpm --filter api test -- src/modules/ai/intake/intake-executor.service.spec.ts`                                                            | 1 suite passed, 28 tests passed (7.638s) | 0         |
+| `pnpm --filter api test -- src/modules/ai/intake/cpu-structured.spec.ts`                                                                     | 1 suite passed, 27 tests passed (4.003s) | 0         |
+| `pnpm --filter api test -- src/modules/ai/extraction/benchmark/scoring.spec.ts src/modules/ai/extraction/benchmark/run-benchmark.spec.ts`    | 2 suites passed, 52 tests passed (2.59s) | 0         |
+| `pnpm --filter api type-check`                                                                                                               | Clean, 0 errors (29s)                    | 0         |
+| `pnpm --filter api lint`                                                                                                                     | Clean, 0 errors (25s)                    | 0         |
 
 ---
 
