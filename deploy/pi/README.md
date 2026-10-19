@@ -88,7 +88,7 @@ The units assume the repo at `/opt/mizano`; edit `ExecStart` otherwise, and ensu
 
 ## 6. Monitoring
 
-`mizano-healthcheck.timer` runs `healthcheck.sh` every 5 minutes: API and web health endpoints, disk above 80%, low available memory, CPU temperature, throttling (`vcgencmd get_throttled`), and backup status older than 26 hours. Alerts and recovery messages go to Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_ID`). Messages contain only short check names; no secrets or document data. A state file in `$MIZANO_DATA_DIR/monitor` suppresses repeats. Create the bot with BotFather and get the chat id from `getUpdates`.
+`mizano-healthcheck.timer` runs `healthcheck.sh` every 5 minutes: API and web health endpoints, the intake worker's container health, disk above 80%, low available memory, CPU temperature, throttling (`vcgencmd get_throttled`), and backup status older than 26 hours. Alerts and recovery messages go to Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_ID`). Messages contain only short check names; no secrets or document data. A state file in `$MIZANO_DATA_DIR/monitor` suppresses repeats. Create the bot with BotFather and get the chat id from `getUpdates`.
 
 ## 7. Upgrade and rollback
 
