@@ -85,6 +85,22 @@ describe('CostingService', () => {
     prisma.inventoryCostLayer.create.mockImplementation(((args: {
       data: Prisma.InventoryCostLayerUncheckedCreateInput;
     }) => {
+      // Mirrors the inventory_cost_layers_source_event_key unique index (NULL references never collide).
+      const { organizationId, itemId, warehouseId, referenceType, referenceId } = args.data;
+      if (
+        referenceType &&
+        referenceId &&
+        layers.some((l) =>
+          matches(l, { organizationId, itemId, warehouseId, referenceType, referenceId }),
+        )
+      ) {
+        return Promise.reject(
+          new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+            code: 'P2002',
+            clientVersion: 'test',
+          }),
+        );
+      }
       const row = layer(`new-${layers.length + 1}`, '0', '0', layers.length, {
         ...(args.data as Partial<InventoryCostLayer>),
       });
@@ -219,6 +235,45 @@ describe('CostingService', () => {
       expect(retry?.id).toBe(first?.id);
       expect(layers).toHaveLength(1);
       expectEveryQueryScopedTo(ORG);
+    });
+
+    it('concurrent retries of the same event: the unique index rejects the loser, which returns the winner layer', async () => {
+      const [a, b] = await Promise.all([
+        service.addCostLayer(ORG, ITEM, WH, 4, 10, 'bill', 'bill-9'),
+        service.addCostLayer(ORG, ITEM, WH, 4, 10, 'bill', 'bill-9'),
+      ]);
+
+      // Both passed the existence check (nothing was stored yet), both tried to create.
+      expect(prisma.inventoryCostLayer.create).toHaveBeenCalledTimes(2);
+      expect(layers).toHaveLength(1);
+      expect(layers[0].quantity.toFixed(4)).toBe('4.0000');
+      expect(a?.id).toBe(layers[0].id);
+      expect(b?.id).toBe(layers[0].id);
+      expectEveryQueryScopedTo(ORG);
+    });
+
+    it('rethrows a unique violation that is not a duplicate source event', async () => {
+      prisma.inventoryCostLayer.create.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: 'test',
+        }),
+      );
+
+      await expect(
+        service.addCostLayer(ORG, ITEM, WH, 4, 10, 'bill', 'bill-9'),
+      ).rejects.toMatchObject({
+        code: 'P2002',
+      });
+      expect(layers).toHaveLength(0);
+    });
+
+    it('rethrows other database errors', async () => {
+      prisma.inventoryCostLayer.create.mockRejectedValueOnce(new Error('connection lost'));
+
+      await expect(service.addCostLayer(ORG, ITEM, WH, 4, 10, 'bill', 'bill-9')).rejects.toThrow(
+        'connection lost',
+      );
     });
 
     it('the same reference in another organization is a different event', async () => {

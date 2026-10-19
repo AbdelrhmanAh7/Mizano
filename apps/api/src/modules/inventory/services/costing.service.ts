@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -26,30 +27,46 @@ export class CostingService {
 
     if (qty.lte(0)) return null;
 
+    const sourceEvent = { organizationId, itemId, warehouseId, referenceType, referenceId };
     if (referenceType && referenceId) {
-      const existing = await this.prisma.inventoryCostLayer.findFirst({
-        where: { organizationId, itemId, warehouseId, referenceType, referenceId },
-      });
+      const existing = await this.prisma.inventoryCostLayer.findFirst({ where: sourceEvent });
       if (existing) return existing;
     }
 
-    return this.prisma.inventoryCostLayer.create({
-      data: {
-        itemId,
-        warehouseId,
-        quantity: qty,
-        originalQty: qty,
-        costPerUnit: cost,
-        referenceType,
-        referenceId,
-        organizationId,
-      },
-    });
+    try {
+      return await this.prisma.inventoryCostLayer.create({
+        data: {
+          itemId,
+          warehouseId,
+          quantity: qty,
+          originalQty: qty,
+          costPerUnit: cost,
+          referenceType,
+          referenceId,
+          organizationId,
+        },
+      });
+    } catch (error) {
+      // A concurrent retry of the same event won the race and hit inventory_cost_layers_source_event_key.
+      if (
+        referenceType &&
+        referenceId &&
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const winner = await this.prisma.inventoryCostLayer.findFirst({ where: sourceEvent });
+        if (winner) return winner;
+      }
+      throw error;
+    }
   }
 
   /**
    * Consume inventory using FIFO method. Returns total cost consumed (for COGS calculation).
    * Deducts from oldest cost layers first.
+   *
+   * Tenant scoping: the layer read and every layer update are filtered by `organizationId`, so
+   * another organization's layers are never read, consumed or written.
    */
   async consumeFIFO(
     organizationId: string,

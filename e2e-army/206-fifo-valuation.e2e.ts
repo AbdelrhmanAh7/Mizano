@@ -3,22 +3,51 @@ import { expect } from 'e2e';
 
 // The FIFO costing service backs GET /api/items/valuation and /api/items/:id/valuation.
 // Request-level checks only (no model call): the gate runs them alone for backend-only changes.
-const ADMIN = { email: 'admin@mizano.com', password: 'password123' };
-const FOREIGN_ITEM_ID = 'army-206-item-of-another-org';
+// The seeded demo admin owns opening cost layers (throwaway DB only); override with E2E_ARMY_EMAIL / E2E_ARMY_PASSWORD.
+const ADMIN = {
+  email: process.env.E2E_ARMY_EMAIL ?? 'admin@mizano.com',
+  password: process.env.E2E_ARMY_PASSWORD ?? 'password123',
+};
+// A second, empty organization registered by the test: it owns no cost layers.
+const ORG_B = {
+  email: 'army-206-org-b@example.com',
+  password: 'Army206Pass1',
+  firstName: 'Army',
+  lastName: 'Two',
+  organizationName: 'Army 206 Org B',
+};
 
 function apiBase(baseUrl: string): string {
   return (process.env.E2E_ARMY_API ?? new URL('/api', baseUrl).toString()).replace(/\/+$/, '');
 }
 
-async function signIn(api: string): Promise<string> {
-  const res = await fetch(`${api}/auth/login`, {
+async function login(api: string, creds: { email: string; password: string }): Promise<Response> {
+  return fetch(`${api}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(ADMIN),
+    body: JSON.stringify(creds),
   });
+}
+
+async function signIn(api: string, creds = ADMIN): Promise<string> {
+  const res = await login(api, creds);
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { accessToken: string } };
   return body.tokens.accessToken;
+}
+
+// Registers organization B once; a rerun on the same throwaway DB just signs in.
+async function signInOrgB(api: string): Promise<string> {
+  const first = await login(api, ORG_B);
+  if (first.status !== 200) {
+    const reg = await fetch(`${api}/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(ORG_B),
+    });
+    expect(reg.status).toBeLessThan(300);
+  }
+  return signIn(api, ORG_B);
 }
 
 type Valuation = {
@@ -43,12 +72,25 @@ test(
     const sum = all.items.reduce((s, i) => s + i.totalValue, 0);
     expect(Math.abs(sum - Number(all.totalValue))).toBeLessThan(0.0001);
 
-    // An item id this organization does not own yields no layers, not another tenant's stock.
-    const foreign = await fetch(`${api}/items/${FOREIGN_ITEM_ID}/valuation`, { headers: auth });
+    // Organization B asks for organization A's stocked item by id: it sees no layers, not A's stock.
+    const stocked = all.items.find((i) => i.totalQuantity > 0);
+    expect(stocked).toBeDefined();
+    const ownView = (await (
+      await fetch(`${api}/items/${stocked!.itemId}/valuation`, { headers: auth })
+    ).json()) as Valuation;
+    expect(ownView.items.map((i) => i.itemId)).toEqual([stocked!.itemId]);
+
+    const authB = { authorization: `Bearer ${await signInOrgB(api)}` };
+    const foreign = await fetch(`${api}/items/${stocked!.itemId}/valuation`, { headers: authB });
     expect(foreign.status).toBe(200);
     const none = (await foreign.json()) as Valuation;
     expect(none.items).toEqual([]);
     expect(Number(none.totalValue)).toBe(0);
+
+    const totalB = (await (
+      await fetch(`${api}/items/valuation`, { headers: authB })
+    ).json()) as Valuation;
+    expect(Number(totalB.totalValue)).toBe(0);
   },
 );
 
