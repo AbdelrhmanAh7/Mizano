@@ -7,3 +7,16 @@
    seed step from the workflow, or export `SEED_ALLOW_PROD=1` there if a production seed is still wanted.
 2. The issue text says `npm run seed`, but `apps/api/package.json` only had `prisma.seed`, no `seed` script.
    Added `"seed": "ts-node prisma/seed.ts"` so `pnpm --filter api seed` works as the acceptance criteria state.
+
+# Follow-ups from #208 (depreciation.service spec), not fixed in that PR per the CTO rule
+
+The spec marks both cases `it.todo` in
+`apps/api/src/modules/assets/services/depreciation.service.spec.ts`. Each needs its own fix issue under #134.
+
+1. **Concurrent runs post the same period twice.** `runMonthlyDepreciation` and `runDepreciationForAsset`
+   check `scheduleEntry.executedAt` before `$transaction`, and `depreciationSchedule.update` has no
+   `executedAt: null` guard. A probe test that ran two `runDepreciationForAsset(org, asset, 3, 2026)` calls
+   with `Promise.allSettled` got `journal.create` called 2 times (expected 1). Suggested fix: inside the
+   transaction, `updateMany({ where: { id, organizationId, executedAt: null } })` and abort when `count` is 0.
+2. **Queries keyed by id only.** `depreciationSchedule.findUnique/update/findMany` and `asset.update` carry no
+   `organizationId`. They are tenant-safe today only because the asset is first read with `organizationId`.
