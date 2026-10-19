@@ -147,64 +147,52 @@
 
 # Evidence for Issue #104: credential-age check and rotation metadata
 
-- **Baseline (`master`)**: `f97241430d4f635e94ef3a262ba3171b4031d6a2`
-- **Tested head**: `9f8593414d0f62b0ce895ceadca249e49c7fe0d0`
-- **Host**: macOS arm64, Node 26, PostgreSQL 16 throwaway cluster on 127.0.0.1:5432 (`mizano_104_e2e`), no Redis (`REDIS_URL=` blank).
-- **First commit** `96f259f` holds only the failing tests; before the implementation all 6 e2e tests failed (missing `smtpPasswordRotatedAt` column, no boot line).
-- **Key names**: `TELEGRAM_BOT_TOKEN_CREDENTIAL_ROTATED_AT` and `CLOUDFLARE_TUNNEL_TOKEN_CREDENTIAL_ROTATED_AT`, so `<NAME>` is the real secret env name, as the Tech Lead plan asks. The rename went test-first: `f0f1072` (AC1/AC2 boot tests failed, entries `undefined`), then `ba7a2f0`.
+- **Baseline (`origin/master`)**: `1a24f1b36d3360b9d8949882edb6c47d10e5d50a` (merge base of this round).
+- **Tested head**: `f2aca0cc` (`test(api): fail closed on shared targets, assert no log leak (#104)`). Every command below ran on this commit with a clean tree. The only commit after it changes `EVIDENCE.md` and `AI_QUESTIONS.md`.
+- **Host**: macOS arm64, Node 26, throwaway PostgreSQL 16 cluster on 127.0.0.1:55432 (`mizano_104_e2e`, migrations applied with `prisma migrate deploy`), no Redis (`REDIS_URL=` blank).
+- **First commit** `96f259f` holds only the failing tests; before the implementation all 6 e2e tests of that commit failed (missing `smtpPasswordRotatedAt` column, no boot line).
+- **Key names**: `TELEGRAM_BOT_TOKEN_CREDENTIAL_ROTATED_AT` and `CLOUDFLARE_TUNNEL_TOKEN_CREDENTIAL_ROTATED_AT`, so `<NAME>` is the real secret env name.
 
 ## Requirements
 
-| REQ | Requirement                                                                                     | Verified by                                                                                                                             |
-| --- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| AC1 | `classifyCredentialAge`: 89 days `ok`, 90 `due`, 91 `expired`, whole UTC days                   | `credential-age.spec.ts`; e2e boot line: `TELEGRAM_BOT_TOKEN` (89 days) `ok`, `CLOUDFLARE_TUNNEL_TOKEN` (91) `expired`, SMTP (90) `due` |
-| AC2 | Missing or malformed date (not strict `YYYY-MM-DD`, impossible, future) gives `unknown`         | 13 unit cases; e2e boot with `2026-7-11` and an empty key                                                                               |
-| AC3 | `smtpPasswordRotatedAt` set server-side only when `smtpPassword` changes; never client-supplied | e2e: stamp on change, unchanged for other fields or the same password, `400` for a client-sent stamp; `organizations.service.spec.ts`   |
-| AC4 | One line per boot with names and classifications; host keys via `ConfigService`                 | e2e `AC1 AC4` (exactly one `warn` line; org without a password not listed; legacy row without a stamp `unknown`)                        |
-| AC5 | No credential value in logs                                                                     | e2e `AC5` scans every `Logger` call and stdout/stderr for the four sentinel secrets; it fails when the service logs the token (checked) |
+| REQ | Requirement                                                                                     | Verified by                                                                                                                                                                                                                                                    |
+| --- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | `classifyCredentialAge`: 89 days `ok`, 90 `due`, 91 `expired`, whole UTC days                   | `credential-age.spec.ts`; e2e `AC1 AC4 AC5` boot line: `TELEGRAM_BOT_TOKEN` (89 days) `ok`, `CLOUDFLARE_TUNNEL_TOKEN` (91) `expired`, SMTP (90) `due`                                                                                                          |
+| AC2 | Missing or malformed date (not strict `YYYY-MM-DD`, impossible, future) gives `unknown`         | `credential-age.spec.ts` only: the 12 `it.each` dates plus the invalid-clock case (13 unit cases). No e2e case covers it.                                                                                                                                      |
+| AC3 | `smtpPasswordRotatedAt` set server-side only when `smtpPassword` changes; never client-supplied | e2e `AC3` (stamp on change, unchanged for other fields or the same password, `400` for a client-sent stamp); `organizations.service.spec.ts`; `e2e-army/104-smtp-rotation-stamp.e2e.ts` (local or disposable target only)                                      |
+| AC4 | One line per boot with names and classifications; host keys via `ConfigService`                 | e2e `AC1 AC4 AC5` (exactly one `warn` line; org without a password not listed; legacy row without a stamp `unknown`); `credential-age-check.service.spec.ts` (all-ok boot: one `warn`, no `log`)                                                               |
+| AC5 | No credential value in logs                                                                     | `credential-age-check.service.spec.ts` (all-ok boot and the failed SMTP lookup: every `warn`/`error`/`log` call scanned for the secret values and the error text); e2e `AC1 AC4 AC5` scans every `Logger` call and stdout/stderr for the four sentinel secrets |
 
-## Commands and results
+## Commands and results (on `f2aca0cc`)
 
 ```text
-$ /Users/abdelrahmanahmed/agents/hub-live/bin/suite.sh pnpm ci:full
-api:test: Test Suites: 144 passed, 144 total
-api:test: Tests:       2292 passed, 2292 total
-@mizano/web:test: Test Suites: 48 passed, 48 total
-@mizano/web:test: Tests:       458 passed, 458 total
- Tasks:    13 successful, 13 total
- Time:     1m34.288s
+$ pnpm --filter api type-check      -> exit 0
+$ pnpm --filter api lint            -> exit 0
 
-$ pnpm --filter api type-check
-> tsc --noEmit && tsc --noEmit -p test/tsconfig.e2e.json
-(exit 0, clean)
+$ pnpm --filter api exec jest src/common/credentials src/modules/organizations/organizations.service.spec.ts
+PASS src/common/credentials/credential-age-check.service.spec.ts
+PASS src/common/credentials/credential-age.spec.ts
+PASS src/modules/organizations/organizations.service.spec.ts
+Test Suites: 3 passed, 3 total
+Tests:       48 passed, 48 total
 
-$ pnpm --filter api lint
-> eslint "{src,apps,libs,test}/**/*.ts"
-(exit 0, clean)
-
-$ REDIS_URL= DATABASE_URL="postgresql://abdelrahmanahmed@localhost:5432/mizano_104_e2e" pnpm --filter api exec jest --config ./test/jest-e2e.json credential-rotation
+$ DATABASE_URL=postgresql://postgres@127.0.0.1:55432/mizano_104_e2e REDIS_URL= pnpm --filter api exec jest --config ./test/jest-e2e.json credential-rotation
 PASS test/credential-rotation.e2e-spec.ts
-  Credential rotation (e2e) @issue-104
-    ✓ @e2e @flow:credential-rotation @issue-104 AC3: SMTP password rotation stamp is set server-side on change, unchanged on same password or other fields, and rejected if client-supplied (33 ms)
-    ✓ @e2e @flow:credential-rotation @issue-104 AC1 AC4: each boot logs one line classifying host tokens (89/91 days) and SMTP passwords (90 days, legacy, none) (99 ms)
-    ✓ @e2e @flow:credential-rotation @issue-104 AC4: when every credential is ok the boot still logs one warn line, never a log line (88 ms)
-    ✓ @e2e @flow:credential-rotation @issue-104 AC5: no credential value appears in any log output
-Test Suites: 1 passed, 1 total
-Tests:       4 passed, 4 total
-Time:        3.798 s
+    ✓ @issue-104 AC3: SMTP password rotation stamp is set server-side on change, ... rejected if client-supplied
+    ✓ @issue-104 AC1 AC4 AC5: one boot line classifies host tokens (89/91 days) and SMTP passwords (90 days, legacy, none), and no value is logged
+Tests:       2 passed, 2 total
 ```
+
+- **Full suite not re-run on this head.** Repo rule for Mizano (owner, 2026-10-08): the full `pnpm ci:full` runs on GitHub-hosted CI after the push, not locally. The last local full run was on `1b76426e` (`turbo lint type-check test`: api 144 suites / 2292 tests, web 48 suites / 458 tests, 13 of 13 tasks successful). Code changed after it (`timingSafeStringEqual`, the optional Telegram token skip, the SMTP lookup fallback, and this round's test changes), so that run is not evidence for `f2aca0cc`; the CI result on the pushed head is.
+- The `e2e-army` test was not run here (it needs the hub stack); its host guard and restore logic were reviewed only.
 
 ## Notes and open items
 
-- Review round 3 & 4 fixes:
-  1. Constant-time comparison for SMTP password: uses `timingSafeStringEqual` (`apps/api/src/modules/organizations/organizations.service.ts`), safely handling missing or null values.
-  2. Unconfigured host credentials: an unset optional `TELEGRAM_BOT_TOKEN` is skipped; required `CLOUDFLARE_TUNNEL_TOKEN` is always classified.
-  3. Resilient boot check: `classifySmtpPasswords` catches schema query failures (e.g. if the API starts prior to migration deploy), logging an error without leaking credentials and returning `SMTP_PASSWORD=unknown` to preserve boot line output.
-  4. Single warning per boot: `credential-age-check.service.ts` always calls `this.logger.warn(line)` once per boot, ensuring healthy boots also emit the warning without lower-level logging.
-  5. Test suite consolidation: overlapping e2e boot cases were pruned from `credential-rotation.e2e-spec.ts` (dropping test lines from 255 to 226), while retaining full coverage of AC1-AC5.
-- Size and budget: 173 lines of production/config code (well within the ~300 budget), 440 lines of tests (`credential-age-check.service.spec.ts` 88, `credential-age.spec.ts` 60, `organizations.service.spec.ts` 21, `credential-rotation.e2e-spec.ts` 226, `e2e-army` 45). Detailed sign-off rationale documented in `AI_QUESTIONS.md` item 3.
-- Schema change: `Organization.smtpPasswordRotatedAt` (nullable timestamp, migration `20261008000100_smtp_password_rotated_at`, no backfill). Request for coordinator sign-off is tracked in `AI_QUESTIONS.md` item 2.
-- Scope gap & CTO hard rule on root `.env` files: Root `.env.local/.dev/.sit` were not modified in accordance with the CTO binding decision on PR #123 (`<!-- nql-cto decision=blocked-hard-rule -->`). Non-Pi stacks fall back to `unknown` until populated. A follow-up issue is drafted in `AI_QUESTIONS.md` item 1 for manual operator/founder handling.
+- Review round 3 and 4 fixes: constant-time SMTP password compare (`timingSafeStringEqual` in `organizations.service.ts`); unset optional `TELEGRAM_BOT_TOKEN` is skipped while the tunnel token is always classified; a failing SMTP lookup is caught, logged without its message, and reported as `SMTP_PASSWORD=unknown`; one `warn` line per boot, also when everything is `ok`.
+- Round 5 (this commit set): the failed-lookup unit test now scans all log calls for secrets; the e2e-army test refuses non-local targets unless `E2E_ARMY_DISPOSABLE=1` and restores the readable SMTP fields (the password is write-only in the API, so it cannot be restored: use a throwaway stack); the API e2e file went from 4 tests (226 lines) to 2 tests (205 lines) by folding the all-ok and log-scan cases into the boot test.
+- **Size, exact numbers** (`git diff --numstat origin/master...HEAD`, excluding `EVIDENCE.md`, `AI_QUESTIONS.md`, `migration.sql`): 603 lines added, 12 deleted. Production and config 159 added (`credential-age.ts` 38, `credential-age-check.service.ts` 87, `organizations.service.ts` 22, `common.module.ts` 2, `schema.prisma` 2, Pi env example 6, Pi compose 2). Tests 444 added (`credential-age-check.service.spec.ts` 93, `credential-age.spec.ts` 60, `organizations.service.spec.ts` 21, `credential-rotation.e2e-spec.ts` 205, `e2e-army` 65). This is above the ~300-line acceptance; the overrun is tests only, and there is no owner sign-off for it (see `AI_QUESTIONS.md` item 3).
+- Schema change: `Organization.smtpPasswordRotatedAt` (nullable timestamp, migration `20261008000100_smtp_password_rotated_at`, no backfill). Approved by the CTO acting as coordinator on PR #123 (see `AI_QUESTIONS.md` item 2).
+- Scope gap: the brief asks to mirror the two keys into root `.env.local`, `.env.dev` and `.env.sit`. Those files are untouched (credentials hard rule, CTO decision on PR #123), so non-Pi stacks report both host tokens as `unknown` until the keys are added. The follow-up issue is drafted in `AI_QUESTIONS.md` item 1; it has not been created (issue creation is frozen).
 
 ---
 

@@ -39,16 +39,13 @@ Issue #104 requires:
 - **Coordinator sign-off request:** PR #123 serves as the formal request for coordinator sign-off on this schema migration.
 - **Boot resilience:** If the API starts before the migration is applied (e.g. during GCP deployment where API starts before `prisma migrate deploy`), `CredentialAgeCheckService.classifySmtpPasswords` catches the Prisma query error, logs an error without secrets, and gracefully returns `SMTP_PASSWORD=unknown` so boot logging completes successfully without unhandled rejections.
 
-### 3. Test suite line budget sign-off
+### 3. Test suite line budget (open: no sign-off)
 
-The issue specifies:
+The issue says "under ~300 changed lines". Exact numbers on `f2aca0cc` (`git diff --numstat origin/master...HEAD`, excluding the two docs files and `migration.sql`): 159 lines of production and config, 444 lines of tests, 603 in total.
 
-> "Acceptance: ... under ~300 changed lines; no CI or secrets files touched."
+- Tests: `credential-age-check.service.spec.ts` 93, `credential-age.spec.ts` 60, `organizations.service.spec.ts` 21, `credential-rotation.e2e-spec.ts` 205 (2 tests), `e2e-army/104-smtp-rotation-stamp.e2e.ts` 65.
+- The target of about 330 lines is not met. Reaching it means deleting `credential-rotation.e2e-spec.ts`, which is the only test of the stamp and the boot line against a real database. No agent can sign off the overrun; the owner or CTO decides whether to accept it or to delete that file.
 
-- **Production changes:** ~173 lines of code across `credential-age.ts`, `credential-age-check.service.ts`, `organizations.service.ts`, `common.module.ts`, `schema.prisma`, `deploy/pi/.env.pi.example`, and `deploy/pi/docker-compose.pi.yml` (well within the 300-line budget).
-- **Test coverage:** ~441 lines across unit tests (`credential-age.spec.ts`, `credential-age-check.service.spec.ts`, `organizations.service.spec.ts`), API e2e (`credential-rotation.e2e-spec.ts`), and e2e-army (`104-smtp-rotation-stamp.e2e.ts`).
-- **Optimization:** Overlapping e2e boot test cases (testing malformed env dates and unconfigured tokens already covered by unit specs) were trimmed from `credential-rotation.e2e-spec.ts`.
-- **Sign-off:** The comprehensive test suite was requested to ensure zero credential leakage in logs, boundary condition verification (89/90/91 days), constant-time comparison, and multi-tenant security. Sign-off is recorded here per QA guidelines.
 # Questions / follow-ups for #186 (CI config is owner-only, so nothing was changed there)
 
 1. `.github/workflows/deploy.yml:325` runs `docker exec mizano-api npx prisma db seed ... || true` after
