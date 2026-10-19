@@ -177,6 +177,7 @@ Review round 5 (#109):
 - Fixed CodeRabbit finding on `rules-normalize.spec.ts:64`: AC5 test now verifies `parseAmount('10000000000000.0001')` returns a Decimal instance (`toBeInstanceOf(Decimal)`) and preserves the exact 4-decimal fraction string that JS Number conversion would lose.
 - Fixed CodeRabbit finding on `EVIDENCE.md`: E2E gate note updated to report the round-two `e2e-first` review status as unresolved without an authoritative retirement decision and the `e2e-army` result.
 - Confirmed the 3 outdated review threads on `intake-arabic-digits.e2e-spec.ts` and `entity-extraction.service.ts` are satisfied because the relevant code was reverted in commit a5aeed0.
+
 # Issue #141 — intake worker entrypoint, processor out of the API, Pi compose worker
 
 Tested commit: `57f9a0d` (branch `ai/141`; this file is committed after it). Fresh Postgres 16, `REDIS_URL=` blank, in band.
@@ -544,3 +545,42 @@ Each trial balance has two tenant filters: the account list and the line totals.
 ## Index: other issues
 
 - Issue #94 (decimal money math and idempotent posting): [docs/evidence/94/EVIDENCE.md](docs/evidence/94/EVIDENCE.md).
+- Issue #258 (auth error contract and response casing enforcement): see below.
+
+---
+
+## Issue #258 — Auth error contract and response casing enforcement
+
+### Acceptance Criteria
+
+- **AC1**: Validation failure on auth endpoints (`/auth/register`, `/auth/login`) returns HTTP 400 with `code: 'VALIDATION_ERROR'`, `error: 'Bad Request'`, structured `details` naming constraint rules (e.g. uppercase password requirement), and no leakage of sensitive properties (`passwordHash`).
+- **AC2**: Missing, invalid, or forged bearer token on protected routes returns HTTP 401 with `error: 'Unauthorized'` and descriptive message (`'Invalid or expired token'`).
+- **AC3**: Validation error response message is explicitly set to `'Validation Failed'` (Title Case) in `AllExceptionsFilter`.
+- **AC4**: 401 Unauthorized responses consistently return `error: 'Unauthorized'` as fallback in `AllExceptionsFilter` and are documented with `@ApiResponse({ status: 401, description: 'Unauthorized' })` in `AuthController`.
+- **AC5**: `formatValidationErrors` normalizes extracted field keys with initial lowercase (`password` instead of `Password`, preserving camelCase like `firstName`), eliminating key casing inconsistencies in `details`.
+
+### Originating Sentry issue
+
+- None. Issue was identified from QA review findings on PR #234 and stable gate `mz-auth`, not production Sentry exception.
+
+### Base vs Head Regression Demonstration
+
+- **Base (`master`)**: `apps/api/src/common/filters/http-exception.filter.spec.ts` fails with 4 test failures:
+  - `renders a weak password as VALIDATION_ERROR with Title Case message and normalized details` (Expected "Validation Failed", Received "Validation failed")
+  - `names the email rule with normalized details key for malformed email` (Expected "Validation Failed", Received "Validation failed")
+  - `renders an invalid login body as VALIDATION_ERROR with Title Case message` (Expected "Validation Failed", Received "Validation failed")
+  - `falls back to error "Unauthorized" for a 401 that carries no error field` (Expected "Unauthorized", Received "Error")
+- **Head (`ai/258`)**:
+  - `pnpm --filter api exec jest --maxWorkers=2 apps/api/src/common/filters/http-exception.filter.spec.ts apps/api/src/common/guards/jwt-auth.guard.spec.ts apps/api/src/modules/auth/auth.service.spec.ts`: 3 test suites passed, 19 tests passed, 0 failures (exit code 0).
+  - `pnpm --filter api type-check`: exit code 0.
+  - `pnpm --filter api lint`: exit code 0.
+
+### Verification Matrix
+
+| AC  | Covering Test                                                                                                                                                             | Command                                                                                                                                               | Observed Result |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| AC1 | `http-exception.filter.spec.ts` "renders a weak password as VALIDATION_ERROR...", `e2e-army/258-auth-error-contract.e2e.ts`                                               | `pnpm --filter api exec jest --maxWorkers=2 apps/api/src/common/filters/http-exception.filter.spec.ts`                                                | Passed, exit 0  |
+| AC2 | `jwt-auth.guard.spec.ts` "should reject with a 401 whose error is 'Unauthorized'", `http-exception.filter.spec.ts` "renders a missing or invalid JWT as 401 Unauthorized" | `pnpm --filter api exec jest --maxWorkers=2 apps/api/src/common/guards/jwt-auth.guard.spec.ts`                                                        | Passed, exit 0  |
+| AC3 | `http-exception.filter.spec.ts` "renders a weak password as VALIDATION_ERROR with Title Case message...", `e2e-army/258-auth-error-contract.e2e.ts`                       | `pnpm --filter api exec jest --maxWorkers=2 apps/api/src/common/filters/http-exception.filter.spec.ts`                                                | Passed, exit 0  |
+| AC4 | `http-exception.filter.spec.ts` "falls back to error 'Unauthorized' for a 401...", `auth.service.spec.ts` "rejects unknown login credentials with 401 Unauthorized"       | `pnpm --filter api exec jest --maxWorkers=2 apps/api/src/common/filters/http-exception.filter.spec.ts apps/api/src/modules/auth/auth.service.spec.ts` | Passed, exit 0  |
+| AC5 | `http-exception.filter.spec.ts` "renders a weak password... and normalized details", "names the email rule with normalized details key..."                                | `pnpm --filter api exec jest --maxWorkers=2 apps/api/src/common/filters/http-exception.filter.spec.ts`                                                | Passed, exit 0  |

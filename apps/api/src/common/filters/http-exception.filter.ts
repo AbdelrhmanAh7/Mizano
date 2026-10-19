@@ -15,7 +15,7 @@ import { LoggerService } from '../../modules/logger/logger.service';
 import { LogLevel, LogSource } from '@mizano/shared-types';
 import { describeError, redactText, redactUrl, sanitizeStack } from '../utils/redact';
 
-interface ErrorResponse {
+export interface ErrorResponse {
   statusCode: number;
   code?: string;
   message: string;
@@ -201,22 +201,25 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const exceptionResponse = exception.getResponse();
 
     let message: string = exception.message;
-    let error: string = 'Error';
+    // Fallback error for 401 is 'Unauthorized' when the exception response specifies no error field.
+    const fallbackError = status === HttpStatus.UNAUTHORIZED ? 'Unauthorized' : 'Error';
+    let error: string = fallbackError;
     let details: Record<string, unknown> | undefined;
     let code: string | undefined;
 
     if (typeof exceptionResponse === 'object') {
       const responseObj = exceptionResponse as Record<string, unknown>;
       message = (responseObj.message as string) || exception.message;
-      error = (responseObj.error as string) || 'Error';
+      error = (responseObj.error as string) || fallbackError;
       code = responseObj.code as string | undefined;
       details = responseObj.details as Record<string, unknown> | undefined;
 
       // Handle validation errors from class-validator
       if (Array.isArray(responseObj.message)) {
         details = this.formatValidationErrors(responseObj.message);
-        message = 'Validation failed';
+        message = 'Validation Failed';
         code = 'VALIDATION_ERROR';
+        error = (responseObj.error as string) || 'Bad Request';
       }
     } else if (typeof exceptionResponse === 'string') {
       message = exceptionResponse;
@@ -238,9 +241,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const formatted: Record<string, string[]> = {};
 
     for (const error of errors) {
-      // Try to extract field name from validation error
+      // Try to extract field name from validation error and normalize initial letter to lowercase
       const match = error.match(/^(\w+)/);
-      const field = match ? match[1] : 'general';
+      const field = match ? match[1].charAt(0).toLowerCase() + match[1].slice(1) : 'general';
 
       if (!formatted[field]) {
         formatted[field] = [];
