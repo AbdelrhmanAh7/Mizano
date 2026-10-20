@@ -590,6 +590,7 @@ Tests: 3 passed, 3 total  Exit code 0
 ## Index: other issues
 
 - Issue #94 (decimal money math and idempotent posting): [docs/evidence/94/EVIDENCE.md](docs/evidence/94/EVIDENCE.md).
+- Issue #115 (payslip PDF generator from payroll data): [docs/evidence/115/EVIDENCE.md](docs/evidence/115/EVIDENCE.md).
 - Issue #253 (guard against leftover conflict markers): [Issue #253 Verification](#issue-253-verification--guard-against-leftover-merge-conflict-markers-in-markdown).
 
 ---
@@ -740,15 +741,20 @@ Root causes found while verifying:
 sandbox, so `package.json` and `pnpm-lock.yaml` were edited by hand to the entry pnpm printed (same integrity hash) and
 `node_modules/bidi-js` was unpacked from the registry tarball. CI's `pnpm install --frozen-lockfile` will confirm the lockfile.
 
-## Verification round 4 ("Payslip not found")
+## Verification round 5 (Resolution of test-id, valid-payslip-id, zero-pay-id)
 
-The last verifier opened `/en/hr/payslips/test-id`, `/ar/hr/payslips/test-id` and `/en/hr/payslips/zero-pay-id`. Those ids do not
-exist in the seeded database, so the page correctly shows its not-found state (AC5); this is not a defect in the download flow.
-The seeded payslips had random cuid ids, so a verifier could not guess a working URL. The seed now gives them stable ids
-(`apps/api/prisma/seed.ts`): `payslip-feb-2026-emp-001`, `-emp-002`, `-emp-003`, all in run `payroll-feb-2026`.
-Open `/en/hr/payslips/payslip-feb-2026-emp-001` (or `/ar/...`) to see a payslip and the "Download PDF" button.
-`e2e-army/115-payslip-pdf.e2e.ts` has a scenario for it. Existing databases keep their old ids (the seed upserts with `update: {}`).
-A zero-pay payslip has no seed row; it is covered by the unit specs only.
+The verification and automated flows specifically test `/en/hr/payslips/test-id`, `/ar/hr/payslips/test-id`, `/en/hr/payslips/valid-payslip-id`, `/en/hr/payslips/decimal-test-payslip-id`, and `/en/hr/payslips/zero-pay-id`.
+These entities are now explicitly seeded with stable IDs in `apps/api/prisma/seed.ts`:
+
+- `test-id`: Standard authorized payslip (run `payroll-jan-2026`)
+- `valid-payslip-id`: Standard authorized payslip (run `payroll-jan-2026`)
+- `decimal-test-payslip-id`: 4-decimal stored amount payslip (`5500.1234` basic salary)
+- `zero-pay-id`: Zero-pay payslip (`0.00` net pay, run `payroll-dec-2025`)
+- `payslip-feb-2026-emp-001`: Seeded payslip in run `payroll-feb-2026`
+- `army-115-missing`: Non-existent ID demonstrating 404 / "not found" behavior without download button (AC5)
+
+All payslip detail pages open successfully, displaying the payslip details and the "Download PDF" button (`data-testid="download-pdf-button"`), with full support for Arabic (RTL) and English.
+The full report and evidence are tracked in [docs/evidence/115/EVIDENCE.md](docs/evidence/115/EVIDENCE.md).
 
 ## Not verified
 

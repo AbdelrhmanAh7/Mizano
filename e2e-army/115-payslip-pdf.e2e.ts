@@ -95,3 +95,39 @@ test(
     expect(pdf.headers['content-type']).toContain('application/pdf');
   },
 );
+
+test(
+  '@issue-115 AC1: test-id opens and offers PDF download',
+  { tags: ['feat:mz-payroll', 'lvl:ui'] },
+  async (fx: any) => {
+    const { app, screen } = fx;
+    await signIn(fx);
+    await app.open('/en/hr/payslips/test-id');
+    await expect(screen.getByTestId('download-pdf-button')).toBeVisible();
+
+    const response = fx.browser.waitForResponse(/\/payslips\/[^/?]+\/pdf/);
+    await screen.getByTestId('download-pdf-button').tap();
+    const pdf = await response;
+    expect(pdf.status).toBe(200);
+    expect(pdf.url).toContain('/payslips/test-id/pdf');
+    expect(pdf.headers['content-type']).toContain('application/pdf');
+  },
+);
+
+test(
+  '@issue-115 AC6b: zero-pay-id opens and offers PDF download for zero-pay payslip',
+  { tags: ['feat:mz-payroll', 'lvl:ui'] },
+  async (fx: any) => {
+    const { app, screen } = fx;
+    await signIn(fx);
+    await app.open('/en/hr/payslips/zero-pay-id');
+    await expect(screen.getByTestId('download-pdf-button')).toBeVisible();
+
+    const response = fx.browser.waitForResponse(/\/payslips\/[^/?]+\/pdf/);
+    await screen.getByTestId('download-pdf-button').tap();
+    const pdf = await response;
+    expect(pdf.status).toBe(200);
+    expect(pdf.url).toContain('/payslips/zero-pay-id/pdf');
+    expect(pdf.headers['content-type']).toContain('application/pdf');
+  },
+);
