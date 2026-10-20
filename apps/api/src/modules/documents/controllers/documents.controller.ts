@@ -196,8 +196,16 @@ export class DocumentsController {
   @Permissions('sales.view')
   @ApiOperation({ summary: 'Generate customer statement PDF' })
   @ApiParam({ name: 'customerId', description: 'Customer ID' })
-  @ApiQuery({ name: 'dateFrom', required: true, description: 'Statement start date' })
-  @ApiQuery({ name: 'dateTo', required: true, description: 'Statement end date' })
+  @ApiQuery({
+    name: 'dateFrom',
+    required: false,
+    description: 'Statement start date (default: 1 year ago)',
+  })
+  @ApiQuery({
+    name: 'dateTo',
+    required: false,
+    description: 'Statement end date (default: today)',
+  })
   @ApiResponse({ status: 200, description: 'PDF file' })
   async getStatementPdf(
     @CurrentOrg() orgId: string,
@@ -205,8 +213,10 @@ export class DocumentsController {
     @Query() query: StatementQueryDto,
     @Res() res: Response,
   ): Promise<void> {
-    const dateFrom = new Date(query.dateFrom);
-    const dateTo = new Date(query.dateTo);
+    const dateFrom = query.dateFrom
+      ? new Date(query.dateFrom)
+      : new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+    const dateTo = query.dateTo ? new Date(query.dateTo) : new Date();
 
     const pdfBuffer = await this.pdfService.generateStatementPdf(
       orgId,

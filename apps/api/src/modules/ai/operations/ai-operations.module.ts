@@ -24,6 +24,7 @@ import { ExtractionStrategyResolver } from '../extraction/extraction-strategy-re
 import { IntakeJobOwnerGuard } from '../intake/intake-job-owner.guard';
 import { IntakeJobsService } from '../intake/intake-jobs.service';
 import { IntakeQueueService } from '../intake/intake-queue.service';
+import { IntakeProcessorService } from '../intake/intake-processor.service';
 import { IntakeStorage, LocalFsIntakeStorage } from '../intake/intake-storage';
 import { INTAKE_CLOCK, monotonicClock } from '../intake/stage-timer';
 
@@ -34,6 +35,8 @@ import { PatternDetectionController } from '../controllers/pattern-detection.con
 import { AnomalyDetectionController } from '../controllers/anomaly-detection.controller';
 import { ReconciliationAiController } from '../controllers/reconciliation-ai.controller';
 import { OllamaTunnelController } from '../controllers/ollama-tunnel.controller';
+
+const isE2eArmy = process.env.APP_ENV === 'e2e-army' || process.env.E2E_ARMY_DB_DISPOSABLE === '1';
 
 @Module({
   imports: [PrismaModule, AiCoreModule, AiNlpModule, HttpModule, ConfigModule],
@@ -63,6 +66,7 @@ import { OllamaTunnelController } from '../controllers/ollama-tunnel.controller'
     PatternDetectionService,
     AnomalyDetectionService,
     ReconciliationMatcherService,
+    ...(isE2eArmy ? [IntakeProcessorService] : []),
   ],
   exports: [
     OllamaService,

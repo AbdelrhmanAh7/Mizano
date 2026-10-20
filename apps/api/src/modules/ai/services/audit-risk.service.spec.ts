@@ -4,6 +4,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { AiFeedbackService } from './ai-feedback.service';
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { NotFoundException } from '@nestjs/common';
 import {
   createMockPrisma,
   createMockAiFeedback,
@@ -124,22 +125,18 @@ describe('AuditRiskService', () => {
       expect(result.factors.length).toBeGreaterThan(0);
     });
 
-    it('should return 0 risk for unknown entity type', async () => {
-      const result = await service.scoreEntity(orgId, 'unknown', 'x-001');
-
-      expect(result.riskScore).toBe(0);
-      expect(result.riskLevel).toBe('LOW');
-      expect(result.factors).toHaveLength(0);
-      expect(result.confidence).toBe(0);
+    it('should throw NotFoundException for unknown entity type', async () => {
+      await expect(service.scoreEntity(orgId, 'unknown', 'x-001')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
-    it('should return 0 risk when entity not found', async () => {
+    it('should throw NotFoundException when entity not found', async () => {
       prisma.journal.findFirst.mockResolvedValue(null as any);
 
-      const result = await service.scoreEntity(orgId, 'journal', 'non-existent');
-
-      expect(result.riskScore).toBe(0);
-      expect(result.riskLevel).toBe('LOW');
+      await expect(service.scoreEntity(orgId, 'journal', 'non-existent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should include weekend_activity factor for Saturday journals', async () => {
