@@ -6,11 +6,12 @@ import { PayslipPdfService } from './services/payslip-pdf.service';
 import { EmployeesController } from './controllers/employees.controller';
 import { AttendanceController } from './controllers/attendance.controller';
 import { PayrollController } from './controllers/payroll.controller';
+import { PayslipsController } from './controllers/payslips.controller';
 import { PrismaModule } from '../../prisma/prisma.module';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [EmployeesController, AttendanceController, PayrollController],
+  controllers: [EmployeesController, AttendanceController, PayrollController, PayslipsController],
   providers: [EmployeesService, AttendanceService, PayrollService, PayslipPdfService],
   exports: [EmployeesService, AttendanceService, PayrollService, PayslipPdfService],
 })
