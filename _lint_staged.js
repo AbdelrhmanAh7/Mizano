@@ -44,6 +44,23 @@ if (stagedFiles.length === 0) {
   process.exit(0);
 }
 
+// Track files that also have unstaged modifications to preserve unstaged hunks
+let unstagedFiles = new Set();
+try {
+  const unstagedOutput = execSync('git diff --name-only --no-ext-diff --diff-filter=ACMR', {
+    encoding: 'utf8',
+    cwd: root,
+  }).trim();
+  unstagedFiles = new Set(
+    unstagedOutput
+      .split('\n')
+      .map((f) => f.trim())
+      .filter(Boolean),
+  );
+} catch (_e) {
+  /* non-fatal */
+}
+
 const apiTsFiles = stagedFiles
   .filter((f) => f.startsWith('apps/api/') && f.endsWith('.ts'))
   .map((f) => path.join(root, f));
@@ -116,12 +133,17 @@ if (jsonMdCssFiles.length > 0) {
   runTool('prettier --write (json/md/css)', prettierBin, ['--write', ...jsonMdCssFiles], root);
 }
 
-// Re-stage modified files
+// Re-stage modified files, preserving unstaged hunks in partially staged files
 const allFiles = [...apiTsFiles, ...webTsFiles, ...pkgTsFiles, ...jsonMdCssFiles];
-if (allFiles.length > 0) {
+const filesToRestage = allFiles.filter((absPath) => {
+  const relPath = path.relative(root, absPath).split(path.sep).join('/');
+  return !unstagedFiles.has(relPath);
+});
+
+if (filesToRestage.length > 0) {
   try {
-    for (let i = 0; i < allFiles.length; i += 50) {
-      const batch = allFiles.slice(i, i + 50);
+    for (let i = 0; i < filesToRestage.length; i += 50) {
+      const batch = filesToRestage.slice(i, i + 50);
       execSync(`git add ${batch.map((f) => `"${f}"`).join(' ')}`, { cwd: root, stdio: 'pipe' });
     }
   } catch (_e) {
