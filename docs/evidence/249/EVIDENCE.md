@@ -3,6 +3,7 @@
 - **Issue**: [#249](https://github.com/AbdelrhmanAh7/Mizano/issues/249)
 - **PR**: [#269](https://github.com/AbdelrhmanAh7/Mizano/pull/269) (Supersedes part of #246)
 - **Base commit**: `34da63d23f176550d8f9e006788d03426ebdc44b` (`origin/master`)
+- **Tested HEAD commit**: `6abec353cabd4806c2380fdf8052a00fd8cf8107` (`ai/249`)
 - **Originating Sentry issue**: None (split from PR #246 review finding `0b74c29e8a46`, parent issue #182).
 - **User-facing flow / E2E**: Not user-facing (internal rules extraction backend logic in `apps/api/src/modules/ai/extraction/rules/`). `E2E: not needed — internal extraction utility fix, no user-facing flow or schema change.`
 - **Skills used**: `diagnosing-bugs`, `systematic-debugging`, `verification-before-completion`, `test-driven-development`.
