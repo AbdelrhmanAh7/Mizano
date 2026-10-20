@@ -53,3 +53,35 @@ describe('CacheService pattern invalidation (memory store, no Redis)', () => {
     expect(cache.store.size).toBe(0);
   });
 });
+
+describe('CacheService.onModuleDestroy', () => {
+  const config = { get: () => undefined } as unknown as ConfigService;
+
+  it('is a no-op when REDIS_URL is blank', async () => {
+    const service = new CacheService(memoryCache(), config);
+    await expect(service.onModuleDestroy()).resolves.toBeUndefined();
+  });
+
+  it('quits the direct Redis client once and never touches it again', async () => {
+    const service = new CacheService(memoryCache(), config);
+    const client = { quit: jest.fn().mockResolvedValue('OK'), disconnect: jest.fn() };
+    (service as unknown as { redisClient: unknown }).redisClient = client;
+
+    await service.onModuleDestroy();
+    await service.onModuleDestroy();
+
+    expect(client.quit).toHaveBeenCalledTimes(1);
+    expect(client.disconnect).not.toHaveBeenCalled();
+    expect(service.isRedisAvailable).toBe(false);
+  });
+
+  it('falls back to disconnect when quit fails', async () => {
+    const service = new CacheService(memoryCache(), config);
+    const client = { quit: jest.fn().mockRejectedValue(new Error('boom')), disconnect: jest.fn() };
+    (service as unknown as { redisClient: unknown }).redisClient = client;
+
+    await service.onModuleDestroy();
+
+    expect(client.disconnect).toHaveBeenCalledTimes(1);
+  });
+});
