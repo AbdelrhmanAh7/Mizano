@@ -1,8 +1,7 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, Link } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
-import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';

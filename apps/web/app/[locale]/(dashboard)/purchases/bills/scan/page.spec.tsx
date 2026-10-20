@@ -13,6 +13,13 @@ jest.mock('next-intl', () => ({
     }),
 }));
 
+jest.mock('@/i18n/routing', () => ({
+  Link: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
+  useRouter: () => ({ push: jest.fn() }),
+}));
+
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
 }));

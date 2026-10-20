@@ -36,14 +36,17 @@ function withCors(response: NextResponse, origin: string | null): NextResponse {
 export async function middleware(request: NextRequest) {
   const origin = request.headers.get('origin');
   if (request.method === 'OPTIONS') {
+    const headers: Record<string, string> = {
+      'Access-Control-Allow-Origin': origin || '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+      'Access-Control-Allow-Headers': 'X-Requested-With, Content-Type, Authorization',
+    };
+    if (origin) {
+      headers['Access-Control-Allow-Credentials'] = 'true';
+    }
     return new NextResponse(null, {
       status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': origin || '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-        'Access-Control-Allow-Headers': 'X-Requested-With, Content-Type, Authorization',
-        'Access-Control-Allow-Credentials': 'true',
-      },
+      headers,
     });
   }
 
