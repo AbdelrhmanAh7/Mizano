@@ -8,7 +8,7 @@ It lives under `docs/evidence/11/EVIDENCE.md` and is indexed in root `EVIDENCE.m
 - **Issue:** #11 ([P0] Make bill approval and payment posting atomic and idempotent)
 - **Pull Request:** #296
 - **Base commit (`origin/master`):** `0e12286d`
-- **Tested HEAD commit:** `9b440c5e`
+- **Tested HEAD commit:** `444bdaae`
 - **Verification Date:** 2026-10-20
 - **Skills Used:** `systematic-debugging`, `verification-before-completion`, `tdd`, `writing-plans`, `e2e-army`
 
