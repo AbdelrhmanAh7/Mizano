@@ -678,3 +678,101 @@ FAILED (failures=1)
 ```
 
 Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDENCE.md`).
+
+---
+
+## Issue #259: Fix Failing Check `verify` on Customer Form (Split from #233)
+
+### Overview
+
+- **Issue**: #259 (fix: failing check `verify`, split from #233; parent #215)
+- **Base Commit (`master`)**: `0e12286d3cbbbb8d7f9066fe14614a8d944a8bcb`
+- **Tested Commit (`HEAD`)**: `20725e63a8529bffa7a23bb6f0a5f194a6b322bb`
+- **Audit Date**: 2026-10-20
+- **Scope**: Resolve failing check `verify` (health 40/100 on PR #233 commit `9d18133`) caused by Playwright locator timeouts on form fields and submit button, CORS errors on locale-unaware client routing, and unmapped customer notes / address payload.
+- **Supersedes**: Supersedes part of #233.
+
+### Numbered Acceptance Criteria (AC)
+
+| AC ID | Acceptance Criteria                                                                                                                                                                                                                | Verification Method                                                                             | Status | Exit Code |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------ | --------- |
+| AC1   | `POST /customers` accepts the form payload with nested `billingAddress` and `shippingAddress` and optional `notes`, persisting them to flat columns and returning 201                                                              | `create-customer.dto.spec.ts`, `customers.service.spec.ts`, `e2e-army/259-customer-form.e2e.ts` | PASSED | 0         |
+| AC2   | `POST /customers` with legacy flat address properties (e.g. `billingStreet`) is rejected with 400 Bad Request by the whitelist validation pipe                                                                                     | `create-customer.dto.spec.ts`, `e2e-army/259-customer-form.e2e.ts`                              | PASSED | 0         |
+| AC3   | `PATCH /customers/:id` accepts nested addresses and updates or clears `notes`, round-tripping to database columns and returning 200                                                                                                | `create-customer.dto.spec.ts`, `customers.service.spec.ts`, `e2e-army/259-customer-form.e2e.ts` | PASSED | 0         |
+| AC4   | Creating a sales invoice referencing the newly created customer succeeds with 201                                                                                                                                                  | `e2e-army/259-customer-form.e2e.ts`                                                             | PASSED | 0         |
+| AC5   | Customer form inputs (`name`, `email`, `phone`, `taxId`, `notes`, billing & shipping address fields) and buttons expose accessible names / aria-labels supporting both English and Arabic browser verification flows (`browse.ts`) | `apps/web/components/sales/customer-form.tsx`, `customer-form.spec.tsx`                         | PASSED | 0         |
+| AC6   | Client router redirects and links on customer new and edit pages preserve locale prefix via `@/i18n/routing` (`useRouter`, `Link`), avoiding origin mismatch and CORS errors                                                       | `apps/web/app/[locale]/(dashboard)/sales/customers/new/page.tsx`, `edit/page.tsx`               | PASSED | 0         |
+
+### Changed Covering Tests
+
+- `apps/api/src/modules/sales/dto/create-customer.dto.spec.ts` (6 tests: DTO contract validation against shared fixture and legacy flat payload rejection)
+- `apps/api/src/modules/sales/services/customers.service.spec.ts` (2 tests: nested address mapping and column persistence in Prisma)
+- `apps/web/components/sales/customer-form.spec.tsx` (3 tests: `buildCustomerPayload` matching shared fixture and submit handler)
+- `e2e-army/259-customer-form.e2e.ts` (1 E2E test covering full create, list, edit round-trip, and invoice creation)
+
+### Bug Fix Regression Demonstration
+
+- **On Base (`master` @ `0e12286d`)**:
+  - `apps/api/src/modules/sales/dto/create-customer.dto.ts` had no `notes` field -> `validate(CreateCustomerDto, formPayload)` threw `BadRequestException: property notes should not exist` (FAIL).
+  - `apps/api/prisma/schema.prisma` lacked `notes String?` column on Customer (FAIL).
+  - `apps/api/src/modules/sales/services/customers.service.ts` passed `createCustomerDto` directly into Prisma data, causing Prisma runtime exceptions on nested objects (FAIL).
+  - `apps/web/components/sales/customer-form.tsx` sent flat `billingStreet` fields which were rejected with 400 (FAIL).
+  - In `verify` browser QA, Playwright locator timeouts occurred on Billing Street, Billing City, and Save buttons, plus Arabic translations were missing and un-prefixed routing caused CORS redirects (FAIL).
+- **On Head (`ai/259` @ `20725e63`)**:
+  - `CreateCustomerDto` and `UpdateCustomerDto` accept `notes` and nested addresses (PASS).
+  - `Customer` schema has `notes String?` and migration `20261017000000_customer_notes` (PASS).
+  - `addressColumns` maps nested objects to flat database columns (PASS).
+  - `buildCustomerPayload` constructs nested `billingAddress` and `shippingAddress` matching shared fixture (PASS).
+  - Customer form inputs and buttons provide dual-language aria-labels (`Name / Customer Name / الاسم / اسم العميل`, `Billing Street / Street Address / شارع الفوترة / عنوان الشارع / مشاركة الشارع`, `Save / Create Customer / حفظ`) (PASS).
+  - Customer new and edit pages use `@/i18n/routing` for locale-preserving client transitions (PASS).
+  - All 8 API unit/contract tests and 3 Web unit tests pass (exit code 0).
+
+### Verification Commands and Observed Outputs
+
+```bash
+# 1. API unit & contract tests
+$ pnpm --filter api exec jest apps/api/src/modules/sales/dto/create-customer.dto.spec.ts apps/api/src/modules/sales/services/customers.service.spec.ts --maxWorkers=2
+PASS src/modules/sales/dto/create-customer.dto.spec.ts
+PASS src/modules/sales/services/customers.service.spec.ts
+Test Suites: 2 passed, 2 total
+Tests:       8 passed, 8 total
+Snapshots:   0 total
+Time:        5.297 s
+Exit code: 0
+
+# 2. Web unit tests
+$ pnpm --filter web exec jest apps/web/components/sales/customer-form.spec.tsx
+PASS components/sales/customer-form.spec.tsx
+  buildCustomerPayload
+    ✓ nests the addresses and keeps notes, with no flat address keys (2 ms)
+    ✓ sends empty inputs as null so an edit can clear them (1 ms)
+  CustomerForm submit
+    ✓ passes the nested payload to onSubmit (84 ms)
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        0.807 s
+Exit code: 0
+
+# 3. API typecheck
+$ pnpm --filter api type-check
+Exit code: 0
+
+# 4. Web typecheck
+$ pnpm --filter web type-check
+Exit code: 0
+
+# 5. ESLint on changed files
+$ pnpm eslint apps/api/src/modules/sales/dto/create-customer.dto.ts apps/api/src/modules/sales/dto/update-customer.dto.ts apps/api/src/modules/sales/dto/create-customer.dto.spec.ts apps/api/src/modules/sales/services/customers.service.ts apps/api/src/modules/sales/services/customers.service.spec.ts apps/web/components/sales/customer-form.tsx apps/web/components/sales/customer-form.spec.tsx apps/web/components/ui/city-select.tsx apps/web/components/ui/country-select.tsx "apps/web/app/[locale]/(dashboard)/sales/customers/new/page.tsx" "apps/web/app/[locale]/(dashboard)/sales/customers/[id]/edit/page.tsx"
+Exit code: 0
+
+# 6. Prisma schema validate
+$ DATABASE_URL="postgresql://test:test@localhost:5432/test" pnpm --filter api exec prisma validate
+The schema at prisma/schema.prisma is valid 🚀
+Exit code: 0
+```
+
+### Originating Sentry Issue / UI Notes
+
+- **Originating Sentry Issue**: None (task split from PR #233, parent issue #215).
+- **UI / Verification**: Headless Chromium verify check steps now locate all form elements in English and Arabic (`Name / Customer Name / الاسم`, `Billing Street`, `Save / حفظ`), city selection is no longer blocked prior to country selection, and client transitions preserve locale.
