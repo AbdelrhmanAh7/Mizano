@@ -27,10 +27,9 @@ export function LocaleDirectionProvider({
         data-testid="direction-indicator"
         data-direction={dir}
         data-locale={lang}
+        aria-hidden="true"
         className="sr-only"
-      >
-        {dir === 'rtl' ? 'RTL' : 'LTR'}
-      </span>
+      />
       {children}
     </DirectionProvider>
   );

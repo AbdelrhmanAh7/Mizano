@@ -20,7 +20,7 @@ describe('locale Radix direction', () => {
   });
 
   it.each(['ar', 'en'] as const)(
-    'renders %s direction indicator for accessibility and verification',
+    'renders %s direction indicator with machine-readable attributes and aria-hidden',
     (locale) => {
       render(
         <LocaleDirectionProvider dir={localeDirections[locale]} lang={locale}>
@@ -28,9 +28,10 @@ describe('locale Radix direction', () => {
         </LocaleDirectionProvider>,
       );
       const indicator = screen.getByTestId('direction-indicator');
-      expect(indicator).toHaveTextContent(locale === 'ar' ? 'RTL' : 'LTR');
       expect(indicator).toHaveAttribute('data-direction', localeDirections[locale]);
       expect(indicator).toHaveAttribute('data-locale', locale);
+      expect(indicator).toHaveAttribute('aria-hidden', 'true');
+      expect(indicator).toBeEmptyDOMElement();
     },
   );
 });
@@ -64,8 +65,9 @@ it('keeps <html> dir, lang and direction indicator in sync when the locale chang
   );
   expect(document.documentElement).toHaveAttribute('dir', 'rtl');
   expect(document.documentElement).toHaveAttribute('lang', 'ar');
-  expect(screen.getByTestId('direction-indicator')).toHaveTextContent('RTL');
   expect(screen.getByTestId('direction-indicator')).toHaveAttribute('data-direction', 'rtl');
+  expect(screen.getByTestId('direction-indicator')).toHaveAttribute('aria-hidden', 'true');
+  expect(screen.getByTestId('direction-indicator')).toBeEmptyDOMElement();
 
   rerender(
     <LocaleDirectionProvider dir={localeDirections.en} lang="en">
@@ -74,6 +76,7 @@ it('keeps <html> dir, lang and direction indicator in sync when the locale chang
   );
   expect(document.documentElement).toHaveAttribute('dir', 'ltr');
   expect(document.documentElement).toHaveAttribute('lang', 'en');
-  expect(screen.getByTestId('direction-indicator')).toHaveTextContent('LTR');
   expect(screen.getByTestId('direction-indicator')).toHaveAttribute('data-direction', 'ltr');
+  expect(screen.getByTestId('direction-indicator')).toHaveAttribute('aria-hidden', 'true');
+  expect(screen.getByTestId('direction-indicator')).toBeEmptyDOMElement();
 });

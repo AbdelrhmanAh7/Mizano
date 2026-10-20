@@ -28,8 +28,8 @@ test(
     for (let i = 0; i < 3; i++) {
       await app.open('/en/login');
       await expect(screen.getByRole('button', 'Sign In')).toBeVisible();
-      await screen.getByRole('textbox', 'Email').fill('admin@mizano.com');
-      await screen.getByRole('textbox', 'Password').fill('password123');
+      await browser.locator('#email').fill('admin@mizano.com');
+      await browser.locator('#password').fill('password123');
       await screen.getByRole('button', 'Sign In').tap();
       try {
         await expect(browser).toHaveURL(/\/en\/(dashboard|onboarding|accounting|sales)/, {
@@ -48,10 +48,14 @@ test(
       await app.open(`/${locale}/dashboard`);
       await expect(browser.locator('html')).toHaveAttribute('dir', l.dir);
       await expect(browser.locator('html')).toHaveAttribute('lang', locale);
-      await expect(screen.getByTestId('direction-indicator')).toHaveTextContent(
-        locale === 'ar' ? 'RTL' : 'LTR',
+      await expect(browser.locator('[data-testid="direction-indicator"]')).toHaveAttribute(
+        'data-direction',
+        l.dir,
       );
-      await expect(screen.getByTestId('direction-indicator')).toHaveAttribute('data-direction', l.dir);
+      await expect(browser.locator('[data-testid="direction-indicator"]')).toHaveAttribute(
+        'aria-hidden',
+        'true',
+      );
 
       const first = screen.getByRole('tab', l.first);
       await expect(first).toBeVisible();
@@ -65,13 +69,19 @@ test(
     // html dir/lang and direction indicator must follow it without a full reload.
     await app.open('/ar/dashboard');
     await expect(browser.locator('html')).toHaveAttribute('dir', 'rtl');
-    await expect(screen.getByTestId('direction-indicator')).toHaveTextContent('RTL');
+    await expect(browser.locator('[data-testid="direction-indicator"]')).toHaveAttribute(
+      'data-direction',
+      'rtl',
+    );
     await screen.getByRole('button', 'اللغة').tap();
     await screen.getByRole('menuitem', 'English').tap();
     await browser.waitForURL(/\/en\//);
     await expect(browser.locator('html')).toHaveAttribute('dir', 'ltr');
     await expect(browser.locator('html')).toHaveAttribute('lang', 'en');
-    await expect(screen.getByTestId('direction-indicator')).toHaveTextContent('LTR');
+    await expect(browser.locator('[data-testid="direction-indicator"]')).toHaveAttribute(
+      'data-direction',
+      'ltr',
+    );
     await app.screenshot('232-switched-to-en');
   },
 );
