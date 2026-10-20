@@ -597,7 +597,7 @@ Tests: 3 passed, 3 total  Exit code 0
 
 - **Issue**: #212 (Follow-up: findings merged under an open CHANGES_REQUESTED (#162, #143, #107))
 - **Scope**: Layer 2 [2/2] — #162 complete (#162 items 1–3): p0 delivery-challan org-scoping fix, test hardening, and atomic stock moves in `issue` / `markReturned`
-- **Tested commit**: `cbdaaff9968284e82ce9fdd3b143bc53ebe3c19d` (HEAD of `ai/212-p2`)
+- **Tested commit**: `70b349ae` (HEAD of `ai/212-p2`; implementation at `cbdaaff9968284e82ce9fdd3b143bc53ebe3c19d`)
 - **Base commit**: `0e12286d` (`origin/master`)
 - **Originating Sentry issue**: none (findings from PR-cycle audit 2026-10-11)
 - **UI screenshots**: none (API-only service change, no user-facing UI flow)
@@ -678,12 +678,12 @@ Tests: 30 passed, 30 total
 1. Line 168 threw a hard-coded `ConflictException` for any `count !== 1`, making no distinction between a missing record (should be 404), a status mismatch (should be 400), and a genuine race condition (409). The fix delegates to `rejectTransition`, which re-reads the record in the same transaction and throws the appropriate exception.
 2. In `issue` and `markReturned`, `trackedLineItems` was called without `tx`, causing it to query `this.prisma` outside the transaction client. The fix passes `tx` so that all reads and mutations execute atomically within `tx`, and roll back if any subsequent stock movement fails.
 
-## Local Checks (re-run on HEAD `cbdaaff9968284e82ce9fdd3b143bc53ebe3c19d`)
+## Local Checks (re-run on HEAD `70b349ae`)
 
 - **Linter**: `pnpm --filter api lint` — exit code 0, clean.
 - **Typecheck**: `pnpm --filter api type-check` — exit code 0, clean (0 errors in changed files and full suite).
-- **Unit tests**: `nice -n 10 pnpm --filter api exec jest --maxWorkers=2 src/modules/sales/services/delivery-challans.service.spec.ts` — 30 passed, exit code 0.
-- **Movement tests**: `nice -n 10 pnpm --filter api exec jest --maxWorkers=2 src/modules/inventory/services/delivery-challans-movement.spec.ts` — 2 passed, exit code 0.
+- **Unit tests**: `nice -n 10 pnpm --filter api exec jest --maxWorkers=2 src/modules/sales/services/delivery-challans.service.spec.ts` — 30 passed, exit code 0, 3.213 s.
+- **Movement tests**: `nice -n 10 pnpm --filter api exec jest --maxWorkers=2 src/modules/inventory/services/delivery-challans-movement.spec.ts` — 2 passed, exit code 0, 3.08 s.
 
 ## Out of scope (follow-ups for #212)
 
