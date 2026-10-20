@@ -46,15 +46,31 @@ describe('parseAmount', () => {
 
 describe('parseDate', () => {
   it('parses day-first, ISO, and named-month dates', () => {
-    expect(parseDate('15/03/2024')).toEqual({ iso: '2024-03-15', ambiguous: false });
+    expect(parseDate('15/03/2024')).toEqual({
+      iso: '2024-03-15',
+      ambiguous: false,
+      start: 0,
+      end: 10,
+    });
     expect(parseDate('2024-06-09')?.iso).toBe('2024-06-09');
     expect(parseDate('12 March 2024')?.iso).toBe('2024-03-12');
+    expect(parseDate('March 15, 2024')).toEqual({
+      iso: '2024-03-15',
+      ambiguous: false,
+      start: 0,
+      end: 14,
+    });
     expect(parseDate('9 يونيو 2024')?.iso).toBe('2024-06-09');
     expect(parseDate('3 تشرين الثاني 2024')?.iso).toBe('2024-11-03');
   });
 
   it('flags day/month ambiguity and rejects impossible or Hijri dates', () => {
-    expect(parseDate('01/02/2024')).toEqual({ iso: '2024-02-01', ambiguous: true });
+    expect(parseDate('01/02/2024')).toEqual({
+      iso: '2024-02-01',
+      ambiguous: true,
+      start: 0,
+      end: 10,
+    });
     expect(parseDate('31/02/2024')).toBeNull();
     expect(parseDate('15/03/1445')).toBeNull();
     expect(parseDate('2024-06-09')?.ambiguous).toBe(false);
@@ -254,5 +270,58 @@ describe('toExtractionResult', () => {
     expect(result.vendorAddress).toBeNull();
     expect(result.fieldEvidence?.total?.lineIndex).toBe(10);
     expect(result.fieldConfidence.total).toBeGreaterThan(0);
+  });
+});
+
+describe('extractInvoiceFields date offsets map back to original text', () => {
+  it('slices the exact substring parseDate parsed when a line has two date-like tokens', () => {
+    const text = 'Date: 15/03/2024 (1445.9.5 H)';
+    const r = extractInvoiceFields(text);
+    expect(r.date?.value).toBe('2024-03-15');
+    expect(r.date?.start).toBeDefined();
+    expect(r.date?.end).toBeDefined();
+    expect(text.slice(r.date?.start, r.date?.end)).toBe('15/03/2024');
+  });
+
+  it('slices month-first textual dates with irregular spacing', () => {
+    const text = 'Date:   March   15,   2024';
+    const r = extractInvoiceFields(text);
+    expect(r.date?.value).toBe('2024-03-15');
+    expect(r.date?.start).toBeDefined();
+    expect(r.date?.end).toBeDefined();
+    expect(text.slice(r.date?.start, r.date?.end)).toBe('March   15,   2024');
+  });
+
+  it('slices day-first named dates and dates with irregular spacing', () => {
+    const named = 'Date:   ١٥   March ٢٠٢٤';
+    const r1 = extractInvoiceFields(named);
+    expect(r1.date?.value).toBe('2024-03-15');
+    expect(named.slice(r1.date?.start, r1.date?.end)).toBe('١٥   March ٢٠٢٤');
+    const spaced = 'Date: 2024 / 03  /  15';
+    const r2 = extractInvoiceFields(spaced);
+    expect(spaced.slice(r2.date?.start, r2.date?.end)).toBe('2024 / 03  /  15');
+  });
+
+  it('selects valid date when invalid Hijri ISO appears first on the line', () => {
+    const text = 'Date: 1445.9.5 (15/03/2024)';
+    const r = extractInvoiceFields(text);
+    expect(r.date?.value).toBe('2024-03-15');
+    expect(text.slice(r.date?.start, r.date?.end)).toBe('15/03/2024');
+  });
+
+  it('translates span back through Arabic-Indic digits via mapSpanToOriginal', () => {
+    const text = 'Invoice\nDate: \u200e١٥/٠٣/٢٠٢٤\nTotal: 100.00';
+    const r = extractInvoiceFields(text);
+    expect(r.date?.value).toBe('2024-03-15');
+    expect(text.slice(r.date?.start, r.date?.end)).toBe('١٥/٠٣/٢٠٢٤');
+  });
+
+  it('does not store raw document text in RulesExtraction to prevent sensitive data logging', () => {
+    const text = 'Invoice 101\nDate: 2024-05-01\nTotal: 100.00';
+    const r = extractInvoiceFields(text);
+    expect((r as unknown as { originalText?: unknown }).originalText).toBeUndefined();
+    expect(r.date?.start).toBeDefined();
+    expect(r.date?.end).toBeDefined();
+    expect(text.slice(r.date?.start, r.date?.end)).toBe('2024-05-01');
   });
 });
