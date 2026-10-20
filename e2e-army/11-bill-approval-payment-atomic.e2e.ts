@@ -54,10 +54,17 @@ test(
     const accounts: Json[] = list.body.data ?? list.body;
     expect(accounts.length).toBeGreaterThan(2);
 
-    const expenseAccount = accounts.find((a) => a.accountType === "EXPENSE" || a.accountSubtype === "OPERATING_EXPENSE")?.id;
-    const bankAccount = accounts.find((a) => a.code === "1000" || a.code === "1010" || a.accountType === "ASSET")?.id;
+    const expenseAccount = accounts.find(
+      (a) => a.accountType === "EXPENSE" || a.accountSubtype === "OPERATING_EXPENSE",
+    )?.id;
     expect(expenseAccount).toBeDefined();
-    expect(bankAccount).toBeDefined();
+
+    const bankAccountObj =
+      accounts.find((a) => a.code === "1010" || a.code === "1000") ??
+      accounts.find((a) => a.accountSubtype === "BANK" || a.accountSubtype === "CASH");
+    expect(bankAccountObj).toBeDefined();
+    expect(["1010", "1000"]).toContain(bankAccountObj.code);
+    const bankAccount = bankAccountObj.id;
 
     // Create a vendor or find existing
     let vendorId: string;
@@ -116,7 +123,10 @@ test(
 
     const journalsRes = await call(`/journals?sourceType=BILL_APPROVAL&sourceId=${bill1Id}`, "GET", undefined, token);
     const journalsList: Json[] = journalsRes.body.data ?? journalsRes.body;
-    expect(journalsList).toHaveLength(1);
+    const bill1Journals = journalsList.filter(
+      (j) => j.sourceType === "BILL_APPROVAL" && j.sourceId === bill1Id,
+    );
+    expect(bill1Journals).toHaveLength(1);
 
     // ───────────────────────────────────────────────────────────
     // AC2: Concurrent payments that together exceed bill balance
@@ -169,10 +179,20 @@ test(
     expect(paymentFailures).toHaveLength(1);
     expect(paymentFailures[0]).toBe(400);
 
+    const paymentId = paymentSuccesses[0].body.id;
     const bill2After = await call(`/bills/${bill2Id}`, "GET", undefined, token);
     expect(bill2After.status).toBe(200);
     expect(bill2After.body.status).toBe("PAID");
     expect(Number(bill2After.body.balanceDue)).toBe(0);
+    expect(bill2After.body.billAllocations).toBeDefined();
+    expect(bill2After.body.billAllocations).toHaveLength(1);
+
+    const allJournalsRes = await call("/journals?limit=100", "GET", undefined, token);
+    const allJournals: Json[] = allJournalsRes.body.data ?? allJournalsRes.body;
+    const paymentJournals = allJournals.filter(
+      (j) => j.sourceType === "PAYMENT_MADE" && j.sourceId === paymentId,
+    );
+    expect(paymentJournals).toHaveLength(1);
 
     const tbRes = await call("/accounting-reports/trial-balance", "GET", undefined, token);
     expect(tbRes.status).toBe(200);

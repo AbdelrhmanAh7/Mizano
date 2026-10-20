@@ -18,6 +18,7 @@ import {
   midnightIso,
 } from './helpers/journey.helper';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { JournalsService } from '../src/modules/accounting/services/journals.service';
 
 const BILL_APPROVAL = 'BILL_APPROVAL';
 const PAYMENT_MADE = 'PAYMENT_MADE';
@@ -210,12 +211,13 @@ describe('Accountant journey (e2e)', () => {
       const results = await Promise.all([
         a.post(`/bills/${bill2Id}/approve`),
         a.post(`/bills/${bill2Id}/approve`),
+        a.post(`/bills/${bill2Id}/approve`),
       ]);
       const statuses = results.map((r) => r.status).sort();
       expect(statuses.filter((s) => s === 201)).toHaveLength(1);
       const failures = statuses.filter((s) => s !== 201);
-      expect(failures).toHaveLength(1);
-      expect([400, 409]).toContain(failures[0]);
+      expect(failures).toHaveLength(2);
+      for (const f of failures) expect([400, 409]).toContain(f);
 
       const journals = await journalsFor(BILL_APPROVAL, bill2Id);
       expect(journals).toHaveLength(1);
@@ -688,6 +690,218 @@ describe('Accountant journey (e2e)', () => {
       const trialBalance = await a.get('/accounting-reports/trial-balance');
       expect(trialBalance.status).toBe(200);
       expect(trialBalance.body.totals.totalDebits).toBe(trialBalance.body.totals.totalCredits);
+    });
+
+    it('rolls back bill approval when journal creation fails (AC2 failure injection)', async () => {
+      const draft = await createDraftBill([
+        { accountId: acc.rent, quantity: '1', rate: '50', taxRate: '0' },
+      ]);
+      const initialBill = await getBill(draft.id);
+      expect(initialBill.status).toBe('DRAFT');
+
+      const journalsBefore = await prisma.journal.count({
+        where: { organizationId: tenantA.organizationId },
+      });
+      const paymentsBefore = await prisma.paymentMade.count({
+        where: { organizationId: tenantA.organizationId },
+      });
+      const allocationsBefore = await prisma.billAllocation.count({
+        where: { bill: { organizationId: tenantA.organizationId } },
+      });
+
+      const journalsService = app.get(JournalsService);
+      const spy = jest
+        .spyOn(journalsService, 'create')
+        .mockRejectedValueOnce(new Error('Injected journal failure during approval'));
+
+      let res: any;
+      try {
+        res = await a.post(`/bills/${draft.id}/approve`);
+      } finally {
+        spy.mockRestore();
+      }
+      expect(res.status).toBe(500);
+
+      const billAfter = await getBill(draft.id);
+      expect(billAfter.status).toBe('DRAFT');
+      expect(billAfter.balanceDue).toBe(initialBill.balanceDue);
+      expect(
+        await prisma.journal.count({ where: { organizationId: tenantA.organizationId } }),
+      ).toBe(journalsBefore);
+      expect(
+        await prisma.paymentMade.count({ where: { organizationId: tenantA.organizationId } }),
+      ).toBe(paymentsBefore);
+      expect(
+        await prisma.billAllocation.count({
+          where: { bill: { organizationId: tenantA.organizationId } },
+        }),
+      ).toBe(allocationsBefore);
+      expect(await journalsFor(BILL_APPROVAL, draft.id)).toHaveLength(0);
+    });
+
+    it('rolls back payment creation when journal creation fails (AC2 failure injection)', async () => {
+      const billBefore = await getBill(okBillId);
+      expect(billBefore.status).toBe('OPEN');
+      expect(billBefore.balanceDue).toBe('40');
+
+      const journalsBefore = await prisma.journal.count({
+        where: { organizationId: tenantA.organizationId },
+      });
+      const paymentsBefore = await prisma.paymentMade.count({
+        where: { organizationId: tenantA.organizationId },
+      });
+      const allocationsBefore = await prisma.billAllocation.count({
+        where: { billId: okBillId },
+      });
+
+      const journalsService = app.get(JournalsService);
+      const spy = jest
+        .spyOn(journalsService, 'create')
+        .mockRejectedValueOnce(new Error('Injected journal failure during payment'));
+
+      let res: any;
+      try {
+        res = await a.post('/payments-made').send({
+          vendorId,
+          date: isoDay(-1),
+          amount: '10',
+          paymentMode: 'BANK_TRANSFER',
+          paidFromAccountId: acc.bank,
+          allocations: [{ billId: okBillId, amount: '10' }],
+        });
+      } finally {
+        spy.mockRestore();
+      }
+      expect(res.status).toBe(500);
+
+      const billAfter = await getBill(okBillId);
+      expect(billAfter.status).toBe('OPEN');
+      expect(billAfter.balanceDue).toBe(billBefore.balanceDue);
+      expect(
+        await prisma.journal.count({ where: { organizationId: tenantA.organizationId } }),
+      ).toBe(journalsBefore);
+      expect(
+        await prisma.paymentMade.count({ where: { organizationId: tenantA.organizationId } }),
+      ).toBe(paymentsBefore);
+      expect(await prisma.billAllocation.count({ where: { billId: okBillId } })).toBe(
+        allocationsBefore,
+      );
+    });
+
+    it('rejects approval when default AP account is unset, with zero partial writes (AC3)', async () => {
+      const draft = await createDraftBill([
+        { accountId: acc.rent, quantity: '1', rate: '50', taxRate: '0' },
+      ]);
+      const initialBill = await getBill(draft.id);
+      expect(initialBill.status).toBe('DRAFT');
+
+      const journalsBefore = await prisma.journal.count({
+        where: { organizationId: tenantA.organizationId },
+      });
+      const paymentsBefore = await prisma.paymentMade.count({
+        where: { organizationId: tenantA.organizationId },
+      });
+      const allocationsBefore = await prisma.billAllocation.count({
+        where: { bill: { organizationId: tenantA.organizationId } },
+      });
+      const auditsBefore = await prisma.auditLog.count({
+        where: { organizationId: tenantA.organizationId },
+      });
+
+      await prisma.organization.update({
+        where: { id: tenantA.organizationId },
+        data: { defaultApAccountId: null },
+      });
+
+      let res: any;
+      try {
+        res = await a.post(`/bills/${draft.id}/approve`);
+      } finally {
+        await prisma.organization.update({
+          where: { id: tenantA.organizationId },
+          data: { defaultApAccountId: acc.ap },
+        });
+      }
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toMatch(/Accounts Payable/i);
+
+      const billAfter = await getBill(draft.id);
+      expect(billAfter.status).toBe('DRAFT');
+      expect(billAfter.balanceDue).toBe(initialBill.balanceDue);
+      expect(
+        await prisma.journal.count({ where: { organizationId: tenantA.organizationId } }),
+      ).toBe(journalsBefore);
+      expect(
+        await prisma.paymentMade.count({ where: { organizationId: tenantA.organizationId } }),
+      ).toBe(paymentsBefore);
+      expect(
+        await prisma.billAllocation.count({
+          where: { bill: { organizationId: tenantA.organizationId } },
+        }),
+      ).toBe(allocationsBefore);
+      expect(
+        await prisma.auditLog.count({ where: { organizationId: tenantA.organizationId } }),
+      ).toBe(auditsBefore);
+      expect(await journalsFor(BILL_APPROVAL, draft.id)).toHaveLength(0);
+    });
+
+    it('rejects approval of a taxed bill when VAT receivable account is unset, with zero partial writes (AC3)', async () => {
+      const draft = await createDraftBill([
+        { accountId: acc.rent, quantity: '1', rate: '50', taxRate: '14' },
+      ]);
+      const initialBill = await getBill(draft.id);
+      expect(initialBill.status).toBe('DRAFT');
+
+      const journalsBefore = await prisma.journal.count({
+        where: { organizationId: tenantA.organizationId },
+      });
+      const paymentsBefore = await prisma.paymentMade.count({
+        where: { organizationId: tenantA.organizationId },
+      });
+      const allocationsBefore = await prisma.billAllocation.count({
+        where: { bill: { organizationId: tenantA.organizationId } },
+      });
+      const auditsBefore = await prisma.auditLog.count({
+        where: { organizationId: tenantA.organizationId },
+      });
+
+      await prisma.organization.update({
+        where: { id: tenantA.organizationId },
+        data: { defaultVatReceivableAccountId: null },
+      });
+
+      let res: any;
+      try {
+        res = await a.post(`/bills/${draft.id}/approve`);
+      } finally {
+        await prisma.organization.update({
+          where: { id: tenantA.organizationId },
+          data: { defaultVatReceivableAccountId: acc.vat },
+        });
+      }
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toMatch(/VAT Receivable/i);
+
+      const billAfter = await getBill(draft.id);
+      expect(billAfter.status).toBe('DRAFT');
+      expect(billAfter.balanceDue).toBe(initialBill.balanceDue);
+      expect(
+        await prisma.journal.count({ where: { organizationId: tenantA.organizationId } }),
+      ).toBe(journalsBefore);
+      expect(
+        await prisma.paymentMade.count({ where: { organizationId: tenantA.organizationId } }),
+      ).toBe(paymentsBefore);
+      expect(
+        await prisma.billAllocation.count({
+          where: { bill: { organizationId: tenantA.organizationId } },
+        }),
+      ).toBe(allocationsBefore);
+      expect(
+        await prisma.auditLog.count({ where: { organizationId: tenantA.organizationId } }),
+      ).toBe(auditsBefore);
+      expect(await journalsFor(BILL_APPROVAL, draft.id)).toHaveLength(0);
     });
 
     it('ends with a balanced ledger whose AP equals the open bill balances', async () => {
