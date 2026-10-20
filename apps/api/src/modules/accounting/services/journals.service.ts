@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
+import { MAX_FRACTION_DIGITS, MAX_INTEGER_DIGITS } from '../../../common/dto/decimal-string';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 import { runBulk } from '../../../common/utils/run-bulk';
@@ -63,6 +64,9 @@ export interface CreateJournalOptions {
 
 type JournalLineInput = CreateJournalDto['lines'][number];
 
+const PLAIN_DECIMAL = /^\d+(\.\d+)?$/;
+const AMOUNT_LIMIT = new Decimal(10).pow(MAX_INTEGER_DIGITS);
+
 const JOURNAL_INCLUDE = {
   lines: {
     include: {
@@ -77,14 +81,20 @@ type JournalWithLines = Prisma.JournalGetPayload<{ include: typeof JOURNAL_INCLU
 
 function parseAmount(value: string | undefined, field: string): Decimal {
   if (value === undefined || value === null || value === '') return new Decimal(0);
-  let amount: Decimal;
-  try {
-    amount = new Decimal(value);
-  } catch {
+  // Same grammar as the shared validator; Decimal alone also accepts `1e3`, `0x10` and `1_0`.
+  if (!PLAIN_DECIMAL.test(value)) {
     throw new BadRequestException(`${field} must be a valid decimal number`);
   }
+  const amount = new Decimal(value);
   if (!amount.isFinite() || amount.isNegative()) {
     throw new BadRequestException(`${field} must be a non-negative decimal number`);
+  }
+  // The Decimal(19, 4) column would round extra decimals per line (or overflow), so a journal
+  // balanced here could be stored unbalanced. Balance is only checked on storable amounts.
+  if (amount.decimalPlaces() > MAX_FRACTION_DIGITS || amount.greaterThanOrEqualTo(AMOUNT_LIMIT)) {
+    throw new BadRequestException(
+      `${field} must have at most ${MAX_INTEGER_DIGITS} integer digits and ${MAX_FRACTION_DIGITS} decimal places`,
+    );
   }
   return amount;
 }
@@ -230,6 +240,13 @@ export class JournalsService {
       where.date = {};
       if (dateFrom) where.date.gte = new Date(dateFrom);
       if (dateTo) where.date.lte = new Date(dateTo);
+    }
+    // A cursor must belong to this organization, else Prisma pages from a foreign row (cross-tenant).
+    if (cursor) {
+      const owned = await this.prisma.journal.count({
+        where: { id: cursor, organizationId, deletedAt: null },
+      });
+      if (owned === 0) throw new NotFoundException('Journal not found');
     }
     return cursorPaginate(
       this.prisma.journal,
