@@ -197,18 +197,32 @@ export class ApReconciliationService {
     organizationId: string,
     asOf: Date,
   ): Promise<{ balance: Decimal; currencyCode: string }> {
+    const apAccountFilter: Prisma.AccountWhereInput = {
+      type: AccountType.LIABILITY,
+      NOT: [
+        { code: { startsWith: '22' } },
+        { name: { contains: 'Tax', mode: 'insensitive' } },
+        { name: { contains: 'VAT', mode: 'insensitive' } },
+      ],
+    };
+
     const [org, used, currencyCode] = await Promise.all([
       tx.organization.findUnique({
         where: { id: organizationId },
-        select: { defaultApAccountId: true },
+        select: { defaultApAccountId: true, defaultVatPayableAccountId: true },
       }),
       tx.journalLine.findMany({
         where: {
           journal: { organizationId, deletedAt: null },
           OR: [
-            { credit: { gt: 0 }, journal: { sourceType: JournalSourceType.BILL_APPROVAL } },
+            {
+              credit: { gt: 0 },
+              account: apAccountFilter,
+              journal: { sourceType: JournalSourceType.BILL_APPROVAL },
+            },
             {
               debit: { gt: 0 },
+              account: apAccountFilter,
               journal: {
                 sourceType: {
                   in: [JournalSourceType.PAYMENT_MADE, JournalSourceType.VENDOR_CREDIT],
@@ -219,7 +233,7 @@ export class ApReconciliationService {
             // liability accounts so a customer receipt never pulls a bank account in.
             ...(['credit', 'debit'] as const).map((side) => ({
               [side]: { gt: 0 },
-              account: { type: AccountType.LIABILITY },
+              account: apAccountFilter,
               journal: {
                 sourceType: null,
                 OR: LEGACY_AP_REFERENCES[side].map((prefix) => ({

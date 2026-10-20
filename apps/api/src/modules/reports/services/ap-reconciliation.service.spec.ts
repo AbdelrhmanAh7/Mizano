@@ -272,4 +272,84 @@ describe('@issue-125 ApReconciliationService.reconcileApControl', () => {
       BadRequestException,
     );
   });
+
+  describe('AP control account discovery filtering (CTO P2)', () => {
+    it('(a) a bill with a discount or negative line crediting an expense account leaves controlBalance unchanged', async () => {
+      const { tx, service } = setup({
+        open: '100',
+        defaultAp: 'ap-control',
+        usedAp: [],
+        lines: [{ accountId: 'ap-control', debit: '0', credit: '100' }],
+      });
+      const result = await service.reconcileApControl(ORG, '2026-03-31');
+      expect(result).toMatchObject({
+        subledgerTotal: '100.0000',
+        controlBalance: '100.0000',
+        difference: '0.0000',
+        ok: true,
+      });
+
+      // Branch 0 (BILL_APPROVAL) must restrict discovery to liability accounts
+      const billApprovalBranch = tx.journalLine.findMany.mock.calls[0][0].where.OR[0];
+      expect(billApprovalBranch).toMatchObject({
+        credit: { gt: 0 },
+        journal: { sourceType: 'BILL_APPROVAL' },
+        account: { type: 'LIABILITY' },
+      });
+    });
+
+    it('(b) a withholding-tax line crediting a tax liability is excluded', async () => {
+      const { tx, service } = setup({
+        open: '100',
+        defaultAp: 'ap-control',
+        usedAp: [],
+        lines: [{ accountId: 'ap-control', debit: '0', credit: '100' }],
+      });
+      const result = await service.reconcileApControl(ORG, '2026-03-31');
+      expect(result.ok).toBe(true);
+
+      // Discovery query excludes tax/VAT accounts (code 22xx, Tax, VAT)
+      const billApprovalBranch = tx.journalLine.findMany.mock.calls[0][0].where.OR[0];
+      expect(billApprovalBranch.account.NOT).toEqual(
+        expect.arrayContaining([{ code: { startsWith: '22' } }]),
+      );
+    });
+
+    it('(c) a payment with a bank-fee or FX-loss line debiting an expense account is excluded', async () => {
+      const { tx, service } = setup({
+        open: '0',
+        defaultAp: 'ap-control',
+        usedAp: [],
+        lines: [{ accountId: 'ap-control', debit: '100', credit: '100' }],
+      });
+      const result = await service.reconcileApControl(ORG, '2026-03-31');
+      expect(result.ok).toBe(true);
+
+      // Branch 1 (PAYMENT_MADE / VENDOR_CREDIT) must restrict discovery to liability accounts
+      const paymentBranch = tx.journalLine.findMany.mock.calls[0][0].where.OR[1];
+      expect(paymentBranch).toMatchObject({
+        debit: { gt: 0 },
+        account: { type: 'LIABILITY' },
+      });
+    });
+
+    it('(d) all three return ok:true, difference 0 on a consistent ledger', async () => {
+      // Consistent ledger: open bill balance = 0, AP control balance = 0
+      const { service } = setup({
+        open: '0',
+        defaultAp: 'ap-control',
+        usedAp: [],
+        lines: [{ accountId: 'ap-control', debit: '85', credit: '85' }],
+      });
+      const result = await service.reconcileApControl(ORG, '2026-03-31');
+      expect(result).toEqual({
+        asOf: '2026-03-31',
+        currencyCode: 'EGP',
+        subledgerTotal: '0.0000',
+        controlBalance: '0.0000',
+        difference: '0.0000',
+        ok: true,
+      });
+    });
+  });
 });
