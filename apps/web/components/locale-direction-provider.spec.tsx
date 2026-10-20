@@ -50,7 +50,7 @@ it.each(['ar', 'en'] as const)('moves tabs in %s reading direction', async (loca
       </Tabs>
     </LocaleDirectionProvider>,
   );
-  screen.getByRole('tab', { name: firstLabel }).focus();
+  await user.click(screen.getByRole('tab', { name: firstLabel }));
   await user.keyboard(locale === 'ar' ? '{ArrowLeft}' : '{ArrowRight}');
   expect(screen.getByRole('tab', { name: secondLabel })).toHaveFocus();
 });
@@ -79,4 +79,19 @@ it('keeps <html> dir, lang and direction indicator in sync when the locale chang
   expect(screen.getByTestId('direction-indicator')).toHaveAttribute('data-direction', 'ltr');
   expect(screen.getByTestId('direction-indicator')).toHaveAttribute('aria-hidden', 'true');
   expect(screen.getByTestId('direction-indicator')).toBeEmptyDOMElement();
+});
+
+it('restores previous <html> dir and lang on unmount', () => {
+  document.documentElement.dir = 'ltr';
+  document.documentElement.lang = 'en';
+  const { unmount } = render(
+    <LocaleDirectionProvider dir="rtl" lang="ar">
+      <DirectionProbe />
+    </LocaleDirectionProvider>,
+  );
+  expect(document.documentElement).toHaveAttribute('dir', 'rtl');
+  expect(document.documentElement).toHaveAttribute('lang', 'ar');
+  unmount();
+  expect(document.documentElement).toHaveAttribute('dir', 'ltr');
+  expect(document.documentElement).toHaveAttribute('lang', 'en');
 });

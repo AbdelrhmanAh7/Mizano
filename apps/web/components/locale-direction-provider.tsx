@@ -17,8 +17,14 @@ export function LocaleDirectionProvider({
   // The layout's inline script sets <html dir/lang> on a full load only; React does not run it
   // again after a client-side locale switch, so keep the document in sync here.
   useEffect(() => {
+    const prevDir = document.documentElement.dir;
+    const prevLang = document.documentElement.lang;
     document.documentElement.dir = dir;
     document.documentElement.lang = lang;
+    return () => {
+      document.documentElement.dir = prevDir;
+      document.documentElement.lang = prevLang;
+    };
   }, [dir, lang]);
 
   return (
