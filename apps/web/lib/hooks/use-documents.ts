@@ -58,7 +58,7 @@ export interface EmailLog {
 
 // ============ API Functions ============
 
-const documentsApi = {
+export const documentsApi = {
   // Invoice PDFs
   getInvoicePdf: async (invoiceId: string) => {
     const response = await api.get(`/documents/invoice/${invoiceId}/pdf`, {
@@ -104,8 +104,9 @@ const documentsApi = {
   },
 
   // Payslip PDFs
-  getPayslipPdf: async (payslipId: string) => {
-    const response = await api.get(`/documents/payslip/${payslipId}/pdf`, {
+  getPayslipPdf: async (payslipId: string, lang: 'ar' | 'en' = 'ar') => {
+    const response = await api.get(`/payslips/${payslipId}/pdf`, {
+      params: { lang },
       responseType: 'blob',
     });
     return response.data;
@@ -246,10 +247,10 @@ export function useBillPdf(billId: string) {
 
 // ============ Hooks - Payslip ============
 
-export function usePayslipPdf(payslipId: string) {
+export function usePayslipPdf(payslipId: string, lang: 'ar' | 'en' = 'ar') {
   return useQuery({
-    queryKey: ['payslip-pdf', payslipId],
-    queryFn: () => documentsApi.getPayslipPdf(payslipId),
+    queryKey: ['payslip-pdf', payslipId, lang],
+    queryFn: () => documentsApi.getPayslipPdf(payslipId, lang),
     enabled: !!payslipId,
     staleTime: 0,
   });
