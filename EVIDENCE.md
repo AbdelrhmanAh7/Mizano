@@ -590,3 +590,96 @@ Tests: 3 passed, 3 total  Exit code 0
 ## Index: other issues
 
 - Issue #94 (decimal money math and idempotent posting): [docs/evidence/94/EVIDENCE.md](docs/evidence/94/EVIDENCE.md).
+
+---
+
+# EVIDENCE.md — Issue #207: Specs for currency service (base conversion, unrealised FX)
+
+- **Tested commit**: `35af7aa1` (branch `ai/207`, merged with `origin/master`).
+- **Originating Sentry issue**: None (none linked in the issue brief).
+- **User-facing flow / E2E**: Not user-facing (backend calculation/unit service). API-level e2e-army test provided at `e2e-army/207-currency-fx-tenant-and-idempotency.e2e.ts`.
+- **Changed covering tests**:
+  - `apps/api/src/modules/currency/services/currency.service.spec.ts` (new unit spec, 18 tests)
+  - `e2e-army/207-currency-fx-tenant-and-idempotency.e2e.ts` (API-level e2e-army spec, 1 test)
+
+## Acceptance criteria
+
+1. **AC1 (Base conversion & rounding)**: `convertToBaseCurrency` returns original amount at rate 1 for base currency without query; converts with latest rate on or before target date; rounds to 4 decimals with half-up rounding (0.50005 -> 0.5001); handles inverse and triangulated rates; defaults to SAR when organization has no base currency configured.
+2. **AC2 (Missing rate error handling)**: Throws `NotFoundException` when no rate exists for the currency pair on or before date; never falls back to or leaks another organization's rates.
+3. **AC3 (Unrealised FX gain/loss & zero ledger writes)**: `calculateGainLoss` computes correct sign/amounts for receivables (foreign currency strengthening = gain) and payables (foreign currency strengthening = loss); `calculateUnrealizedGainLoss` reads only open, non-deleted, foreign-currency documents within caller's organization; total matches sum of details; writes zero journal entries (`journal.create`, `journalLine.create`, `invoice.update`, `bill.update`, `$transaction` not called); repeated runs produce identical results (idempotent / pure reporting).
+4. **AC4 (Tenant scoping on reads and writes)**: Every Prisma read query (`findFirst`, `findMany`, `count`, `organization.findUnique`, raw SQL) filters strictly by `organizationId`; writes (`updateExchangeRate`, `deleteExchangeRate`, `createExchangeRate` upsert) include `organizationId` in their Prisma `where` clause (`{ id, organizationId }`), preventing cross-tenant mutation even if an ID is known; cross-tenant updates/deletes reject with `NotFoundException`.
+5. **AC5 (Mocks and deterministic execution)**: Prisma client mocked via `apps/api/src/test/mocks/prisma.mock`; fixed fake clock (`2026-03-31T12:00:00.000Z`) used so tests are independent of wall-clock time; both `node apps/api/_run_tests.js --testPathPattern=currency.service.spec` and `pnpm --filter api test -- --testPathPattern=currency.service.spec` pass with 18/18 tests.
+
+## Verification Matrix
+
+| AC  | Requirement Description                                       | Evidence / Command                                                                                                                                                                                        | Exit Code | Status |
+| --- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
+| AC1 | Base conversion & 4-dp rounding                               | `node apps/api/_run_tests.js --testPathPattern=currency.service.spec`: 7 tests under `convertToBaseCurrency` PASS (base identity, latest rate, half-up rounding, inverse, fallback SAR)                   | 0         | PASSED |
+| AC2 | Missing rate throws NotFoundException across tenants          | `currency.service.spec.ts`: test `throws NotFoundException when the org has no rate, even if another org has one` PASS                                                                                    | 0         | PASSED |
+| AC3 | Unrealised FX math + zero ledger writes + idempotent          | `currency.service.spec.ts`: 5 tests under `calculateGainLoss` & `calculateUnrealizedGainLoss` PASS; asserts `expectNoLedgerWrites` and identical rerun outputs                                            | 0         | PASSED |
+| AC4 | Strict tenant scoping on all Prisma queries and write clauses | `currency.service.spec.ts`: 5 tests under `tenant scoping` PASS; verifies `organizationId` in all read filters, raw SQL parameter, and `{ id, organizationId }` in update/delete calls                    | 0         | PASSED |
+| AC5 | Mocking, deterministic fake clock, test runners pass          | `node apps/api/_run_tests.js --testPathPattern=currency.service.spec` (18/18 PASS) and `pnpm --filter api test -- --testPathPattern=currency.service.spec` (18/18 PASS)                                   | 0         | PASSED |
+| —   | Type check                                                    | `pnpm --filter api type-check`                                                                                                                                                                            | 0         | PASSED |
+| —   | Lint                                                          | `pnpm --filter api lint`                                                                                                                                                                                  | 0         | PASSED |
+| —   | Formatting                                                    | `pnpm prettier --check apps/api/src/modules/currency/services/currency.service.ts apps/api/src/modules/currency/services/currency.service.spec.ts e2e-army/207-currency-fx-tenant-and-idempotency.e2e.ts` | 0         | PASSED |
+
+## Regression demonstration (bug fix: test fails on base and passes on head)
+
+Run on `origin/master` (before fix: `updateExchangeRate` and `deleteExchangeRate` update/delete by `where: { id }` without `organizationId`):
+
+```text
+FAIL src/modules/currency/services/currency.service.spec.ts
+  ● CurrencyService › tenant scoping › keeps organizationId on the update and delete writes themselves
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 0
+
+      Object {
+        "id": "r-a-usd",
+    -   "organizationId": "org-a",
+      }
+
+      372 |       expect(writes).toHaveLength(3);
+      373 |       for (const [args] of writes) {
+    > 374 |         expect(args.where).toEqual({ id: 'r-a-usd', organizationId: ORG_A });
+          |                            ^
+      375 |       }
+
+Tests: 1 failed, 17 passed, 18 total  Exit code 1
+```
+
+Run on `ai/207` HEAD (after fix: `where: { id, organizationId }` enforced on all write paths):
+
+```text
+PASS src/modules/currency/services/currency.service.spec.ts
+  CurrencyService
+    convertToBaseCurrency
+      ✓ returns the amount unchanged at rate 1 for the base currency, without a rate lookup (4 ms)
+      ✓ converts with the latest rate on or before the date and rounds to 4 decimals (2 ms)
+      ✓ rounds a half at the 5th decimal up (0.50005 -> 0.5001) (1 ms)
+      ✓ uses an older rate for an older date and never a future-dated one (fixed clock) (1 ms)
+      ✓ inverts a base->foreign rate when no direct rate exists (2 ms)
+      ✓ throws NotFoundException when the org has no rate, even if another org has one (12 ms)
+      ✓ defaults the base currency to SAR when the organization has none
+    getRate
+      ✓ triangulates through the base currency when neither direct nor inverse exists (1 ms)
+    calculateGainLoss
+      ✓ books a receivable gain when the foreign currency strengthens
+      ✓ books a payable loss when the foreign currency strengthens (1 ms)
+    calculateUnrealizedGainLoss
+      ✓ computes exact receivable and payable gain/loss per open document (2 ms)
+      ✓ only reads open, non-deleted, foreign-currency documents of the caller org (2 ms)
+      ✓ posts nothing: running it twice gives the same figures and writes no journal (2 ms)
+    tenant scoping
+      ✓ scopes every exchange-rate lookup by organizationId (2 ms)
+      ✓ passes organizationId into the latest-rates raw query (16 ms)
+      ✓ does not update or delete another org rate (4 ms)
+      ✓ keeps organizationId on the update and delete writes themselves (2 ms)
+      ✓ creates a new rate in the caller org with an exact Decimal rate (1 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       18 passed, 18 total
+Exit code 0
+```
