@@ -5,7 +5,7 @@
 - **Issue**: #216 (Bill form: add expense-account picker per line so UI-made bills can be approved)
 - **PR**: #230
 - **Base**: `master` (`4c006386`)
-- **Tested head (code)**: `bb4a8ba4` (with locale-aware navigation across all bill pages)
+- **Tested head (code)**: `ea504f5a`
 - **Date**: 2026-10-21
 - **Originating Sentry issue**: None (originates from 2026-10-11 demo walkthrough #175 step 2: 400 "All bill lines must have an expense account assigned before approval")
 
