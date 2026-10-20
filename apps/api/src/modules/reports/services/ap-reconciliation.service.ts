@@ -251,6 +251,7 @@ export class ApReconciliationService {
 
     const accountIds = new Set(used.map((l) => l.accountId));
     if (org?.defaultApAccountId) accountIds.add(org.defaultApAccountId);
+    if (org?.defaultVatPayableAccountId) accountIds.delete(org.defaultVatPayableAccountId);
     if (accountIds.size === 0) return { balance: new Wide(0), currencyCode };
 
     const totals = await sumPostedLinesByAccount(tx, organizationId, { lte: asOf }, [

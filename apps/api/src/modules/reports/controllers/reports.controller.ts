@@ -532,10 +532,21 @@ export class ReportsController {
     return this.agingReportsService.getPayablesAging(orgId, asOfDate);
   }
 
-  // Not cached: a reconciliation check must read the current subledger and ledger.
+  /**
+   * Reconcile the AP subledger with the AP control account (read-only backend check).
+   *
+   * @note Backend REST API endpoint (GET /api/reports/reconciliation/ap).
+   * There is NO web page, link, or UI button in apps/web for this issue (frontend UI is out of
+   * scope per issue #125 spec and CTO decision; frontend report page is tracked in #125-ui).
+   * Verified by e2e-army/125-ap-reconciliation.e2e.ts and api e2e tests.
+   */
   @Get('reconciliation/ap')
   @Permissions('reports.view')
-  @ApiOperation({ summary: 'Reconcile the AP subledger with the AP control account (read-only)' })
+  @ApiOperation({
+    summary: 'Reconcile the AP subledger with the AP control account (read-only backend API)',
+    description:
+      'Returns subledgerTotal, controlBalance, difference, and ok status as of date. Backend REST API only; no web UI.',
+  })
   getApReconciliation(@CurrentOrg() orgId: string, @Query('asOf') asOf?: string) {
     return this.apReconciliationService.reconcileApControl(orgId, asOf);
   }

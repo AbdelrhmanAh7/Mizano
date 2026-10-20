@@ -108,7 +108,7 @@ describe('@e2e @flow:ap-reconciliation @issue-125 AP subledger vs control accoun
     await app.close();
   });
 
-  it('@issue-125 AC1: approved and paid bills reconcile with ok true and a zero difference', async () => {
+  it('@issue-125 AC1: approved and paid bills reconcile with ok true and a zero difference [REST API]', async () => {
     // Open: b1 0 + b2 (456 - 56 - 20) + b3 114 - unapplied credit 50 = 444.
     expect(await recon(a.api)).toEqual({
       asOf: isoDay(0),
@@ -120,7 +120,7 @@ describe('@e2e @flow:ap-reconciliation @issue-125 AP subledger vs control accoun
     });
   });
 
-  it('@issue-125 AC3: voided and draft bills are excluded from the subledger total', async () => {
+  it('@issue-125 AC3: voided and draft bills are excluded from the subledger total [REST API]', async () => {
     const stored = await prisma.bill.findMany({
       where: { id: { in: [bills.draft, bills.void] } },
       select: { balanceDue: true },
@@ -129,7 +129,7 @@ describe('@e2e @flow:ap-reconciliation @issue-125 AP subledger vs control accoun
     expect((await recon(a.api)).subledgerTotal).toBe('444.0000');
   });
 
-  it('@issue-125 AC5: asOf filters bills, payments, voids and credits on both sides', async () => {
+  it('@issue-125 AC5: asOf filters bills, payments, voids and credits on both sides [REST API]', async () => {
     // As of day -5: b1 912 + b2 456 - payment 100 (voided only later) = 1268; b3 and later
     // payments/credits are excluded on both sides.
     expect(await recon(a.api, isoDay(-5))).toEqual({
@@ -155,7 +155,7 @@ describe('@e2e @flow:ap-reconciliation @issue-125 AP subledger vs control accoun
     ]);
   });
 
-  it('@issue-125 AC2: a corrupted subledger balance returns ok false with the exact difference', async () => {
+  it('@issue-125 AC2: a corrupted subledger balance returns ok false with the exact difference [REST API]', async () => {
     await prisma.bill.update({
       where: { id: bills.b3 },
       data: { balanceDue: { increment: '12.34' } },
@@ -178,7 +178,7 @@ describe('@e2e @flow:ap-reconciliation @issue-125 AP subledger vs control accoun
     expect((await recon(a.api)).ok).toBe(true);
   });
 
-  it("@issue-125 AC4: another tenant's bills and corrupted balances never affect the result", async () => {
+  it("@issue-125 AC4: another tenant's bills and corrupted balances never affect the result [REST API]", async () => {
     const b = await setup(tenantB);
     const otherBill = await bill(b, '1000', isoDay(-10));
     await prisma.bill.update({
@@ -198,7 +198,7 @@ describe('@e2e @flow:ap-reconciliation @issue-125 AP subledger vs control accoun
     });
   });
 
-  it('@issue-125 AC5: a payment dated before its future-dated bill ties on both sides', async () => {
+  it('@issue-125 AC5: a payment dated before its future-dated bill ties on both sides [REST API]', async () => {
     const c = await setup(await registerTenant(app, 'ApRecPrepay'));
     const future = await bill(c, '100', isoDay(-2)); // 114 with VAT
     await pay(c, future, '40', isoDay(-5));
@@ -213,7 +213,7 @@ describe('@e2e @flow:ap-reconciliation @issue-125 AP subledger vs control accoun
     expect(await recon(c.api)).toMatchObject({ subledgerTotal: '74.0000', ok: true });
   });
 
-  it('@issue-125 AC1: still ties after the default AP account changed over source-less legacy journals', async () => {
+  it('@issue-125 AC1: still ties after the default AP account changed over source-less legacy journals [REST API]', async () => {
     const t = await registerTenant(app, 'ApRecLegacy');
     const d = await setup(t);
     const billId = await bill(d, '100', isoDay(-3));
@@ -243,7 +243,7 @@ describe('@e2e @flow:ap-reconciliation @issue-125 AP subledger vs control accoun
     });
   });
 
-  it('@issue-125 AC3/AC5: a bill voided after the cutoff stays in the subledger as of the cutoff', async () => {
+  it('@issue-125 AC3/AC5: a bill voided after the cutoff stays in the subledger as of the cutoff [REST API]', async () => {
     const t = await registerTenant(app, 'ApRecVoidLater');
     const v = await setup(t);
     const billId = await bill(v, '100', isoDay(-5));
@@ -281,7 +281,7 @@ describe('@e2e @flow:ap-reconciliation @issue-125 AP subledger vs control accoun
     });
   });
 
-  it('@issue-125 rejects an invalid asOf and anonymous callers', async () => {
+  it('@issue-125 rejects an invalid asOf and anonymous callers [REST API]', async () => {
     const bad = await a.api.get('/reports/reconciliation/ap').query({ asOf: '2026-02-30' });
     expect(bad.status).toBe(400);
     const anon = await ApiHelper.anonymous(app)
