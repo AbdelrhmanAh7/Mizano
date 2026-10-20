@@ -107,6 +107,8 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
    * Pages through all recoverable rows. Returns the number of jobs enqueued.
    */
   async recoverJobs(): Promise<number> {
+    // An API process without Redis cannot hand rows to the worker; the worker's own sweep does it.
+    if (!this.queue.isAvailable()) return 0;
     let enqueued = 0;
     try {
       let after = '';
@@ -177,6 +179,9 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
       where: { organizationId: input.organizationId, sha256, deletedAt: null },
     });
     if (existing) return { job: existing, duplicate: true };
+
+    // Fail before any side effect (stored file, DB row): a job nothing can consume must not exist.
+    this.queue.assertAvailable();
 
     const configured = Number(this.config.get<string>('INTAKE_MAX_ACTIVE_JOBS'));
     const maxActive =
@@ -294,6 +299,7 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
 
   /** FAILED/DEAD_LETTER -> QUEUED as a guarded transition; dead letters get a fresh attempt budget. */
   async retry(jobId: string, organizationId: string): Promise<IntakeJob> {
+    this.queue.assertAvailable();
     const before = await this.getForOrg(jobId, organizationId);
     const pendingQueueId = queueJobId(before.id, before.attempts);
     const fromDead = await this.prisma.intakeJob.updateMany({

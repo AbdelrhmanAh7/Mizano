@@ -239,6 +239,19 @@ export const createJournalLineSchema = z.object({
   description: z.string().max(500).optional(),
 });
 
+const FOUR_DP_AMOUNT = /^(\d+)(?:\.(\d{1,4}))?$/;
+
+/** Exact sum in 1/10000 units (amounts have at most 4 decimals); null if one is invalid. */
+function sumTenThousandths(amounts: Array<string | undefined>): bigint | null {
+  let total = BigInt(0);
+  for (const amount of amounts) {
+    const match = FOUR_DP_AMOUNT.exec(amount || '0');
+    if (!match) return null;
+    total += BigInt(match[1] + (match[2] ?? '').padEnd(4, '0'));
+  }
+  return total;
+}
+
 export const createJournalSchema = z
   .object({
     date: dateSchema,
@@ -248,9 +261,10 @@ export const createJournalSchema = z
   })
   .refine(
     (data) => {
-      const totalDebit = data.lines.reduce((sum, line) => sum + parseFloat(line.debit || '0'), 0);
-      const totalCredit = data.lines.reduce((sum, line) => sum + parseFloat(line.credit || '0'), 0);
-      return Math.abs(totalDebit - totalCredit) < 0.0001;
+      // Exact, like the API's Decimal check: a float sum calls 1000000.0001 = 1000000 balanced.
+      const totalDebit = sumTenThousandths(data.lines.map((line) => line.debit));
+      const totalCredit = sumTenThousandths(data.lines.map((line) => line.credit));
+      return totalDebit !== null && totalDebit === totalCredit;
     },
     { message: 'Total debits must equal total credits', path: ['lines'] },
   );
