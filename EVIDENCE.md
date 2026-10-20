@@ -555,7 +555,7 @@ Unset launcher heap_size_limit: 4395630592
 | AC2b | Cursor endpoints reject the other tenant's id                      | `AC2b: foreign ids as cursor return 404, own ids 200`                                        | PASSED |
 | AC3  | No token or an expired token gets 401 on all 14 routes             | two `AC3:` tests                                                                             | PASSED |
 | AC4  | Existing command, no new services                                  | `jest --config ./test/jest-e2e.json` (`pnpm --filter api test:e2e`)                          | PASSED |
-| AC5  | Change ≤ ~300 lines                                                | 308 added lines of test and source (see Size)                                                | MET    |
+| AC5  | Change ≤ ~300 lines                                                | 307 changed lines of test and source (see Size)                                              | MET    |
 
 **Commands and output** (at `34a8ca9c`, from `apps/api`):
 
