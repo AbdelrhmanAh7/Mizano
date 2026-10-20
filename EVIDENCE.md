@@ -590,3 +590,29 @@ Tests: 3 passed, 3 total  Exit code 0
 ## Index: other issues
 
 - Issue #94 (decimal money math and idempotent posting): [docs/evidence/94/EVIDENCE.md](docs/evidence/94/EVIDENCE.md).
+
+## Issue #209 — Bank transactions service unit spec (#134 follow-up 4/5)
+
+- **PR**: #295
+- **Branch**: `ai/209`
+- **Changed covering tests**: `apps/api/src/modules/banking/services/bank-transactions.service.spec.ts` (12 tests).
+- **Service under test**: `apps/api/src/modules/banking/services/bank-transactions.service.ts`
+- **Scope note**: Scoped to `BankTransactionsService` per CTO directive on PR #295. Sibling PR (`ai/209-bulk`) handles `BulkOperationsService`.
+
+### Acceptance criteria
+
+1. **AC1: Decimal handling & Journal Posting Contract**: Bank statement transactions ingested and queried with exact `Decimal` amounts (4 decimal places). Confirms `BankTransactionsService` (`create`, `bulkImport`, `findAll`, `findAllCursor`, `findOne`) handles bank statement records and performs 0 general ledger journal writes (0 calls to `prisma.journal` or `prisma.journalLine`).
+2. **AC2: Tenant Scoping**: Every query and command strictly enforces `organizationId`. Cross-tenant bank accounts in `create` and `bulkImport` are rejected with `BadRequestException` with `where: { id, organizationId }` verified. Cross-tenant transactions in `findOne` throw `NotFoundException` with query scoped to caller's `organizationId`. List and cursor queries (`findAll`, `findAllCursor`) include `where.organizationId`.
+3. **AC3: Idempotency & Bulk-Operations Separation**: Confirms statement service writes no journals. Drafted follow-up bug issue (empty job status bug, retry failure reset bug) and security issue (missing tenant isolation in getJob/processJob) for `BulkOperationsService`.
+4. **AC4: Mocking & Deterministic Clocks**: Prisma client mocked via `createMockPrisma()`. Fixed dates (`FIXED_DATE = new Date('2024-06-15T00:00:00.000Z')`) and Jest fake timers (`jest.useFakeTimers()`); no wall-clock dependencies.
+5. **AC5: Test Runner & Quality Gates**: Both `node apps/api/_run_tests.js --testPathPattern=bank-transactions.service.spec.ts` and `pnpm --filter api test -- bank-transactions.service.spec.ts` pass (12 passed, 0 failed, exit 0). `pnpm --filter api lint` passes (exit 0). `pnpm --filter api type-check` passes (exit 0). PR diff size: ~252 lines (within 100-300 lines limit).
+
+### Verification Matrix
+
+| AC  | Requirement Description                   | Evidence / Command                                                                                                                                                                                                                                                                   | Exit Code | Status |
+| --- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------- | ------ |
+| AC1 | Exact Decimal handling & 0 journal writes | `node apps/api/_run_tests.js --testPathPattern=bank-transactions.service.spec.ts`: `creates a transaction with exact Decimal amount, date and organizationId, writing no journals` asserts Decimal amounts and zero calls to `prisma.journal.create` and `prisma.journalLine.create` | 0         | PASSED |
+| AC2 | Tenant scoping on all operations          | `pnpm --filter api test -- bank-transactions.service.spec.ts`: 4 tenant rejection & scoping tests pass (rejects cross-org accounts in `create`, `bulkImport`, rejects cross-org tx in `findOne`, scopes `findAll`/`findAllCursor` to `organizationId`)                               | 0         | PASSED |
+| AC3 | Service posting contract & issue drafts   | Method audit of `BankTransactionsService` confirms no journal creation methods. Bug and security issue drafts recorded in `AI_QUESTIONS.md`                                                                                                                                          | 0         | PASSED |
+| AC4 | Mocked Prisma & fixed dates               | Spec uses `createMockPrisma()` and `jest.useFakeTimers()` with `FIXED_DATE`                                                                                                                                                                                                          | 0         | PASSED |
+| AC5 | Test runners, lint, typecheck & diff size | `pnpm --filter api test` (12 passed), `_run_tests.js` (12 passed), `pnpm --filter api lint` (exit 0), `pnpm --filter api type-check` (exit 0), `git diff origin/master --stat` (252 lines)                                                                                           | 0         | PASSED |
