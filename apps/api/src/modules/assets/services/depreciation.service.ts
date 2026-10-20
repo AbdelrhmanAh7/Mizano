@@ -77,13 +77,12 @@ export class DepreciationService {
 
     for (const asset of activeAssets) {
       // Get the schedule entry for this month
-      const scheduleEntry = await this.prisma.depreciationSchedule.findUnique({
+      const scheduleEntry = await this.prisma.depreciationSchedule.findFirst({
         where: {
-          assetId_month_year: {
-            assetId: asset.id,
-            month: currentMonth,
-            year: currentYear,
-          },
+          assetId: asset.id,
+          month: currentMonth,
+          year: currentYear,
+          organizationId,
         },
       });
 
@@ -98,7 +97,16 @@ export class DepreciationService {
       }
 
       try {
-        await this.prisma.$transaction(async (tx) => {
+        const posted = await this.prisma.$transaction(async (tx) => {
+          // Claim the period first: only one concurrent run flips executedAt from null
+          const claimed = await tx.depreciationSchedule.updateMany({
+            where: { id: scheduleEntry.id, organizationId, executedAt: null },
+            data: { executedAt: today },
+          });
+          if (claimed.count === 0) {
+            return false; // another run already posted this period
+          }
+
           // Create depreciation journal entry
           const journalNumber = await this.generateJournalNumber(tx, organizationId);
 
@@ -129,18 +137,15 @@ export class DepreciationService {
             },
           });
 
-          // Mark schedule entry as executed
+          // Link the journal to the schedule entry claimed above
           await tx.depreciationSchedule.update({
-            where: { id: scheduleEntry.id },
-            data: {
-              journalId: journal.id,
-              executedAt: today,
-            },
+            where: { id: scheduleEntry.id, organizationId },
+            data: { journalId: journal.id },
           });
 
           // Update asset accumulated depreciation and book value
           await tx.asset.update({
-            where: { id: asset.id },
+            where: { id: asset.id, organizationId },
             data: {
               accumulatedDepreciation: scheduleEntry.accumulatedTotal,
               currentBookValue: scheduleEntry.bookValue,
@@ -150,14 +155,19 @@ export class DepreciationService {
           // Check if fully depreciated
           if (scheduleEntry.bookValue.equals(asset.salvageValue)) {
             await tx.asset.update({
-              where: { id: asset.id },
+              where: { id: asset.id, organizationId },
               data: { status: AssetStatus.FULLY_DEPRECIATED },
             });
           }
 
-          journalsCreated++;
+          return true;
         });
 
+        if (!posted) {
+          continue;
+        }
+
+        journalsCreated++;
         processed++;
         totalDepreciation += depreciationAmount.toNumber();
       } catch (error) {
@@ -200,14 +210,8 @@ export class DepreciationService {
       throw new Error('Asset not found or not active');
     }
 
-    const scheduleEntry = await this.prisma.depreciationSchedule.findUnique({
-      where: {
-        assetId_month_year: {
-          assetId,
-          month: targetMonth,
-          year: targetYear,
-        },
-      },
+    const scheduleEntry = await this.prisma.depreciationSchedule.findFirst({
+      where: { assetId, month: targetMonth, year: targetYear, organizationId },
     });
 
     if (!scheduleEntry) {
@@ -219,6 +223,15 @@ export class DepreciationService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // Claim the period first: only one concurrent run flips executedAt from null
+      const claimed = await tx.depreciationSchedule.updateMany({
+        where: { id: scheduleEntry.id, organizationId, executedAt: null },
+        data: { executedAt: new Date() },
+      });
+      if (claimed.count === 0) {
+        throw new Error('Depreciation already executed for this period');
+      }
+
       const journalNumber = await this.generateJournalNumber(tx, organizationId);
 
       const journal = await tx.journal.create({
@@ -249,15 +262,12 @@ export class DepreciationService {
       });
 
       await tx.depreciationSchedule.update({
-        where: { id: scheduleEntry.id },
-        data: {
-          journalId: journal.id,
-          executedAt: new Date(),
-        },
+        where: { id: scheduleEntry.id, organizationId },
+        data: { journalId: journal.id },
       });
 
       await tx.asset.update({
-        where: { id: assetId },
+        where: { id: assetId, organizationId },
         data: {
           accumulatedDepreciation: scheduleEntry.accumulatedTotal,
           currentBookValue: scheduleEntry.bookValue,
@@ -266,7 +276,7 @@ export class DepreciationService {
 
       if (scheduleEntry.bookValue.equals(asset.salvageValue)) {
         await tx.asset.update({
-          where: { id: assetId },
+          where: { id: assetId, organizationId },
           data: { status: AssetStatus.FULLY_DEPRECIATED },
         });
       }
@@ -364,7 +374,7 @@ export class DepreciationService {
     await this.prisma.$transaction(async (tx) => {
       // Mark schedule as not executed
       await tx.depreciationSchedule.update({
-        where: { id: scheduleId },
+        where: { id: scheduleId, organizationId },
         data: {
           journalId: null,
           executedAt: null,
@@ -374,7 +384,7 @@ export class DepreciationService {
       // Void the journal entry by marking it as not posted
       if (schedule.journalId) {
         await tx.journal.update({
-          where: { id: schedule.journalId },
+          where: { id: schedule.journalId, organizationId },
           data: { isPosted: false },
         });
       }
@@ -383,6 +393,7 @@ export class DepreciationService {
       const executedSchedules = await tx.depreciationSchedule.findMany({
         where: {
           assetId: schedule.assetId,
+          organizationId,
           executedAt: { not: null },
         },
         orderBy: [{ year: 'desc' }, { month: 'desc' }],
@@ -392,7 +403,7 @@ export class DepreciationService {
       const lastExecuted = executedSchedules[0];
 
       await tx.asset.update({
-        where: { id: schedule.assetId },
+        where: { id: schedule.assetId, organizationId },
         data: {
           accumulatedDepreciation: lastExecuted?.accumulatedTotal || new Decimal(0),
           currentBookValue: lastExecuted?.bookValue || schedule.asset.purchasePrice,

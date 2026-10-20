@@ -125,3 +125,4 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Rollback must be repeatable.** Track an active pointer in `deployments.log` (`OK`/`ROLLBACK` lines), not "the previous OK line", or the second rollback is a no-op.
 - **Check DB readiness over TCP** (`pg_isready -h 127.0.0.1`). The temporary init server listens on the unix socket only and passes a socket probe.
 - **Dedupe alerts on stable keys** (check name), never on live values like percentages; alert once on start and once on recovery.
+- **Give pdf.js a zero-offset copy.** pdf-parse can misread a pooled `Buffer` with `byteOffset > 0` on newer Node; pass `new Uint8Array(buffer)` (fresh `ArrayBuffer`, offset 0) and test with a slice from a larger pool. _(#87)_
