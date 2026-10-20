@@ -116,7 +116,7 @@ describe('Credential rotation (e2e) @issue-104', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    await app?.close();
     restorers.forEach((restore) => restore());
     for (const [key, value] of Object.entries(savedEnv)) {
       if (value === undefined) delete process.env[key];
