@@ -678,3 +678,19 @@ FAILED (failures=1)
 ```
 
 Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDENCE.md`).
+
+---
+
+## Issue #256: Payslip PDF generator from Mizano payroll data (replaces #118, closes #115)
+
+- **Date**: 2026-10-20
+- **Tested Head**: `e0f45959dc02f8b53a3d844810371086b60eac62`
+- **Scope**: Re-implementation of #115 on branch `ai/256` from default branch
+- **Detailed Evidence**: See `docs/evidence/256/EVIDENCE.md`
+- **Verification Summary**:
+  - AC1-AC7 API E2E: `DATABASE_URL=... pnpm --filter api test:e2e test/payslip-pdf.e2e-spec.ts` (8 passed, 0 failed, exit code 0)
+  - AC1-AC8 Service Unit: `pnpm --filter api exec jest src/modules/hr/services/payslip-pdf.service.spec.ts` (43 passed, 0 failed, exit code 0)
+  - AC1 Controller Unit: `pnpm --filter api exec jest src/modules/hr/controllers/payslips.controller.spec.ts` (3 passed, 0 failed, exit code 0)
+  - AC9 Web Client Unit: `pnpm --filter web test lib/hooks/use-documents.spec.ts` (2 passed, 0 failed, exit code 0)
+  - E2E-Army: `e2e-army/256-payslip-pdf.e2e.ts`
+  - Guard Test: `nice -n 10 python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py'` (10 passed, 0 failed, exit code 0)
