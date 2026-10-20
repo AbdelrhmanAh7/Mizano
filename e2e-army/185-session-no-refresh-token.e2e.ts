@@ -1,6 +1,9 @@
 import { test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 
+// Throwaway-DB seeded demo admin — prescribed by the e2e-army skill for Mizano.
+// This account does NOT exist in deployed environments: the production seed aborts
+// unless explicitly opt-in (commit fd19dc16, ancestor of this branch).
 const ADMIN = { email: 'admin@mizano.com', password: 'password123' };
 // Each request fails fast instead of stalling the gate's time budget.
 const REQUEST_TIMEOUT_MS = 20_000;
