@@ -113,7 +113,7 @@ describe('AttendancePage', () => {
     expect(() => renderPage()).not.toThrow();
   });
 
-  it('shows fallback "?" in AvatarFallback when name is null', () => {
+  it('shows fallback "??" in AvatarFallback when employee name is null', () => {
     mockUseEmployees.mockReturnValue({
       data: {
         data: [makeEmployee({ name: null, firstName: null, lastName: null })],
@@ -121,10 +121,14 @@ describe('AttendancePage', () => {
       },
       isLoading: false,
     });
-    renderPage();
-    // '??' characters should appear (calendar + detail table avatars)
-    const fallbacks = screen.getAllByText('??');
-    expect(fallbacks.length).toBeGreaterThanOrEqual(1);
+    const { container } = renderPage();
+    // In page.tsx: (employee.name || '??').slice(0, 2) explicitly falls back to '??'
+    // for avatar initials when the employee name is null or empty.
+    const fallbacks = container.querySelectorAll('[class*="text-xs"]');
+    const fallbackTexts = Array.from(fallbacks).map((el) => el.textContent);
+    expect(fallbackTexts).toContain('??');
+    const avatarElements = screen.getAllByText('??');
+    expect(avatarElements.length).toBeGreaterThanOrEqual(1);
   });
 
   // ── Error 4 regression ──────────────────────────────────────────────────────
@@ -139,11 +143,12 @@ describe('AttendancePage', () => {
 
     const { container } = renderPage();
 
-    // Radix Select renders a hidden input with the current value.
-    // It must never be "" — should be "__none__" sentinel instead.
+    // The status Select must never use "" — should be "__none__" sentinel instead.
     const hiddenInputs = container.querySelectorAll('input[type="hidden"]');
+    expect(hiddenInputs.length).toBeGreaterThan(0);
     hiddenInputs.forEach((input) => {
       expect((input as HTMLInputElement).value).not.toBe('');
+      expect((input as HTMLInputElement).value).toBe('__none__');
     });
   });
 

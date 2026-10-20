@@ -117,13 +117,4 @@ describe('EmployeesPage', () => {
     });
     expect(() => renderPage()).not.toThrow();
   });
-
-  it('renders without crashing for null joiningDate (additional null guard check)', () => {
-    mockUseInfiniteEmployees.mockReturnValue({
-      ...defaultHookReturn,
-      data: [{ ...baseEmployee, joiningDate: null }],
-      total: 1,
-    });
-    expect(() => renderPage()).not.toThrow();
-  });
 });

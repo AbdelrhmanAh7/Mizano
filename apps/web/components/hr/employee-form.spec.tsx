@@ -13,6 +13,7 @@
 
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import { format } from 'date-fns';
 
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
@@ -123,6 +124,8 @@ describe('EmployeeForm', () => {
   it('shows a formatted date (not "Pick a date") when dateOfJoining is null — defaults to today', () => {
     render(<EmployeeForm employee={makeEmployee({ dateOfJoining: null as unknown as string })} />);
     // When dateOfJoining is null the form defaults to new Date() (today) — a valid date is shown
+    const expectedDate = format(new Date(), 'PPP');
+    expect(screen.getByText(expectedDate)).toBeInTheDocument();
     expect(screen.queryByText('Pick a date')).not.toBeInTheDocument();
   });
 

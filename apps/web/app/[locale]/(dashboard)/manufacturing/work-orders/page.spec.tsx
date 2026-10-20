@@ -124,8 +124,10 @@ describe('WorkOrdersPage', () => {
       refetch: jest.fn(),
     });
     renderPage();
-    // The WO number should render and the date cell should be '-'
+    // The WO number should render and the null date cells should display '-'
     expect(screen.getByText('WO-001')).toBeInTheDocument();
+    const dashes = screen.getAllByText('-');
+    expect(dashes.length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders without crashing when both plannedStartDate and dueDate are undefined', () => {
