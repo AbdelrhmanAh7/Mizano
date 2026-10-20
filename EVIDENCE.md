@@ -27,7 +27,7 @@
 ### PR #58: Telegram Long-Polling Ingestion into Intake Jobs (Issue #20)
 
 - **Branch**: `demo/20-telegram-intake` (rebased & merged with `master`)
-- **Tested Head SHA**: `07be91024343e0d86e10777ce4d9bb1a1a9e3a62`
+- **Tested Head SHA**: `961b29ff89cf5984b672967b9c7813d9dcc2d030`
 - **Related Issue**: #20 (milestone P3: Ingest Telegram channel invoices into durable CPU queue)
 - **Originating Sentry Issue**: None (feature implementation and code review fixes; no production crash/Sentry issue)
 - **E2E Status**: E2E: not needed — Telegram long-polling is disabled by default and only processes documents after secure link code verification
