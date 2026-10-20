@@ -47,18 +47,31 @@ Regression tests lock the contract, so a later change to the filter, the guard o
 The acceptance criteria as decided:
 
 1. AC1: a weak registration password or invalid login returns 400 `VALIDATION_ERROR`, and `details` names the constraint rule.
-2. AC2: a missing, forged or invalid bearer token returns 401.
+2. AC2: a missing, forged or invalid bearer token returns 401 with `error: 'Unauthorized'`.
 3. AC3: the validation `message` stays `'Validation failed'` (sentence case, per the CTO decision).
 4. AC4: the 401 body's `error` is `'Unauthorized'`.
 
-## Verification report (branch `ai/219`)
+## Requirements Verification Matrix
 
-| AC       | Covering test                                                                                                                                                               | Command                                                                                                                            | Observed                                                                                                                                         |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| AC1, AC3 | `http-exception.filter.spec.ts` "renders a weak password as VALIDATION_ERROR…", "renders an invalid login body as VALIDATION_ERROR", "names the email rule…"                | `cd apps/api && npx jest --maxWorkers=2 src/common/filters/http-exception.filter.spec.ts src/common/guards/jwt-auth.guard.spec.ts` | 2 suites, 13 tests passed, exit 0                                                                                                                |
-| AC2, AC4 | `jwt-auth.guard.spec.ts` "should reject with a 401 whose error is \"Unauthorized\"", `http-exception.filter.spec.ts` "renders a missing or invalid JWT as 401 Unauthorized" | same command                                                                                                                       | passed, exit 0                                                                                                                                   |
-| AC1–AC4  | `apps/api/test/auth.e2e-spec.ts` (weak-password `details`, invalid login `details`, invalid token `error`)                                                                  | `pnpm --filter api test:e2e`                                                                                                       | not run: needs Postgres and Redis, which the agent sandbox cannot reach, and `ci.yml` skips API e2e specs (its `nightly.yml` does not exist yet) |
-| AC1–AC4  | `e2e-army/219-auth-error-contract.e2e.ts` (`feat:mz-auth`, `lvl:api`)                                                                                                       | type-checked with `tsc --strict` against the runner's `e2e` / `@e2e-dev/web` types                                                 | exit 0; the run itself happens in the hub `e2e-army` verify job                                                                                  |
+| REQ ID | Acceptance Criterion                                                                                           | Unit Verification Method                                                                                                                                                                                                | Unit Status | E2E Verification Method                                       | E2E Status                                                                                               |
+| ------ | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| REQ-1  | AC1: Registration validation error or invalid login returns 400 `VALIDATION_ERROR` with rule name in `details` | `http-exception.filter.spec.ts` ("renders a weak password as VALIDATION_ERROR with uppercase rule in details", "renders an invalid login body as VALIDATION_ERROR", "names the email rule when email validation fails") | PASSED      | `auth.e2e-spec.ts`, `e2e-army/219-auth-error-contract.e2e.ts` | PENDING: API e2e not run (requires Postgres & Redis); e2e-army type-checked only, pending hub verify job |
+| REQ-2  | AC2: Missing, forged or invalid JWT token returns 401 with `error: 'Unauthorized'`                             | `jwt-auth.guard.spec.ts` ("should reject with a 401 whose error is 'Unauthorized'"), `http-exception.filter.spec.ts` ("renders a missing or invalid JWT as 401 Unauthorized")                                           | PASSED      | `auth.e2e-spec.ts`, `e2e-army/219-auth-error-contract.e2e.ts` | PENDING: API e2e not run (requires Postgres & Redis); e2e-army type-checked only, pending hub verify job |
+| REQ-3  | AC3: Validation error message is `'Validation failed'` (sentence case, per CTO decision)                       | `http-exception.filter.spec.ts` ("renders a weak password as VALIDATION_ERROR with uppercase rule in details", "renders an invalid login body as VALIDATION_ERROR")                                                     | PASSED      | `auth.e2e-spec.ts`                                            | PENDING: API e2e not run (requires Postgres & Redis)                                                     |
+| REQ-4  | AC4: 401 error response explicitly provides `error: 'Unauthorized'` fallback                                   | `http-exception.filter.spec.ts` ("falls back to error 'Unauthorized' for a 401 that carries no error field"), `jwt-auth.guard.spec.ts`                                                                                  | PASSED      | `auth.e2e-spec.ts`                                            | PENDING: API e2e not run (requires Postgres & Redis)                                                     |
+
+### Implementation Note
+
+- `apps/api/src/common/filters/http-exception.filter.ts`: Enforces `error: 'Unauthorized'` as fallback for 401 responses when no error field is provided, and `error: 'Bad Request'` with `message: 'Validation failed'` and `code: 'VALIDATION_ERROR'` for validation rejections.
+- `apps/api/src/common/guards/jwt-auth.guard.ts`: Preserves the descriptive message `'Invalid or expired token'` while the exception filter renders `error: 'Unauthorized'`.
+- `apps/api/src/modules/auth/auth.controller.ts`: Adds Swagger `@ApiResponse` annotations documenting 400 (`Validation failed`) and 401 (`Unauthorized`) response contracts.
+
+## Test Execution Evidence
+
+- **Tested Commit (`ai/219`)**: `d4fa7e3773a445a17bd0dafb4f81227c85dfc71a`
+- `nice -n 10 pnpm --filter api exec jest --maxWorkers=2 src/common/filters/http-exception.filter.spec.ts src/common/guards/jwt-auth.guard.spec.ts`: 2 suites, 13 tests passed, exit 0.
+- `pnpm --filter api type-check`: exit 0.
+- `pnpm --filter api lint`: exit 0.
 
 Base vs head: the filter test "falls back to error \"Unauthorized\" for a 401 that carries no error field"
 fails on the previous head (`d201f502` filter: `error` was `'Error'`) and passes now. The validation-shape tests pass on both,
