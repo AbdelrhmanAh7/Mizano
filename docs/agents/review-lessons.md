@@ -19,11 +19,13 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **An idempotency key must stay the same across retries of one action.** Generating a fresh random id on the server for each request defeats it. A client UUID created once per user action and reused on every retry is fine (`idempotencyKeyFor`); so are `profileId:YYYY-MM-DD` or a sha256 of file + row. _(manual recurring execute, import retries)_
 - **Store idempotency markers where users cannot edit them.** Notes, reason and reference text get edited; use an append-only store such as AuditLog `IMPORT_ROW`. _(import markers)_
 - **Bulk operations reuse the single-record command through `runBulk`** and report `{ processed, total, failures }`. Never write a bulk `updateMany` that skips the posting logic.
+- **Automated postings (payroll, depreciation, disposal, COGM) also go through `JournalsService.create/reverse`** with a source key, never a raw `tx.journal.create` with a private `createdAt`/`parseInt` journal number. The private numbering collided with `MAX(JRN-n)` on backdated posts and skipped the balance, lock-date and idempotency checks. Claim the source row (schedule, run, work order) with a guarded update inside the same transaction. _(#130)_
 
 ## 3. Use the accounts that were actually posted
 
 - **Mutable default accounts change, so later events must use the account the original journal used,** not today's default. A refund credits the AP account the vendor-credit journal debited. A VAT payment debits the payable the settlement journal credited. A credit's VAT reverses the account the bill approval debited. _(vendor credits, VAT payment)_
 - **Aggregate over historical accounts too.** VAT figures include every account that carried VAT lines, not only the current defaults.
+- **A register follows what was posted.** The asset register is the sum of the posted depreciation periods, not a schedule row's running snapshot, and periods post and reverse in order. _(depreciation, #130)_
 
 ## 4. Dates
 
@@ -33,6 +35,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Web defaults use the user's local calendar date** (`format(d, 'yyyy-MM-dd')`), never `toISOString()`, which gives yesterday in UTC+ zones such as Cairo.
 - **"Current" figures exclude future-dated entries.** Cash today means lines dated ≤ end of today.
 - **Side records carry the document date.** Inventory movements are dated on the adjustment date, not on `createdAt` = now.
+- **Bound a month the way its rows are stored.** Attendance days are kept at local midnight, so payroll bounds its month in local time; UTC bounds drop the 1st on servers ahead of UTC. _(payroll, #130)_
 - **Historical reports keep later-voided documents in their original period** and show the reversal on the void date. Filtering on today's status rewrites history. _(customer statement)_
 
 ## 5. Single-currency ledger and data
@@ -50,6 +53,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Decimal precision must cover products before subtraction.** Two `Decimal(19,4)` factors can require 38 significant digits; the default 20 can lose 4-dp amounts when large valuations cancel. Use a locally cloned constructor with aggregation headroom, never change global precision, and test large products as well as fractional values. _(inventory value trend, PR #59)_
 - **Bound inputs to `Decimal(19,4)`:** at most 15 integer and 4 fraction digits, validated with `common/dto/decimal-string.ts`. Bound computed totals before writing.
 - **Allocate VAT cumulatively.** Each partial credit's VAT = `round(totalVAT × cumulative/total) − already allocated`, so the parts sum exactly to the whole.
+- **Round computed amounts per line at `CURRENCY_SCALE` and let one figure absorb the remainder** (net pay, the last depreciation period), so gross = net + deductions and a schedule sums to the depreciable amount. _(payroll, depreciation, #130)_
 - **The web preview rounds per line exactly like the server** (`computeDocumentTotals`), otherwise the shown and stored totals differ.
 - **When storage changes (net vs. gross), update every view:** list, detail, PDF and report. _(tax-inclusive expenses)_
 - **Keep accepted amounts.** Converting a quote copies its stored lines and totals rather than recomputing them.
@@ -69,6 +73,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 8. Voided and deleted records
 
+- **Never un-post a journal (`isPosted = false`) to undo it.** Create a linked reversal and leave the original posted. _(depreciation reversal, #130)_
 - **Posted documents that were voided stay readable** (read-only, with `deletedAt` set) on their detail endpoint so journal source links resolve. Lists exclude them. Deleted drafts, which never posted, return 404.
 - **Current figures (open balances, aging, dashboards) exclude DRAFT, VOID and deleted documents.** Historical statements and period reports keep a posted document that was voided later in its original period, with the reversal on the void date (see 4).
 
@@ -95,7 +100,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 ## 12. Caches, tests and scope
 
 - **Finite inputs do not guarantee finite arithmetic results.** Diagnostic timers must validate the elapsed difference and the accumulated safe-integer total before storing them; test subtraction overflow and repeated-stage accumulation. _(intake timings, PR #129)_
-- **Every endpoint that posts or reverses uses one `@InvalidatesLedger(...)`,** imports included.
+- **Every endpoint that posts or reverses uses one `@InvalidatesLedger(...)`,** imports included, and its controller applies `@UseInterceptors(CacheInvalidationInterceptor)`: the decorator is only metadata, so without the interceptor no cache is cleared. _(#130)_
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.

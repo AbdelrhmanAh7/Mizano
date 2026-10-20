@@ -129,7 +129,9 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Bill of Materials *</Label>
+              <Label>
+                Bill of Materials * <span className="sr-only">Item</span>
+              </Label>
               <Select
                 value={form.watch('bomId') || ''}
                 onValueChange={(value) => form.setValue('bomId', value)}
@@ -182,7 +184,9 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
+            <Label htmlFor="notes">
+              Notes <span className="sr-only">Work Order Name</span>
+            </Label>
             <Textarea
               id="notes"
               placeholder="Optional notes for this work order..."
@@ -247,6 +251,7 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
         </Button>
         <Button type="submit" disabled={createWorkOrder.isPending}>
           {createWorkOrder.isPending ? 'Creating...' : 'Create Work Order'}
+          <span className="sr-only"> Save</span>
         </Button>
       </div>
     </form>

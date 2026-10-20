@@ -67,8 +67,18 @@ async function bootstrap() {
   const corsOrigins = corsOriginRaw
     ? corsOriginRaw.split(',').map((o) => o.trim())
     : ['http://localhost:5001'];
+  // Ensure 127.0.0.1 and localhost equivalence for local origins
+  const expandedOrigins = new Set<string>(corsOrigins);
+  for (const origin of corsOrigins) {
+    if (origin.startsWith('http://127.0.0.1:')) {
+      expandedOrigins.add(origin.replace('http://127.0.0.1:', 'http://localhost:'));
+    } else if (origin.startsWith('http://localhost:')) {
+      expandedOrigins.add(origin.replace('http://localhost:', 'http://127.0.0.1:'));
+    }
+  }
+  const allowedOrigins = Array.from(expandedOrigins);
   app.enableCors({
-    origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
+    origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
     credentials: true,
   });
 
