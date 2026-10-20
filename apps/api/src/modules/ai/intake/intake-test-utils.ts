@@ -99,6 +99,11 @@ export class FakeIntakeJobTable {
       }
       return { count: hit.length };
     }),
+    delete: jest.fn(async ({ where }: { where: Where }) => {
+      const idx = this.rows.findIndex((r) => matches(r as unknown as Row, where));
+      if (idx >= 0) this.rows.splice(idx, 1);
+      return { count: idx >= 0 ? 1 : 0 };
+    }),
   };
 }
 

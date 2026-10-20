@@ -1,5 +1,5 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cache } from 'cache-manager';
 import Redis from 'ioredis';
@@ -25,7 +25,7 @@ export interface CacheKeyInfo {
 }
 
 @Injectable()
-export class CacheService implements OnModuleInit {
+export class CacheService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(CacheService.name);
   private redisClient: Redis | null = null;
   private hits = 0;
@@ -57,6 +57,18 @@ export class CacheService implements OnModuleInit {
         this.logger.warn('Failed to connect direct Redis client; pattern operations unavailable');
         this.redisClient = null;
       }
+    }
+  }
+
+  /** Close the direct client so its socket cannot keep the process alive after shutdown. */
+  async onModuleDestroy(): Promise<void> {
+    const client = this.redisClient;
+    this.redisClient = null;
+    if (!client) return;
+    try {
+      await client.quit();
+    } catch {
+      client.disconnect();
     }
   }
 
