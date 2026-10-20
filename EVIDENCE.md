@@ -616,3 +616,29 @@ Tests: 3 passed, 3 total  Exit code 0
 | AC3 | Service posting contract & issue drafts   | Method audit of `BankTransactionsService` confirms no journal creation methods. Bug and security issue drafts recorded in `AI_QUESTIONS.md`                                                                                                                                          | 0         | PASSED |
 | AC4 | Mocked Prisma & fixed dates               | Spec uses `createMockPrisma()` and `jest.useFakeTimers()` with `FIXED_DATE`                                                                                                                                                                                                          | 0         | PASSED |
 | AC5 | Test runners, lint, typecheck & diff size | `pnpm --filter api test` (12 passed), `_run_tests.js` (12 passed), `pnpm --filter api lint` (exit 0), `pnpm --filter api type-check` (exit 0), `git diff origin/master --stat` (252 lines)                                                                                           | 0         | PASSED |
+
+## Issue #209 Part 2 — Bulk operations service unit spec (#134 follow-up 4/5)
+
+- **PR**: #298
+- **Branch**: `ai/209-p2`
+- **Changed covering tests**: `apps/api/src/modules/bulk-operations/bulk-operations.service.spec.ts` (13 tests).
+- **Service under test**: `apps/api/src/modules/bulk-operations/bulk-operations.service.ts`
+- **Scope note**: Layer 2 of stacked PR #209. Covers `BulkOperationsService` unit spec per CTO directives on PR #295.
+
+### Acceptance criteria
+
+1. **AC1: Decimal journal lines & Domain Posting Delegation**: Confirms `BulkOperationsService` is an in-memory batch orchestrator with chunking and progress emission that writes zero journals directly. Ledger journal creation and `Decimal` balance integrity are delegated to caller-provided domain process functions.
+2. **AC2: Tenant scoping & isolation**: Confirms `createJob` accepts and stores `organizationId` with every job. Cross-tenant access limitations (`getJob` and `processJob` currently accept only `jobId`) are documented and tracked via dedicated security issue draft.
+3. **AC3: Idempotent retries & Failure Handling**: Retried jobs and partial failures handled via job failure tracking; empty job status and retry accumulation bugs documented and tracked via dedicated bug issue draft without encoding buggy behavior as expected.
+4. **AC4: Mocking & Deterministic Clocks**: Service has no Prisma or Redis dependencies; fake timers (`jest.useFakeTimers()`) and fixed dates (`FIXED_DATE = new Date('2024-06-15T00:00:00.000Z')`) used throughout to eliminate wall-clock dependencies; background `setInterval` mocked.
+5. **AC5: Test Runner & Quality Gates**: Both `node apps/api/_run_tests.js --testPathPattern=bulk-operations.service.spec.ts` (13 passed) and `pnpm --filter api test -- bulk-operations.service.spec.ts` (13 passed) exit 0. `pnpm --filter api lint` (0 errors) and `pnpm --filter api type-check` exit 0.
+
+### Verification Matrix
+
+| AC  | Requirement Description                   | Evidence / Command                                                                                                                                                                                                                 | Exit Code | Status |
+| --- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
+| AC1 | Posting delegation & zero direct journals | `apps/api/src/modules/bulk-operations/bulk-operations.service.spec.ts`: verified orchestrator delegates processing to `processFn`, 0 direct Prisma calls                                                                           | 0         | PASSED |
+| AC2 | Tenant scoping on job creation            | `bulk-operations.service.spec.ts`: `should create a job with organizationId...` & `should store created jobs... and generate unique job IDs` verify `organizationId` is recorded and segregated                                    | 0         | PASSED |
+| AC3 | Failure handling & retry audit            | `bulk-operations.service.spec.ts`: `should handle partial failures and mark job as completed with failures` & `should mark job as failed when all items fail`; no buggy outcomes encoded                                           | 0         | PASSED |
+| AC4 | Deterministic clocks & mocks              | `bulk-operations.service.spec.ts`: `should use fixed date for startedAt` & `should process all items in chunks... completedAt` with `FIXED_DATE`                                                                                   | 0         | PASSED |
+| AC5 | Test runners, lint & typecheck            | `pnpm --filter api test -- bulk-operations.service.spec.ts` (13 passed), `node apps/api/_run_tests.js --testPathPattern=bulk-operations` (13 passed), `pnpm --filter api lint` (0 errors), `pnpm --filter api type-check` (exit 0) | 0         | PASSED |
