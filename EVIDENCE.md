@@ -899,6 +899,7 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 - **Issue**: #183 `Mizano #132-1: Secure Docker Compose Production Stacks`
 - **PR**: #203
 - **Branch**: `ai/183`
+- **Tested commit**: `0defea19539502029120c87e1135f90a44491e60` (ai/183; clean head on origin/master).
 - **Originating Sentry Issue**: None. This is a security remediation sub-issue split from audit #132.
 - **User-facing flow / E2E**: Not user-facing (infrastructure compose hardening and internal API Redis URL resolution). An E2E request-level test is added at `e2e-army/183-redis-password-api.e2e.ts` covering `feat:mz-system-diagnostics` and `feat:mz-intake-processor`.
 - **Changed covering tests**:
