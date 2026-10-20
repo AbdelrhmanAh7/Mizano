@@ -551,45 +551,83 @@ Each trial balance has two tenant filters: the account list and the line totals.
 # EVIDENCE.md — Delivery challan org scoping (#212)
 
 - **Issue**: #212 (Follow-up: findings merged under an open CHANGES_REQUESTED (#162, #143, #107))
-- **Scope**: Slice 1 (#162 items 1–2: p0 delivery-challan org-scoping fix and test hardening)
-- **Tested commit**: `29ba7b80`
+- **Scope**: Slice 1 — #162 items 1–2: p0 delivery-challan org-scoping fix and test hardening
+- **Tested commit**: `afb64e8c` (HEAD of `ai/212`; code unchanged from `2f5b7898`, `afb64e8c` is a docs-only update)
+- **Base commit**: `5a8be028` (`origin/master`)
 - **Originating Sentry issue**: none
-- **UI screenshots / e2e-army**: none (API-only service change, no user-facing UI flow)
+- **UI screenshots**: none (API-only service change, no user-facing UI flow)
+- **e2e-army**: `E2E: not needed — API-only service-layer fix with no UI flow or screen changes`
 
 ## Acceptance Criteria
 
-- **AC1**: When a delivery-challan update targets a record outside the caller's organization (`count: 0`), the service throws `NotFoundException` and no mutation is executed inside the transaction.
-- **AC2**: When the guarded `updateMany` returns `count > 1`, the service throws `ConflictException` and writes no lines.
-- **AC3**: Each of the four validation-failure tests (foreign `customerId`, `invoiceId`, `itemId`, `warehouseId`) asserts `prisma.$transaction` and `tx.deliveryChallan.updateMany` were not called.
-- **AC4**: A regression test asserts that none of the write mocks (`update`, `updateMany`, `create`, `createMany`, `delete`, `deleteMany`, `upsert`) are invoked when a scoped-out ID is supplied.
-- **AC5**: `pnpm --filter api test -- delivery-challans.service.spec.ts` passes with all 26 tests green (exit code 0).
+1. **AC1**: When a delivery-challan update targets a record outside the caller's organisation (guarded `updateMany` returns `count: 0` and re-read finds no row), the service throws `NotFoundException` and no mutation is executed inside the transaction.
+2. **AC2**: When the guarded `updateMany` returns `count > 1`, the service throws `ConflictException` (via `rejectTransition`) rather than persisting anything.
+3. **AC3**: Each of the four validation-failure tests (foreign `customerId`, `invoiceId`, `itemId`, `warehouseId`) asserts `prisma.$transaction` was not called and `tx.deliveryChallan.updateMany` was not called.
+4. **AC4**: A regression test (`expectNoWrites`) asserts that none of `update`/`updateMany`/`create`/`createMany`/`delete`/`deleteMany`/`upsert` mocks were invoked on `deliveryChallan` or `deliveryChallanLine` when a scoped-out ID is supplied.
+5. **AC5**: `pnpm --filter api test -- delivery-challans.service.spec.ts` passes with all 26 tests green (exit code 0).
 
-## Verification Matrix
+## Verification Report
 
-| AC  | Requirement                                                                | Verified By                                                                                                                                                          | Exit Code | Result                                                                                       |
-| --- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | -------------------------------------------------------------------------------------------- |
-| AC1 | `count: 0`, no row in org -> `NotFoundException`, no line writes           | `update › answers 404 and writes no lines when the guarded update finds no row in the org`                                                                           | 0         | PASSED (fails on base with 409 `ConflictException`, passes on head with `NotFoundException`) |
-| AC2 | `count > 1` -> rejected, nothing persisted                                 | `update › rejects and writes no lines when the guarded update matches more than one row`                                                                             | 0         | PASSED (throws `ConflictException`, aborts tx, no lines written)                             |
-| AC3 | Four validation failures assert `$transaction` and `updateMany` not called | `expectNoWrites(prisma)` in `rejects a {customer,invoice,item} outside the org` and `rejects a warehouse outside the org`                                            | 0         | PASSED                                                                                       |
-| AC4 | No write mock runs for scoped-out ID                                       | `expectNoWrites(prisma)` checks `update`, `updateMany`, `create`, `createMany`, `delete`, `deleteMany`, `upsert` on both `deliveryChallan` and `deliveryChallanLine` | 0         | PASSED                                                                                       |
-| AC5 | All tests in spec pass                                                     | `nice -n 10 pnpm --filter api exec jest --maxWorkers=2 src/modules/sales/services/delivery-challans.service.spec.ts`                                                 | 0         | PASSED (26 passed, 0 failed)                                                                 |
+### Changed files
 
-## Regression Test (Base vs Head)
+| File                                                                    | Change                                                                                                                                                  |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/modules/sales/services/delivery-challans.service.ts`      | Line 167: replaced `throw new ConflictException(...)` with `await this.rejectTransition(tx, organizationId, id, ChallanStatus.DRAFT, ...)`              |
+| `apps/api/src/modules/sales/services/delivery-challans.service.spec.ts` | Added `expectNoWrites()` helper; replaced `prisma.deliveryChallan.update` assertions with `expectNoWrites(prisma)`; added 404, 400, and count > 1 tests |
 
-Command: `nice -n 10 pnpm --filter api exec jest --maxWorkers=2 src/modules/sales/services/delivery-challans.service.spec.ts`
+### Covering tests
 
-- **On base (`origin/master`)**: 2 failed, 24 passed (exit code 1).
-  - `answers 404 and writes no lines when the guarded update finds no row in the org`: Expected `NotFoundException`, received `ConflictException`.
-  - `answers 400 when the guarded update finds the challan already ISSUED`: Expected `BadRequestException`, received `ConflictException`.
-- **On head (`HEAD`)**: 26 passed, 0 failed (exit code 0).
+| AC  | Test name                                                                                  | File:line                                 | Command                                      | Exit code |
+| --- | ------------------------------------------------------------------------------------------ | ----------------------------------------- | -------------------------------------------- | --------- |
+| AC1 | `update › answers 404 and writes no lines when the guarded update finds no row in the org` | `delivery-challans.service.spec.ts:113`   | `jest ... delivery-challans.service.spec.ts` | 0         |
+| AC1 | `update › answers 400 when the guarded update finds the challan already ISSUED`            | `delivery-challans.service.spec.ts:128`   | same                                         | 0         |
+| AC2 | `update › rejects and writes no lines when the guarded update matches more than one row`   | `delivery-challans.service.spec.ts:140`   | same                                         | 0         |
+| AC3 | `update › rejects a customer outside the org before writing`                               | `delivery-challans.service.spec.ts:62`    | same                                         | 0         |
+| AC3 | `update › rejects a invoice outside the org before writing`                                | `delivery-challans.service.spec.ts:62`    | same                                         | 0         |
+| AC3 | `update › rejects a item outside the org before writing`                                   | `delivery-challans.service.spec.ts:62`    | same                                         | 0         |
+| AC3 | `update › rejects a warehouse outside the org before writing`                              | `delivery-challans.service.spec.ts:70`    | same                                         | 0         |
+| AC4 | Same four tests above, each calls `expectNoWrites(prisma)`                                 | `delivery-challans.service.spec.ts:20-37` | same                                         | 0         |
+| AC5 | Full spec suite (26 tests)                                                                 | `delivery-challans.service.spec.ts`       | same                                         | 0         |
 
-## Local Checks
+### Regression test: fails on base, passes on head
 
-- Linter: `pnpm --filter api lint` (exit code 0, clean).
-- Typecheck: `pnpm --filter api type-check` (exit code 0, 0 error TS lines).
-- Changed unit test: `nice -n 10 pnpm --filter api exec jest --maxWorkers=2 src/modules/sales/services/delivery-challans.service.spec.ts` (26 passed, exit code 0).
+**Method**: copied the HEAD spec file over the base service code (master `ConflictException` at line 168), ran the tests, then restored.
 
-### Implementation Note (count > 1)
+**On base** (`origin/master` service, HEAD spec — exit code 1):
 
-Where the `count > 1` `ConflictException` comes from: `update` calls `await this.rejectTransition(...)` for any `count !== 1` (`delivery-challans.service.ts`, `rejectTransition`). That helper re-reads the challan in the same transaction: missing -> 404, status not `DRAFT` -> 400, otherwise (still `DRAFT`) falls through to `throw new ConflictException`. In the `count: 2` test the re-read mock returns the `DRAFT` challan, so the 409 is `rejectTransition`'s last line, not a hard-coded throw. The transaction aborts with this error, guaranteeing line `deleteMany`/`createMany` mutations never execute.
+```
+FAIL src/modules/sales/services/delivery-challans.service.spec.ts
+  ● update › answers 404 and writes no lines when the guarded update finds no row in the org
+    Expected constructor: NotFoundException
+    Received constructor: ConflictException
+    Received message: "Only draft challans can be updated"
+        > 168 |         throw new ConflictException('Only draft challans can be updated');
+  ● update › answers 400 when the guarded update finds the challan already ISSUED
+    Expected constructor: BadRequestException
+    Received constructor: ConflictException
+    Received message: "Only draft challans can be updated"
+        > 168 |         throw new ConflictException('Only draft challans can be updated');
+Tests: 2 failed, 24 passed, 26 total
+```
 
+**On head** (`ai/212` — exit code 0):
+
+```
+PASS src/modules/sales/services/delivery-challans.service.spec.ts
+Tests: 26 passed, 26 total
+```
+
+**Root cause on base**: line 168 threw a hard-coded `ConflictException` for any `count !== 1`, making no distinction between a missing record (should be 404), a status mismatch (should be 400), and a genuine race condition (409). The fix delegates to `rejectTransition`, which re-reads the record in the same transaction and throws the appropriate exception.
+
+## Local Checks (re-run on HEAD `afb64e8c`)
+
+- **Linter**: `pnpm --filter api lint` — exit code 0, clean.
+- **Typecheck**: `pnpm --filter api type-check` — exit code 0, clean (pre-existing errors on base eliminated by earlier work; 0 errors in the changed delivery-challans files).
+- **Unit tests**: `nice -n 10 pnpm --filter api exec jest --maxWorkers=2 src/modules/sales/services/delivery-challans.service.spec.ts` — 26 passed, exit code 0, 9.903 s.
+
+## Out of scope (follow-ups for #212)
+
+- #162 item 3: make the stock moves in `issue` / `markReturned` atomic with the status change.
+- #143: lower the heap cap, fix `.env.local` load order, route production CMD through launcher, align parsing rules, re-run EVIDENCE.
+- #107: re-check `.husky/pre-push` CodeRabbit findings; fix `docs/DEVELOPMENT.md` Minor.
+- QA-checklist review of #149, #152, #154.
