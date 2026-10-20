@@ -251,7 +251,7 @@ export function CacheManagement() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <span className="text-2xl font-bold">{stats.memoryUsage}</span>
+              <span className="text-2xl font-bold">{stats.memoryUsage ?? 'N/A'}</span>
               <p className="text-xs text-muted-foreground mt-1">{t('cache.redisMemory')}</p>
             </CardContent>
           </Card>

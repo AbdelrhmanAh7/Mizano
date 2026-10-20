@@ -43,15 +43,17 @@ jobs:
     outputs:
       shards: ${{ steps.shards.outputs.shards }}
     steps:
-      - name: Checkout the shard list
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
-          sparse-checkout: e2e-army/shards.json
-          sparse-checkout-cone-mode: false
+          fetch-depth: 0
 
-      - name: Read e2e-army/shards.json
+      - name: Plan shards to run
         id: shards
-        run: echo "shards=$(jq -c '["pr"] + [.shards[].id]' e2e-army/shards.json)" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: echo "shards=$(node scripts/plan-shards.mjs)" >> "$GITHUB_OUTPUT"
 
   shard:
     name: e2e-army (${{ matrix.shard }})
@@ -80,8 +82,11 @@ jobs:
       DATABASE_URL: postgresql://test:test@localhost:5432/mizano_e2e?schema=public
       E2E_ARMY_DB_DISPOSABLE: '1'
       E2E_TELEMETRY_DISABLED: '1'
-      E2E_ARMY_NOAGENT: '1'
       REDIS_URL: ''
+      E2E_ARMY_MODEL_KEY: ${{ secrets.GEMINI_API_KEY || secrets.E2E_ARMY_MODEL_KEY || '' }}
+      E2E_ARMY_MODEL_URL: ${{ secrets.E2E_ARMY_MODEL_URL || 'https://generativelanguage.googleapis.com/v1beta/openai/' }}
+      E2E_ARMY_MODEL_ID: ${{ secrets.E2E_ARMY_MODEL_ID || 'gemini-1.5-flash' }}
+      E2E_ARMY_NOAGENT: ${{ (secrets.GEMINI_API_KEY != '' || secrets.E2E_ARMY_MODEL_KEY != '') && '0' || '1' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

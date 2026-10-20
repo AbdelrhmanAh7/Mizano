@@ -1,0 +1,1917 @@
+{
+  "repo": "AbdelrhmanAh7/Mizano",
+  "name": "Mizano",
+  "branch": "master",
+  "generated": "2026-10-08",
+  "sources": [
+    "apps/web/app/[locale]/** (every Next page)",
+    "apps/api/src/**/*.controller.ts (every Nest controller)",
+    "@Cron / BullMQ jobs (recurring journals, depreciation, notifications, intake worker, AI schedulers)",
+    "README.md demo scope + docs/strategy/demo-acceptance.md",
+    "ship-plan.json project MZ",
+    "gh issue list + milestones (MVP — Ship plan → 20 Nov, Post-launch)",
+    "apps/api/test/*.e2e-spec.ts (API contracts)"
+  ],
+  "smokeShard": "smoke",
+  "ignore": [
+    "deploy/**",
+    "nginx/**",
+    "docker-compose*.yml",
+    "scripts/**",
+    "services/ollama-proxy/test_*.py",
+    "commitlint.config.js",
+    "_lint_staged.js",
+    "apps/*/Dockerfile",
+    "apps/api/_run_tests.js",
+    "apps/api/_jest*.js",
+    "apps/api/nest-cli.json",
+    "apps/api/tsconfig*.json",
+    "apps/web/tsconfig.json",
+    "apps/web/components.json",
+    "apps/web/next-env.d.ts",
+    "apps/web/**/*.stories.tsx",
+    ".husky/**",
+    "apps/*/.eslintrc*",
+    "apps/*/.storybook/**",
+    "apps/api/.swcrc",
+    "**/.gitkeep",
+    ".env.*",
+    ".clinerules",
+    ".coderabbit.yaml",
+    ".dockerignore",
+    ".npmrc",
+    ".prettierignore",
+    ".prettierrc",
+    "deploy/**",
+    "*.config.js",
+    "CLAUDE.md",
+    "AGENTS.md",
+    "GLM.md",
+    "CODEX.md",
+    "ANTIGRAVITY.md",
+    "EVIDENCE.md"
+  ],
+  "features": [
+    {
+      "id": "mz-auth",
+      "name": {
+        "en": "Authentication and sessions",
+        "ar": "تسجيل الدخول والجلسات"
+      },
+      "kind": "ui",
+      "entry": "/en/login",
+      "paths": [
+        "apps/web/app/[locale]/(auth)/login/**",
+        "apps/web/app/[locale]/(auth)/layout.tsx",
+        "apps/web/app/api/auth/**",
+        "apps/web/lib/auth.ts",
+        "apps/web/lib/auth.spec.ts",
+        "apps/web/lib/auth-refresh.ts",
+        "apps/web/middleware.ts",
+        "apps/web/components/auth/**",
+        "apps/web/lib/hooks/use-permissions.ts",
+        "apps/web/messages/*/auth.json",
+        "apps/api/src/modules/auth/**",
+        "apps/api/src/common/guards/**",
+        "apps/api/src/common/decorators/**",
+        "apps/api/src/common/exceptions/**",
+        "apps/api/src/common/filters/**",
+        "apps/api/src/app.module.ts",
+        "apps/api/src/main.ts",
+        "apps/api/src/common/**",
+        "apps/api/src/prisma/**",
+        "apps/api/prisma/**",
+        "packages/validators/**"
+      ],
+      "mvp": true,
+      "tests": ["mz-auth.1", "mz-auth.2", "mz-auth.3"],
+      "issues": [8, 9, 19],
+      "notes": "Form login + NextAuth + JWT refresh rotation; the auth endpoints are throttled to 5 requests/minute per handler, the suite rations logins accordingly."
+    },
+    {
+      "id": "mz-registration",
+      "name": {
+        "en": "Registration of a new organization",
+        "ar": "تسجيل منشأة جديدة"
+      },
+      "kind": "ui",
+      "entry": "/en/register",
+      "paths": ["apps/web/app/[locale]/(auth)/register/**"],
+      "mvp": false,
+      "tests": ["mz-registration.1", "mz-registration.2"],
+      "notes": "POST /auth/register creates the organization, its Admin role and the first user."
+    },
+    {
+      "id": "mz-landing",
+      "name": {
+        "en": "Public landing page",
+        "ar": "الصفحة التعريفية العامة"
+      },
+      "kind": "ui",
+      "entry": "/en/onboarding",
+      "paths": [
+        "apps/web/app/[locale]/(auth)/onboarding/**",
+        "apps/web/messages/*/onboarding.json",
+        "apps/web/public/**"
+      ],
+      "mvp": false,
+      "tests": ["mz-landing.1"],
+      "notes": "Anonymous visitors of / are redirected here."
+    },
+    {
+      "id": "mz-health",
+      "name": {
+        "en": "Health and readiness endpoints",
+        "ar": "فحوصات الصحة والجاهزية"
+      },
+      "kind": "api",
+      "entry": "GET /api/health",
+      "paths": ["apps/api/src/health/**"],
+      "mvp": true,
+      "tests": ["mz-health.1"],
+      "issues": [110, 43]
+    },
+    {
+      "id": "mz-dashboard",
+      "name": {
+        "en": "Dashboard",
+        "ar": "لوحة التحكم"
+      },
+      "kind": "ui",
+      "entry": "/en/dashboard",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/dashboard/**",
+        "apps/web/components/dashboard/**",
+        "apps/web/lib/hooks/use-dashboard.ts",
+        "apps/web/lib/hooks/use-dashboard.spec.ts",
+        "apps/web/lib/hooks/use-dashboard-sections.ts",
+        "apps/web/lib/stores/use-dashboard-filters.ts",
+        "apps/api/src/modules/reports/controllers/reports.controller.ts",
+        "apps/api/src/modules/reports/services/dashboard.service.ts",
+        "apps/api/src/modules/reports/reports.module.ts",
+        "apps/api/src/modules/reports/utils/**"
+      ],
+      "mvp": true,
+      "tests": ["mz-dashboard.2", "mz-dashboard.1"],
+      "issues": [22],
+      "notes": "KPI cards + ~40 widget endpoints under /reports/dashboard/*."
+    },
+    {
+      "id": "mz-i18n-rtl",
+      "name": {
+        "en": "Arabic / English and RTL",
+        "ar": "العربية والإنجليزية والاتجاه من اليمين لليسار"
+      },
+      "kind": "ui",
+      "entry": "/ar/dashboard",
+      "paths": [
+        "apps/web/i18n/**",
+        "apps/web/messages/*/common.json",
+        "apps/web/messages/*/navigation.json",
+        "apps/web/messages/*/validation.json",
+        "apps/web/messages/*/index.ts",
+        "apps/web/messages/*/tour.json",
+        "apps/web/components/layout/language-switcher.tsx",
+        "apps/web/app/[locale]/layout.tsx",
+        "apps/web/app/layout.tsx",
+        "apps/web/app/globals.css",
+        "apps/web/styles/**",
+        "apps/web/tailwind.config.js",
+        "apps/web/postcss.config.js",
+        "apps/web/next.config.js",
+        "apps/web/next.config.spec.ts",
+        "apps/web/components/ui/**",
+        "apps/web/app/*.png",
+        "apps/web/app/favicon.ico",
+        "apps/api/src/i18n/**"
+      ],
+      "mvp": true,
+      "tests": ["mz-i18n-rtl.1", "mz-i18n-rtl.2"],
+      "issues": [109],
+      "notes": "Several pages (composite items, movements, trial balance page, general ledger page, my tasks) hard-code English titles: only their direction is asserted in Arabic."
+    },
+    {
+      "id": "mz-app-shell",
+      "name": {
+        "en": "Application shell and navigation",
+        "ar": "هيكل التطبيق والتنقل"
+      },
+      "kind": "ui",
+      "entry": "/en/dashboard",
+      "paths": [
+        "apps/web/components/layout/**",
+        "apps/web/components/shared/**",
+        "apps/web/components/data-table/**",
+        "apps/web/components/providers/**",
+        "apps/web/components/providers.tsx",
+        "apps/web/components/navigation-progress.tsx",
+        "apps/web/components/error-boundary.tsx",
+        "apps/web/components/error-boundary.spec.tsx",
+        "apps/web/components/keyboard-shortcuts.tsx",
+        "apps/web/components/activity-timeline.tsx",
+        "apps/web/components/tour/**",
+        "apps/web/app/[locale]/(dashboard)/layout.tsx",
+        "apps/web/app/[locale]/(dashboard)/loading.tsx",
+        "apps/web/app/[locale]/(dashboard)/error.tsx",
+        "apps/web/app/[locale]/(dashboard)/not-found.tsx",
+        "apps/web/app/[locale]/error.tsx",
+        "apps/web/app/robots.ts",
+        "apps/web/app/sitemap.ts",
+        "apps/web/lib/seo/**",
+        "apps/web/lib/utils.ts",
+        "apps/web/lib/utils.spec.ts",
+        "apps/web/lib/utils/**",
+        "apps/web/lib/stores/use-recent-items-store.ts",
+        "apps/web/lib/stores/use-recent-store.ts",
+        "apps/web/lib/stores/use-shortcut-registry.ts",
+        "apps/web/lib/stores/use-tour-store.ts",
+        "apps/web/lib/api.ts",
+        "apps/web/lib/api/create-api-client.ts",
+        "apps/web/lib/api-error.ts",
+        "apps/web/lib/money.ts",
+        "apps/web/lib/money.spec.ts",
+        "apps/web/lib/decimal.ts",
+        "apps/web/lib/types/**",
+        "apps/web/lib/data/**",
+        "apps/web/jest.setup.ts",
+        "apps/web/jest.config.js",
+        "apps/web/lib/hooks/create-crud-hooks.ts",
+        "apps/web/lib/hooks/index.ts",
+        "apps/web/lib/hooks/use-debounce.ts",
+        "apps/web/lib/hooks/use-form-auto-save.ts",
+        "apps/web/lib/hooks/use-formatters.ts",
+        "apps/web/lib/hooks/use-infinite-table-data.ts",
+        "apps/web/lib/hooks/use-keyboard-shortcut.ts",
+        "apps/web/lib/hooks/use-table-params.ts",
+        "apps/web/lib/hooks/use-table-params.spec.ts",
+        "apps/web/lib/hooks/use-sse.ts",
+        "apps/web/lib/hooks/use-realtime.ts",
+        "apps/web/lib/hooks/use-realtime.spec.tsx"
+      ],
+      "mvp": false,
+      "tests": ["mz-app-shell.1", "mz-app-shell.2"],
+      "notes": "Sidebar, header, breadcrumbs, shared UI building blocks; also robots.txt / sitemap.xml and the protected-route middleware behaviour."
+    },
+    {
+      "id": "mz-customers",
+      "name": {
+        "en": "Customers",
+        "ar": "العملاء"
+      },
+      "kind": "ui",
+      "entry": "/en/sales/customers",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/sales/customers/**",
+        "apps/web/components/sales/customer-form.tsx",
+        "apps/web/components/sales/customer-statement.tsx",
+        "apps/web/components/ui/**",
+        "apps/web/components/data-table/**",
+        "apps/web/lib/hooks/use-customers.ts",
+        "apps/web/messages/*/sales.json",
+        "apps/api/src/modules/sales/controllers/customers.controller.ts",
+        "apps/api/src/modules/sales/services/customers.service.ts",
+        "apps/api/src/modules/sales/dto/create-customer.dto.ts",
+        "apps/api/src/modules/sales/dto/update-customer.dto.ts",
+        "apps/api/src/modules/sales/sales.module.ts",
+        "apps/api/src/app.module.ts",
+        "apps/api/src/main.ts",
+        "apps/api/src/common/**",
+        "apps/api/src/prisma/**",
+        "apps/api/prisma/**",
+        "packages/validators/**"
+      ],
+      "mvp": true,
+      "tests": ["mz-customers.1", "mz-customers.2"]
+    },
+    {
+      "id": "mz-quotes",
+      "name": {
+        "en": "Quotes",
+        "ar": "عروض الأسعار"
+      },
+      "kind": "ui",
+      "entry": "/en/sales/quotes",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/sales/quotes/**",
+        "apps/web/components/sales/quote-form.tsx",
+        "apps/web/components/sales/line-items-form.tsx",
+        "apps/web/components/sales/line-items-form.spec.ts",
+        "apps/web/lib/hooks/use-quotes.ts",
+        "apps/api/src/modules/sales/controllers/quotes.controller.ts",
+        "apps/api/src/modules/sales/services/quotes.service.ts",
+        "apps/api/src/modules/sales/dto/create-quote.dto.ts",
+        "apps/api/src/modules/sales/dto/update-quote.dto.ts",
+        "apps/api/src/modules/sales/dto/quote-query.dto.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-quotes.1", "mz-quotes.2"]
+    },
+    {
+      "id": "mz-sales-invoices",
+      "name": {
+        "en": "Sales invoices",
+        "ar": "فواتير المبيعات"
+      },
+      "kind": "ui",
+      "entry": "/en/sales/invoices",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/sales/page.tsx",
+        "apps/web/app/[locale]/(dashboard)/sales/error.tsx",
+        "apps/web/app/[locale]/(dashboard)/sales/invoices/**",
+        "apps/web/components/sales/invoice-form.tsx",
+        "apps/web/components/sales/status-badge.tsx",
+        "apps/web/components/sales/line-items-form.tsx",
+        "apps/web/components/ui/**",
+        "apps/web/components/data-table/**",
+        "apps/web/lib/hooks/use-invoices.ts",
+        "apps/api/src/modules/sales/controllers/invoices.controller.ts",
+        "apps/api/src/modules/sales/services/invoices.service.ts",
+        "apps/api/src/modules/sales/dto/create-invoice.dto.ts",
+        "apps/api/src/modules/sales/dto/update-invoice.dto.ts",
+        "apps/api/src/modules/sales/dto/invoice-query.dto.ts",
+        "apps/api/src/modules/sales/dto/invoice-cursor-query.dto.ts",
+        "apps/api/src/modules/sales/dto/record-invoice-payment.dto.ts",
+        "apps/api/src/modules/sales/dto/bulk-pay-invoices.dto.ts",
+        "apps/api/src/modules/sales/utils/**",
+        "apps/api/src/common/utils/document-totals.ts",
+        "apps/api/src/common/services/document-number.service.ts",
+        "apps/api/src/app.module.ts",
+        "apps/api/src/main.ts",
+        "apps/api/src/common/**",
+        "apps/api/src/prisma/**",
+        "apps/api/prisma/**",
+        "packages/validators/**"
+      ],
+      "mvp": true,
+      "tests": ["mz-sales-invoices.1", "mz-sales-invoices.2", "mz-sales-invoices.3"],
+      "issues": [10]
+    },
+    {
+      "id": "mz-sales-payments",
+      "name": {
+        "en": "Payments received",
+        "ar": "المدفوعات المستلمة"
+      },
+      "kind": "ui",
+      "entry": "/en/sales/payments",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/sales/payments/**",
+        "apps/web/components/sales/payment-received-form.tsx",
+        "apps/web/lib/hooks/use-payments-received.ts",
+        "apps/api/src/modules/sales/controllers/payments-received.controller.ts",
+        "apps/api/src/modules/sales/services/payments-received.service.ts",
+        "apps/api/src/modules/sales/dto/create-payment-received.dto.ts",
+        "apps/api/src/modules/sales/dto/payment-received-query.dto.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-sales-payments.1", "mz-sales-payments.2"]
+    },
+    {
+      "id": "mz-credit-notes",
+      "name": {
+        "en": "Credit notes",
+        "ar": "إشعارات الائتمان"
+      },
+      "kind": "ui",
+      "entry": "/en/sales/credit-notes",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/sales/credit-notes/**",
+        "apps/web/components/sales/credit-note-form.tsx",
+        "apps/web/lib/hooks/use-credit-notes.ts",
+        "apps/api/src/modules/sales/controllers/credit-notes.controller.ts",
+        "apps/api/src/modules/sales/services/credit-notes.service.ts",
+        "apps/api/src/modules/sales/dto/create-credit-note.dto.ts",
+        "apps/api/src/modules/sales/dto/update-credit-note.dto.ts",
+        "apps/api/src/modules/sales/dto/apply-credit-note.dto.ts",
+        "apps/api/src/modules/sales/dto/credit-note-query.dto.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-credit-notes.1", "mz-credit-notes.2"]
+    },
+    {
+      "id": "mz-delivery-challans",
+      "name": {
+        "en": "Delivery challans",
+        "ar": "سندات التسليم"
+      },
+      "kind": "ui",
+      "entry": "/en/sales/delivery-challans",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/sales/delivery-challans/**",
+        "apps/web/lib/hooks/use-delivery-challans.ts",
+        "apps/api/src/modules/sales/controllers/delivery-challans.controller.ts",
+        "apps/api/src/modules/sales/services/delivery-challans.service.ts",
+        "apps/api/src/modules/sales/dto/delivery-challan.dto.ts"
+      ],
+      "mvp": true,
+      "tests": ["mz-delivery-challans.1", "mz-delivery-challans.2"],
+      "issues": [131]
+    },
+    {
+      "id": "mz-vendors",
+      "name": {
+        "en": "Vendors",
+        "ar": "الموردون"
+      },
+      "kind": "ui",
+      "entry": "/en/purchases/vendors",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/purchases/vendors/**",
+        "apps/web/components/purchases/vendor-form.tsx",
+        "apps/web/lib/hooks/use-vendors.ts",
+        "apps/web/messages/*/purchases.json",
+        "apps/api/src/modules/purchases/controllers/vendors.controller.ts",
+        "apps/api/src/modules/purchases/services/vendors.service.ts",
+        "apps/api/src/modules/purchases/dto/create-vendor.dto.ts",
+        "apps/api/src/modules/purchases/dto/update-vendor.dto.ts",
+        "apps/api/src/modules/purchases/purchases.module.ts"
+      ],
+      "mvp": true,
+      "tests": ["mz-vendors.1", "mz-vendors.2"]
+    },
+    {
+      "id": "mz-purchase-bills",
+      "name": {
+        "en": "Purchase bills",
+        "ar": "فواتير المشتريات"
+      },
+      "kind": "ui",
+      "entry": "/en/purchases/bills",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/purchases/page.tsx",
+        "apps/web/app/[locale]/(dashboard)/purchases/error.tsx",
+        "apps/web/app/[locale]/(dashboard)/purchases/bills/page.tsx",
+        "apps/web/app/[locale]/(dashboard)/purchases/bills/new/**",
+        "apps/web/app/[locale]/(dashboard)/purchases/bills/[id]/**",
+        "apps/web/components/purchases/bill-form.tsx",
+        "apps/web/components/ui/**",
+        "apps/web/components/data-table/**",
+        "apps/web/lib/hooks/use-bills.ts",
+        "apps/api/src/modules/purchases/controllers/bills.controller.ts",
+        "apps/api/src/modules/purchases/services/bills.service.ts",
+        "apps/api/src/modules/purchases/dto/create-bill.dto.ts",
+        "apps/api/src/modules/purchases/dto/update-bill.dto.ts",
+        "apps/api/src/modules/purchases/dto/bill-query.dto.ts",
+        "apps/api/src/modules/purchases/dto/bill-cursor-query.dto.ts",
+        "apps/api/src/modules/purchases/dto/bulk-pay-bills.dto.ts",
+        "apps/api/src/modules/purchases/dto/check-duplicate-bill.dto.ts",
+        "apps/api/src/common/utils/ledger-lock.ts",
+        "apps/api/src/app.module.ts",
+        "apps/api/src/main.ts",
+        "apps/api/src/common/**",
+        "apps/api/src/prisma/**",
+        "apps/api/prisma/**",
+        "packages/validators/**"
+      ],
+      "mvp": true,
+      "tests": ["mz-purchase-bills.1", "mz-purchase-bills.2", "mz-purchase-bills.3"],
+      "issues": [11, 12, 96],
+      "notes": "Approval posts one balanced journal exactly once (atomic and idempotent); the midnight overdue sweep (BillsService.markOverdueBills) has no HTTP hook."
+    },
+    {
+      "id": "mz-bill-scan",
+      "name": {
+        "en": "Scan a vendor bill",
+        "ar": "مسح فاتورة مورد"
+      },
+      "kind": "ui",
+      "entry": "/en/purchases/bills/scan",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/purchases/bills/scan/**",
+        "apps/web/components/purchases/bill-form.scan.spec.tsx",
+        "apps/web/lib/document-intake-tax.ts",
+        "apps/web/lib/document-intake-tax.spec.ts",
+        "apps/web/lib/scan-review-error.ts",
+        "apps/web/lib/scan-review-error.spec.ts",
+        "apps/web/lib/hooks/use-ai-document-intake.ts",
+        "apps/web/lib/hooks/use-ai-document-intake.spec.ts",
+        "apps/api/src/modules/ai/controllers/document-intake.controller.ts",
+        "apps/api/src/modules/ai/dto/document-intake.dto.ts",
+        "apps/api/src/modules/ai/services/document-intake.service.ts"
+      ],
+      "mvp": true,
+      "tests": ["mz-bill-scan.2", "mz-bill-scan.1"],
+      "issues": [17, 18, 21, 109],
+      "notes": "Upload step and stepper are tested in the browser; scanned images need the OCR service (off in the verify stack). The confirm step (draft bill with exact totals) is covered at API level."
+    },
+    {
+      "id": "mz-expenses",
+      "name": {
+        "en": "Expenses",
+        "ar": "المصروفات"
+      },
+      "kind": "ui",
+      "entry": "/en/purchases/expenses",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/purchases/expenses/**",
+        "apps/web/components/purchases/expense-form.tsx",
+        "apps/web/components/purchases/expense-payload.ts",
+        "apps/web/components/purchases/expense-payload.spec.ts",
+        "apps/web/lib/hooks/use-expenses.ts",
+        "apps/api/src/modules/purchases/controllers/expenses.controller.ts",
+        "apps/api/src/modules/purchases/services/expenses.service.ts",
+        "apps/api/src/modules/purchases/dto/create-expense.dto.ts",
+        "apps/api/src/modules/purchases/dto/expense-query.dto.ts",
+        "apps/api/src/modules/purchases/dto/bulk-categorize-expenses.dto.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-expenses.1", "mz-expenses.2"]
+    },
+    {
+      "id": "mz-purchase-payments",
+      "name": {
+        "en": "Payments made",
+        "ar": "المدفوعات للموردين"
+      },
+      "kind": "ui",
+      "entry": "/en/purchases/payments",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/purchases/payments/**",
+        "apps/web/components/purchases/payment-made-form.tsx",
+        "apps/web/components/purchases/payment-allocation.ts",
+        "apps/web/lib/hooks/use-payments-made.ts",
+        "apps/api/src/modules/purchases/controllers/payments-made.controller.ts",
+        "apps/api/src/modules/purchases/services/payments-made.service.ts",
+        "apps/api/src/modules/purchases/dto/create-payment-made.dto.ts",
+        "apps/api/src/modules/purchases/dto/payment-made-query.dto.ts"
+      ],
+      "mvp": true,
+      "tests": ["mz-purchase-payments.1", "mz-purchase-payments.2"],
+      "issues": [11]
+    },
+    {
+      "id": "mz-vendor-credits",
+      "name": {
+        "en": "Vendor credits",
+        "ar": "ائتمانات الموردين"
+      },
+      "kind": "ui",
+      "entry": "/en/purchases/credits",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/purchases/credits/**",
+        "apps/web/components/purchases/vendor-credit-form.tsx",
+        "apps/web/components/purchases/vendor-credit-payload.ts",
+        "apps/web/components/purchases/vendor-credit-payload.spec.ts",
+        "apps/web/lib/hooks/use-vendor-credits.ts",
+        "apps/api/src/modules/purchases/controllers/vendor-credits.controller.ts",
+        "apps/api/src/modules/purchases/services/vendor-credits.service.ts",
+        "apps/api/src/modules/purchases/dto/create-vendor-credit.dto.ts",
+        "apps/api/src/modules/purchases/dto/apply-vendor-credit.dto.ts",
+        "apps/api/src/modules/purchases/dto/refund-vendor-credit.dto.ts",
+        "apps/api/src/modules/purchases/dto/vendor-credit-query.dto.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-vendor-credits.1", "mz-vendor-credits.2"]
+    },
+    {
+      "id": "mz-chart-of-accounts",
+      "name": {
+        "en": "Chart of accounts",
+        "ar": "دليل الحسابات"
+      },
+      "kind": "ui",
+      "entry": "/en/accounting/accounts",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/accounting/page.tsx",
+        "apps/web/app/[locale]/(dashboard)/accounting/error.tsx",
+        "apps/web/app/[locale]/(dashboard)/accounting/accounts/**",
+        "apps/web/components/accounting/account-form-dialog.tsx",
+        "apps/web/components/accounting/account-tree.tsx",
+        "apps/web/lib/hooks/use-accounts.ts",
+        "apps/web/messages/*/accounting.json",
+        "apps/api/src/modules/accounting/controllers/accounts.controller.ts",
+        "apps/api/src/modules/accounting/services/accounts.service.ts",
+        "apps/api/src/modules/accounting/dto/create-account.dto.ts",
+        "apps/api/src/modules/accounting/dto/update-account.dto.ts",
+        "apps/api/src/modules/accounting/accounting.module.ts"
+      ],
+      "mvp": true,
+      "tests": ["mz-chart-of-accounts.1", "mz-chart-of-accounts.2"]
+    },
+    {
+      "id": "mz-journals",
+      "name": {
+        "en": "Journal entries and the posted ledger",
+        "ar": "قيود اليومية والدفتر المرحّل"
+      },
+      "kind": "ui",
+      "entry": "/en/accounting/journals",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/accounting/journals/**",
+        "apps/web/components/accounting/journal-form.tsx",
+        "apps/web/components/ui/**",
+        "apps/web/components/data-table/**",
+        "apps/web/lib/hooks/use-journals.ts",
+        "apps/api/src/modules/accounting/controllers/journals.controller.ts",
+        "apps/api/src/modules/accounting/services/journals.service.ts",
+        "apps/api/src/modules/accounting/dto/create-journal.dto.ts",
+        "apps/api/src/modules/accounting/dto/update-journal.dto.ts",
+        "apps/api/src/modules/accounting/dto/journal-query.dto.ts",
+        "apps/api/src/modules/accounting/dto/journal-cursor-query.dto.ts",
+        "apps/api/src/common/utils/ledger-lock.ts",
+        "apps/api/src/common/utils/decimal.ts",
+        "apps/api/src/app.module.ts",
+        "apps/api/src/main.ts",
+        "apps/api/src/common/**",
+        "apps/api/src/prisma/**",
+        "apps/api/prisma/**",
+        "packages/validators/**"
+      ],
+      "mvp": true,
+      "tests": ["mz-journals.1", "mz-journals.2", "mz-journals.3"],
+      "issues": [12, 90, 130],
+      "notes": "Double entry, immutability of posted history, single reversal, period lock date."
+    },
+    {
+      "id": "mz-recurring-journals",
+      "name": {
+        "en": "Recurring journal profiles",
+        "ar": "القيود المتكررة"
+      },
+      "kind": "ui",
+      "entry": "/en/accounting/recurring",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/accounting/recurring/**",
+        "apps/web/components/accounting/recurring-profile-form.tsx",
+        "apps/web/lib/hooks/use-recurring.ts",
+        "apps/web/lib/hooks/use-recurring-profiles.ts",
+        "apps/api/src/modules/accounting/controllers/recurring-profiles.controller.ts",
+        "apps/api/src/modules/accounting/dto/create-recurring-profile.dto.ts",
+        "apps/api/src/modules/accounting/dto/update-recurring-profile.dto.ts",
+        "apps/api/src/modules/accounting/dto/execute-recurring-profile.dto.ts",
+        "apps/api/src/modules/accounting/dto/recurring-profile-query.dto.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-recurring-journals.1", "mz-recurring-journals.2"]
+    },
+    {
+      "id": "mz-recurring-scheduler",
+      "name": {
+        "en": "Recurring journal posting job",
+        "ar": "مهمة ترحيل القيود المتكررة"
+      },
+      "kind": "job",
+      "entry": "RecurringProfilesService.processRecurringProfiles (daily 00:00)",
+      "paths": ["apps/api/src/modules/accounting/services/recurring-profiles.service.ts"],
+      "mvp": false,
+      "tests": ["mz-recurring-scheduler.1"],
+      "notes": "The midnight @Cron has no HTTP hook; the same idempotent posting runs through POST /recurring-profiles/:id/execute, which the test drives."
+    },
+    {
+      "id": "mz-trial-balance",
+      "name": {
+        "en": "Trial balance",
+        "ar": "ميزان المراجعة"
+      },
+      "kind": "ui",
+      "entry": "/en/accounting/trial-balance",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/accounting/trial-balance/**",
+        "apps/web/app/[locale]/(dashboard)/reports/trial-balance/**",
+        "apps/web/lib/hooks/use-accounting-reports.ts",
+        "apps/api/src/modules/accounting/controllers/accounting-reports.controller.ts",
+        "apps/api/src/modules/accounting/services/accounting-reports.service.ts"
+      ],
+      "mvp": true,
+      "tests": ["mz-trial-balance.1", "mz-trial-balance.2"],
+      "issues": [22]
+    },
+    {
+      "id": "mz-general-ledger",
+      "name": {
+        "en": "General ledger",
+        "ar": "دفتر الأستاذ العام"
+      },
+      "kind": "ui",
+      "entry": "/en/accounting/general-ledger",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/accounting/general-ledger/**",
+        "apps/web/app/[locale]/(dashboard)/reports/general-ledger/**"
+      ],
+      "mvp": true,
+      "tests": ["mz-general-ledger.1", "mz-general-ledger.2"],
+      "issues": [22]
+    },
+    {
+      "id": "mz-onboarding",
+      "name": {
+        "en": "Organization onboarding and opening balances",
+        "ar": "إعداد المنشأة والأرصدة الافتتاحية"
+      },
+      "kind": "api",
+      "entry": "POST /api/organization/onboarding/*",
+      "paths": [
+        "apps/api/src/modules/organizations/dto/onboarding.dto.ts",
+        "apps/api/src/modules/accounting/controllers/opening-balances.controller.ts",
+        "apps/api/src/modules/accounting/services/opening-balances.service.ts",
+        "apps/web/lib/hooks/use-organization.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-onboarding.1"],
+      "notes": "No page uses the wizard yet (only the hooks); the API wizard and the opening balance journal are tested."
+    },
+    {
+      "id": "mz-tax-rates",
+      "name": {
+        "en": "Tax rates",
+        "ar": "معدلات الضرائب"
+      },
+      "kind": "ui",
+      "entry": "/en/tax/rates",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/tax/page.tsx",
+        "apps/web/app/[locale]/(dashboard)/tax/error.tsx",
+        "apps/web/app/[locale]/(dashboard)/tax/rates/**",
+        "apps/web/components/tax/**",
+        "apps/web/lib/hooks/use-tax.ts",
+        "apps/web/messages/*/tax.json",
+        "apps/api/src/modules/tax/controllers/tax-rates.controller.ts",
+        "apps/api/src/modules/tax/services/tax-rates.service.ts",
+        "apps/api/src/modules/tax/dto/create-tax-rate.dto.ts",
+        "apps/api/src/modules/tax/dto/update-tax-rate.dto.ts",
+        "apps/api/src/modules/tax/dto/tax-rate-query.dto.ts",
+        "apps/api/src/modules/tax/tax.module.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-tax-rates.1", "mz-tax-rates.2"]
+    },
+    {
+      "id": "mz-vat-returns",
+      "name": {
+        "en": "VAT returns",
+        "ar": "إقرارات ضريبة القيمة المضافة"
+      },
+      "kind": "ui",
+      "entry": "/en/tax/returns",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/tax/returns/**",
+        "apps/api/src/modules/tax/controllers/vat-returns.controller.ts",
+        "apps/api/src/modules/tax/services/vat-returns.service.ts",
+        "apps/api/src/modules/tax/dto/create-vat-return.dto.ts",
+        "apps/api/src/modules/tax/dto/vat-return-query.dto.ts",
+        "apps/api/src/modules/tax/dto/vat-summary-query.dto.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-vat-returns.1", "mz-vat-returns.2", "mz-vat-returns.3"],
+      "issues": [114, 119, 120],
+      "notes": "VAT/e-invoicing: the repo has no ETA / ZATCA adapter (issues #27-#30 are closed as 'Later'); VAT returns, settlement journals and payments are what exists."
+    },
+    {
+      "id": "mz-tax-payments",
+      "name": {
+        "en": "VAT payments",
+        "ar": "مدفوعات ضريبة القيمة المضافة"
+      },
+      "kind": "ui",
+      "entry": "/en/tax/payments",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/tax/payments/**",
+        "apps/api/src/modules/tax/dto/record-vat-payment.dto.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-tax-payments.1", "mz-tax-payments.2"]
+    },
+    {
+      "id": "mz-items",
+      "name": {
+        "en": "Inventory items",
+        "ar": "الأصناف"
+      },
+      "kind": "ui",
+      "entry": "/en/inventory/items",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/inventory/page.tsx",
+        "apps/web/app/[locale]/(dashboard)/inventory/error.tsx",
+        "apps/web/app/[locale]/(dashboard)/inventory/items/**",
+        "apps/web/components/inventory/item-form.tsx",
+        "apps/web/lib/hooks/use-items.ts",
+        "apps/web/messages/*/inventory.json",
+        "apps/api/src/modules/inventory/controllers/items.controller.ts",
+        "apps/api/src/modules/inventory/services/items.service.ts",
+        "apps/api/src/modules/inventory/services/costing.service.ts",
+        "apps/api/src/modules/inventory/dto/create-item.dto.ts",
+        "apps/api/src/modules/inventory/dto/update-item.dto.ts",
+        "apps/api/src/modules/inventory/inventory.module.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-items.1", "mz-items.2"]
+    },
+    {
+      "id": "mz-warehouses",
+      "name": {
+        "en": "Warehouses",
+        "ar": "المستودعات"
+      },
+      "kind": "ui",
+      "entry": "/en/inventory/warehouses",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/inventory/warehouses/**",
+        "apps/web/components/inventory/warehouse-form.tsx",
+        "apps/web/lib/hooks/use-warehouses.ts",
+        "apps/api/src/modules/inventory/controllers/warehouses.controller.ts",
+        "apps/api/src/modules/inventory/services/warehouses.service.ts",
+        "apps/api/src/modules/inventory/dto/create-warehouse.dto.ts",
+        "apps/api/src/modules/inventory/dto/update-warehouse.dto.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-warehouses.1", "mz-warehouses.2"]
+    },
+    {
+      "id": "mz-stock-adjustments",
+      "name": {
+        "en": "Stock adjustments",
+        "ar": "تسويات المخزون"
+      },
+      "kind": "ui",
+      "entry": "/en/inventory/adjustments",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/inventory/adjustments/**",
+        "apps/web/components/inventory/adjustment-form.tsx",
+        "apps/web/lib/hooks/use-adjustments.ts",
+        "apps/api/src/modules/inventory/controllers/adjustments.controller.ts",
+        "apps/api/src/modules/inventory/services/adjustments.service.ts",
+        "apps/api/src/modules/inventory/dto/create-adjustment.dto.ts",
+        "apps/api/src/modules/inventory/dto/adjustment-query.dto.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-stock-adjustments.1", "mz-stock-adjustments.2"]
+    },
+    {
+      "id": "mz-stock-transfers",
+      "name": {
+        "en": "Stock transfers",
+        "ar": "تحويلات المخزون"
+      },
+      "kind": "ui",
+      "entry": "/en/inventory/transfers",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/inventory/transfers/**",
+        "apps/web/components/inventory/transfer-form.tsx",
+        "apps/web/lib/hooks/use-transfers.ts",
+        "apps/api/src/modules/inventory/controllers/transfers.controller.ts",
+        "apps/api/src/modules/inventory/services/transfers.service.ts",
+        "apps/api/src/modules/inventory/dto/transfer-cursor-query.dto.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-stock-transfers.1", "mz-stock-transfers.2"]
+    },
+    {
+      "id": "mz-price-lists",
+      "name": {
+        "en": "Price lists",
+        "ar": "قوائم الأسعار"
+      },
+      "kind": "ui",
+      "entry": "/en/inventory/price-lists",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/inventory/price-lists/**",
+        "apps/web/lib/hooks/use-price-lists.ts",
+        "apps/api/src/modules/inventory/controllers/price-lists.controller.ts",
+        "apps/api/src/modules/inventory/services/price-lists.service.ts",
+        "apps/api/src/modules/inventory/dto/price-list.dto.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-price-lists.1", "mz-price-lists.2"]
+    },
+    {
+      "id": "mz-composite-items",
+      "name": {
+        "en": "Composite items (bundles)",
+        "ar": "الأصناف المركبة"
+      },
+      "kind": "ui",
+      "entry": "/en/inventory/composite-items",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/inventory/composite-items/**",
+        "apps/web/components/inventory/composite-item-form.tsx",
+        "apps/web/lib/hooks/use-composite-items.ts",
+        "apps/api/src/modules/inventory/controllers/composite-items.controller.ts",
+        "apps/api/src/modules/inventory/services/composite-items.service.ts",
+        "apps/api/src/modules/inventory/dto/composite-item.dto.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-composite-items.1", "mz-composite-items.2"]
+    },
+    {
+      "id": "mz-stock-movements",
+      "name": {
+        "en": "Stock movements and levels",
+        "ar": "حركات المخزون وأرصدته"
+      },
+      "kind": "ui",
+      "entry": "/en/inventory/movements",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/inventory/movements/**",
+        "apps/web/lib/hooks/use-inventory-movements.ts",
+        "apps/web/lib/hooks/use-inventory-levels.ts",
+        "apps/api/src/modules/inventory/controllers/inventory-movements.controller.ts",
+        "apps/api/src/modules/inventory/controllers/inventory-levels.controller.ts",
+        "apps/api/src/modules/inventory/services/inventory-movements.service.ts",
+        "apps/api/src/modules/inventory/services/inventory-levels.service.ts",
+        "apps/api/src/modules/inventory/utils/**"
+      ],
+      "mvp": false,
+      "tests": ["mz-stock-movements.1", "mz-stock-movements.2"],
+      "issues": [1]
+    },
+    {
+      "id": "mz-bank-accounts",
+      "name": {
+        "en": "Bank accounts",
+        "ar": "الحسابات البنكية"
+      },
+      "kind": "ui",
+      "entry": "/en/banking/accounts",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/banking/page.tsx",
+        "apps/web/app/[locale]/(dashboard)/banking/error.tsx",
+        "apps/web/app/[locale]/(dashboard)/banking/accounts/**",
+        "apps/web/components/banking/bank-account-form.tsx",
+        "apps/web/components/banking/bank-account-form.spec.tsx",
+        "apps/web/lib/hooks/use-bank-accounts.ts",
+        "apps/web/messages/*/banking.json",
+        "apps/api/src/modules/banking/controllers/bank-accounts.controller.ts",
+        "apps/api/src/modules/banking/services/bank-accounts.service.ts",
+        "apps/api/src/modules/banking/dto/create-bank-account.dto.ts",
+        "apps/api/src/modules/banking/dto/update-bank-account.dto.ts",
+        "apps/api/src/modules/banking/dto/bank-account-query.dto.ts",
+        "apps/api/src/modules/banking/banking.module.ts",
+        "apps/api/src/common/utils/bank-cash-accounts.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-bank-accounts.1", "mz-bank-accounts.2"]
+    },
+    {
+      "id": "mz-bank-transactions",
+      "name": {
+        "en": "Bank transactions and statement import",
+        "ar": "المعاملات البنكية واستيراد الكشوف"
+      },
+      "kind": "ui",
+      "entry": "/en/banking/transactions",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/banking/transactions/**",
+        "apps/web/components/banking/statement-import-zone.tsx",
+        "apps/web/lib/hooks/use-bank-transactions.ts",
+        "apps/api/src/types/**",
+        "apps/api/src/modules/banking/controllers/bank-transactions.controller.ts",
+        "apps/api/src/modules/banking/services/bank-transactions.service.ts",
+        "apps/api/src/modules/banking/services/bank-statement-import.service.ts",
+        "apps/api/src/modules/banking/dto/create-bank-transaction.dto.ts",
+        "apps/api/src/modules/banking/dto/bank-transaction-cursor-query.dto.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-bank-transactions.1", "mz-bank-transactions.2"]
+    },
+    {
+      "id": "mz-bank-reconciliation",
+      "name": {
+        "en": "Bank reconciliation",
+        "ar": "التسوية البنكية"
+      },
+      "kind": "ui",
+      "entry": "/en/banking/reconcile",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/banking/reconcile/**",
+        "apps/web/components/ai/reconciliation-match-card.tsx",
+        "apps/api/src/modules/banking/controllers/reconciliation.controller.ts",
+        "apps/api/src/modules/banking/services/reconciliation.service.ts",
+        "apps/api/src/modules/ai/controllers/reconciliation-ai.controller.ts",
+        "apps/api/src/modules/ai/services/reconciliation-matcher.service.ts",
+        "apps/api/src/modules/ai/services/reconciliation-matcher.service.spec.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-bank-reconciliation.1", "mz-bank-reconciliation.2"]
+    },
+    {
+      "id": "mz-bank-rules",
+      "name": {
+        "en": "Bank rules",
+        "ar": "قواعد البنك"
+      },
+      "kind": "ui",
+      "entry": "/en/banking/rules",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/banking/rules/**",
+        "apps/web/components/banking/bank-rule-form.tsx",
+        "apps/web/lib/hooks/use-bank-rules.ts",
+        "apps/api/src/modules/banking/controllers/bank-rules.controller.ts",
+        "apps/api/src/modules/banking/services/bank-rules.service.ts",
+        "apps/api/src/modules/banking/dto/create-bank-rule.dto.ts",
+        "apps/api/src/modules/banking/dto/update-bank-rule.dto.ts",
+        "apps/api/src/modules/banking/dto/bank-rule-query.dto.ts",
+        "apps/api/src/modules/ai/dto/create-bank-rule.dto.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-bank-rules.1", "mz-bank-rules.2"]
+    },
+    {
+      "id": "mz-fixed-assets",
+      "name": {
+        "en": "Fixed assets",
+        "ar": "الأصول الثابتة"
+      },
+      "kind": "ui",
+      "entry": "/en/assets",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/assets/**",
+        "apps/web/components/assets/**",
+        "apps/web/lib/hooks/use-assets.ts",
+        "apps/web/messages/*/assets.json",
+        "apps/api/src/modules/assets/controllers/assets.controller.ts",
+        "apps/api/src/modules/assets/services/assets.service.ts",
+        "apps/api/src/modules/assets/dto/assets.dto.ts",
+        "apps/api/src/modules/assets/assets.module.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-fixed-assets.1", "mz-fixed-assets.2"]
+    },
+    {
+      "id": "mz-asset-depreciation",
+      "name": {
+        "en": "Monthly depreciation job",
+        "ar": "مهمة الإهلاك الشهري"
+      },
+      "kind": "job",
+      "entry": "POST /api/assets/depreciation/run (DepreciationService cron 28-31 00:00)",
+      "paths": [
+        "apps/api/src/modules/assets/services/depreciation.service.ts",
+        "apps/api/src/modules/assets/controllers/assets.controller.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-asset-depreciation.1"],
+      "notes": "The cron and POST /assets/depreciation/run call the same runMonthlyDepreciation(organization)."
+    },
+    {
+      "id": "mz-employees",
+      "name": {
+        "en": "Employees",
+        "ar": "الموظفون"
+      },
+      "kind": "ui",
+      "entry": "/en/hr/employees",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/hr/page.tsx",
+        "apps/web/app/[locale]/(dashboard)/hr/error.tsx",
+        "apps/web/app/[locale]/(dashboard)/hr/employees/**",
+        "apps/web/components/hr/**",
+        "apps/web/lib/hooks/use-hr.ts",
+        "apps/web/messages/*/hr.json",
+        "apps/api/src/modules/hr/controllers/employees.controller.ts",
+        "apps/api/src/modules/hr/services/employees.service.ts",
+        "apps/api/src/modules/hr/dto/create-employee.dto.ts",
+        "apps/api/src/modules/hr/dto/update-employee.dto.ts",
+        "apps/api/src/modules/hr/dto/employee-cursor-query.dto.ts",
+        "apps/api/src/modules/hr/hr.module.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-employees.1", "mz-employees.2"]
+    },
+    {
+      "id": "mz-attendance",
+      "name": {
+        "en": "Attendance",
+        "ar": "الحضور"
+      },
+      "kind": "ui",
+      "entry": "/en/hr/attendance",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/hr/attendance/**",
+        "apps/api/src/modules/hr/controllers/attendance.controller.ts",
+        "apps/api/src/modules/hr/services/attendance.service.ts",
+        "apps/api/src/modules/hr/dto/record-attendance.dto.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-attendance.1", "mz-attendance.2"]
+    },
+    {
+      "id": "mz-payroll",
+      "name": {
+        "en": "Payroll",
+        "ar": "الرواتب"
+      },
+      "kind": "ui",
+      "entry": "/en/hr/payroll",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/hr/payroll/**",
+        "apps/web/app/[locale]/(dashboard)/hr/payslips/**",
+        "apps/api/src/modules/hr/controllers/payroll.controller.ts",
+        "apps/api/src/modules/hr/services/payroll.service.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-payroll.1", "mz-payroll.2"],
+      "issues": [115, 130],
+      "notes": "Payroll is computed with JS floats and its journal bypasses JournalsService (issue #130)."
+    },
+    {
+      "id": "mz-crm-leads",
+      "name": {
+        "en": "CRM leads",
+        "ar": "العملاء المحتملون"
+      },
+      "kind": "ui",
+      "entry": "/en/crm/leads",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/crm/page.tsx",
+        "apps/web/app/[locale]/(dashboard)/crm/error.tsx",
+        "apps/web/app/[locale]/(dashboard)/crm/leads/**",
+        "apps/web/components/crm/lead-form.tsx",
+        "apps/web/components/crm/activity-log.tsx",
+        "apps/web/lib/hooks/use-crm.ts",
+        "apps/web/messages/*/crm.json",
+        "apps/api/src/modules/crm/controllers/crm.controller.ts",
+        "apps/api/src/modules/crm/services/leads.service.ts",
+        "apps/api/src/modules/crm/services/activities.service.ts",
+        "apps/api/src/modules/crm/crm.module.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-crm-leads.1", "mz-crm-leads.2"]
+    },
+    {
+      "id": "mz-crm-deals",
+      "name": {
+        "en": "CRM deals pipeline",
+        "ar": "صفقات المبيعات"
+      },
+      "kind": "ui",
+      "entry": "/en/crm/deals",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/crm/deals/**",
+        "apps/web/components/crm/deal-form.tsx",
+        "apps/web/components/crm/kanban-board.tsx",
+        "apps/api/src/modules/crm/services/deals.service.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-crm-deals.1", "mz-crm-deals.2"]
+    },
+    {
+      "id": "mz-projects",
+      "name": {
+        "en": "Projects and tasks",
+        "ar": "المشاريع والمهام"
+      },
+      "kind": "ui",
+      "entry": "/en/projects",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/projects/page.tsx",
+        "apps/web/app/[locale]/(dashboard)/projects/error.tsx",
+        "apps/web/app/[locale]/(dashboard)/projects/new/**",
+        "apps/web/app/[locale]/(dashboard)/projects/[id]/**",
+        "apps/web/app/[locale]/(dashboard)/projects/my-tasks/**",
+        "apps/web/components/projects/**",
+        "apps/web/lib/hooks/use-projects.ts",
+        "apps/web/messages/*/projects.json",
+        "apps/api/src/modules/projects/controllers/projects.controller.ts",
+        "apps/api/src/modules/projects/controllers/tasks.controller.ts",
+        "apps/api/src/modules/projects/services/projects.service.ts",
+        "apps/api/src/modules/projects/services/tasks.service.ts",
+        "apps/api/src/modules/projects/dto/create-project.dto.ts",
+        "apps/api/src/modules/projects/dto/update-project.dto.ts",
+        "apps/api/src/modules/projects/dto/project-query.dto.ts",
+        "apps/api/src/modules/projects/dto/create-task.dto.ts",
+        "apps/api/src/modules/projects/dto/update-task.dto.ts",
+        "apps/api/src/modules/projects/dto/task-query.dto.ts",
+        "apps/api/src/modules/projects/projects.module.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-projects.1", "mz-projects.2"]
+    },
+    {
+      "id": "mz-timesheets",
+      "name": {
+        "en": "Timesheets",
+        "ar": "سجلات الوقت"
+      },
+      "kind": "ui",
+      "entry": "/en/projects/timesheets",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/projects/timesheets/**",
+        "apps/api/src/modules/projects/controllers/timesheets.controller.ts",
+        "apps/api/src/modules/projects/services/timesheets.service.ts",
+        "apps/api/src/modules/projects/dto/create-timesheet.dto.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-timesheets.1", "mz-timesheets.2"]
+    },
+    {
+      "id": "mz-bom",
+      "name": {
+        "en": "Bills of materials",
+        "ar": "قوائم المواد"
+      },
+      "kind": "ui",
+      "entry": "/en/manufacturing/bom",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/manufacturing/page.tsx",
+        "apps/web/app/[locale]/(dashboard)/manufacturing/error.tsx",
+        "apps/web/app/[locale]/(dashboard)/manufacturing/bom/**",
+        "apps/web/components/manufacturing/bom-form.tsx",
+        "apps/web/lib/hooks/use-manufacturing.ts",
+        "apps/web/messages/*/manufacturing.json",
+        "apps/api/src/modules/manufacturing/controllers/bom.controller.ts",
+        "apps/api/src/modules/manufacturing/services/bom.service.ts",
+        "apps/api/src/modules/manufacturing/manufacturing.module.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-bom.1", "mz-bom.2"]
+    },
+    {
+      "id": "mz-work-orders",
+      "name": {
+        "en": "Work orders",
+        "ar": "أوامر العمل"
+      },
+      "kind": "ui",
+      "entry": "/en/manufacturing/work-orders",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/manufacturing/work-orders/**",
+        "apps/web/components/manufacturing/work-order-form.tsx",
+        "apps/api/src/modules/manufacturing/controllers/work-orders.controller.ts",
+        "apps/api/src/modules/manufacturing/services/work-orders.service.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-work-orders.1", "mz-work-orders.2"],
+      "issues": [90, 130],
+      "notes": "Completion consumes components, delivers finished goods and posts a COGM journal."
+    },
+    {
+      "id": "mz-financial-reports",
+      "name": {
+        "en": "Financial statements",
+        "ar": "القوائم المالية"
+      },
+      "kind": "ui",
+      "entry": "/en/reports",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/reports/page.tsx",
+        "apps/web/app/[locale]/(dashboard)/reports/loading.tsx",
+        "apps/web/app/[locale]/(dashboard)/reports/error.tsx",
+        "apps/web/app/[locale]/(dashboard)/reports/profit-loss/**",
+        "apps/web/app/[locale]/(dashboard)/reports/balance-sheet/**",
+        "apps/web/app/[locale]/(dashboard)/reports/cash-flow/**",
+        "apps/web/components/reports/**",
+        "apps/web/lib/hooks/use-reports.ts",
+        "apps/web/lib/hooks/use-report-export.ts",
+        "apps/web/messages/*/reports.json",
+        "apps/api/src/modules/reports/services/financial-reports.service.ts",
+        "apps/api/src/modules/reports/controllers/reports.controller.ts"
+      ],
+      "mvp": true,
+      "tests": ["mz-financial-reports.1", "mz-financial-reports.2"],
+      "issues": [22]
+    },
+    {
+      "id": "mz-aging-reports",
+      "name": {
+        "en": "Receivables and payables aging",
+        "ar": "أعمار الذمم المدينة والدائنة"
+      },
+      "kind": "ui",
+      "entry": "/en/reports/ap-aging",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/reports/ap-aging/**",
+        "apps/web/app/[locale]/(dashboard)/reports/ar-aging/**",
+        "apps/api/src/modules/reports/services/aging-reports.service.ts"
+      ],
+      "mvp": true,
+      "tests": ["mz-aging-reports.1", "mz-aging-reports.2"],
+      "issues": [22, 125]
+    },
+    {
+      "id": "mz-sales-purchase-reports",
+      "name": {
+        "en": "Sales and purchase reports",
+        "ar": "تقارير المبيعات والمشتريات"
+      },
+      "kind": "ui",
+      "entry": "/en/reports/sales-by-customer",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/reports/sales-by-customer/**",
+        "apps/web/app/[locale]/(dashboard)/reports/sales-by-item/**",
+        "apps/web/app/[locale]/(dashboard)/reports/purchases-by-vendor/**"
+      ],
+      "mvp": false,
+      "tests": ["mz-sales-purchase-reports.1", "mz-sales-purchase-reports.2"]
+    },
+    {
+      "id": "mz-report-exports",
+      "name": {
+        "en": "Report PDF exports",
+        "ar": "تصدير التقارير بصيغة PDF"
+      },
+      "kind": "api",
+      "entry": "GET /api/reports/*/pdf",
+      "paths": [
+        "apps/api/src/modules/documents/services/pdf.service.ts",
+        "apps/api/src/modules/documents/services/pdf-renderer.ts",
+        "apps/api/src/modules/documents/templates/**"
+      ],
+      "mvp": false,
+      "tests": ["mz-report-exports.1"],
+      "notes": "Rendered by headless Chromium (puppeteer)."
+    },
+    {
+      "id": "mz-settings-organization",
+      "name": {
+        "en": "Organization settings",
+        "ar": "إعدادات المنشأة"
+      },
+      "kind": "ui",
+      "entry": "/en/settings",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/settings/page.tsx",
+        "apps/web/app/[locale]/(dashboard)/settings/loading.tsx",
+        "apps/web/app/[locale]/(dashboard)/settings/error.tsx",
+        "apps/web/app/[locale]/(dashboard)/settings/organization/**",
+        "apps/web/app/[locale]/(dashboard)/settings/financial/**",
+        "apps/web/app/[locale]/(dashboard)/settings/invoicing/**",
+        "apps/web/app/[locale]/(dashboard)/settings/localization/**",
+        "apps/web/app/[locale]/(dashboard)/settings/branding/**",
+        "apps/web/app/[locale]/(dashboard)/settings/accounts/**",
+        "apps/web/app/[locale]/(dashboard)/settings/ai/**",
+        "apps/web/lib/hooks/use-all-settings.ts",
+        "apps/web/lib/hooks/use-all-settings.spec.ts",
+        "apps/web/lib/hooks/use-organization.ts",
+        "apps/web/lib/hooks/use-organization-settings.ts",
+        "apps/web/lib/hooks/use-organization-settings.spec.ts",
+        "apps/web/messages/*/settings.json",
+        "apps/api/src/modules/organizations/organizations.controller.ts",
+        "apps/api/src/modules/organizations/organizations.service.ts",
+        "apps/api/src/modules/organizations/organizations.module.ts",
+        "apps/api/src/modules/organizations/dto/organization-settings.dto.ts",
+        "apps/api/src/modules/organizations/dto/update-organization.dto.ts",
+        "apps/api/src/modules/organizations/dto/update-account-settings.dto.ts"
+      ],
+      "mvp": true,
+      "tests": ["mz-settings-organization.1", "mz-settings-organization.2"],
+      "notes": "Includes the ledger lock date (period locks) and the default accounts every posting uses."
+    },
+    {
+      "id": "mz-team-roles",
+      "name": {
+        "en": "Team, roles and permissions",
+        "ar": "الفريق والأدوار والصلاحيات"
+      },
+      "kind": "ui",
+      "entry": "/en/settings/team",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/settings/team/**",
+        "apps/web/lib/hooks/use-users.ts",
+        "apps/web/lib/hooks/use-users.spec.ts",
+        "apps/web/lib/hooks/use-roles.ts",
+        "apps/web/lib/hooks/use-roles.spec.ts",
+        "apps/api/src/modules/users/**",
+        "apps/api/src/modules/roles/**",
+        "apps/api/src/common/guards/permissions.guard.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-team-roles.1", "mz-team-roles.2"]
+    },
+    {
+      "id": "mz-audit-log",
+      "name": {
+        "en": "Audit log",
+        "ar": "سجل التدقيق"
+      },
+      "kind": "ui",
+      "entry": "/en/settings/audit-logs",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/settings/audit-logs/**",
+        "apps/web/lib/hooks/use-audit-logs.ts",
+        "apps/api/src/modules/audit/**",
+        "apps/api/src/common/interceptors/audit.interceptor.ts",
+        "apps/api/src/common/interceptors/audit-summary.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-audit-log.1", "mz-audit-log.2"]
+    },
+    {
+      "id": "mz-notifications",
+      "name": {
+        "en": "Notifications",
+        "ar": "الإشعارات"
+      },
+      "kind": "ui",
+      "entry": "/en/settings/notifications",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/settings/notifications/**",
+        "apps/web/components/layout/notification-panel.tsx",
+        "apps/web/components/providers/realtime-provider.tsx",
+        "apps/api/src/modules/notifications/**"
+      ],
+      "mvp": false,
+      "tests": ["mz-notifications.1", "mz-notifications.2"]
+    },
+    {
+      "id": "mz-notification-jobs",
+      "name": {
+        "en": "Notification jobs",
+        "ar": "مهام الإشعارات المجدولة"
+      },
+      "kind": "job",
+      "entry": "NotificationsService @Cron (hourly overdue invoices, 08:00 low stock, 09:00 bills due)",
+      "paths": ["apps/api/src/modules/notifications/services/notifications.service.ts"],
+      "mvp": false,
+      "tests": ["mz-notification-jobs.1"],
+      "blocked": "cron-only: the hourly/daily jobs have no HTTP or test hook in the verify stack; their inputs (overdue invoice in the aging report) are asserted instead"
+    },
+    {
+      "id": "mz-system-diagnostics",
+      "name": {
+        "en": "Cache and performance diagnostics",
+        "ar": "تشخيص الذاكرة المؤقتة والأداء"
+      },
+      "kind": "ui",
+      "entry": "/en/settings/performance",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/settings/cache/**",
+        "apps/web/app/[locale]/(dashboard)/settings/performance/**",
+        "apps/web/components/settings/**",
+        "apps/web/lib/hooks/use-cache.ts",
+        "apps/web/lib/hooks/use-performance.ts",
+        "apps/api/src/cache/**",
+        "apps/api/src/modules/performance/**"
+      ],
+      "mvp": false,
+      "tests": ["mz-system-diagnostics.1", "mz-system-diagnostics.2"]
+    },
+    {
+      "id": "mz-error-logger",
+      "name": {
+        "en": "Error logger",
+        "ar": "سجل الأخطاء"
+      },
+      "kind": "api",
+      "entry": "POST /api/logger/capture",
+      "paths": [
+        "apps/web/components/logger/**",
+        "apps/web/lib/hooks/use-logger.ts",
+        "apps/web/lib/hooks/use-logger.spec.tsx",
+        "apps/web/lib/hooks/use-global-error-capture.ts",
+        "apps/web/lib/stores/use-logger-store.ts",
+        "packages/shared-types/**",
+        "apps/api/src/modules/logger/**"
+      ],
+      "mvp": false,
+      "tests": ["mz-error-logger.1"]
+    },
+    {
+      "id": "mz-global-search",
+      "name": {
+        "en": "Global search and command palette",
+        "ar": "البحث الشامل ولوحة الأوامر"
+      },
+      "kind": "ui",
+      "entry": "/en/dashboard (Ctrl+K)",
+      "paths": [
+        "apps/web/components/command-palette.tsx",
+        "apps/web/lib/hooks/use-global-search.ts",
+        "apps/web/lib/stores/use-search-history-store.ts",
+        "apps/api/src/modules/search/**"
+      ],
+      "mvp": false,
+      "tests": ["mz-global-search.1", "mz-global-search.2"]
+    },
+    {
+      "id": "mz-import-export",
+      "name": {
+        "en": "Data import and export",
+        "ar": "استيراد وتصدير البيانات"
+      },
+      "kind": "api",
+      "entry": "POST /api/import/* , GET /api/export/*",
+      "paths": [
+        "apps/web/components/import/**",
+        "apps/web/lib/hooks/use-import-export.ts",
+        "apps/web/lib/hooks/use-export-all.ts",
+        "apps/web/lib/hooks/use-bulk-export.ts",
+        "apps/api/src/modules/import-export/**"
+      ],
+      "mvp": false,
+      "tests": ["mz-import-export.1"]
+    },
+    {
+      "id": "mz-documents",
+      "name": {
+        "en": "Document PDFs and e-mail delivery",
+        "ar": "مستندات PDF والإرسال بالبريد"
+      },
+      "kind": "api",
+      "entry": "GET /api/documents/*/pdf , POST /api/documents/*/send",
+      "paths": [
+        "apps/web/lib/hooks/use-documents.ts",
+        "apps/api/src/modules/documents/controllers/**",
+        "apps/api/src/modules/documents/dto/**",
+        "apps/api/src/modules/documents/documents.module.ts",
+        "apps/api/src/modules/documents/services/email.service.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-documents.1"],
+      "notes": "PDFs are rendered by headless Chromium; sending needs SMTP settings (off in the verify stack)."
+    },
+    {
+      "id": "mz-currency",
+      "name": {
+        "en": "Currencies and exchange rates",
+        "ar": "العملات وأسعار الصرف"
+      },
+      "kind": "api",
+      "entry": "GET /api/currency/*",
+      "paths": ["apps/web/lib/hooks/use-currency.ts", "apps/api/src/modules/currency/**"],
+      "mvp": false,
+      "tests": ["mz-currency.1"]
+    },
+    {
+      "id": "mz-user-preferences",
+      "name": {
+        "en": "User preferences",
+        "ar": "تفضيلات المستخدم"
+      },
+      "kind": "api",
+      "entry": "GET /api/user/preferences",
+      "paths": [
+        "apps/web/lib/hooks/use-user-preferences.ts",
+        "apps/web/lib/hooks/use-user-preferences.spec.tsx",
+        "apps/web/lib/api/user-preferences.ts",
+        "apps/web/lib/stores/use-dashboard-layout.ts",
+        "apps/web/components/dashboard/widget-customizer.tsx",
+        "apps/api/src/modules/user-preferences/**"
+      ],
+      "mvp": false,
+      "tests": ["mz-user-preferences.1"]
+    },
+    {
+      "id": "mz-bulk-operations",
+      "name": {
+        "en": "Bulk operation progress",
+        "ar": "تقدم العمليات الجماعية"
+      },
+      "kind": "api",
+      "entry": "GET /api/bulk-operations/:jobId/status",
+      "paths": [
+        "apps/web/components/data-table/bulk-progress-dialog.tsx",
+        "apps/web/components/data-table/bulk-action-confirm.tsx",
+        "apps/web/lib/hooks/use-bulk-action.ts",
+        "apps/web/lib/hooks/use-bulk-action.spec.tsx",
+        "apps/web/lib/hooks/use-bulk-action-outcome.spec.ts",
+        "apps/api/src/modules/bulk-operations/**"
+      ],
+      "mvp": false,
+      "tests": ["mz-bulk-operations.1"],
+      "notes": "The controller only exposes status/SSE of a job; no endpoint starts one (each module has its own per-record bulk-* routes)."
+    },
+    {
+      "id": "mz-ai-insights",
+      "name": {
+        "en": "AI insights and alerts",
+        "ar": "رؤى وتنبيهات الذكاء الاصطناعي"
+      },
+      "kind": "ui",
+      "entry": "/en/ai-insights",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/ai-insights/**",
+        "apps/web/components/ai/index.ts",
+        "apps/web/components/ai/insight-data-viewer.tsx",
+        "apps/web/components/ai/ai-feedback-widget.tsx",
+        "apps/web/components/dashboard/ai-alerts.tsx",
+        "apps/web/components/dashboard/enhanced-ai-insights.tsx",
+        "apps/web/components/dashboard/ai-business-pulse.tsx",
+        "apps/web/lib/hooks/use-ai-insights.ts",
+        "apps/web/lib/hooks/use-ai-alerts.ts",
+        "apps/web/lib/hooks/use-ai.ts",
+        "apps/web/messages/*/ai.json",
+        "apps/api/src/modules/ai/controllers/ai.controller.ts",
+        "apps/api/src/modules/ai/controllers/ai-alerts.controller.ts",
+        "apps/api/src/modules/ai/controllers/ai-feedback.controller.ts",
+        "apps/api/src/modules/ai/services/ai-insights.service.ts",
+        "apps/api/src/modules/ai/services/ai-alerts.service.ts",
+        "apps/api/src/modules/ai/services/ai-feedback.service.ts",
+        "apps/api/src/modules/ai/services/ai-forecasting.service.ts",
+        "apps/api/src/modules/ai/dto/ai-alerts.dto.ts",
+        "apps/api/src/modules/ai/dto/submit-feedback.dto.ts",
+        "apps/api/src/modules/ai/forecasting/**"
+      ],
+      "mvp": false,
+      "tests": ["mz-ai-insights.2", "mz-ai-insights.1"],
+      "blocked": "model-backed text needs Ollama (off in the verify stack); the read/empty-state contract is tested"
+    },
+    {
+      "id": "mz-ai-assistant",
+      "name": {
+        "en": "AI assistant (chat, knowledge, narratives, voice)",
+        "ar": "المساعد الذكي"
+      },
+      "kind": "ui",
+      "entry": "/en/dashboard (chat widget)",
+      "paths": [
+        "apps/web/components/ai/chatbot/**",
+        "apps/web/lib/hooks/use-ai-chatbot.ts",
+        "apps/web/lib/hooks/use-ai-narrative.ts",
+        "apps/api/src/modules/ai/controllers/chatbot.controller.ts",
+        "apps/api/src/modules/ai/controllers/knowledge-assistant.controller.ts",
+        "apps/api/src/modules/ai/controllers/narrative.controller.ts",
+        "apps/api/src/modules/ai/controllers/voice-command.controller.ts",
+        "apps/api/src/modules/ai/services/chatbot.service.ts",
+        "apps/api/src/modules/ai/services/knowledge-assistant.service.ts",
+        "apps/api/src/modules/ai/services/financial-narrative.service.ts",
+        "apps/api/src/modules/ai/services/voice-command.service.ts",
+        "apps/api/src/modules/ai/dto/chatbot.dto.ts",
+        "apps/api/src/modules/ai/dto/knowledge-assistant.dto.ts",
+        "apps/api/src/modules/ai/dto/narrative.dto.ts",
+        "apps/api/src/modules/ai/dto/voice-command.dto.ts",
+        "apps/api/src/modules/ai/nlp/**",
+        "apps/api/src/modules/ai/templates/**"
+      ],
+      "mvp": false,
+      "tests": ["mz-ai-assistant.2", "mz-ai-assistant.1"],
+      "blocked": "answers need Ollama (off in the verify stack); the widget and the graceful 'unavailable' contract are tested"
+    },
+    {
+      "id": "mz-deep-search",
+      "name": {
+        "en": "DeepSearch agent",
+        "ar": "وكيل البحث العميق"
+      },
+      "kind": "ui",
+      "entry": "/en/deep-search",
+      "paths": [
+        "apps/web/app/[locale]/(dashboard)/deep-search/**",
+        "apps/web/components/ai/deep-search/**",
+        "apps/web/lib/hooks/use-deep-search.ts",
+        "apps/api/src/modules/ai/controllers/deep-search.controller.ts",
+        "apps/api/src/modules/ai/services/deep-search.service.ts",
+        "apps/api/src/modules/ai/dto/deep-search.dto.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-deep-search.2", "mz-deep-search.1"],
+      "blocked": "a run scrapes external web sources and reads the repository (outbound network, off in the verify stack); only the page, job history and validation are tested"
+    },
+    {
+      "id": "mz-ai-risk-compliance",
+      "name": {
+        "en": "AI risk, fraud and compliance",
+        "ar": "المخاطر والاحتيال والامتثال بالذكاء الاصطناعي"
+      },
+      "kind": "api",
+      "entry": "GET /api/ai/anomalies , /ai/fraud , /ai/compliance",
+      "paths": [
+        "apps/web/components/ai/anomaly-badge.tsx",
+        "apps/web/lib/hooks/use-ai-fraud-detection.ts",
+        "apps/web/lib/hooks/use-ai-patterns.ts",
+        "apps/api/src/modules/ai/controllers/anomaly-detection.controller.ts",
+        "apps/api/src/modules/ai/controllers/fraud-detection.controller.ts",
+        "apps/api/src/modules/ai/controllers/audit-risk.controller.ts",
+        "apps/api/src/modules/ai/controllers/compliance-monitoring.controller.ts",
+        "apps/api/src/modules/ai/controllers/pattern-detection.controller.ts",
+        "apps/api/src/modules/ai/services/anomaly-detection.service.ts",
+        "apps/api/src/modules/ai/services/fraud-detection.service.ts",
+        "apps/api/src/modules/ai/services/audit-risk.service.ts",
+        "apps/api/src/modules/ai/services/compliance-monitoring.service.ts",
+        "apps/api/src/modules/ai/services/pattern-detection.service.ts",
+        "apps/api/src/modules/ai/dto/anomaly-query.dto.ts",
+        "apps/api/src/modules/ai/dto/fraud-detection.dto.ts",
+        "apps/api/src/modules/ai/dto/audit-risk.dto.ts",
+        "apps/api/src/modules/ai/dto/compliance-monitoring.dto.ts",
+        "apps/api/src/modules/ai/dto/pattern-detection.dto.ts",
+        "apps/api/src/modules/ai/security/**",
+        "apps/api/src/modules/ai/utils/isolation-forest.util.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-ai-risk-compliance.1"],
+      "blocked": "LLM explanations need Ollama (off in the verify stack); the rule/statistics based reads and the empty-state contract are tested"
+    },
+    {
+      "id": "mz-ai-predictions",
+      "name": {
+        "en": "AI predictions (cash flow, payments, churn, leads, pricing)",
+        "ar": "التنبؤات (التدفق النقدي والمدفوعات والعملاء والمبيعات)"
+      },
+      "kind": "api",
+      "entry": "GET /api/ai/cash-flow , /ai/churn , /ai/lead-scoring …",
+      "paths": [
+        "apps/web/components/ai/collection-priority-card.tsx",
+        "apps/web/components/ai/pipeline-forecast-card.tsx",
+        "apps/web/components/ai/customer-ai-insights.tsx",
+        "apps/web/lib/hooks/use-ai-cash-flow.ts",
+        "apps/web/lib/hooks/use-ai-payment-prediction.ts",
+        "apps/web/lib/hooks/use-ai-churn-prediction.ts",
+        "apps/web/lib/hooks/use-ai-clv.ts",
+        "apps/web/lib/hooks/use-ai-lead-scoring.ts",
+        "apps/web/lib/hooks/use-ai-pipeline-forecast.ts",
+        "apps/api/src/modules/ai/controllers/cash-flow-prediction.controller.ts",
+        "apps/api/src/modules/ai/controllers/payment-prediction.controller.ts",
+        "apps/api/src/modules/ai/controllers/churn-prediction.controller.ts",
+        "apps/api/src/modules/ai/controllers/clv-analysis.controller.ts",
+        "apps/api/src/modules/ai/controllers/cross-sell.controller.ts",
+        "apps/api/src/modules/ai/controllers/lead-scoring.controller.ts",
+        "apps/api/src/modules/ai/controllers/pipeline-forecast.controller.ts",
+        "apps/api/src/modules/ai/controllers/dynamic-pricing.controller.ts",
+        "apps/api/src/modules/ai/controllers/sentiment-analysis.controller.ts",
+        "apps/api/src/modules/ai/controllers/contract-analysis.controller.ts",
+        "apps/api/src/modules/ai/services/cash-flow-prediction.service.ts",
+        "apps/api/src/modules/ai/services/payment-prediction.service.ts",
+        "apps/api/src/modules/ai/services/churn-prediction.service.ts",
+        "apps/api/src/modules/ai/services/clv-analysis.service.ts",
+        "apps/api/src/modules/ai/services/cross-sell.service.ts",
+        "apps/api/src/modules/ai/services/lead-scoring.service.ts",
+        "apps/api/src/modules/ai/services/pipeline-forecast.service.ts",
+        "apps/api/src/modules/ai/services/dynamic-pricing.service.ts",
+        "apps/api/src/modules/ai/services/sentiment-analysis.service.ts",
+        "apps/api/src/modules/ai/services/contract-analysis.service.ts",
+        "apps/api/src/modules/ai/dto/cash-flow-prediction.dto.ts",
+        "apps/api/src/modules/ai/dto/payment-prediction.dto.ts",
+        "apps/api/src/modules/ai/dto/churn-prediction.dto.ts",
+        "apps/api/src/modules/ai/dto/clv-analysis.dto.ts",
+        "apps/api/src/modules/ai/dto/cross-sell.dto.ts",
+        "apps/api/src/modules/ai/dto/lead-scoring.dto.ts",
+        "apps/api/src/modules/ai/dto/pipeline-forecast.dto.ts",
+        "apps/api/src/modules/ai/dto/dynamic-pricing.dto.ts",
+        "apps/api/src/modules/ai/dto/sentiment-analysis.dto.ts",
+        "apps/api/src/modules/ai/dto/contract-analysis.dto.ts",
+        "apps/api/src/modules/ai/sales-crm/**",
+        "apps/api/src/modules/ai/config/**",
+        "apps/api/src/modules/ai/utils/holt-winters.util.ts",
+        "apps/api/src/modules/ai/utils/monte-carlo.util.ts",
+        "apps/api/src/modules/ai/utils/logistic-regression.util.ts",
+        "apps/api/src/modules/ai/utils/statistics.util.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-ai-predictions.1"],
+      "blocked": "model-assisted parts need Ollama (off in the verify stack); statistics-based reads and the empty-state contract are tested"
+    },
+    {
+      "id": "mz-ai-operations",
+      "name": {
+        "en": "AI operations and HR analytics",
+        "ar": "تحليلات التشغيل والموارد البشرية بالذكاء الاصطناعي"
+      },
+      "kind": "api",
+      "entry": "GET /api/ai/demand-forecast , /ai/reorder , /ai/workforce …",
+      "paths": [
+        "apps/web/components/ai/flight-risk-card.tsx",
+        "apps/web/components/ai/reorder-status-badge.tsx",
+        "apps/web/components/ai/inventory-ai-panel.tsx",
+        "apps/web/lib/hooks/use-ai-demand-forecast.ts",
+        "apps/web/lib/hooks/use-ai-attrition.ts",
+        "apps/api/src/modules/ai/controllers/demand-forecasting.controller.ts",
+        "apps/api/src/modules/ai/controllers/reorder-points.controller.ts",
+        "apps/api/src/modules/ai/controllers/resource-optimization.controller.ts",
+        "apps/api/src/modules/ai/controllers/route-optimization.controller.ts",
+        "apps/api/src/modules/ai/controllers/predictive-maintenance.controller.ts",
+        "apps/api/src/modules/ai/controllers/quality-prediction.controller.ts",
+        "apps/api/src/modules/ai/controllers/workforce-scheduling.controller.ts",
+        "apps/api/src/modules/ai/controllers/skills-gap.controller.ts",
+        "apps/api/src/modules/ai/controllers/employee-attrition.controller.ts",
+        "apps/api/src/modules/ai/controllers/compensation-benchmark.controller.ts",
+        "apps/api/src/modules/ai/services/demand-forecasting.service.ts",
+        "apps/api/src/modules/ai/services/reorder-points.service.ts",
+        "apps/api/src/modules/ai/services/resource-optimization.service.ts",
+        "apps/api/src/modules/ai/services/route-optimization.service.ts",
+        "apps/api/src/modules/ai/services/predictive-maintenance.service.ts",
+        "apps/api/src/modules/ai/services/quality-prediction.service.ts",
+        "apps/api/src/modules/ai/services/workforce-scheduling.service.ts",
+        "apps/api/src/modules/ai/services/skills-gap.service.ts",
+        "apps/api/src/modules/ai/services/employee-attrition.service.ts",
+        "apps/api/src/modules/ai/services/compensation-benchmark.service.ts",
+        "apps/api/src/modules/ai/dto/demand-forecast.dto.ts",
+        "apps/api/src/modules/ai/dto/resource-optimization.dto.ts",
+        "apps/api/src/modules/ai/dto/route-optimization.dto.ts",
+        "apps/api/src/modules/ai/dto/predictive-maintenance.dto.ts",
+        "apps/api/src/modules/ai/dto/quality-prediction.dto.ts",
+        "apps/api/src/modules/ai/dto/workforce-scheduling.dto.ts",
+        "apps/api/src/modules/ai/dto/skills-gap.dto.ts",
+        "apps/api/src/modules/ai/dto/employee-attrition.dto.ts",
+        "apps/api/src/modules/ai/dto/compensation-benchmark.dto.ts",
+        "apps/api/src/modules/ai/operations/**",
+        "apps/api/src/modules/ai/hr/**"
+      ],
+      "mvp": false,
+      "tests": ["mz-ai-operations.1"],
+      "blocked": "model-assisted parts need Ollama (off in the verify stack); statistics-based reads and the empty-state contract are tested"
+    },
+    {
+      "id": "mz-ai-categorization",
+      "name": {
+        "en": "AI categorization and entity extraction",
+        "ar": "التصنيف الذكي واستخراج الكيانات"
+      },
+      "kind": "api",
+      "entry": "POST /api/ai/categorization/predict",
+      "paths": [
+        "apps/web/components/ai/accounting-entry-preview.tsx",
+        "apps/web/components/ai/confidence-badge.tsx",
+        "apps/web/components/ai/confidence-badge.spec.tsx",
+        "apps/web/lib/hooks/use-ai-categorization.ts",
+        "apps/api/src/modules/ai/controllers/categorization.controller.ts",
+        "apps/api/src/modules/ai/controllers/entity-extraction.controller.ts",
+        "apps/api/src/modules/ai/controllers/document-classification.controller.ts",
+        "apps/api/src/modules/ai/services/ai-categorization.service.ts",
+        "apps/api/src/modules/ai/services/transaction-categorizer.service.ts",
+        "apps/api/src/modules/ai/services/entity-extraction.service.ts",
+        "apps/api/src/modules/ai/services/document-classification.service.ts",
+        "apps/api/src/modules/ai/dto/categorization.dto.ts",
+        "apps/api/src/modules/ai/dto/entity-extraction.dto.ts",
+        "apps/api/src/modules/ai/dto/document-classification.dto.ts",
+        "apps/api/src/modules/ai/utils/text-similarity.util.ts",
+        "apps/api/src/modules/ai/utils/date-pattern.util.ts"
+      ],
+      "mvp": false,
+      "tests": ["mz-ai-categorization.1"],
+      "blocked": "model suggestions need Ollama (off in the verify stack); the explicit unavailable answer and 'never auto-posted' rule are tested"
+    },
+    {
+      "id": "mz-document-intake",
+      "name": {
+        "en": "Document intake jobs",
+        "ar": "طابور استقبال المستندات"
+      },
+      "kind": "api",
+      "entry": "POST /api/ai/document-intake/process",
+      "paths": [
+        "apps/api/src/modules/ai/intake/intake-jobs.service.ts",
+        "apps/api/src/modules/ai/intake/intake-job-owner.guard.ts",
+        "apps/api/src/modules/ai/intake/intake-storage.ts",
+        "apps/api/src/modules/ai/intake/intake-test-utils.ts",
+        "apps/api/src/modules/ai/controllers/document-intake.controller.ts",
+        "apps/api/src/modules/ai/services/document-intake.service.ts",
+        "apps/api/src/modules/ai/dto/document-intake.dto.ts",
+        "apps/api/src/modules/ai/utils/file-upload.util.ts",
+        "apps/api/src/modules/ai/utils/pdf-extractor.util.ts",
+        "apps/api/src/modules/ai/utils/pdf-to-images.util.ts",
+        "apps/api/src/modules/ai/utils/image-preprocessor.util.ts",
+        "apps/api/src/modules/ai/utils/secure-temp.util.ts",
+        "apps/api/prisma/migrations/20261003000000_intake_jobs/**",
+        "apps/api/ara.traineddata",
+        "apps/api/eng.traineddata"
+      ],
+      "mvp": true,
+      "tests": ["mz-document-intake.1"],
+      "issues": [15, 17, 18, 21, 52, 142],
+      "notes": "Durable jobs, original preserved byte for byte, SHA-256 duplicate protection, tenant ownership."
+    },
+    {
+      "id": "mz-intake-processor",
+      "name": {
+        "en": "Intake extraction worker",
+        "ar": "عامل استخراج بيانات المستندات"
+      },
+      "kind": "job",
+      "entry": "IntakeProcessorService (BullMQ queue, in-process timers without Redis)",
+      "paths": [
+        "apps/api/src/modules/ai/intake/intake-processor.service.ts",
+        "apps/api/src/modules/ai/intake/intake-queue.service.ts",
+        "apps/api/src/modules/ai/extraction/**",
+        "apps/api/src/modules/ai/services/paddle-ocr.service.ts",
+        "apps/api/src/modules/ai/services/paddle-ocr-api.service.ts",
+        "apps/api/src/modules/ai/services/ollama.service.ts",
+        "apps/api/src/modules/ai/prompts/ollama-extraction.prompts.ts",
+        "apps/api/scripts/**"
+      ],
+      "mvp": true,
+      "tests": ["mz-intake-processor.1"],
+      "issues": [16, 42, 87, 126, 133, 141],
+      "notes": "Runs in-process when REDIS_URL is empty; scanned images / OCR need the OCR service (off in the verify stack), native-text PDFs do not."
+    },
+    {
+      "id": "mz-ai-infrastructure",
+      "name": {
+        "en": "AI runtime and Ollama tunnel",
+        "ar": "بنية الذكاء الاصطناعي ونفق Ollama"
+      },
+      "kind": "api",
+      "entry": "GET /api/internal/ollama-status",
+      "paths": [
+        "apps/api/src/modules/ai/ai.module.ts",
+        "apps/api/src/modules/ai/core/**",
+        "apps/api/src/modules/ai/controllers/ollama-tunnel.controller.ts",
+        "apps/api/src/modules/ai/services/ollama-inference-gateway.service.ts",
+        "apps/api/src/modules/ai/services/ai-cache.service.ts",
+        "apps/api/src/modules/ai/types/**",
+        "apps/api/src/modules/ai/utils/bounded-cache.util.ts",
+        "apps/api/src/modules/ai/utils/batch-processor.util.ts",
+        "apps/api/src/modules/ai/utils/secure-compare.util.ts",
+        "apps/api/src/modules/ai/utils/risk-level.util.ts",
+        "apps/api/src/modules/ai/prompts/**",
+        "apps/api/src/modules/ai/__tests__/**",
+        "apps/web/lib/hooks/use-ai-infrastructure.ts",
+        "services/ollama-proxy/**"
+      ],
+      "mvp": false,
+      "tests": ["mz-ai-infrastructure.1"],
+      "blocked": "Ollama / the Colab tunnel are off in the verify stack; the admin-only status and the secret check are tested"
+    },
+    {
+      "id": "mz-ai-schedulers",
+      "name": {
+        "en": "AI scheduled jobs",
+        "ar": "المهام المجدولة للذكاء الاصطناعي"
+      },
+      "kind": "job",
+      "entry": "AiSecurity / AiOperations / AiHrOps / AiSalesCrm / AiNlpChat schedulers (@Cron)",
+      "paths": ["apps/api/src/modules/ai/schedulers/**"],
+      "mvp": false,
+      "tests": ["mz-ai-schedulers.1"],
+      "blocked": "the nightly/weekly crons need Ollama and wall-clock time; their manual triggers (scan / recalculate / predict-all) are exercised and must not post anything"
+    }
+  ]
+}
