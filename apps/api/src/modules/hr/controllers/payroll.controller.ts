@@ -1,6 +1,7 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
+import { Response } from 'express';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -95,6 +96,25 @@ export class PayrollController {
     }>
   > {
     return this.payrollService.getPayslip(orgId, id);
+  }
+
+  @Post(':id/payslip')
+  @Permissions('hr.view')
+  @ApiOperation({ summary: 'Generate payslip PDF for the specified payroll record' })
+  async generatePayslip(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Query('lang') lang: string = 'ar',
+    @Res() res: Response,
+  ): Promise<void> {
+    const pdfBuffer = await this.payrollService.generatePayslipPdf(orgId, id, lang);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'attachment; filename="payslip.pdf"',
+      'Content-Length': pdfBuffer.length,
+      'Cache-Control': 'private, no-store',
+    });
+    res.send(pdfBuffer);
   }
 
   // Bulk Operations

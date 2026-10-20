@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -11,18 +11,52 @@ import { Response } from 'express';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
-import { PayslipPdfService } from '../services/payslip-pdf.service';
+import { PayrollService } from '../services/payroll.service';
 
 @ApiTags('Payroll')
 @ApiBearerAuth()
 @Controller('payslips')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class PayslipsController {
-  constructor(private readonly payslipPdfService: PayslipPdfService) {}
+  constructor(private readonly payrollService: PayrollService) {}
+
+  @Post(':id/payslip')
+  @Permissions('hr.view')
+  @ApiOperation({ summary: 'Generate payslip PDF (deterministic Arabic/English export)' })
+  @ApiParam({ name: 'id', description: 'Payslip ID' })
+  @ApiQuery({
+    name: 'lang',
+    required: false,
+    enum: ['ar', 'en'],
+    description: 'PDF language: "ar" (default) or "en"',
+  })
+  @ApiResponse({ status: 200, description: 'Deterministic payslip PDF file' })
+  @ApiResponse({ status: 400, description: 'Unsupported language' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Payslip not found' })
+  @ApiResponse({ status: 422, description: 'Missing required data' })
+  async generatePayslip(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Query('lang') lang: string = 'ar',
+    @Res() res: Response,
+  ): Promise<void> {
+    const pdfBuffer = await this.payrollService.generatePayslipPdf(orgId, id, lang);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="payslip-${id}.pdf"`,
+      'Content-Length': pdfBuffer.length,
+      // Salary data: never cache in a shared or private browser cache
+      'Cache-Control': 'private, no-store',
+    });
+
+    res.send(pdfBuffer);
+  }
 
   @Get(':id/pdf')
   @Permissions('hr.view')
-  @ApiOperation({ summary: 'Generate payslip PDF (deterministic Arabic/English export)' })
+  @ApiOperation({ summary: 'Get payslip PDF (deterministic Arabic/English export)' })
   @ApiParam({ name: 'id', description: 'Payslip ID' })
   @ApiQuery({
     name: 'lang',
@@ -41,7 +75,7 @@ export class PayslipsController {
     @Query('lang') lang: string = 'ar',
     @Res() res: Response,
   ): Promise<void> {
-    const pdfBuffer = await this.payslipPdfService.generatePayslipPdf(orgId, id, lang);
+    const pdfBuffer = await this.payrollService.generatePayslipPdf(orgId, id, lang);
 
     res.set({
       'Content-Type': 'application/pdf',
