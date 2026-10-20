@@ -704,7 +704,7 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 | AC3  | Tenant scoping: every Prisma query carries `organizationId` in `where`/`data`; another organisation records are never read or written    | `depreciation.service.spec.ts:329-411` (asserts 10+ Prisma queries carry `where.organizationId === ORG_A`, org B untouched) | PASSED |
 | AC4  | Idempotent retries: posting the same source-event (asset + period) twice creates exactly one journal; concurrent runs are atomic         | `depreciation.service.spec.ts:263-314` (in-tx atomic claim via `updateMany({ where: { executedAt: null } })`)               | PASSED |
 | AC5  | Prisma mocked from `apps/api/src/test/mocks`; no wall-clock dates (fake timers via `jest.useFakeTimers`, restored in `afterEach`)        | `depreciation.service.spec.ts:78-87,169-171` (`createMockPrisma()`, `FIXED_NOW = new Date(2026, 2, 15, 12, 0, 0)`)          | PASSED |
-| AC6  | Test execution: `node apps/api/_run_tests.js --testPathPattern=depreciation.service.spec` passes (13/13 passed) and lint passes clean    | `node apps/api/_run_tests.js --testPathPattern=depreciation.service.spec` (exit 0) and `pnpm --filter api lint` (exit 0)    | PASSED |
+| AC6  | Test execution: `node apps/api/_run_tests.js --testPathPattern=depreciation.service.spec` passes (14/14 passed) and lint passes clean    | `node apps/api/_run_tests.js --testPathPattern=depreciation.service.spec` (exit 0) and `pnpm --filter api lint` (exit 0)    | PASSED |
 
 ---
 
@@ -728,6 +728,7 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 - **Tests**:
   - `posts the declining-balance amount 333.3333 exactly` ([`spec:217-225`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L217-L225))
   - `final period posts the residual so book value lands exactly on salvage` ([`spec:227-240`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L227-L240))
+  - `final period via manual run lands book value on salvage and marks FULLY_DEPRECIATED` ([`spec:260-267`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L260-L267))
 - **Assertion**:
   - Declining balance period 1: `333.3333` debit and credit.
   - Final period schedule: `amount = 12.3456`, `accumulatedTotal = 9000.0000`, `bookValue = 1000.0000`.
@@ -785,9 +786,9 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
   ```text
   PASS src/modules/assets/services/depreciation.service.spec.ts
   Test Suites: 1 passed, 1 total
-  Tests:       13 passed, 13 total
+  Tests:       14 passed, 14 total
   Snapshots:   0 total
-  Time:        8.176 s
+  Time:        3.014 s
   ```
 - **Exit Code**: 0
 
@@ -833,6 +834,6 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 
 | File                                                                | Purpose                                                                                                                                   | Lines Changed   |
 | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| `apps/api/src/modules/assets/services/depreciation.service.spec.ts` | Complete unit spec suite covering straight-line, declining-balance, final-period rounding, idempotency, concurrency, and tenant isolation | +413 lines      |
+| `apps/api/src/modules/assets/services/depreciation.service.spec.ts` | Complete unit spec suite covering straight-line, declining-balance, final-period rounding, idempotency, concurrency, and tenant isolation | +422 lines      |
 | `apps/api/src/modules/assets/services/depreciation.service.ts`      | In-transaction atomic claim (`updateMany` with `executedAt: null`) and org-scoping on all queries                                         | +45 / -34 lines |
 | `EVIDENCE.md`                                                       | Appended Issue #208 / PR #255 verification report and acceptance criteria                                                                 | +170 lines      |

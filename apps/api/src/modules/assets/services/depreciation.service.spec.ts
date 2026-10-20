@@ -257,6 +257,15 @@ describe('DepreciationService', () => {
         executedAt: FIXED_NOW,
       });
     });
+
+    it('final period via manual run lands book value on salvage and marks FULLY_DEPRECIATED', async () => {
+      const result = await service.runDepreciationForAsset(ORG_A, 'last', 3, 2026);
+
+      expect(result).toEqual({ journalId: 'jrn-42', amount: 12.3456 });
+      const last = assets.find((a) => a.id === 'last')!;
+      expect(last.currentBookValue.equals(last.salvageValue)).toBe(true);
+      expect(last.status).toBe(AssetStatus.FULLY_DEPRECIATED);
+    });
   });
 
   describe('idempotent retries', () => {
