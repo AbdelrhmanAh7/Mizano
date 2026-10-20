@@ -137,6 +137,17 @@ describe('AllExceptionsFilter (auth and validation error contract)', () => {
     expect(objEx2.body.code).toBe('VALIDATION_ERROR');
     expect(objEx2.body.message).toBe('Validation Failed');
     expect(objEx2.body.details).toEqual({ code: ['Code is required'] });
+
+    const codeEx = render(
+      new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        message: 'Field does not meet requirements',
+      }),
+    );
+    expect(codeEx.status).toBe(HttpStatus.BAD_REQUEST);
+    expect(codeEx.body.code).toBe('VALIDATION_ERROR');
+    expect(codeEx.body.message).toBe('Validation Failed');
+    expect(codeEx.body.error).toBe('Bad Request');
   });
 
   it('normalizes Prisma validation errors to Validation Failed and VALIDATION_ERROR', () => {
@@ -186,7 +197,7 @@ describe('AllExceptionsFilter (auth and validation error contract)', () => {
     expect(body.details).toBeUndefined();
   });
 
-  it('normalizes any 401 response error property to "Unauthorized"', () => {
+  it('consistently returns error "Unauthorized" and normalizes any 401 response error property to "Unauthorized"', () => {
     // 401 with custom error property is normalized to 'Unauthorized' (AC4)
     const customError401 = render(
       new HttpException({ message: 'Session expired', error: 'CustomUnauthorized' }, 401),
