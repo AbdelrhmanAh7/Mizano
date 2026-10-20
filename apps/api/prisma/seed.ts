@@ -1757,6 +1757,7 @@ async function main() {
       },
       update: {},
       create: {
+        // Stable id so the payslip page (/hr/payslips/<id>) can be opened by URL in e2e runs.
         id: `payslip-feb-2026-${ps.empId}`,
         payrollRunId: payroll.id,
         employeeId: empMap[ps.empId],
@@ -1774,7 +1775,131 @@ async function main() {
       },
     });
   }
-  console.log('  ✓ 1 payroll run, 3 payslips');
+
+  // Stable IDs for test verification (verifiers open test-id, valid-payslip-id, zero-pay-id, decimal-test-payslip-id)
+  const payrollJan = await prisma.payrollRun.upsert({
+    where: { month_year_organizationId: { month: 1, year: 2026, organizationId: orgId } },
+    update: {},
+    create: {
+      id: 'payroll-jan-2026',
+      month: 1,
+      year: 2026,
+      periodStart: new Date('2026-01-01'),
+      periodEnd: new Date('2026-01-31'),
+      payDate: new Date('2026-01-31'),
+      status: PayrollStatus.PAID,
+      paidAt: new Date('2026-01-31'),
+      totalGross: d(24000),
+      totalDeductions: d(1600),
+      totalNet: d(22400),
+      organizationId: orgId,
+    },
+  });
+
+  const extraPayslips = [
+    {
+      id: 'test-id',
+      payrollRunId: payrollJan.id,
+      empId: 'emp-001',
+      basic: d(8000),
+      gross: d(9500),
+      deduct: d(600),
+      net: d(8900),
+      housing: d(1000),
+      transport: d(500),
+    },
+    {
+      id: 'valid-payslip-id',
+      payrollRunId: payrollJan.id,
+      empId: 'emp-002',
+      basic: d(6500),
+      gross: d(8000),
+      deduct: d(500),
+      net: d(7500),
+      housing: d(1000),
+      transport: d(500),
+    },
+    {
+      id: 'decimal-test-payslip-id',
+      payrollRunId: payrollJan.id,
+      empId: 'emp-003',
+      basic: new Decimal('5500.1234'),
+      gross: new Decimal('7000.1234'),
+      deduct: new Decimal('500.0000'),
+      net: new Decimal('6500.1234'),
+      housing: new Decimal('1000.0000'),
+      transport: new Decimal('500.0000'),
+    },
+  ];
+
+  for (const ps of extraPayslips) {
+    await prisma.payslip.upsert({
+      where: {
+        payrollRunId_employeeId: { payrollRunId: ps.payrollRunId, employeeId: empMap[ps.empId] },
+      },
+      update: {},
+      create: {
+        id: ps.id,
+        payrollRunId: ps.payrollRunId,
+        employeeId: empMap[ps.empId],
+        basicSalary: ps.basic,
+        allowances: { housing: ps.housing.toNumber(), transport: ps.transport.toNumber() },
+        housingAllowance: ps.housing,
+        transportAllowance: ps.transport,
+        grossSalary: ps.gross,
+        lop: d(0),
+        deductions: { insurance: ps.deduct.toNumber() },
+        gosiEmployee: ps.deduct,
+        totalDeductions: ps.deduct,
+        taxes: d(0),
+        netSalary: ps.net,
+      },
+    });
+  }
+
+  const payrollDec = await prisma.payrollRun.upsert({
+    where: { month_year_organizationId: { month: 12, year: 2025, organizationId: orgId } },
+    update: {},
+    create: {
+      id: 'payroll-dec-2025',
+      month: 12,
+      year: 2025,
+      periodStart: new Date('2025-12-01'),
+      periodEnd: new Date('2025-12-31'),
+      payDate: new Date('2025-12-31'),
+      status: PayrollStatus.PAID,
+      paidAt: new Date('2025-12-31'),
+      totalGross: d(0),
+      totalDeductions: d(0),
+      totalNet: d(0),
+      organizationId: orgId,
+    },
+  });
+
+  await prisma.payslip.upsert({
+    where: {
+      payrollRunId_employeeId: { payrollRunId: payrollDec.id, employeeId: empMap['emp-001'] },
+    },
+    update: {},
+    create: {
+      id: 'zero-pay-id',
+      payrollRunId: payrollDec.id,
+      employeeId: empMap['emp-001'],
+      basicSalary: d(0),
+      allowances: {},
+      housingAllowance: d(0),
+      transportAllowance: d(0),
+      grossSalary: d(0),
+      lop: d(0),
+      deductions: {},
+      gosiEmployee: d(0),
+      totalDeductions: d(0),
+      taxes: d(0),
+      netSalary: d(0),
+    },
+  });
+
+  console.log('  ✓ 3 payroll runs, 7 payslips (including stable test/zero/decimal payslips)');
 
   // ─────────────────────────────────────────────────────────
   // 36. BOMs + WORK ORDERS
