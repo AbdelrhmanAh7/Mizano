@@ -4,7 +4,7 @@
 - **PR**: [#268](https://github.com/AbdelrhmanAh7/Mizano/pull/268)
 - **Branch**: `ai/153`
 - **Base Commit**: `origin/master` (`4c006386`)
-- **Tested Head Commit**: `13e12d62` (clean merge with latest `origin/master`)
+- **Tested Head Commit**: `91778ac4` (security fixes, auth guard normalization, algorithm confusion prevention, and upstream merge)
 - **Sentry Issue**: None (framework adoption & in-repo testing gate)
 - **Skills Used**: `root-cause debugging`, `verification-before-completion`, `systematic-debugging`, `test-audit`, `test-first engineering`, `e2e-army`
 
@@ -47,7 +47,7 @@
   1. `apps/api/src/common/guards/jwt-auth.guard.ts:26-36`: `handleRequest` previously re-threw any raw `err` from passport/jwt library, which NestJS global filters mapped to a 500 error instead of a client 401. Updated `handleRequest` to wrap any error into `UnauthorizedException(message)` ensuring a strict 401 response on expired, malformed, or algorithm-confused tokens.
   2. `apps/api/src/common/guards/jwt-auth.guard.ts:13-24`: `canActivate` strictly delegates to `super.canActivate(context)` for all non-public endpoints. It contains zero checks for `NODE_ENV` or `E2E_ARMY_DB_DISPOSABLE` and never treats test environments as a trust signal.
   3. `apps/api/src/common/guards/jwt-auth.guard.spec.ts:40-62, 74-92`: Added explicit regression tests proving that setting `NODE_ENV=test` or `E2E_ARMY_DB_DISPOSABLE=1` does not bypass authentication, and that expired tokens, invalid algorithm tokens, and invalid signatures strictly throw `UnauthorizedException` (401).
-  4. `apps/api/src/modules/auth/strategies/jwt.strategy.ts:23-28` & `apps/api/src/modules/auth/strategies/jwt.strategy.spec.ts:1-77`: Added dedicated unit test suite for `JwtStrategy` confirming `ignoreExpiration: false`, secret derivation from `ConfigService.get('JWT_SECRET')`, and rejection of inactive or nonexistent users with 401.
+  4. `apps/api/src/modules/auth/strategies/jwt.strategy.ts:23-28` & `apps/api/src/modules/auth/strategies/jwt.strategy.spec.ts:24-30`: Enforced explicit `algorithms: ['HS256']` in `PassportStrategy` options to eliminate algorithm confusion vulnerabilities, verified `ignoreExpiration: false`, secret derivation from `ConfigService.get('JWT_SECRET')`, and rejection of inactive or nonexistent users with 401.
 - **Verification Evidence**:
   - `pnpm --filter api exec jest src/common/guards/jwt-auth.guard.spec.ts` -> 9 passed, 0 failed (exit 0).
   - `pnpm --filter api exec jest src/modules/auth/strategies/jwt.strategy.spec.ts` -> 4 passed, 0 failed (exit 0).
