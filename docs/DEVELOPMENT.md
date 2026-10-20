@@ -172,13 +172,17 @@ The GitHub Actions workflow includes gating, draft skips, and Turbo caching:
 
 1. **gate** (`CI Gate`, timeout 5m) — sets `should_run`. Event data reaches the script as environment variables, never through `${{ }}` inside the script, so a label name cannot inject shell code.
 2. **install** (`Install Dependencies`, timeout 5m) — shared dependency install (pnpm store cache) and `prisma generate`.
-3. **lint**, **test**, **build** (each timeout 5m) — run in parallel after install. Each lists `gate` and `install` in `needs`. The lint job also runs the `scripts/test_turbo_config.py` guard (see Turbo task inputs below). The build job restores the Next.js build cache.
+3. **lint**, **test**, **build** (each timeout 5m) — run in parallel after install. Each lists `gate` and `install` in `needs`. The lint job also runs `scripts/test_turbo_config.py` and `scripts/test_ci_config.py` guards (see Turbo task inputs and CI rules below). The build job restores the Next.js build cache.
 
 #### Caching
 
 - **pnpm store**: `setup-node` with `cache: 'pnpm'`.
-- **turbo**: `.turbo/cache` is restored before the Turbo tasks of the lint, test and build jobs and saved when the job succeeds (`actions/cache`), with one key prefix per job (`turbo-lint-`, `turbo-test-`, `turbo-build-`) because the tasks differ. Keys include `pnpm-lock.yaml`, `turbo.json` and the SHA; `restore-keys` give partial hits. The pipeline relies solely on `actions/cache` without external secrets or third-party remote cache tokens, adhering to the "no secrets beyond `GITHUB_TOKEN`" security policy.
+- **turbo**: `.turbo/cache` is restored before the Turbo tasks of the lint, test and build jobs and saved after the job steps succeed unless there was an exact cache hit (`actions/cache`), with one key prefix per job (`turbo-lint-`, `turbo-test-`, `turbo-build-`) because the tasks differ. Keys include `pnpm-lock.yaml`, `turbo.json` and the SHA; `restore-keys` give partial hits. The pipeline relies solely on `actions/cache` without external secrets or third-party remote cache tokens, adhering to the "no secrets beyond `GITHUB_TOKEN`" security policy.
 - **Next.js cache**: `apps/web/.next/cache` is restored during `build` to speed up compilation.
+
+#### Docker build validation decoupling
+
+Multi-arch native Docker builds (`docker-build` matrix job) were decoupled from `ci.yml` and moved to a dedicated follow-up issue (`docs/follow-up-docker-validation.md`) because measured cold builds take 8–12 minutes, exceeding the mandatory 5-minute job timeout limit (`timeout-minutes: 5`). For change-detection paths in follow-up implementations, `base` is set for pushes only, whereas PRs use the GitHub API to list changed files (a push whose `before` commit is all zeros or missing from shallow clones treats Docker files as changed).
 
 #### Turbo task inputs
 

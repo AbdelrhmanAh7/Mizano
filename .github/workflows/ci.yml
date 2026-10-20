@@ -142,10 +142,10 @@ jobs:
           restore-keys: |
             turbo-lint-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
 
-      # A task `inputs` list that skips a source directory (apps/web has no src/) makes
-      # the cache above replay stale results.
-      - name: Check turbo task inputs
-        run: python3 -m unittest discover -s scripts -p 'test_turbo_config.py'
+      # Check turbo task inputs and CI configuration constraints (5-minute timeouts,
+      # no cold docker-build jobs, least-privilege permissions, stable check names).
+      - name: Check turbo task inputs and CI configuration
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
 
       - name: Run ESLint
         run: pnpm lint

@@ -26,7 +26,7 @@ def restrictive_inputs(tasks):
         name
         for name, task in tasks.items()
         if "inputs" in task
-        and (not task.get("inputs") or task["inputs"][0] != DEFAULT_INPUTS)
+        and (not task.get("inputs") or DEFAULT_INPUTS not in task["inputs"])
     )
 
 
@@ -47,6 +47,13 @@ class TurboInputsTest(unittest.TestCase):
             "build": {},
         }
         self.assertEqual(restrictive_inputs(tasks), ["lint"])
+
+    def test_guard_accepts_inputs_with_default_inputs_at_any_position(self):
+        tasks = {
+            "test": {"inputs": ["!**/*.md", DEFAULT_INPUTS]},
+            "build": {},
+        }
+        self.assertEqual(restrictive_inputs(tasks), [])
 
 
 if __name__ == "__main__":
