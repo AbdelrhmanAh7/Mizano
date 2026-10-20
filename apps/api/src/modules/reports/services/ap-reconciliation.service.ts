@@ -24,17 +24,18 @@ export interface ApReconciliation {
   ok: boolean;
 }
 
-// Ledger totals of many near-maximum Decimal(19,4) amounts pass Decimal's default 20 significant
-// digits, which would round the large credit and debit totals before they cancel.
+export interface ApReconciliationOptions {
+  timeout?: number;
+  isolationLevel?: Prisma.TransactionIsolationLevel;
+}
+
+// Prevent rounding when ledger totals of many near-max Decimal(19,4) amounts pass Decimal's default 20 digits.
 const Wide = Decimal.clone({ precision: 40 });
 const wide = (value: Decimal | string | null | undefined): Decimal =>
   new Wide(toDecimal(value).toFixed());
 
 /** Source-less journals written before journal source linking carry only this reference prefix. */
-const LEGACY_AP_REFERENCES = {
-  credit: ['Bill '],
-  debit: ['Payment ', 'Vendor Credit '],
-};
+const LEGACY_AP_REFERENCES = { credit: ['Bill '], debit: ['Payment ', 'Vendor Credit '] };
 
 @Injectable()
 export class ApReconciliationService {
@@ -42,24 +43,30 @@ export class ApReconciliationService {
 
   /**
    * Read-only check that the AP subledger ties to the AP control account as of a date (#125).
-   *
-   * Everything is read in one repeatable-read transaction, so a payment committing mid-request
-   * cannot show the new bill balance next to the old ledger.
-   *
-   * Subledger: open balances of posted bills dated on or before `asOf` (DRAFT, PENDING, VOID and
-   * deleted bills never count), less live unapplied vendor credits. The stored `balanceDue`
-   * reflects every settlement up to now, so settlements dated after `asOf` are added back and
-   * payments voided after `asOf` are taken off again. Payments dated on or before `asOf` that
-   * were allocated to bills dated after it still sit in the ledger, so they reduce the subledger
-   * too. Bills voided after `asOf` (their reversal is dated later) are rebuilt from their gross
-   * total. Control: posted journal lines dated on or before `asOf` on every account that carried
-   * AP (the default may have changed since a document was posted).
+   * Read in one transaction (RepeatableRead by default, configurable) to prevent posting skew.
+   * Subledger: open balances of posted bills <= asOf (less live unapplied vendor credits,
+   * adjusted for post-cutoff settlements, voids, and prepayments).
+   * Control: posted journal lines <= asOf on AP liability control accounts.
    */
-  async reconcileApControl(organizationId: string, asOfDate?: string): Promise<ApReconciliation> {
+  async reconcileApControl(
+    organizationId: string,
+    asOfDate?: string,
+    options?: ApReconciliationOptions,
+  ): Promise<ApReconciliation> {
     const asOf = parseReportDate(asOfDate, 'end', 'asOf') ?? endOfUtcDay(new Date());
+    const timeout =
+      options?.timeout ??
+      (process.env.AP_RECONCILIATION_TIMEOUT_MS
+        ? Number(process.env.AP_RECONCILIATION_TIMEOUT_MS)
+        : 15_000);
+    const isolationLevel =
+      options?.isolationLevel ??
+      (process.env.AP_RECONCILIATION_ISOLATION_LEVEL as Prisma.TransactionIsolationLevel) ??
+      Prisma.TransactionIsolationLevel.RepeatableRead;
+
     return this.prisma.$transaction((tx) => this.reconcile(tx, organizationId, asOf), {
-      isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
-      timeout: 30_000,
+      isolationLevel,
+      timeout,
     });
   }
 
@@ -102,8 +109,7 @@ export class ApReconciliationService {
           where: { organizationId, deletedAt: null, date: later, appliedToBill: bill },
           _sum: { amount: true },
         }),
-        // Unapplied as of `asOf`: not yet voided or refunded then, and not applied to a bill
-        // that counts on that date.
+        // Unapplied as of asOf: not yet voided/refunded then, and not applied to a bill counting on that date.
         tx.vendorCredit.aggregate({
           where: {
             organizationId,
@@ -139,12 +145,7 @@ export class ApReconciliationService {
     };
   }
 
-  /**
-   * Open payable at `asOf` of bills that are void or deleted now but were posted then: their
-   * approval journal is dated by `asOf` and its reversal comes later. Never-posted VOID drafts have
-   * no approval journal and a bill voided without a reversal still sits in the ledger, so neither
-   * is included.
-   */
+  /** Reconstructs open payable for bills voided/deleted after cutoff whose approval journal was dated by asOf. */
   private async billsVoidedAfter(
     tx: Prisma.TransactionClient,
     organizationId: string,
@@ -229,8 +230,7 @@ export class ApReconciliationService {
                 },
               },
             },
-            // Legacy postings carry no source: find them by the document reference, and only on
-            // liability accounts so a customer receipt never pulls a bank account in.
+            // Legacy postings carry no source: find by document reference on liability accounts only.
             ...(['credit', 'debit'] as const).map((side) => ({
               [side]: { gt: 0 },
               account: apAccountFilter,

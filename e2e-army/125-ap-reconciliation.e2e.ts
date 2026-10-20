@@ -17,12 +17,15 @@ const apiRoot = (baseUrl: string): string =>
   (process.env.E2E_ARMY_API ?? new URL('/api', baseUrl).toString()).replace(/\/+$/, '');
 
 // One login for the file: the auth route is throttled to a handful of attempts a minute.
+// Test credentials default to demo admin fixtures, configurable via env vars.
 let token: Promise<string> | undefined;
 function login(root: string): Promise<string> {
+  const email = process.env.E2E_EMAIL ?? 'admin@mizano.com';
+  const password = process.env.E2E_PASSWORD ?? 'password123';
   token ??= fetch(`${root}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: 'admin@mizano.com', password: 'password123' }),
+    body: JSON.stringify({ email, password }),
   }).then(async (res) => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { tokens: { accessToken: string } };

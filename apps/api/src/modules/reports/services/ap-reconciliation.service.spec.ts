@@ -143,12 +143,38 @@ describe('@issue-125 ApReconciliationService.reconcileApControl', () => {
     expect(prepaid).toBeDefined();
   });
 
-  it('reads both sides in one repeatable-read transaction', async () => {
+  it('reads both sides in one repeatable-read transaction with configurable timeout', async () => {
     const { prisma, service } = setup({ open: '0' });
     await service.reconcileApControl(ORG, '2026-03-31');
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     const options = (prisma.$transaction as jest.Mock).mock.calls[0][1];
     expect(options.isolationLevel).toBe(Prisma.TransactionIsolationLevel.RepeatableRead);
+    expect(options.timeout).toBe(15_000);
+  });
+
+  it('allows overriding timeout and isolation level via options or environment variables', async () => {
+    const { prisma, service } = setup({ open: '0' });
+    await service.reconcileApControl(ORG, '2026-03-31', {
+      timeout: 5000,
+      isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+    });
+    const options = (prisma.$transaction as jest.Mock).mock.calls[0][1];
+    expect(options.timeout).toBe(5000);
+    expect(options.isolationLevel).toBe(Prisma.TransactionIsolationLevel.ReadCommitted);
+
+    const origTimeout = process.env.AP_RECONCILIATION_TIMEOUT_MS;
+    const origIso = process.env.AP_RECONCILIATION_ISOLATION_LEVEL;
+    try {
+      process.env.AP_RECONCILIATION_TIMEOUT_MS = '8000';
+      process.env.AP_RECONCILIATION_ISOLATION_LEVEL = 'Serializable';
+      await service.reconcileApControl(ORG, '2026-03-31');
+      const envOptions = (prisma.$transaction as jest.Mock).mock.calls[1][1];
+      expect(envOptions.timeout).toBe(8000);
+      expect(envOptions.isolationLevel).toBe('Serializable');
+    } finally {
+      process.env.AP_RECONCILIATION_TIMEOUT_MS = origTimeout;
+      process.env.AP_RECONCILIATION_ISOLATION_LEVEL = origIso;
+    }
   });
 
   it('T3: a payment dated before its future-dated bill reduces the subledger like the ledger', async () => {
