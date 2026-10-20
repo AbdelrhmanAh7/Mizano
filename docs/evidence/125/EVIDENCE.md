@@ -3,7 +3,7 @@
 - **Issue**: #125 (Add AP subledger vs control-account reconciliation check with test)
 - **Originating Sentry issue**: None (internal accounting correctness feature)
 - **Scope**: Backend only (service, controller route, module, unit spec, API e2e spec, e2e-army API test). The web report page was moved to branch `ai/125-ui` (follow-up PR) per the CTO decision; no `apps/web` file is in this diff.
-- **Tested SHA**: `7ac5dcf5bca2da916f8bb20abedd13b2f16c70a0`
+- **Tested SHA**: `e31b54671b044c753581c3c92a016c8d866ef67a`
 - **Implementer**: AI implementer on branch `ai/125`.
 
 ## Acceptance Criteria & Verification Matrix
