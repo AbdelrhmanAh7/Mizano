@@ -286,4 +286,13 @@ describe('extractInvoiceFields date offsets map back to original text', () => {
     const r2 = extractInvoiceFields(spaced);
     expect(spaced.slice(r2.date?.start, r2.date?.end)).toBe('2024 / 03  /  15');
   });
+
+  it('does not store raw document text in RulesExtraction to prevent sensitive data logging', () => {
+    const text = 'Invoice 101\nDate: 2024-05-01\nTotal: 100.00';
+    const r = extractInvoiceFields(text);
+    expect((r as unknown as { originalText?: unknown }).originalText).toBeUndefined();
+    expect(r.date?.start).toBeDefined();
+    expect(r.date?.end).toBeDefined();
+    expect(text.slice(r.date?.start, r.date?.end)).toBe('2024-05-01');
+  });
 });

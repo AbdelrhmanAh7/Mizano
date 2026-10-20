@@ -19,7 +19,7 @@ export interface RuleField<T> {
   /** 0..1. Never invented: derived from how the value was found and cross-checks. */
   confidence: number;
   evidence: Evidence;
-  /** `[start, end)` of the value in `RulesExtraction.originalText`. */
+  /** `[start, end)` character offsets of the value in the source document passed to `extractInvoiceFields`. */
   start?: number;
   end?: number;
 }
@@ -43,7 +43,6 @@ export interface RulesExtraction {
   warnings: string[];
   /** 0..1; capped below the review threshold when a consistency check fails. */
   overallConfidence: number;
-  originalText?: string;
 }
 
 const TOLERANCE = new Decimal('0.01');
@@ -516,7 +515,6 @@ export function extractInvoiceFields(rawText: string, textConfidence = 1): Rules
     currency: extractCurrency(lines, folded, factor),
     warnings,
     overallConfidence: 0,
-    originalText: rawText,
   };
 
   const consistent = checkConsistency(result);
