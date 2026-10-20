@@ -26,7 +26,8 @@ export const MONEY_DECIMALS = 4;
 const DAY_MS = 86_400_000;
 const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-export type ReportPrisma = PrismaClient;
+/** A client or an interactive-transaction client, so a report can read from one snapshot. */
+export type ReportPrisma = PrismaClient | Prisma.TransactionClient;
 
 export function toDecimal(value: Decimal | string | number | null | undefined): Decimal {
   if (value === null || value === undefined) return new Decimal(0);
