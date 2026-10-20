@@ -5,7 +5,6 @@ import { DocumentsModule } from '../documents/documents.module';
 import { AiModule } from '../ai/ai.module';
 import { TaxModule } from '../tax/tax.module';
 import { ReportsController } from './controllers/reports.controller';
-import { VatReturnDraftController } from './controllers/vat-return-draft.controller';
 import { AgingReportsService } from './services/aging-reports.service';
 import { DashboardService } from './services/dashboard.service';
 import { FinancialReportsService } from './services/financial-reports.service';
@@ -13,7 +12,7 @@ import { VatReturnDraftService } from './services/vat-return-draft.service';
 
 @Module({
   imports: [PrismaModule, DocumentsModule, CacheModule, AiModule, TaxModule],
-  controllers: [ReportsController, VatReturnDraftController],
+  controllers: [ReportsController],
   providers: [
     FinancialReportsService,
     AgingReportsService,

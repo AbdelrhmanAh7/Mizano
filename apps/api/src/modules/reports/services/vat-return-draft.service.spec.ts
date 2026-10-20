@@ -74,9 +74,9 @@ describe('VatReturnDraftService', () => {
     given({ output: '170.0000', input: '35.0000' }, [doc('1', '190.0000')], [doc('2', '20.0000')]);
     const result = await draft();
     expect(result).toMatchObject({
-      outputTax: '170.0000',
-      inputTax: '35.0000',
-      netPayable: '135.0000',
+      outputVat: '170.0000',
+      inputVat: '35.0000',
+      netVat: '135.0000',
       status: 'complete',
     });
     expect(getVatSummary).toHaveBeenCalledWith('org_1', '2023-01-01', '2023-01-31');
@@ -84,15 +84,15 @@ describe('VatReturnDraftService', () => {
 
   it('@issue-114 AC2: a ledger refund position is a negative net payable', async () => {
     given({ output: '10.0000', input: '35.5000' });
-    expect((await draft()).netPayable).toBe('-25.5000');
+    expect((await draft()).netVat).toBe('-25.5000');
   });
 
   it('@issue-114 AC2: keeps four decimals when the totals have 17 integer digits', async () => {
     given({ output: '12345678901234567.1234', input: '0.0001' });
     expect(await draft()).toMatchObject({
-      outputTax: '12345678901234567.1234',
-      inputTax: '0.0001',
-      netPayable: '12345678901234567.1233',
+      outputVat: '12345678901234567.1234',
+      inputVat: '0.0001',
+      netVat: '12345678901234567.1233',
     });
   });
 
@@ -107,9 +107,9 @@ describe('VatReturnDraftService', () => {
     expect(await draft()).toMatchObject({
       label: 'DRAFT, not for filing',
       status: 'complete',
-      outputTax: '0.0000',
-      inputTax: '0.0000',
-      netPayable: '0.0000',
+      outputVat: '0.0000',
+      inputVat: '0.0000',
+      netVat: '0.0000',
       exceptions: [],
       etaMismatches: [],
     });
@@ -289,7 +289,7 @@ describe('VatReturnDraftService', () => {
       ]);
       expect(result.status).toBe('incomplete');
       // Totals still follow the posted ledger, never the recomputed line tax.
-      expect(result).toMatchObject({ outputTax: '31.3300', inputTax: '7.0000', exceptions: [] });
+      expect(result).toMatchObject({ outputVat: '31.3300', inputVat: '7.0000', exceptions: [] });
     });
 
     it('@issue-114 AC6: zero-amount documents and zero-rated lines match a zero header', async () => {
@@ -379,6 +379,20 @@ describe('VatReturnDraftService', () => {
     await expect(draft()).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.invoice.findMany).not.toHaveBeenCalled();
     expect(log).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it('@issue-114: propagates a stored return query rejection as a logged error, not complete', async () => {
+    const log = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    given();
+    prisma.vATReturn.findFirst.mockRejectedValue(
+      Object.assign(new Error('Connection failure'), {
+        name: 'PrismaClientInitializationError',
+        code: 'P1001',
+      }),
+    );
+    await expect(draft()).rejects.toThrow();
+    expect(log).toHaveBeenCalledWith('PrismaClientInitializationError(P1001)');
     log.mockRestore();
   });
 });

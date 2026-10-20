@@ -156,14 +156,11 @@ export interface VatReturnDraft {
   label: typeof VAT_RETURN_DRAFT_LABEL;
   /** Organization base currency: the currency of every amount in this draft. */
   currency: string;
-  from: string;
-  to: string;
-  periodStart?: string;
-  periodEnd?: string;
+  from?: string;
+  to?: string;
+  periodStart: string;
+  periodEnd: string;
   status: 'complete' | 'incomplete';
-  outputTax: string;
-  inputTax: string;
-  netPayable: string;
   outputVat: string;
   inputVat: string;
   netVat: string;

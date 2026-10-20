@@ -642,7 +642,7 @@ describe('VatReturnsService', () => {
         _sum: { subtotal: dec('500'), taxAmount: dec('70') },
       });
       prisma.vATReturn.findFirst.mockResolvedValue({
-        totalVat: dec('60.0000'),
+        netPayable: dec('60.0000'),
         outputVAT: dec('140.0000'),
         inputVAT: dec('70.0000'),
         totalSales: dec('1000.0000'),
@@ -656,6 +656,14 @@ describe('VatReturnsService', () => {
         computed: '70.0000',
         recorded: '60.0000',
       });
+      expect(prisma.vATReturn.findFirst).toHaveBeenCalledWith({
+        where: {
+          organizationId: ORG,
+          deletedAt: null,
+          startDate: new Date('2026-01-01T00:00:00.000Z'),
+          endDate: new Date('2026-03-31T00:00:00.000Z'),
+        },
+      });
     });
 
     it('@issue-114 AC5: throws BadRequestException when periodStart is after periodEnd', async () => {
@@ -664,6 +672,31 @@ describe('VatReturnsService', () => {
       );
       await expect(service.computeDraftFromLedger(ORG, '2026-04-01', '2026-01-01')).rejects.toThrow(
         'periodStart must be before or equal to periodEnd',
+      );
+    });
+
+    it('@issue-114 AC7: rejects periods longer than 366 days with BadRequestException', async () => {
+      await expect(service.computeDraftFromLedger(ORG, '2025-01-01', '2026-01-03')).rejects.toThrow(
+        'The period must not be longer than 366 days',
+      );
+    });
+
+    it('@issue-114: propagates a findFirst rejection as a logged error', async () => {
+      prisma.invoice.aggregate.mockResolvedValue({
+        _sum: { subtotal: dec('1000'), taxAmount: dec('140') },
+      });
+      prisma.bill.aggregate.mockResolvedValue({
+        _sum: { subtotal: dec('500'), taxAmount: dec('70') },
+      });
+      prisma.vATReturn.findFirst.mockRejectedValue(
+        Object.assign(new Error('Connection failure'), {
+          name: 'PrismaClientInitializationError',
+          code: 'P1001',
+        }),
+      );
+
+      await expect(service.computeDraftFromLedger(ORG, '2026-01-01', '2026-03-31')).rejects.toThrow(
+        'Connection failure',
       );
     });
   });

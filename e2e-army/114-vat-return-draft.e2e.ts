@@ -2,7 +2,7 @@ import { test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 
 const TAGS = ['feat:mz-vat-returns'];
-const DRAFT_URL = '/api/reports/vat-return-draft';
+const DRAFT_URL = '/api/tax/vat-returns/draft';
 
 async function signIn(baseUrl: string): Promise<string> {
   const res = await fetch(new URL('/api/auth/login', baseUrl), {
@@ -18,12 +18,12 @@ async function signIn(baseUrl: string): Promise<string> {
 async function draft(
   baseUrl: string,
   token: string | null,
-  from: string,
-  to: string,
+  periodStart?: string,
+  periodEnd?: string,
 ): Promise<Response> {
   const url = new URL(DRAFT_URL, baseUrl);
-  url.searchParams.set('from', from);
-  url.searchParams.set('to', to);
+  if (periodStart !== undefined) url.searchParams.set('periodStart', periodStart);
+  if (periodEnd !== undefined) url.searchParams.set('periodEnd', periodEnd);
   return fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
 }
 
@@ -46,7 +46,7 @@ test(
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.label).toBe('DRAFT, not for filing');
     expect(body.currency).toEqual(expect.stringMatching(/^[A-Z]{3}$/));
-    for (const key of ['outputTax', 'inputTax', 'netPayable', 'outputVat', 'inputVat', 'netVat', 'totalSales', 'totalPurchases']) {
+    for (const key of ['outputVat', 'inputVat', 'netVat', 'totalSales', 'totalPurchases']) {
       expect(body[key]).toEqual(expect.stringMatching(/^-?\d+\.\d{4}$/));
     }
     expect(Array.isArray(body.exceptions)).toBe(true);
@@ -60,10 +60,7 @@ test(
   { tags: TAGS },
   async ({ app }) => {
     const token = await signIn(app.baseUrl);
-    const url = new URL('/api/tax/vat-returns/draft', app.baseUrl);
-    url.searchParams.set('periodStart', '2026-01-01');
-    url.searchParams.set('periodEnd', '2026-01-31');
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await draft(app.baseUrl, token, '2026-01-01', '2026-01-31');
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     for (const key of ['outputVat', 'inputVat', 'netVat', 'totalSales', 'totalPurchases']) {
@@ -72,7 +69,6 @@ test(
     expect(Array.isArray(body.mismatches)).toBe(true);
   },
 );
-
 
 test(
   '@issue-114 AC3: a date-only end date covers the whole day',
@@ -91,6 +87,18 @@ test(
     const token = await signIn(app.baseUrl);
     const res = await draft(app.baseUrl, token, '2026-02-01', '2026-01-31');
     expect(res.status).toBe(400);
+  },
+);
+
+test(
+  '@issue-114 AC5: missing period dates are rejected with 400',
+  { tags: TAGS },
+  async ({ app }) => {
+    const token = await signIn(app.baseUrl);
+    const noDates = await draft(app.baseUrl, token);
+    expect(noDates.status).toBe(400);
+    const missingEnd = await draft(app.baseUrl, token, '2026-01-01');
+    expect(missingEnd.status).toBe(400);
   },
 );
 

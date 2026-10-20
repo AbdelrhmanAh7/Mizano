@@ -8,6 +8,7 @@
  */
 import { INestApplication } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 import { ApiHelper } from './helpers/api-client.helper';
 import { createTestApp, getPrisma, uniqueSuffix } from './helpers/app.helper';
 import { registerTenant, TestTenant } from './helpers/tenant.helper';
@@ -573,7 +574,7 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
 
   describe('tenant A: VAT return draft (@issue-114)', () => {
     const vat = (from: string, to: string): ReturnType<ApiHelper['get']> =>
-      a.get('/reports/vat-return-draft').query({ from, to });
+      a.get('/tax/vat-returns/draft').query({ periodStart: from, periodEnd: to });
     const oneLine = (
       rate: string,
       taxRate?: string,
@@ -641,9 +642,9 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
         label: 'DRAFT, not for filing',
         currency: expect.stringMatching(/^[A-Z]{3}$/),
         status: 'incomplete',
-        outputTax: '154.0000',
-        inputTax: '70.0000',
-        netPayable: '84.0000',
+        outputVat: '154.0000',
+        inputVat: '70.0000',
+        netVat: '84.0000',
         etaMismatches: [],
       });
       expect(res.body.exceptions).toEqual([
@@ -655,7 +656,7 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
         },
       ]);
 
-      const taxDraft = await a.get('/vat-returns/draft').query({
+      const taxDraft = await a.get('/tax/vat-returns/draft').query({
         periodStart: isoDay(200),
         periodEnd: isoDay(230),
       });
@@ -673,9 +674,9 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({
         status: 'complete',
-        outputTax: '0.0000',
-        inputTax: '0.0000',
-        netPayable: '0.0000',
+        outputVat: '0.0000',
+        inputVat: '0.0000',
+        netVat: '0.0000',
         exceptions: [],
         etaMismatches: [],
       });
@@ -691,7 +692,7 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       // Totals follow the posted ledger (140.00); the edited header (139.99) is what gets flagged.
       expect(res.body).toMatchObject({
         status: 'incomplete',
-        outputTax: '140.0000',
+        outputVat: '140.0000',
         exceptions: [],
       });
       expect(res.body.etaMismatches).toEqual([
@@ -736,9 +737,9 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       const base = await vat(...window);
       expect(base.status).toBe(200);
       expect(base.body).toMatchObject({
-        outputTax: '133.0000',
-        inputTax: '14.0000',
-        netPayable: '119.0000',
+        outputVat: '133.0000',
+        inputVat: '14.0000',
+        netVat: '119.0000',
         etaMismatches: [],
         exceptions: [],
       });
@@ -746,7 +747,7 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       // A manual journal adds 10 output VAT; its reversal (dated today, so a window that ends
       // before today still sees the original) takes it out again.
       const wide = [isoDay(-3), isoDay(0)] as const;
-      const before = (await vat(...wide)).body.outputTax as string;
+      const before = (await vat(...wide)).body.outputVat as string;
       const manual = await a.post('/journals').send({
         date: isoDay(-3),
         lines: [
@@ -756,13 +757,13 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       });
       expect(manual.status).toBe(201);
       expect(
-        D((await vat(...wide)).body.outputTax)
+        D((await vat(...wide)).body.outputVat)
           .sub(before)
           .toFixed(4),
       ).toBe('10.0000');
-      expect(D((await vat(isoDay(-3), isoDay(-1))).body.outputTax).isPositive()).toBe(true);
+      expect(D((await vat(isoDay(-3), isoDay(-1))).body.outputVat).isPositive()).toBe(true);
       expect((await a.post(`/journals/${manual.body.id}/reverse`).send({})).status).toBe(201);
-      expect((await vat(...wide)).body.outputTax).toBe(before);
+      expect((await vat(...wide)).body.outputVat).toBe(before);
     });
 
     it('@issue-114 AC3: a document stamped midday on the end date is inside a date-only period', async () => {
@@ -777,7 +778,7 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       expect(res.body.etaMismatches).toEqual([
         expect.objectContaining({ id: midday.id, headerTax: '139.5000', lineTax: '140.0000' }),
       ]);
-      expect(res.body.outputTax).toBe('140.0000');
+      expect(res.body.outputVat).toBe('140.0000');
     });
 
     it('@issue-114 AC7: a period of 366 days is allowed and 367 is rejected with 400', async () => {
@@ -791,8 +792,76 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
     it('@issue-114 AC5: an inverted or malformed range returns 400', async () => {
       const inverted = await vat(isoDay(10), isoDay(5));
       expect(inverted.status).toBe(400);
-      expect(inverted.body.message).toContain('from date must be before or equal to to date');
+      expect(inverted.body.message).toMatch(
+        /(periodStart must be before or equal to periodEnd|from date must be before or equal to to date)/,
+      );
       expect((await vat('not-a-date', isoDay(5))).status).toBe(400);
+    });
+
+    it('@issue-114 AC5: GET /tax/vat-returns/draft returns 400 when query parameters are missing', async () => {
+      expect((await a.get('/tax/vat-returns/draft')).status).toBe(400);
+      expect((await a.get('/tax/vat-returns/draft').query({ periodStart: isoDay(0) })).status).toBe(
+        400,
+      );
+      expect((await a.get('/tax/vat-returns/draft').query({ periodEnd: isoDay(0) })).status).toBe(
+        400,
+      );
+    });
+
+    it('@issue-114 AC1: GET /tax/vat-returns/draft returns 403 for user lacking tax.view permission', async () => {
+      const noTaxRole = await prisma.role.create({
+        data: { name: `NoTax-${uniqueSuffix()}`, organizationId: tenantA.organizationId },
+      });
+      const noTaxEmail = `e2e-notax-${uniqueSuffix()}@mizano.test`;
+      await prisma.user.create({
+        data: {
+          email: noTaxEmail,
+          name: 'No Tax User',
+          passwordHash: await bcrypt.hash('password123', 10),
+          roleId: noTaxRole.id,
+          organizationId: tenantA.organizationId,
+        },
+      });
+      const login = await anon
+        .post('/auth/login')
+        .send({ email: noTaxEmail, password: 'password123' });
+      expect(login.status).toBe(200);
+      const limitedUser = anon.withToken(login.body.tokens.accessToken as string);
+      const res = await limitedUser.get('/tax/vat-returns/draft').query({
+        periodStart: isoDay(200),
+        periodEnd: isoDay(230),
+      });
+      expect(res.status).toBe(403);
+    });
+
+    it('@issue-114 AC4: GET /tax/vat-returns/draft flags mismatch against stored return', async () => {
+      const pStart = new Date(isoDay(450));
+      const pEnd = new Date(isoDay(470));
+      await prisma.vATReturn.create({
+        data: {
+          organizationId: tenantA.organizationId,
+          period: `Mismatch-${uniqueSuffix()}`,
+          startDate: pStart,
+          endDate: pEnd,
+          outputVAT: D('100.0000'),
+          inputVAT: D('20.0000'),
+          netPayable: D('999.0000'),
+          totalSales: D('0.0000'),
+          totalPurchases: D('0.0000'),
+          status: 'FILED',
+        },
+      });
+      const res = await a.get('/tax/vat-returns/draft').query({
+        periodStart: isoDay(450),
+        periodEnd: isoDay(470),
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('incomplete');
+      expect(res.body.mismatches).toContainEqual({
+        field: 'netVat',
+        computed: '0.0000',
+        recorded: '999.0000',
+      });
     });
   });
 
@@ -822,12 +891,14 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       const vatTo = isoDay(230);
       // A tenant without configured VAT accounts gets a clear 400 instead of another tenant's data.
       const unconfigured = await b
-        .get('/reports/vat-return-draft')
-        .query({ from: vatFrom, to: vatTo });
+        .get('/tax/vat-returns/draft')
+        .query({ periodStart: vatFrom, periodEnd: vatTo });
       expect(unconfigured.status).toBe(400);
       expect(unconfigured.body.message).toContain('VAT Payable');
       expect((await b.post('/accounts/seed-defaults')).status).toBe(201);
-      const vatDraft = await b.get('/reports/vat-return-draft').query({ from: vatFrom, to: vatTo });
+      const vatDraft = await b
+        .get('/tax/vat-returns/draft')
+        .query({ periodStart: vatFrom, periodEnd: vatTo });
       expect(vatDraft.status).toBe(200);
       expect(vatDraft.body).toMatchObject({
         label: 'DRAFT, not for filing',
@@ -835,9 +906,6 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
         from: new Date(vatFrom).toISOString(),
         to: new Date(vatTo).toISOString(),
         status: 'complete',
-        outputTax: '0.0000',
-        inputTax: '0.0000',
-        netPayable: '0.0000',
         outputVat: '0.0000',
         inputVat: '0.0000',
         netVat: '0.0000',
@@ -858,7 +926,7 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
         '/reports/balance-sheet',
         '/reports/profit-and-loss',
         '/reports/trial-balance',
-        '/reports/vat-return-draft',
+        '/tax/vat-returns/draft',
         '/accounting-reports/trial-balance',
         '/accounts/balances',
         `/accounts/${acc.bank}/balance`,
