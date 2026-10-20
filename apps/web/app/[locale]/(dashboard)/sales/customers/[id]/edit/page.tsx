@@ -1,6 +1,7 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
+import { Link, useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { CustomerForm } from '@/components/sales/customer-form';
 import { useCustomer, useUpdateCustomer } from '@/lib/hooks/use-customers';
-import Link from 'next/link';
 
 export default function EditCustomerPage() {
   const params = useParams();

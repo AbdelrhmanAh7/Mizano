@@ -43,6 +43,35 @@ const customerSchema = z.object({
 });
 
 type CustomerFormData = z.infer<typeof customerSchema>;
+type AddressFormData = z.infer<typeof addressSchema>;
+
+// Empty inputs become null so an edit can clear a field.
+const addressPayload = (address?: AddressFormData) => ({
+  street: address?.street || null,
+  city: address?.city || null,
+  state: address?.state || null,
+  postalCode: address?.postalCode || null,
+  country: address?.country || null,
+});
+
+/**
+ * Body for POST/PATCH /customers. The API DTO takes nested billingAddress/shippingAddress
+ * objects and rejects unknown keys, so flat billingStreet/... fields would be a 400 (#259).
+ */
+export function buildCustomerPayload(data: CustomerFormData): Record<string, unknown> {
+  return {
+    name: data.name,
+    displayName: data.displayName || null,
+    email: data.email || null,
+    phone: data.phone || null,
+    currency: data.currency,
+    taxId: data.taxId || null,
+    paymentTerms: data.paymentTerms || 0,
+    notes: data.notes || null,
+    billingAddress: addressPayload(data.billingAddress),
+    shippingAddress: addressPayload(data.shippingAddress),
+  };
+}
 
 interface CustomerFormProps {
   customer?: Customer | null;
@@ -129,28 +158,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
   }, [customer, form]);
 
   const handleSubmit = (data: CustomerFormData) => {
-    // Flatten addresses for API
-    const submitData = {
-      name: data.name,
-      displayName: data.displayName || null,
-      email: data.email || null,
-      phone: data.phone || null,
-      currency: data.currency,
-      taxId: data.taxId || null,
-      paymentTerms: data.paymentTerms || 0,
-      notes: data.notes || null,
-      billingStreet: data.billingAddress?.street || null,
-      billingCity: data.billingAddress?.city || null,
-      billingState: data.billingAddress?.state || null,
-      billingPostalCode: data.billingAddress?.postalCode || null,
-      billingCountry: data.billingAddress?.country || null,
-      shippingStreet: data.shippingAddress?.street || null,
-      shippingCity: data.shippingAddress?.city || null,
-      shippingState: data.shippingAddress?.state || null,
-      shippingPostalCode: data.shippingAddress?.postalCode || null,
-      shippingCountry: data.shippingAddress?.country || null,
-    };
-    onSubmit(submitData as Record<string, unknown>);
+    onSubmit(buildCustomerPayload(data));
   };
 
   const copyBillingToShipping = () => {
@@ -169,7 +177,12 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Customer Name *</Label>
-              <Input id="name" placeholder="Enter customer name" {...form.register('name')} />
+              <Input
+                id="name"
+                aria-label="Customer Name / Name / الاسم / اسم العميل"
+                placeholder="Enter customer name"
+                {...form.register('name')}
+              />
               {form.formState.errors.name && (
                 <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
               )}
@@ -179,6 +192,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
               <Label htmlFor="displayName">Display Name</Label>
               <Input
                 id="displayName"
+                aria-label="Display Name / الاسم المعروض"
                 placeholder="How to display on documents"
                 {...form.register('displayName')}
               />
@@ -191,6 +205,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
               <Input
                 id="email"
                 type="email"
+                aria-label="Email / البريد الإلكتروني"
                 placeholder="customer@example.com"
                 {...form.register('email')}
               />
@@ -203,6 +218,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
               <Label htmlFor="phone">Phone</Label>
               <PhoneInput
                 id="phone"
+                aria-label="Phone / الهاتف"
                 value={form.watch('phone') || ''}
                 onChange={(val) => form.setValue('phone', val)}
               />
@@ -250,7 +266,12 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
 
             <div className="space-y-2">
               <Label htmlFor="taxId">Tax ID</Label>
-              <Input id="taxId" placeholder="Tax ID / VAT Number" {...form.register('taxId')} />
+              <Input
+                id="taxId"
+                aria-label="Tax ID / الرقم الضريبي"
+                placeholder="Tax ID / VAT Number"
+                {...form.register('taxId')}
+              />
             </div>
           </div>
 
@@ -258,6 +279,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
             <Label htmlFor="notes">Notes</Label>
             <Textarea
               id="notes"
+              aria-label="Notes / ملاحظات"
               placeholder="Internal notes about this customer"
               {...form.register('notes')}
               rows={3}
@@ -276,6 +298,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
             <Label htmlFor="billingStreet">Street Address</Label>
             <Textarea
               id="billingStreet"
+              aria-label="Billing Street / Street Address / شارع الفوترة / عنوان الشارع / مشاركة الشارع"
               placeholder="Street address"
               {...form.register('billingAddress.street')}
               rows={2}
@@ -287,6 +310,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
               <Label htmlFor="billingCountry">Country</Label>
               <CountrySelect
                 id="billingCountry"
+                aria-label="Billing Country / Country / البلد / الدولة / مشاركة الدولة"
                 value={form.watch('billingAddress.country') || ''}
                 onValueChange={(val) => {
                   form.setValue('billingAddress.country', val);
@@ -299,6 +323,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
               <Label htmlFor="billingCity">City</Label>
               <CitySelect
                 id="billingCity"
+                aria-label="Billing City / City / المدينة / مشاركة المدينة"
                 value={form.watch('billingAddress.city') || ''}
                 onValueChange={(val) => form.setValue('billingAddress.city', val)}
                 country={form.watch('billingAddress.country') || ''}
@@ -311,6 +336,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
               <Label htmlFor="billingState">State/Province</Label>
               <Input
                 id="billingState"
+                aria-label="Billing State / State / State/Province / الولاية / المقاطعة"
                 placeholder="State"
                 {...form.register('billingAddress.state')}
               />
@@ -320,6 +346,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
               <Label htmlFor="billingPostalCode">Zip/Postal Code</Label>
               <Input
                 id="billingPostalCode"
+                aria-label="Billing Postal Code / Zip / Postal Code / Zip/Postal Code / الرمز البريدي / مشاركة البريد"
                 placeholder="Postal code"
                 {...form.register('billingAddress.postalCode')}
               />
@@ -333,7 +360,13 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Shipping Address</CardTitle>
-            <Button type="button" variant="outline" size="sm" onClick={copyBillingToShipping}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={copyBillingToShipping}
+              aria-label="Copy from Billing / نسخ من الفوترة"
+            >
               Copy from Billing
             </Button>
           </div>
@@ -343,6 +376,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
             <Label htmlFor="shippingStreet">Street Address</Label>
             <Textarea
               id="shippingStreet"
+              aria-label="Shipping Street / Street Address / شارع الشحن / عنوان الشارع / مشاركة الشارع"
               placeholder="Street address"
               {...form.register('shippingAddress.street')}
               rows={2}
@@ -354,6 +388,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
               <Label htmlFor="shippingCountry">Country</Label>
               <CountrySelect
                 id="shippingCountry"
+                aria-label="Shipping Country / Country / البلد / الدولة / مشاركة الدولة"
                 value={form.watch('shippingAddress.country') || ''}
                 onValueChange={(val) => {
                   form.setValue('shippingAddress.country', val);
@@ -366,6 +401,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
               <Label htmlFor="shippingCity">City</Label>
               <CitySelect
                 id="shippingCity"
+                aria-label="Shipping City / City / المدينة / مشاركة المدينة"
                 value={form.watch('shippingAddress.city') || ''}
                 onValueChange={(val) => form.setValue('shippingAddress.city', val)}
                 country={form.watch('shippingAddress.country') || ''}
@@ -378,6 +414,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
               <Label htmlFor="shippingState">State/Province</Label>
               <Input
                 id="shippingState"
+                aria-label="Shipping State / State / State/Province / الولاية / المقاطعة"
                 placeholder="State"
                 {...form.register('shippingAddress.state')}
               />
@@ -387,6 +424,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
               <Label htmlFor="shippingPostalCode">Zip/Postal Code</Label>
               <Input
                 id="shippingPostalCode"
+                aria-label="Shipping Postal Code / Zip / Postal Code / Zip/Postal Code / الرمز البريدي / مشاركة البريد"
                 placeholder="Postal code"
                 {...form.register('shippingAddress.postalCode')}
               />
@@ -397,10 +435,20 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
 
       {/* Actions */}
       <div className="flex justify-end gap-3">
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" onClick={onCancel} aria-label="Cancel / إلغاء">
           Cancel
         </Button>
-        <Button type="submit" disabled={isSubmitting}>
+        <Button
+          type="submit"
+          disabled={isSubmitting}
+          aria-label={
+            isSubmitting
+              ? 'Saving... / جاري الحفظ'
+              : isEditing
+                ? 'Save / Update Customer / حفظ'
+                : 'Save / Create Customer / حفظ'
+          }
+        >
           {isSubmitting ? 'Saving...' : isEditing ? 'Update Customer' : 'Create Customer'}
         </Button>
       </div>
