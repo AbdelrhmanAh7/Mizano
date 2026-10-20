@@ -688,7 +688,7 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 - **Issue**: #208 `test(api): specs for fixed-asset depreciation service (#134 follow-up 3/5)`
 - **PR**: #255
 - **Branch**: `ai/208`
-- **Head SHA**: `4235342a` (tested and verified at this commit)
+- **Tested Head (`ai/208`)**: `40fea5d6` (tested and verified at this commit)
 - **Parent Issue**: #134 (R5: ledger-writing services with zero specs)
 - **Originating Sentry Issue**: None. This is an internal ledger-writing service spec addition and latent defect fix; no user-reported production incident in Sentry.
 - **E2E Waiver**: `E2E: not needed — pure test/fix with no changed user-facing flow.`
