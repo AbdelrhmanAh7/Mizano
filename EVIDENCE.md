@@ -143,6 +143,107 @@
   Lint: 4 packages successful
   ```
 
+## Issue #109 — Arabic-Indic/Persian digit normalization
+
+Tested code head: `65a635172907434efa52bec650fbd54fa4f87777` (this file is committed after it; only EVIDENCE.md differs).
+
+`normalizeDigits` (`apps/api/src/modules/ai/extraction/rules/rules-normalize.ts`) and its use in the intake rules extractor already exist on master. This PR only adds the acceptance spec `rules-normalize.spec.ts` (tagged `@issue-109`); no production code changes remain. An earlier attempt that also wired the helper into `entity-extraction.service.ts` and `ollama.service.ts` was reverted because dropped bidi marks shift entity offsets.
+
+| REQ                                         | Verified by                                                                       |
+| ------------------------------------------- | --------------------------------------------------------------------------------- |
+| AC1 `١٢٣٫٤٥` → 123.45, `١٬٢٣٤٫٥٠` → 1234.50 | `normalizeDigits` + `findAmounts` cases in rules-normalize.spec.ts                |
+| AC2 `٠٧/١٠/٢٠٢٦` = `07/10/2026`             | `parseDate` cases (Arabic-Indic and Persian)                                      |
+| AC3 mixed script `EGP ١٢٠٠`                 | mixed-script `normalizeDigits` and `extractInvoiceFields` cases                   |
+| AC4 English tests unchanged                 | `invoice-rules-extractor.spec.ts`, `rules-strategy.spec.ts` untouched and passing |
+| AC5 no float math                           | `parseAmount` returns Decimal and preserves precision (asserted)                  |
+| AC6 ≤ ~200 lines                            | no production code in the diff                                                    |
+
+Commands run (sandbox off, local):
+
+- `npx jest src/modules/ai/extraction/rules` in apps/api: 3 suites passed, 66 tests passed
+- `npx tsc --noEmit -p .` in apps/api: no errors
+- `prettier --check` on the spec: clean
+
+Not run: the seeded PDF e2e (removed; see commit a5aeed0).
+
+E2E gate note (#109): this PR changes no production code and no UI or user-flow files, only the unit acceptance spec `rules-normalize.spec.ts`. The round-two `e2e-first` review still reports “E2E-first rule not met” because no E2E or acceptance tests were added or changed. Record the gate as unresolved unless an authoritative retirement decision and the `e2e-army` result are available.
+
+Review round 3 (#109): the PDF-fixture, offset-preservation and async-path threads target code removed in a5aeed0 (no e2e PDF spec, no wiring in `entity-extraction.service.ts` / `ollama.service.ts`), so nothing remains to fix there. CodeRabbit's spec notes are fixed in `rules-normalize.spec.ts`: amount tests now pass `normalizeDigits(...)` output into `parseAmount`, the European-format case is renamed, and the Decimal(19,4) bound test covers 15/16 integer digits and 4/5 decimals. `npx jest src/modules/ai/extraction/rules` in apps/api: 3 suites, 66 tests passed.
+
+Review round 4 (#109): the three code threads (Unicode PDF fixtures, original-text offsets, async entity-extraction path) are all OUTDATED. They target the e2e PDF spec and the `entity-extraction.service.ts` / `ollama.service.ts` wiring, which were removed in a5aeed0 and are not on this branch, so no code change is needed. The EVIDENCE.md e2e note is reworded to the `E2E: not needed — <reason>` waiver form. The spec fixes from round 3 (aed8cb7) are unchanged.
+
+Review round 5 (#109):
+
+- Fixed CodeRabbit finding on `rules-normalize.spec.ts:64`: AC5 test now verifies `parseAmount('10000000000000.0001')` returns a Decimal instance (`toBeInstanceOf(Decimal)`) and preserves the exact 4-decimal fraction string that JS Number conversion would lose.
+- Fixed CodeRabbit finding on `EVIDENCE.md`: E2E gate note updated to report the round-two `e2e-first` review status as unresolved without an authoritative retirement decision and the `e2e-army` result.
+- Confirmed the 3 outdated review threads on `intake-arabic-digits.e2e-spec.ts` and `entity-extraction.service.ts` are satisfied because the relevant code was reverted in commit a5aeed0.
+
+# Issue #141 — intake worker entrypoint, processor out of the API, Pi compose worker
+
+Tested commit: `57f9a0d` (branch `ai/141`; this file is committed after it). Fresh Postgres 16, `REDIS_URL=` blank, in band.
+
+"Move out" is read as: `IntakeProcessorService` is no longer provided by `AiOperationsModule` (so `AppModule`), and the only place it is provided is `IntakeWorkerModule`. `IntakeQueueService` stays in the API as the producer (`enqueue`/`cancel`); the consumer handler is registered only when the processor exists, that is, in the worker.
+
+| REQ                                                                              | Verified by                                                                                                                                                            |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 API does not resolve the processor; upload without Redis is refused with 503 | `test/intake-worker.e2e-spec.ts` AC1 (`app.get(IntakeProcessorService)` throws; 503 `INTAKE_QUEUE_UNAVAILABLE`, no row created; see the final-behaviour section below) |
+| AC2 worker boots headless and processes a QUEUED job                             | AC2 (`IntakeWorkerModule` has no HTTP adapter; job reaches EXTRACTED, attempts 1)                                                                                      |
+| AC3 heartbeat fails when stale or missing                                        | AC3 (missing, invalid, future, stale -> false; fresh -> true, real files)                                                                                              |
+| AC4 compose defines `worker`                                                     | AC4 (mem_limit 2048m, `dist/intake-worker.js`, healthcheck, 30s grace, read-only originals)                                                                            |
+
+Commands and results:
+
+```
+npx jest -c test/jest-e2e.json --runInBand intake   2 suites, 20 tests passed
+node apps/api/_run_tests.js --testPathPattern=intake   7 suites, 99 tests passed
+tsc --noEmit (src + e2e), eslint, prettier --check   clean
+```
+
+Not run: the full API suite and a real container start of the worker image (no Docker on this machine). `dist/intake-worker.js` is only compiled by `tsc`.
+
+## Issue #141 — round 2 (CTO review T1/T2 and the IntakeModule slice)
+
+Tested on top of `47e55211` plus the working-tree changes of the commit that adds this section. Local sandbox: no Postgres (`localhost:5435` unreachable) and no Docker, so `test/intake-worker.e2e-spec.ts` was **not** re-run here; it runs on CI.
+
+| REQ                                                                      | Verified by                                                                                                                          |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| T1 deploy fails when the worker is unhealthy                             | `src/deploy-worker-gating.spec.ts`: real `wait_healthy` with a fake `docker`; red with `worker` removed from the loop, green with it |
+| T1 periodic check reports the worker                                     | same spec, asserts `healthcheck.sh` has `check_worker`, `worker-down`, `worker-unhealthy`                                            |
+| T2 `CacheService` closes its Redis client (safe when `REDIS_URL` blank)  | `src/cache/cache.service.spec.ts` `onModuleDestroy` (no-op, quit once, disconnect fallback)                                          |
+| T2 worker ends the process after close (0 ok, 1 error), once only        | `src/modules/ai/intake/intake.worker.spec.ts` `registerGracefulShutdown`                                                             |
+| Slice AC1 `IntakeModule` exports resolve                                 | `intake.worker.spec.ts` `IntakeModule` (processor, queue, jobs service, owner guard, storage)                                        |
+| Slice AC2/AC3 `createIntakeWorker()` has no HTTP adapter or port, closes | `intake.worker.spec.ts` `createIntakeWorker` (no `getHttpServer`, TCPServerWrap count unchanged, `close()` resolves)                 |
+| Slice AC4 existing intake specs unchanged                                | `intake-processor`, `intake-jobs`, `intake-storage` specs pass unmodified                                                            |
+
+```
+npx jest --detectOpenHandles src/deploy-worker-gating.spec.ts src/modules/ai/intake src/cache   7 suites, 62 tests passed, exits without --forceExit
+npx jest --findRelatedTests <changed src files>                                                  6 suites, 87 tests passed
+tsc --noEmit (src, test/tsconfig.e2e.json) exit 0; eslint on touched paths exit 0; prettier --check clean
+shellcheck lib.sh healthcheck.sh: only the existing SC1091 info (sourced file)
+```
+
+Behaviour notes: `IntakeWorkerModule` now gets the processor from `IntakeModule`, which also provides `IntakeJobsService`, so the worker runs the startup/periodic recovery sweep too (queue job ids collapse duplicates with the API's sweep). `AiOperationsModule` is unchanged in this round.
+
+### PR #237 Review Resolution (final behaviour, supersedes round 2)
+
+Tested on the merge of `origin/master` into `ai/141` plus the working-tree changes of the commit that adds this section (SHA is in `git log` for this file).
+
+Final behaviour of the queue contract: the DB row is the source of truth, so a row is never deleted to report a queue problem.
+
+- **No Redis and no local handler** (the API process, which registers none): `IntakeQueueService.assertAvailable()` throws `IntakeQueueUnavailableException` (503) at the start of `createFromUpload` and `retry`, before the stored file, the row or any status change exist. Nothing is created, so nothing is lost or orphaned. `recoverJobs` returns 0 quietly in that process (the worker's sweep does the work).
+- **Redis configured but down or erroring**: `enqueueSafely` logs and swallows the error (as before this PR); the row stays `QUEUED`, attempts 0, and the sweep re-enqueues it.
+- **One provider**: `IntakeJobsService` and `IntakeJobOwnerGuard` are provided only by `AiOperationsModule` and exported; `IntakeModule` provides only `IntakeProcessorService` and re-exports `AiOperationsModule`. A worker context has one `IntakeJobsService`, hence one recovery sweep.
+- `docs/DEVELOPMENT.md` documents that `REDIS_URL` is required for intake.
+
+| REQ                                                         | Verified by                                                                                                                                                                                                        |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| No-Redis upload: 503, no file, no row                       | `intake-jobs.service.spec.ts` 'rejects the upload with 503 before storing a file or creating a row'; e2e AC1 (not run here, no Postgres)                                                                           |
+| No-Redis retry leaves the row untouched                     | `intake-jobs.service.spec.ts` 'keeps a QUEUED row untouched when a retry is refused'                                                                                                                               |
+| No-Redis recovery sweep is a quiet no-op                    | `intake-jobs.service.spec.ts` 'skips the recovery sweep quietly...'                                                                                                                                                |
+| Redis enqueue failure keeps the row QUEUED                  | `intake-jobs.service.spec.ts` 'keeps the row QUEUED for recovery when the Redis enqueue itself fails'                                                                                                              |
+| Queue availability rule                                     | `intake-queue.service.spec.ts` 'reports unavailable and asserts with 503 until a handler is registered'                                                                                                            |
+| One `IntakeJobsService`, exports visible through the module | `intake.worker.spec.ts` `IntakeModule`: strict resolution from a consumer module, `recoverJobs` called once. With `IntakeJobsService` added back to `IntakeModule.providers` the test fails (2 calls instead of 1) |
+
 ---
 
 # Issue #127 Verification — Cap Node heap for api and worker from env with validated config
@@ -438,6 +539,145 @@ Each trial balance has two tenant filters: the account list and the line totals.
 **Size (AC5).** `git diff --numstat origin/master HEAD -- apps/api e2e-army` at the tested commit: `tenant-isolation.e2e-spec.ts` 285, three services 23, e2e-army 0 = 308 added lines of test and source. The earlier 501 came from a 367-line spec and a 108-line e2e-army file; the e2e-army file was removed and the three AC2 list tests were merged. All four earlier reviewer requests stay covered: second general-ledger route, `meta.total`, vendor-credit netting in AP aging, foreign cursor ids.
 
 **Suite stability.** Before `34a8ca9c` the unmutated suite failed in about 1 of 7 to 16 consecutive runs on this shared machine, always while seeding or on one request (405 on `POST /bills/:id/approve`, 404 on `POST /vendor-credits`, `socket hang up`), never in an assertion. Cause: supertest binds and releases a fresh ephemeral port per request, and another process can claim it in between. `beforeAll` now calls `app.listen(0, '127.0.0.1')` once. After the change, 60 consecutive runs passed. The cause is inferred from the pattern and the fix, not traced to a specific foreign process.
+
+---
+
+# EVIDENCE.md — Issue #87: pdf-parse and zero-offset Buffers
+
+- **Tested commit**: `22c873fb` (branch `ai/87`, merged with `origin/master`).
+- **Originating Sentry issue**: None (none linked in the issue brief).
+- **User-facing flow / E2E**: Not user-facing (internal intake parsing utility). `E2E: not needed — pure internal utility fix, no user-facing flow or schema change.`
+- **Changed covering tests**: `apps/api/src/modules/ai/utils/pdf-extractor.util.spec.ts` (new spec, 3 tests).
+
+## Acceptance criteria
+
+1. **AC1**: Every pdf-parse call site passes a fresh `Uint8Array` copy (zero-offset, covers only the PDF bytes). Find all sites with `grep -rn pdf-parse apps/api/src`.
+2. **AC2**: Unit test feeds a `Buffer` sliced from a larger pool (non-zero `byteOffset`) and asserts the text is correctly extracted.
+3. **AC3**: One line added to `docs/agents/review-lessons.md` about zero-offset buffers for pdf.js.
+
+## Verification Matrix
+
+| AC  | Requirement Description                                               | Evidence / Command                                                                                                                                                            | Exit Code | Status |
+| --- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
+| AC1 | Every pdf-parse call site passes a fresh `Uint8Array` copy            | `grep -rn pdf-parse apps/api/src` → single call site `pdf-extractor.util.ts`; line 22 creates `new Uint8Array(buffer)` and passes it to both v1 and v2 code paths             | 0         | PASSED |
+| AC2 | Unit test feeds Buffer with non-zero `byteOffset` and asserts text    | `npx jest --testPathPattern="pdf-extractor.util.spec" --no-coverage` from `apps/api/`: 3 tests PASS — sliced buffer (byteOffset=50), zero-offset assertion, plain buffer path | 0         | PASSED |
+| AC3 | One line in `docs/agents/review-lessons.md` about zero-offset buffers | `git diff master -- docs/agents/review-lessons.md` → one bullet added: "Give pdf.js a zero-offset copy…" _(#87)_                                                              | 0         | PASSED |
+| —   | Type check                                                            | `pnpm --filter api type-check`                                                                                                                                                | 0         | PASSED |
+| —   | Lint                                                                  | `pnpm --filter api lint`                                                                                                                                                      | 0         | PASSED |
+
+## Regression demonstration (bug fix: test fails on base, passes on head)
+
+Run on `origin/master` (before fix — pdf-parse receives raw sliced `Buffer`):
+
+```
+FAIL src/modules/ai/utils/pdf-extractor.util.spec.ts
+  ✕ hands pdf-parse a fresh zero-offset copy that covers only the PDF bytes
+    Expected: 0  (byteOffset)
+    Received: 50
+Exit code 1
+```
+
+Run on `ai/87` HEAD (after fix — pdf-parse receives `new Uint8Array(buffer)`):
+
+```
+PASS src/modules/ai/utils/pdf-extractor.util.spec.ts
+  ✓ extracts text from a Buffer with non-zero byteOffset (sliced from a larger pool)
+  ✓ hands pdf-parse a fresh zero-offset copy that covers only the PDF bytes
+  ✓ extracts the same text from a plain zero-offset Buffer
+Tests: 3 passed, 3 total  Exit code 0
+```
+
+## Index: other issues
+
+- Issue #94 (decimal money math and idempotent posting): [docs/evidence/94/EVIDENCE.md](docs/evidence/94/EVIDENCE.md).
+- Issue #253 (guard against leftover conflict markers): [Issue #253 Verification](#issue-253-verification--guard-against-leftover-merge-conflict-markers-in-markdown).
+
+---
+
+# Issue #253 Verification — Guard against leftover merge-conflict markers in markdown
+
+- **Issue**: #253 (fix: qa finding: EVIDENCE.md leftover merge-conflict marker, split from #237)
+- **Base Commit (`origin/master`)**: `5a8be028`
+- **Tested Head (`ai/253`)**: `ad7fa04b`
+- **Originating Sentry issue**: None (internal QA finding on PR #237, item `finding:7d58c29ac8ff`)
+- **Scope & Context**:
+  - In PR #237 (branch `ai/141`), a leftover merge-conflict marker `> > > > > > > origin/master` was committed after the #127 section in `EVIDENCE.md`.
+  - That leftover marker was already resolved and removed when PR #237 landed on `master` (commit `b8c0ab1e8b2dc8b348edabdf4fdd009ac7c3aa65`).
+  - Confirmed on the final repository head that no conflict marker exists in `EVIDENCE.md` or any tracked markdown file.
+  - This PR supersedes part of #237 by introducing the automated regression guard test (`scripts/test_no_conflict_markers.py`) to prevent leftover git merge-conflict markers (both standard git markers and prettier-reformatted markers) from entering tracked markdown files.
+
+---
+
+## Acceptance Criteria & Verification Matrix
+
+| AC ID | Acceptance Criterion                                                                                     | Verification Method                                                                                                               | Exit Code | Status |
+| ----- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
+| AC1   | No leftover merge-conflict marker exists in `EVIDENCE.md` or any tracked markdown file                   | Confirmed on head: 0 markers in 47 tracked markdown files via `scripts/test_no_conflict_markers.py`                               | 0         | PASSED |
+| AC2   | Automated regression guard test exists, handles code fences/headings/banners, and passes cleanly on head | `nice -n 10 python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v`                                          | 0         | PASSED |
+| AC3   | Planted marker causes the regression guard test to fail fast naming exact file:line                      | Planted marker (`> > > > > > > origin/master`) at end of `EVIDENCE.md` causes test failure on that line with immediate clean exit | 1         | PASSED |
+
+---
+
+## Verification Evidence
+
+### AC1 & AC2: Guard test execution on clean repository head
+
+Command:
+
+```bash
+nice -n 10 python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v
+```
+
+Output:
+
+```text
+test_bare_seven_equals_outside_heading_flagged (test_no_conflict_markers.ConflictMarkerMatcherTests.test_bare_seven_equals_outside_heading_flagged) ... ok
+test_full_conflict_block_detected (test_no_conflict_markers.ConflictMarkerMatcherTests.test_full_conflict_block_detected) ... ok
+test_long_equals_lines_not_flagged (test_no_conflict_markers.ConflictMarkerMatcherTests.test_long_equals_lines_not_flagged) ... ok
+test_markers_inside_fenced_code_blocks_ignored (test_no_conflict_markers.ConflictMarkerMatcherTests.test_markers_inside_fenced_code_blocks_ignored) ... ok
+test_normal_heading_underline_passes (test_no_conflict_markers.ConflictMarkerMatcherTests.test_normal_heading_underline_passes) ... ok
+test_planted_prettier_escaped_markers_fail (test_no_conflict_markers.ConflictMarkerMatcherTests.test_planted_prettier_escaped_markers_fail) ... ok
+test_planted_raw_markers_fail (test_no_conflict_markers.ConflictMarkerMatcherTests.test_planted_raw_markers_fail) ... ok
+test_prettier_escaped_leftover_marker_detected (test_no_conflict_markers.ConflictMarkerMatcherTests.test_prettier_escaped_leftover_marker_detected) ... ok
+test_setext_heading_underline_after_markdown_syntax (test_no_conflict_markers.ConflictMarkerMatcherTests.test_setext_heading_underline_after_markdown_syntax) ... ok
+test_no_conflict_markers_in_tracked_markdown (test_no_conflict_markers.TrackedMarkdownConflictMarkerTests.test_no_conflict_markers_in_tracked_markdown) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.026s
+
+OK
+```
+
+Exit code: 0
+
+### AC3: Planted regression test failure demonstration
+
+Note on base comparison: The leftover marker from PR #237 was already removed during merge into master. To demonstrate regression detection on the current head, the marker was temporarily planted by appending to `EVIDENCE.md`.
+
+Command:
+
+```bash
+echo "> > > > > > > origin/master" >> EVIDENCE.md && python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v
+```
+
+Output:
+
+```text
+FAIL: test_no_conflict_markers_in_tracked_markdown (test_no_conflict_markers.TrackedMarkdownConflictMarkerTests.test_no_conflict_markers_in_tracked_markdown)
+AssertionError: Lists differ: ['EVIDENCE.md:636: > > > > > > > origin/master'] != []
+First list contains 1 additional elements.
+First extra element 0:
+'EVIDENCE.md:636: > > > > > > > origin/master'
+- ['EVIDENCE.md:636: > > > > > > > origin/master']
++ [] : Merge conflict markers found in tracked markdown files:
+EVIDENCE.md:636: > > > > > > > origin/master
+----------------------------------------------------------------------
+Ran 10 tests in 0.016s
+
+FAILED (failures=1)
+```
+
+Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDENCE.md`).
 
 ---
 
