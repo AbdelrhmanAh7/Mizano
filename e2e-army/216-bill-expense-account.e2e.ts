@@ -71,8 +71,26 @@ test(
 
     await app.open('/ar/purchases/bills/new');
     await expect(screen.getByText('حساب المصروف').first()).toBeVisible();
+    await expect(screen.getByRole('button', { name: 'إضافة سطر' })).toBeVisible();
     expect(await browser.evaluate(() => document.documentElement.dir)).toBe('rtl');
     await agent.assert('each bill line has an expense account select labelled in Arabic');
+  },
+);
+
+test(
+  '@issue-216 AC1 (multi-line): clicking "Add line" allows filling description and expense account on subsequent lines',
+  { tags: ['feat:mz-purchase-bills', 'lvl:ui'] },
+  async ({ app, agent, screen }) => {
+    await app.open('/en/login');
+    await agent.act('sign in as {email} with password {pw}', { params: LOGIN });
+
+    await app.open('/en/purchases/bills/new');
+    await agent.act('click "Add line" to add a second bill line');
+    await agent.act(
+      'on the second line type the description {desc}, quantity {qty} and unit price {rate}',
+      { params: { desc: `${SEED}-second-line`, qty: '2', rate: '50' } },
+    );
+    await agent.assert('both bill lines are visible and editable in the table');
   },
 );
 

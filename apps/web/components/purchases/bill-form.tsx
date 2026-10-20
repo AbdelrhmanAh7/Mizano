@@ -403,12 +403,12 @@ export function BillForm({
               <TableRow>
                 <TableHead className="w-[200px]">{tForm('item')}</TableHead>
                 <TableHead className="w-[200px]">{tForm('expenseAccount')}</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="w-[80px]">Qty</TableHead>
-                <TableHead className="w-[110px]">Unit Price</TableHead>
-                <TableHead className="w-[110px] text-right">Amount</TableHead>
-                <TableHead className="w-[100px]">Tax %</TableHead>
-                <TableHead className="w-[110px] text-right">Total</TableHead>
+                <TableHead>{tForm('description')}</TableHead>
+                <TableHead className="w-[80px]">{tForm('qty')}</TableHead>
+                <TableHead className="w-[110px]">{tForm('unitPrice')}</TableHead>
+                <TableHead className="w-[110px] text-right">{tForm('amount')}</TableHead>
+                <TableHead className="w-[100px]">{tForm('taxPercent')}</TableHead>
+                <TableHead className="w-[110px] text-right">{tForm('total')}</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -461,37 +461,41 @@ export function BillForm({
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-testid={`line-${index}-description`}>
                       <Input
                         {...form.register(`lines.${index}.description`)}
-                        placeholder="Description"
+                        placeholder={tForm('descriptionPlaceholder')}
+                        aria-label={tForm('description')}
                         className="h-8"
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-testid={`line-${index}-quantity`}>
                       <Input
                         {...form.register(`lines.${index}.quantity`)}
                         type="number"
                         step="0.0001"
+                        aria-label={tForm('qty')}
                         className="h-8"
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-testid={`line-${index}-rate`}>
                       <Input
                         {...form.register(`lines.${index}.rate`)}
                         type="number"
                         step="0.0001"
+                        aria-label={tForm('unitPrice')}
                         className="h-8"
                       />
                     </TableCell>
                     <TableCell className="text-right font-mono">{lineTotals.net}</TableCell>
-                    <TableCell>
+                    <TableCell data-testid={`line-${index}-taxRate`}>
                       <Input
                         {...form.register(`lines.${index}.taxRate`)}
                         type="number"
                         min={0}
                         step={0.01}
                         placeholder="0.00"
+                        aria-label={tForm('taxPercent')}
                         className="h-8 w-24"
                       />
                     </TableCell>
@@ -506,7 +510,7 @@ export function BillForm({
                           size="icon"
                           className="h-8 w-8"
                           onClick={() => remove(index)}
-                          aria-label="Delete line item"
+                          aria-label={tForm('deleteLine')}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -531,27 +535,28 @@ export function BillForm({
             variant="outline"
             size="sm"
             className="mt-4"
+            aria-label={tForm('addLine')}
             onClick={() =>
               append({ accountId: '', description: '', quantity: '1', rate: '', taxRate: '0' })
             }
           >
             <Plus className="mr-2 h-4 w-4" />
-            Add Line
+            {tForm('addLine')}
           </Button>
 
           {/* Totals */}
           <div className="mt-6 flex justify-end">
             <div className="w-64 space-y-2">
               <div className="flex justify-between text-sm">
-                <span>Subtotal</span>
+                <span>{tForm('subtotal')}</span>
                 <span className="font-mono">{totals.subtotal}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span>Tax</span>
+                <span>{tForm('tax')}</span>
                 <span className="font-mono">{totals.taxAmount}</span>
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2">
-                <span>Total</span>
+                <span>{tForm('total')}</span>
                 <span className="font-mono">{totals.grandTotal}</span>
               </div>
             </div>

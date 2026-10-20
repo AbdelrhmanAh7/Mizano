@@ -263,4 +263,25 @@ describe('BillForm expense account per line (#216)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create Bill' }));
     expect(await screen.findByText('السطر 1: اختر حساب المصروف')).toBeInTheDocument();
   });
+
+  it('renders localized Add Line button and allows filling Description on newly added lines', async () => {
+    renderForm();
+    const addLineButton = screen.getByRole('button', { name: /Add line/i });
+    expect(addLineButton).toBeInTheDocument();
+    fireEvent.click(addLineButton);
+
+    const descInputs = screen.getAllByRole('textbox', { name: 'Description' });
+    expect(descInputs).toHaveLength(2);
+    fireEvent.change(descInputs[1], { target: { value: 'Second line description' } });
+    expect(descInputs[1]).toHaveValue('Second line description');
+  });
+
+  it('labels the Add Line button and table columns in Arabic on /ar', async () => {
+    mockLocale = 'ar';
+    renderForm();
+    expect(screen.getByRole('button', { name: 'إضافة سطر' })).toBeInTheDocument();
+    expect(screen.getByText('الوصف')).toBeInTheDocument();
+    expect(screen.getByText('سعر الوحدة')).toBeInTheDocument();
+    expect(screen.getAllByText('الإجمالي').length).toBeGreaterThanOrEqual(1);
+  });
 });

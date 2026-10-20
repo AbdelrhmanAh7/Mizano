@@ -180,7 +180,18 @@
       "lineItemRequired": "At least one line item is required",
       "item": "Item",
       "expenseAccount": "Expense account",
-      "expenseAccountPlaceholder": "Choose an expense account"
+      "expenseAccountPlaceholder": "Choose an expense account",
+      "description": "Description",
+      "descriptionPlaceholder": "Description",
+      "qty": "Qty",
+      "unitPrice": "Unit Price",
+      "amount": "Amount",
+      "taxPercent": "Tax %",
+      "total": "Total",
+      "subtotal": "Subtotal",
+      "tax": "Tax",
+      "addLine": "Add line",
+      "deleteLine": "Delete line item"
     },
     "table": {
       "billNumber": "Bill #",

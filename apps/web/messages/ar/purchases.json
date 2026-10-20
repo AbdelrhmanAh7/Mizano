@@ -180,7 +180,18 @@
       "lineItemRequired": "مطلوب عنصر واحد على الأقل",
       "item": "الصنف",
       "expenseAccount": "حساب المصروف",
-      "expenseAccountPlaceholder": "اختر حساب المصروف"
+      "expenseAccountPlaceholder": "اختر حساب المصروف",
+      "description": "الوصف",
+      "descriptionPlaceholder": "الوصف",
+      "qty": "الكمية",
+      "unitPrice": "سعر الوحدة",
+      "amount": "المبلغ",
+      "taxPercent": "نسبة الضريبة",
+      "total": "الإجمالي",
+      "subtotal": "المجموع الفرعي",
+      "tax": "الضريبة",
+      "addLine": "إضافة سطر",
+      "deleteLine": "حذف البند"
     },
     "table": {
       "billNumber": "رقم الفاتورة",
