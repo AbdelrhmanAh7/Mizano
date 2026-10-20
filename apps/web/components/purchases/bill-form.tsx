@@ -423,7 +423,7 @@ export function BillForm({
                         value={form.watch(`lines.${index}.itemId`) || 'none'}
                         onValueChange={(value) => handleItemSelect(index, value)}
                       >
-                        <SelectTrigger className="h-8">
+                        <SelectTrigger className="h-8" aria-label={tForm('item')}>
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
