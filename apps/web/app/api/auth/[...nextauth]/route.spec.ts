@@ -22,6 +22,20 @@ describe('GET /api/auth/session (NextAuth route)', () => {
 
   beforeEach(() => cookieJar.clear());
 
+  const baseToken: JWT = {
+    email: 'admin@mizano.com',
+    name: 'Admin User',
+    id: 'user-1',
+    firstName: 'Admin',
+    lastName: 'User',
+    organizationId: 'org-1',
+    role: 'admin',
+    accessToken: 'access-token-1',
+    refreshToken: 'secret-refresh-token',
+    // Far from expiry, so the jwt callback returns the token without a network refresh.
+    accessTokenExpires: Date.now() + 10 * 60 * 1000,
+  };
+
   async function getSession(): Promise<{ status: number; body: string }> {
     const { GET } = await import('./route');
     const req = Object.assign(new Request('http://localhost:5001/api/auth/session'), {
@@ -32,20 +46,7 @@ describe('GET /api/auth/session (NextAuth route)', () => {
   }
 
   it('returns the signed-in session with all user fields, accessToken and a string expires', async () => {
-    const token: JWT = {
-      email: 'admin@mizano.com',
-      name: 'Admin User',
-      id: 'user-1',
-      firstName: 'Admin',
-      lastName: 'User',
-      organizationId: 'org-1',
-      role: 'admin',
-      accessToken: 'access-token-1',
-      refreshToken: 'secret-refresh-token',
-      // Far from expiry, so the jwt callback returns the token without a network refresh.
-      accessTokenExpires: Date.now() + 10 * 60 * 1000,
-    };
-    cookieJar.set('next-auth.session-token', await encode({ token, secret: SECRET }));
+    cookieJar.set('next-auth.session-token', await encode({ token: baseToken, secret: SECRET }));
 
     const { status, body } = await getSession();
     const session = JSON.parse(body) as Record<string, unknown>;
@@ -53,6 +54,22 @@ describe('GET /api/auth/session (NextAuth route)', () => {
     expect(status).toBe(200);
     // AC1: verify the complete session shape — all reachable user fields,
     // accessToken, and a string expires value.
+    expect(session).toHaveProperty('user');
+    const user = session.user as Record<string, unknown>;
+    expect(user).toHaveProperty('id', 'user-1');
+    expect(user).toHaveProperty('email', 'admin@mizano.com');
+    expect(user).toHaveProperty('name', 'Admin User');
+    expect(user).toHaveProperty('firstName', 'Admin');
+    expect(user).toHaveProperty('lastName', 'User');
+    expect(user).toHaveProperty('organizationId', 'org-1');
+    expect(user).toHaveProperty('role', 'admin');
+
+    expect(session).toHaveProperty('accessToken', 'access-token-1');
+    expect(typeof session.accessToken).toBe('string');
+    expect(session).toHaveProperty('expires');
+    expect(typeof session.expires).toBe('string');
+
+    // Deep equality ensures no missing or unexpected fields exist.
     expect(session).toEqual({
       user: {
         name: 'Admin User',
@@ -67,32 +84,38 @@ describe('GET /api/auth/session (NextAuth route)', () => {
       expires: expect.any(String),
     });
     // AC2: the refresh token must NOT appear in the client-visible session.
+    expect(session).not.toHaveProperty('refreshToken');
     expect(Object.keys(session)).not.toContain('refreshToken');
-    expect(Object.keys(session.user as Record<string, unknown>)).not.toContain('refreshToken');
+    expect(user).not.toHaveProperty('refreshToken');
+    expect(Object.keys(user)).not.toContain('refreshToken');
     expect(body).not.toContain('refreshToken');
     expect(body).not.toContain('secret-refresh-token');
   });
 
   it('includes error in the session when token.error is present', async () => {
-    const token: JWT = {
-      email: 'admin@mizano.com',
-      name: 'Admin User',
-      id: 'user-1',
-      firstName: 'Admin',
-      lastName: 'User',
-      organizationId: 'org-1',
-      role: 'admin',
-      accessToken: 'access-token-1',
-      refreshToken: 'secret-refresh-token',
-      accessTokenExpires: Date.now() + 10 * 60 * 1000,
-      error: 'RefreshAccessTokenError',
-    };
+    const token: JWT = { ...baseToken, error: 'RefreshAccessTokenError' };
     cookieJar.set('next-auth.session-token', await encode({ token, secret: SECRET }));
 
     const { status, body } = await getSession();
     const session = JSON.parse(body) as Record<string, unknown>;
 
     expect(status).toBe(200);
+    expect(session).toHaveProperty('user');
+    const user = session.user as Record<string, unknown>;
+    expect(user).toHaveProperty('id', 'user-1');
+    expect(user).toHaveProperty('email', 'admin@mizano.com');
+    expect(user).toHaveProperty('name', 'Admin User');
+    expect(user).toHaveProperty('firstName', 'Admin');
+    expect(user).toHaveProperty('lastName', 'User');
+    expect(user).toHaveProperty('organizationId', 'org-1');
+    expect(user).toHaveProperty('role', 'admin');
+
+    expect(session).toHaveProperty('accessToken', 'access-token-1');
+    expect(typeof session.accessToken).toBe('string');
+    expect(session).toHaveProperty('expires');
+    expect(typeof session.expires).toBe('string');
+    expect(session).toHaveProperty('error', 'RefreshAccessTokenError');
+
     expect(session).toEqual({
       user: {
         name: 'Admin User',
@@ -107,8 +130,10 @@ describe('GET /api/auth/session (NextAuth route)', () => {
       expires: expect.any(String),
       error: 'RefreshAccessTokenError',
     });
+    expect(session).not.toHaveProperty('refreshToken');
     expect(Object.keys(session)).not.toContain('refreshToken');
-    expect(Object.keys(session.user as Record<string, unknown>)).not.toContain('refreshToken');
+    expect(user).not.toHaveProperty('refreshToken');
+    expect(Object.keys(user)).not.toContain('refreshToken');
     expect(body).not.toContain('refreshToken');
     expect(body).not.toContain('secret-refresh-token');
   });

@@ -50,3 +50,16 @@ test(
     expect(JSON.stringify(session)).not.toContain('refreshToken');
   },
 );
+
+test(
+  '@issue-252 AC4: signed-out session returns empty object and omits refreshToken',
+  { tags: ['feat:mz-auth', 'lvl:api'] },
+  async ({ app }) => {
+    const res = await fetch(new URL('/api/auth/session', app.baseUrl));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({});
+    expect(JSON.stringify(body)).not.toContain('refreshToken');
+  },
+);
+
