@@ -158,30 +158,27 @@ Checks on PRs and pushes to `master`, by source:
 
 ### Pipeline optimizations (`ci.yml`)
 
-The GitHub Actions workflow includes gating, draft skips, Turbo caching, and conditional native-runner Docker builds:
+The GitHub Actions workflow includes gating, draft skips, and Turbo caching:
 
 #### Trigger rules
 
-- **Push to `master` or `develop`**: full CI runs (install → lint/type-check → test → build → Docker multi-arch validation).
+- **Push to `master` or `develop`**: full CI runs (install → lint/type-check → test → build).
 - **Pull requests**: CI runs on `opened`, `synchronize`, `reopened`, `ready_for_review` and `labeled`.
 - **Draft PRs**: CI is **skipped** unless the PR has the `ci` label. Adding `ci` to an existing draft starts CI without a new commit. When marked `ready_for_review`, a real CI run is triggered before any merge.
-- **Labels**: only `ci` and `docker` change what runs. Adding a label re-runs CI on the same commit: a run whose jobs were all skipped would report under the same check names as the real run and hide a failing one, so adding a label never produces a skipped run (except on a draft without `ci`, which has no real run to hide). The `ci` and `docker` labels must exist in the repository before they can be applied. Removing a label does not trigger a run (`labeled` event only).
-- **Concurrency**: one run per PR (keyed by PR number) or per pushed commit (keyed by SHA). A newer PR run (a push or adding a label) cancels the older one as a whole, including the Docker job. Pushes to `master`/`develop` never cancel or replace each other (each commit gets its own SHA group and runs independently), so every commit on those branches keeps a complete CI result (the deploy workflow starts from the CI result of `master`).
+- **Labels**: the `ci` label allows running CI on draft PRs without a new commit. Adding a label re-runs CI on the same commit: a run whose jobs were all skipped would report under the same check names as the real run and hide a failing one, so adding a label never produces a skipped run (except on a draft without `ci`, which has no real run to hide). The `ci` label must exist in the repository before it can be applied. Removing a label does not trigger a run (`labeled` event only).
+- **Concurrency**: one run per PR (keyed by PR number) or per pushed commit (keyed by SHA). A newer PR run (a push or adding a label) cancels the older one as a whole. Pushes to `master`/`develop` never cancel or replace each other (each commit gets its own SHA group and runs independently), so every commit on those branches keeps a complete CI result (the deploy workflow starts from the CI result of `master`).
 
 #### Job flow
 
 1. **gate** (`CI Gate`, timeout 5m) — sets `should_run`. Event data reaches the script as environment variables, never through `${{ }}` inside the script, so a label name cannot inject shell code.
-2. **filter** (`Path Filter`, timeout 5m) — `dorny/paths-filter` detects changes to Docker-relevant files: `apps/api/Dockerfile`, `apps/web/Dockerfile`, `.dockerignore`, `deploy/**`, `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`. Base is set only for pushes (`github.event.before`); PRs leave `base` empty so the action queries the GitHub API (`pull-requests: read`). A push whose `before` commit is all-zeros or missing from the clone treats Docker files as changed.
-3. **install** (`Install Dependencies`, timeout 5m) — shared dependency install (pnpm store cache) and `prisma generate`.
-4. **lint**, **test**, **build** (each timeout 5m) — run in parallel after install. Each lists `gate` and `install` in `needs`. The lint job also runs the `scripts/test_turbo_config.py` guard (see Turbo task inputs below). The build job restores the Next.js build cache.
-5. **docker-build** (`Docker Multi-Arch Build`, timeout 5m) — multi-arch Docker **validation**, split into parallel matrix legs per image and architecture (`api`/`web` on `amd64`/`arm64`). It starts only after lint, test and build passed, and only when the event is a push, or the PR changes a Docker-relevant file (per filter), or the PR has the `docker` label. Adding `docker` to an existing PR starts it without a new commit. Every leg strictly adheres to `timeout-minutes: 5` by building images independently and leveraging native runners and layer caches.
+2. **install** (`Install Dependencies`, timeout 5m) — shared dependency install (pnpm store cache) and `prisma generate`.
+3. **lint**, **test**, **build** (each timeout 5m) — run in parallel after install. Each lists `gate` and `install` in `needs`. The lint job also runs the `scripts/test_turbo_config.py` guard (see Turbo task inputs below). The build job restores the Next.js build cache.
 
 #### Caching
 
 - **pnpm store**: `setup-node` with `cache: 'pnpm'`.
 - **turbo**: `.turbo/cache` is restored before the Turbo tasks of the lint, test and build jobs and saved when the job succeeds (`actions/cache`), with one key prefix per job (`turbo-lint-`, `turbo-test-`, `turbo-build-`) because the tasks differ. Keys include `pnpm-lock.yaml`, `turbo.json` and the SHA; `restore-keys` give partial hits. The pipeline relies solely on `actions/cache` without external secrets or third-party remote cache tokens, adhering to the "no secrets beyond `GITHUB_TOKEN`" security policy.
 - **Next.js cache**: `apps/web/.next/cache` is restored during `build` to speed up compilation.
-- **Docker layers**: GitHub Actions cache (`type=gha`) with a separate scope per image and architecture (`api-amd64`, `api-arm64`, `web-amd64`, `web-arm64`); a shared scope would let the next build overwrite the cache of the previous one.
 
 #### Turbo task inputs
 
@@ -194,10 +191,6 @@ The GitHub Actions workflow includes gating, draft skips, Turbo caching, and con
 pnpm turbo run type-check --filter=@mizano/web --dry=json
 # the changed file must appear under tasks[].inputs and cache.status must be "MISS"
 ```
-
-#### Docker multi-arch validation
-
-The `docker-build` job builds each image and architecture independently in parallel on native runners under the 5-minute limit (`timeout-minutes: 5`), and **never pushes** (`push: false`). The first version emulated arm64 with QEMU on `ubuntu-latest`; `pnpm install --frozen-lockfile` made no progress for the whole 60-minute timeout (the same step took 44 seconds for amd64), so the arm64 leg now runs on `ubuntu-24.04-arm`, which is free for public repositories (this repository is public). Publishing belongs to `deploy.yml`, which tags the images with the short SHA: the web image bakes `NEXT_PUBLIC_API_URL` in at build time, so an image built in CI with a placeholder URL must not be pushed as `latest`. When registry names are built for a push elsewhere, lower-case the owner (GHCR rejects `ghcr.io/AbdelrhmanAh7/...`).
 
 `.github/workflows/demo-planning.yml` validates and syncs `docs/planning/` metadata with `scripts/sync-demo-planning.py`; see the [planning guide](planning/README.md).
 

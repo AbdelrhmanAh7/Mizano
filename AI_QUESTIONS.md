@@ -2,7 +2,7 @@
 
 ## PR #82: Timeout for `docker-build` job in PR #82
 
-- **Resolution**: Per CTO rework directive, Option 2 was implemented: `docker-build` is split into parallel per-image and per-architecture matrix legs (`api` / `web` on `amd64` / `arm64`), strictly enforcing `timeout-minutes: 5` across every job in `.github/workflows/ci.yml`. No 5-minute owner rule exceptions remain.
+- **Resolution**: docker-build removed from PR #82; follow-up issue tracks a ≤5-minute design (e.g. split pnpm install/build stages or a pre-built base layer)
 
 # Questions / follow-ups for #186 (CI config is owner-only, so nothing was changed there)
 
