@@ -641,7 +641,6 @@ Tests: 3 passed, 3 total  Exit code 0
 ## Index: other issues
 
 - Issue #94 (decimal money math and idempotent posting): [docs/evidence/94/EVIDENCE.md](docs/evidence/94/EVIDENCE.md).
-- Issue #167 / #277 (web sends `quantityProduced`): [docs/evidence/167/EVIDENCE.md](docs/evidence/167/EVIDENCE.md).
 - Issue #253 (guard against leftover conflict markers): [Issue #253 Verification](#issue-253-verification--guard-against-leftover-merge-conflict-markers-in-markdown).
 
 ---

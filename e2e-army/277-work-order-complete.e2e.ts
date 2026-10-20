@@ -1,10 +1,11 @@
 import { test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 
-const SEED = 'army-277';
+const RUN_ID = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
 function apiBase(baseUrl: string): string {
-  return (process.env.E2E_ARMY_API ?? new URL('/api', baseUrl).toString()).replace(/\/+$/, '');
+  const raw = process.env.E2E_ARMY_API ?? process.env.E2E_ARMY_URL ?? baseUrl;
+  return /\/api$/.test(raw) ? raw : `${raw.replace(/\/+$/, '')}/api`;
 }
 
 type Json = { id?: string; data?: { id?: string } };
@@ -36,19 +37,18 @@ async function createStartedWorkOrder(baseUrl: string): Promise<string> {
   const headers = { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` };
 
   const item = (code: string) => ({
-    name: `${SEED}-${code}`,
-    code: `${SEED}-${code}`,
+    name: `army-277-${code}-${RUN_ID}`,
+    sku: `army-277-${code}-${RUN_ID}`,
     type: 'GOODS',
     unit: 'PCS',
+    sellingPrice: '10.00',
   });
-  const outputItemId = await post(api, '/inventory/items', headers, item('OUT'));
-  const componentItemId = await post(api, '/inventory/items', headers, item('COMP'));
+  const outputItemId = await post(api, '/items', headers, item('OUT'));
   const bomId = await post(api, '/manufacturing/bom', headers, {
-    name: `${SEED}-bom`,
+    name: `army-277-bom-${RUN_ID}`,
     outputItemId,
     outputQuantity: 1,
-    components: [{ itemId: componentItemId, quantity: 2 }],
-    operationsCost: 10,
+    operationsCost: 0,
     isActive: true,
   });
   const workOrderId = await post(api, '/manufacturing/work-orders', headers, {
