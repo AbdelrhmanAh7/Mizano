@@ -430,18 +430,28 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
         delivery.deferredUntil !== null,
       );
     } catch (error) {
-      const deferred = error instanceof IntakeDeferred;
-      if (deferred || this.stopping) {
+      if (this.stopping) {
+        await this.prisma.telegramDelivery.updateMany({
+          where,
+          data: { attempts: { decrement: 1 } },
+        });
+        throw error;
+      }
+      if (error instanceof IntakeDeferred) {
         await this.prisma.telegramDelivery.updateMany({
           where,
           data: {
             attempts: { decrement: 1 },
-            ...(deferred ? { deferredUntil: new Date(Date.now() + DEFER_MS) } : {}),
+            deferredUntil: new Date(Date.now() + DEFER_MS),
           },
         });
+        return;
       }
-      if (deferred) return;
-      throw error;
+      this.logger.error(
+        `Telegram delivery failed: ${describeError(error, { includeMessage: false })}`,
+      );
+      await this.deferDelivery(delivery);
+      return;
     }
     await this.prisma.telegramDelivery.updateMany({
       where,

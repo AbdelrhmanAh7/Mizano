@@ -3121,6 +3121,7 @@ model TelegramDelivery {
   fileName       String
   mimeType       String
   fileSize       Int?
+  /// Telegram sender ID (from.id). Null for channel posts, anonymous senders, or when Telegram omits the from field.
   senderId       BigInt?
   attempts       Int       @default(0)
   intakeJobId    String?
@@ -3131,6 +3132,7 @@ model TelegramDelivery {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  // Primary key uses (botKey, updateId) because Telegram update_ids are guaranteed unique per bot instance (botKey = sha256(token)).
   @@id([botKey, updateId])
   @@index([organizationId, createdAt])
   @@index([botKey, completedAt, deferredUntil])

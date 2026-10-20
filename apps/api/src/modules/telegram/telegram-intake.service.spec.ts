@@ -563,24 +563,30 @@ describe('TelegramIntakeService', () => {
     expect(jobs.createFromUpload).toHaveBeenCalledTimes(2);
   });
 
-  it('retries a failing update before later updates, without acknowledging or logging content', async () => {
-    const { svc, client, jobs, sent } = setup();
-    jobs.createFromUpload.mockRejectedValueOnce(
-      new Error(`boom ${TOKEN} ${CAPTION} api.telegram.org/bot${TOKEN}`),
+  it('defers a delivery when downloadFile rejects once, ingests a later update from another tenant, and advances the cursor', async () => {
+    jest.useFakeTimers();
+    const { svc, client, jobs, deliveries } = setup();
+    client.downloadFile.mockRejectedValueOnce(
+      new Error(`503 Service Unavailable ${TOKEN} ${CAPTION} api.telegram.org/bot${TOKEN}`),
     );
     client.getUpdates.mockResolvedValueOnce([upd(doc(), 1), upd(doc({ message_id: 8 }), 2)]);
-    await expect(svc.pollOnce(0)).rejects.toThrow('boom');
-    expect(await svc.loadOffset()).toBe(0);
-    expect(jobs.createFromUpload).toHaveBeenCalledTimes(1);
-    expect(sent[0].text).toContain('will be retried');
-    client.getUpdates.mockResolvedValueOnce([upd(doc(), 1), upd(doc({ message_id: 8 }), 2)]);
     await svc.pollOnce(0);
-    expect(jobs.createFromUpload).toHaveBeenCalledTimes(3);
     expect(await svc.loadOffset()).toBe(3);
+    expect(jobs.createFromUpload).toHaveBeenCalledTimes(1);
+    expect(deliveries.get('1')?.completedAt).toBeNull();
+    expect(deliveries.get('1')?.deferredUntil).toEqual(expect.any(Date));
+    expect(deliveries.get('2')?.completedAt).toEqual(expect.any(Date));
     const all = logged.join('\n');
     expect(all).not.toContain(TOKEN);
     expect(all).not.toContain('SECRET');
     expect(all).not.toContain(CAPTION);
+
+    // Resuming deferred delivery ingests the deferred document after deferral window
+    client.downloadFile.mockResolvedValueOnce(Buffer.from('%PDF-1.4 body'));
+    jest.advanceTimersByTime(61_000);
+    await svc.drainDeferred();
+    expect(jobs.createFromUpload).toHaveBeenCalledTimes(2);
+    expect(deliveries.get('1')?.completedAt).toEqual(expect.any(Date));
   });
 
   it('orders a batch before advancing the cursor so lower update IDs are not lost', async () => {
@@ -624,7 +630,7 @@ describe('TelegramIntakeService', () => {
   it('pins a failed delivery to its original organization across a relink', async () => {
     const { svc, restart, client, links, jobs } = setup();
     client.downloadFile.mockRejectedValueOnce(new TelegramApiError('getFile', 503));
-    await expect(svc.handleUpdate(upd(doc()))).rejects.toBeInstanceOf(TelegramApiError);
+    await svc.handleUpdate(upd(doc()));
     links.findByChat.mockResolvedValue({ ...link, id: 'new-link', organizationId: 'org-2' });
     await restart().handleUpdate(upd(doc()));
     expect(client.downloadFile).toHaveBeenCalledTimes(1);
@@ -634,7 +640,7 @@ describe('TelegramIntakeService', () => {
   it('stops after five failed attempts and preserves terminal delivery evidence', async () => {
     const { svc, jobs, deliveries, sent } = setup();
     jobs.createFromUpload.mockRejectedValue(new Error('storage unavailable'));
-    for (let i = 0; i < 5; i += 1) await expect(svc.handleUpdate(upd(doc()))).rejects.toThrow();
+    for (let i = 0; i < 5; i += 1) await svc.handleUpdate(upd(doc()));
     await svc.handleUpdate(upd(doc()));
     expect(jobs.createFromUpload).toHaveBeenCalledTimes(5);
     expect(deliveries.get('1')).toMatchObject({
@@ -648,7 +654,7 @@ describe('TelegramIntakeService', () => {
   it('sends no failure reply if another processor completed the exhausted delivery first', async () => {
     const { svc, prisma, jobs, sent } = setup();
     jobs.createFromUpload.mockRejectedValue(new Error('storage unavailable'));
-    for (let i = 0; i < 5; i += 1) await expect(svc.handleUpdate(upd(doc()))).rejects.toThrow();
+    for (let i = 0; i < 5; i += 1) await svc.handleUpdate(upd(doc()));
     sent.length = 0;
     (prisma.telegramDelivery.updateMany as jest.Mock).mockResolvedValueOnce({ count: 0 });
     await svc.handleUpdate(upd(doc()));
