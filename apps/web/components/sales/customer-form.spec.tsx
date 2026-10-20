@@ -6,6 +6,22 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 
+jest.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => {
+    const map: Record<string, string> = {
+      'customers.form.name': 'Customer Name',
+      'customers.form.billingStreet': 'Billing Street Address',
+      'customers.form.shippingStreet': 'Shipping Street Address',
+      'customers.form.notes': 'Notes',
+      'customers.form.createCustomer': 'Create Customer',
+      'customers.form.updateCustomer': 'Update Customer',
+      'customers.form.saving': 'Saving...',
+      'customers.form.cancel': 'Cancel',
+    };
+    return map[key] || key;
+  },
+}));
+
 // Country/city/phone pickers and the Radix select need a real browser; plain stubs are enough here.
 jest.mock('@/components/ui/phone-input', () => ({
   PhoneInput: () => <input aria-label="phone" />,
@@ -78,6 +94,14 @@ describe('buildCustomerPayload', () => {
 });
 
 describe('CustomerForm submit', () => {
+  it('renders accessible labels for billing and shipping addresses', () => {
+    render(<CustomerForm onSubmit={jest.fn()} onCancel={jest.fn()} />);
+    expect(screen.getByLabelText(/Customer Name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Billing Street/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Shipping Street/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Notes/i)).toBeInTheDocument();
+  });
+
   it('passes the nested payload to onSubmit', async () => {
     const onSubmit = jest.fn();
     render(<CustomerForm onSubmit={onSubmit} onCancel={jest.fn()} />);
@@ -85,13 +109,13 @@ describe('CustomerForm submit', () => {
     fireEvent.change(screen.getByLabelText(/Customer Name/i), {
       target: { value: 'Nile Traders' },
     });
-    fireEvent.change(document.getElementById('billingStreet') as HTMLElement, {
+    fireEvent.change(screen.getByLabelText(/Billing Street/i), {
       target: { value: '1 Nile St' },
     });
-    fireEvent.change(document.getElementById('shippingStreet') as HTMLElement, {
+    fireEvent.change(screen.getByLabelText(/Shipping Street/i), {
       target: { value: '9 Port Rd' },
     });
-    fireEvent.change(document.getElementById('notes') as HTMLElement, {
+    fireEvent.change(screen.getByLabelText(/Notes/i), {
       target: { value: 'Prefers e-mail' },
     });
     fireEvent.submit(document.querySelector('form') as HTMLFormElement);
