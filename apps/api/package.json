@@ -9,6 +9,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node scripts/start-node.js dist/main",
+    "start:worker": "node scripts/start-node.js dist/intake-worker",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "type-check": "tsc --noEmit && tsc --noEmit -p test/tsconfig.e2e.json",
@@ -17,6 +18,7 @@
     "test:cov": "jest --coverage --maxWorkers=2",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "seed": "ts-node prisma/seed.ts",
     "download-ocr-models": "bash scripts/download-paddle-models.sh"
   },
   "dependencies": {
@@ -129,6 +131,9 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@mizano/validators$": "<rootDir>/../../../packages/validators/src/index.ts"
+    },
     "setupFilesAfterEnv": [
       "<rootDir>/test/setup.ts"
     ]
