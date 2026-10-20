@@ -41,13 +41,17 @@ test(
       }
     }
 
-    // AC1 (ar) and AC2 (en): a full load sets html dir/lang, and the Radix tabs move focus to the
-    // next tab with the reading-direction arrow key (ArrowLeft in RTL, ArrowRight in LTR).
+    // AC1 (ar) and AC2 (en): a full load sets html dir/lang, direction indicator, and the Radix tabs move
+    // focus to the next tab with the reading-direction arrow key (ArrowLeft in RTL, ArrowRight in LTR).
     for (const locale of ['ar', 'en'] as const) {
       const l = LOCALES[locale];
       await app.open(`/${locale}/dashboard`);
       await expect(browser.locator('html')).toHaveAttribute('dir', l.dir);
       await expect(browser.locator('html')).toHaveAttribute('lang', locale);
+      await expect(screen.getByTestId('direction-indicator')).toHaveTextContent(
+        locale === 'ar' ? 'RTL' : 'LTR',
+      );
+      await expect(screen.getByTestId('direction-indicator')).toHaveAttribute('data-direction', l.dir);
 
       const first = screen.getByRole('tab', l.first);
       await expect(first).toBeVisible();
@@ -58,14 +62,16 @@ test(
     }
 
     // AC3: switching Arabic -> English with the header language menu is a client-side navigation;
-    // html dir/lang must follow it without a full reload.
+    // html dir/lang and direction indicator must follow it without a full reload.
     await app.open('/ar/dashboard');
     await expect(browser.locator('html')).toHaveAttribute('dir', 'rtl');
+    await expect(screen.getByTestId('direction-indicator')).toHaveTextContent('RTL');
     await screen.getByRole('button', 'اللغة').tap();
     await screen.getByRole('menuitem', 'English').tap();
     await browser.waitForURL(/\/en\//);
     await expect(browser.locator('html')).toHaveAttribute('dir', 'ltr');
     await expect(browser.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(screen.getByTestId('direction-indicator')).toHaveTextContent('LTR');
     await app.screenshot('232-switched-to-en');
   },
 );

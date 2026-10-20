@@ -21,5 +21,17 @@ export function LocaleDirectionProvider({
     document.documentElement.lang = lang;
   }, [dir, lang]);
 
-  return <DirectionProvider dir={dir}>{children}</DirectionProvider>;
+  return (
+    <DirectionProvider dir={dir}>
+      <span
+        data-testid="direction-indicator"
+        data-direction={dir}
+        data-locale={lang}
+        className="sr-only"
+      >
+        {dir === 'rtl' ? 'RTL' : 'LTR'}
+      </span>
+      {children}
+    </DirectionProvider>
+  );
 }

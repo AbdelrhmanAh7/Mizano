@@ -18,27 +18,43 @@ describe('locale Radix direction', () => {
     );
     expect(screen.getByTestId('direction')).toHaveTextContent(locale === 'ar' ? 'rtl' : 'ltr');
   });
+
+  it.each(['ar', 'en'] as const)(
+    'renders %s direction indicator for accessibility and verification',
+    (locale) => {
+      render(
+        <LocaleDirectionProvider dir={localeDirections[locale]} lang={locale}>
+          <DirectionProbe />
+        </LocaleDirectionProvider>,
+      );
+      const indicator = screen.getByTestId('direction-indicator');
+      expect(indicator).toHaveTextContent(locale === 'ar' ? 'RTL' : 'LTR');
+      expect(indicator).toHaveAttribute('data-direction', localeDirections[locale]);
+      expect(indicator).toHaveAttribute('data-locale', locale);
+    },
+  );
 });
 
 it.each(['ar', 'en'] as const)('moves tabs in %s reading direction', async (locale) => {
   const user = userEvent.setup();
+  const firstLabel = locale === 'ar' ? 'نظرة عامة' : 'Overview';
+  const secondLabel = locale === 'ar' ? 'مالي' : 'Financial';
   render(
     <LocaleDirectionProvider dir={localeDirections[locale]} lang={locale}>
-      <Tabs defaultValue="one">
+      <Tabs defaultValue="first">
         <TabsList>
-          <TabsTrigger value="one">One</TabsTrigger>
-          <TabsTrigger value="two">Two</TabsTrigger>
-          <TabsTrigger value="three">Three</TabsTrigger>
+          <TabsTrigger value="first">{firstLabel}</TabsTrigger>
+          <TabsTrigger value="second">{secondLabel}</TabsTrigger>
         </TabsList>
       </Tabs>
     </LocaleDirectionProvider>,
   );
-  screen.getByRole('tab', { name: 'One' }).focus();
+  screen.getByRole('tab', { name: firstLabel }).focus();
   await user.keyboard(locale === 'ar' ? '{ArrowLeft}' : '{ArrowRight}');
-  expect(screen.getByRole('tab', { name: 'Two' })).toHaveFocus();
+  expect(screen.getByRole('tab', { name: secondLabel })).toHaveFocus();
 });
 
-it('keeps <html> dir and lang in sync when the locale changes without a full page load', () => {
+it('keeps <html> dir, lang and direction indicator in sync when the locale changes without a full page load', () => {
   // The layout's inline script only runs on a full load; a client-side switch (router.push from
   // /ar to /en in the language switcher) re-renders the layout but React never runs that script.
   const { rerender } = render(
@@ -48,6 +64,8 @@ it('keeps <html> dir and lang in sync when the locale changes without a full pag
   );
   expect(document.documentElement).toHaveAttribute('dir', 'rtl');
   expect(document.documentElement).toHaveAttribute('lang', 'ar');
+  expect(screen.getByTestId('direction-indicator')).toHaveTextContent('RTL');
+  expect(screen.getByTestId('direction-indicator')).toHaveAttribute('data-direction', 'rtl');
 
   rerender(
     <LocaleDirectionProvider dir={localeDirections.en} lang="en">
@@ -56,4 +74,6 @@ it('keeps <html> dir and lang in sync when the locale changes without a full pag
   );
   expect(document.documentElement).toHaveAttribute('dir', 'ltr');
   expect(document.documentElement).toHaveAttribute('lang', 'en');
+  expect(screen.getByTestId('direction-indicator')).toHaveTextContent('LTR');
+  expect(screen.getByTestId('direction-indicator')).toHaveAttribute('data-direction', 'ltr');
 });
