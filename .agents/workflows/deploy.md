@@ -48,7 +48,7 @@ docker-compose -f docker-compose.production.yml ps
 
 ## Deployment Targets
 
-- **Production VM (GCP)**: `.github/workflows/deploy.yml` builds API/web images, pushes them to GHCR and rolls out `docker-compose.production.yml` over SSH after CI passes on `master`. Host/user/key come from repository secrets.
+- **Production (Mac mini)**: Deployed via the Thoth hub release job (former GCP VM `.github/workflows/deploy.yml` was retired in 2026-10).
 - **Manual Docker**: `pnpm docker:prod` with `.env.prod` and `docker-compose.production.yml`.
 
 See [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md#deployment) for details.
