@@ -5,7 +5,7 @@
 - **Issue**: #216 (Bill form: add expense-account picker per line so UI-made bills can be approved)
 - **PR**: #230
 - **Base**: `master` (`4c006386`)
-- **Tested head (code)**: `ea504f5a`
+- **Tested head (code)**: `81e2dd77` (with locale-aware navigation across all bill & purchase pages, Item select aria-label, clean next.config)
 - **Date**: 2026-10-21
 - **Originating Sentry issue**: None (originates from 2026-10-11 demo walkthrough #175 step 2: 400 "All bill lines must have an expense account assigned before approval")
 
@@ -96,7 +96,7 @@ $ pnpm --filter @mizano/web type-check
 > tsc --noEmit
 Exit code: 0
 
-$ pnpm --filter @mizano/web exec next lint --file components/purchases/bill-form.tsx --file components/purchases/bill-form.spec.tsx --file components/purchases/bill-form.scan.spec.tsx --file "app/[locale]/(dashboard)/purchases/bills/scan/page.tsx" --file "app/[locale]/(dashboard)/purchases/bills/scan/page.spec.tsx" --file "app/[locale]/(dashboard)/purchases/bills/new/page.tsx" --file "app/[locale]/(dashboard)/purchases/bills/page.tsx" --file "app/[locale]/(dashboard)/purchases/bills/[id]/page.tsx" --file "app/[locale]/(dashboard)/purchases/bills/[id]/edit/page.tsx" --file middleware.ts
+$ pnpm --filter @mizano/web exec next lint --file components/purchases/bill-form.tsx --file components/purchases/bill-form.spec.tsx --file components/purchases/bill-form.scan.spec.tsx --file "app/[locale]/(dashboard)/purchases/bills/scan/page.tsx" --file "app/[locale]/(dashboard)/purchases/bills/scan/page.spec.tsx" --file "app/[locale]/(dashboard)/purchases/bills/new/page.tsx" --file "app/[locale]/(dashboard)/purchases/bills/page.tsx" --file "app/[locale]/(dashboard)/purchases/bills/[id]/page.tsx" --file "app/[locale]/(dashboard)/purchases/bills/[id]/edit/page.tsx" --file "app/[locale]/(dashboard)/purchases/page.tsx" --file middleware.ts
 ✔ No ESLint warnings or errors
 Exit code: 0
 
