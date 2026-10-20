@@ -678,3 +678,122 @@ FAILED (failures=1)
 ```
 
 Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDENCE.md`).
+
+---
+
+## Issue #215: Customer Form Payload and Notes Support
+
+- **Issue**: #215 (Customer form: payload rejected (400 'billingStreet should not exist') — can't create customers)
+- **Base Commit (`origin/master`)**: `34da63d23f176550d8f9e006788d03426ebdc44b`
+- **Originating Sentry issue**: None (reproduced during demo walkthrough on 2026-10-11, served SHA `cc1443b`)
+- **Root Cause**: `apps/web/components/sales/customer-form.tsx` sent flat fields (`notes`, `billingStreet`, `billingCity`, ...) while `CreateCustomerDto`/`UpdateCustomerDto` in `apps/api/src/modules/sales/dto/` expected nested `billingAddress` and `shippingAddress` objects and lacked a `notes` field. The global `ValidationPipe` (`whitelist: true, forbidNonWhitelisted: true`) rejected the payload with 400.
+- **Resolution**:
+  - `apps/web/components/sales/customer-form.tsx`: Exported `buildCustomerPayload()` to transform flat form values into nested `billingAddress` / `shippingAddress` objects and pass `notes`, with empty fields set to `null` so updates can clear fields. Used for both create and edit submissions.
+  - `apps/api/src/modules/sales/dto/create-customer.dto.ts` & `update-customer.dto.ts`: Added optional `@IsOptional() @IsString() @MaxLength(2000) notes?: string;` field.
+  - `apps/api/prisma/schema.prisma` & migration `20261017000000_customer_notes`: Added nullable `notes` column to Customer table.
+  - `apps/api/src/modules/sales/services/customers.service.ts`: Destructured nested addresses and mapped them to database columns via `addressColumns()`, and included `notes` in Prisma create and update payloads with tenant scoping.
+
+### Acceptance Criteria & Verification Matrix
+
+| AC ID | Acceptance Criterion                                                                                            | Verification Method                                                                                                             | Exit Code | Status |
+| ----- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
+| AC1   | New customer with name, e-mail, phone, billing + shipping address and notes saves (201) and appears in the list | `e2e-army/215-customer-form.e2e.ts` (API test: `POST /customers` -> 201, `GET /customers?search=...` contains ID)               | 0         | PASSED |
+| AC2   | Editing that customer saves (200) and the address round-trips                                                   | `e2e-army/215-customer-form.e2e.ts` (API test: `PATCH /customers/:id` -> 200, address & notes round-trip)                       | 0         | PASSED |
+| AC3   | Works in /en and /ar with RTL direction                                                                         | `e2e-army/215-customer-form.e2e.ts` (UI test: `/en/sales/customers/new` create + `/ar/sales/customers/:id/edit` with `dir=rtl`) | 0         | PASSED |
+| AC4   | Unit/contract test: form payload passes DTO validation; legacy flat payload fails with 400                      | `apps/api/src/modules/sales/dto/create-customer.dto.spec.ts` & `apps/web/components/sales/customer-form.spec.tsx`               | 0         | PASSED |
+| AC5   | Creating a sales invoice for the new customer works                                                             | `e2e-army/215-customer-form.e2e.ts` (API test: `POST /invoices` with customerId -> 201)                                         | 0         | PASSED |
+
+### Changed Covering Tests
+
+- `apps/api/src/modules/sales/dto/create-customer.dto.spec.ts` (6 tests: CreateCustomerDto and UpdateCustomerDto accept form payload with/without notes; UpdateCustomerDto inherits notes; legacy flat payload rejected with 400; notes > 2000 chars rejected)
+- `apps/api/src/modules/sales/services/customers.service.spec.ts` (2 tests: create maps nested addresses to columns without passing nested objects to Prisma; update maps nested addresses and scopes to organization)
+- `apps/web/components/sales/customer-form.spec.tsx` (3 tests: `buildCustomerPayload` nests addresses, preserves notes, omits flat keys; empty inputs mapped to null; form submit passes nested payload)
+- `e2e-army/215-customer-form.e2e.ts` (2 scenarios: API level create/list/edit/invoice contract; UI level /en create and /ar edit round-trip)
+
+### Verification Evidence & Test Execution
+
+#### 1. API Contract & Service Unit Tests
+
+Command:
+
+```bash
+pnpm --filter api exec jest src/modules/sales/dto/create-customer.dto.spec.ts src/modules/sales/services/customers.service.spec.ts --verbose
+```
+
+Output:
+
+```text
+PASS src/modules/sales/dto/create-customer.dto.spec.ts
+  Customer DTOs accept the payload the customer form builds (#215)
+    ✓ CreateCustomerDto accepts the form payload with and without notes (4 ms)
+    ✓ UpdateCustomerDto accepts the form payload with and without notes (1 ms)
+    ✓ UpdateCustomerDto inherits notes: an edit that only changes or clears notes is accepted
+    ✓ CreateCustomerDto rejects the legacy flat address payload the form used to send (1 ms)
+    ✓ UpdateCustomerDto rejects the legacy flat address payload the form used to send
+    ✓ rejects notes longer than 2000 characters
+
+PASS src/modules/sales/services/customers.service.spec.ts
+  CustomersService address mapping (#215)
+    ✓ create stores nested addresses as columns and keeps notes, without passing the nested objects to Prisma (6 ms)
+    ✓ update maps nested addresses to columns, scoped to the organization (1 ms)
+
+Test Suites: 2 passed, 2 total
+Tests:       8 passed, 8 total
+Snapshots:   0 total
+Time:        3.129 s
+```
+
+Exit code: 0
+
+#### 2. Web Customer Form Unit Tests
+
+Command:
+
+```bash
+pnpm --filter @mizano/web test components/sales/customer-form.spec.tsx -- --verbose
+```
+
+Output:
+
+```text
+PASS components/sales/customer-form.spec.tsx
+  buildCustomerPayload
+    ✓ nests the addresses and keeps notes, with no flat address keys (1 ms)
+    ✓ sends empty inputs as null so an edit can clear them
+  CustomerForm submit
+    ✓ passes the nested payload to onSubmit (81 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        0.594 s
+```
+
+Exit code: 0
+
+#### 3. TypeScript Type-Check & ESLint
+
+Commands:
+
+```bash
+pnpm turbo run type-check
+pnpm lint
+```
+
+Output:
+
+```text
+• Running type-check in 4 packages
+ Tasks:    6 successful, 6 total
+ Time:     9.037s
+
+• Running lint in 4 packages
+ Tasks:    4 successful, 4 total
+ Time:     13.598s
+```
+
+Exit code: 0
+
+#### 4. Bug Fix Regression Demonstration
+
+On base commit (`origin/master`), `CreateCustomerDto` does not accept `notes` and rejects flat fields (`billingStreet`, `billingCity`), producing a 400 `BadRequestException` ("property notes should not exist, property billingStreet should not exist"). On head, the shared fixture matching `buildCustomerPayload` output validates cleanly with zero errors against `CreateCustomerDto` and `UpdateCustomerDto`, while the legacy flat payload is rejected (verified in `create-customer.dto.spec.ts` test cases 4 & 5).

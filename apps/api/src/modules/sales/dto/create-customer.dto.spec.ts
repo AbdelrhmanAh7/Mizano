@@ -20,7 +20,10 @@ const validate = (dto: typeof CreateCustomerDto | typeof UpdateCustomerDto, body
 // so the two sides cannot drift and the API spec does not depend on apps/web being present.
 const formPayload = JSON.parse(
   readFileSync(
-    join(__dirname, '../../../../../../packages/shared-types/fixtures/customer-form-payload.fixture.json'),
+    join(
+      __dirname,
+      '../../../../../../packages/shared-types/fixtures/customer-form-payload.fixture.json',
+    ),
     'utf8',
   ),
 ) as Record<string, unknown>;
