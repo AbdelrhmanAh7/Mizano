@@ -1,3 +1,4 @@
+import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { IsDecimalString } from './decimal-string';
 
@@ -37,6 +38,19 @@ describe('IsDecimalString', () => {
 
   it('rejects negatives, exponents and blanks', async () => {
     for (const bad of ['-1', '1e3', '', '1.', '.5', 'abc']) {
+      expect(await errorsFor(bad)).toEqual(['amount']);
+    }
+  });
+
+  it('keeps "1234.10" as the exact string through the global pipe conversion', async () => {
+    const options = { enableImplicitConversion: true };
+    const probe = plainToInstance(Probe, { amount: '1234.10', percent: '14' }, options);
+    expect(probe.amount).toBe('1234.10');
+    expect(await validate(probe)).toEqual([]);
+  });
+
+  it('rejects Arabic-Indic digits and separators', async () => {
+    for (const bad of ['١٢٣٤٫١٠', '١٢٣٤.10', '1234٫10']) {
       expect(await errorsFor(bad)).toEqual(['amount']);
     }
   });
