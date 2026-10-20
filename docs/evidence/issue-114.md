@@ -1,6 +1,6 @@
 # Issue #114 — VAT Return Draft from Ledger: Evidence & Verification Report
 
-Tested branch: `ai/114` → PR #117
+Tested head: **568c285fb420dcbb399b4b198775dc7632972218** (`ai/114` → PR #117)
 
 ---
 
