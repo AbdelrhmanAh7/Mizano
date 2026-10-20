@@ -681,12 +681,11 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 
 ---
 
-
 ---
 
 # EVIDENCE.md — Issue #249: Date Span Extraction and parseDate Single Source of Truth
 
-- **Tested commit**: `23abe8e0` (branch `ai/249`).
+- **Tested commit**: `76fae4d0` (branch `ai/249`, merged with `master`).
 - **Originating Sentry issue**: None (split from #246 finding `0b74c29e8a46`).
 - **User-facing flow / E2E**: Not user-facing (internal rules extraction backend logic). `E2E: not needed — internal extraction utility fix, no user-facing flow or schema change.`
 - **Changed covering tests**:
@@ -705,20 +704,38 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 | AC  | Requirement Description                                                                 | Evidence / Command                                                                                                            | Exit Code | Status |
 | --- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
 | AC1 | `parseDate` returns accurate `[start, end)` offsets for day-first and month-first dates | `invoice-rules-extractor.spec.ts#L57-L62` (`March 15, 2024`, `12 March 2024`, `15/03/2024`)                                   | 0         | PASSED |
-| AC2 | Global candidate evaluation selects valid date over non-qualifying tokens               | `invoice-rules-extractor.spec.ts#L271-L284` (`Date: 15/03/2024 (1445.9.5 H)`) and `L305-L310` (`Date: 1445.9.5 (15/03/2024)`) | 0         | PASSED |
+| AC2 | Global candidate evaluation selects valid date over non-qualifying tokens               | `invoice-rules-extractor.spec.ts#L277-L284` (`Date: 15/03/2024 (1445.9.5 H)`) and `L305-L310` (`Date: 1445.9.5 (15/03/2024)`) | 0         | PASSED |
 | AC3 | Date span offsets accurately map back to original source text                           | `invoice-rules-extractor.spec.ts#L286-L317` (`Date:   March   15,   2024`, Arabic-Indic digits `١٥/٠٣/٢٠٢٤`)                  | 0         | PASSED |
 | AC4 | `RulesExtraction` omits `originalText` to prevent document text logging                 | `invoice-rules-extractor.spec.ts#L319-L327` (`originalText` undefined, `r.date.start`/`end` defined)                          | 0         | PASSED |
 | —   | Type check                                                                              | `pnpm --filter api type-check`                                                                                                | 0         | PASSED |
 | —   | Lint                                                                                    | `pnpm --filter api lint`                                                                                                      | 0         | PASSED |
 
-## Regression demonstration (bug fix: test fails on base, passes on head)
+## Regression demonstration (bug fix: test fails on base and passes on head)
 
 Run on `origin/master` (before fix — `parseDate` has no offsets and `RuleField` has no start/end):
 
 ```text
-src/modules/ai/extraction/rules/invoice-rules-extractor.spec.ts:275:20
-Property 'start' does not exist on type 'RuleField<string>'.
-Exit code 1
+FAIL src/modules/ai/extraction/rules/invoice-rules-extractor.spec.ts
+  ● Test suite failed to run
+
+    src/modules/ai/extraction/rules/invoice-rules-extractor.spec.ts:281:20 - error TS2339: Property 'start' does not exist on type 'RuleField<string>'.
+
+    281     expect(r.date?.start).toBeDefined();
+                           ~~~~~
+    src/modules/ai/extraction/rules/invoice-rules-extractor.spec.ts:282:20 - error TS2339: Property 'end' does not exist on type 'RuleField<string>'.
+
+    282     expect(r.date?.end).toBeDefined();
+                           ~~~
+    src/modules/ai/extraction/rules/invoice-rules-extractor.spec.ts:283:31 - error TS2339: Property 'start' does not exist on type 'RuleField<string>'.
+
+    283     expect(text.slice(r.date?.start, r.date?.end)).toBe('15/03/2024');
+                                      ~~~~~
+
+Test Suites: 1 failed, 1 total
+Tests:       0 total
+Snapshots:   0 total
+Time:        2.394 s
+Exit code: 1
 ```
 
 Run on `ai/249` HEAD (after fix — `parseDate` returns accurate `[start, end)` and `extractInvoiceFields` maps span):
@@ -728,5 +745,5 @@ PASS src/modules/ai/extraction/rules/rules-normalize.spec.ts
 PASS src/modules/ai/extraction/rules/invoice-rules-extractor.spec.ts
 Test Suites: 2 passed, 2 total
 Tests:       75 passed, 75 total
-Exit code 0
+Exit code: 0
 ```
