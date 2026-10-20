@@ -192,6 +192,14 @@ export class InvoicesService {
       where.date = dateFilter;
     }
 
+    // A cursor must belong to this organization, else Prisma pages from a foreign row (cross-tenant).
+    if (cursor) {
+      const owned = await this.prisma.invoice.count({
+        where: { id: cursor, organizationId, deletedAt: null },
+      });
+      if (owned === 0) throw new NotFoundException('Invoice not found');
+    }
+
     return cursorPaginate(
       this.prisma.invoice,
       where,
