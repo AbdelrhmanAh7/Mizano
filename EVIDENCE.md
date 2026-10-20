@@ -542,154 +542,139 @@ Each trial balance has two tenant filters: the account list and the line totals.
 
 ---
 
+# EVIDENCE.md — Issue #87: pdf-parse and zero-offset Buffers
+
+- **Tested commit**: `22c873fb` (branch `ai/87`, merged with `origin/master`).
+- **Originating Sentry issue**: None (none linked in the issue brief).
+- **User-facing flow / E2E**: Not user-facing (internal intake parsing utility). `E2E: not needed — pure internal utility fix, no user-facing flow or schema change.`
+- **Changed covering tests**: `apps/api/src/modules/ai/utils/pdf-extractor.util.spec.ts` (new spec, 3 tests).
+
+## Acceptance criteria
+
+1. **AC1**: Every pdf-parse call site passes a fresh `Uint8Array` copy (zero-offset, covers only the PDF bytes). Find all sites with `grep -rn pdf-parse apps/api/src`.
+2. **AC2**: Unit test feeds a `Buffer` sliced from a larger pool (non-zero `byteOffset`) and asserts the text is correctly extracted.
+3. **AC3**: One line added to `docs/agents/review-lessons.md` about zero-offset buffers for pdf.js.
+
+## Verification Matrix
+
+| AC  | Requirement Description                                               | Evidence / Command                                                                                                                                                            | Exit Code | Status |
+| --- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
+| AC1 | Every pdf-parse call site passes a fresh `Uint8Array` copy            | `grep -rn pdf-parse apps/api/src` → single call site `pdf-extractor.util.ts`; line 22 creates `new Uint8Array(buffer)` and passes it to both v1 and v2 code paths             | 0         | PASSED |
+| AC2 | Unit test feeds Buffer with non-zero `byteOffset` and asserts text    | `npx jest --testPathPattern="pdf-extractor.util.spec" --no-coverage` from `apps/api/`: 3 tests PASS — sliced buffer (byteOffset=50), zero-offset assertion, plain buffer path | 0         | PASSED |
+| AC3 | One line in `docs/agents/review-lessons.md` about zero-offset buffers | `git diff master -- docs/agents/review-lessons.md` → one bullet added: "Give pdf.js a zero-offset copy…" _(#87)_                                                              | 0         | PASSED |
+| —   | Type check                                                            | `pnpm --filter api type-check`                                                                                                                                                | 0         | PASSED |
+| —   | Lint                                                                  | `pnpm --filter api lint`                                                                                                                                                      | 0         | PASSED |
+
+## Regression demonstration (bug fix: test fails on base, passes on head)
+
+Run on `origin/master` (before fix — pdf-parse receives raw sliced `Buffer`):
+
+```
+FAIL src/modules/ai/utils/pdf-extractor.util.spec.ts
+  ✕ hands pdf-parse a fresh zero-offset copy that covers only the PDF bytes
+    Expected: 0  (byteOffset)
+    Received: 50
+Exit code 1
+```
+
+Run on `ai/87` HEAD (after fix — pdf-parse receives `new Uint8Array(buffer)`):
+
+```
+PASS src/modules/ai/utils/pdf-extractor.util.spec.ts
+  ✓ extracts text from a Buffer with non-zero byteOffset (sliced from a larger pool)
+  ✓ hands pdf-parse a fresh zero-offset copy that covers only the PDF bytes
+  ✓ extracts the same text from a plain zero-offset Buffer
+Tests: 3 passed, 3 total  Exit code 0
+```
+
 ## Index: other issues
 
 - Issue #94 (decimal money math and idempotent posting): [docs/evidence/94/EVIDENCE.md](docs/evidence/94/EVIDENCE.md).
-- Issue #260 (fix: failing check e2e-army, customer form payload): see below.
+- Issue #253 (guard against leftover conflict markers): [Issue #253 Verification](#issue-253-verification--guard-against-leftover-merge-conflict-markers-in-markdown).
 
 ---
 
-## Issue #260: Customer Form Payload Round-Trip and `e2e-army` Gate
+# Issue #253 Verification — Guard against leftover merge-conflict markers in markdown
 
-### Overview
+- **Issue**: #253 (fix: qa finding: EVIDENCE.md leftover merge-conflict marker, split from #237)
+- **Base Commit (`origin/master`)**: `5a8be028`
+- **Tested Head (`ai/253`)**: `ad7fa04b`
+- **Originating Sentry issue**: None (internal QA finding on PR #237, item `finding:7d58c29ac8ff`)
+- **Scope & Context**:
+  - In PR #237 (branch `ai/141`), a leftover merge-conflict marker `> > > > > > > origin/master` was committed after the #127 section in `EVIDENCE.md`.
+  - That leftover marker was already resolved and removed when PR #237 landed on `master` (commit `b8c0ab1e8b2dc8b348edabdf4fdd009ac7c3aa65`).
+  - Confirmed on the final repository head that no conflict marker exists in `EVIDENCE.md` or any tracked markdown file.
+  - This PR supersedes part of #237 by introducing the automated regression guard test (`scripts/test_no_conflict_markers.py`) to prevent leftover git merge-conflict markers (both standard git markers and prettier-reformatted markers) from entering tracked markdown files.
 
-- **Issue**: #260 (fix: failing check `e2e-army`, split from #233; parent #215)
-- **Base Commit (`master`)**: `5a8be028`
-- **Tested Commit (`HEAD`)**: `fa261f05`
-- **Audit Date**: 2026-10-20
-- **Scope**: Fix `e2e-army` check failure, reject flat address fields on API, accept nested billing/shipping addresses + optional notes in DTOs and customer service, update web customer form payload builder, and add comprehensive contract and e2e-army tests.
-- **Supersedes**: Supersedes part of #233.
+---
 
-### Numbered Acceptance Criteria (AC)
+## Acceptance Criteria & Verification Matrix
 
-| AC ID | Acceptance Criteria                                                                                                                                                                     | Verification Method                                                                    | Status          | Exit Code |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | --------------- | --------- |
-| AC1   | `POST /customers` accepts form-shaped payload with nested `billingAddress`/`shippingAddress` and optional `notes`, persisting notes to the database and flattening addresses to columns | `create-customer.dto.spec.ts`, `customers.service.spec.ts`                             | PASSED          | 0         |
-| AC2   | `PATCH /customers/:id` accepts form-shaped payload with nested addresses and `notes` (including clearing notes with `null`), updating columns appropriately                             | `create-customer.dto.spec.ts`, `customers.service.spec.ts`                             | PASSED          | 0         |
-| AC3   | API rejects legacy flat address keys (`billingStreet`, `billingCity`, etc.) with `400 Bad Request` via global `ValidationPipe` (`forbidNonWhitelisted: true`)                           | `create-customer.dto.spec.ts`                                                          | PASSED          | 0         |
-| AC4   | `CustomerForm` (`apps/web/components/sales/customer-form.tsx`) emits nested `billingAddress` and `shippingAddress` with `notes` via `buildCustomerPayload`, omitting flat address keys  | `apps/web/components/sales/customer-form.spec.tsx`                                     | PASSED          | 0         |
-| AC5   | `UpdateCustomerDto` inherits `notes` and nested address validation from `CreateCustomerDto` via `PartialType`                                                                           | `create-customer.dto.spec.ts`, `update-customer.dto.ts`                                | PASSED          | 0         |
-| AC6   | E2E test `e2e-army/260-customer-form.e2e.ts` covers the full create, list, edit, get round-trip with nested addresses and notes                                                         | `e2e-army/260-customer-form.e2e.ts` (syntactically complete; runs on hub verify stack) | NOT RUN LOCALLY | N/A       |
+| AC ID | Acceptance Criterion                                                                                     | Verification Method                                                                                                               | Exit Code | Status |
+| ----- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
+| AC1   | No leftover merge-conflict marker exists in `EVIDENCE.md` or any tracked markdown file                   | Confirmed on head: 0 markers in 47 tracked markdown files via `scripts/test_no_conflict_markers.py`                               | 0         | PASSED |
+| AC2   | Automated regression guard test exists, handles code fences/headings/banners, and passes cleanly on head | `nice -n 10 python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v`                                          | 0         | PASSED |
+| AC3   | Planted marker causes the regression guard test to fail fast naming exact file:line                      | Planted marker (`> > > > > > > origin/master`) at end of `EVIDENCE.md` causes test failure on that line with immediate clean exit | 1         | PASSED |
 
-### Changed Covering Tests
+---
 
-- `apps/api/src/modules/sales/dto/create-customer.dto.spec.ts` (6 tests: CreateCustomerDto + UpdateCustomerDto contract)
-- `apps/api/src/modules/sales/services/customers.service.spec.ts` (2 tests: Prisma column mapping + isolation)
-- `apps/web/components/sales/customer-form.spec.tsx` (3 tests: payload nesting + submit handling)
-- `apps/web/components/sales/customer-form-payload.fixture.json` (shared form payload fixture)
-- `e2e-army/260-customer-form.e2e.ts` (1 request-level e2e-army test: API create/list/patch/get round-trip)
+## Verification Evidence
 
-### Real Bug Reproduction on Master (`451cc181`)
+### AC1 & AC2: Guard test execution on clean repository head
 
-Spec files and fixture checked out directly on top of `master` source to prove regression:
+Command:
 
-1. **`create-customer.dto.spec.ts` on master**:
-   Command: `nice -n 10 pnpm --filter api test -- src/modules/sales/dto/create-customer.dto.spec.ts`
-   Result: **FAIL** (exit status 1, 3 failed, 3 passed, 6 total)
-   - `CreateCustomerDto accepts the form payload with and without notes`: Promise rejected with `BadRequestException: Bad Request Exception` (property `notes` is forbidden by `forbidNonWhitelisted: true`).
-   - `UpdateCustomerDto accepts the form payload with and without notes`: Promise rejected with `BadRequestException: Bad Request Exception`.
-   - `UpdateCustomerDto inherits notes: an edit that only changes or clears notes is accepted`: Promise rejected with `BadRequestException: Bad Request Exception`.
+```bash
+nice -n 10 python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v
+```
 
-2. **`customers.service.spec.ts` on master**:
-   Command: `nice -n 10 pnpm --filter api test -- src/modules/sales/services/customers.service.spec.ts`
-   Result: **FAIL** (exit status 1, 0 passed, suite failed to run)
-   - TypeScript compilation error TS2353: Object literal may only specify known properties, and 'notes' does not exist in type 'CreateCustomerDto' / 'UpdateCustomerDto'.
-   - Furthermore, master `CustomersService` passed `...createCustomerDto` / `...updateCustomerDto` directly into Prisma `data` without omitting nested address objects.
+Output:
 
-3. **`customer-form.spec.tsx` on master**:
-   Command: `nice -n 10 pnpm --filter @mizano/web test -- components/sales/customer-form.spec.tsx`
-   Result: **FAIL** (exit status 1, 3 failed, 3 total)
-   - `TypeError: (0 , _customerform.buildCustomerPayload) is not a function`: on master `buildCustomerPayload` did not exist as an exported helper.
-   - `CustomerForm submit passes the nested payload to onSubmit`: failed with `expect(received).toMatchObject(expected)` because master emitted flat keys (`billingStreet`, `shippingStreet`) instead of nested `billingAddress` and `shippingAddress`.
+```text
+test_bare_seven_equals_outside_heading_flagged (test_no_conflict_markers.ConflictMarkerMatcherTests.test_bare_seven_equals_outside_heading_flagged) ... ok
+test_full_conflict_block_detected (test_no_conflict_markers.ConflictMarkerMatcherTests.test_full_conflict_block_detected) ... ok
+test_long_equals_lines_not_flagged (test_no_conflict_markers.ConflictMarkerMatcherTests.test_long_equals_lines_not_flagged) ... ok
+test_markers_inside_fenced_code_blocks_ignored (test_no_conflict_markers.ConflictMarkerMatcherTests.test_markers_inside_fenced_code_blocks_ignored) ... ok
+test_normal_heading_underline_passes (test_no_conflict_markers.ConflictMarkerMatcherTests.test_normal_heading_underline_passes) ... ok
+test_planted_prettier_escaped_markers_fail (test_no_conflict_markers.ConflictMarkerMatcherTests.test_planted_prettier_escaped_markers_fail) ... ok
+test_planted_raw_markers_fail (test_no_conflict_markers.ConflictMarkerMatcherTests.test_planted_raw_markers_fail) ... ok
+test_prettier_escaped_leftover_marker_detected (test_no_conflict_markers.ConflictMarkerMatcherTests.test_prettier_escaped_leftover_marker_detected) ... ok
+test_setext_heading_underline_after_markdown_syntax (test_no_conflict_markers.ConflictMarkerMatcherTests.test_setext_heading_underline_after_markdown_syntax) ... ok
+test_no_conflict_markers_in_tracked_markdown (test_no_conflict_markers.TrackedMarkdownConflictMarkerTests.test_no_conflict_markers_in_tracked_markdown) ... ok
 
-### Verification on Head (`ai/260`)
+----------------------------------------------------------------------
+Ran 10 tests in 0.026s
 
-1. **API DTO contract tests**:
+OK
+```
 
-   ```bash
-   nice -n 10 pnpm --filter api test -- src/modules/sales/dto/create-customer.dto.spec.ts
-   ```
+Exit code: 0
 
-   Output:
+### AC3: Planted regression test failure demonstration
 
-   ```text
-   PASS src/modules/sales/dto/create-customer.dto.spec.ts
-     Customer DTOs accept the payload the customer form builds (#260)
-       ✓ CreateCustomerDto accepts the form payload with and without notes (15 ms)
-       ✓ UpdateCustomerDto accepts the form payload with and without notes
-       ✓ UpdateCustomerDto inherits notes: an edit that only changes or clears notes is accepted (1 ms)
-       ✓ CreateCustomerDto rejects the legacy flat address payload the form used to send
-       ✓ UpdateCustomerDto rejects the legacy flat address payload the form used to send
-       ✓ rejects notes longer than 2000 characters
+Note on base comparison: The leftover marker from PR #237 was already removed during merge into master. To demonstrate regression detection on the current head, the marker was temporarily planted by appending to `EVIDENCE.md`.
 
-   Test Suites: 1 passed, 1 total
-   Tests:       6 passed, 6 total
-   Time:        2.848 s
-   Exit code: 0
-   ```
+Command:
 
-2. **API service unit tests**:
+```bash
+echo "> > > > > > > origin/master" >> EVIDENCE.md && python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v
+```
 
-   ```bash
-   nice -n 10 pnpm --filter api test -- src/modules/sales/services/customers.service.spec.ts
-   ```
+Output:
 
-   Output:
+```text
+FAIL: test_no_conflict_markers_in_tracked_markdown (test_no_conflict_markers.TrackedMarkdownConflictMarkerTests.test_no_conflict_markers_in_tracked_markdown)
+AssertionError: Lists differ: ['EVIDENCE.md:636: > > > > > > > origin/master'] != []
+First list contains 1 additional elements.
+First extra element 0:
+'EVIDENCE.md:636: > > > > > > > origin/master'
+- ['EVIDENCE.md:636: > > > > > > > origin/master']
++ [] : Merge conflict markers found in tracked markdown files:
+EVIDENCE.md:636: > > > > > > > origin/master
+----------------------------------------------------------------------
+Ran 10 tests in 0.016s
 
-   ```text
-   PASS src/modules/sales/services/customers.service.spec.ts
-     CustomersService address mapping (#260)
-       ✓ create stores nested addresses as columns and keeps notes, without passing the nested objects to Prisma (1 ms)
-       ✓ update maps nested addresses to columns, scoped to the organization
+FAILED (failures=1)
+```
 
-   Test Suites: 1 passed, 1 total
-   Tests:       2 passed, 2 total
-   Time:        2.388 s
-   Exit code: 0
-   ```
-
-3. **Web component tests**:
-
-   ```bash
-   nice -n 10 pnpm --filter @mizano/web test -- components/sales/customer-form.spec.tsx
-   ```
-
-   Output:
-
-   ```text
-   PASS components/sales/customer-form.spec.tsx
-     buildCustomerPayload
-       ✓ nests the addresses and keeps notes, with no flat address keys (2 ms)
-       ✓ sends empty inputs as null so an edit can clear them
-     CustomerForm submit
-       ✓ passes the nested payload to onSubmit (85 ms)
-
-   Test Suites: 1 passed, 1 total
-   Tests:       3 passed, 3 total
-   Time:        0.636 s
-   Exit code: 0
-   ```
-
-4. **API typecheck & lint**:
-
-   ```bash
-   pnpm --filter api type-check && pnpm --filter api lint
-   ```
-
-   - `tsc --noEmit && tsc --noEmit -p test/tsconfig.e2e.json`: exit code 0
-   - `eslint "{src,apps,libs,test}/**/*.ts"`: exit code 0
-
-5. **Web typecheck & lint**:
-
-   ```bash
-   pnpm --filter @mizano/web type-check && pnpm --filter @mizano/web lint
-   ```
-
-   - `tsc --noEmit`: exit code 0
-   - `next lint`: exit code 0 (pre-existing unused variable warnings in other dashboard pages only, 0 errors)
-
-### Sentry Issue & Gate Status
-
-- **Sentry**: no Sentry issue (GitHub issue #260 contains no Sentry link; task split from PR #233 on parent issue #215).
-- **Component Tests**: Form payload and user submit interaction verified via React Testing Library (`customer-form.spec.tsx`). RTL and Arabic form localization preserved without disruption.
-- **e2e-army**: `e2e-army/260-customer-form.e2e.ts` is syntactically complete (`pnpm exec tsc --noEmit --skipLibCheck --noResolve e2e-army/260-customer-form.e2e.ts` confirms valid syntax) and carries `@issue-260 AC1...` in title. It was not run locally because `@e2e-dev/web` and `e2e` packages are provided by the remote hub verify environment and are not local workspace dependencies (`Cannot find module '@e2e-dev/web'`). The hub verify suite executes it upon push.
+Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDENCE.md`).
