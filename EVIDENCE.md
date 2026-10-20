@@ -685,6 +685,7 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 # EVIDENCE — Issue #252: assert full session shape, drop refresh token
 
 - **Base Commit (`origin/master`):** `34da63d2`
+- **Tested Head (`ai/252`):** `4ac8041e`
 - **Originating Sentry issue:** None (split from PR #242 / issue #185; no Sentry issue linked)
 - **User-facing flow / E2E:** `e2e-army/252-session-shape.e2e.ts` tagged `feat:mz-auth`, `lvl:ui`, `lvl:api`.
 - **UI / RTL / LTR:** Pure test assertion & auth session fix (`apps/web/lib/auth.ts`, `route.spec.ts`); no UI templates or styles changed. Both LTR (`/en`) and RTL (`/ar`) login/session journeys function with the stripped session shape.
