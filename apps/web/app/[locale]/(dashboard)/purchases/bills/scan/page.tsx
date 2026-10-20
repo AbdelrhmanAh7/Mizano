@@ -204,7 +204,11 @@ export default function ScanBillPage() {
   );
 
   const handleProcess = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile) {
+      setLocalError(ts('dropHint'));
+      fileInputRef.current?.click();
+      return;
+    }
 
     setStep('processing');
     setLocalError(null);
@@ -404,7 +408,7 @@ export default function ScanBillPage() {
           <CardContent className="space-y-4">
             <div
               className={cn(
-                'border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors',
+                'border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors relative',
                 dragOver
                   ? 'border-primary bg-primary/5'
                   : 'border-muted-foreground/25 hover:border-primary/50',
@@ -426,8 +430,13 @@ export default function ScanBillPage() {
                 id="file-upload"
                 name="file"
                 aria-label="Select file"
+                data-testid="file-upload-input"
                 accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
-                className="sr-only"
+                className={
+                  selectedFile
+                    ? 'sr-only'
+                    : 'absolute inset-0 w-full h-full opacity-0 cursor-pointer'
+                }
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) handleFileSelect(file);
@@ -485,6 +494,7 @@ export default function ScanBillPage() {
                     type="button"
                     variant="outline"
                     size="sm"
+                    data-testid="select-file-button"
                     onClick={(e) => {
                       e.stopPropagation();
                       fileInputRef.current?.click();
@@ -500,7 +510,7 @@ export default function ScanBillPage() {
               <Button
                 type="button"
                 onClick={handleProcess}
-                disabled={!selectedFile || converting}
+                disabled={converting}
                 size="lg"
                 aria-label="Scan"
                 data-testid="scan-button"

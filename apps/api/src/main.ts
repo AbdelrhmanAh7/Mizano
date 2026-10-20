@@ -67,22 +67,35 @@ async function bootstrap() {
   const corsOrigins = corsOriginRaw
     ? corsOriginRaw.split(',').map((o) => o.trim())
     : ['http://localhost:5001'];
+  const isVerify = configService.get('APP_ENV') === 'verify';
   app.enableCors({
-    origin: isProduction
-      ? corsOrigins.length === 1
-        ? corsOrigins[0]
-        : corsOrigins
-      : (origin, callback) => {
-          if (
-            !origin ||
-            /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
-            corsOrigins.includes(origin)
-          ) {
-            callback(null, true);
-          } else {
-            callback(null, false);
-          }
-        },
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (corsOrigins.includes(origin)) return callback(null, true);
+
+      // Allow loopback origins in verify/test/dev or when matching the allowed loopback port
+      const isLoopback = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+      if (isLoopback) {
+        if (!isProduction || isVerify) return callback(null, true);
+        try {
+          const originPort = new URL(origin).port;
+          const matchesPort = corsOrigins.some((allowed) => {
+            try {
+              const u = new URL(allowed);
+              return (
+                (u.hostname === 'localhost' || u.hostname === '127.0.0.1') && u.port === originPort
+              );
+            } catch {
+              return false;
+            }
+          });
+          if (matchesPort) return callback(null, true);
+        } catch {
+          // invalid origin URL
+        }
+      }
+      callback(null, false);
+    },
     credentials: true,
   });
 

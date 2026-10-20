@@ -1,22 +1,6 @@
-type PdfParseFunction = (data: Uint8Array | Buffer) => Promise<{ text: string; numpages: number }>;
-
-interface PdfParseModule {
-  (data: Uint8Array | Buffer): Promise<{ text: string; numpages: number }>;
-  default?: PdfParseFunction;
-  PDFParse?: {
-    new (data: Uint8Array): { getText(): Promise<{ text?: string; total?: number }> };
-  };
-}
-
-// Direct require of pdf-parse lib avoids the index.js debug execution on module.parent
+// pdf-parse v2.x exports { PDFParse } as named export (v1 exported default function)
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-let pdfParseModule: PdfParseModule;
-try {
-  pdfParseModule = require('pdf-parse/lib/pdf-parse.js');
-} catch {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  pdfParseModule = require('pdf-parse');
-}
+const pdfParseModule = require('pdf-parse');
 
 export interface PdfExtractionResult {
   text: string;
@@ -50,7 +34,7 @@ export async function extractTextFromPdf(buffer: Buffer): Promise<PdfExtractionR
     return { text, pageCount, isNativeText };
   }
 
-  // v1 API: pdfParse(data) → { text, numpages }
+  // v1 API: pdfParse(buffer) → { text, numpages }
   const pdfParse = pdfParseModule.default || pdfParseModule;
   const result = await pdfParse(uint8);
   const text = (result.text || '').trim();
