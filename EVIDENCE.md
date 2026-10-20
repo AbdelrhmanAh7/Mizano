@@ -177,6 +177,7 @@ Review round 5 (#109):
 - Fixed CodeRabbit finding on `rules-normalize.spec.ts:64`: AC5 test now verifies `parseAmount('10000000000000.0001')` returns a Decimal instance (`toBeInstanceOf(Decimal)`) and preserves the exact 4-decimal fraction string that JS Number conversion would lose.
 - Fixed CodeRabbit finding on `EVIDENCE.md`: E2E gate note updated to report the round-two `e2e-first` review status as unresolved without an authoritative retirement decision and the `e2e-army` result.
 - Confirmed the 3 outdated review threads on `intake-arabic-digits.e2e-spec.ts` and `entity-extraction.service.ts` are satisfied because the relevant code was reverted in commit a5aeed0.
+
 # Issue #141 — intake worker entrypoint, processor out of the API, Pi compose worker
 
 Tested commit: `57f9a0d` (branch `ai/141`; this file is committed after it). Fresh Postgres 16, `REDIS_URL=` blank, in band.
@@ -242,6 +243,57 @@ Final behaviour of the queue contract: the DB row is the source of truth, so a r
 | Redis enqueue failure keeps the row QUEUED                  | `intake-jobs.service.spec.ts` 'keeps the row QUEUED for recovery when the Redis enqueue itself fails'                                                                                                              |
 | Queue availability rule                                     | `intake-queue.service.spec.ts` 'reports unavailable and asserts with 503 until a handler is registered'                                                                                                            |
 | One `IntakeJobsService`, exports visible through the module | `intake.worker.spec.ts` `IntakeModule`: strict resolution from a consumer module, `recoverJobs` called once. With `IntakeJobsService` added back to `IntakeModule.providers` the test fails (2 calls instead of 1) |
+
+---
+
+# Evidence for Issue #104: credential-age check and rotation metadata
+
+- **Baseline (`origin/master`)**: `34da63d2 (origin/master, origin/HEAD)`.
+- **Tested head**: `765bedcf` (all verification checks run and verified).
+- **Host**: macOS arm64, Node 26, throwaway PostgreSQL 16 cluster on 127.0.0.1:5432 (`mizano_104_e2e`, migrations applied with `prisma migrate deploy`), no Redis (`REDIS_URL=` blank).
+- **First commit** `96f259f` holds only the failing tests; before the implementation all 6 e2e tests of that commit failed (missing `smtpPasswordRotatedAt` column, no boot line).
+- **Key names**: `TELEGRAM_BOT_TOKEN_CREDENTIAL_ROTATED_AT` and `CLOUDFLARE_TUNNEL_TOKEN_CREDENTIAL_ROTATED_AT`, so `<NAME>` is the real secret env name.
+
+## Requirements
+
+| REQ | Requirement                                                                                     | Verified by                                                                                                                                                                                                                                                    |
+| --- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | `classifyCredentialAge`: 89 days `ok`, 90 `due`, 91 `expired`, whole UTC days                   | `credential-age.spec.ts`; e2e `AC1 AC4 AC5` boot line: `TELEGRAM_BOT_TOKEN` (89 days) `ok`, `CLOUDFLARE_TUNNEL_TOKEN` (91) `expired`, SMTP (90) `due`                                                                                                          |
+| AC2 | Missing or malformed date (not strict `YYYY-MM-DD`, impossible, future) gives `unknown`         | `credential-age.spec.ts` only: the 12 `it.each` dates plus the invalid-clock case (13 unit cases). No e2e case covers it.                                                                                                                                      |
+| AC3 | `smtpPasswordRotatedAt` set server-side only when `smtpPassword` changes; never client-supplied | e2e `AC3` (stamp on change, unchanged for other fields or the same password, `400` for a client-sent stamp); `organizations.service.spec.ts`; `e2e-army/104-smtp-rotation-stamp.e2e.ts` (local or disposable target only)                                      |
+| AC4 | One line per boot with names and classifications; host keys via `ConfigService`                 | e2e `AC1 AC4 AC5` (exactly one `warn` line; org without a password not listed; legacy row without a stamp `unknown`); `credential-age-check.service.spec.ts` (all-ok boot: one `warn`, no `log`)                                                               |
+| AC5 | No credential value in logs                                                                     | `credential-age-check.service.spec.ts` (all-ok boot and the failed SMTP lookup: every `warn`/`error`/`log` call scanned for the secret values and the error text); e2e `AC1 AC4 AC5` scans every `Logger` call and stdout/stderr for the four sentinel secrets |
+
+## Commands and results
+
+```text
+$ pnpm --filter api type-check      -> exit 0
+$ pnpm --filter api lint            -> exit 0
+
+$ pnpm --filter api exec jest src/common/credentials src/modules/organizations/organizations.service.spec.ts
+PASS src/common/credentials/credential-age.spec.ts
+PASS src/common/credentials/credential-age-check.service.spec.ts
+PASS src/modules/organizations/organizations.service.spec.ts
+Test Suites: 3 passed, 3 total
+Tests:       48 passed, 48 total
+
+$ DATABASE_URL=postgresql://abdelrahmanahmed@localhost:5432/mizano_104_e2e REDIS_URL= pnpm --filter api exec jest --config ./test/jest-e2e.json credential-rotation
+PASS test/credential-rotation.e2e-spec.ts
+    ✓ @issue-104 AC3: SMTP password rotation stamp is set server-side on change, ... rejected if client-supplied
+    ✓ @issue-104 AC1 AC4 AC5: one boot line classifies host tokens (89/91 days) and SMTP passwords (90 days, legacy, none), and no value is logged
+Tests:       2 passed, 2 total
+```
+
+- **Full suite not re-run on this head.** Repo rule for Mizano (owner, 2026-10-08): the full `pnpm ci:full` runs on GitHub-hosted CI after the push, not locally. Changed test files and type-check/lint ran locally and passed cleanly.
+- The `e2e-army` test (`e2e-army/104-smtp-rotation-stamp.e2e.ts`) passed Prettier check and is verified with host guard and non-secret cleanup.
+
+## Notes and decisions
+
+- Review round 3 and 4 fixes: constant-time SMTP password compare (`timingSafeStringEqual` in `organizations.service.ts`); unset optional `TELEGRAM_BOT_TOKEN` is skipped while the tunnel token is always classified; a failing SMTP lookup is caught, logged without its message, and reported as `SMTP_PASSWORD=unknown`; one `warn` line per boot, also when everything is `ok`.
+- Round 5 fixes: the failed-lookup unit test scans all log calls for secrets; the e2e-army test refuses non-local targets unless `E2E_ARMY_DISPOSABLE=1` and restores readable SMTP fields; the API e2e file merged into 2 comprehensive tests covering all acceptance criteria.
+- **Size and test-budget sign-off**: Production and config 159 added (`credential-age.ts` 38, `credential-age-check.service.ts` 87, `organizations.service.ts` 22, `common.module.ts` 2, `schema.prisma` 2, Pi env example 6, Pi compose 2). Tests 444 added (`credential-age-check.service.spec.ts` 93, `credential-age.spec.ts` 60, `organizations.service.spec.ts` 21, `credential-rotation.e2e-spec.ts` 205, `e2e-army` 65). Formally approved and signed off by the CTO on PR #123 ("Accept the test suite size as is - the credential-rotation.e2e-spec.ts is critical for testing the stamp and boot line against a real database and shouldn't be deleted").
+- **Schema change sign-off**: `Organization.smtpPasswordRotatedAt` (nullable timestamp, migration `20261008000100_smtp_password_rotated_at`, no backfill). Formally approved by the CTO acting as coordinator on PR #123 ("Proceed with the Organization.smtpPasswordRotatedAt schema change - the migration is approved and the boot resilience is already implemented").
+- **Scope gap & credentials hard rule**: Root `.env.local`, `.env.dev`, `.env.sit` are untouched under the CTO binding credentials rule. Non-Pi stacks report host tokens as `unknown` on boot without crashing or blocking startup. Follow-up is tracked for operator/founder execution via CTO digest ("ops: mirror host token credential rotation dates to non-Pi root .env files").
 
 ---
 
@@ -541,6 +593,300 @@ Each trial balance has two tenant filters: the account list and the line totals.
 
 ---
 
+# EVIDENCE.md — Issue #87: pdf-parse and zero-offset Buffers
+
+- **Tested commit**: `22c873fb` (branch `ai/87`, merged with `origin/master`).
+- **Originating Sentry issue**: None (none linked in the issue brief).
+- **User-facing flow / E2E**: Not user-facing (internal intake parsing utility). `E2E: not needed — pure internal utility fix, no user-facing flow or schema change.`
+- **Changed covering tests**: `apps/api/src/modules/ai/utils/pdf-extractor.util.spec.ts` (new spec, 3 tests).
+
+## Acceptance criteria
+
+1. **AC1**: Every pdf-parse call site passes a fresh `Uint8Array` copy (zero-offset, covers only the PDF bytes). Find all sites with `grep -rn pdf-parse apps/api/src`.
+2. **AC2**: Unit test feeds a `Buffer` sliced from a larger pool (non-zero `byteOffset`) and asserts the text is correctly extracted.
+3. **AC3**: One line added to `docs/agents/review-lessons.md` about zero-offset buffers for pdf.js.
+
+## Verification Matrix
+
+| AC  | Requirement Description                                               | Evidence / Command                                                                                                                                                            | Exit Code | Status |
+| --- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
+| AC1 | Every pdf-parse call site passes a fresh `Uint8Array` copy            | `grep -rn pdf-parse apps/api/src` → single call site `pdf-extractor.util.ts`; line 22 creates `new Uint8Array(buffer)` and passes it to both v1 and v2 code paths             | 0         | PASSED |
+| AC2 | Unit test feeds Buffer with non-zero `byteOffset` and asserts text    | `npx jest --testPathPattern="pdf-extractor.util.spec" --no-coverage` from `apps/api/`: 3 tests PASS — sliced buffer (byteOffset=50), zero-offset assertion, plain buffer path | 0         | PASSED |
+| AC3 | One line in `docs/agents/review-lessons.md` about zero-offset buffers | `git diff master -- docs/agents/review-lessons.md` → one bullet added: "Give pdf.js a zero-offset copy…" _(#87)_                                                              | 0         | PASSED |
+| —   | Type check                                                            | `pnpm --filter api type-check`                                                                                                                                                | 0         | PASSED |
+| —   | Lint                                                                  | `pnpm --filter api lint`                                                                                                                                                      | 0         | PASSED |
+
+## Regression demonstration (bug fix: test fails on base, passes on head)
+
+Run on `origin/master` (before fix — pdf-parse receives raw sliced `Buffer`):
+
+```
+FAIL src/modules/ai/utils/pdf-extractor.util.spec.ts
+  ✕ hands pdf-parse a fresh zero-offset copy that covers only the PDF bytes
+    Expected: 0  (byteOffset)
+    Received: 50
+Exit code 1
+```
+
+Run on `ai/87` HEAD (after fix — pdf-parse receives `new Uint8Array(buffer)`):
+
+```
+PASS src/modules/ai/utils/pdf-extractor.util.spec.ts
+  ✓ extracts text from a Buffer with non-zero byteOffset (sliced from a larger pool)
+  ✓ hands pdf-parse a fresh zero-offset copy that covers only the PDF bytes
+  ✓ extracts the same text from a plain zero-offset Buffer
+Tests: 3 passed, 3 total  Exit code 0
+```
+
 ## Index: other issues
 
 - Issue #94 (decimal money math and idempotent posting): [docs/evidence/94/EVIDENCE.md](docs/evidence/94/EVIDENCE.md).
+- Issue #253 (guard against leftover conflict markers): [Issue #253 Verification](#issue-253-verification--guard-against-leftover-merge-conflict-markers-in-markdown).
+
+---
+
+# Issue #253 Verification — Guard against leftover merge-conflict markers in markdown
+
+- **Issue**: #253 (fix: qa finding: EVIDENCE.md leftover merge-conflict marker, split from #237)
+- **Base Commit (`origin/master`)**: `5a8be028`
+- **Tested Head (`ai/253`)**: `ad7fa04b`
+- **Originating Sentry issue**: None (internal QA finding on PR #237, item `finding:7d58c29ac8ff`)
+- **Scope & Context**:
+  - In PR #237 (branch `ai/141`), a leftover merge-conflict marker `> > > > > > > origin/master` was committed after the #127 section in `EVIDENCE.md`.
+  - That leftover marker was already resolved and removed when PR #237 landed on `master` (commit `b8c0ab1e8b2dc8b348edabdf4fdd009ac7c3aa65`).
+  - Confirmed on the final repository head that no conflict marker exists in `EVIDENCE.md` or any tracked markdown file.
+  - This PR supersedes part of #237 by introducing the automated regression guard test (`scripts/test_no_conflict_markers.py`) to prevent leftover git merge-conflict markers (both standard git markers and prettier-reformatted markers) from entering tracked markdown files.
+
+---
+
+## Acceptance Criteria & Verification Matrix
+
+| AC ID | Acceptance Criterion                                                                                     | Verification Method                                                                                                               | Exit Code | Status |
+| ----- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
+| AC1   | No leftover merge-conflict marker exists in `EVIDENCE.md` or any tracked markdown file                   | Confirmed on head: 0 markers in 47 tracked markdown files via `scripts/test_no_conflict_markers.py`                               | 0         | PASSED |
+| AC2   | Automated regression guard test exists, handles code fences/headings/banners, and passes cleanly on head | `nice -n 10 python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v`                                          | 0         | PASSED |
+| AC3   | Planted marker causes the regression guard test to fail fast naming exact file:line                      | Planted marker (`> > > > > > > origin/master`) at end of `EVIDENCE.md` causes test failure on that line with immediate clean exit | 1         | PASSED |
+
+---
+
+## Verification Evidence
+
+### AC1 & AC2: Guard test execution on clean repository head
+
+Command:
+
+```bash
+nice -n 10 python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v
+```
+
+Output:
+
+```text
+test_bare_seven_equals_outside_heading_flagged (test_no_conflict_markers.ConflictMarkerMatcherTests.test_bare_seven_equals_outside_heading_flagged) ... ok
+test_full_conflict_block_detected (test_no_conflict_markers.ConflictMarkerMatcherTests.test_full_conflict_block_detected) ... ok
+test_long_equals_lines_not_flagged (test_no_conflict_markers.ConflictMarkerMatcherTests.test_long_equals_lines_not_flagged) ... ok
+test_markers_inside_fenced_code_blocks_ignored (test_no_conflict_markers.ConflictMarkerMatcherTests.test_markers_inside_fenced_code_blocks_ignored) ... ok
+test_normal_heading_underline_passes (test_no_conflict_markers.ConflictMarkerMatcherTests.test_normal_heading_underline_passes) ... ok
+test_planted_prettier_escaped_markers_fail (test_no_conflict_markers.ConflictMarkerMatcherTests.test_planted_prettier_escaped_markers_fail) ... ok
+test_planted_raw_markers_fail (test_no_conflict_markers.ConflictMarkerMatcherTests.test_planted_raw_markers_fail) ... ok
+test_prettier_escaped_leftover_marker_detected (test_no_conflict_markers.ConflictMarkerMatcherTests.test_prettier_escaped_leftover_marker_detected) ... ok
+test_setext_heading_underline_after_markdown_syntax (test_no_conflict_markers.ConflictMarkerMatcherTests.test_setext_heading_underline_after_markdown_syntax) ... ok
+test_no_conflict_markers_in_tracked_markdown (test_no_conflict_markers.TrackedMarkdownConflictMarkerTests.test_no_conflict_markers_in_tracked_markdown) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.026s
+
+OK
+```
+
+Exit code: 0
+
+### AC3: Planted regression test failure demonstration
+
+Note on base comparison: The leftover marker from PR #237 was already removed during merge into master. To demonstrate regression detection on the current head, the marker was temporarily planted by appending to `EVIDENCE.md`.
+
+Command:
+
+```bash
+echo "> > > > > > > origin/master" >> EVIDENCE.md && python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v
+```
+
+Output:
+
+```text
+FAIL: test_no_conflict_markers_in_tracked_markdown (test_no_conflict_markers.TrackedMarkdownConflictMarkerTests.test_no_conflict_markers_in_tracked_markdown)
+AssertionError: Lists differ: ['EVIDENCE.md:636: > > > > > > > origin/master'] != []
+First list contains 1 additional elements.
+First extra element 0:
+'EVIDENCE.md:636: > > > > > > > origin/master'
+- ['EVIDENCE.md:636: > > > > > > > origin/master']
++ [] : Merge conflict markers found in tracked markdown files:
+EVIDENCE.md:636: > > > > > > > origin/master
+----------------------------------------------------------------------
+Ran 10 tests in 0.016s
+
+FAILED (failures=1)
+```
+
+Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDENCE.md`).
+
+---
+
+# EVIDENCE.md — Issue #208: Fixed-Asset Depreciation Service Unit Spec & Concurrency Fix (#134 follow-up 3/5)
+
+## Overview
+
+- **Issue**: #208 `test(api): specs for fixed-asset depreciation service (#134 follow-up 3/5)`
+- **PR**: #255
+- **Branch**: `ai/208`
+- **Tested Head (`ai/208`)**: `40fea5d6` (tested and verified at this commit)
+- **Parent Issue**: #134 (R5: ledger-writing services with zero specs)
+- **Originating Sentry Issue**: None. This is an internal ledger-writing service spec addition and latent defect fix; no user-reported production incident in Sentry.
+- **E2E Waiver**: `E2E: not needed — pure test/fix with no changed user-facing flow.`
+
+---
+
+## Acceptance Criteria (Explicit & Numbered)
+
+| AC # | Criterion                                                                                                                                | Verification Method                                                                                                           | Status |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------ |
+| AC1  | Straight-line: exact `Decimal` journal lines (expense account Dr, accumulated-depreciation account Cr); debits equal credits each period | `depreciation.service.spec.ts:195-215, 270-282` (`lines` helper asserts `debit instanceof Decimal`, `debits.equals(credits)`) | PASSED |
+| AC2  | Declining-balance + last-period rounding: exact `Decimal` amounts; last-period residual absorbed so book value lands exactly on salvage  | `depreciation.service.spec.ts:217-240, 244-268` (asserts `12.3456` residual, `salvageValue == 1000`, `FULLY_DEPRECIATED`)     | PASSED |
+| AC3  | Tenant scoping: every Prisma query carries `organizationId` in `where`/`data`; another organisation records are never read or written    | `depreciation.service.spec.ts:375-458` (asserts 10+ Prisma queries carry `where.organizationId === ORG_A`, org B untouched)   | PASSED |
+| AC4  | Idempotent retries: posting the same source-event (asset + period) twice creates exactly one journal; concurrent runs are atomic         | `depreciation.service.spec.ts:309-373` (in-tx atomic claim via `updateMany({ where: { executedAt: null } })`)                 | PASSED |
+| AC5  | Prisma mocked from `apps/api/src/test/mocks`; no wall-clock dates (fake timers via `jest.useFakeTimers`, restored in `afterEach`)        | `depreciation.service.spec.ts:78-87, 169-171` (`createMockPrisma()`, `FIXED_NOW = new Date(2026, 2, 15, 12, 0, 0)`)           | PASSED |
+| AC6  | Test execution: `node apps/api/_run_tests.js --testPathPattern=depreciation.service.spec` passes (16/16 passed) and lint passes clean    | `node apps/api/_run_tests.js --testPathPattern=depreciation.service.spec` (exit 0) and `pnpm --filter api lint` (exit 0)      | PASSED |
+
+---
+
+## Verification Report
+
+### AC1 — Straight-line journal lines
+
+- **Tests**:
+  - `posts straight-line 37.5000: Dr expense, Cr accumulated depreciation` ([`spec:195-215`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L195-L215))
+  - `posts manual straight-line depreciation with balanced debit and credit` ([`spec:270-282`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L270-L282))
+- **Assertion**:
+  - Asset cost: 2500, salvage: 250, useful life: 60 months -> monthly depreciation = 37.5000
+  - Dr: expense account `exp-sl`, debit: `37.5000`, credit: `0.0000`
+  - Cr: accumulated depreciation account `accdep-sl`, debit: `0.0000`, credit: `37.5000`
+  - Exact Decimal arithmetic: `debits.equals(credits)` asserted via `lines()` helper
+  - Output book value: `1487.5000`, accumulated: `1012.5000`, status: `ACTIVE`
+- **Command**: `node apps/api/_run_tests.js --testPathPattern=depreciation.service.spec`
+- **Exit Code**: 0
+
+### AC2 — Declining-balance + last-period rounding
+
+- **Tests**:
+  - `posts the declining-balance amount 333.3333 exactly` ([`spec:217-225`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L217-L225))
+  - `final period posts the residual so book value lands exactly on salvage` ([`spec:227-240`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L227-L240))
+  - `posts the requested period dated on its first day` ([`spec:244-259`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L244-L259))
+  - `final period via manual run lands book value on salvage and marks FULLY_DEPRECIATED` ([`spec:261-268`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L261-L268))
+- **Assertion**:
+  - Declining balance period 1: `333.3333` debit and credit.
+  - Final period schedule: `amount = 12.3456`, `accumulatedTotal = 9000.0000`, `bookValue = 1000.0000`.
+  - Final period absorption: `purchasePrice.minus(accumulatedDepreciation).equals(salvageValue)` is true.
+  - Current book value lands exactly on salvage value `1000.0000`.
+  - Asset status transitions to `AssetStatus.FULLY_DEPRECIATED`.
+- **Command**: `node apps/api/_run_tests.js --testPathPattern=depreciation.service.spec`
+- **Exit Code**: 0
+
+### AC3 — Tenant scoping
+
+- **Tests**:
+  - `scopes reads and writes to the organization and never touches org B` ([`spec:376-395`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L376-L395))
+  - `rejects a manual run on another organization asset before reading its schedule` ([`spec:397-407`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L397-L407))
+  - `cannot reverse another organization schedule` ([`spec:409-421`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L409-L421))
+  - `every schedule, asset and journal query on monthly, manual and reverse paths is org-scoped` ([`spec:425-458`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L425-L458))
+- **Assertion**:
+  - Prisma query mock call inspections verify `where.organizationId === ORG_A` across `findMany`, `findFirst`, `updateMany`, and `update` calls.
+  - Seeded Org B asset (`other`) and schedule (`sch-other-2026-03`) are never read or mutated.
+  - Cross-tenant manual execution throws `Asset not found or not active`.
+  - Cross-tenant reversal throws `Depreciation schedule not found`.
+- **Exit Code**: 0
+
+### AC4 — Idempotent retries and concurrency
+
+- **Tests**:
+  - `a second monthly run for the same period creates no second journal` ([`spec:310-317`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L310-L317))
+  - `a manual run after the monthly run does not post the period twice` ([`spec:319-326`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L319-L326))
+  - `two concurrent manual runs for the same asset and period create one journal` ([`spec:331-342`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L331-L342))
+  - `a monthly run racing a manual run for one period posts one journal` ([`spec:344-361`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L344-L361))
+  - `the cron only posts on the last day of the month` ([`spec:363-372`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L363-L372))
+- **Assertion**:
+  - Second monthly run returns `{ processed: 0, journalsCreated: 0 }`; `journal.create` is not called again.
+  - Manual retry throws `Depreciation already executed for this period`.
+  - Concurrent `Promise.allSettled` executions result in exactly one fulfilled and one rejected; exactly one journal is created.
+  - Cron executed on 15 March makes zero queries; executed on 31 March runs depreciation.
+- **Exit Code**: 0
+
+### AC5 — Mocked Prisma/Redis & fake timers
+
+- **Configuration**:
+  - `createMockPrisma()` from `apps/api/src/test/mocks/prisma.mock.ts`.
+  - Fake system time frozen at `FIXED_NOW = new Date(2026, 2, 15, 12, 0, 0)` via `jest.useFakeTimers({ now: FIXED_NOW })`.
+  - Timers restored via `jest.useRealTimers()` in `afterEach()`.
+  - Zero network or database dependencies. Zero wall-clock dependencies.
+- **Exit Code**: 0
+
+### AC6 — Test & lint execution
+
+- **Command**:
+  ```bash
+  node apps/api/_run_tests.js --testPathPattern=depreciation.service.spec
+  ```
+- **Output**:
+  ```text
+  PASS src/modules/assets/services/depreciation.service.spec.ts
+  Test Suites: 1 passed, 1 total
+  Tests:       16 passed, 16 total
+  Snapshots:   0 total
+  Time:        2.531 s
+  ```
+- **Exit Code**: 0
+
+- **Command**:
+  ```bash
+  pnpm --filter api lint
+  ```
+- **Output**:
+  ```text
+  > eslint "{src,apps,libs,test}/**/*.ts"
+  ```
+- **Exit Code**: 0
+
+---
+
+## Bug Fix Regression Demonstration (Fails on Base, Passes on Head)
+
+### Bug 1: Concurrency race condition creating duplicate journals for a single period
+
+- **Base Behavior**:
+  On base (`origin/master` prior to fix), `depreciation.service.ts` checked `scheduleEntry.executedAt !== null` _outside_ the database transaction, and used `update({ where: { id } })` inside the transaction without condition checking. If two executions ran concurrently (e.g. monthly cron racing a manual trigger, or duplicate API clicks), both read `executedAt === null`, both entered the transaction, and both invoked `journal.create`.
+- **Regression Repro on Base**:
+  When two concurrent calls execute `Promise.allSettled([service.runDepreciationForAsset(...), service.runDepreciationForAsset(...])`, both succeeded and `prisma.journal.create` was invoked 2 times (failing the assertion `expect(prisma.journal.create).toHaveBeenCalledTimes(1)`).
+- **Head Fix** ([`depreciation.service.ts:102-108, 227-233`](apps/api/src/modules/assets/services/depreciation.service.ts#L102-L108)):
+  The execution atomically claims the period inside the `$transaction` using `updateMany({ where: { id: scheduleEntry.id, organizationId, executedAt: null }, data: { executedAt: today } })`. If `claimed.count === 0`, the transaction immediately aborts/throws `'Depreciation already executed for this period'`.
+- **Head Result**:
+  Tests at lines 331-342 and 344-361 pass; exactly 1 journal is created.
+
+### Bug 2: Tenant isolation leak via unscoped queries keyed by ID only
+
+- **Base Behavior**:
+  On base, `depreciationSchedule.update`, `asset.update`, and `journal.findFirst` were called with `{ where: { id } }` or `{ where: {} }` without `organizationId`. A malicious or misconfigured tenant could trigger updates or reads on another tenant records if IDs matched.
+- **Regression Repro on Base**:
+  Asserting `where.organizationId === ORG_A` across all Prisma update calls failed because `where` only contained `{ id }`.
+- **Head Fix** ([`depreciation.service.ts:85, 103, 142, 148, 158, 214, 228, 265, 270, 279, 377, 387, 396, 406`](apps/api/src/modules/assets/services/depreciation.service.ts)):
+  All Prisma queries (`findFirst`, `update`, `updateMany`) explicitly include `organizationId: organizationId` in the `where` filter.
+- **Head Result**:
+  Test at lines 425-458 verifies that every query on schedule, asset, and journal across monthly, manual, and reverse paths carries `where.organizationId === ORG_A`.
+
+---
+
+## Changed Files & Line Summary
+
+| File                                                                | Purpose                                                                                                                                   | Lines Changed   |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `apps/api/src/modules/assets/services/depreciation.service.spec.ts` | Complete unit spec suite covering straight-line, declining-balance, final-period rounding, idempotency, concurrency, and tenant isolation | +459 lines      |
+| `apps/api/src/modules/assets/services/depreciation.service.ts`      | In-transaction atomic claim (`updateMany` with `executedAt: null`) and org-scoping on all queries                                         | +45 / -34 lines |
+| `EVIDENCE.md`                                                       | Appended Issue #208 / PR #255 verification report and acceptance criteria                                                                 | +180 lines      |
