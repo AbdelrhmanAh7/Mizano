@@ -22,8 +22,11 @@ describe('JwtStrategy', () => {
   });
 
   describe('constructor & crypto configuration', () => {
-    it('configures passport strategy with JWT_SECRET from config service and enforces expiration', () => {
+    it('configures passport strategy with JWT_SECRET from config service and enforces expiration and HS256 algorithm', () => {
       expect(configService.get).toHaveBeenCalledWith('JWT_SECRET');
+      const verifOpts = (strategy as any)._verifOpts;
+      expect(verifOpts.ignoreExpiration).toBe(false);
+      expect(verifOpts.algorithms).toEqual(['HS256']);
     });
   });
 

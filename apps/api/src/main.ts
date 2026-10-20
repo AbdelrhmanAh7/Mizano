@@ -72,7 +72,8 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Strip unknown properties, auto-transform types, reject unexpected fields
+  // Security Contract: Strip unknown properties (whitelist: true), reject non-whitelisted properties
+  // (forbidNonWhitelisted: true), auto-transform types, and cast numeric parameters preserving DB schema constraints
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
