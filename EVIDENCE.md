@@ -688,7 +688,7 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 - **Issue**: #208 `test(api): specs for fixed-asset depreciation service (#134 follow-up 3/5)`
 - **PR**: #255
 - **Branch**: `ai/208`
-- **Head SHA**: `8b64de72` (and merge of `origin/master`)
+- **Head SHA**: `4235342a` (tested and verified at this commit)
 - **Parent Issue**: #134 (R5: ledger-writing services with zero specs)
 - **Originating Sentry Issue**: None. This is an internal ledger-writing service spec addition and latent defect fix; no user-reported production incident in Sentry.
 - **E2E Waiver**: `E2E: not needed — pure test/fix with no changed user-facing flow.`
@@ -697,14 +697,14 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 
 ## Acceptance Criteria (Explicit & Numbered)
 
-| AC # | Criterion                                                                                                                                | Verification Method                                                                                                         | Status |
-| ---- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------ |
-| AC1  | Straight-line: exact `Decimal` journal lines (expense account Dr, accumulated-depreciation account Cr); debits equal credits each period | `depreciation.service.spec.ts:195-215` (`lines` helper asserts `debit instanceof Decimal`, `debits.equals(credits)`)        | PASSED |
-| AC2  | Declining-balance + last-period rounding: exact `Decimal` amounts; last-period residual absorbed so book value lands exactly on salvage  | `depreciation.service.spec.ts:217-240` (asserts `12.3456` residual, `salvageValue == 1000`, `FULLY_DEPRECIATED`)            | PASSED |
-| AC3  | Tenant scoping: every Prisma query carries `organizationId` in `where`/`data`; another organisation records are never read or written    | `depreciation.service.spec.ts:329-411` (asserts 10+ Prisma queries carry `where.organizationId === ORG_A`, org B untouched) | PASSED |
-| AC4  | Idempotent retries: posting the same source-event (asset + period) twice creates exactly one journal; concurrent runs are atomic         | `depreciation.service.spec.ts:263-314` (in-tx atomic claim via `updateMany({ where: { executedAt: null } })`)               | PASSED |
-| AC5  | Prisma mocked from `apps/api/src/test/mocks`; no wall-clock dates (fake timers via `jest.useFakeTimers`, restored in `afterEach`)        | `depreciation.service.spec.ts:78-87,169-171` (`createMockPrisma()`, `FIXED_NOW = new Date(2026, 2, 15, 12, 0, 0)`)          | PASSED |
-| AC6  | Test execution: `node apps/api/_run_tests.js --testPathPattern=depreciation.service.spec` passes (14/14 passed) and lint passes clean    | `node apps/api/_run_tests.js --testPathPattern=depreciation.service.spec` (exit 0) and `pnpm --filter api lint` (exit 0)    | PASSED |
+| AC # | Criterion                                                                                                                                | Verification Method                                                                                                           | Status |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------ |
+| AC1  | Straight-line: exact `Decimal` journal lines (expense account Dr, accumulated-depreciation account Cr); debits equal credits each period | `depreciation.service.spec.ts:195-215, 270-282` (`lines` helper asserts `debit instanceof Decimal`, `debits.equals(credits)`) | PASSED |
+| AC2  | Declining-balance + last-period rounding: exact `Decimal` amounts; last-period residual absorbed so book value lands exactly on salvage  | `depreciation.service.spec.ts:217-240, 244-268` (asserts `12.3456` residual, `salvageValue == 1000`, `FULLY_DEPRECIATED`)     | PASSED |
+| AC3  | Tenant scoping: every Prisma query carries `organizationId` in `where`/`data`; another organisation records are never read or written    | `depreciation.service.spec.ts:375-458` (asserts 10+ Prisma queries carry `where.organizationId === ORG_A`, org B untouched)   | PASSED |
+| AC4  | Idempotent retries: posting the same source-event (asset + period) twice creates exactly one journal; concurrent runs are atomic         | `depreciation.service.spec.ts:309-373` (in-tx atomic claim via `updateMany({ where: { executedAt: null } })`)                 | PASSED |
+| AC5  | Prisma mocked from `apps/api/src/test/mocks`; no wall-clock dates (fake timers via `jest.useFakeTimers`, restored in `afterEach`)        | `depreciation.service.spec.ts:78-87, 169-171` (`createMockPrisma()`, `FIXED_NOW = new Date(2026, 2, 15, 12, 0, 0)`)           | PASSED |
+| AC6  | Test execution: `node apps/api/_run_tests.js --testPathPattern=depreciation.service.spec` passes (16/16 passed) and lint passes clean    | `node apps/api/_run_tests.js --testPathPattern=depreciation.service.spec` (exit 0) and `pnpm --filter api lint` (exit 0)      | PASSED |
 
 ---
 
@@ -712,8 +712,9 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 
 ### AC1 — Straight-line journal lines
 
-- **Test**: `DepreciationService > runMonthlyDepreciation: journal lines > posts straight-line 37.5000: Dr expense, Cr accumulated depreciation`
-- **Location**: [`apps/api/src/modules/assets/services/depreciation.service.spec.ts:195-215`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L195-L215)
+- **Tests**:
+  - `posts straight-line 37.5000: Dr expense, Cr accumulated depreciation` ([`spec:195-215`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L195-L215))
+  - `posts manual straight-line depreciation with balanced debit and credit` ([`spec:270-282`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L270-L282))
 - **Assertion**:
   - Asset cost: 2500, salvage: 250, useful life: 60 months -> monthly depreciation = 37.5000
   - Dr: expense account `exp-sl`, debit: `37.5000`, credit: `0.0000`
@@ -728,7 +729,8 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 - **Tests**:
   - `posts the declining-balance amount 333.3333 exactly` ([`spec:217-225`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L217-L225))
   - `final period posts the residual so book value lands exactly on salvage` ([`spec:227-240`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L227-L240))
-  - `final period via manual run lands book value on salvage and marks FULLY_DEPRECIATED` ([`spec:260-267`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L260-L267))
+  - `posts the requested period dated on its first day` ([`spec:244-259`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L244-L259))
+  - `final period via manual run lands book value on salvage and marks FULLY_DEPRECIATED` ([`spec:261-268`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L261-L268))
 - **Assertion**:
   - Declining balance period 1: `333.3333` debit and credit.
   - Final period schedule: `amount = 12.3456`, `accumulatedTotal = 9000.0000`, `bookValue = 1000.0000`.
@@ -741,10 +743,10 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 ### AC3 — Tenant scoping
 
 - **Tests**:
-  - `scopes reads and writes to the organization and never touches org B` ([`spec:329-348`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L329-L348))
-  - `rejects a manual run on another organization asset before reading its schedule` ([`spec:350-360`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L350-L360))
-  - `cannot reverse another organization schedule` ([`spec:362-374`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L362-L374))
-  - `every schedule, asset and journal query on monthly, manual and reverse paths is org-scoped` ([`spec:378-411`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L378-L411))
+  - `scopes reads and writes to the organization and never touches org B` ([`spec:376-395`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L376-L395))
+  - `rejects a manual run on another organization asset before reading its schedule` ([`spec:397-407`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L397-L407))
+  - `cannot reverse another organization schedule` ([`spec:409-421`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L409-L421))
+  - `every schedule, asset and journal query on monthly, manual and reverse paths is org-scoped` ([`spec:425-458`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L425-L458))
 - **Assertion**:
   - Prisma query mock call inspections verify `where.organizationId === ORG_A` across `findMany`, `findFirst`, `updateMany`, and `update` calls.
   - Seeded Org B asset (`other`) and schedule (`sch-other-2026-03`) are never read or mutated.
@@ -755,11 +757,11 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 ### AC4 — Idempotent retries and concurrency
 
 - **Tests**:
-  - `a second monthly run for the same period creates no second journal` ([`spec:263-270`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L263-L270))
-  - `a manual run after the monthly run does not post the period twice` ([`spec:272-279`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L272-L279))
-  - `two concurrent manual runs for the same asset and period create one journal` ([`spec:284-295`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L284-L295))
-  - `a monthly run racing a manual run for one period posts one journal` ([`spec:297-314`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L297-L314))
-  - `the cron only posts on the last day of the month` ([`spec:316-325`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L316-L325))
+  - `a second monthly run for the same period creates no second journal` ([`spec:310-317`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L310-L317))
+  - `a manual run after the monthly run does not post the period twice` ([`spec:319-326`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L319-L326))
+  - `two concurrent manual runs for the same asset and period create one journal` ([`spec:331-342`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L331-L342))
+  - `a monthly run racing a manual run for one period posts one journal` ([`spec:344-361`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L344-L361))
+  - `the cron only posts on the last day of the month` ([`spec:363-372`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L363-L372))
 - **Assertion**:
   - Second monthly run returns `{ processed: 0, journalsCreated: 0 }`; `journal.create` is not called again.
   - Manual retry throws `Depreciation already executed for this period`.
@@ -786,9 +788,9 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
   ```text
   PASS src/modules/assets/services/depreciation.service.spec.ts
   Test Suites: 1 passed, 1 total
-  Tests:       14 passed, 14 total
+  Tests:       16 passed, 16 total
   Snapshots:   0 total
-  Time:        3.014 s
+  Time:        2.531 s
   ```
 - **Exit Code**: 0
 
@@ -811,11 +813,11 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 - **Base Behavior**:
   On base (`origin/master` prior to fix), `depreciation.service.ts` checked `scheduleEntry.executedAt !== null` _outside_ the database transaction, and used `update({ where: { id } })` inside the transaction without condition checking. If two executions ran concurrently (e.g. monthly cron racing a manual trigger, or duplicate API clicks), both read `executedAt === null`, both entered the transaction, and both invoked `journal.create`.
 - **Regression Repro on Base**:
-  When two concurrent calls execute `Promise.allSettled([service.runDepreciationForAsset(...), service.runDepreciationForAsset(...)])`, both succeeded and `prisma.journal.create` was invoked 2 times (failing the assertion `expect(prisma.journal.create).toHaveBeenCalledTimes(1)`).
+  When two concurrent calls execute `Promise.allSettled([service.runDepreciationForAsset(...), service.runDepreciationForAsset(...])`, both succeeded and `prisma.journal.create` was invoked 2 times (failing the assertion `expect(prisma.journal.create).toHaveBeenCalledTimes(1)`).
 - **Head Fix** ([`depreciation.service.ts:102-108, 227-233`](apps/api/src/modules/assets/services/depreciation.service.ts#L102-L108)):
   The execution atomically claims the period inside the `$transaction` using `updateMany({ where: { id: scheduleEntry.id, organizationId, executedAt: null }, data: { executedAt: today } })`. If `claimed.count === 0`, the transaction immediately aborts/throws `'Depreciation already executed for this period'`.
 - **Head Result**:
-  Tests at lines 284-295 and 297-314 pass; exactly 1 journal is created.
+  Tests at lines 331-342 and 344-361 pass; exactly 1 journal is created.
 
 ### Bug 2: Tenant isolation leak via unscoped queries keyed by ID only
 
@@ -826,7 +828,7 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 - **Head Fix** ([`depreciation.service.ts:85, 103, 142, 148, 158, 214, 228, 265, 270, 279, 377, 387, 396, 406`](apps/api/src/modules/assets/services/depreciation.service.ts)):
   All Prisma queries (`findFirst`, `update`, `updateMany`) explicitly include `organizationId: organizationId` in the `where` filter.
 - **Head Result**:
-  Test at lines 378-411 verifies that every query on schedule, asset, and journal across monthly, manual, and reverse paths carries `where.organizationId === ORG_A`.
+  Test at lines 425-458 verifies that every query on schedule, asset, and journal across monthly, manual, and reverse paths carries `where.organizationId === ORG_A`.
 
 ---
 
@@ -834,6 +836,6 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 
 | File                                                                | Purpose                                                                                                                                   | Lines Changed   |
 | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| `apps/api/src/modules/assets/services/depreciation.service.spec.ts` | Complete unit spec suite covering straight-line, declining-balance, final-period rounding, idempotency, concurrency, and tenant isolation | +422 lines      |
+| `apps/api/src/modules/assets/services/depreciation.service.spec.ts` | Complete unit spec suite covering straight-line, declining-balance, final-period rounding, idempotency, concurrency, and tenant isolation | +459 lines      |
 | `apps/api/src/modules/assets/services/depreciation.service.ts`      | In-transaction atomic claim (`updateMany` with `executedAt: null`) and org-scoping on all queries                                         | +45 / -34 lines |
-| `EVIDENCE.md`                                                       | Appended Issue #208 / PR #255 verification report and acceptance criteria                                                                 | +170 lines      |
+| `EVIDENCE.md`                                                       | Appended Issue #208 / PR #255 verification report and acceptance criteria                                                                 | +180 lines      |

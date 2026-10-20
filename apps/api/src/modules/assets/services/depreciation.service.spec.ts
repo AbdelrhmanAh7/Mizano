@@ -266,6 +266,44 @@ describe('DepreciationService', () => {
       expect(last.currentBookValue.equals(last.salvageValue)).toBe(true);
       expect(last.status).toBe(AssetStatus.FULLY_DEPRECIATED);
     });
+
+    it('posts manual straight-line depreciation with balanced debit and credit', async () => {
+      const result = await service.runDepreciationForAsset(ORG_A, 'sl', 3, 2026);
+
+      expect(result).toEqual({ journalId: 'jrn-42', amount: 37.5 });
+      const data = journalFor('sl');
+      expect(data.date).toEqual(new Date(2026, 2, 1));
+      expect(lines(data)).toEqual([
+        { accountId: 'exp-sl', debit: '37.5000', credit: '0.0000' },
+        { accountId: 'accdep-sl', debit: '0.0000', credit: '37.5000' },
+      ]);
+      const sl = assets.find((a) => a.id === 'sl')!;
+      expect(sl.currentBookValue.toFixed(4)).toBe('1487.5000');
+    });
+  });
+
+  describe('reverseDepreciation', () => {
+    it('voids journal entry and restores asset book value and schedule state', async () => {
+      schedules.push(
+        schedule('sl', '37.5000', '1012.5000', '1487.5000', {
+          id: 'sch-sl-2026-02',
+          month: 2,
+          executedAt: new Date(2026, 1, 28),
+          journalId: 'jrn-old',
+        }),
+      );
+      await service.reverseDepreciation(ORG_A, 'sch-sl-2026-02');
+
+      const sch = schedules.find((s) => s.id === 'sch-sl-2026-02')!;
+      expect(sch.journalId).toBeNull();
+      expect(sch.executedAt).toBeNull();
+      expect(prisma.journal.update).toHaveBeenCalledWith({
+        where: { id: 'jrn-old', organizationId: ORG_A },
+        data: { isPosted: false },
+      });
+      const sl = assets.find((a) => a.id === 'sl')!;
+      expect(sl.status).toBe(AssetStatus.ACTIVE);
+    });
   });
 
   describe('idempotent retries', () => {
