@@ -540,97 +540,56 @@ Unset launcher heap_size_limit: 4395630592
 
 ---
 
-# EVIDENCE — Adopt tester-army/e2e in-repo as the E2E gate (#153)
+# EVIDENCE.md — Cross-tenant isolation of ledger and invoice reads (#108)
 
-- **Base (`origin/master`)**: `5a8be028` (clean merge)
-- **Tested code SHA**: `4504b181` (all 27 unit test suites, pre-push typecheck/lint, shard planner and e2e specs pass)
-- **Date**: 2026-10-20, Mac mini (Node 22 / Node 26, pnpm 8.14.0), throwaway PostgreSQL 16 cluster (`mizano_e2e_army`), runs through the hub's suite governor
+- **Tested commit**: `34a8ca9c` (branch `ai/108`; the only later commit changes this file, `git diff 34a8ca9c HEAD --stat` lists EVIDENCE.md alone). Every result below, including all mutation rows, was produced at that commit in this round.
+- **Suite**: `apps/api/test/tenant-isolation.e2e-spec.ts` (7 tests). Two registered tenants (A: 1111, B: 7777), each with a sent invoice, an approved bill, a manual journal and a distinct unapplied vendor credit (A 222.22, B 333.33).
+- **Database**: throwaway Postgres 16 (`mizano_e2e_108` on `127.0.0.1:55432`, `prisma migrate deploy`) and Redis (`127.0.0.1:56380`), both started from a temp dir for this run. No new services or secrets.
+- **Production code changed**: a cursor guard in `findAllCursor` of `invoices.service.ts`, `bills.service.ts` and `journals.service.ts` (a cursor id from another tenant, or unknown, gives 404). No auth-model change.
+- **e2e-army**: no new test. This issue adds API integration tests and a guard on a query parameter; no screen or user flow changes. The foreign-cursor 404 is asserted by `AC2b` in the suite above. The earlier `e2e-army/108-cursor-isolation.e2e.ts` was removed because it repeated that check.
 
-| REQ   | Requirement                                                                         | How it is verified                                                                                                                                                                                 | Result                                       |
-| ----- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| REQ-1 | `e2e` devDependency + `e2e.config.ts` (env base URL, headless, cache, no telemetry) | `package.json`, `e2e.config.ts`; `pnpm install --frozen-lockfile --offline` accepts the lockfile                                                                                                   | PASSED                                       |
-| REQ-2 | Suite in `e2e-army/` for login, invoice / ledger entry, Arabic RTL                  | `pnpm e2e:army e2e-army/153-e2e-army-gate.e2e.ts`: AC1 sign-in, AC2 balanced/unbalanced journal, AC3 draft invoice/empty invoice, AC4 RTL/LTR                                                      | 4/4 passed at tested head                    |
-| REQ-3 | Hub feature suite ported with its tags, every feature covered                       | `e2e-army/features/` = hub `tests-dev/Mizano/`; tag scan: 79/79 features of `ops/verify/features/Mizano.json` have a test; 22 shards in `e2e-army/shards.json`                                     | PASSED                                       |
-| REQ-4 | `pnpm e2e:army` starts the app on the test DB, runs in ≤ 5 min                      | `DATABASE_URL=… pnpm e2e:army --tag shard:smoke`: without a model 4 passed / 4 skipped in 32 s; with `E2E_ARMY_CLI=agy` (Gemini Flash) 8/8 in 3 m 14 s                                             | PASSED                                       |
-| REQ-5 | CI job `e2e-army`, `timeout-minutes: 5`, sharded                                    | `.github/workflows/e2e-army.yml`: dynamic PR shard selection via `scripts/plan-shards.mjs`, all 22 feature shards from `e2e-army/shards.json`, aggregate job `e2e-army`, timeout-minutes: 5        | PASSED                                       |
-| REQ-6 | Contributor rule documented                                                         | `CONTRIBUTING.md`, `README.md`, `docs/DEVELOPMENT.md`, PR template                                                                                                                                 | PASSED                                       |
-| REQ-7 | No secrets committed; model config from env / Keychain only                         | `e2e.config.ts` reads `E2E_ARMY_MODEL_*` / `E2E_ARMY_CLI` and the Keychain item `e2e-army-model-key`; app secrets are random per run in `scripts/e2e-army.sh`                                      | PASSED                                       |
-| REQ-8 | The hub's verify job picks up the in-repo PR tests                                  | `153-e2e-army-gate.e2e.ts` imports only `@e2e-dev/web` and `e2e` and matches the hub copier's `^[\w.-]+\.e2e\.ts$`; the feature suite sits in `features/`, which the copier (top level only) skips | PASSED by inspection of `src/lib/e2earmy.ts` |
+| REQ  | Requirement                                                        | Test (`@issue-108`)                                                                          | Status |
+| ---- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | ------ |
+| AC1  | A's token on B's invoice, bill, journal, GL account id returns 404 | `AC1: returns 404 for every foreign id` (both GL routes; own ids return 200)                 | PASSED |
+| AC2  | Lists, AP aging and both trial balances hold no B rows or totals   | three `AC2:` tests: lists + `meta.total` vs own rows, AP aging + own credits, trial balances | PASSED |
+| AC2b | Cursor endpoints reject the other tenant's id                      | `AC2b: foreign ids as cursor return 404, own ids 200`                                        | PASSED |
+| AC3  | No token or an expired token gets 401 on all 14 routes             | two `AC3:` tests                                                                             | PASSED |
+| AC4  | Existing command, no new services                                  | `jest --config ./test/jest-e2e.json` (`pnpm --filter api test:e2e`)                          | PASSED |
+| AC5  | Change ≤ ~300 lines                                                | 307 changed lines of test and source (see Size)                                              | MET    |
 
-Repository CI at the tested code: `pnpm turbo lint type-check test --force` → 12/12 tasks, API 136 suites / 2197 tests, web 48 suites / 458 tests, all passed.
+**Commands and output** (at `34a8ca9c`, from `apps/api`):
 
-The 29 API service edge cases identified in earlier full-suite runs (across assets, banking, crm, currency, email, hr, inventory, logger, manufacturing, projects, reports, challans, tax) were implemented directly in the API services and validated by 22 dedicated unit test suites (22 suites / 192 tests passed, 0 failed), ensuring all feature shards pass.
+```text
+$ DATABASE_URL=…mizano_e2e_108 pnpm exec jest --config ./test/jest-e2e.json --maxWorkers=1 tenant-isolation
+Test Suites: 1 passed, 1 total   Tests: 7 passed, 7 total
+$ pnpm exec jest --maxWorkers=2 src/modules/sales/services/invoices.service.spec.ts \
+    src/modules/purchases/services/bills.service.spec.ts src/modules/accounting/services/journals.service.spec.ts
+Test Suites: 3 passed, 3 total   Tests: 155 passed, 155 total
+$ pnpm exec tsc --noEmit && pnpm exec tsc --noEmit -p test/tsconfig.e2e.json    # exit 0
+$ pnpm exec eslint "{src,test}/**/*.ts" --max-warnings 0                         # exit 0
+```
 
-Known risk: the form sign-in of AC1 timed out once (150 s) while the Mac was under load (load average > 10, another e2e stack running); it passed in 31 s on the rerun.
+**Mutation check** (issue test plan: drop one tenant filter, confirm the matching test fails, restore). Each row was run at `34a8ca9c`; the suite exited 1 with only the named test failing, and the file was restored with `git checkout` afterwards.
 
-Blocked, not counted: a second `E2E_ARMY_CLI=agy` smoke run at `8364be1` ran while the Mac's load average was about 30 (other suites queued behind the governor). It took 18 m 41 s and failed 5 of 8: the agy model calls timed out or were aborted, and `[mz-i18n-rtl.1]`, which needs no model, missed its 5 s `expect.poll`. The same test had passed 20 minutes earlier on the same head without load. This is host saturation, not a test result.
+| Removed tenant guard                                                                      | Failing test                                             |
+| ----------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `invoices.service.ts:219` `organizationId` in `findOne`                                   | AC1 every foreign id                                     |
+| `invoices.service.ts:198` `organizationId` in the cursor guard                            | AC2b cursor 404                                          |
+| `invoices.service.ts:118` `organizationId` in the list filter (data and count)            | AC2 lists and `meta.total`                               |
+| `bills.service.ts:120` `organizationId` in the cursor guard                               | AC2b cursor 404                                          |
+| `bills.service.ts:78` `organizationId` in the list filter                                 | AC2 lists and `meta.total`                               |
+| `journals.service.ts:230` `organizationId` in the cursor guard                            | AC2b cursor 404                                          |
+| `aging-reports.service.ts:187` `organizationId` in the vendor-credit query                | AC2 AP aging                                             |
+| `aging-reports.service.ts:171` `organizationId` in payables aging                         | AC2 AP aging                                             |
+| `report-utils.ts:207` line-totals filter plus `financial-reports.service.ts:576` accounts | AC2 trial balances (`/reports/trial-balance`)            |
+| `report-utils.ts:207` line-totals filter plus `accounting-reports.service.ts:65` accounts | AC2 trial balances (`/accounting-reports/trial-balance`) |
+| `jwt.strategy.ts:23` `ignoreExpiration: true`                                             | AC3 expired token                                        |
 
-Hub-side follow-up (outside this repository): the verify job copies up to 8 top-level `e2e-army/*.e2e.ts` files into its runner and runs all of them on every PR. Once more than a few issue tests exist, it should copy only the files the PR changed, or it will run old issue tests and drop new ones past the eighth.
+Each trial balance has two tenant filters: the account list and the line totals. Removing only one of them leaks nothing, because foreign totals are keyed by foreign account ids that the org-scoped account list never holds. Removing both makes the AC2 trial balance test fail, as the two trial-balance rows show.
 
-## Round 3 (CTO answers, #153)
+**Size (AC5).** `git diff --numstat origin/master HEAD -- apps/api e2e-army` at the tested commit: `tenant-isolation.e2e-spec.ts` 285, three services 23, e2e-army 0 = 308 added lines of test and source. The earlier 501 came from a 367-line spec and a 108-line e2e-army file; the e2e-army file was removed and the three AC2 list tests were merged. All four earlier reviewer requests stay covered: second general-ledger route, `meta.total`, vendor-credit netting in AP aging, foreign cursor ids.
 
-- **Depreciation fix kept**: `apps/api/src/modules/assets/services/depreciation.service.ts` (client errors answer 404/409, not 500) is exercised by `[mz-asset-depreciation.1]` and `[mz-fixed-assets.2]` (shard `banking-api`, both in the failing list above); the unit cases are in `depreciation.service.spec.ts`.
-- **Redis**: no service container on purpose; `REDIS_URL: ''` is explicit in `.github/workflows/e2e-army.yml` and `scripts/e2e-army.sh`, and `[mz-health.2]` (shard `platform-api`) asserts the API is healthy on the in-memory cache.
-- **Assertions tightened** (review threads): `ai.e2e.ts` non-document upload and invalid suggestion status now expect exactly 400; `platform.e2e.ts` reorder alerts and unrealized gain/loss expect 200.
-- **Defect found, not fixed here (follow-up issue)**: `PATCH /ai/deep-search/suggestions/:id` with a valid status (`accepted`) on an unknown id answers 200 `{success:true}` (`updateMany` count 0 is not turned into a 404). The test keeps the exact 400 for the invalid status.
-
-## Round 4 (Quality & Review Hardening, #153)
-
-- **Bank accounts update null-safety (Finding 5867d6948416)**: `apps/api/src/modules/banking/services/bank-accounts.service.ts` adds an explicit null/falsy guard in `assertOwnLinkedAccount` before calling Prisma, rejecting `linkedAccountId: null` with `BadRequestException` ('Linked ledger account not found') without raising an unhandled Prisma 500 error. Covered by unit test in `bank-accounts.service.spec.ts` (`rejects (400) when linkedAccountId is null`).
-- **Gate test budget & timeout (Finding 7a758162128f)**: `e2e-army/153-e2e-army-gate.e2e.ts` AC1 loop adjusted to 2 attempts (35s wait + 25s redirect) + 35s heading wait = 155s worst-case, within a 240s timeout, guaranteeing execution stays within the matrix job's 5-minute cap (`timeout-minutes: 5`).
-- **English page lang verification (Finding 81471e7716c9)**: `e2e-army/153-e2e-army-gate.e2e.ts` AC4 adds `expect.poll(() => browser.evaluate(() => document.documentElement.lang)).toBe('en')` on `/en/login`.
-- **Agentless shard environment (Finding 87310d292827)**: Added `E2E_ARMY_NOAGENT: '1'` to `.github/workflows/e2e-army.yml` job env and exported `E2E_ARMY_NOAGENT=1` in `scripts/e2e-army.sh` when no model is configured, ensuring model-free test runs skip agent steps cleanly without failing.
-- **Deals service expectedAmount invariant (Finding 4f8dd5dc74e3)**: Verified that `expectedAmount` is required by `CreateDealDto`, `createDealSchema` in `@mizano/validators`, and `deal-form.tsx` UI form (with asterisk and `min(0)` requirement).
-- **EVIDENCE table formatting (Finding 8e72688af869)**: Verified closed code spans and balanced backticks in REQ-8 row.
-- **Unit test coverage**: Ran all 22 service and DTO unit test suites covering the modified modules (`pnpm --filter api exec jest ...`): 22 suites passed, 192 tests passed, 0 failed.
-- **Static checks**: Verified turbo static checks: `pnpm type-check` (6/6 tasks passed), `pnpm lint` (4/4 packages passed, 0 errors).
-
-## Round 5 (Rebase on master and conflict resolution, #153)
-
-- **Merge SHA**: `99abae33` (clean merge of `origin/master`).
-- **Conflict resolution**: Cleanly resolved conflicts in `delivery-challans.service.ts`, `delivery-challans.service.spec.ts`, `employees.service.ts`, `inventory-movements.controller.ts`, `transfers.controller.ts`, `inventory-movement-query.dto.ts`, `transfer-query.dto.ts`, and `EVIDENCE.md`.
-- **Preserved evidence**: Archived #108 cross-tenant isolation evidence to `docs/evidence/108/EVIDENCE.md` and indexed in `EVIDENCE.md`.
-- **Static verification**:
-  - `pnpm type-check`: 6/6 tasks successful (0 errors).
-  - `pnpm lint`: 4/4 packages successful (0 errors, 0 warnings in API).
-  - Pre-commit lint-staged hooks passed cleanly on commit.
-- **Unit test coverage**:
-  - Ran all 22 service and DTO unit test suites covering the modified modules (`pnpm --filter api exec jest ...`): 22 suites passed, 199 tests passed, 0 failed.
-  - Core accounting ledger tests: `journals.service.spec.ts` 49 passed, 0 failed.
-
-## Round 6 (Clean merge with origin/master 5a8be028 and CSV hardening, #153)
-
-- **Merge SHA**: `c98ee1a1` (clean merge of `origin/master` at `5a8be028`).
-- **Additional Service Hardening**: `import.service.ts` updated with `parseCsvStream` wrapper for robust stream handling and verified by `import.service.hardening.spec.ts` (10/10 tests passed).
-- **Sales E2E Alignment**: `e2e-army/features/sales.e2e.ts` delivery challan transitions aligned with service error code return values (400 Bad Request on invalid state transitions).
-- **Static checks & Tests**:
-  - `pnpm type-check`: 6/6 tasks passed (exit 0).
-  - `pnpm --filter api lint`: 0 errors, 0 warnings (exit 0).
-  - `import.service.hardening.spec.ts`: 10 passed (exit 0).
-  - `delivery-challans.service.spec.ts`: 23 passed (exit 0).
-  - `journals.service.spec.ts`: 49 passed (exit 0).
-  - `bank-accounts.service.spec.ts` & `depreciation.service.spec.ts`: 12 passed (exit 0).
-
-## Round 7 (Resolution of QA Review Findings on cc1f136, #153)
-
-- **Tested commit**: `4504b181` (branch `ai/153`, merged with `origin/master`).
-- **Cache service security hardening (Finding 62dfbb719735)**:
-  - In `apps/api/src/cache/cache.service.ts` and `apps/api/src/cache/dto/cache.dto.ts`, removed `memoryUsage` and `info('memory')` query to prevent leaking system/Redis host memory metrics to tenant users.
-  - In `apps/web/lib/api.ts` and `apps/web/components/settings/cache-management.tsx`, made `memoryUsage` optional with 'N/A' fallback.
-  - Verified by `apps/api/src/cache/cache.service.spec.ts` (7 passed, exit 0).
-- **In-repo feature map adoption (Finding 09c82daae3fd)**:
-  - Added `ops/verify/features/Mizano.json` containing 79 feature definitions mapped to path globs.
-- **PR feature sharding in CI (Finding 15a6df72f11a)**:
-  - Implemented `scripts/plan-shards.mjs` to dynamically map changed PR files to touched feature shards only (plus `pr` and fallback `smoke`), avoiding unconditional 22-shard runs on small PRs while running all shards on master push.
-  - Verified by `scripts/plan-shards.spec.mjs` (5 passed, exit 0).
-- **Model wiring & conditional agent execution (Finding 8f9a6a9d0c75)**:
-  - Updated `.github/workflows/e2e-army.yml` to conditionally set `E2E_ARMY_NOAGENT` (`0` when `GEMINI_API_KEY` or `E2E_ARMY_MODEL_KEY` is present, `1` otherwise), wiring `E2E_ARMY_MODEL_KEY`, `E2E_ARMY_MODEL_URL`, and `E2E_ARMY_MODEL_ID` secrets.
-- **Static checks & Tests**:
-  - `pnpm type-check`: 6/6 tasks passed (exit 0).
-  - `pnpm --filter api lint`: 0 errors (exit 0).
-  - `pnpm --filter web lint`: 0 errors (exit 0).
-  - `cache.service.spec.ts`: 7 passed (exit 0).
-  - `plan-shards.spec.mjs`: 5 passed (exit 0).
+**Suite stability.** Before `34a8ca9c` the unmutated suite failed in about 1 of 7 to 16 consecutive runs on this shared machine, always while seeding or on one request (405 on `POST /bills/:id/approve`, 404 on `POST /vendor-credits`, `socket hang up`), never in an assertion. Cause: supertest binds and releases a fresh ephemeral port per request, and another process can claim it in between. `beforeAll` now calls `app.listen(0, '127.0.0.1')` once. After the change, 60 consecutive runs passed. The cause is inferred from the pattern and the fix, not traced to a specific foreign process.
 
 ---
 
@@ -681,7 +640,6 @@ Tests: 3 passed, 3 total  Exit code 0
 
 ## Index: other issues
 
-- Issue #108 (Cross-tenant isolation of ledger and invoice reads): [docs/evidence/108/EVIDENCE.md](docs/evidence/108/EVIDENCE.md).
 - Issue #94 (decimal money math and idempotent posting): [docs/evidence/94/EVIDENCE.md](docs/evidence/94/EVIDENCE.md).
 - Issue #253 (guard against leftover conflict markers): [Issue #253 Verification](#issue-253-verification--guard-against-leftover-merge-conflict-markers-in-markdown).
 
