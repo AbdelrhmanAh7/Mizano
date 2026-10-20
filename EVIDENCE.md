@@ -686,8 +686,8 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 ### Overview
 
 - **Issue**: #259 (fix: failing check `verify`, split from #233; parent #215)
-- **Base Commit (`master`)**: `0e12286d3cbbbb8d7f9066fe14614a8d944a8bcb`
-- **Tested Commit (`HEAD`)**: `20725e63a8529bffa7a23bb6f0a5f194a6b322bb`
+- **Base Commit (`master`)**: `34da63d23f176550d8f9e006788d03426ebdc44b`
+- **Tested Commit (`HEAD`)**: `43c67e9473257cd21984ff65cf92081f6628fd70`
 - **Audit Date**: 2026-10-20
 - **Scope**: Resolve failing check `verify` (health 40/100 on PR #233 commit `9d18133`) caused by Playwright locator timeouts on form fields and submit button, CORS errors on locale-unaware client routing, and unmapped customer notes / address payload.
 - **Supersedes**: Supersedes part of #233.
