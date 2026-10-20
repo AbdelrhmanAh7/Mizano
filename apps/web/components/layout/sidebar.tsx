@@ -38,6 +38,7 @@ import {
   Percent,
   Receipt,
   Search,
+  Send,
   Settings,
   ShoppingCart,
   Target,
@@ -217,7 +218,16 @@ const navigationConfig: NavItem[] = [
     icon: Activity,
     permission: 'settings.view',
   },
-  { nameKey: 'settings', href: '/settings', icon: Settings, permission: 'settings.view' },
+  {
+    nameKey: 'settings',
+    href: '/settings',
+    icon: Settings,
+    permission: 'settings.view',
+    children: [
+      { nameKey: 'settingsOverview', href: '/settings', icon: Settings },
+      { nameKey: 'telegramLinks', href: '/settings/telegram', icon: Send },
+    ],
+  },
 ];
 
 interface SidebarNavProps {

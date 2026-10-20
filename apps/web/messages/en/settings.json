@@ -54,6 +54,10 @@
     "auditLogs": {
       "title": "Audit Logs",
       "description": "Track all user actions and changes across the system"
+    },
+    "telegram": {
+      "title": "Telegram Links",
+      "description": "Connect Telegram chats to automatically intake invoice documents"
     }
   },
   "organization": {
@@ -568,5 +572,28 @@
       "system": "System"
     },
     "language": "Language"
+  },
+  "telegram": {
+    "title": "Telegram Links",
+    "description": "Connect Telegram chats to automatically intake invoice documents",
+    "generateCode": "Generate Telegram Link Code",
+    "generating": "Generating...",
+    "codeGenerated": "Link code generated",
+    "codeInstruction": "Send the following command to your Telegram bot in a private chat:",
+    "expiresIn": "Expires in 15 minutes",
+    "copyCommand": "Copy Command",
+    "copied": "Copied to clipboard",
+    "activeLinks": "Active Telegram Links",
+    "noLinks": "No Telegram chats currently linked",
+    "chatId": "Chat ID",
+    "linkedAt": "Linked Date",
+    "actions": "Actions",
+    "unlink": "Unlink",
+    "unlinking": "Unlinking...",
+    "unlinkSuccess": "Telegram chat unlinked successfully",
+    "unlinkConfirm": "Are you sure you want to unlink this chat? Invoices from this chat will no longer be processed.",
+    "errorGenerating": "Failed to generate link code",
+    "errorFetching": "Failed to load Telegram links",
+    "errorUnlinking": "Failed to unlink Telegram chat"
   }
 }

@@ -56,6 +56,7 @@ const segmentLabels: Record<string, string> = {
   'price-lists': 'Price Lists',
   assets: 'Fixed Assets',
   'deep-search': 'Deep Search',
+  telegram: 'Telegram Links',
 };
 
 export function Breadcrumbs() {
