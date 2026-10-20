@@ -128,3 +128,27 @@ describe('price list DTOs', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
+
+describe('main.ts ValidationPipe contract end-to-end (whitelist & forbidNonWhitelisted)', () => {
+  it('strips/rejects unknown properties on POST requests with 400 (forbidNonWhitelisted: true)', async () => {
+    await expect(
+      body(CreateWarehouseDto, {
+        code: 'WH-VALID',
+        name: 'Valid WH',
+        maliciousField: 'exploit',
+        foreignTenantId: 'org-evil',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('casts numeric parameters properly to numbers preserving DB contracts without string demotion', async () => {
+    const dto = await query(InventoryMovementQueryDto, {
+      page: '10',
+      limit: '25',
+    });
+    expect(typeof dto.page).toBe('number');
+    expect(typeof dto.limit).toBe('number');
+    expect(dto.page).toBe(10);
+    expect(dto.limit).toBe(25);
+  });
+});

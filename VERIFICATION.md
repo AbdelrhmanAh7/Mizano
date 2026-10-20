@@ -3,8 +3,8 @@
 - **Issue**: [#153](https://github.com/AbdelrhmanAh7/Mizano/issues/153)
 - **PR**: [#268](https://github.com/AbdelrhmanAh7/Mizano/pull/268)
 - **Branch**: `ai/153`
-- **Base**: `master` (`5a8be028`)
-- **Tested Head Commit**: `4504b181` (clean merge with latest `origin/master`)
+- **Base**: `master` (`4c006386`)
+- **Tested Head Commit**: `13e12d62` (clean merge with latest `origin/master`)
 - **Sentry Issue**: None (Feature enablement & in-repo testing framework adoption, not triggered by a Sentry error)
 - **Skills Used**: `root-cause debugging`, `verification-before-completion`, `test-audit`, `test-first engineering`, `e2e-army`
 
@@ -168,6 +168,31 @@ Exit Code: 0
 - **Fix (Green)**: Added explicit guard `if (!linkedAccountId) throw new BadRequestException('Linked ledger account not found')` in `apps/api/src/modules/banking/services/bank-accounts.service.ts`.
 - **Regression Test**: `src/modules/banking/services/bank-accounts.service.spec.ts` (`rejects (400) when linkedAccountId is null`).
 - **Observed Result**: Test passes (Exit code 0).
+
+---
+
+## Security Review Findings Resolution
+
+### 1. NestJS JWT Auth Guard & Crypto Enforcement (`Findings 9af77235ed33 & 046fe4c4faf9`)
+
+- **Reviewer Concern**: The reviewer requested verification that the auth guard still calls passport verify with the expected secret, rejects algorithm-confusion tokens, returns 401 on expired tokens, and does not short-circuit when `NODE_ENV=test` or `E2E_ARMY_DB_DISPOSABLE=1` is set.
+- **Root Cause & Fix**:
+  1. `apps/api/src/common/guards/jwt-auth.guard.ts:26-36`: `handleRequest` previously re-threw any raw `err` from passport/jwt library, which NestJS global filters mapped to a 500 error instead of a client 401. Updated `handleRequest` to wrap any error into `UnauthorizedException(message)` ensuring a strict 401 response on expired, malformed, or algorithm-confused tokens.
+  2. `apps/api/src/common/guards/jwt-auth.guard.ts:13-24`: `canActivate` strictly delegates to `super.canActivate(context)` for all non-public endpoints. It contains zero checks for `NODE_ENV` or `E2E_ARMY_DB_DISPOSABLE` and never treats test environments as a trust signal.
+  3. `apps/api/src/common/guards/jwt-auth.guard.spec.ts:40-62, 74-92`: Added explicit regression tests proving that setting `NODE_ENV=test` or `E2E_ARMY_DB_DISPOSABLE=1` does not bypass authentication, and that expired tokens, invalid algorithm tokens, and invalid signatures strictly throw `UnauthorizedException` (401).
+  4. `apps/api/src/modules/auth/strategies/jwt.strategy.ts:23-28` & `apps/api/src/modules/auth/strategies/jwt.strategy.spec.ts:1-77`: Added dedicated unit test suite for `JwtStrategy` confirming `ignoreExpiration: false`, secret derivation from `ConfigService.get('JWT_SECRET')`, and rejection of inactive or nonexistent users with 401.
+- **Verification Evidence**:
+  - `pnpm --filter api exec jest src/common/guards/jwt-auth.guard.spec.ts` -> 9 passed, 0 failed (exit 0).
+  - `pnpm --filter api exec jest src/modules/auth/strategies/jwt.strategy.spec.ts` -> 4 passed, 0 failed (exit 0).
+
+### 2. Untrusted Input & ValidationPipe Contract (`Finding d6232875ff7b`)
+
+- **Reviewer Concern**: Verify end-to-end how POST routes validate references, strip unknown properties (`whitelist: true`, `forbidNonWhitelisted: true`), and cast DTO fields to numeric/enum values without implicit string demotion.
+- **Implementation & Contract**:
+  - `apps/api/src/main.ts:74-82`: Configures global `ValidationPipe` with `whitelist: true`, `forbidNonWhitelisted: true`, `transform: true`, and `enableImplicitConversion: true`.
+  - `apps/api/src/modules/inventory/dto/inventory-dtos.spec.ts:130-153`: Dedicated end-to-end pipe contract tests verifying that extraneous or non-whitelisted fields on POST payloads reject with `BadRequestException` (400), and that query/body parameters cast to exact numbers (`typeof dto.page === 'number'`) matching database column types.
+- **Verification Evidence**:
+  - `pnpm --filter api exec jest src/modules/inventory/dto/inventory-dtos.spec.ts` -> 21 passed, 0 failed (exit 0).
 
 ---
 

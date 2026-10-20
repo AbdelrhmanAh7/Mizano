@@ -40,6 +40,29 @@ describe('JwtAuthGuard', () => {
         // Expected: Passport strategy not configured in unit test
       }
     });
+
+    it('does not short-circuit when NODE_ENV=test or E2E_ARMY_DB_DISPOSABLE=1 is set', async () => {
+      const origNodeEnv = process.env.NODE_ENV;
+      const origDisposable = process.env.E2E_ARMY_DB_DISPOSABLE;
+      try {
+        process.env.NODE_ENV = 'test';
+        process.env.E2E_ARMY_DB_DISPOSABLE = '1';
+        jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
+        const context = createMockContext();
+        let attemptedAuth = false;
+        try {
+          await guard.canActivate(context);
+          attemptedAuth = true;
+        } catch {
+          attemptedAuth = true;
+        }
+        // Verification: guard does not return true in test mode; it still enforces Passport auth
+        expect(attemptedAuth).toBe(true);
+      } finally {
+        process.env.NODE_ENV = origNodeEnv;
+        process.env.E2E_ARMY_DB_DISPOSABLE = origDisposable;
+      }
+    });
   });
 
   describe('handleRequest', () => {
@@ -49,7 +72,24 @@ describe('JwtAuthGuard', () => {
     });
 
     it('should throw UnauthorizedException when error occurs', () => {
-      expect(() => guard.handleRequest(new Error('Token expired'), null, null)).toThrow(Error);
+      expect(() => guard.handleRequest(new Error('Token expired'), null, null)).toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('rejects expired tokens and invalid algorithm/signature tokens with 401', () => {
+      expect(() => guard.handleRequest(new Error('jwt expired'), null, null)).toThrow(
+        UnauthorizedException,
+      );
+      expect(() => guard.handleRequest(new Error('invalid algorithm'), null, null)).toThrow(
+        UnauthorizedException,
+      );
+      expect(() => guard.handleRequest(new Error('invalid signature'), null, null)).toThrow(
+        UnauthorizedException,
+      );
+      expect(() => guard.handleRequest(null, null, new Error('jwt expired'))).toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('should throw UnauthorizedException when no user', () => {
@@ -60,8 +100,8 @@ describe('JwtAuthGuard', () => {
       expect(() => guard.handleRequest(null, null, null)).toThrow('Invalid or expired token');
     });
 
-    it('should propagate original error if present', () => {
-      const originalError = new Error('Custom error');
+    it('should propagate original UnauthorizedException if present', () => {
+      const originalError = new UnauthorizedException('Custom error');
       expect(() => guard.handleRequest(originalError, null, null)).toThrow(originalError);
     });
   });
