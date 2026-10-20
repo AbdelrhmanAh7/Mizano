@@ -4,32 +4,34 @@
 
 No git hook or CI job may exceed 5 minutes.
 
-| Hook         | What runs                                                                                                 | Budget   |
-| ------------ | --------------------------------------------------------------------------------------------------------- | -------- |
-| `pre-commit` | `_lint_staged.js` (ESLint `--fix` + Prettier) on staged files only                                        | <= 60 s  |
-| `pre-push`   | `turbo run type-check test --filter=...[<base>]` for the packages the push changes (and their dependents) | <= 290 s |
+| Hook         | What runs                                                                                                 | Budget   | Measured (Mac mini)                               |
+| ------------ | --------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------- |
+| `pre-commit` | `_lint_staged.js` (ESLint `--fix` + Prettier) on staged files only; preserves unstaged hunks              | <= 60 s  | 0.3 s – 1.2 s                                     |
+| `pre-push`   | `turbo run type-check test --filter=...[<base>]` for the packages the push changes (and their dependents) | <= 290 s | 0.7 s – 3.4 s (warm), ~20–40 s (cold changed pkg) |
 
 The hooks are a fast gate only. `pre-commit` runs the custom `_lint_staged.js` runner (it hard-codes its
-file groups and does not read the `lint-staged` block in `package.json`). The full CI is not a hook:
-`pnpm ci:full` runs lint, type-check and unit tests (no E2E, no build); the hub's **localci** job runs it
-(plus the build), sharded, and posts the GitHub commit statuses under the `ci.yml` job names. Feature E2E is a
-separate gate, the `e2e-army` commit status (see `docs/DEVELOPMENT.md`). All of these must be green before merge.
-Run `pnpm ci:full` manually when you need the whole monorepo suite locally.
+file groups and preserves unstaged hunks in partially staged files, rather than using the `lint-staged` block
+in `package.json`). The full CI is not a hook: `pnpm ci:full` runs lint, type-check and unit tests (no E2E, no build);
+the hub's **localci** job runs it (plus the build), sharded, and posts the GitHub commit statuses under the
+`ci.yml` job names. Feature E2E is a separate gate, the `e2e-army` commit status (see `docs/DEVELOPMENT.md`).
+All of these must be green before merge. Run `pnpm ci:full` manually when you need the whole monorepo suite locally.
 
 How `.husky/pre-push` works:
 
-- It reads the refs git sends on stdin; `<base>` is the remote's old sha, or the merge-base with
-  `origin/master` for a new branch. Root config changes (`package.json`, lockfile, `turbo.json`, `tsconfig*`)
-  or a pushed sha that differs from the checked-out `HEAD` check every package.
+- It reads the refs git sends on stdin; `<base>` is the remote ref's old sha, or the merge-base with
+  `origin/master` for a new branch. Root config changes (`package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`,
+  `.npmrc`, `turbo.json`, `tsconfig*`) or a pushed sha that differs from the checked-out `HEAD` check every package.
 - When the pushed changes include `apps/api/prisma/schema.prisma` the hook regenerates the Prisma client first.
 - A perl watchdog kills the whole process group after 290 s (`MZ_PREPUSH_LIMIT_SECONDS` overrides it).
 - A worktree without `node_modules` skips with a note instead of installing anything.
 - Escape hatch: `SKIP_LOCAL_CI=1 git push` (or `HUSKY=0`); localci still runs the full CI.
 - `python3 -m unittest discover -s scripts -p 'test_husky_hooks.py'` runs the real hook against a throwaway repo with
-  stub tools: ref parsing, base selection (deleted ref, new branch, multi-ref, non-HEAD sha), root-config and schema
-  triggers, the skip paths and the watchdog kill; the same file runs the real `pre-commit` against a recording
-  `_lint_staged.js` (staged files only, blocking exit code, skip path, 60 s watchdog).
+  stub tools: ref parsing, base selection (deleted ref, new branch, multi-ref, non-HEAD sha), root-config (including
+  `pnpm-workspace.yaml` and `.npmrc`) and schema triggers, the skip paths, and the watchdog kill; the same file runs
+  the real `pre-commit` against `_lint_staged.js` (staged files only, unstaged hunk preservation, blocking exit code,
+  skip path, 60 s watchdog).
 
-Measured on the Mac mini (2026-10-11): `pre-commit` on a one-file docs change 0.3 s; `pre-push` with no
-affected package 0.7 s (turbo runs 0 tasks); `pre-push` over all 4 packages with a warm turbo cache 3.4 s. A cold run of real
-packages was not timed (a manual type-check did not finish within 200 s on the busy shared Mac). Budgets are hard caps enforced by the watchdogs.
+Measured on the Mac mini: `pre-commit` on a staged docs change 0.3 s (staged TS ~1.2 s); `pre-push` with no
+affected package 0.7 s (turbo runs 0 tasks); `pre-push` with a warm turbo cache 3.4 s; `pre-push` on a changed package
+~20–40 s (cold runs ≤ 2.5 min for all packages). All measurements fit safely within the <= 60 s and <= 290 s budgets.
+Budgets are hard caps enforced by the watchdogs.

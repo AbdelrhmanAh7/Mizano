@@ -18,10 +18,15 @@ PRE_PUSH = ROOT / ".husky" / "pre-push"
 PRE_COMMIT = ROOT / ".husky" / "pre-commit"
 ZERO = "0" * 40
 
+GIT_ENV_CLEAN = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 
-def git(cwd, *args):
+
+def git(cwd, *args, env=None):
+    clean = dict(GIT_ENV_CLEAN)
+    if env:
+        clean.update(env)
     return subprocess.run(
-        ["git", *args], cwd=cwd, check=True, capture_output=True, text=True
+        ["git", *args], cwd=cwd, check=True, capture_output=True, text=True, env=clean
     ).stdout.strip()
 
 
@@ -30,6 +35,20 @@ def pid_alive(pid):
         os.kill(pid, 0)
     except ProcessLookupError:
         return False
+    except PermissionError:
+        return True
+    try:
+        res = subprocess.run(
+            ["ps", "-o", "state=", "-p", str(pid)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        state = res.stdout.strip()
+        if not state or state.startswith("Z"):
+            return False
+    except Exception:
+        pass
     return True
 
 
@@ -71,7 +90,7 @@ class PrePushHookTests(unittest.TestCase):
         return git(self.repo, "rev-parse", "HEAD")
 
     def push(self, lines, **env):
-        clean = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+        clean = dict(GIT_ENV_CLEAN)
         clean.pop("SKIP_LOCAL_CI", None)
         clean.update(env)
         stdin = "".join(f"{line}\n" for line in lines)
@@ -125,10 +144,24 @@ class PrePushHookTests(unittest.TestCase):
         self.assertEqual(calls, ["turbo run type-check test --output-logs=errors-only"])
 
     def test_root_config_change_checks_every_package(self):
-        head = self.commit("package.json", "{}")
-        result, calls = self.push([self.line(head, self.base)])
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(calls, ["turbo run type-check test --output-logs=errors-only"])
+        for config_file in (
+            "package.json",
+            "pnpm-lock.yaml",
+            "pnpm-workspace.yaml",
+            ".npmrc",
+            "turbo.json",
+            "tsconfig.json",
+        ):
+            head = self.commit(config_file, "{}")
+            result, calls = self.push([self.line(head, self.base)])
+            self.assertEqual(result.returncode, 0, f"Failed on {config_file}: {result.stderr}")
+            self.assertEqual(
+                calls,
+                ["turbo run type-check test --output-logs=errors-only"],
+                f"Failed to trigger all packages for {config_file}",
+            )
+            if self.log.exists():
+                self.log.unlink()
 
     def test_schema_change_regenerates_the_prisma_client_first(self):
         head = self.commit("apps/api/prisma/schema.prisma", "model A {}")
@@ -158,11 +191,13 @@ class PrePushHookTests(unittest.TestCase):
         head = self.commit("apps/web/b.txt", "slow")
         started = time.monotonic()
         result, _ = self.push([self.line(head, self.base)], MZ_PREPUSH_LIMIT_SECONDS="2")
+        elapsed = time.monotonic() - started
         self.assertEqual(result.returncode, 124, result.stdout + result.stderr)
-        self.assertLess(time.monotonic() - started, 30)
+        self.assertGreaterEqual(elapsed, 1.8, f"Watchdog terminated too early ({elapsed:.2f}s)")
+        self.assertLess(elapsed, 10.0, f"Watchdog exceeded wall-clock budget ({elapsed:.2f}s)")
         self.assertIn("exceeded the 2s limit", result.stderr)
         for pid in map(int, pids.read_text().split()):
-            for _ in range(20):
+            for _ in range(30):
                 if not pid_alive(pid):
                     break
                 time.sleep(0.1)
@@ -197,7 +232,7 @@ class PreCommitHookTests(unittest.TestCase):
         (self.repo / "_lint_staged.js").write_text(js)
 
     def run_hook(self, **env):
-        clean = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+        clean = dict(GIT_ENV_CLEAN)
         clean.update(env)
         return subprocess.run(["sh", str(self.repo / ".husky" / "pre-commit")], cwd=self.repo,
                               env=clean, capture_output=True, text=True, timeout=60)
@@ -222,9 +257,31 @@ class PreCommitHookTests(unittest.TestCase):
         self.runner("setTimeout(() => {}, 60000);")
         started = time.monotonic()
         result = self.run_hook(MZ_PRECOMMIT_LIMIT_SECONDS="2")
+        elapsed = time.monotonic() - started
         self.assertEqual(result.returncode, 124, result.stdout + result.stderr)
-        self.assertLess(time.monotonic() - started, 30)
+        self.assertGreaterEqual(elapsed, 1.8, f"Watchdog terminated too early ({elapsed:.2f}s)")
+        self.assertLess(elapsed, 10.0, f"Watchdog exceeded wall-clock budget ({elapsed:.2f}s)")
         self.assertIn("exceeded the 2s limit", result.stderr)
+
+    def test_preserves_unstaged_hunks_in_partially_staged_files(self):
+        real_lint_staged = ROOT / "_lint_staged.js"
+        shutil.copy(real_lint_staged, self.repo / "_lint_staged.js")
+        partial = self.repo / "partial.md"
+        partial.write_text("initial content\n")
+        git(self.repo, "add", "partial.md")
+        git(self.repo, "commit", "-q", "-m", "init partial")
+        partial.write_text("staged hunk\n")
+        git(self.repo, "add", "partial.md")
+        partial.write_text("staged hunk\nunstaged hunk\n")
+        self.assertIn("partial.md", git(self.repo, "diff", "--name-only").split())
+        self.assertIn("partial.md", git(self.repo, "diff", "--cached", "--name-only").split())
+
+        (self.repo / "node_modules" / "prettier" / "bin" / "prettier.cjs").write_text("process.exit(0);")
+        result = self.run_hook()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        unstaged = git(self.repo, "diff", "--name-only").split()
+        self.assertIn("partial.md", unstaged, "Partially staged file had its unstaged hunks staged")
 
 
 if __name__ == "__main__":
