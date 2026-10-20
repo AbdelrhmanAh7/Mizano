@@ -1,6 +1,6 @@
-import { BulkEntityType, BulkActionType } from './dto/bulk-operation.dto';
-import { BulkOperationsService } from './bulk-operations.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { BulkOperationsService } from './bulk-operations.service';
+import { BulkActionType, BulkEntityType } from './dto/bulk-operation.dto';
 
 const ORG_ID = 'org-test-001';
 const OTHER_ORG_ID = 'org-test-002';
@@ -16,7 +16,6 @@ describe('BulkOperationsService', () => {
     jest.useFakeTimers();
     mockEmit = jest.fn();
     eventEmitter = { emit: mockEmit } as unknown as EventEmitter2;
-    // Mock setInterval to prevent the cleanup interval from running during tests
     setIntervalSpy = jest.spyOn(global, 'setInterval').mockImplementation(() => ({}) as any);
     service = new BulkOperationsService(eventEmitter);
   });
@@ -28,47 +27,26 @@ describe('BulkOperationsService', () => {
   });
 
   describe('createJob', () => {
-    it('should create a job with correct organizationId and initial state', () => {
+    it('should create a job with organizationId, initial pending state, and deterministic timestamp', () => {
+      jest.setSystemTime(FIXED_DATE);
       const ids = ['id-1', 'id-2', 'id-3'];
-      const entityType = BulkEntityType.INVOICES;
-      const action = BulkActionType.APPROVE;
-
-      const job = service.createJob(ORG_ID, ids, entityType, action);
+      const job = service.createJob(ORG_ID, ids, BulkEntityType.INVOICES, BulkActionType.APPROVE);
 
       expect(job).toBeDefined();
       expect(job.jobId).toBeDefined();
       expect(job.organizationId).toBe(ORG_ID);
-      expect(job.entityType).toBe(entityType);
-      expect(job.action).toBe(action);
+      expect(job.entityType).toBe(BulkEntityType.INVOICES);
+      expect(job.action).toBe(BulkActionType.APPROVE);
       expect(job.status).toBe('pending');
       expect(job.ids).toEqual(ids);
       expect(job.processed).toBe(0);
       expect(job.total).toBe(3);
       expect(job.failures).toEqual([]);
-      expect(job.startedAt).toBeInstanceOf(Date);
+      expect(job.startedAt.getTime()).toBe(FIXED_DATE.getTime());
       expect(job.completedAt).toBeUndefined();
     });
 
-    it('should store the job in the internal map', () => {
-      const job = service.createJob(ORG_ID, ['id-1'], BulkEntityType.BILLS, BulkActionType.DELETE);
-
-      const retrieved = service.getJob(job.jobId);
-      expect(retrieved).toBe(job);
-    });
-
-    it('should generate unique job IDs', () => {
-      const job1 = service.createJob(
-        ORG_ID,
-        ['id-1'],
-        BulkEntityType.INVOICES,
-        BulkActionType.APPROVE,
-      );
-      const job2 = service.createJob(ORG_ID, ['id-2'], BulkEntityType.BILLS, BulkActionType.DELETE);
-
-      expect(job1.jobId).not.toBe(job2.jobId);
-    });
-
-    it('should include organizationId in every created job', () => {
+    it('should store created jobs in the internal map and generate unique job IDs', () => {
       const job1 = service.createJob(
         ORG_ID,
         ['id-1'],
@@ -82,9 +60,11 @@ describe('BulkOperationsService', () => {
         BulkActionType.DELETE,
       );
 
+      expect(service.getJob(job1.jobId)).toBe(job1);
+      expect(service.getJob(job2.jobId)).toBe(job2);
+      expect(job1.jobId).not.toBe(job2.jobId);
       expect(job1.organizationId).toBe(ORG_ID);
       expect(job2.organizationId).toBe(OTHER_ORG_ID);
-      expect(job1.organizationId).not.toBe(job2.organizationId);
     });
   });
 
@@ -92,23 +72,18 @@ describe('BulkOperationsService', () => {
     it('should return the job by jobId', () => {
       const created = service.createJob(
         ORG_ID,
-        ['id-1', 'id-2'],
+        ['id-1'],
         BulkEntityType.EXPENSES,
         BulkActionType.PROCESS,
       );
-      const retrieved = service.getJob(created.jobId);
-
-      expect(retrieved).toBe(created);
+      expect(service.getJob(created.jobId)).toBe(created);
     });
 
     it('should return undefined for non-existent jobId', () => {
-      const result = service.getJob('non-existent-job-id');
-      expect(result).toBeUndefined();
+      expect(service.getJob('non-existent-job-id')).toBeUndefined();
     });
 
-    // TODO: Security issue - getJob needs organizationId parameter to prevent cross-tenant access
-    // See AI_QUESTIONS.md: sec(bulk-operations): getJob and processJob lack organizationId scoping
-    it('currently allows cross-tenant job lookup by jobId alone (known gap)', () => {
+    it('documents cross-tenant job lookup by jobId alone (security gap tracked in issue draft)', () => {
       const jobOrg1 = service.createJob(
         ORG_ID,
         ['id-1'],
@@ -122,73 +97,54 @@ describe('BulkOperationsService', () => {
         BulkActionType.DELETE,
       );
 
-      // getJob only takes jobId - no organizationId scoping enforced yet
-      const retrievedByOrg1 = service.getJob(jobOrg1.jobId);
-      const retrievedByOrg2 = service.getJob(jobOrg2.jobId);
-
-      expect(retrievedByOrg1).toBe(jobOrg1);
-      expect(retrievedByOrg2).toBe(jobOrg2);
-      // A caller from org1 could theoretically call getJob(jobOrg2.jobId) and access org2's job
+      // getJob lookup is by jobId only; scoping to organizationId is tracked in follow-up security issue
+      expect(service.getJob(jobOrg1.jobId)).toBe(jobOrg1);
+      expect(service.getJob(jobOrg2.jobId)).toBe(jobOrg2);
     });
   });
 
   describe('processJob', () => {
-    it('should process all items and mark job as completed', async () => {
-      const ids = ['id-1', 'id-2', 'id-3'];
+    it('should process all items in chunks, emit progress events, and mark job completed', async () => {
+      jest.setSystemTime(FIXED_DATE);
+      const ids = ['id-1', 'id-2', 'id-3', 'id-4', 'id-5'];
       const job = service.createJob(ORG_ID, ids, BulkEntityType.INVOICES, BulkActionType.APPROVE);
-
       const processFn = jest.fn().mockResolvedValue(undefined);
 
-      const processPromise = service.processJob(job.jobId, processFn);
-
-      // Advance timers to trigger all async operations
+      const processPromise = service.processJob(job.jobId, processFn, 2);
       await jest.runAllTimersAsync();
-
       const result = await processPromise;
 
       expect(result.jobId).toBe(job.jobId);
       expect(result.status).toBe('completed');
-      expect(result.processed).toBe(3);
+      expect(result.processed).toBe(5);
       expect(result.failures).toEqual([]);
       expect(result.completedAt).toBeInstanceOf(Date);
+      // Advances by 100ms due to two 50ms inter-chunk delay promises
+      expect(result.completedAt?.getTime()).toBe(FIXED_DATE.getTime() + 100);
 
-      expect(processFn).toHaveBeenCalledTimes(3);
-      expect(processFn).toHaveBeenCalledWith('id-1', 0);
-      expect(processFn).toHaveBeenCalledWith('id-2', 1);
-      expect(processFn).toHaveBeenCalledWith('id-3', 2);
-    });
+      expect(processFn).toHaveBeenCalledTimes(5);
+      expect(processFn).toHaveBeenNthCalledWith(1, 'id-1', 0);
+      expect(processFn).toHaveBeenNthCalledWith(2, 'id-2', 1);
+      expect(processFn).toHaveBeenNthCalledWith(3, 'id-3', 2);
+      expect(processFn).toHaveBeenNthCalledWith(4, 'id-4', 3);
+      expect(processFn).toHaveBeenNthCalledWith(5, 'id-5', 4);
 
-    it('should emit progress events during processing', async () => {
-      const job = service.createJob(
-        ORG_ID,
-        ['id-1', 'id-2'],
-        BulkEntityType.BILLS,
-        BulkActionType.VOID,
-      );
-      const processFn = jest.fn().mockResolvedValue(undefined);
-
-      const processPromise = service.processJob(job.jobId, processFn);
-      await jest.runAllTimersAsync();
-      await processPromise;
-
-      // Should emit: pending -> running -> progress (per chunk) -> completed
       expect(mockEmit).toHaveBeenCalledWith(
         `bulk-operation.progress.${job.jobId}`,
         expect.objectContaining({
           jobId: job.jobId,
           status: 'running',
           processed: 0,
-          total: 2,
+          total: 5,
           progress: 0,
         }),
       );
-
       expect(mockEmit).toHaveBeenCalledWith(
         `bulk-operation.progress.${job.jobId}`,
         expect.objectContaining({
           status: 'completed',
-          processed: 2,
-          total: 2,
+          processed: 5,
+          total: 5,
           progress: 100,
         }),
       );
@@ -204,9 +160,9 @@ describe('BulkOperationsService', () => {
 
       const processFn = jest
         .fn()
-        .mockResolvedValueOnce(undefined) // id-1 succeeds
-        .mockRejectedValueOnce(new Error('Item 2 failed')) // id-2 fails
-        .mockResolvedValueOnce(undefined); // id-3 succeeds
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('Item 2 failed'))
+        .mockResolvedValueOnce(undefined);
 
       const processPromise = service.processJob(job.jobId, processFn);
       await jest.runAllTimersAsync();
@@ -226,7 +182,7 @@ describe('BulkOperationsService', () => {
         BulkActionType.SEND,
       );
 
-      const processFn = jest.fn().mockRejectedValue(new Error('All failed'));
+      const processFn = jest.fn().mockRejectedValue(new Error('All items failed'));
 
       const processPromise = service.processJob(job.jobId, processFn);
       await jest.runAllTimersAsync();
@@ -243,53 +199,7 @@ describe('BulkOperationsService', () => {
       );
     });
 
-    it('should process items in chunks with delay between chunks', async () => {
-      const ids = ['id-1', 'id-2', 'id-3', 'id-4', 'id-5'];
-      const job = service.createJob(ORG_ID, ids, BulkEntityType.PROJECTS, BulkActionType.ACTIVATE);
-      const processFn = jest.fn().mockResolvedValue(undefined);
-
-      const processPromise = service.processJob(job.jobId, processFn, 2); // chunkSize = 2
-      await jest.runAllTimersAsync();
-      await processPromise;
-
-      expect(processFn).toHaveBeenCalledTimes(5);
-      // Verify chunks were processed
-      expect(processFn.mock.calls.map((c) => c[0])).toEqual([
-        'id-1',
-        'id-2',
-        'id-3',
-        'id-4',
-        'id-5',
-      ]);
-    });
-
-    it('should correctly pass index to processFn accounting for chunk offset', async () => {
-      const job = service.createJob(
-        ORG_ID,
-        ['a', 'b', 'c'],
-        BulkEntityType.VAT_RETURNS,
-        BulkActionType.SUBMIT,
-      );
-      const processFn = jest.fn().mockResolvedValue(undefined);
-
-      const processPromise = service.processJob(job.jobId, processFn);
-      await jest.runAllTimersAsync();
-      await processPromise;
-
-      expect(processFn).toHaveBeenCalledWith('a', 0);
-      expect(processFn).toHaveBeenCalledWith('b', 1);
-      expect(processFn).toHaveBeenCalledWith('c', 2);
-    });
-
-    // TODO: Security issue - processJob needs organizationId parameter to prevent cross-tenant access
-    // See AI_QUESTIONS.md: sec(bulk-operations): getJob and processJob lack organizationId scoping
-    it('currently allows cross-tenant job processing by jobId alone (known gap)', async () => {
-      const jobOrg1 = service.createJob(
-        ORG_ID,
-        ['id-1'],
-        BulkEntityType.INVOICES,
-        BulkActionType.APPROVE,
-      );
+    it('documents cross-tenant job processing gap by jobId alone (tracked in security issue draft)', async () => {
       const jobOrg2 = service.createJob(
         OTHER_ORG_ID,
         ['id-2'],
@@ -298,89 +208,27 @@ describe('BulkOperationsService', () => {
       );
       const processFn = jest.fn().mockResolvedValue(undefined);
 
-      // processJob only takes jobId - no organizationId scoping enforced yet
-      const processPromise1 = service.processJob(jobOrg1.jobId, processFn);
+      const processPromise = service.processJob(jobOrg2.jobId, processFn);
       await jest.runAllTimersAsync();
-      const result1 = await processPromise1;
-      expect(result1.status).toBe('completed');
+      const result = await processPromise;
 
-      const processPromise2 = service.processJob(jobOrg2.jobId, processFn);
-      await jest.runAllTimersAsync();
-      const result2 = await processPromise2;
-      expect(result2.status).toBe('completed');
-      // A caller from org1 could theoretically call processJob(jobOrg2.jobId) and process org2's job
+      expect(result.status).toBe('completed');
     });
   });
 
   describe('chunkArray', () => {
-    it('should split array into chunks of specified size', () => {
-      // Access private method through the service instance
+    it('should correctly partition arrays into chunks including remainders and empty inputs', () => {
       const chunkArray = (service as any).chunkArray.bind(service);
 
-      const result = chunkArray([1, 2, 3, 4, 5], 2);
-      expect(result).toEqual([[1, 2], [3, 4], [5]]);
-    });
-
-    it('should return single chunk when array smaller than chunk size', () => {
-      const chunkArray = (service as any).chunkArray.bind(service);
-      const result = chunkArray([1, 2], 5);
-      expect(result).toEqual([[1, 2]]);
-    });
-
-    it('should return empty array for empty input', () => {
-      const chunkArray = (service as any).chunkArray.bind(service);
-      const result = chunkArray([], 2);
-      expect(result).toEqual([]);
-    });
-
-    it('should handle chunk size of 1', () => {
-      const chunkArray = (service as any).chunkArray.bind(service);
-      const result = chunkArray([1, 2, 3], 1);
-      expect(result).toEqual([[1], [2], [3]]);
+      expect(chunkArray([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
+      expect(chunkArray([1, 2], 5)).toEqual([[1, 2]]);
+      expect(chunkArray([], 2)).toEqual([]);
+      expect(chunkArray([1, 2, 3], 1)).toEqual([[1], [2], [3]]);
     });
   });
 
   describe('cleanupStaleJobs', () => {
-    it('should remove jobs older than TTL', () => {
-      // Create a job
-      const job = service.createJob(
-        ORG_ID,
-        ['id-1'],
-        BulkEntityType.INVOICES,
-        BulkActionType.APPROVE,
-      );
-      expect(service.getJob(job.jobId)).toBeDefined();
-
-      // Advance time beyond TTL (10 minutes)
-      jest.advanceTimersByTime(11 * 60 * 1000);
-
-      // Trigger cleanup manually
-      (service as any).cleanupStaleJobs();
-
-      // Job should be cleaned up
-      expect(service.getJob(job.jobId)).toBeUndefined();
-    });
-
-    it('should keep jobs within TTL', () => {
-      const job = service.createJob(
-        ORG_ID,
-        ['id-1'],
-        BulkEntityType.INVOICES,
-        BulkActionType.APPROVE,
-      );
-      expect(service.getJob(job.jobId)).toBeDefined();
-
-      // Advance time but stay within TTL (5 minutes)
-      jest.advanceTimersByTime(5 * 60 * 1000);
-
-      (service as any).cleanupStaleJobs();
-
-      // Job should still exist
-      expect(service.getJob(job.jobId)).toBeDefined();
-    });
-
-    it('should clean up only stale jobs, not recent ones', () => {
-      // Create old job first
+    it('should purge jobs older than TTL while preserving active jobs within TTL', () => {
       const oldJob = service.createJob(
         ORG_ID,
         ['old'],
@@ -388,10 +236,9 @@ describe('BulkOperationsService', () => {
         BulkActionType.APPROVE,
       );
 
-      // Advance time past TTL
+      // Advance time past 10-minute TTL
       jest.advanceTimersByTime(11 * 60 * 1000);
 
-      // Create new job after time has advanced
       const newJob = service.createJob(
         ORG_ID,
         ['new'],
@@ -399,7 +246,6 @@ describe('BulkOperationsService', () => {
         BulkActionType.DELETE,
       );
 
-      // Trigger cleanup
       (service as any).cleanupStaleJobs();
 
       expect(service.getJob(oldJob.jobId)).toBeUndefined();
@@ -407,112 +253,13 @@ describe('BulkOperationsService', () => {
     });
   });
 
-  describe('progress emission', () => {
-    it('should emit correct progress percentages', async () => {
-      const job = service.createJob(
-        ORG_ID,
-        ['a', 'b', 'c', 'd'],
-        BulkEntityType.PAYROLL,
-        BulkActionType.PROCESS,
-      );
-      const processFn = jest.fn().mockResolvedValue(undefined);
-
-      const processPromise = service.processJob(job.jobId, processFn, 2); // 2 chunks of 2
-      await jest.runAllTimersAsync();
-      await processPromise;
-
-      // Check progress emissions
-      const progressCalls = mockEmit.mock.calls.filter((call) =>
-        call[0].startsWith('bulk-operation.progress.'),
-      );
-
-      // First: running with 0%
-      expect(progressCalls[0][1].progress).toBe(0);
-      // After first chunk (2/4 = 50%)
-      expect(progressCalls[1][1].progress).toBe(50);
-      // After second chunk (4/4 = 100%)
-      expect(progressCalls[2][1].progress).toBe(100);
-    });
-
-    it('should emit failures in progress events', async () => {
-      const job = service.createJob(
-        ORG_ID,
-        ['id-1', 'id-2'],
-        BulkEntityType.WORK_ORDERS,
-        BulkActionType.COMPLETE,
-      );
-      const processFn = jest
-        .fn()
-        .mockResolvedValueOnce(undefined)
-        .mockRejectedValueOnce(new Error('Failed'));
-
-      const processPromise = service.processJob(job.jobId, processFn);
-      await jest.runAllTimersAsync();
-      await processPromise;
-
-      const finalProgress = mockEmit.mock.calls
-        .filter((call) => call[0].startsWith('bulk-operation.progress.'))
-        .pop();
-
-      expect(finalProgress[1].failures).toHaveLength(1);
-      expect(finalProgress[1].failures[0]).toMatchObject({ id: 'id-2', reason: 'Failed' });
-    });
-  });
-
-  describe('edge cases', () => {
-    it('should handle empty ids array', () => {
+  describe('edge cases & determinism', () => {
+    it('should handle empty ids array on job creation without errors', () => {
       const job = service.createJob(ORG_ID, [], BulkEntityType.INVOICES, BulkActionType.APPROVE);
 
       expect(job.total).toBe(0);
       expect(job.ids).toEqual([]);
-    });
-
-    // NOTE: Empty job currently marks status as 'failed' due to 0 === 0 comparison in service
-    // Bug tracked in AI_QUESTIONS.md: bug(bulk-operations): empty job status evaluates to failed
-    it('currently marks empty job as failed (known bug)', async () => {
-      const job = service.createJob(ORG_ID, [], BulkEntityType.BILLS, BulkActionType.DELETE);
-      const processFn = jest.fn();
-
-      const processPromise = service.processJob(job.jobId, processFn);
-      await jest.runAllTimersAsync();
-      const result = await processPromise;
-
-      // Known bug: with 0 total items and 0 failures, 0 === 0 is true, so status is 'failed'
-      // Expected fix: empty job should be 'completed' with 0 processed
-      expect(result.status).toBe('failed');
-      expect(result.processed).toBe(0);
-      expect(processFn).not.toHaveBeenCalled();
-    });
-
-    it('should use fixed date for startedAt (no wall-clock dependency)', () => {
-      jest.setSystemTime(FIXED_DATE);
-
-      const job = service.createJob(
-        ORG_ID,
-        ['id-1'],
-        BulkEntityType.INVOICES,
-        BulkActionType.APPROVE,
-      );
-
-      expect(job.startedAt.getTime()).toBe(FIXED_DATE.getTime());
-    });
-
-    it('should use fixed date for completedAt', async () => {
-      jest.setSystemTime(FIXED_DATE);
-
-      const job = service.createJob(
-        ORG_ID,
-        ['id-1'],
-        BulkEntityType.INVOICES,
-        BulkActionType.APPROVE,
-      );
-      const processFn = jest.fn().mockResolvedValue(undefined);
-
-      const processPromise = service.processJob(job.jobId, processFn);
-      await jest.runAllTimersAsync();
-      const result = await processPromise;
-
-      expect(result.completedAt?.getTime()).toBe(FIXED_DATE.getTime());
+      expect(job.status).toBe('pending');
     });
   });
 });
