@@ -132,8 +132,8 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
 
-      # Restores here and saves after the job succeeds, so the cache holds what the Turbo
-      # tasks below produced. Each job has its own key prefix: the tasks differ per job.
+      # Restores here and saves only when all earlier steps passed and the key was not an
+      # exact hit, so the cache holds what the Turbo tasks below produced. Each job has its own key prefix.
       - name: Cache turbo build cache
         uses: actions/cache@v4
         with:

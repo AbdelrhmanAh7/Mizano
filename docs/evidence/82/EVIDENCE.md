@@ -102,4 +102,4 @@ Exit code: `0`
 
 - `scripts/test_turbo_config.py`: Added `test_guard_accepts_inputs_with_default_inputs_at_any_position` and updated `restrictive_inputs` check.
 - `scripts/test_ci_config.py`: Added automated regression guard testing timeout-minutes <= 5 on all jobs, absence of docker-build and filter jobs, and stable check names.
-- `.github/workflows/ci.yml`: Updated CI lint step to execute all script test suites (`test_*.py`).
+- `.github/workflows/ci.yml`: Updated CI lint step to execute all script test suites (`test_*.py`), and clarified Turbo cache saving comment at line 135 (saved only when all earlier steps pass and key is not an exact hit).
