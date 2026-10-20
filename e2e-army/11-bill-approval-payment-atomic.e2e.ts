@@ -103,8 +103,9 @@ test(
     expect(bill1Res.status).toBe(201);
     const bill1Id = bill1Res.body.id;
 
-    // Two simultaneous approval attempts
+    // Three simultaneous approval attempts (restored per CTO requirement)
     const approvalResults = await Promise.all([
+      call(`/bills/${bill1Id}/approve`, "POST", undefined, token),
       call(`/bills/${bill1Id}/approve`, "POST", undefined, token),
       call(`/bills/${bill1Id}/approve`, "POST", undefined, token),
     ]);
@@ -114,8 +115,8 @@ test(
     const approvalFailures = approvalStatuses.filter((s) => s !== 201);
 
     expect(approvalSuccesses).toHaveLength(1);
-    expect(approvalFailures).toHaveLength(1);
-    expect([400, 409]).toContain(approvalFailures[0]);
+    expect(approvalFailures).toHaveLength(2);
+    for (const f of approvalFailures) expect([400, 409]).toContain(f);
 
     const bill1After = await call(`/bills/${bill1Id}`, "GET", undefined, token);
     expect(bill1After.status).toBe(200);
@@ -187,12 +188,24 @@ test(
     expect(bill2After.body.billAllocations).toBeDefined();
     expect(bill2After.body.billAllocations).toHaveLength(1);
 
-    const allJournalsRes = await call("/journals?limit=100", "GET", undefined, token);
-    const allJournals: Json[] = allJournalsRes.body.data ?? allJournalsRes.body;
-    const paymentJournals = allJournals.filter(
+    // Explicit assertion: exactly one PAYMENT_MADE journal and one allocation for bill2
+    const paymentJournalsRes = await call(
+      `/journals?sourceType=PAYMENT_MADE&sourceId=${paymentId}`,
+      "GET",
+      undefined,
+      token,
+    );
+    const paymentJournalsList: Json[] = paymentJournalsRes.body.data ?? paymentJournalsRes.body;
+    const paymentJournals = paymentJournalsList.filter(
       (j) => j.sourceType === "PAYMENT_MADE" && j.sourceId === paymentId,
     );
     expect(paymentJournals).toHaveLength(1);
+
+    const allocationsRes = await call(`/bills/${bill2Id}/allocations`, "GET", undefined, token);
+    const allocationsList: Json[] = allocationsRes.body.data ?? allocationsRes.body;
+    expect(allocationsList).toHaveLength(1);
+    expect(allocationsList[0].amount).toBe("100");
+    expect(allocationsList[0].paymentId).toBe(paymentId);
 
     const tbRes = await call("/accounting-reports/trial-balance", "GET", undefined, token);
     expect(tbRes.status).toBe(200);
