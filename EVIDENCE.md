@@ -27,8 +27,10 @@
 ### PR #58: Telegram Long-Polling Ingestion into Intake Jobs (Issue #20)
 
 - **Branch**: `demo/20-telegram-intake` (rebased & merged with `master`)
-- **Tested Head SHA**: `04d1c7e8029b2397d8a01b3ff92c6e48ac8c553c`
+- **Tested Head SHA**: `07be91024343e0d86e10777ce4d9bb1a1a9e3a62`
 - **Related Issue**: #20 (milestone P3: Ingest Telegram channel invoices into durable CPU queue)
+- **Originating Sentry Issue**: None (feature implementation and code review fixes; no production crash/Sentry issue)
+- **E2E Status**: E2E: not needed — Telegram long-polling is disabled by default and only processes documents after secure link code verification
 
 #### Acceptance Criteria & Verification Matrix
 
@@ -62,7 +64,7 @@
    Test Suites: 3 passed, 3 total
    Tests:       75 passed, 75 total
    Snapshots:   0 total
-   Time:        3.764 s
+   Time:        6.445 s
    ```
 
    Exit code: `0`
@@ -82,6 +84,12 @@
    ```
    Exit code: `0` (clean, 0 warnings, 0 errors)
 
+#### UI & Localization Verification
+
+- **UI Scope**: PR #58 adds backend API endpoints (`/telegram/link-code`, `/telegram/links`) and the long-polling Telegram bot worker; no frontend/web UI screens are modified.
+- **Web App Non-Regression**: Verified in Thoth verification run (`d378921`): signed-in app shell, `/en/dashboard`, `/en/purchases/bills`, `/en/purchases/bills/scan`, and `/en/purchases/expenses` rendered cleanly at desktop and 375px mobile viewport with zero uncaught exceptions.
+- **Bilingual Bot Text**: User-facing bot communications in `MSG` provide complete Arabic and English pairs (tested in `telegram-intake.service.spec.ts`).
+
 #### Regression & Bug Fix Evidence
 
 - **Terminal Update Race Guard (Commit `e2e20835`)**:
@@ -98,6 +106,10 @@
   - _Symptom_: Hard-rule violation for modifying `.env.*` configuration files with `TELEGRAM_BOT_TOKEN`.
   - _Fix_: Removed changes to `.env.local`, `.env.dev`, `.env.sit`, `.env.prod`. Documented variable solely in `docs/telegram-intake.md`, `docs/DEVELOPMENT.md`, and `deploy/pi/.env.pi.example`. Poller gracefully disabled when variable is unset.
   - _Result_: Verified clean working tree with no secret leaks in tracked environment files.
+- **CI Gate Restoration (Commit `07be910`)**:
+  - _Symptom_: `CLAUDE.md` was modified to drop E2E from `pnpm ci:full`, weakening the CI gate.
+  - _Fix_: Restored `CLAUDE.md` to `pnpm ci:full # lint + type-check + test + e2e (MUST pass)` to match master.
+  - _Result_: CI gate integrity preserved.
 
 ### PR #60
 
