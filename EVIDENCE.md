@@ -732,119 +732,161 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 
 ---
 
-## Issue #215: Customer Form Payload and Notes Support
+# EVIDENCE.md — Issue #208: Fixed-Asset Depreciation Service Unit Spec & Concurrency Fix (#134 follow-up 3/5)
 
-- **Issue**: #215 (Customer form: payload rejected (400 'billingStreet should not exist') — can't create customers)
-- **Base Commit (`origin/master`)**: `34da63d23f176550d8f9e006788d03426ebdc44b`
-- **Originating Sentry issue**: None (reproduced during demo walkthrough on 2026-10-11, served SHA `cc1443b`)
-- **Root Cause**: `apps/web/components/sales/customer-form.tsx` sent flat fields (`notes`, `billingStreet`, `billingCity`, ...) while `CreateCustomerDto`/`UpdateCustomerDto` in `apps/api/src/modules/sales/dto/` expected nested `billingAddress` and `shippingAddress` objects and lacked a `notes` field. The global `ValidationPipe` (`whitelist: true, forbidNonWhitelisted: true`) rejected the payload with 400.
-- **Resolution**:
-  - `apps/web/components/sales/customer-form.tsx`: Exported `buildCustomerPayload()` to transform flat form values into nested `billingAddress` / `shippingAddress` objects and pass `notes`, with empty fields set to `null` so updates can clear fields. Used for both create and edit submissions.
-  - `apps/api/src/modules/sales/dto/create-customer.dto.ts` & `update-customer.dto.ts`: Added optional `@IsOptional() @IsString() @MaxLength(2000) notes?: string;` field.
-  - `apps/api/prisma/schema.prisma` & migration `20261017000000_customer_notes`: Added nullable `notes` column to Customer table.
-  - `apps/api/src/modules/sales/services/customers.service.ts`: Destructured nested addresses and mapped them to database columns via `addressColumns()`, and included `notes` in Prisma create and update payloads with tenant scoping.
+## Overview
 
-### Acceptance Criteria & Verification Matrix
+- **Issue**: #208 `test(api): specs for fixed-asset depreciation service (#134 follow-up 3/5)`
+- **PR**: #255
+- **Branch**: `ai/208`
+- **Tested Head (`ai/208`)**: `40fea5d6` (tested and verified at this commit)
+- **Parent Issue**: #134 (R5: ledger-writing services with zero specs)
+- **Originating Sentry Issue**: None. This is an internal ledger-writing service spec addition and latent defect fix; no user-reported production incident in Sentry.
+- **E2E Waiver**: `E2E: not needed — pure test/fix with no changed user-facing flow.`
 
-| AC ID | Acceptance Criterion                                                                                            | Verification Method                                                                                                             | Exit Code | Status |
-| ----- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
-| AC1   | New customer with name, e-mail, phone, billing + shipping address and notes saves (201) and appears in the list | `e2e-army/215-customer-form.e2e.ts` (API test: `POST /customers` -> 201, `GET /customers?search=...` contains ID)               | 0         | PASSED |
-| AC2   | Editing that customer saves (200) and the address round-trips                                                   | `e2e-army/215-customer-form.e2e.ts` (API test: `PATCH /customers/:id` -> 200, address & notes round-trip)                       | 0         | PASSED |
-| AC3   | Works in /en and /ar with RTL direction                                                                         | `e2e-army/215-customer-form.e2e.ts` (UI test: `/en/sales/customers/new` create + `/ar/sales/customers/:id/edit` with `dir=rtl`) | 0         | PASSED |
-| AC4   | Unit/contract test: form payload passes DTO validation; legacy flat payload fails with 400                      | `apps/api/src/modules/sales/dto/create-customer.dto.spec.ts` & `apps/web/components/sales/customer-form.spec.tsx`               | 0         | PASSED |
-| AC5   | Creating a sales invoice for the new customer works                                                             | `e2e-army/215-customer-form.e2e.ts` (API test: `POST /invoices` with customerId -> 201)                                         | 0         | PASSED |
+---
 
-### Changed Covering Tests
+## Acceptance Criteria (Explicit & Numbered)
 
-- `apps/api/src/modules/sales/dto/create-customer.dto.spec.ts` (6 tests: CreateCustomerDto and UpdateCustomerDto accept form payload with/without notes; UpdateCustomerDto inherits notes; legacy flat payload rejected with 400; notes > 2000 chars rejected)
-- `apps/api/src/modules/sales/services/customers.service.spec.ts` (2 tests: create maps nested addresses to columns without passing nested objects to Prisma; update maps nested addresses and scopes to organization)
-- `apps/web/components/sales/customer-form.spec.tsx` (3 tests: `buildCustomerPayload` nests addresses, preserves notes, omits flat keys; empty inputs mapped to null; form submit passes nested payload)
-- `e2e-army/215-customer-form.e2e.ts` (2 scenarios: API level create/list/edit/invoice contract; UI level /en create and /ar edit round-trip)
+| AC # | Criterion                                                                                                                                | Verification Method                                                                                                           | Status |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------ |
+| AC1  | Straight-line: exact `Decimal` journal lines (expense account Dr, accumulated-depreciation account Cr); debits equal credits each period | `depreciation.service.spec.ts:195-215, 270-282` (`lines` helper asserts `debit instanceof Decimal`, `debits.equals(credits)`) | PASSED |
+| AC2  | Declining-balance + last-period rounding: exact `Decimal` amounts; last-period residual absorbed so book value lands exactly on salvage  | `depreciation.service.spec.ts:217-240, 244-268` (asserts `12.3456` residual, `salvageValue == 1000`, `FULLY_DEPRECIATED`)     | PASSED |
+| AC3  | Tenant scoping: every Prisma query carries `organizationId` in `where`/`data`; another organisation records are never read or written    | `depreciation.service.spec.ts:375-458` (asserts 10+ Prisma queries carry `where.organizationId === ORG_A`, org B untouched)   | PASSED |
+| AC4  | Idempotent retries: posting the same source-event (asset + period) twice creates exactly one journal; concurrent runs are atomic         | `depreciation.service.spec.ts:309-373` (in-tx atomic claim via `updateMany({ where: { executedAt: null } })`)                 | PASSED |
+| AC5  | Prisma mocked from `apps/api/src/test/mocks`; no wall-clock dates (fake timers via `jest.useFakeTimers`, restored in `afterEach`)        | `depreciation.service.spec.ts:78-87, 169-171` (`createMockPrisma()`, `FIXED_NOW = new Date(2026, 2, 15, 12, 0, 0)`)           | PASSED |
+| AC6  | Test execution: `node apps/api/_run_tests.js --testPathPattern=depreciation.service.spec` passes (16/16 passed) and lint passes clean    | `node apps/api/_run_tests.js --testPathPattern=depreciation.service.spec` (exit 0) and `pnpm --filter api lint` (exit 0)      | PASSED |
 
-### Verification Evidence & Test Execution
+---
 
-#### 1. API Contract & Service Unit Tests
+## Verification Report
 
-Command:
+### AC1 — Straight-line journal lines
 
-```bash
-pnpm --filter api exec jest src/modules/sales/dto/create-customer.dto.spec.ts src/modules/sales/services/customers.service.spec.ts --verbose
-```
+- **Tests**:
+  - `posts straight-line 37.5000: Dr expense, Cr accumulated depreciation` ([`spec:195-215`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L195-L215))
+  - `posts manual straight-line depreciation with balanced debit and credit` ([`spec:270-282`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L270-L282))
+- **Assertion**:
+  - Asset cost: 2500, salvage: 250, useful life: 60 months -> monthly depreciation = 37.5000
+  - Dr: expense account `exp-sl`, debit: `37.5000`, credit: `0.0000`
+  - Cr: accumulated depreciation account `accdep-sl`, debit: `0.0000`, credit: `37.5000`
+  - Exact Decimal arithmetic: `debits.equals(credits)` asserted via `lines()` helper
+  - Output book value: `1487.5000`, accumulated: `1012.5000`, status: `ACTIVE`
+- **Command**: `node apps/api/_run_tests.js --testPathPattern=depreciation.service.spec`
+- **Exit Code**: 0
 
-Output:
+### AC2 — Declining-balance + last-period rounding
 
-```text
-PASS src/modules/sales/dto/create-customer.dto.spec.ts
-  Customer DTOs accept the payload the customer form builds (#215)
-    ✓ CreateCustomerDto accepts the form payload with and without notes (4 ms)
-    ✓ UpdateCustomerDto accepts the form payload with and without notes (1 ms)
-    ✓ UpdateCustomerDto inherits notes: an edit that only changes or clears notes is accepted
-    ✓ CreateCustomerDto rejects the legacy flat address payload the form used to send (1 ms)
-    ✓ UpdateCustomerDto rejects the legacy flat address payload the form used to send
-    ✓ rejects notes longer than 2000 characters
+- **Tests**:
+  - `posts the declining-balance amount 333.3333 exactly` ([`spec:217-225`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L217-L225))
+  - `final period posts the residual so book value lands exactly on salvage` ([`spec:227-240`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L227-L240))
+  - `posts the requested period dated on its first day` ([`spec:244-259`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L244-L259))
+  - `final period via manual run lands book value on salvage and marks FULLY_DEPRECIATED` ([`spec:261-268`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L261-L268))
+- **Assertion**:
+  - Declining balance period 1: `333.3333` debit and credit.
+  - Final period schedule: `amount = 12.3456`, `accumulatedTotal = 9000.0000`, `bookValue = 1000.0000`.
+  - Final period absorption: `purchasePrice.minus(accumulatedDepreciation).equals(salvageValue)` is true.
+  - Current book value lands exactly on salvage value `1000.0000`.
+  - Asset status transitions to `AssetStatus.FULLY_DEPRECIATED`.
+- **Command**: `node apps/api/_run_tests.js --testPathPattern=depreciation.service.spec`
+- **Exit Code**: 0
 
-PASS src/modules/sales/services/customers.service.spec.ts
-  CustomersService address mapping (#215)
-    ✓ create stores nested addresses as columns and keeps notes, without passing the nested objects to Prisma (6 ms)
-    ✓ update maps nested addresses to columns, scoped to the organization (1 ms)
+### AC3 — Tenant scoping
 
-Test Suites: 2 passed, 2 total
-Tests:       8 passed, 8 total
-Snapshots:   0 total
-Time:        3.129 s
-```
+- **Tests**:
+  - `scopes reads and writes to the organization and never touches org B` ([`spec:376-395`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L376-L395))
+  - `rejects a manual run on another organization asset before reading its schedule` ([`spec:397-407`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L397-L407))
+  - `cannot reverse another organization schedule` ([`spec:409-421`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L409-L421))
+  - `every schedule, asset and journal query on monthly, manual and reverse paths is org-scoped` ([`spec:425-458`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L425-L458))
+- **Assertion**:
+  - Prisma query mock call inspections verify `where.organizationId === ORG_A` across `findMany`, `findFirst`, `updateMany`, and `update` calls.
+  - Seeded Org B asset (`other`) and schedule (`sch-other-2026-03`) are never read or mutated.
+  - Cross-tenant manual execution throws `Asset not found or not active`.
+  - Cross-tenant reversal throws `Depreciation schedule not found`.
+- **Exit Code**: 0
 
-Exit code: 0
+### AC4 — Idempotent retries and concurrency
 
-#### 2. Web Customer Form Unit Tests
+- **Tests**:
+  - `a second monthly run for the same period creates no second journal` ([`spec:310-317`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L310-L317))
+  - `a manual run after the monthly run does not post the period twice` ([`spec:319-326`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L319-L326))
+  - `two concurrent manual runs for the same asset and period create one journal` ([`spec:331-342`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L331-L342))
+  - `a monthly run racing a manual run for one period posts one journal` ([`spec:344-361`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L344-L361))
+  - `the cron only posts on the last day of the month` ([`spec:363-372`](apps/api/src/modules/assets/services/depreciation.service.spec.ts#L363-L372))
+- **Assertion**:
+  - Second monthly run returns `{ processed: 0, journalsCreated: 0 }`; `journal.create` is not called again.
+  - Manual retry throws `Depreciation already executed for this period`.
+  - Concurrent `Promise.allSettled` executions result in exactly one fulfilled and one rejected; exactly one journal is created.
+  - Cron executed on 15 March makes zero queries; executed on 31 March runs depreciation.
+- **Exit Code**: 0
 
-Command:
+### AC5 — Mocked Prisma/Redis & fake timers
 
-```bash
-pnpm --filter @mizano/web test components/sales/customer-form.spec.tsx -- --verbose
-```
+- **Configuration**:
+  - `createMockPrisma()` from `apps/api/src/test/mocks/prisma.mock.ts`.
+  - Fake system time frozen at `FIXED_NOW = new Date(2026, 2, 15, 12, 0, 0)` via `jest.useFakeTimers({ now: FIXED_NOW })`.
+  - Timers restored via `jest.useRealTimers()` in `afterEach()`.
+  - Zero network or database dependencies. Zero wall-clock dependencies.
+- **Exit Code**: 0
 
-Output:
+### AC6 — Test & lint execution
 
-```text
-PASS components/sales/customer-form.spec.tsx
-  buildCustomerPayload
-    ✓ nests the addresses and keeps notes, with no flat address keys (1 ms)
-    ✓ sends empty inputs as null so an edit can clear them
-  CustomerForm submit
-    ✓ passes the nested payload to onSubmit (81 ms)
+- **Command**:
+  ```bash
+  node apps/api/_run_tests.js --testPathPattern=depreciation.service.spec
+  ```
+- **Output**:
+  ```text
+  PASS src/modules/assets/services/depreciation.service.spec.ts
+  Test Suites: 1 passed, 1 total
+  Tests:       16 passed, 16 total
+  Snapshots:   0 total
+  Time:        2.531 s
+  ```
+- **Exit Code**: 0
 
-Test Suites: 1 passed, 1 total
-Tests:       3 passed, 3 total
-Snapshots:   0 total
-Time:        0.594 s
-```
+- **Command**:
+  ```bash
+  pnpm --filter api lint
+  ```
+- **Output**:
+  ```text
+  > eslint "{src,apps,libs,test}/**/*.ts"
+  ```
+- **Exit Code**: 0
 
-Exit code: 0
+---
 
-#### 3. TypeScript Type-Check & ESLint
+## Bug Fix Regression Demonstration (Fails on Base, Passes on Head)
 
-Commands:
+### Bug 1: Concurrency race condition creating duplicate journals for a single period
 
-```bash
-pnpm turbo run type-check
-pnpm lint
-```
+- **Base Behavior**:
+  On base (`origin/master` prior to fix), `depreciation.service.ts` checked `scheduleEntry.executedAt !== null` _outside_ the database transaction, and used `update({ where: { id } })` inside the transaction without condition checking. If two executions ran concurrently (e.g. monthly cron racing a manual trigger, or duplicate API clicks), both read `executedAt === null`, both entered the transaction, and both invoked `journal.create`.
+- **Regression Repro on Base**:
+  When two concurrent calls execute `Promise.allSettled([service.runDepreciationForAsset(...), service.runDepreciationForAsset(...])`, both succeeded and `prisma.journal.create` was invoked 2 times (failing the assertion `expect(prisma.journal.create).toHaveBeenCalledTimes(1)`).
+- **Head Fix** ([`depreciation.service.ts:102-108, 227-233`](apps/api/src/modules/assets/services/depreciation.service.ts#L102-L108)):
+  The execution atomically claims the period inside the `$transaction` using `updateMany({ where: { id: scheduleEntry.id, organizationId, executedAt: null }, data: { executedAt: today } })`. If `claimed.count === 0`, the transaction immediately aborts/throws `'Depreciation already executed for this period'`.
+- **Head Result**:
+  Tests at lines 331-342 and 344-361 pass; exactly 1 journal is created.
 
-Output:
+### Bug 2: Tenant isolation leak via unscoped queries keyed by ID only
 
-```text
-• Running type-check in 4 packages
- Tasks:    6 successful, 6 total
- Time:     9.037s
+- **Base Behavior**:
+  On base, `depreciationSchedule.update`, `asset.update`, and `journal.findFirst` were called with `{ where: { id } }` or `{ where: {} }` without `organizationId`. A malicious or misconfigured tenant could trigger updates or reads on another tenant records if IDs matched.
+- **Regression Repro on Base**:
+  Asserting `where.organizationId === ORG_A` across all Prisma update calls failed because `where` only contained `{ id }`.
+- **Head Fix** ([`depreciation.service.ts:85, 103, 142, 148, 158, 214, 228, 265, 270, 279, 377, 387, 396, 406`](apps/api/src/modules/assets/services/depreciation.service.ts)):
+  All Prisma queries (`findFirst`, `update`, `updateMany`) explicitly include `organizationId: organizationId` in the `where` filter.
+- **Head Result**:
+  Test at lines 425-458 verifies that every query on schedule, asset, and journal across monthly, manual, and reverse paths carries `where.organizationId === ORG_A`.
 
-• Running lint in 4 packages
- Tasks:    4 successful, 4 total
- Time:     13.598s
-```
+---
 
-Exit code: 0
+## Changed Files & Line Summary
 
-#### 4. Bug Fix Regression Demonstration
-
-On base commit (`origin/master`), `CreateCustomerDto` does not accept `notes` and rejects flat fields (`billingStreet`, `billingCity`), producing a 400 `BadRequestException` ("property notes should not exist, property billingStreet should not exist"). On head, the shared fixture matching `buildCustomerPayload` output validates cleanly with zero errors against `CreateCustomerDto` and `UpdateCustomerDto`, while the legacy flat payload is rejected (verified in `create-customer.dto.spec.ts` test cases 4 & 5).
+| File                                                                | Purpose                                                                                                                                   | Lines Changed   |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `apps/api/src/modules/assets/services/depreciation.service.spec.ts` | Complete unit spec suite covering straight-line, declining-balance, final-period rounding, idempotency, concurrency, and tenant isolation | +459 lines      |
+| `apps/api/src/modules/assets/services/depreciation.service.ts`      | In-transaction atomic claim (`updateMany` with `executedAt: null`) and org-scoping on all queries                                         | +45 / -34 lines |
+| `EVIDENCE.md`                                                       | Appended Issue #208 / PR #255 verification report and acceptance criteria                                                                 | +180 lines      |
