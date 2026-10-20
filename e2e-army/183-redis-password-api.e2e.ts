@@ -57,7 +57,8 @@ test(
     expect((await fetch(`${API()}/cache/stats`)).status).toBe(401);
     const stats = await call('/cache/stats');
     expect(stats.status).toBe(200);
-    expect(stats.body).toHaveProperty('type');
+    expect(stats.body).toHaveProperty('storeType');
+    expect(stats.body).toHaveProperty('connected');
     // warm a cached list, then the keys and flush endpoints answer for this organization
     expect((await call('/customers?limit=5')).status).toBe(200);
     expect((await call('/cache/keys')).status).toBe(200);

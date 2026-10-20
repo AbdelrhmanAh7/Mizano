@@ -125,6 +125,25 @@ describe.each(FILES)('%s (#183)', (file) => {
     });
   });
 
+  it('preserves existing credentials in an external REDIS_URL', () => {
+    const rendered = render(file, {
+      POSTGRES_PASSWORD: PG_PASS,
+      REDIS_URL: 'redis://:ext_secret@cache.internal:6380/2',
+    });
+    const api = service(rendered, 'api');
+    const env = {
+      REDIS_URL: envOf(api, 'REDIS_URL'),
+      REDIS_PASSWORD: envOf(api, 'REDIS_PASSWORD'),
+    };
+    expect(env.REDIS_URL).toBe('redis://:ext_secret@cache.internal:6380/2');
+    const url = resolveRedisUrl({ get: (key) => env[key as keyof typeof env] });
+    expect(connectionFromUrl(url as string)).toMatchObject({
+      host: 'cache.internal',
+      port: 6380,
+      password: 'ext_secret',
+    });
+  });
+
   it('lets the API connect with a fallback POSTGRES_PASSWORD full of URL-special characters', () => {
     const special = 'army183/pg+=@:%?';
     const api = service(render(file, { POSTGRES_PASSWORD: special }), 'api');

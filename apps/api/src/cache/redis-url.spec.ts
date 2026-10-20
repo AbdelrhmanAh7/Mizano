@@ -39,10 +39,20 @@ describe('resolveRedisUrl (#183)', () => {
     expect(decodeURIComponent(new URL(url).password)).toBe(SPECIAL);
   });
 
-  it('REDIS_PASSWORD replaces a password already in the URL', () => {
+  it('preserves credentials already present in REDIS_URL', () => {
     const url = resolveRedisUrl(
-      config({ REDIS_URL: 'redis://:old@redis:6379', REDIS_PASSWORD: 'new' }),
+      config({
+        REDIS_URL: 'redis://:external_pass@redis:6379',
+        REDIS_PASSWORD: 'fallback_pg_pass',
+      }),
     ) as string;
-    expect(connectionFromUrl(url)).toMatchObject({ password: 'new' });
+    expect(connectionFromUrl(url)).toMatchObject({ password: 'external_pass' });
+  });
+
+  it('injects REDIS_PASSWORD when REDIS_URL has no credentials', () => {
+    const url = resolveRedisUrl(
+      config({ REDIS_URL: 'redis://redis:6379/0', REDIS_PASSWORD: 'custom_redis_pass' }),
+    ) as string;
+    expect(connectionFromUrl(url)).toMatchObject({ password: 'custom_redis_pass' });
   });
 });
