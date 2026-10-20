@@ -25,7 +25,7 @@ jest.mock('@/components/ui/select', () => ({
 }));
 
 import { buildCustomerPayload, CustomerForm } from './customer-form';
-import formPayloadFixture from './customer-form-payload.fixture.json';
+import formPayloadFixture from '../../../../packages/shared-types/fixtures/customer-form-payload.fixture.json';
 
 const FLAT_KEYS = [
   'billingStreet',

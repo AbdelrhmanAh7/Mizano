@@ -173,7 +173,7 @@ export class CustomersService {
 
     const { billingAddress, shippingAddress, ...rest } = updateCustomerDto;
     const updatedCustomer = await this.prisma.customer.update({
-      where: { id },
+      where: { id, organizationId },
       data: {
         ...rest,
         ...addressColumns(billingAddress, shippingAddress),

@@ -12,6 +12,8 @@ function apiBase(baseUrl: string): string {
   return (process.env.E2E_ARMY_API ?? `${baseUrl.replace(/\/+$/, '')}/api`).replace(/\/+$/, '');
 }
 
+const REQUEST_TIMEOUT_MS = 90_000;
+
 async function call(
   base: string,
   method: string,
@@ -27,6 +29,8 @@ async function call(
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
+    // Bound a stalled connection; longer than the 85 s login polling window, far below the 300 s test timeout.
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   const text = await res.text();
   let parsed: unknown = text;

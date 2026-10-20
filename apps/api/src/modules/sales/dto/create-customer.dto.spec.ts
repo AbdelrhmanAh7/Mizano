@@ -16,10 +16,11 @@ const validate = (dto: typeof CreateCustomerDto | typeof UpdateCustomerDto, body
   pipe.transform(body, { type: 'body', metatype: dto });
 
 // Exactly what buildCustomerPayload() in apps/web/components/sales/customer-form.tsx returns:
-// customer-form.spec.tsx asserts the builder's output equals this file, so the two sides cannot drift.
+// customer-form.spec.tsx asserts the builder's output equals this shared fixture (packages/shared-types/fixtures),
+// so the two sides cannot drift and the API spec does not depend on apps/web being present.
 const formPayload = JSON.parse(
   readFileSync(
-    join(__dirname, '../../../../../web/components/sales/customer-form-payload.fixture.json'),
+    join(__dirname, '../../../../../../packages/shared-types/fixtures/customer-form-payload.fixture.json'),
     'utf8',
   ),
 ) as Record<string, unknown>;
