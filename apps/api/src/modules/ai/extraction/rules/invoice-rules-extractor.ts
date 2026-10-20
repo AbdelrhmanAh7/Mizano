@@ -214,14 +214,16 @@ function extractDates(
     const d = parseDate(lines[i]);
     if (!d) return null;
     if (d.ambiguous) ambiguousLines.add(i);
-    const offsets = span(i, d.start, d.end);
+    // Map parseDate line offsets back to original text coordinates via lineStarts and mapSpanToOriginal
+    const { start, end } = span(i, d.start, d.end);
     return {
       value: d.iso,
       confidence: d.ambiguous
         ? Math.min(AMBIGUOUS_DATE_CAP, base * scaleFactor)
         : base * scaleFactor,
       evidence: evidence(lines, i),
-      ...offsets,
+      start,
+      end,
     };
   };
   for (let i = 0; i < lines.length && !(date && dueDate); i++) {

@@ -54,6 +54,12 @@ describe('parseDate', () => {
     });
     expect(parseDate('2024-06-09')?.iso).toBe('2024-06-09');
     expect(parseDate('12 March 2024')?.iso).toBe('2024-03-12');
+    expect(parseDate('March 15, 2024')).toEqual({
+      iso: '2024-03-15',
+      ambiguous: false,
+      start: 0,
+      end: 14,
+    });
     expect(parseDate('9 يونيو 2024')?.iso).toBe('2024-06-09');
     expect(parseDate('3 تشرين الثاني 2024')?.iso).toBe('2024-11-03');
   });
@@ -277,7 +283,16 @@ describe('extractInvoiceFields date offsets map back to original text', () => {
     expect(text.slice(r.date?.start, r.date?.end)).toBe('15/03/2024');
   });
 
-  it('slices month-first-less named dates and dates with irregular spacing', () => {
+  it('slices month-first textual dates with irregular spacing', () => {
+    const text = 'Date:   March   15,   2024';
+    const r = extractInvoiceFields(text);
+    expect(r.date?.value).toBe('2024-03-15');
+    expect(r.date?.start).toBeDefined();
+    expect(r.date?.end).toBeDefined();
+    expect(text.slice(r.date?.start, r.date?.end)).toBe('March   15,   2024');
+  });
+
+  it('slices day-first named dates and dates with irregular spacing', () => {
     const named = 'Date:   ١٥   March ٢٠٢٤';
     const r1 = extractInvoiceFields(named);
     expect(r1.date?.value).toBe('2024-03-15');
@@ -285,6 +300,20 @@ describe('extractInvoiceFields date offsets map back to original text', () => {
     const spaced = 'Date: 2024 / 03  /  15';
     const r2 = extractInvoiceFields(spaced);
     expect(spaced.slice(r2.date?.start, r2.date?.end)).toBe('2024 / 03  /  15');
+  });
+
+  it('selects valid date when invalid Hijri ISO appears first on the line', () => {
+    const text = 'Date: 1445.9.5 (15/03/2024)';
+    const r = extractInvoiceFields(text);
+    expect(r.date?.value).toBe('2024-03-15');
+    expect(text.slice(r.date?.start, r.date?.end)).toBe('15/03/2024');
+  });
+
+  it('translates span back through Arabic-Indic digits via mapSpanToOriginal', () => {
+    const text = 'Invoice\nDate: \u200e١٥/٠٣/٢٠٢٤\nTotal: 100.00';
+    const r = extractInvoiceFields(text);
+    expect(r.date?.value).toBe('2024-03-15');
+    expect(text.slice(r.date?.start, r.date?.end)).toBe('١٥/٠٣/٢٠٢٤');
   });
 
   it('does not store raw document text in RulesExtraction to prevent sensitive data logging', () => {

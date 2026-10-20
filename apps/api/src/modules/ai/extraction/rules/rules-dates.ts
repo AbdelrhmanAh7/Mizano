@@ -48,10 +48,18 @@ const MONTH_WORDS = MONTHS.flatMap(([, names]) => names)
   .map((n) => n.replace(/ /g, String.raw`\s+`))
   .sort((a, b) => b.length - a.length)
   .join('|');
-const NAMED_RE = new RegExp(
+const DAY_FIRST_NAMED_RE = new RegExp(
   String.raw`(\d{1,2})\s*(?:st|nd|rd|th)?\s+(${MONTH_WORDS})\s*,?\s+(\d{2,4})`,
-  'i',
+  'gi',
 );
+
+const MONTH_FIRST_NAMED_RE = new RegExp(
+  String.raw`(${MONTH_WORDS})\s+(\d{1,2})\s*(?:st|nd|rd|th)?\s*,?\s+(\d{2,4})`,
+  'gi',
+);
+
+const YMD_RE = /(?<!\d)(\d{4})\s*[-/.]\s*(\d{1,2})\s*[-/.]\s*(\d{1,2})(?!\d)/g;
+const DMY_RE = /(?<!\d)(\d{1,2})\s*[-/.]\s*(\d{1,2})\s*[-/.]\s*(\d{4}|\d{2})(?!\d)/g;
 
 /** Collapse whitespace runs to one space, keeping the line index of every kept character. */
 function collapseWhitespace(input: string): { text: string; toLine: number[] } {
@@ -70,38 +78,51 @@ function collapseWhitespace(input: string): { text: string; toLine: number[] } {
 export function parseDate(line: string): DateMatch | null {
   // Collapse whitespace runs so adjacent \s* / \s+ in the patterns cannot backtrack quadratically.
   const { text: folded, toLine } = collapseWhitespace(foldForMatch(line));
-  const at = (m: RegExpMatchArray): { start: number; end: number } => ({
-    start: toLine[m.index ?? 0],
-    end: toLine[(m.index ?? 0) + m[0].length - 1] + 1,
+  const at = (m: RegExpExecArray): { start: number; end: number } => ({
+    start: toLine[m.index],
+    end: toLine[m.index + m[0].length - 1] + 1,
   });
-  const ymd = folded.match(/(?<!\d)(\d{4})\s*[-/.]\s*(\d{1,2})\s*[-/.]\s*(\d{1,2})(?!\d)/);
-  if (ymd) {
-    const iso = validIso(Number(ymd[1]), Number(ymd[2]), Number(ymd[3]));
-    if (iso) return { iso, ambiguous: false, ...at(ymd) }; // year-first is always year-month-day
+
+  const candidates: DateMatch[] = [];
+
+  for (const m of folded.matchAll(YMD_RE)) {
+    const iso = validIso(Number(m[1]), Number(m[2]), Number(m[3]));
+    if (iso) candidates.push({ iso, ambiguous: false, ...at(m) });
   }
-  const dmy = folded.match(/(?<!\d)(\d{1,2})\s*[-/.]\s*(\d{1,2})\s*[-/.]\s*(\d{4}|\d{2})(?!\d)/);
-  if (dmy) {
-    const a = Number(dmy[1]);
-    const b = Number(dmy[2]);
-    const y = fullYear(Number(dmy[3]), dmy[3].length);
+
+  for (const m of folded.matchAll(DMY_RE)) {
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    const y = fullYear(Number(m[3]), m[3].length);
     if (a > 12) {
       const iso = validIso(y, b, a);
-      if (iso) return { iso, ambiguous: false, ...at(dmy) };
+      if (iso) candidates.push({ iso, ambiguous: false, ...at(m) });
     } else if (b > 12) {
       const iso = validIso(y, a, b);
-      if (iso) return { iso, ambiguous: false, ...at(dmy) };
+      if (iso) candidates.push({ iso, ambiguous: false, ...at(m) });
     } else {
       const iso = validIso(y, b, a); // day-first
-      if (iso) return { iso, ambiguous: a !== b, ...at(dmy) };
+      if (iso) candidates.push({ iso, ambiguous: a !== b, ...at(m) });
     }
   }
-  const named = folded.match(NAMED_RE);
-  if (named) {
-    const month = monthByName(named[2]);
+
+  for (const m of folded.matchAll(DAY_FIRST_NAMED_RE)) {
+    const month = monthByName(m[2]);
     if (month) {
-      const iso = validIso(fullYear(Number(named[3]), named[3].length), month, Number(named[1]));
-      if (iso) return { iso, ambiguous: false, ...at(named) };
+      const iso = validIso(fullYear(Number(m[3]), m[3].length), month, Number(m[1]));
+      if (iso) candidates.push({ iso, ambiguous: false, ...at(m) });
     }
   }
-  return null;
+
+  for (const m of folded.matchAll(MONTH_FIRST_NAMED_RE)) {
+    const month = monthByName(m[1]);
+    if (month) {
+      const iso = validIso(fullYear(Number(m[3]), m[3].length), month, Number(m[2]));
+      if (iso) candidates.push({ iso, ambiguous: false, ...at(m) });
+    }
+  }
+
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => a.start - b.start || b.end - b.start - (a.end - a.start));
+  return candidates[0];
 }
