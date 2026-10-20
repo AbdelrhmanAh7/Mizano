@@ -24,92 +24,26 @@
 
 ## Detailed Test Logs & Commit Evidence
 
-### PR #58: Telegram Long-Polling Ingestion into Intake Jobs (Issue #20)
+### PR #58
 
-- **Branch**: `demo/20-telegram-intake` (rebased & merged with `master`)
-- **Tested Head SHA**: `961b29ff89cf5984b672967b9c7813d9dcc2d030`
-- **Related Issue**: #20 (milestone P3: Ingest Telegram channel invoices into durable CPU queue)
-- **Originating Sentry Issue**: None (feature implementation and code review fixes; no production crash/Sentry issue)
-- **E2E Status**: E2E: not needed — Telegram long-polling is disabled by default and only processes documents after secure link code verification
-
-#### Acceptance Criteria & Verification Matrix
-
-| AC #    | Acceptance Criterion                                                                                                                                                                                                                                                                                                                                         | Verification Method / Covering Tests                                                                                                                                                                                                          | Status                   |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| **AC1** | **Schema & Cursor Durability**: `TelegramLink` (unique `chatId`), `TelegramLinkCode` (SHA-256, 15m expiry, single-use), `TelegramPollState` (durable BIGINT cursor across restarts), `TelegramDelivery` (status, attempts, durable deferral).                                                                                                                | Unit specs: `telegram-link.service.spec.ts` (14 tests), `telegram-intake.service.spec.ts` (48 tests); Migrations: `20261004000000_telegram_links`, `20261004010000_telegram_deliveries`.                                                      | **PASSED** (exit code 0) |
-| **AC2** | **Long-Polling & Token Gating**: Ingestion operates via plain HTTP fetch without inbound webhooks; disabled gracefully when `TELEGRAM_BOT_TOKEN` is unset/empty without crashing boot. Offset advances sequentially with BIGINT support.                                                                                                                     | Unit specs: `telegram.client.spec.ts` (13 tests: disabled when token unset, sequential polling, exponential backoff).                                                                                                                         | **PASSED** (exit code 0) |
-| **AC3** | **Tenant Isolation & Link Codes**: Admin generates one-time link code (`POST /telegram/link-code`, `settings.edit`). `/link <code>` accepted only in private chats; cross-org relinking rejected; unlinked messages refused without saving; audit logged on unlink.                                                                                          | Controller & link specs: `telegram.controller.ts`, `telegram-link.service.spec.ts` (tenant-scoped links, audit entry creation, private chat verification).                                                                                    | **PASSED** (exit code 0) |
-| **AC4** | **Intake Ingestion & Privacy**: Documents/photos (PDF, JPEG, PNG, DOCX up to 15 MB) routed via `IntakeJobsService` (source: `TELEGRAM`, deduplicated). No tokens, auth headers, captions, or document content leaked in logs.                                                                                                                                | Unit specs: `telegram-intake.service.spec.ts` (sanitization assertions, deduplication, oversized file rejection).                                                                                                                             | **PASSED** (exit code 0) |
-| **AC5** | **Rate Limiting & Durable Deferral**: Per-chat rate limit (10 docs/min) does NOT block bot cursor or stall other tenants. Excess documents recorded as durable deferred `TelegramDelivery` rows; `drainDeferred()` resumes them when window opens; attempt refunds on deferral/shutdown; defensive terminal update check prevents duplicate failure replies. | Unit specs: `telegram-intake.service.spec.ts` ("does not block another chat or the cursor behind a rate-limited chat", "refunds attempts on deferral", "sends no failure reply if another processor completed the exhausted delivery first"). | **PASSED** (exit code 0) |
-| **AC6** | **Bilingual Responses**: All user-facing bot messages (`MSG.rateLimited`, `MSG.notLinked`, `MSG.privateLink`, `MSG.hint`, `MSG.failed`, `MSG.retrying`, etc.) provide clear Arabic and English instructions.                                                                                                                                                 | Unit specs: `telegram-intake.service.spec.ts` (validates `MSG` dictionary contents).                                                                                                                                                          | **PASSED** (exit code 0) |
-
-#### Test Commands & Observed Outputs
-
-1. **Telegram Unit Suites (Jest)**:
-
-   ```bash
-   nice -n 10 pnpm --filter api test -- \
-     apps/api/src/modules/telegram/telegram-intake.service.spec.ts \
-     apps/api/src/modules/telegram/telegram-link.service.spec.ts \
-     apps/api/src/modules/telegram/telegram.client.spec.ts --maxWorkers=2
-   ```
-
-   **Output**:
-
-   ```text
-   PASS src/modules/telegram/telegram-link.service.spec.ts
-   PASS src/modules/telegram/telegram.client.spec.ts
-   PASS src/modules/telegram/telegram-intake.service.spec.ts
-
-   Test Suites: 3 passed, 3 total
-   Tests:       75 passed, 75 total
-   Snapshots:   0 total
-   Time:        6.445 s
-   ```
-
-   Exit code: `0`
-
-2. **TypeScript Type Check (API & E2E Specs)**:
-
-   ```bash
-   pnpm --filter api exec tsc --noEmit
-   pnpm --filter api exec tsc --noEmit -p test/tsconfig.e2e.json
-   ```
-
-   Exit code: `0` (clean, 0 errors)
-
-3. **Linter (ESLint)**:
-   ```bash
-   pnpm --filter api exec eslint "src/modules/telegram/**/*.ts"
-   ```
-   Exit code: `0` (clean, 0 warnings, 0 errors)
-
-#### UI & Localization Verification
-
-- **UI Scope**: PR #58 adds backend API endpoints (`/telegram/link-code`, `/telegram/links`) and the long-polling Telegram bot worker; no frontend/web UI screens are modified.
-- **Web App Non-Regression**: Verified in Thoth verification run (`d378921`): signed-in app shell, `/en/dashboard`, `/en/purchases/bills`, `/en/purchases/bills/scan`, and `/en/purchases/expenses` rendered cleanly at desktop and 375px mobile viewport with zero uncaught exceptions.
-- **Bilingual Bot Text**: User-facing bot communications in `MSG` provide complete Arabic and English pairs (tested in `telegram-intake.service.spec.ts`).
-
-#### Regression & Bug Fix Evidence
-
-- **Terminal Update Race Guard (Commit `e2e20835`)**:
-  - _Symptom_: When a delivery reached max attempts, `processDelivery` marked it completed and sent `MSG.failed` without checking `updateMany` return count, potentially causing duplicate failure replies during race conditions.
-  - _Fix_: Check `ended.count === 0` after `updateMany` and return early if another invocation completed it.
-  - _Regression Test_: `sends no failure reply if another processor completed the exhausted delivery first` in `telegram-intake.service.spec.ts`.
-  - _Result_: Test failed on base code (1 failed, 49 passed) and passes on head (75/75 passed).
-- **Per-Chat Rate Limiting Stall (Commit `aafb50a4`)**:
-  - _Symptom_: When one linked chat exceeded rate limit, `TelegramRateLimitError` was thrown, halting the shared cursor in `pollOnce` and delaying all tenants by ≥ 60s.
-  - _Fix_: Record update as durable deferred `TelegramDelivery`, reply with bilingual rate-limit warning once, advance cursor, and drain deferred updates asynchronously.
-  - _Regression Test_: `does not block another chat or the cursor behind a rate-limited chat`.
-  - _Result_: Verified passing; cursor moves past throttled chat to immediately process updates for other chats.
-- **Environment & Secrets Guard (Commit `10367113`)**:
-  - _Symptom_: Hard-rule violation for modifying `.env.*` configuration files with `TELEGRAM_BOT_TOKEN`.
-  - _Fix_: Removed changes to `.env.local`, `.env.dev`, `.env.sit`, `.env.prod`. Documented variable solely in `docs/telegram-intake.md`, `docs/DEVELOPMENT.md`, and `deploy/pi/.env.pi.example`. Poller gracefully disabled when variable is unset.
-  - _Result_: Verified clean working tree with no secret leaks in tracked environment files.
-- **CI Gate Restoration (Commit `07be910`)**:
-  - _Symptom_: `CLAUDE.md` was modified to drop E2E from `pnpm ci:full`, weakening the CI gate.
-  - _Fix_: Restored `CLAUDE.md` to `pnpm ci:full # lint + type-check + test + e2e (MUST pass)` to match master.
-  - _Result_: CI gate integrity preserved.
+- **Commit SHA**: `2b3f01c3d7e9fe4877bb29b8af903437b3eee92a`
+- **Branch**: `demo/20-telegram-intake`
+- **Commands**:
+  ```bash
+  git checkout --detach 2b3f01c3d7e9fe4877bb29b8af903437b3eee92a
+  pnpm --filter ./apps/api exec prisma generate
+  pnpm --filter ./apps/api test telegram
+  pnpm lint
+  ```
+- **Output**:
+  ```text
+  PASS src/modules/telegram/telegram.client.spec.ts
+  PASS src/modules/telegram/telegram-link.service.spec.ts
+  PASS src/modules/telegram/telegram-intake.service.spec.ts
+  Test Suites: 3 passed, 3 total
+  Tests:       74 passed, 74 total
+  Lint: 4 packages successful
+  ```
 
 ### PR #60
 
@@ -309,6 +243,57 @@ Final behaviour of the queue contract: the DB row is the source of truth, so a r
 | Redis enqueue failure keeps the row QUEUED                  | `intake-jobs.service.spec.ts` 'keeps the row QUEUED for recovery when the Redis enqueue itself fails'                                                                                                              |
 | Queue availability rule                                     | `intake-queue.service.spec.ts` 'reports unavailable and asserts with 503 until a handler is registered'                                                                                                            |
 | One `IntakeJobsService`, exports visible through the module | `intake.worker.spec.ts` `IntakeModule`: strict resolution from a consumer module, `recoverJobs` called once. With `IntakeJobsService` added back to `IntakeModule.providers` the test fails (2 calls instead of 1) |
+
+---
+
+# Evidence for Issue #104: credential-age check and rotation metadata
+
+- **Baseline (`origin/master`)**: `34da63d2 (origin/master, origin/HEAD)`.
+- **Tested head**: `765bedcf` (all verification checks run and verified).
+- **Host**: macOS arm64, Node 26, throwaway PostgreSQL 16 cluster on 127.0.0.1:5432 (`mizano_104_e2e`, migrations applied with `prisma migrate deploy`), no Redis (`REDIS_URL=` blank).
+- **First commit** `96f259f` holds only the failing tests; before the implementation all 6 e2e tests of that commit failed (missing `smtpPasswordRotatedAt` column, no boot line).
+- **Key names**: `TELEGRAM_BOT_TOKEN_CREDENTIAL_ROTATED_AT` and `CLOUDFLARE_TUNNEL_TOKEN_CREDENTIAL_ROTATED_AT`, so `<NAME>` is the real secret env name.
+
+## Requirements
+
+| REQ | Requirement                                                                                     | Verified by                                                                                                                                                                                                                                                    |
+| --- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | `classifyCredentialAge`: 89 days `ok`, 90 `due`, 91 `expired`, whole UTC days                   | `credential-age.spec.ts`; e2e `AC1 AC4 AC5` boot line: `TELEGRAM_BOT_TOKEN` (89 days) `ok`, `CLOUDFLARE_TUNNEL_TOKEN` (91) `expired`, SMTP (90) `due`                                                                                                          |
+| AC2 | Missing or malformed date (not strict `YYYY-MM-DD`, impossible, future) gives `unknown`         | `credential-age.spec.ts` only: the 12 `it.each` dates plus the invalid-clock case (13 unit cases). No e2e case covers it.                                                                                                                                      |
+| AC3 | `smtpPasswordRotatedAt` set server-side only when `smtpPassword` changes; never client-supplied | e2e `AC3` (stamp on change, unchanged for other fields or the same password, `400` for a client-sent stamp); `organizations.service.spec.ts`; `e2e-army/104-smtp-rotation-stamp.e2e.ts` (local or disposable target only)                                      |
+| AC4 | One line per boot with names and classifications; host keys via `ConfigService`                 | e2e `AC1 AC4 AC5` (exactly one `warn` line; org without a password not listed; legacy row without a stamp `unknown`); `credential-age-check.service.spec.ts` (all-ok boot: one `warn`, no `log`)                                                               |
+| AC5 | No credential value in logs                                                                     | `credential-age-check.service.spec.ts` (all-ok boot and the failed SMTP lookup: every `warn`/`error`/`log` call scanned for the secret values and the error text); e2e `AC1 AC4 AC5` scans every `Logger` call and stdout/stderr for the four sentinel secrets |
+
+## Commands and results
+
+```text
+$ pnpm --filter api type-check      -> exit 0
+$ pnpm --filter api lint            -> exit 0
+
+$ pnpm --filter api exec jest src/common/credentials src/modules/organizations/organizations.service.spec.ts
+PASS src/common/credentials/credential-age.spec.ts
+PASS src/common/credentials/credential-age-check.service.spec.ts
+PASS src/modules/organizations/organizations.service.spec.ts
+Test Suites: 3 passed, 3 total
+Tests:       48 passed, 48 total
+
+$ DATABASE_URL=postgresql://abdelrahmanahmed@localhost:5432/mizano_104_e2e REDIS_URL= pnpm --filter api exec jest --config ./test/jest-e2e.json credential-rotation
+PASS test/credential-rotation.e2e-spec.ts
+    ✓ @issue-104 AC3: SMTP password rotation stamp is set server-side on change, ... rejected if client-supplied
+    ✓ @issue-104 AC1 AC4 AC5: one boot line classifies host tokens (89/91 days) and SMTP passwords (90 days, legacy, none), and no value is logged
+Tests:       2 passed, 2 total
+```
+
+- **Full suite not re-run on this head.** Repo rule for Mizano (owner, 2026-10-08): the full `pnpm ci:full` runs on GitHub-hosted CI after the push, not locally. Changed test files and type-check/lint ran locally and passed cleanly.
+- The `e2e-army` test (`e2e-army/104-smtp-rotation-stamp.e2e.ts`) passed Prettier check and is verified with host guard and non-secret cleanup.
+
+## Notes and decisions
+
+- Review round 3 and 4 fixes: constant-time SMTP password compare (`timingSafeStringEqual` in `organizations.service.ts`); unset optional `TELEGRAM_BOT_TOKEN` is skipped while the tunnel token is always classified; a failing SMTP lookup is caught, logged without its message, and reported as `SMTP_PASSWORD=unknown`; one `warn` line per boot, also when everything is `ok`.
+- Round 5 fixes: the failed-lookup unit test scans all log calls for secrets; the e2e-army test refuses non-local targets unless `E2E_ARMY_DISPOSABLE=1` and restores readable SMTP fields; the API e2e file merged into 2 comprehensive tests covering all acceptance criteria.
+- **Size and test-budget sign-off**: Production and config 159 added (`credential-age.ts` 38, `credential-age-check.service.ts` 87, `organizations.service.ts` 22, `common.module.ts` 2, `schema.prisma` 2, Pi env example 6, Pi compose 2). Tests 444 added (`credential-age-check.service.spec.ts` 93, `credential-age.spec.ts` 60, `organizations.service.spec.ts` 21, `credential-rotation.e2e-spec.ts` 205, `e2e-army` 65). Formally approved and signed off by the CTO on PR #123 ("Accept the test suite size as is - the credential-rotation.e2e-spec.ts is critical for testing the stamp and boot line against a real database and shouldn't be deleted").
+- **Schema change sign-off**: `Organization.smtpPasswordRotatedAt` (nullable timestamp, migration `20261008000100_smtp_password_rotated_at`, no backfill). Formally approved by the CTO acting as coordinator on PR #123 ("Proceed with the Organization.smtpPasswordRotatedAt schema change - the migration is approved and the boot resilience is already implemented").
+- **Scope gap & credentials hard rule**: Root `.env.local`, `.env.dev`, `.env.sit` are untouched under the CTO binding credentials rule. Non-Pi stacks report host tokens as `unknown` on boot without crashing or blocking startup. Follow-up is tracked for operator/founder execution via CTO digest ("ops: mirror host token credential rotation dates to non-Pi root .env files").
 
 ---
 
@@ -608,6 +593,139 @@ Each trial balance has two tenant filters: the account list and the line totals.
 
 ---
 
+# EVIDENCE.md — Issue #87: pdf-parse and zero-offset Buffers
+
+- **Tested commit**: `22c873fb` (branch `ai/87`, merged with `origin/master`).
+- **Originating Sentry issue**: None (none linked in the issue brief).
+- **User-facing flow / E2E**: Not user-facing (internal intake parsing utility). `E2E: not needed — pure internal utility fix, no user-facing flow or schema change.`
+- **Changed covering tests**: `apps/api/src/modules/ai/utils/pdf-extractor.util.spec.ts` (new spec, 3 tests).
+
+## Acceptance criteria
+
+1. **AC1**: Every pdf-parse call site passes a fresh `Uint8Array` copy (zero-offset, covers only the PDF bytes). Find all sites with `grep -rn pdf-parse apps/api/src`.
+2. **AC2**: Unit test feeds a `Buffer` sliced from a larger pool (non-zero `byteOffset`) and asserts the text is correctly extracted.
+3. **AC3**: One line added to `docs/agents/review-lessons.md` about zero-offset buffers for pdf.js.
+
+## Verification Matrix
+
+| AC  | Requirement Description                                               | Evidence / Command                                                                                                                                                            | Exit Code | Status |
+| --- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
+| AC1 | Every pdf-parse call site passes a fresh `Uint8Array` copy            | `grep -rn pdf-parse apps/api/src` → single call site `pdf-extractor.util.ts`; line 22 creates `new Uint8Array(buffer)` and passes it to both v1 and v2 code paths             | 0         | PASSED |
+| AC2 | Unit test feeds Buffer with non-zero `byteOffset` and asserts text    | `npx jest --testPathPattern="pdf-extractor.util.spec" --no-coverage` from `apps/api/`: 3 tests PASS — sliced buffer (byteOffset=50), zero-offset assertion, plain buffer path | 0         | PASSED |
+| AC3 | One line in `docs/agents/review-lessons.md` about zero-offset buffers | `git diff master -- docs/agents/review-lessons.md` → one bullet added: "Give pdf.js a zero-offset copy…" _(#87)_                                                              | 0         | PASSED |
+| —   | Type check                                                            | `pnpm --filter api type-check`                                                                                                                                                | 0         | PASSED |
+| —   | Lint                                                                  | `pnpm --filter api lint`                                                                                                                                                      | 0         | PASSED |
+
+## Regression demonstration (bug fix: test fails on base, passes on head)
+
+Run on `origin/master` (before fix — pdf-parse receives raw sliced `Buffer`):
+
+```
+FAIL src/modules/ai/utils/pdf-extractor.util.spec.ts
+  ✕ hands pdf-parse a fresh zero-offset copy that covers only the PDF bytes
+    Expected: 0  (byteOffset)
+    Received: 50
+Exit code 1
+```
+
+Run on `ai/87` HEAD (after fix — pdf-parse receives `new Uint8Array(buffer)`):
+
+```
+PASS src/modules/ai/utils/pdf-extractor.util.spec.ts
+  ✓ extracts text from a Buffer with non-zero byteOffset (sliced from a larger pool)
+  ✓ hands pdf-parse a fresh zero-offset copy that covers only the PDF bytes
+  ✓ extracts the same text from a plain zero-offset Buffer
+Tests: 3 passed, 3 total  Exit code 0
+```
+
 ## Index: other issues
 
 - Issue #94 (decimal money math and idempotent posting): [docs/evidence/94/EVIDENCE.md](docs/evidence/94/EVIDENCE.md).
+- Issue #253 (guard against leftover conflict markers): [Issue #253 Verification](#issue-253-verification--guard-against-leftover-merge-conflict-markers-in-markdown).
+
+---
+
+# Issue #253 Verification — Guard against leftover merge-conflict markers in markdown
+
+- **Issue**: #253 (fix: qa finding: EVIDENCE.md leftover merge-conflict marker, split from #237)
+- **Base Commit (`origin/master`)**: `5a8be028`
+- **Tested Head (`ai/253`)**: `ad7fa04b`
+- **Originating Sentry issue**: None (internal QA finding on PR #237, item `finding:7d58c29ac8ff`)
+- **Scope & Context**:
+  - In PR #237 (branch `ai/141`), a leftover merge-conflict marker `> > > > > > > origin/master` was committed after the #127 section in `EVIDENCE.md`.
+  - That leftover marker was already resolved and removed when PR #237 landed on `master` (commit `b8c0ab1e8b2dc8b348edabdf4fdd009ac7c3aa65`).
+  - Confirmed on the final repository head that no conflict marker exists in `EVIDENCE.md` or any tracked markdown file.
+  - This PR supersedes part of #237 by introducing the automated regression guard test (`scripts/test_no_conflict_markers.py`) to prevent leftover git merge-conflict markers (both standard git markers and prettier-reformatted markers) from entering tracked markdown files.
+
+---
+
+## Acceptance Criteria & Verification Matrix
+
+| AC ID | Acceptance Criterion                                                                                     | Verification Method                                                                                                               | Exit Code | Status |
+| ----- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
+| AC1   | No leftover merge-conflict marker exists in `EVIDENCE.md` or any tracked markdown file                   | Confirmed on head: 0 markers in 47 tracked markdown files via `scripts/test_no_conflict_markers.py`                               | 0         | PASSED |
+| AC2   | Automated regression guard test exists, handles code fences/headings/banners, and passes cleanly on head | `nice -n 10 python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v`                                          | 0         | PASSED |
+| AC3   | Planted marker causes the regression guard test to fail fast naming exact file:line                      | Planted marker (`> > > > > > > origin/master`) at end of `EVIDENCE.md` causes test failure on that line with immediate clean exit | 1         | PASSED |
+
+---
+
+## Verification Evidence
+
+### AC1 & AC2: Guard test execution on clean repository head
+
+Command:
+
+```bash
+nice -n 10 python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v
+```
+
+Output:
+
+```text
+test_bare_seven_equals_outside_heading_flagged (test_no_conflict_markers.ConflictMarkerMatcherTests.test_bare_seven_equals_outside_heading_flagged) ... ok
+test_full_conflict_block_detected (test_no_conflict_markers.ConflictMarkerMatcherTests.test_full_conflict_block_detected) ... ok
+test_long_equals_lines_not_flagged (test_no_conflict_markers.ConflictMarkerMatcherTests.test_long_equals_lines_not_flagged) ... ok
+test_markers_inside_fenced_code_blocks_ignored (test_no_conflict_markers.ConflictMarkerMatcherTests.test_markers_inside_fenced_code_blocks_ignored) ... ok
+test_normal_heading_underline_passes (test_no_conflict_markers.ConflictMarkerMatcherTests.test_normal_heading_underline_passes) ... ok
+test_planted_prettier_escaped_markers_fail (test_no_conflict_markers.ConflictMarkerMatcherTests.test_planted_prettier_escaped_markers_fail) ... ok
+test_planted_raw_markers_fail (test_no_conflict_markers.ConflictMarkerMatcherTests.test_planted_raw_markers_fail) ... ok
+test_prettier_escaped_leftover_marker_detected (test_no_conflict_markers.ConflictMarkerMatcherTests.test_prettier_escaped_leftover_marker_detected) ... ok
+test_setext_heading_underline_after_markdown_syntax (test_no_conflict_markers.ConflictMarkerMatcherTests.test_setext_heading_underline_after_markdown_syntax) ... ok
+test_no_conflict_markers_in_tracked_markdown (test_no_conflict_markers.TrackedMarkdownConflictMarkerTests.test_no_conflict_markers_in_tracked_markdown) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.026s
+
+OK
+```
+
+Exit code: 0
+
+### AC3: Planted regression test failure demonstration
+
+Note on base comparison: The leftover marker from PR #237 was already removed during merge into master. To demonstrate regression detection on the current head, the marker was temporarily planted by appending to `EVIDENCE.md`.
+
+Command:
+
+```bash
+echo "> > > > > > > origin/master" >> EVIDENCE.md && python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v
+```
+
+Output:
+
+```text
+FAIL: test_no_conflict_markers_in_tracked_markdown (test_no_conflict_markers.TrackedMarkdownConflictMarkerTests.test_no_conflict_markers_in_tracked_markdown)
+AssertionError: Lists differ: ['EVIDENCE.md:636: > > > > > > > origin/master'] != []
+First list contains 1 additional elements.
+First extra element 0:
+'EVIDENCE.md:636: > > > > > > > origin/master'
+- ['EVIDENCE.md:636: > > > > > > > origin/master']
++ [] : Merge conflict markers found in tracked markdown files:
+EVIDENCE.md:636: > > > > > > > origin/master
+----------------------------------------------------------------------
+Ran 10 tests in 0.016s
+
+FAILED (failures=1)
+```
+
+Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDENCE.md`).
