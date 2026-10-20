@@ -143,6 +143,41 @@
   Lint: 4 packages successful
   ```
 
+## Issue #109 — Arabic-Indic/Persian digit normalization
+
+Tested code head: `65a635172907434efa52bec650fbd54fa4f87777` (this file is committed after it; only EVIDENCE.md differs).
+
+`normalizeDigits` (`apps/api/src/modules/ai/extraction/rules/rules-normalize.ts`) and its use in the intake rules extractor already exist on master. This PR only adds the acceptance spec `rules-normalize.spec.ts` (tagged `@issue-109`); no production code changes remain. An earlier attempt that also wired the helper into `entity-extraction.service.ts` and `ollama.service.ts` was reverted because dropped bidi marks shift entity offsets.
+
+| REQ                                         | Verified by                                                                       |
+| ------------------------------------------- | --------------------------------------------------------------------------------- |
+| AC1 `١٢٣٫٤٥` → 123.45, `١٬٢٣٤٫٥٠` → 1234.50 | `normalizeDigits` + `findAmounts` cases in rules-normalize.spec.ts                |
+| AC2 `٠٧/١٠/٢٠٢٦` = `07/10/2026`             | `parseDate` cases (Arabic-Indic and Persian)                                      |
+| AC3 mixed script `EGP ١٢٠٠`                 | mixed-script `normalizeDigits` and `extractInvoiceFields` cases                   |
+| AC4 English tests unchanged                 | `invoice-rules-extractor.spec.ts`, `rules-strategy.spec.ts` untouched and passing |
+| AC5 no float math                           | `parseAmount` returns Decimal and preserves precision (asserted)                  |
+| AC6 ≤ ~200 lines                            | no production code in the diff                                                    |
+
+Commands run (sandbox off, local):
+
+- `npx jest src/modules/ai/extraction/rules` in apps/api: 3 suites passed, 66 tests passed
+- `npx tsc --noEmit -p .` in apps/api: no errors
+- `prettier --check` on the spec: clean
+
+Not run: the seeded PDF e2e (removed; see commit a5aeed0).
+
+E2E gate note (#109): this PR changes no production code and no UI or user-flow files, only the unit acceptance spec `rules-normalize.spec.ts`. The round-two `e2e-first` review still reports “E2E-first rule not met” because no E2E or acceptance tests were added or changed. Record the gate as unresolved unless an authoritative retirement decision and the `e2e-army` result are available.
+
+Review round 3 (#109): the PDF-fixture, offset-preservation and async-path threads target code removed in a5aeed0 (no e2e PDF spec, no wiring in `entity-extraction.service.ts` / `ollama.service.ts`), so nothing remains to fix there. CodeRabbit's spec notes are fixed in `rules-normalize.spec.ts`: amount tests now pass `normalizeDigits(...)` output into `parseAmount`, the European-format case is renamed, and the Decimal(19,4) bound test covers 15/16 integer digits and 4/5 decimals. `npx jest src/modules/ai/extraction/rules` in apps/api: 3 suites, 66 tests passed.
+
+Review round 4 (#109): the three code threads (Unicode PDF fixtures, original-text offsets, async entity-extraction path) are all OUTDATED. They target the e2e PDF spec and the `entity-extraction.service.ts` / `ollama.service.ts` wiring, which were removed in a5aeed0 and are not on this branch, so no code change is needed. The EVIDENCE.md e2e note is reworded to the `E2E: not needed — <reason>` waiver form. The spec fixes from round 3 (aed8cb7) are unchanged.
+
+Review round 5 (#109):
+
+- Fixed CodeRabbit finding on `rules-normalize.spec.ts:64`: AC5 test now verifies `parseAmount('10000000000000.0001')` returns a Decimal instance (`toBeInstanceOf(Decimal)`) and preserves the exact 4-decimal fraction string that JS Number conversion would lose.
+- Fixed CodeRabbit finding on `EVIDENCE.md`: E2E gate note updated to report the round-two `e2e-first` review status as unresolved without an authoritative retirement decision and the `e2e-army` result.
+- Confirmed the 3 outdated review threads on `intake-arabic-digits.e2e-spec.ts` and `entity-extraction.service.ts` are satisfied because the relevant code was reverted in commit a5aeed0.
+
 # Issue #141 — intake worker entrypoint, processor out of the API, Pi compose worker
 
 Tested commit: `57f9a0d` (branch `ai/141`; this file is committed after it). Fresh Postgres 16, `REDIS_URL=` blank, in band.
@@ -618,3 +653,139 @@ $ pnpm --filter web exec eslint "lib/api.ts" "lib/api.work-orders.spec.ts"
 
 - The e2e-army UI scenario covers EN and AR/RTL on the work orders list.
 - The full suite was not run locally (owner rule: CI runs it for Mizano).
+# EVIDENCE.md — Issue #87: pdf-parse and zero-offset Buffers
+
+- **Tested commit**: `22c873fb` (branch `ai/87`, merged with `origin/master`).
+- **Originating Sentry issue**: None (none linked in the issue brief).
+- **User-facing flow / E2E**: Not user-facing (internal intake parsing utility). `E2E: not needed — pure internal utility fix, no user-facing flow or schema change.`
+- **Changed covering tests**: `apps/api/src/modules/ai/utils/pdf-extractor.util.spec.ts` (new spec, 3 tests).
+
+## Acceptance criteria
+
+1. **AC1**: Every pdf-parse call site passes a fresh `Uint8Array` copy (zero-offset, covers only the PDF bytes). Find all sites with `grep -rn pdf-parse apps/api/src`.
+2. **AC2**: Unit test feeds a `Buffer` sliced from a larger pool (non-zero `byteOffset`) and asserts the text is correctly extracted.
+3. **AC3**: One line added to `docs/agents/review-lessons.md` about zero-offset buffers for pdf.js.
+
+## Verification Matrix
+
+| AC  | Requirement Description                                               | Evidence / Command                                                                                                                                                            | Exit Code | Status |
+| --- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
+| AC1 | Every pdf-parse call site passes a fresh `Uint8Array` copy            | `grep -rn pdf-parse apps/api/src` → single call site `pdf-extractor.util.ts`; line 22 creates `new Uint8Array(buffer)` and passes it to both v1 and v2 code paths             | 0         | PASSED |
+| AC2 | Unit test feeds Buffer with non-zero `byteOffset` and asserts text    | `npx jest --testPathPattern="pdf-extractor.util.spec" --no-coverage` from `apps/api/`: 3 tests PASS — sliced buffer (byteOffset=50), zero-offset assertion, plain buffer path | 0         | PASSED |
+| AC3 | One line in `docs/agents/review-lessons.md` about zero-offset buffers | `git diff master -- docs/agents/review-lessons.md` → one bullet added: "Give pdf.js a zero-offset copy…" _(#87)_                                                              | 0         | PASSED |
+| —   | Type check                                                            | `pnpm --filter api type-check`                                                                                                                                                | 0         | PASSED |
+| —   | Lint                                                                  | `pnpm --filter api lint`                                                                                                                                                      | 0         | PASSED |
+
+## Regression demonstration (bug fix: test fails on base, passes on head)
+
+Run on `origin/master` (before fix — pdf-parse receives raw sliced `Buffer`):
+
+```
+FAIL src/modules/ai/utils/pdf-extractor.util.spec.ts
+  ✕ hands pdf-parse a fresh zero-offset copy that covers only the PDF bytes
+    Expected: 0  (byteOffset)
+    Received: 50
+Exit code 1
+```
+
+Run on `ai/87` HEAD (after fix — pdf-parse receives `new Uint8Array(buffer)`):
+
+```
+PASS src/modules/ai/utils/pdf-extractor.util.spec.ts
+  ✓ extracts text from a Buffer with non-zero byteOffset (sliced from a larger pool)
+  ✓ hands pdf-parse a fresh zero-offset copy that covers only the PDF bytes
+  ✓ extracts the same text from a plain zero-offset Buffer
+Tests: 3 passed, 3 total  Exit code 0
+```
+
+## Index: other issues
+
+- Issue #94 (decimal money math and idempotent posting): [docs/evidence/94/EVIDENCE.md](docs/evidence/94/EVIDENCE.md).
+- Issue #253 (guard against leftover conflict markers): [Issue #253 Verification](#issue-253-verification--guard-against-leftover-merge-conflict-markers-in-markdown).
+
+---
+
+# Issue #253 Verification — Guard against leftover merge-conflict markers in markdown
+
+- **Issue**: #253 (fix: qa finding: EVIDENCE.md leftover merge-conflict marker, split from #237)
+- **Base Commit (`origin/master`)**: `5a8be028`
+- **Tested Head (`ai/253`)**: `ad7fa04b`
+- **Originating Sentry issue**: None (internal QA finding on PR #237, item `finding:7d58c29ac8ff`)
+- **Scope & Context**:
+  - In PR #237 (branch `ai/141`), a leftover merge-conflict marker `> > > > > > > origin/master` was committed after the #127 section in `EVIDENCE.md`.
+  - That leftover marker was already resolved and removed when PR #237 landed on `master` (commit `b8c0ab1e8b2dc8b348edabdf4fdd009ac7c3aa65`).
+  - Confirmed on the final repository head that no conflict marker exists in `EVIDENCE.md` or any tracked markdown file.
+  - This PR supersedes part of #237 by introducing the automated regression guard test (`scripts/test_no_conflict_markers.py`) to prevent leftover git merge-conflict markers (both standard git markers and prettier-reformatted markers) from entering tracked markdown files.
+
+---
+
+## Acceptance Criteria & Verification Matrix
+
+| AC ID | Acceptance Criterion                                                                                     | Verification Method                                                                                                               | Exit Code | Status |
+| ----- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------- | ------ |
+| AC1   | No leftover merge-conflict marker exists in `EVIDENCE.md` or any tracked markdown file                   | Confirmed on head: 0 markers in 47 tracked markdown files via `scripts/test_no_conflict_markers.py`                               | 0         | PASSED |
+| AC2   | Automated regression guard test exists, handles code fences/headings/banners, and passes cleanly on head | `nice -n 10 python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v`                                          | 0         | PASSED |
+| AC3   | Planted marker causes the regression guard test to fail fast naming exact file:line                      | Planted marker (`> > > > > > > origin/master`) at end of `EVIDENCE.md` causes test failure on that line with immediate clean exit | 1         | PASSED |
+
+---
+
+## Verification Evidence
+
+### AC1 & AC2: Guard test execution on clean repository head
+
+Command:
+
+```bash
+nice -n 10 python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v
+```
+
+Output:
+
+```text
+test_bare_seven_equals_outside_heading_flagged (test_no_conflict_markers.ConflictMarkerMatcherTests.test_bare_seven_equals_outside_heading_flagged) ... ok
+test_full_conflict_block_detected (test_no_conflict_markers.ConflictMarkerMatcherTests.test_full_conflict_block_detected) ... ok
+test_long_equals_lines_not_flagged (test_no_conflict_markers.ConflictMarkerMatcherTests.test_long_equals_lines_not_flagged) ... ok
+test_markers_inside_fenced_code_blocks_ignored (test_no_conflict_markers.ConflictMarkerMatcherTests.test_markers_inside_fenced_code_blocks_ignored) ... ok
+test_normal_heading_underline_passes (test_no_conflict_markers.ConflictMarkerMatcherTests.test_normal_heading_underline_passes) ... ok
+test_planted_prettier_escaped_markers_fail (test_no_conflict_markers.ConflictMarkerMatcherTests.test_planted_prettier_escaped_markers_fail) ... ok
+test_planted_raw_markers_fail (test_no_conflict_markers.ConflictMarkerMatcherTests.test_planted_raw_markers_fail) ... ok
+test_prettier_escaped_leftover_marker_detected (test_no_conflict_markers.ConflictMarkerMatcherTests.test_prettier_escaped_leftover_marker_detected) ... ok
+test_setext_heading_underline_after_markdown_syntax (test_no_conflict_markers.ConflictMarkerMatcherTests.test_setext_heading_underline_after_markdown_syntax) ... ok
+test_no_conflict_markers_in_tracked_markdown (test_no_conflict_markers.TrackedMarkdownConflictMarkerTests.test_no_conflict_markers_in_tracked_markdown) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.026s
+
+OK
+```
+
+Exit code: 0
+
+### AC3: Planted regression test failure demonstration
+
+Note on base comparison: The leftover marker from PR #237 was already removed during merge into master. To demonstrate regression detection on the current head, the marker was temporarily planted by appending to `EVIDENCE.md`.
+
+Command:
+
+```bash
+echo "> > > > > > > origin/master" >> EVIDENCE.md && python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py' -v
+```
+
+Output:
+
+```text
+FAIL: test_no_conflict_markers_in_tracked_markdown (test_no_conflict_markers.TrackedMarkdownConflictMarkerTests.test_no_conflict_markers_in_tracked_markdown)
+AssertionError: Lists differ: ['EVIDENCE.md:636: > > > > > > > origin/master'] != []
+First list contains 1 additional elements.
+First extra element 0:
+'EVIDENCE.md:636: > > > > > > > origin/master'
+- ['EVIDENCE.md:636: > > > > > > > origin/master']
++ [] : Merge conflict markers found in tracked markdown files:
+EVIDENCE.md:636: > > > > > > > origin/master
+----------------------------------------------------------------------
+Ran 10 tests in 0.016s
+
+FAILED (failures=1)
+```
+
+Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDENCE.md`).
