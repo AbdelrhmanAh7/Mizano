@@ -4,27 +4,25 @@ import { expect } from 'e2e';
 test(
   '@issue-252 AC1 AC2: NextAuth session omits refreshToken and shows full user shape',
   { tags: ['feat:mz-auth', 'lvl:ui'] },
-  async ({ app, screen, browser }) => {
-    // Sign in through the form as the seeded demo admin using locators (deterministic, no model latency).
-    for (let i = 0; i < 3; i++) {
-      await app.open('/en/login');
-      await expect(screen.getByRole('button', 'Sign In')).toBeVisible();
-      await screen.getByRole('textbox', 'Email').fill('admin@mizano.com');
-      await screen.getByRole('textbox', 'Password').fill('password123');
-      await screen.getByRole('button', 'Sign In').tap();
-      try {
-        await expect(browser).toHaveURL(/\/en\/(dashboard|onboarding|accounting|sales)/, {
-          timeout: 40_000,
-        });
-        break;
-      } catch (e) {
-        if (i === 2) throw e;
-      }
-    }
+  async ({ app, screen }) => {
+    await app.open('/en/login');
+    await expect(screen.getByRole('button', 'Sign In')).toBeVisible();
 
-    // After sign-in, fetch the NextAuth session endpoint from the browser context
-    // (the session cookie is set by NextAuth during sign-in).
+    // Sign in deterministically within the browser context via NextAuth credentials callback
+    // (avoids next dev pre-hydration form submit races and completes well within the execution budget).
     const session = await screen.evaluate(async () => {
+      const csrfRes = await fetch('/api/auth/csrf');
+      const { csrfToken } = await csrfRes.json();
+      await fetch('/api/auth/callback/credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          csrfToken,
+          email: 'admin@mizano.com',
+          password: 'password123',
+          json: 'true',
+        }),
+      });
       const res = await fetch('/api/auth/session');
       return res.json();
     });
@@ -62,4 +60,3 @@ test(
     expect(JSON.stringify(body)).not.toContain('refreshToken');
   },
 );
-
