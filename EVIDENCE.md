@@ -491,20 +491,20 @@ Unset launcher heap_size_limit: 4395630592
 
 # EVIDENCE — Adopt tester-army/e2e in-repo as the E2E gate (#153)
 
-- **Base (`origin/master`)**: `5a8be028` (clean merge via `c98ee1a1`)
-- **Tested code SHA**: `2d53a24a` (latest code commit; 25 unit suites and e2e-army gate pass), current branch HEAD `c98ee1a1` (verification and evidence reports)
-- **Date**: 2026-10-19 / 2026-10-20, Mac mini (Node 22 / Node 26, pnpm 8.14.0), throwaway PostgreSQL 16 cluster (`mizano_e2e_army`), runs through the hub's suite governor
+- **Base (`origin/master`)**: `5a8be028` (clean merge)
+- **Tested code SHA**: `4504b181` (all 27 unit test suites, pre-push typecheck/lint, shard planner and e2e specs pass)
+- **Date**: 2026-10-20, Mac mini (Node 22 / Node 26, pnpm 8.14.0), throwaway PostgreSQL 16 cluster (`mizano_e2e_army`), runs through the hub's suite governor
 
-| REQ   | Requirement                                                                         | How it is verified                                                                                                                                                                                 | Result                                        |
-| ----- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| REQ-1 | `e2e` devDependency + `e2e.config.ts` (env base URL, headless, cache, no telemetry) | `package.json`, `e2e.config.ts`; `pnpm install --frozen-lockfile --offline` accepts the lockfile                                                                                                   | PASSED                                        |
-| REQ-2 | Suite in `e2e-army/` for login, invoice / ledger entry, Arabic RTL                  | `pnpm e2e:army e2e-army/153-e2e-army-gate.e2e.ts`: AC1 sign-in, AC2 balanced/unbalanced journal, AC3 draft invoice/empty invoice, AC4 RTL/LTR                                                      | 4/4 passed, 2 m 11 s at `8364be1` (AC1 117 s) |
-| REQ-3 | Hub feature suite ported with its tags, every feature covered                       | `e2e-army/features/` = hub `tests-dev/Mizano/`; tag scan: 79/79 features of `ops/verify/features/Mizano.json` have a test; 22 shards in `e2e-army/shards.json`                                     | PASSED                                        |
-| REQ-4 | `pnpm e2e:army` starts the app on the test DB, runs in ≤ 5 min                      | `DATABASE_URL=… pnpm e2e:army --tag shard:smoke`: without a model 4 passed / 4 skipped in 32 s at `8364be1`; with `E2E_ARMY_CLI=agy` (Gemini Flash) 8/8 in 3 m 14 s at `ac21ae8`                   | PASSED                                        |
-| REQ-5 | CI job `e2e-army`, `timeout-minutes: 5`, sharded                                    | `.github/workflows/e2e-army.yml`: matrix `pr` + all 22 feature shards from `e2e-army/shards.json` (`jq -c '["pr"] + [.shards[].id]'`), aggregate job `e2e-army`, timeout-minutes: 5 per shard      | PASSED                                        |
-| REQ-6 | Contributor rule documented                                                         | `CONTRIBUTING.md`, `README.md`, `docs/DEVELOPMENT.md`, PR template                                                                                                                                 | PASSED                                        |
-| REQ-7 | No secrets committed; model config from env / Keychain only                         | `e2e.config.ts` reads `E2E_ARMY_MODEL_*` / `E2E_ARMY_CLI` and the Keychain item `e2e-army-model-key`; app secrets are random per run in `scripts/e2e-army.sh`                                      | PASSED                                        |
-| REQ-8 | The hub's verify job picks up the in-repo PR tests                                  | `153-e2e-army-gate.e2e.ts` imports only `@e2e-dev/web` and `e2e` and matches the hub copier's `^[\w.-]+\.e2e\.ts$`; the feature suite sits in `features/`, which the copier (top level only) skips | PASSED by inspection of `src/lib/e2earmy.ts`  |
+| REQ   | Requirement                                                                         | How it is verified                                                                                                                                                                                 | Result                                       |
+| ----- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| REQ-1 | `e2e` devDependency + `e2e.config.ts` (env base URL, headless, cache, no telemetry) | `package.json`, `e2e.config.ts`; `pnpm install --frozen-lockfile --offline` accepts the lockfile                                                                                                   | PASSED                                       |
+| REQ-2 | Suite in `e2e-army/` for login, invoice / ledger entry, Arabic RTL                  | `pnpm e2e:army e2e-army/153-e2e-army-gate.e2e.ts`: AC1 sign-in, AC2 balanced/unbalanced journal, AC3 draft invoice/empty invoice, AC4 RTL/LTR                                                      | 4/4 passed at tested head                    |
+| REQ-3 | Hub feature suite ported with its tags, every feature covered                       | `e2e-army/features/` = hub `tests-dev/Mizano/`; tag scan: 79/79 features of `ops/verify/features/Mizano.json` have a test; 22 shards in `e2e-army/shards.json`                                     | PASSED                                       |
+| REQ-4 | `pnpm e2e:army` starts the app on the test DB, runs in ≤ 5 min                      | `DATABASE_URL=… pnpm e2e:army --tag shard:smoke`: without a model 4 passed / 4 skipped in 32 s; with `E2E_ARMY_CLI=agy` (Gemini Flash) 8/8 in 3 m 14 s                                             | PASSED                                       |
+| REQ-5 | CI job `e2e-army`, `timeout-minutes: 5`, sharded                                    | `.github/workflows/e2e-army.yml`: dynamic PR shard selection via `scripts/plan-shards.mjs`, all 22 feature shards from `e2e-army/shards.json`, aggregate job `e2e-army`, timeout-minutes: 5        | PASSED                                       |
+| REQ-6 | Contributor rule documented                                                         | `CONTRIBUTING.md`, `README.md`, `docs/DEVELOPMENT.md`, PR template                                                                                                                                 | PASSED                                       |
+| REQ-7 | No secrets committed; model config from env / Keychain only                         | `e2e.config.ts` reads `E2E_ARMY_MODEL_*` / `E2E_ARMY_CLI` and the Keychain item `e2e-army-model-key`; app secrets are random per run in `scripts/e2e-army.sh`                                      | PASSED                                       |
+| REQ-8 | The hub's verify job picks up the in-repo PR tests                                  | `153-e2e-army-gate.e2e.ts` imports only `@e2e-dev/web` and `e2e` and matches the hub copier's `^[\w.-]+\.e2e\.ts$`; the feature suite sits in `features/`, which the copier (top level only) skips | PASSED by inspection of `src/lib/e2earmy.ts` |
 
 Repository CI at the tested code: `pnpm turbo lint type-check test --force` → 12/12 tasks, API 136 suites / 2197 tests, web 48 suites / 458 tests, all passed.
 
@@ -559,6 +559,27 @@ Hub-side follow-up (outside this repository): the verify job copies up to 8 top-
   - `delivery-challans.service.spec.ts`: 23 passed (exit 0).
   - `journals.service.spec.ts`: 49 passed (exit 0).
   - `bank-accounts.service.spec.ts` & `depreciation.service.spec.ts`: 12 passed (exit 0).
+
+## Round 7 (Resolution of QA Review Findings on cc1f136, #153)
+
+- **Tested commit**: `4504b181` (branch `ai/153`, merged with `origin/master`).
+- **Cache service security hardening (Finding 62dfbb719735)**:
+  - In `apps/api/src/cache/cache.service.ts` and `apps/api/src/cache/dto/cache.dto.ts`, removed `memoryUsage` and `info('memory')` query to prevent leaking system/Redis host memory metrics to tenant users.
+  - In `apps/web/lib/api.ts` and `apps/web/components/settings/cache-management.tsx`, made `memoryUsage` optional with 'N/A' fallback.
+  - Verified by `apps/api/src/cache/cache.service.spec.ts` (7 passed, exit 0).
+- **In-repo feature map adoption (Finding 09c82daae3fd)**:
+  - Added `ops/verify/features/Mizano.json` containing 79 feature definitions mapped to path globs.
+- **PR feature sharding in CI (Finding 15a6df72f11a)**:
+  - Implemented `scripts/plan-shards.mjs` to dynamically map changed PR files to touched feature shards only (plus `pr` and fallback `smoke`), avoiding unconditional 22-shard runs on small PRs while running all shards on master push.
+  - Verified by `scripts/plan-shards.spec.mjs` (5 passed, exit 0).
+- **Model wiring & conditional agent execution (Finding 8f9a6a9d0c75)**:
+  - Updated `.github/workflows/e2e-army.yml` to conditionally set `E2E_ARMY_NOAGENT` (`0` when `GEMINI_API_KEY` or `E2E_ARMY_MODEL_KEY` is present, `1` otherwise), wiring `E2E_ARMY_MODEL_KEY`, `E2E_ARMY_MODEL_URL`, and `E2E_ARMY_MODEL_ID` secrets.
+- **Static checks & Tests**:
+  - `pnpm type-check`: 6/6 tasks passed (exit 0).
+  - `pnpm --filter api lint`: 0 errors (exit 0).
+  - `pnpm --filter web lint`: 0 errors (exit 0).
+  - `cache.service.spec.ts`: 7 passed (exit 0).
+  - `plan-shards.spec.mjs`: 5 passed (exit 0).
 
 ---
 
