@@ -6,7 +6,7 @@
 # base = the remote ref's old sha (or the merge-base with origin/master); a new
 # branch with no known base, a pushed commit differing from checked-out HEAD,
 # or a change to root config (package.json, pnpm-lock.yaml, pnpm-workspace.yaml,
-# .npmrc, turbo.json, tsconfig*) checks every package. The jest unit suites need no database. No lint (pre-commit
+# .npmrc, turbo.json, tsconfig* e.g. tsconfig.json, tsconfig.base.json) checks every package. The jest unit suites need no database. No lint (pre-commit
 # lints staged files), no build, no E2E/browser.
 #
 # The full CI (`pnpm ci:full`, build, E2E) runs on the Mac mini via the hub's
@@ -76,7 +76,7 @@ else
       fi
       continue
     fi
-    if git diff --name-only "$base" "$local_sha" | grep -qE '^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|turbo\.json|tsconfig[^/]*\.json|\.npmrc)$'; then
+    if git diff --name-only "$base" "$local_sha" | grep -qE '^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|turbo\.json|tsconfig[^/]*|\.npmrc)$'; then
       all=1
     fi
     if git diff --name-only "$base" "$local_sha" | grep -qE '^apps/api/prisma/schema\.prisma$'; then

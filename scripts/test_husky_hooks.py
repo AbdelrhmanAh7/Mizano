@@ -151,6 +151,8 @@ class PrePushHookTests(unittest.TestCase):
             ".npmrc",
             "turbo.json",
             "tsconfig.json",
+            "tsconfig.base.json",
+            "tsconfig.build.json",
         ):
             head = self.commit(config_file, "{}")
             result, calls = self.push([self.line(head, self.base)])
