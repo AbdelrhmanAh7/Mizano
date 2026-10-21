@@ -85,3 +85,15 @@ describe('CacheService.onModuleDestroy', () => {
     expect(client.disconnect).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('CacheService.getStats security', () => {
+  it('does not expose memoryUsage or system memory information', async () => {
+    const service = new CacheService(memoryCache(), {
+      get: () => undefined,
+    } as unknown as ConfigService);
+    const stats = await service.getStats();
+    expect(stats).not.toHaveProperty('memoryUsage');
+    expect(stats.storeType).toBe('memory');
+    expect(stats.connected).toBe(true);
+  });
+});

@@ -112,3 +112,6 @@ services/vlm-service/models/
 **/*.pt
 **/*.pth
 .claude/worktrees/
+
+# tester-army/e2e (e2e-army) results, replay cache and app logs
+.e2e/

@@ -40,18 +40,20 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
       ['customer', { customerId: 'cust-a' }, 'Customer not found'],
       ['invoice', { invoiceId: 'inv-a' }, 'Invoice not found'],
       ['item', { lines: [{ itemId: 'item-a', quantity: 1 }] }, 'Item item-a not found'],
-    ])('rejects a %s outside the org before writing', async (_label, dto, message) => {
-      await expect(service.update(ORG, 'dc-1', dto)).rejects.toThrow(
-        new NotFoundException(message),
-      );
+    ])('rejects a %s outside the org with a 400 before writing', async (_label, dto, message) => {
+      const result = service.update(ORG, 'dc-1', dto);
+      await expect(result).rejects.toBeInstanceOf(BadRequestException);
+      await expect(result).rejects.toThrow(message);
       expect(prisma.deliveryChallanLine.deleteMany).not.toHaveBeenCalled();
       expect(prisma.deliveryChallan.update).not.toHaveBeenCalled();
     });
 
-    it('rejects a warehouse outside the org before writing', async () => {
+    it('rejects a warehouse outside the org with a 400 before writing', async () => {
       prisma.item.findFirst.mockResolvedValue({ id: 'item-b' } as never);
       const dto = { lines: [{ itemId: 'item-b', quantity: 1, warehouseId: 'wh-a' }] };
-      await expect(service.update(ORG, 'dc-1', dto)).rejects.toThrow('Warehouse wh-a not found');
+      const result = service.update(ORG, 'dc-1', dto);
+      await expect(result).rejects.toBeInstanceOf(BadRequestException);
+      await expect(result).rejects.toThrow('Warehouse wh-a not found');
       expect(prisma.deliveryChallanLine.deleteMany).not.toHaveBeenCalled();
       expect(prisma.deliveryChallan.update).not.toHaveBeenCalled();
     });

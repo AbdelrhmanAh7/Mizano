@@ -10,6 +10,13 @@ import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { CreateWarehouseDto } from '../dto/create-warehouse.dto';
 import { UpdateWarehouseDto } from '../dto/update-warehouse.dto';
 
+/** The warehouse row stores the street line as `street`; clients read and write it as `address`. */
+function withAddress<T extends { street: string | null }>(
+  warehouse: T,
+): T & { address: string | null } {
+  return { ...warehouse, address: warehouse.street };
+}
+
 @Injectable()
 export class WarehousesService {
   constructor(private prisma: PrismaService) {}
@@ -27,9 +34,12 @@ export class WarehousesService {
       });
     }
 
-    return this.prisma.warehouse.create({
-      data: { ...dto, organizationId },
+    // The column is `street`; the API (and the warehouse form) call it `address`.
+    const { address, ...fields } = dto;
+    const created = await this.prisma.warehouse.create({
+      data: { ...fields, street: address, organizationId },
     });
+    return withAddress(created);
   }
 
   async findAll(organizationId: string, query: PaginationDto) {
@@ -54,7 +64,10 @@ export class WarehousesService {
       this.prisma.warehouse.count({ where }),
     ]);
 
-    return { data: warehouses, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    return {
+      data: warehouses.map(withAddress),
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   async findOne(organizationId: string, id: string) {
@@ -62,7 +75,7 @@ export class WarehousesService {
       where: { id, organizationId, deletedAt: null },
     });
     if (!warehouse) throw new NotFoundException('Warehouse not found');
-    return warehouse;
+    return withAddress(warehouse);
   }
 
   async getStock(organizationId: string, id: string) {
@@ -83,12 +96,17 @@ export class WarehousesService {
         data: { isDefault: false },
       });
     }
-    return this.prisma.warehouse.update({ where: { id }, data: dto });
+    const { address, ...fields } = dto;
+    const updated = await this.prisma.warehouse.update({
+      where: { id },
+      data: address === undefined ? fields : { ...fields, street: address },
+    });
+    return withAddress(updated);
   }
 
   async remove(organizationId: string, id: string) {
     const warehouse = await this.prisma.warehouse.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, deletedAt: null },
       include: { _count: { select: { inventoryMovements: true } } },
     });
     if (!warehouse) throw new NotFoundException('Warehouse not found');

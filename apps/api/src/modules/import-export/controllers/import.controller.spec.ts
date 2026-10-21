@@ -15,6 +15,7 @@ describe('ImportController', () => {
     parseFile: jest.Mock;
     validateImport: jest.Mock;
     importData: jest.Mock;
+    assertCanImport: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -26,6 +27,7 @@ describe('ImportController', () => {
       parseFile: jest.fn(),
       validateImport: jest.fn(),
       importData: jest.fn(),
+      assertCanImport: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -147,6 +149,73 @@ describe('ImportController', () => {
 
     it('should throw BadRequestException for nonsense hyphenated value', () => {
       expect(() => controller.getFieldDefinitions('foo-bar-baz')).toThrow(BadRequestException);
+    });
+  });
+
+  describe('config field (JSON string of a multipart upload)', () => {
+    const file = { buffer: Buffer.from('Name\nAcme\n'), originalname: 'customers.csv' };
+    const user = { id: 'user-1', roleId: 'role-1' };
+    const validConfig = {
+      entityType: 'customers',
+      columnMappings: [{ sourceColumn: 'Name', targetField: 'name' }],
+    };
+
+    it('answers 400 (not 500) when validate receives malformed JSON', async () => {
+      await expect(controller.validateImport('org-1', file as never, '{not json')).rejects.toThrow(
+        new BadRequestException('Config must be valid JSON'),
+      );
+      expect(importService.validateImport).not.toHaveBeenCalled();
+    });
+
+    it('answers 400 when the config is not a JSON object', async () => {
+      await expect(controller.validateImport('org-1', file as never, '[1]')).rejects.toThrow(
+        new BadRequestException('Config must be a JSON object'),
+      );
+      await expect(controller.validateImport('org-1', file as never, 'null')).rejects.toThrow(
+        new BadRequestException('Config must be a JSON object'),
+      );
+    });
+
+    it('answers 400 for an unknown entity type instead of failing on the field lookup', async () => {
+      const config = JSON.stringify({ ...validConfig, entityType: 'starships' });
+      const rejected = controller.validateImport('org-1', file as never, config);
+      await expect(rejected).rejects.toThrow(BadRequestException);
+      await expect(rejected).rejects.toThrow(/entityType/);
+      expect(importService.validateImport).not.toHaveBeenCalled();
+    });
+
+    it('answers 400 when the column mappings are missing', async () => {
+      const config = JSON.stringify({ entityType: 'customers' });
+      await expect(controller.validateImport('org-1', file as never, config)).rejects.toThrow(
+        /columnMappings/,
+      );
+    });
+
+    it('rejects an invalid execute config before checking permissions or importing', async () => {
+      await expect(
+        controller.executeImport('org-1', user as never, file as never, '{not json'),
+      ).rejects.toThrow(new BadRequestException('Config must be valid JSON'));
+      await expect(
+        controller.executeImport(
+          'org-1',
+          user as never,
+          file as never,
+          JSON.stringify({ ...validConfig, entityType: 'starships' }),
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(importService.assertCanImport).not.toHaveBeenCalled();
+      expect(importService.importData).not.toHaveBeenCalled();
+    });
+
+    it('passes a valid config on to the service', async () => {
+      importService.validateImport.mockResolvedValue({ valid: true });
+      await controller.validateImport('org-1', file as never, JSON.stringify(validConfig));
+      expect(importService.validateImport).toHaveBeenCalledWith(
+        'org-1',
+        file.buffer,
+        'customers.csv',
+        expect.objectContaining(validConfig),
+      );
     });
   });
 });

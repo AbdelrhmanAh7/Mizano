@@ -4,11 +4,16 @@ import { expect } from 'e2e';
 const ORG_A = 'org-a';
 const ORG_B = 'org-b';
 const SEED = 'army-131';
+// Every step here is an agent step: without a model (E2E_ARMY_NOAGENT=1, e.g. the model-less GitHub e2e-army job) the tests skip
+// themselves, as the feature suite's needsModel() does; the hub's verify job runs them with a model.
+const needsModel = () =>
+  test.skip(process.env.E2E_ARMY_NOAGENT === '1', 'no model available — agent steps skipped');
 
 test(
   '@issue-131 AC1: updating a challan with another org customerId returns 404 and no inventory movement',
   { tags: ['feat:mz-sales-delivery-challans'] },
   async ({ app, agent, screen }) => {
+    needsModel();
     await app.open('/en/login');
     await agent.act('sign in as {email} with password {pw}', {
       params: { email: 'admin@mizano.com', pw: 'password123' },
@@ -47,9 +52,12 @@ test(
     await agent.act('switch to organization {org}', { params: { org: ORG_A } });
 
     await app.open('/en/sales/delivery-challans');
-    await agent.act('create a draft supply challan for customer {cust} with item {item} qty {qty}', {
-      params: { cust: `${SEED}-cust-a`, item: `${SEED}-item-a`, qty: '5' },
-    });
+    await agent.act(
+      'create a draft supply challan for customer {cust} with item {item} qty {qty}',
+      {
+        params: { cust: `${SEED}-cust-a`, item: `${SEED}-item-a`, qty: '5' },
+      },
+    );
     const challanNumber = await agent.extract('the challan number of the created challan');
 
     // Try to update the challan with org B's customer ID (should fail with 404)
@@ -76,13 +84,14 @@ test(
     await agent.assert('no inventory movement exists for challan {challan}', {
       params: { challan: challanNumber },
     });
-  }
+  },
 );
 
 test(
   '@issue-131 AC2: issuing a challan with another org itemId returns 404 and no inventory movement',
   { tags: ['feat:mz-sales-delivery-challans'] },
   async ({ app, agent, screen }) => {
+    needsModel();
     await app.open('/en/login');
     await agent.act('sign in as {email} with password {pw}', {
       params: { email: 'admin@mizano.com', pw: 'password123' },
@@ -121,9 +130,12 @@ test(
     await agent.act('switch to organization {org}', { params: { org: ORG_A } });
 
     await app.open('/en/sales/delivery-challans');
-    await agent.act('create a draft supply challan for customer {cust} with item {item} qty {qty}', {
-      params: { cust: `${SEED}-cust-a-issue`, item: `${SEED}-item-a-issue`, qty: '5' },
-    });
+    await agent.act(
+      'create a draft supply challan for customer {cust} with item {item} qty {qty}',
+      {
+        params: { cust: `${SEED}-cust-a-issue`, item: `${SEED}-item-a-issue`, qty: '5' },
+      },
+    );
     const challanNumber = await agent.extract('the challan number of the created challan');
 
     // Manually manipulate the challan line to reference org B's item (simulating a cross-tenant attack)
@@ -147,13 +159,14 @@ test(
     await agent.assert('an IN inventory movement exists for challan {challan} and item {item}', {
       params: { challan: challanNumber, item: `${SEED}-item-a-issue` },
     });
-  }
+  },
 );
 
 test(
   '@issue-131 AC3: concurrent issue/update race is prevented by atomic DRAFT check',
   { tags: ['feat:mz-sales-delivery-challans'] },
   async ({ app, agent, screen }) => {
+    needsModel();
     await app.open('/en/login');
     await agent.act('sign in as {email} with password {pw}', {
       params: { email: 'admin@mizano.com', pw: 'password123' },
@@ -178,9 +191,12 @@ test(
     });
 
     await app.open('/en/sales/delivery-challans');
-    await agent.act('create a draft supply challan for customer {cust} with item {item} qty {qty}', {
-      params: { cust: `${SEED}-cust-race`, item: `${SEED}-item-race`, qty: '5' },
-    });
+    await agent.act(
+      'create a draft supply challan for customer {cust} with item {item} qty {qty}',
+      {
+        params: { cust: `${SEED}-cust-race`, item: `${SEED}-item-race`, qty: '5' },
+      },
+    );
     const challanNumber = await agent.extract('the challan number of the created challan');
 
     // Issue the challan (changes status from DRAFT to ISSUED)
@@ -192,5 +208,5 @@ test(
       params: { challan: challanNumber, notes: 'should fail' },
     });
     await agent.assert('an error says only draft challans can be updated');
-  }
+  },
 );

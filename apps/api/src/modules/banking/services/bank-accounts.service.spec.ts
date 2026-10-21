@@ -54,3 +54,52 @@ describe('BankAccountsService.create opening balance', () => {
     });
   });
 });
+
+describe('BankAccountsService.update linked account ownership', () => {
+  let prisma: MockPrismaClient;
+  let service: BankAccountsService;
+
+  beforeEach(() => {
+    prisma = createMockPrisma();
+    prisma.bankAccount.findFirst.mockResolvedValue({ id: 'ba-1' } as never);
+    prisma.bankAccount.update.mockResolvedValue({ id: 'ba-1' } as never);
+    service = new BankAccountsService(prisma as unknown as PrismaService);
+  });
+
+  it('rejects (400) a linked ledger account of another organization and writes nothing', async () => {
+    prisma.account.findFirst.mockResolvedValue(null);
+
+    await expect(service.update(ORG, 'ba-1', { linkedAccountId: 'foreign-acc' })).rejects.toThrow(
+      /Linked ledger account/,
+    );
+    expect(prisma.account.findFirst.mock.calls[0]![0]!.where).toMatchObject({
+      id: 'foreign-acc',
+      organizationId: ORG,
+      deletedAt: null,
+    });
+    expect(prisma.bankAccount.update).not.toHaveBeenCalled();
+  });
+
+  it('does not look up an account when the link is not part of the update', async () => {
+    await service.update(ORG, 'ba-1', { name: 'Renamed' });
+
+    expect(prisma.account.findFirst).not.toHaveBeenCalled();
+    expect(prisma.bankAccount.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts an own ledger account', async () => {
+    prisma.account.findFirst.mockResolvedValue({ id: 'acc-2' } as never);
+
+    await service.update(ORG, 'ba-1', { linkedAccountId: 'acc-2' });
+
+    expect(prisma.bankAccount.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects (400) when linkedAccountId is null', async () => {
+    await expect(service.update(ORG, 'ba-1', { linkedAccountId: null as never })).rejects.toThrow(
+      /Linked ledger account/,
+    );
+    expect(prisma.account.findFirst).not.toHaveBeenCalled();
+    expect(prisma.bankAccount.update).not.toHaveBeenCalled();
+  });
+});

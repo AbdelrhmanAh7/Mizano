@@ -123,6 +123,59 @@ export class CostingService {
       orderBy: [{ itemId: 'asc' }, { createdAt: 'asc' }],
     });
 
+    if (layers.length === 0) {
+      const itemWhere: Record<string, unknown> = {
+        organizationId,
+        deletedAt: null,
+      };
+      if (itemId) itemWhere.id = itemId;
+
+      const dbItems = await this.prisma.item.findMany({
+        where: itemWhere,
+        include: {
+          inventoryLevels: {
+            where: { quantity: { gt: new Decimal(0) } },
+          },
+        },
+        orderBy: { name: 'asc' },
+      });
+
+      let totalValue = new Decimal(0);
+      const items: Array<{
+        itemId: string;
+        itemName: string;
+        sku: string;
+        totalQuantity: number;
+        totalValue: number;
+        avgCostPerUnit: number;
+      }> = [];
+
+      for (const item of dbItems) {
+        const totalQty =
+          item.inventoryLevels.length > 0
+            ? item.inventoryLevels.reduce((sum, lvl) => sum.add(lvl.quantity), new Decimal(0))
+            : new Decimal(item.currentStock || 0);
+
+        if (totalQty.gt(0)) {
+          const costPrice = item.costPrice ?? new Decimal(0);
+          const itemTotalVal = totalQty.mul(costPrice);
+          totalValue = totalValue.add(itemTotalVal);
+          const qtyNum = parseFloat(totalQty.toString());
+          const valNum = parseFloat(itemTotalVal.toString());
+          items.push({
+            itemId: item.id,
+            itemName: item.name,
+            sku: item.sku,
+            totalQuantity: qtyNum,
+            totalValue: valNum,
+            avgCostPerUnit: qtyNum > 0 ? valNum / qtyNum : 0,
+          });
+        }
+      }
+
+      return { totalValue, items };
+    }
+
     // Group by item
     const itemMap = new Map<
       string,

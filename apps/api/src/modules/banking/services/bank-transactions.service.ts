@@ -79,8 +79,6 @@ export class BankTransactionsService {
 
   async findAll(organizationId: string, query: BankTransactionQueryDto) {
     const {
-      page = 1,
-      limit = 50,
       sortBy = 'date',
       sortOrder = 'desc',
       bankAccountId,
@@ -90,6 +88,10 @@ export class BankTransactionsService {
       amountMin,
       amountMax,
     } = query;
+    // The controller types the query as an intersection (no DTO class), so the ValidationPipe
+    // does not transform it: page and limit arrive as strings and Prisma rejects a string `take`.
+    const page = Math.max(1, Math.floor(Number(query.page)) || 1);
+    const limit = Math.min(500, Math.max(1, Math.floor(Number(query.limit)) || 50));
     const where: Prisma.BankTransactionWhereInput = {
       organizationId,
       ...(bankAccountId ? { bankAccountId } : {}),

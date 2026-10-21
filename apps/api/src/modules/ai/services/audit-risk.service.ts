@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AiFeedbackService } from './ai-feedback.service';
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
@@ -44,15 +44,7 @@ export class AuditRiskService {
   ): Promise<AuditRiskResult> {
     const features = await this.extractFeatures(organizationId, entityType, entityId);
     if (!features) {
-      return {
-        entityType,
-        entityId,
-        riskScore: 0,
-        riskLevel: 'LOW',
-        factors: [],
-        confidence: 0,
-        predictionMethod: 'RULE_BASED' as PredictionMethod,
-      };
+      throw new NotFoundException(`Entity ${entityType}:${entityId} not found or unsupported`);
     }
 
     const { score, factors } = this.ruleBasedScore(features);
@@ -208,12 +200,54 @@ export class AuditRiskService {
           return await this.extractBillFeatures(organizationId, entityId);
         case 'expense':
           return await this.extractExpenseFeatures(organizationId, entityId);
+        case 'customer':
+          return await this.extractCustomerFeatures(organizationId, entityId);
         default:
           return null;
       }
     } catch {
       return null;
     }
+  }
+
+  private async extractCustomerFeatures(
+    organizationId: string,
+    customerId: string,
+  ): Promise<{ vector: number[]; raw: Record<string, number> } | null> {
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: customerId, organizationId, deletedAt: null },
+      select: { id: true, createdAt: true },
+    });
+
+    if (!customer) return null;
+
+    // Customer audit risk: minimal features, mostly based on invoice/payment history
+    const invoices = await this.prisma.invoice.findMany({
+      where: { customerId, organizationId, deletedAt: null },
+      select: { grandTotal: true, date: true, status: true, balanceDue: true },
+      take: 100,
+    });
+
+    const totalInvoices = invoices.length;
+    const overdueInvoices = invoices.filter(
+      (i) =>
+        i.status === 'SENT' &&
+        i.balanceDue &&
+        Number(i.balanceDue) > 0 &&
+        new Date(i.date) < new Date(),
+    ).length;
+    const voidedInvoices = invoices.filter((i) => i.status === 'VOID').length;
+    const totalAmount = invoices.reduce((sum, i) => sum + Number(i.grandTotal), 0);
+    const avgAmount = totalInvoices > 0 ? totalAmount / totalInvoices : 0;
+
+    const raw = {
+      total_invoices: Math.min(totalInvoices, 100) / 100,
+      overdue_ratio: totalInvoices > 0 ? overdueInvoices / totalInvoices : 0,
+      voided_ratio: totalInvoices > 0 ? voidedInvoices / totalInvoices : 0,
+      avg_amount_normalized: avgAmount > 0 ? Math.min(avgAmount / 10000, 1) : 0,
+    };
+
+    return { vector: Object.values(raw), raw };
   }
 
   private async extractJournalFeatures(

@@ -43,15 +43,9 @@ export class EmployeesService {
   }
 
   async findAll(organizationId: string, query: EmployeeQueryDto) {
-    const {
-      page = 1,
-      limit = 50,
-      sortBy = 'name',
-      sortOrder = 'asc',
-      isActive,
-      status,
-      department,
-    } = query;
+    const { sortBy = 'name', sortOrder = 'asc', isActive, status, department } = query;
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 50;
     const where: Prisma.EmployeeWhereInput = { organizationId, deletedAt: null };
     if (isActive !== undefined) {
       where.isActive = typeof isActive === 'string' ? isActive === 'true' : isActive;

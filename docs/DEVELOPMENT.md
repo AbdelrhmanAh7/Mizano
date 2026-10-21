@@ -4,7 +4,7 @@ Setup, environments, database, testing, CI, git workflow and deployment for Miza
 
 ## Prerequisites
 
-- Node 20 (CI and Docker images use Node 20; `engines` allows >=18)
+- Node 20 (CI and Docker images use Node 20; `engines` allows >=18). `pnpm e2e:army` alone needs Node `^22.22.3` or `>=24.8.0` (the `e2e` runner's engines); its GitHub job uses the latest Node 22.x
 - pnpm 8.14 via `corepack enable` (pinned in `packageManager`)
 - Docker with Compose for PostgreSQL 16 and Redis 7
 - Python 3 only for the planning scripts in `scripts/`
@@ -105,13 +105,13 @@ Troubleshooting: `docker ps` to confirm `mizano-postgres`/`mizano-redis`, `redis
 
 ## Testing
 
-| Layer          | Location                                                   | Run                                                     |
-| -------------- | ---------------------------------------------------------- | ------------------------------------------------------- |
-| API unit       | `apps/api/src/**/*.spec.ts`                                | `node apps/api/_run_tests.js [--testPathPattern=…]`     |
-| Web unit       | `apps/web/**/*.spec.ts(x)` (Jest + Testing Library, jsdom) | `cd apps/web && npx jest [--testPathPattern=…]`         |
-| API E2E        | `apps/api/test/*.e2e-spec.ts` (supertest, `jest-e2e.json`) | `pnpm test:e2e` against a seeded database               |
-| Browser E2E    | not wired yet                                              | tracked by the seeded API/browser journey issue         |
-| Planning tools | `scripts/test_*.py`                                        | `python -m unittest discover -s scripts -p 'test_*.py'` |
+| Layer          | Location                                                   | Run                                                       |
+| -------------- | ---------------------------------------------------------- | --------------------------------------------------------- |
+| API unit       | `apps/api/src/**/*.spec.ts`                                | `node apps/api/_run_tests.js [--testPathPattern=…]`       |
+| Web unit       | `apps/web/**/*.spec.ts(x)` (Jest + Testing Library, jsdom) | `cd apps/web && npx jest [--testPathPattern=…]`           |
+| API E2E        | `apps/api/test/*.e2e-spec.ts` (supertest, `jest-e2e.json`) | `pnpm test:e2e` against a seeded database                 |
+| Browser E2E    | `e2e-army/**/*.e2e.ts` (tester-army/e2e, `e2e.config.ts`)  | `DATABASE_URL=<test db> pnpm e2e:army [--tag shard:<id>]` |
+| Planning tools | `scripts/test_*.py`                                        | `python -m unittest discover -s scripts -p 'test_*.py'`   |
 
 `_run_tests.js`, `_jest.config.js` and `_jest_resolver.js` make the API suite resolve pnpm's store on Windows/WSL; use them instead of calling Jest directly.
 
@@ -148,7 +148,8 @@ Checks on PRs and pushes to `master`, by source:
 
 - **`.github/workflows/ci.yml` (GitHub-hosted runners):** runs on pushes to `master` and on PRs to `master`/`develop`, on GitHub-hosted runners only (`ubuntu-latest`; free and unlimited because the repository is public; no self-hosted labels, no secrets beyond `GITHUB_TOKEN`). Four independent parallel jobs, each limited to 5 minutes (`timeout-minutes: 5`; split a job rather than raising the limit): **Install Dependencies** (pnpm 8, Node 20, `prisma generate`), **Lint & Type Check**, **Unit Tests** (PostgreSQL 16 and Redis 7 service containers, `db:push`) and **Build**. Their names are the check names the automerge gates wait for, so keep them stable. A newer push to a PR cancels its older run. The workflow uses `pull_request` (never `pull_request_target`); fork PRs run only after approval in the repository settings. E2E is not part of this workflow. `deploy.yml` stays disabled (it needs deployment secrets).
 - **Hub `localci` job (Mac mini):** runs the full CI (`pnpm ci:full`: lint, type-check, test, build) locally and posts GitHub commit statuses under the same job names, so the gates see the same check names whichever runner produced them.
-- **`e2e-army` status (hub verify suite):** feature-level E2E for the features a PR touches, run by the hub against a throwaway environment; it is a separate commit status, not a job in `ci.yml`.
+- **`.github/workflows/e2e-army.yml` (GitHub-hosted runners):** posts the `e2e-army` check: a `plan` job reads `e2e-army/shards.json`, then one matrix job per shard starts the API and web app on a PostgreSQL 16 service container (no Redis: `REDIS_URL` is empty in the job env and in `scripts/e2e-army.sh`, so the cache and the document-intake queue run in-process; `[mz-health.2]` asserts it) and runs `pnpm e2e:army` for the PR tests (`e2e-army/*.e2e.ts`, job `pr`) or one feature shard (`--tag shard:<id>`). Each job is limited to 5 minutes (split a shard rather than raising the limit) and runs without a model or secrets: agent steps skip themselves there, locator and request-level tests run.
+- **`e2e-army` status (hub verify suite):** feature-level E2E for the features a PR touches, run by the hub against a throwaway environment with a model; see [CONTRIBUTING.md](../CONTRIBUTING.md#e2e-tests-e2e-army-blocking).
 - **Local pre-push hook:** only fast checks (`turbo run type-check test --filter=...[<base>]`, see Git workflow below); full CI, build and E2E are left to the sources above.
 
 `.github/workflows/demo-planning.yml` validates and syncs `docs/planning/` metadata with `scripts/sync-demo-planning.py`; see the [planning guide](planning/README.md).

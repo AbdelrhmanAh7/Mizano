@@ -17,11 +17,7 @@ export class InventoryMovementsController {
   @Get()
   @Permissions('inventory.view')
   @ApiOperation({ summary: 'List inventory movements with pagination and filters' })
-  findAll(
-    @CurrentOrg() orgId: string,
-    @Query()
-    query: InventoryMovementQueryDto,
-  ) {
+  findAll(@CurrentOrg() orgId: string, @Query() query: InventoryMovementQueryDto) {
     return this.inventoryMovementsService.findAll(orgId, query);
   }
 

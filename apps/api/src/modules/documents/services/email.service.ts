@@ -25,26 +25,27 @@ export class EmailService {
     invoiceId: string,
     dto: SendDocumentDto,
   ): Promise<{ success: boolean; emailLogId?: string; error?: string }> {
+    // An unknown (or another tenant's) invoice is a 404 of the route, not an in-band send failure.
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id: invoiceId, organizationId, deletedAt: null },
+      include: {
+        customer: true,
+      },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+    });
+
+    if (!org) {
+      throw new NotFoundException('Organization not found');
+    }
+
     try {
-      const invoice = await this.prisma.invoice.findFirst({
-        where: { id: invoiceId, organizationId, deletedAt: null },
-        include: {
-          customer: true,
-        },
-      });
-
-      if (!invoice) {
-        throw new NotFoundException('Invoice not found');
-      }
-
-      const org = await this.prisma.organization.findUnique({
-        where: { id: organizationId },
-      });
-
-      if (!org) {
-        throw new NotFoundException('Organization not found');
-      }
-
       const context: InvoiceEmailContext = {
         organizationName: org.name,
         customerName: invoice.customer.name,
@@ -121,26 +122,27 @@ export class EmailService {
     quoteId: string,
     dto: SendDocumentDto,
   ): Promise<{ success: boolean; emailLogId?: string; error?: string }> {
+    // An unknown (or another tenant's) quote is a 404 of the route, not an in-band send failure.
+    const quote = await this.prisma.quote.findFirst({
+      where: { id: quoteId, organizationId, deletedAt: null },
+      include: {
+        customer: true,
+      },
+    });
+
+    if (!quote) {
+      throw new NotFoundException('Quote not found');
+    }
+
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+    });
+
+    if (!org) {
+      throw new NotFoundException('Organization not found');
+    }
+
     try {
-      const quote = await this.prisma.quote.findFirst({
-        where: { id: quoteId, organizationId, deletedAt: null },
-        include: {
-          customer: true,
-        },
-      });
-
-      if (!quote) {
-        throw new NotFoundException('Quote not found');
-      }
-
-      const org = await this.prisma.organization.findUnique({
-        where: { id: organizationId },
-      });
-
-      if (!org) {
-        throw new NotFoundException('Organization not found');
-      }
-
       const context: QuoteEmailContext = {
         organizationName: org.name,
         customerName: quote.customer.name,

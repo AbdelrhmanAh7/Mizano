@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { EmailService } from './email.service';
 import { PdfService } from './pdf.service';
@@ -156,5 +156,81 @@ describe('EmailService HTML safety', () => {
     expect(html).not.toContain('<script>');
     expect(html).not.toContain('evil.example');
     expect(html).toContain('&lt;script&gt;');
+  });
+});
+
+describe('EmailService.sendInvoice / sendQuote', () => {
+  const NOT_CONFIGURED =
+    'Email is not configured. Please set up SMTP settings in organization settings.';
+  const document = {
+    invoiceNumber: 'INV-0001',
+    quoteNumber: 'QT-0001',
+    date: new Date('2026-03-10'),
+    dueDate: new Date('2026-04-10'),
+    expiryDate: new Date('2026-04-10'),
+    grandTotal: { toString: () => '10' },
+    currencyCode: 'USD',
+    customer: { name: 'Customer', email: 'c@example.com' },
+  };
+
+  function build(): { prisma: Record<string, Record<string, jest.Mock>>; service: EmailService } {
+    const prisma = buildPrisma();
+    prisma.quote = { findFirst: jest.fn() };
+    // the organization has no SMTP settings
+    prisma.organization.findUnique.mockResolvedValue({
+      id: ORG_A,
+      name: 'Org A',
+      primaryColor: null,
+    });
+    const service = new EmailService(
+      prisma as unknown as PrismaService,
+      { generateInvoicePdf: jest.fn(), generateQuotePdf: jest.fn() } as unknown as PdfService,
+    );
+    return { prisma, service };
+  }
+
+  it("answers 404 (not an in-band failure) for an unknown or another tenant's invoice", async () => {
+    const { prisma, service } = build();
+    prisma.invoice.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.sendInvoice(ORG_B, 'inv-1', { to: 'c@example.com', attachPdf: false } as never),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.invoice.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'inv-1', organizationId: ORG_B, deletedAt: null } }),
+    );
+    expect(prisma.emailLog.create).not.toHaveBeenCalled();
+  });
+
+  it("answers 404 for an unknown or another tenant's quote", async () => {
+    const { prisma, service } = build();
+    prisma.quote.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.sendQuote(ORG_B, 'quote-1', { to: 'c@example.com', attachPdf: false } as never),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.emailLog.create).not.toHaveBeenCalled();
+  });
+
+  it('reports a missing SMTP configuration in the result and logs the failed attempt', async () => {
+    const { prisma, service } = build();
+    prisma.invoice.findFirst.mockResolvedValue(document);
+
+    const result = await service.sendInvoice(ORG_A, 'inv-1', {
+      to: 'c@example.com',
+      attachPdf: false,
+    } as never);
+
+    expect(result).toEqual({ success: false, error: NOT_CONFIGURED });
+    expect(prisma.emailLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        to: 'c@example.com',
+        entityType: 'invoice',
+        entityId: 'inv-1',
+        status: 'failed',
+        error: NOT_CONFIGURED,
+        organizationId: ORG_A,
+      }),
+    });
   });
 });

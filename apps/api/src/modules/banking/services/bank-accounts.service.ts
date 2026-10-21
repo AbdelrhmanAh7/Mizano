@@ -22,11 +22,7 @@ export class BankAccountsService {
         'Record opening bank balances through Opening Balances (Accounting → Opening Balances)',
       );
     }
-    const linked = await this.prisma.account.findFirst({
-      where: { id: dto.linkedAccountId, organizationId, deletedAt: null },
-      select: { id: true },
-    });
-    if (!linked) throw new BadRequestException('Linked ledger account not found');
+    await this.assertOwnLinkedAccount(organizationId, dto.linkedAccountId);
 
     return this.prisma.bankAccount.create({
       data: {
@@ -40,6 +36,21 @@ export class BankAccountsService {
         organizationId,
       },
     });
+  }
+
+  /** The linked ledger account comes from the body: it must belong to the organization (400). */
+  private async assertOwnLinkedAccount(
+    organizationId: string,
+    linkedAccountId: string,
+  ): Promise<void> {
+    if (!linkedAccountId) {
+      throw new BadRequestException('Linked ledger account not found');
+    }
+    const linked = await this.prisma.account.findFirst({
+      where: { id: linkedAccountId, organizationId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!linked) throw new BadRequestException('Linked ledger account not found');
   }
 
   async findAll(organizationId: string, query: BankAccountQueryDto = {}) {
@@ -95,6 +106,9 @@ export class BankAccountsService {
 
   async update(organizationId: string, id: string, dto: UpdateBankAccountDto) {
     await this.findOne(organizationId, id);
+    if (dto.linkedAccountId !== undefined) {
+      await this.assertOwnLinkedAccount(organizationId, dto.linkedAccountId);
+    }
     return this.prisma.bankAccount.update({ where: { id }, data: dto });
   }
 

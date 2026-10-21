@@ -452,7 +452,7 @@ export class DeliveryChallansService {
 
   // ============ Helper Methods ============
 
-  /** Every customer, invoice, item and warehouse id in the payload must belong to the org. */
+  /** Every customer, invoice, item and warehouse id in the payload must belong to the org (an unknown or foreign body id is a 400). */
   private async assertReferencesInOrg(
     organizationId: string,
     dto: UpdateDeliveryChallanDto,
@@ -462,7 +462,7 @@ export class DeliveryChallansService {
         where: { id: dto.customerId, organizationId, deletedAt: null },
       });
       if (!customer) {
-        throw new NotFoundException('Customer not found');
+        throw new BadRequestException('Customer not found');
       }
     }
 
@@ -471,7 +471,7 @@ export class DeliveryChallansService {
         where: { id: dto.invoiceId, organizationId, deletedAt: null },
       });
       if (!invoice) {
-        throw new NotFoundException('Invoice not found');
+        throw new BadRequestException('Invoice not found');
       }
     }
 
@@ -480,14 +480,14 @@ export class DeliveryChallansService {
         where: { id: line.itemId, organizationId, deletedAt: null },
       });
       if (!item) {
-        throw new NotFoundException(`Item ${line.itemId} not found`);
+        throw new BadRequestException(`Item ${line.itemId} not found`);
       }
       if (line.warehouseId) {
         const warehouse = await this.prisma.warehouse.findFirst({
           where: { id: line.warehouseId, organizationId, deletedAt: null },
         });
         if (!warehouse) {
-          throw new NotFoundException(`Warehouse ${line.warehouseId} not found`);
+          throw new BadRequestException(`Warehouse ${line.warehouseId} not found`);
         }
       }
     }

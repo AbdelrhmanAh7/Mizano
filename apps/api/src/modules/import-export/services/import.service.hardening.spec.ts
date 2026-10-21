@@ -260,4 +260,19 @@ describe('ImportService hardening', () => {
       );
     });
   });
+
+  describe('parseFile with CSV', () => {
+    it('parses a CSV buffer into headers, preview and totalRows', async () => {
+      const csvContent = Buffer.from('Date,Description,Amount\n2026-03-01,Test Entry,100.50\n');
+      const result = await service.parseFile(csvContent, 'statement.csv');
+      expect(result.fileType).toBe('csv');
+      expect(result.headers).toEqual(['Date', 'Description', 'Amount']);
+      expect(result.totalRows).toBe(1);
+      expect(result.preview[0]).toMatchObject({
+        Date: '2026-03-01',
+        Description: 'Test Entry',
+        Amount: '100.50',
+      });
+    });
+  });
 });

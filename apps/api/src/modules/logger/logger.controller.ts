@@ -8,6 +8,7 @@ import {
   Param,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
@@ -195,7 +196,10 @@ export class LoggerController {
   @Get('logs/:id')
   @Permissions('settings.edit')
   getById(@CurrentOrg() organizationId: string, @Param('id') id: string) {
-    return this.loggerService.getById(organizationId, id);
+    const entry = this.loggerService.getById(organizationId, id);
+    // Unknown ids and other tenants' ids are the same 404 (never an empty 200).
+    if (!entry) throw new NotFoundException('Log entry not found');
+    return entry;
   }
 
   @Post('update-status')

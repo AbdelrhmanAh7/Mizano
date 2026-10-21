@@ -61,13 +61,15 @@ export class SendPayslipsDto {
 }
 
 export class StatementQueryDto {
-  @ApiProperty({ description: 'Start date for the statement' })
+  @ApiPropertyOptional({ description: 'Start date for the statement (default: 1 year ago)' })
+  @IsOptional()
   @IsDateString()
-  dateFrom: string;
+  dateFrom?: string;
 
-  @ApiProperty({ description: 'End date for the statement' })
+  @ApiPropertyOptional({ description: 'End date for the statement (default: today)' })
+  @IsOptional()
   @IsDateString()
-  dateTo: string;
+  dateTo?: string;
 }
 
 // ============ Response DTOs ============

@@ -680,7 +680,7 @@ export interface CacheStats {
   storeType: 'redis' | 'memory';
   connected: boolean;
   keyCount: number;
-  memoryUsage: string;
+  memoryUsage?: string;
   uptime: number;
   hitRate: number;
 }

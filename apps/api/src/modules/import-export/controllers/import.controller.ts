@@ -12,6 +12,8 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { plainToInstance } from 'class-transformer';
+import { validateSync, ValidationError } from 'class-validator';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -147,7 +149,7 @@ export class ImportController {
       throw new BadRequestException('Config is required');
     }
 
-    const config: ImportConfigDto = JSON.parse(configJson);
+    const config = this.parseConfig(configJson);
     return this.importService.validateImport(orgId, file.buffer, file.originalname, config);
   }
 
@@ -201,9 +203,40 @@ export class ImportController {
       throw new BadRequestException('Config is required');
     }
 
-    const config: ImportConfigDto = JSON.parse(configJson);
+    const config = this.parseConfig(configJson);
     // The same create permission as the single-record route of this entity, on top of settings.manage.
     await this.importService.assertCanImport(user?.roleId, config.entityType);
     return this.importService.importData(orgId, file.buffer, file.originalname, config, user.id);
+  }
+
+  /**
+   * The multipart `config` field is a JSON string the global ValidationPipe cannot see. A malformed
+   * string or an invalid config (unknown entity type, bad column mappings) is the caller's mistake:
+   * answer 400 instead of letting JSON.parse / the field lookup surface as a 500.
+   */
+  private parseConfig(configJson: string): ImportConfigDto {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(configJson);
+    } catch {
+      throw new BadRequestException('Config must be valid JSON');
+    }
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new BadRequestException('Config must be a JSON object');
+    }
+    const config = plainToInstance(ImportConfigDto, parsed);
+    const errors = validateSync(config);
+    if (errors.length > 0) {
+      throw new BadRequestException(`Invalid config: ${this.describeErrors(errors).join('; ')}`);
+    }
+    return config;
+  }
+
+  private describeErrors(errors: ValidationError[], parent = ''): string[] {
+    return errors.flatMap((error) => {
+      const path = parent ? `${parent}.${error.property}` : error.property;
+      const own = Object.values(error.constraints ?? {}).map((message) => `${path}: ${message}`);
+      return [...own, ...this.describeErrors(error.children ?? [], path)];
+    });
   }
 }

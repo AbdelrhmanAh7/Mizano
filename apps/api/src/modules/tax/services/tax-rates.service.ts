@@ -6,11 +6,34 @@ import { CreateTaxRateDto } from '../dto/create-tax-rate.dto';
 import { UpdateTaxRateDto } from '../dto/update-tax-rate.dto';
 import { TaxRateQueryDto } from '../dto/tax-rate-query.dto';
 
+/** A VAT percentage (the DTO bounds the format; the column is Decimal(5, 2)): 0 to 100. */
+function parseRate(value: string): Decimal {
+  const rate = new Decimal(value);
+  if (rate.greaterThan(100)) throw new BadRequestException('rate must be between 0 and 100');
+  return rate;
+}
+
 @Injectable()
 export class TaxRatesService {
   constructor(private prisma: PrismaService) {}
 
+  /** Account ids come from the body: each must belong to the caller's organization (400). */
+  private async assertOwnAccounts(
+    organizationId: string,
+    ids: Array<string | null | undefined>,
+  ): Promise<void> {
+    const accountIds = [...new Set(ids.filter((id): id is string => !!id))];
+    if (accountIds.length === 0) return;
+    const found = await this.prisma.account.count({
+      where: { id: { in: accountIds }, organizationId, deletedAt: null },
+    });
+    if (found !== accountIds.length) throw new BadRequestException('Account not found');
+  }
+
   async create(organizationId: string, dto: CreateTaxRateDto) {
+    const rate = parseRate(dto.rate);
+    await this.assertOwnAccounts(organizationId, [dto.linkedAccountId, dto.collectAccountId]);
+
     // Check for duplicate name
     const existing = await this.prisma.taxRate.findFirst({
       where: { organizationId, name: dto.name },
@@ -21,7 +44,7 @@ export class TaxRatesService {
       data: {
         name: dto.name,
         description: dto.description,
-        rate: new Decimal(dto.rate),
+        rate,
         type: dto.type || TaxType.BOTH,
         linkedAccountId: dto.linkedAccountId,
         isDefault: dto.isDefault ?? false,
@@ -63,9 +86,10 @@ export class TaxRatesService {
 
   async update(organizationId: string, id: string, dto: UpdateTaxRateDto) {
     await this.findOne(organizationId, id);
+    await this.assertOwnAccounts(organizationId, [dto.linkedAccountId, dto.collectAccountId]);
 
     const data: Record<string, unknown> = { ...dto };
-    if (dto.rate !== undefined) data.rate = new Decimal(dto.rate);
+    if (dto.rate !== undefined) data.rate = parseRate(dto.rate);
 
     // If setting as default, unset other defaults
     if (dto.isDefault) {
@@ -109,6 +133,9 @@ export class TaxRatesService {
   }
 
   async seedDefaultTaxRates(organizationId: string, linkedAccountId: string) {
+    if (!linkedAccountId) throw new BadRequestException('linkedAccountId is required');
+    await this.assertOwnAccounts(organizationId, [linkedAccountId]);
+
     const defaults = [
       { name: 'Standard Rate (15%)', rate: 15, type: TaxType.BOTH, isDefault: true },
       { name: 'Zero Rate (0%)', rate: 0, type: TaxType.BOTH, isDefault: false },

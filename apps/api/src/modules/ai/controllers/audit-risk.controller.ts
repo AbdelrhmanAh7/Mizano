@@ -23,7 +23,7 @@ export class AuditRiskController {
   @Get(':entityType/:entityId')
   @Permissions('accounting.view')
   @ApiOperation({ summary: 'Get audit risk score for a specific entity' })
-  @ApiParam({ name: 'entityType', enum: ['journal', 'invoice', 'bill', 'expense'] })
+  @ApiParam({ name: 'entityType', enum: ['journal', 'invoice', 'bill', 'expense', 'customer'] })
   @ApiParam({ name: 'entityId' })
   @ApiResponse({ status: 200, description: 'Returns risk score and factors' })
   scoreEntity(

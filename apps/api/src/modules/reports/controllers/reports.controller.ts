@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { CacheResponse, CacheTTL, CurrentOrg, Permissions } from '../../../common/decorators';
@@ -535,13 +535,21 @@ export class ReportsController {
   @CacheResponse('reports:customer-statement')
   @CacheTTL(600)
   @ApiOperation({ summary: 'Get Customer Statement' })
-  getCustomerStatement(
+  async getCustomerStatement(
     @CurrentOrg() orgId: string,
     @Param('customerId') customerId: string,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
-    return this.agingReportsService.getCustomerStatement(orgId, customerId, startDate, endDate);
+    const statement = await this.agingReportsService.getCustomerStatement(
+      orgId,
+      customerId,
+      startDate,
+      endDate,
+    );
+    // The service answers null for a customer outside this organization: that is a 404, not an empty 200.
+    if (!statement) throw new NotFoundException('Customer not found');
+    return statement;
   }
 
   @Get('vendor-statement/:vendorId')
@@ -549,13 +557,21 @@ export class ReportsController {
   @CacheResponse('reports:vendor-statement')
   @CacheTTL(600)
   @ApiOperation({ summary: 'Get Vendor Statement' })
-  getVendorStatement(
+  async getVendorStatement(
     @CurrentOrg() orgId: string,
     @Param('vendorId') vendorId: string,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
-    return this.agingReportsService.getVendorStatement(orgId, vendorId, startDate, endDate);
+    const statement = await this.agingReportsService.getVendorStatement(
+      orgId,
+      vendorId,
+      startDate,
+      endDate,
+    );
+    // The service answers null for a vendor outside this organization: that is a 404, not an empty 200.
+    if (!statement) throw new NotFoundException('Vendor not found');
+    return statement;
   }
 
   // Sales & Purchases Reports

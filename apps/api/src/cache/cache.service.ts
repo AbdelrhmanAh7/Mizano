@@ -11,9 +11,9 @@ export interface CacheOptions {
 
 export interface CacheStats {
   storeType: 'redis' | 'memory';
+  type: 'redis' | 'memory';
   connected: boolean;
   keyCount: number;
-  memoryUsage: string;
   uptime: number;
   hitRate: number;
 }
@@ -235,27 +235,25 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 
     if (this.isRedisAvailable) {
       try {
-        const info = await this.redisClient!.info('memory');
         const serverInfo = await this.redisClient!.info('server');
         const keyCount = await this.redisClient!.dbsize();
 
-        const memoryMatch = info.match(/used_memory_human:(.+)/);
         const uptimeMatch = serverInfo.match(/uptime_in_seconds:(\d+)/);
 
         return {
           storeType: 'redis',
+          type: 'redis',
           connected: true,
           keyCount,
-          memoryUsage: memoryMatch ? memoryMatch[1].trim() : 'unknown',
           uptime: uptimeMatch ? parseInt(uptimeMatch[1], 10) : 0,
           hitRate: Math.round(hitRate * 100) / 100,
         };
       } catch {
         return {
           storeType: 'redis',
+          type: 'redis',
           connected: false,
           keyCount: 0,
-          memoryUsage: '0B',
           uptime: 0,
           hitRate: Math.round(hitRate * 100) / 100,
         };
@@ -264,9 +262,9 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 
     return {
       storeType: 'memory',
+      type: 'memory',
       connected: true,
       keyCount: 0, // in-memory store doesn't expose key count easily
-      memoryUsage: 'N/A',
       uptime: 0,
       hitRate: Math.round(hitRate * 100) / 100,
     };

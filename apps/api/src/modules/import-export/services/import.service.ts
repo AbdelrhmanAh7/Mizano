@@ -46,6 +46,12 @@ interface RowContext {
 /** AuditLog.entityType of the per-row idempotency record of a money-bearing import. */
 export const IMPORT_ROW_ENTITY = 'IMPORT_ROW';
 
+function parseCsvStream(options?: csv.Options) {
+  const parser =
+    typeof csv === 'function' ? csv : (csv as unknown as { default: typeof csv }).default;
+  return parser(options);
+}
+
 @Injectable()
 export class ImportService {
   constructor(
@@ -84,7 +90,7 @@ export class ImportService {
 
       const stream = Readable.from(buffer.toString());
       stream
-        .pipe(csv())
+        .pipe(parseCsvStream())
         .on('headers', (h: string[]) => {
           headers = h;
         })
@@ -1485,7 +1491,7 @@ export class ImportService {
         const rows: ImportRow[] = [];
         const stream = Readable.from(buffer.toString());
         stream
-          .pipe(csv())
+          .pipe(parseCsvStream())
           .on('data', (row) => rows.push(row))
           .on('end', () => resolve(rows))
           .on('error', reject);

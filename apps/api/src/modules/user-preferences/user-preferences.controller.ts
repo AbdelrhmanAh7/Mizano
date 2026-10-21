@@ -7,9 +7,11 @@ import {
   Body,
   Param,
   UseGuards,
+  Req,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { UserPreferencesService } from './user-preferences.service';
 import { UpdateTourProgressDto } from './dto/update-tour-progress.dto';
@@ -17,6 +19,7 @@ import { UpdateDashboardLayoutDto } from './dto/update-dashboard-layout.dto';
 import { UserPreferencesDto } from './dto/user-preferences.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, CurrentUserData } from '../../common/decorators';
+import { BadRequestException } from '@nestjs/common';
 
 @ApiTags('User Preferences')
 @Controller('user/preferences')
@@ -73,8 +76,14 @@ export class UserPreferencesController {
   async updateTourProgress(
     @CurrentUser() user: CurrentUserData,
     @Param('tourId') tourId: string,
+    @Req() req: Request,
     @Body() updateDto: UpdateTourProgressDto,
   ) {
+    // Strict boolean validation: check raw body before ValidationPipe transforms it
+    const rawCompleted = req.body?.completed;
+    if (typeof rawCompleted !== 'boolean') {
+      throw new BadRequestException('completed must be a boolean (true or false)');
+    }
     return this.userPreferencesService.updateTourProgress(user.id, tourId, updateDto);
   }
 

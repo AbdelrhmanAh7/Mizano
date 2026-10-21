@@ -1,3 +1,4 @@
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AssetStatus, DepreciationMethod } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -322,6 +323,9 @@ describe('DepreciationService', () => {
       await expect(service.runDepreciationForAsset(ORG_A, 'sl', 3, 2026)).rejects.toThrow(
         'Depreciation already executed for this period',
       );
+      await expect(service.runDepreciationForAsset(ORG_A, 'sl', 3, 2026)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
       expect(prisma.journal.create).toHaveBeenCalledTimes(3);
     });
 
@@ -398,12 +402,21 @@ describe('DepreciationService', () => {
       await expect(service.runDepreciationForAsset(ORG_A, 'other', 3, 2026)).rejects.toThrow(
         'Asset not found or not active',
       );
+      await expect(service.runDepreciationForAsset(ORG_A, 'other', 3, 2026)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
       expect(mock(prisma.asset.findFirst).mock.calls[0][0].where).toMatchObject({
         id: 'other',
         organizationId: ORG_A,
       });
       expect(prisma.depreciationSchedule.findFirst).not.toHaveBeenCalled();
       expect(prisma.journal.create).not.toHaveBeenCalled();
+    });
+
+    it('answers 404 for a period without a schedule entry (a client error, not a 500)', async () => {
+      await expect(service.runDepreciationForAsset(ORG_A, 'sl', 1, 2000)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
     });
 
     it("cannot reverse another organization's schedule", async () => {

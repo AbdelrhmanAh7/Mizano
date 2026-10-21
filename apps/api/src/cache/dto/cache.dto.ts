@@ -4,14 +4,14 @@ export class CacheStatsResponseDto {
   @ApiProperty({ enum: ['redis', 'memory'], description: 'Cache backend type' })
   storeType!: 'redis' | 'memory';
 
+  @ApiProperty({ enum: ['redis', 'memory'], description: 'Cache backend type alias' })
+  type!: 'redis' | 'memory';
+
   @ApiProperty({ description: 'Whether the cache backend is connected' })
   connected!: boolean;
 
   @ApiProperty({ description: 'Total number of keys in the cache store' })
   keyCount!: number;
-
-  @ApiProperty({ description: 'Memory usage of the cache (e.g. "1.23M")' })
-  memoryUsage!: string;
 
   @ApiProperty({ description: 'Cache server uptime in seconds' })
   uptime!: number;

@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AssetStatus, AssetType, DepreciationMethod } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -142,6 +143,47 @@ describe('AssetsService', () => {
       const whereArg = prisma.asset.findMany.mock.calls[0]![0]!.where;
       expect(whereArg!.organizationId).toBe(ORG_ID);
       expect(whereArg!.deletedAt).toBeNull();
+    });
+  });
+
+  describe('create account ownership', () => {
+    const dto = {
+      name: 'Rack',
+      assetType: AssetType.ELECTRONICS,
+      purchaseDate: '2025-01-15',
+      purchasePrice: 12000,
+      salvageValue: 2000,
+      usefulLifeYears: 5,
+      assetAccountId: 'account-001',
+      depreciationAccountId: 'account-002',
+      accumulatedDeprAccountId: 'account-003',
+    };
+
+    it('rejects (400) an account that is not one of the organization accounts, writing nothing', async () => {
+      prisma.account.count.mockResolvedValue(2);
+
+      await expect(service.create(ORG_ID, dto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(ORG_ID, dto)).rejects.toThrow(/Account not found/);
+      expect(prisma.account.count.mock.calls[0]![0]!.where).toMatchObject({
+        id: { in: ['account-001', 'account-002', 'account-003'] },
+        organizationId: ORG_ID,
+        deletedAt: null,
+      });
+      expect(prisma.asset.create).not.toHaveBeenCalled();
+    });
+
+    it('counts a repeated account id once', async () => {
+      prisma.account.count.mockResolvedValue(2);
+      prisma.asset.findFirst.mockResolvedValue(null);
+      prisma.asset.create.mockResolvedValue(createMockAsset() as never);
+      prisma.depreciationSchedule.createMany.mockResolvedValue({ count: 60 });
+
+      await service.create(ORG_ID, { ...dto, depreciationAccountId: 'account-001' });
+
+      expect(prisma.account.count.mock.calls[0]![0]!.where).toMatchObject({
+        id: { in: ['account-001', 'account-003'] },
+      });
+      expect(prisma.asset.create).toHaveBeenCalledTimes(1);
     });
   });
 });

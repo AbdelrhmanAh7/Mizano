@@ -45,6 +45,28 @@ export class DealsService {
     [DealStage.LOST]: 0,
   };
 
+  /**
+   * The expected amount is required money for a Decimal(19, 4) column: a missing, non-numeric,
+   * negative or out-of-range value is a 400 (never a silent 0 and never a Decimal constructor 500).
+   */
+  private toAmount(value: unknown): Decimal {
+    const invalid = new BadRequestException(
+      'expectedAmount must be a non-negative number with at most 15 integer and 4 decimal digits',
+    );
+    if ((typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '') {
+      throw invalid;
+    }
+    let amount: Decimal;
+    try {
+      amount = new Decimal(value);
+    } catch {
+      throw invalid;
+    }
+    if (!amount.isFinite() || amount.isNegative() || amount.decimalPlaces() > 4) throw invalid;
+    if (amount.greaterThanOrEqualTo('1e15')) throw invalid;
+    return amount;
+  }
+
   async create(organizationId: string, dto: CreateDealDto, userId: string) {
     const stage = dto.stage || DealStage.NEW;
     const probability = dto.probability ?? this.stageProbability[stage];
@@ -52,7 +74,7 @@ export class DealsService {
     return this.prisma.deal.create({
       data: {
         dealName: dto.dealName,
-        expectedAmount: new Decimal(dto.expectedAmount || 0),
+        expectedAmount: this.toAmount(dto.expectedAmount),
         probability,
         stage,
         expectedCloseDate: dto.expectedCloseDate ? new Date(dto.expectedCloseDate) : null,
@@ -147,7 +169,7 @@ export class DealsService {
     const data: Prisma.DealUpdateInput = {};
 
     if (dto.dealName !== undefined) data.dealName = dto.dealName;
-    if (dto.expectedAmount !== undefined) data.expectedAmount = new Decimal(dto.expectedAmount);
+    if (dto.expectedAmount !== undefined) data.expectedAmount = this.toAmount(dto.expectedAmount);
     if (dto.probability !== undefined) data.probability = dto.probability;
     if (dto.expectedCloseDate !== undefined)
       data.expectedCloseDate = new Date(dto.expectedCloseDate);

@@ -3,6 +3,18 @@ import { Prisma, PayrollStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
 
+/** Sum of the numeric amounts of an allowances / deductions JSON object (non-numeric values count as 0). */
+function sumJsonAmounts(json: Record<string, unknown>): Decimal {
+  return Object.values(json).reduce<Decimal>((sum, value) => {
+    try {
+      const amount = new Decimal(value as Decimal.Value);
+      return amount.isFinite() ? sum.add(amount) : sum;
+    } catch {
+      return sum;
+    }
+  }, new Decimal(0));
+}
+
 @Injectable()
 export class PayrollService {
   constructor(private prisma: PrismaService) {}
@@ -50,13 +62,13 @@ export class PayrollService {
 
     // Get all active employees
     const employees = await this.prisma.employee.findMany({
-      where: { organizationId, isActive: true },
+      where: { organizationId, isActive: true, deletedAt: null },
     });
 
     const payslips = [];
-    let totalGross = 0;
-    let totalNet = 0;
-    let totalDeductions = 0;
+    let totalGross = new Decimal(0);
+    let totalNet = new Decimal(0);
+    let totalDeductions = new Decimal(0);
 
     // Calculate period dates from month/year
     const periodStart = new Date(payrollRun.year, payrollRun.month - 1, 1);
@@ -78,65 +90,57 @@ export class PayrollService {
         return sum + 1;
       }, 0);
 
-      // Calculate salary
-      const basicSalary = parseFloat(employee.basicSalary.toString());
+      // All money arithmetic is Decimal and rounded to the 4 fraction digits the columns store,
+      // so every payslip line and the run totals add up exactly.
+      const basicSalary = new Decimal(employee.basicSalary);
 
-      // Get allowances from employee profile (JSON field)
+      // Get allowances / deductions from the employee profile (JSON fields)
       const allowancesJson = (employee.allowances as Record<string, number>) || {};
-      const totalAllowances = Object.values(allowancesJson).reduce(
-        (sum: number, val: number) => sum + (val || 0),
-        0,
-      );
-
-      // Get deductions from employee profile (JSON field)
+      const totalAllowances = sumJsonAmounts(allowancesJson);
       const deductionsJson = (employee.deductions as Record<string, number>) || {};
-      const totalEmployeeDeductions = Object.values(deductionsJson).reduce(
-        (sum: number, val: number) => sum + (val || 0),
-        0,
-      );
+      const totalEmployeeDeductions = sumJsonAmounts(deductionsJson);
 
-      // Prorate based on days worked
+      // Prorate based on days worked (multiply first, divide once)
       const workingDaysInMonth = 22;
-      const proratedSalary = (basicSalary / workingDaysInMonth) * daysWorked;
+      const proratedSalary = basicSalary.mul(daysWorked).div(workingDaysInMonth).toDecimalPlaces(4);
 
       // Calculate LOP (Loss of Pay)
-      const lop = basicSalary - proratedSalary;
+      const lop = basicSalary.sub(proratedSalary);
 
-      const grossSalary = proratedSalary + totalAllowances;
+      const grossSalary = proratedSalary.add(totalAllowances);
 
       // Calculate tax (simplified - 15% tax rate)
-      const taxRate = 0.15;
-      const taxes = grossSalary * taxRate;
+      const taxes = grossSalary.mul('0.15').toDecimalPlaces(4);
 
-      const netSalary = grossSalary - totalEmployeeDeductions - taxes;
+      const netSalary = grossSalary.sub(totalEmployeeDeductions).sub(taxes);
 
       const payslip = await this.prisma.payslip.create({
         data: {
           employeeId: employee.id,
           payrollRunId,
-          basicSalary: new Decimal(basicSalary),
+          basicSalary,
           allowances: allowancesJson,
-          grossSalary: new Decimal(grossSalary),
-          lop: new Decimal(lop),
+          grossSalary,
+          lop,
           deductions: deductionsJson,
-          taxes: new Decimal(taxes),
-          netSalary: new Decimal(netSalary),
+          taxes,
+          netSalary,
         },
       });
 
       payslips.push(payslip);
-      totalGross += grossSalary;
-      totalNet += netSalary;
-      totalDeductions += totalEmployeeDeductions + taxes;
+      totalGross = totalGross.add(grossSalary);
+      totalNet = totalNet.add(netSalary);
+      totalDeductions = totalDeductions.add(totalEmployeeDeductions).add(taxes);
     }
 
     // Update payroll run with totals
     await this.prisma.payrollRun.update({
       where: { id: payrollRunId },
       data: {
-        totalGross: new Decimal(totalGross),
-        totalNet: new Decimal(totalNet),
-        totalDeductions: new Decimal(totalDeductions),
+        totalGross,
+        totalNet,
+        totalDeductions,
         status: PayrollStatus.PROCESSED,
         processedAt: new Date(),
       },
