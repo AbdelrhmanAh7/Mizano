@@ -68,7 +68,7 @@ The acceptance criteria as decided:
 
 ## Test Execution Evidence
 
-- **Tested Commit (`ai/219`)**: `d4fa7e3773a445a17bd0dafb4f81227c85dfc71a`
+- **Tested Commit (`ai/219`)**: `1b3aa05a9ef1b0a8ec800dbce80d855b14847029`
 - `nice -n 10 pnpm --filter api exec jest --maxWorkers=2 src/common/filters/http-exception.filter.spec.ts src/common/guards/jwt-auth.guard.spec.ts`: 2 suites, 13 tests passed, exit 0.
 - `pnpm --filter api type-check`: exit 0.
 - `pnpm --filter api lint`: exit 0.

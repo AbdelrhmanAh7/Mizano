@@ -4,7 +4,7 @@
 
 - **Issue**: #219 ([e2e] Authentication and sessions failing on master)
 - **Base Commit (`origin/master`)**: `4c0063868ef63447c23171f112e7529ea49d2cb7`
-- **Tested Commit (`ai/219`)**: `d4fa7e3773a445a17bd0dafb4f81227c85dfc71a`
+- **Tested Commit (`ai/219`)**: `1b3aa05a9ef1b0a8ec800dbce80d855b14847029`
 - **Originating Sentry issue**: None (gate failure on hub stable e2e run `mz-auth.3`, not production)
 - **Decision reference**: CTO direction on issue #219 (https://github.com/AbdelrhmanAh7/Mizano/issues/219#issuecomment-6246814448, item `q:AbdelrhmanAh7/Mizano#234`): maintain 'Validation failed' and 'Unauthorized'
 
@@ -46,7 +46,7 @@ PASS src/common/filters/http-exception.filter.spec.ts
 Test Suites: 2 passed, 2 total
 Tests:       13 passed, 13 total
 Snapshots:   0 total
-Time:        5.003 s
+Time:        3.303 s
 Ran all test suites matching /src\/common\/filters\/http-exception.filter.spec.ts|src\/common\/guards\/jwt-auth.guard.spec.ts/i.
 ```
 
