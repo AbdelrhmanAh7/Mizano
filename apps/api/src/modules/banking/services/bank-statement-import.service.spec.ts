@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BankStatementImportService } from './bank-statement-import.service';
 import { ImportService } from '../../import-export/services/import.service';
 import { BankRulesService } from './bank-rules.service';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
+import { createMockPrisma } from '../../../test/mocks/prisma.mock';
 import { expectDecimalEqual } from '../../../test/helpers/decimal.helpers';
 
 const ORG_1 = 'org-1';
@@ -12,9 +13,9 @@ const ORG_2 = 'org-2';
 const BANK_ACCOUNT_ID = 'ba-1';
 
 describe('BankStatementImportService', () => {
-  let prisma: MockPrismaClient;
-  let importService: Partial<Record<keyof ImportService, jest.Mock>>;
-  let bankRulesService: Partial<Record<keyof BankRulesService, jest.Mock>>;
+  let prisma: any;
+  let importService: any;
+  let bankRulesService: any;
   let service: BankStatementImportService;
 
   const mockBankAccount = { id: BANK_ACCOUNT_ID, organizationId: ORG_1 };
@@ -582,13 +583,13 @@ describe('BankStatementImportService', () => {
       const findManyCalls = prisma.bankTransaction.findMany.mock.calls;
       const createManyCalls = prisma.bankTransaction.createMany.mock.calls;
 
-      findFirstCalls.forEach((call) => {
+      findFirstCalls.forEach((call: any) => {
         expect(call[0].where.organizationId).toBe(ORG_1);
       });
-      findManyCalls.forEach((call) => {
+      findManyCalls.forEach((call: any) => {
         expect(call[0].where.organizationId).toBe(ORG_1);
       });
-      createManyCalls.forEach((call) => {
+      createManyCalls.forEach((call: any) => {
         call[0].data.forEach((d: any) => {
           expect(d.organizationId).toBe(ORG_1);
         });
