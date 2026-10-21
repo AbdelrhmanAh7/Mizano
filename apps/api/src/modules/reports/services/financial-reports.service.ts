@@ -618,19 +618,16 @@ export class FinancialReportsService {
   }
 
   /**
-   * The account, scoped to the caller's organization. A foreign or unknown id is the same 404,
-   * so a caller cannot tell another tenant's account from one that does not exist.
+   * Asserts the account belongs to the caller's organization. Throws NotFoundException
+   * if the account does not exist or belongs to another tenant (#223).
+   * Return type is Promise<void> conforming to assertion contract.
    */
-  async assertAccountOwnership(
-    organizationId: string,
-    accountId: string,
-  ): Promise<GeneralLedgerReport['account']> {
+  async assertAccountOwnership(organizationId: string, accountId: string): Promise<void> {
     const account = await this.prisma.account.findFirst({
       where: { id: accountId, organizationId },
-      select: { id: true, code: true, name: true, type: true },
+      select: { id: true },
     });
     if (!account) throw new NotFoundException('Account not found');
-    return account;
   }
 
   async getGeneralLedger(
@@ -639,10 +636,14 @@ export class FinancialReportsService {
     startDate?: string,
     endDate?: string,
   ): Promise<GeneralLedgerReport> {
-    const account = await this.assertAccountOwnership(organizationId, accountId);
+    await this.assertAccountOwnership(organizationId, accountId);
 
     const period = resolvePeriod(startDate, endDate);
-    const [currencyCode, prior, lines] = await Promise.all([
+    const [account, currencyCode, prior, lines] = await Promise.all([
+      this.prisma.account.findFirst({
+        where: { id: accountId, organizationId },
+        select: { id: true, code: true, name: true, type: true },
+      }),
       getBaseCurrency(this.prisma, organizationId),
       sumPostedLinesByAccount(this.prisma, organizationId, { lt: period.start }, [accountId]),
       this.prisma.journalLine.findMany({
@@ -672,6 +673,7 @@ export class FinancialReportsService {
         ],
       }),
     ]);
+    if (!account) throw new NotFoundException('Account not found');
 
     const openingBalance = this.naturalValue(account, prior.get(accountId));
     let running = openingBalance;

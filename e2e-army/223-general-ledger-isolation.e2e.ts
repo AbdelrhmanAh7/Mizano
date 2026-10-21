@@ -1,7 +1,11 @@
 import { test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 
-const ADMIN = { email: 'admin@mizano.com', password: 'password123' };
+// Seed admin credentials read from environment variables with fallback to demo seed
+const ADMIN = {
+  email: process.env.E2E_ADMIN_EMAIL ?? 'admin@mizano.com',
+  password: process.env.E2E_ADMIN_PASSWORD ?? 'password123',
+};
 const FOREIGN_ACCOUNT_ID = 'army-223-foreign-account';
 
 function apiBase(baseUrl: string): string {

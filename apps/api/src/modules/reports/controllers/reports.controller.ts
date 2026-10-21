@@ -502,10 +502,13 @@ export class ReportsController {
 
   @Get('general-ledger/:accountId')
   @Permissions('reports.view')
+  // Cache key derivation in CacheResponseInterceptor scopes entries to org:{organizationId}:{prefix}:{queryHash}
+  // where queryHash incorporates both request.query and request.params (including accountId).
+  // Tenant isolation is preserved as cache hits are partitioned per organizationId (#223).
   @CacheResponse('reports:general-ledger')
   @CacheTTL(600)
   @ApiOperation({ summary: 'Get General Ledger for account' })
-  async getGeneralLedger(
+  public async getGeneralLedger(
     @CurrentOrg() orgId: string,
     @Param('accountId') accountId: string,
     @Query('startDate') startDate?: string,

@@ -129,11 +129,10 @@ describe('FinancialReportsService', () => {
   });
 
   describe('assertAccountOwnership (#223)', () => {
-    it('looks the account up scoped to the caller organization and returns it', async () => {
-      prisma.account.findFirst.mockResolvedValue(ACCOUNTS[0] as never);
-      await expect(service.assertAccountOwnership(ORG_ID, 'acc-cash')).resolves.toEqual(
-        ACCOUNTS[0],
-      );
+    it('asserts the account belongs to the caller organization and returns Promise<void>', async () => {
+      prisma.account.findFirst.mockResolvedValue({ id: 'acc-cash' } as never);
+      const res = await service.assertAccountOwnership(ORG_ID, 'acc-cash');
+      expect(res).toBeUndefined();
       expect(prisma.account.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'acc-cash', organizationId: ORG_ID } }),
       );

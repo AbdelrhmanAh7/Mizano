@@ -50,8 +50,12 @@ describe('ReportsController - general ledger wiring (@issue-223)', () => {
     ).toEqual(['reports.view']);
   });
 
+  it('declares getGeneralLedger as an async method on ReportsController', () => {
+    expect(ReportsController.prototype.getGeneralLedger.constructor.name).toBe('AsyncFunction');
+  });
+
   it('checks account ownership for the caller organization before building the ledger', async () => {
-    financialReportsService.assertAccountOwnership.mockResolvedValue({ id: 'acc-own' });
+    financialReportsService.assertAccountOwnership.mockResolvedValue(undefined);
     const res = await controller.getGeneralLedger('org-a', 'acc-own', '2026-01-01', '2026-01-31');
     expect(res).toBe(mockReport);
     expect(financialReportsService.assertAccountOwnership).toHaveBeenCalledWith('org-a', 'acc-own');
