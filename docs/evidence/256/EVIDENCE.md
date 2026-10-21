@@ -24,14 +24,14 @@
 
 ## CodeRabbit Review Findings Addressed
 
-| Finding                             | Location     | Resolution                                                                                                  | Verified |
-| ----------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------- | -------- |
-| Position could be undefined         | Line 681     | PDF rendering already guards with `if (data.employee.position)`; interface allows optional                  | ✅       |
-| jobTitle not in employee type       | Line 681     | Stale comment - `jobTitle` exists in `Employee` type (`packages/shared-types/src/entities/hr.ts:17`)        | ✅       |
-| taxes not in payslip type           | Line 645     | Stale comment - `taxes` exists in `Payslip` type (`packages/shared-types/src/entities/hr.ts:130`)           | ✅       |
-| totalDeductions not in payslip type | Line 653     | Stale comment - `totalDeductions` exists in `Payslip` type (`packages/shared-types/src/entities/hr.ts:129`) | ✅       |
-| totalDeductions could be negative   | Line 654-655 | Fixed: `calculatedTotal.isNegative() ? new Prisma.Decimal(0) : calculatedTotal`                             | ✅       |
-| Double "Other Deductions" row       | Line 657-662 | Fixed: exclude `otherDeductions` from display lines, include in reconciliation base                         | ✅       |
+| Finding                             | Location              | Resolution                                                                                                  | Verified |
+| ----------------------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------- | -------- |
+| Position could be undefined         | Line 696              | PDF rendering already guards with `if (data.employee.position)`; interface allows optional                  | ✅       |
+| jobTitle not in employee type       | Line 696              | Stale comment - `jobTitle` exists in `Employee` type (`packages/shared-types/src/entities/hr.ts:17`)        | ✅       |
+| taxes not in payslip type           | Line 653              | Stale comment - `taxes` exists in `Payslip` type (`packages/shared-types/src/entities/hr.ts:130`)           | ✅       |
+| totalDeductions not in payslip type | Line 663              | Stale comment - `totalDeductions` exists in `Payslip` type (`packages/shared-types/src/entities/hr.ts:129`) | ✅       |
+| totalDeductions could be negative   | Line 664-670          | Fixed: `calculatedTotal.isNegative() ? new Prisma.Decimal(0) : calculatedTotal`                             | ✅       |
+| Double "Other Deductions" row       | Line 636-643, 671-678 | Fixed: exclude `otherDeductions` from display lines, include in reconciliation base                         | ✅       |
 
 ## Test Results Summary
 
@@ -57,7 +57,7 @@ Exit Code: 0 (no errors)
 
 ## Commit SHA
 
-`HEAD` (branch `ai/256`)
+`8740895ea08aef739c65d95a92d27de7b73fb5e9` (branch `ai/256`)
 
 ## Verification Commands Run
 
