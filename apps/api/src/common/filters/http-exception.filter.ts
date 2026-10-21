@@ -15,7 +15,7 @@ import { LoggerService } from '../../modules/logger/logger.service';
 import { LogLevel, LogSource } from '@mizano/shared-types';
 import { describeError, redactText, redactUrl, sanitizeStack } from '../utils/redact';
 
-interface ErrorResponse {
+export interface ErrorResponse {
   statusCode: number;
   code?: string;
   message: string;
@@ -73,9 +73,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       const isProduction = process.env.NODE_ENV === 'production';
       return {
         statusCode: HttpStatus.BAD_REQUEST,
-        code: 'PRISMA_VALIDATION_ERROR',
-        message: 'Database validation error',
-        error: 'Validation Error',
+        code: 'VALIDATION_ERROR',
+        message: 'Validation Failed',
+        error: 'Bad Request',
         details: isProduction
           ? undefined
           : { prismaError: exception.message.split('\n').slice(-2).join(' ').trim() },
@@ -201,25 +201,54 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const exceptionResponse = exception.getResponse();
 
     let message: string = exception.message;
-    let error: string = 'Error';
+    // Fallback error for 401 is 'Unauthorized' when the exception response specifies no error field.
+    const fallbackError = status === HttpStatus.UNAUTHORIZED ? 'Unauthorized' : 'Error';
+    let error: string = fallbackError;
     let details: Record<string, unknown> | undefined;
     let code: string | undefined;
 
     if (typeof exceptionResponse === 'object') {
       const responseObj = exceptionResponse as Record<string, unknown>;
       message = (responseObj.message as string) || exception.message;
-      error = (responseObj.error as string) || 'Error';
+      error = (responseObj.error as string) || fallbackError;
       code = responseObj.code as string | undefined;
       details = responseObj.details as Record<string, unknown> | undefined;
 
-      // Handle validation errors from class-validator
-      if (Array.isArray(responseObj.message)) {
-        details = this.formatValidationErrors(responseObj.message);
-        message = 'Validation failed';
+      // Handle validation errors from class-validator or explicit validation rejections
+      const isValidationError =
+        status === HttpStatus.BAD_REQUEST &&
+        (Array.isArray(responseObj.message) ||
+          code === 'VALIDATION_ERROR' ||
+          responseObj.code === 'VALIDATION_ERROR' ||
+          (typeof message === 'string' &&
+            (message.toLowerCase() === 'validation failed' ||
+              message.toLowerCase() === 'validation error')) ||
+          (typeof responseObj.message === 'string' &&
+            (responseObj.message.toLowerCase() === 'validation failed' ||
+              responseObj.message.toLowerCase() === 'validation error')));
+
+      if (isValidationError) {
+        if (Array.isArray(responseObj.message)) {
+          details = this.formatValidationErrors(responseObj.message);
+        } else if (responseObj.errors && typeof responseObj.errors === 'object') {
+          // Limit errors field mapping strictly to validation errors only
+          details = responseObj.errors as Record<string, unknown>;
+        }
+        message = 'Validation Failed';
         code = 'VALIDATION_ERROR';
+        error = (responseObj.error as string) || 'Bad Request';
       }
     } else if (typeof exceptionResponse === 'string') {
       message = exceptionResponse;
+      if (
+        status === HttpStatus.BAD_REQUEST &&
+        (message.toLowerCase() === 'validation failed' ||
+          message.toLowerCase() === 'validation error')
+      ) {
+        message = 'Validation Failed';
+        code = 'VALIDATION_ERROR';
+        error = 'Bad Request';
+      }
     }
 
     return {
@@ -238,9 +267,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const formatted: Record<string, string[]> = {};
 
     for (const error of errors) {
-      // Try to extract field name from validation error
+      // Try to extract field name from validation error and normalize initial letter to lowercase
       const match = error.match(/^(\w+)/);
-      const field = match ? match[1] : 'general';
+      const field = match ? match[1].charAt(0).toLowerCase() + match[1].slice(1) : 'general';
 
       if (!formatted[field]) {
         formatted[field] = [];

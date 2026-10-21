@@ -20,6 +20,7 @@ describe('AuthService refresh rotation', () => {
 
   const prisma = {
     user: {
+      findFirst: jest.fn(() => Promise.resolve(null)),
       findUnique: jest.fn(({ where }: { where: { id: string } }) =>
         Promise.resolve(users.has(where.id) ? { ...users.get(where.id) } : null),
       ),
@@ -118,5 +119,39 @@ describe('AuthService refresh rotation', () => {
     await seed('a');
     await expect(service.refreshTokens('zzz', 'x')).rejects.toBeInstanceOf(UnauthorizedException);
     await expect(service.refreshTokens('a', 'wrong')).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('rejects unknown login credentials with 401 Unauthorized', async () => {
+    try {
+      await service.login({ email: 'unknown@x.test', password: 'Password123' });
+      throw new Error('expected login to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(UnauthorizedException);
+      expect((error as UnauthorizedException).getResponse()).toEqual({
+        statusCode: 401,
+        message: 'Invalid email or password',
+        error: 'Unauthorized',
+      });
+    }
+  });
+
+  it('rejects missing or null credentials with VALIDATION_ERROR and Validation Failed', async () => {
+    await expect(service.login(null as never)).rejects.toMatchObject({
+      response: {
+        statusCode: 400,
+        code: 'VALIDATION_ERROR',
+        message: 'Validation Failed',
+        error: 'Bad Request',
+      },
+    });
+
+    await expect(service.register(null as never)).rejects.toMatchObject({
+      response: {
+        statusCode: 400,
+        code: 'VALIDATION_ERROR',
+        message: 'Validation Failed',
+        error: 'Bad Request',
+      },
+    });
   });
 });

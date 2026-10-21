@@ -1,4 +1,10 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  BadRequestException,
+  HttpStatus,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomUUID, timingSafeEqual } from 'crypto';
@@ -31,6 +37,14 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto) {
+    if (!registerDto || !registerDto.email || !registerDto.password) {
+      throw new BadRequestException({
+        statusCode: HttpStatus.BAD_REQUEST,
+        code: 'VALIDATION_ERROR',
+        message: 'Validation Failed',
+        error: 'Bad Request',
+      });
+    }
     const { email, password, firstName, lastName, organizationName } = registerDto;
     const name = `${firstName} ${lastName}`;
 
@@ -129,6 +143,14 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto) {
+    if (!loginDto || !loginDto.email || !loginDto.password) {
+      throw new BadRequestException({
+        statusCode: HttpStatus.BAD_REQUEST,
+        code: 'VALIDATION_ERROR',
+        message: 'Validation Failed',
+        error: 'Bad Request',
+      });
+    }
     const { email, password } = loginDto;
 
     // Find user
@@ -143,17 +165,29 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException({
+        statusCode: HttpStatus.UNAUTHORIZED,
+        message: 'Invalid email or password',
+        error: 'Unauthorized',
+      });
     }
 
     if (user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('Account is not active');
+      throw new UnauthorizedException({
+        statusCode: HttpStatus.UNAUTHORIZED,
+        message: 'Account is not active',
+        error: 'Unauthorized',
+      });
     }
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException({
+        statusCode: HttpStatus.UNAUTHORIZED,
+        message: 'Invalid email or password',
+        error: 'Unauthorized',
+      });
     }
 
     // Generate tokens
@@ -207,12 +241,20 @@ export class AuthService {
     });
 
     if (!user || !user.refreshToken || user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('Access denied');
+      throw new UnauthorizedException({
+        statusCode: HttpStatus.UNAUTHORIZED,
+        message: 'Access denied',
+        error: 'Unauthorized',
+      });
     }
 
     const isRefreshTokenValid = refreshTokenMatches(refreshToken, user.refreshToken);
     if (!isRefreshTokenValid) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException({
+        statusCode: HttpStatus.UNAUTHORIZED,
+        message: 'Invalid refresh token',
+        error: 'Unauthorized',
+      });
     }
 
     // Generate new tokens
@@ -231,7 +273,11 @@ export class AuthService {
       data: { refreshToken: hashRefreshToken(tokens.refreshToken) },
     });
     if (rotated.count !== 1) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException({
+        statusCode: HttpStatus.UNAUTHORIZED,
+        message: 'Invalid refresh token',
+        error: 'Unauthorized',
+      });
     }
 
     return { tokens };
