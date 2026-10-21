@@ -3,7 +3,7 @@
 ## Overview
 
 - **Issue**: #287 (fix: EVIDENCE.md: the cited commits and test output cannot be checked against this diff; split from #263, parent #167)
-- **Base commit**: `d84134508a3f851a5274590048c4eff7197e7a7d` (`origin/master`)
+- **Base commit**: `6679bfe2bbb2679a8c107b7ddffa4fb6529a85ff` (`origin/master`)
 - **Tested code SHA**: `f5003bd811d7eb6b5df9468962629ef71bc9d494`
 - **Tested head**: `f5003bd811d7eb6b5df9468962629ef71bc9d494`
 - **Branch**: `ai/287`
@@ -28,7 +28,7 @@
 
 ### 1. Regression Test on Base (Unpatched master)
 
-The test file `apps/web/lib/hooks/use-manufacturing.spec.ts` (staged spec blob SHA `e79825582b6b28ec36efc3853453cd26b43507ba`) was staged onto the unpatched base commit (`origin/master` at `d84134508a3f851a5274590048c4eff7197e7a7d`) to run against master's implementation:
+The test file `apps/web/lib/hooks/use-manufacturing.spec.ts` (staged spec blob SHA `e79825582b6b28ec36efc3853453cd26b43507ba`) was staged onto the unpatched base commit (`origin/master` at `6679bfe2bbb2679a8c107b7ddffa4fb6529a85ff`) to run against master's implementation:
 
 ```bash
 # Staged use-manufacturing.spec.ts onto origin/master and executed:
