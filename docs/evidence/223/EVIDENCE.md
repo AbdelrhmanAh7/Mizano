@@ -5,7 +5,7 @@
 - **Issue**: #223 (Add general ledger endpoint isolation tests — Part 1/3 of #108)
 - **PR**: #227
 - **Base**: `origin/master` (`e5d9b805e717a6c9367f05566373b526615b6d19`)
-- **Tested Head**: `65403e6593ebbead61f875323a78bc579b691ea4` (the only later commit is this file)
+- **Tested Head**: `f84f36bf98e8d1d4000e560216312a72ef7065c9`
 - **Originating Sentry issue**: None (multi-tenant tenant isolation and authorization hardening)
 - **User-facing flow / E2E**: Backend report endpoint isolation verified via dedicated E2E isolation spec at `apps/api/test/general-ledger.isolation-spec.ts`, regression spec at `apps/api/test/reports.e2e-spec.ts`, and e2e-army test at `e2e-army/223-general-ledger-isolation.e2e.ts`.
 - **Changed covering tests**:
@@ -27,17 +27,17 @@
 
 ## Verification Matrix
 
-| AC ID   | Requirement Description                               | Verification Method / Command                                                                                                                           | Observed Result                                                                                                          | Exit Code | Status     |
-| :------ | :---------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------- | :-------- | :--------- |
-| **AC1** | Owner access: HTTP 200 and entries array              | `pnpm --filter api exec jest test/general-ledger.isolation-spec.ts`                                                                                     | 2/2 AC1 tests pass; returns HTTP 200, account id match, entries array with debits, account present in trial balance      | 0         | **PASSED** |
-| **AC2** | Cross-tenant isolation: HTTP 404 for foreign account  | `pnpm --filter api exec jest test/general-ledger.isolation-spec.ts`                                                                                     | 3/3 AC2 tests pass; returns HTTP 404 for foreign account, 404 for non-existent account, excluded from trial balance list | 0         | **PASSED** |
-| **AC3** | Token validation: HTTP 401 for invalid/missing tokens | `pnpm --filter api exec jest test/general-ledger.isolation-spec.ts`                                                                                     | 1/1 AC3 tests pass; returns HTTP 401 for null token, malformed token string, and token signed with invalid JWT secret    | 0         | **PASSED** |
-| —       | Controller & Service Unit Specifications              | `pnpm --filter api exec jest src/modules/reports/controllers/reports.controller.spec.ts src/modules/reports/services/financial-reports.service.spec.ts` | 10/10 tests pass across 2 test suites; verifies route guards, permissions, and `assertAccountOwnership` tenant scoping   | 0         | **PASSED** |
-| —       | E2E Reports Regression Suite                          | `pnpm --filter api exec jest test/reports.e2e-spec.ts`                                                                                                  | 16/16 tests pass; verifies tenant B sees none of tenant A's figures and invalid/anonymous callers receive 401            | 0         | **PASSED** |
-| —       | Monorepo Type Check                                   | `pnpm type-check`                                                                                                                                       | 6/6 packages clean (`@mizano/shared-types`, `@mizano/validators`, `@mizano/web`, `api` including `tsconfig.e2e.json`)    | 0         | **PASSED** |
-| —       | API Code Linting                                      | `pnpm --filter api lint`                                                                                                                                | 0 errors, 0 warnings across all TypeScript files                                                                         | 0         | **PASSED** |
-| —       | E2E-Army Test Hygiene                                 | `python3 scripts/test_e2e_army_hygiene.py`                                                                                                              | 11/11 unit and file tests pass; no bare imports or duplicate shims                                                       | 0         | **PASSED** |
-| —       | Evidence Freshness & Contract Validation              | `python3 scripts/test_evidence_freshness.py`                                                                                                            | 10/10 tests pass; validated SHA binding, evidence table status parsing, and no stale exclusivity claims                  | 0         | **PASSED** |
+| AC ID   | Requirement Description                               | Verification Method / Command                                                                                                                           | Observed Result                                                                                                                           | Exit Code | Status     |
+| :------ | :---------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------ | :---------------------------------------------------------------------------------------------------------------------------------------- | :-------- | :--------- |
+| **AC1** | Owner access: HTTP 200 and entries array              | `pnpm --filter api exec jest test/general-ledger.isolation-spec.ts`                                                                                     | 2/2 AC1 tests pass; returns HTTP 200, account id match, entries array with debits, account present in trial balance                       | 0         | **PASSED** |
+| **AC2** | Cross-tenant isolation: HTTP 404 for foreign account  | `pnpm --filter api exec jest test/general-ledger.isolation-spec.ts`                                                                                     | 3/3 AC2 tests pass; returns HTTP 404 for foreign account, 404 for non-existent account, excluded from trial balance list                  | 0         | **PASSED** |
+| **AC3** | Token validation: HTTP 401 for invalid/missing tokens | `pnpm --filter api exec jest test/general-ledger.isolation-spec.ts`                                                                                     | 1/1 AC3 tests pass; returns HTTP 401 for null token, malformed token string, and token signed with invalid JWT secret                     | 0         | **PASSED** |
+| —       | Controller & Service Unit Specifications              | `pnpm --filter api exec jest src/modules/reports/controllers/reports.controller.spec.ts src/modules/reports/services/financial-reports.service.spec.ts` | 11/11 tests pass across 2 test suites; verifies route guards, permissions, async declaration, and `assertAccountOwnership` tenant scoping | 0         | **PASSED** |
+| —       | E2E Reports Regression Suite                          | `pnpm --filter api exec jest test/reports.e2e-spec.ts`                                                                                                  | 16/16 tests pass; verifies tenant B sees none of tenant A's figures and invalid/anonymous callers receive 401                             | 0         | **PASSED** |
+| —       | Monorepo Type Check                                   | `pnpm type-check`                                                                                                                                       | 6/6 packages clean (`@mizano/shared-types`, `@mizano/validators`, `@mizano/web`, `api` including `tsconfig.e2e.json`)                     | 0         | **PASSED** |
+| —       | API Code Linting                                      | `pnpm --filter api lint`                                                                                                                                | 0 errors, 0 warnings across all TypeScript files                                                                                          | 0         | **PASSED** |
+| —       | E2E-Army Test Hygiene                                 | `python3 scripts/test_e2e_army_hygiene.py`                                                                                                              | 11/11 unit and file tests pass; no bare imports or duplicate shims                                                                        | 0         | **PASSED** |
+| —       | Evidence Freshness & Contract Validation              | `python3 scripts/test_evidence_freshness.py`                                                                                                            | 10/10 tests pass; validated SHA binding, evidence table status parsing, and no stale exclusivity claims                                   | 0         | **PASSED** |
 
 ---
 
@@ -196,9 +196,9 @@ PASS src/modules/reports/services/financial-reports.service.spec.ts
 PASS src/modules/reports/controllers/reports.controller.spec.ts
 
 Test Suites: 2 passed, 2 total
-Tests:       10 passed, 10 total
+Tests:       11 passed, 11 total
 Snapshots:   0 total
-Time:        3.27 s, estimated 4 s
+Time:        3.828 s, estimated 4 s
 Ran all test suites matching /src\/modules\/reports\/controllers\/reports.controller.spec.ts|src\/modules\/reports\/services\/financial-reports.service.spec.ts/i.
 ```
 
@@ -318,3 +318,33 @@ Per manager re-path instructions:
 3. `apps/web/app/[locale]/(dashboard)/reports/general-ledger/page.tsx`: Reverted general-ledger Link import.
 
 Both CORS interoperability and login toast test runner expectations have been recorded in `AI_QUESTIONS.md` as separate follow-up issues.
+
+---
+
+## Review Findings Resolution (Round 3 on Head 6e3b179)
+
+### 1. `apps/api/src/modules/reports/controllers/reports.controller.ts:508`
+
+- **Finding**: The `getGeneralLedger` method is missing the 'async' keyword in its signature despite being marked as async and using await.
+- **Root Cause & Fix**: Method signature explicitly declared `public async getGeneralLedger(...)` at [reports.controller.ts:509](file:///Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-223/apps/api/src/modules/reports/controllers/reports.controller.ts#L509).
+- **Covering Test**: Added unit test at [reports.controller.spec.ts:53](file:///Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-223/apps/api/src/modules/reports/controllers/reports.controller.spec.ts#L53) explicitly proving `ReportsController.prototype.getGeneralLedger.constructor.name === 'AsyncFunction'`.
+
+### 2. `apps/api/src/modules/reports/services/financial-reports.service.ts:625`
+
+- **Finding**: The `assertAccountOwnership` method's return type annotation should be `Promise<void>` since it throws `NotFoundException` when account not found, violating the contract of returning account data.
+- **Root Cause & Fix**: Changed return type annotation to `Promise<void>` at [financial-reports.service.ts:625](file:///Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-223/apps/api/src/modules/reports/services/financial-reports.service.ts#L625), selecting only `{ id: true }` and returning void upon successful ownership assertion. In `getGeneralLedger`, account retrieval is performed in parallel via `Promise.all` alongside currency and prior totals.
+- **Covering Test**: Updated unit test at [financial-reports.service.spec.ts:132](file:///Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-223/apps/api/src/modules/reports/services/financial-reports.service.spec.ts#L132) asserting that `service.assertAccountOwnership(ORG_ID, 'acc-cash')` resolves `undefined` (`Promise<void>`).
+
+### 3. `apps/api/src/modules/reports/controllers/reports.controller.ts:505` (Non-blocking)
+
+- **Finding**: Confirm the `@CacheResponse('reports:general-ledger')` interceptor's key derivation ensures tenant isolation.
+- **Analysis & Documentation**: In `apps/api/src/common/interceptors/cache-response.interceptor.ts`, cache keys are derived as `org:{organizationId}:{prefix}:{queryHash}` where `organizationId` is taken from `request.user?.organizationId` and `queryHash` hashes both `request.query` and `request.params` (which includes `accountId`). Therefore, cached general ledger responses are strictly partitioned per tenant organization. Documented in code at [reports.controller.ts:505](file:///Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-223/apps/api/src/modules/reports/controllers/reports.controller.ts#L505).
+
+### 4. `e2e-army/223-general-ledger-isolation.e2e.ts:4` (Non-blocking)
+
+- **Finding**: Hardcoded seed login `admin@mizano.com` / `password123`. Confirm demo/test seed account or read from E2E env var.
+- **Fix**: Configured `ADMIN` credentials to read from `process.env.E2E_ADMIN_EMAIL` and `process.env.E2E_ADMIN_PASSWORD` with fallback to demo seed at [223-general-ledger-isolation.e2e.ts:4](file:///Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-223/e2e-army/223-general-ledger-isolation.e2e.ts#L4).
+
+### 5. Tested SHA Binding
+
+- All test results and verification matrix entries are bound to commit `f84f36bf98e8d1d4000e560216312a72ef7065c9`.
