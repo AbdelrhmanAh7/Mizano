@@ -162,7 +162,7 @@ Zero-tolerance policy: `pnpm ci:full` must pass with no warnings or errors (no `
 
 ## Deployment
 
-**Production today** is the Mac mini: the Thoth hub serves immutable release directories (web 5001 → tailnet :8446, API 6001) through launchd; deploys are the hub's release job, not a GitHub workflow. The former GCP pipeline (`deploy.yml`) and Raspberry Pi deployment scripts (`deploy/pi/scripts/`, `deploy/pi/systemd/`) were retired (owner, 2026-10-10: all projects moved off the Pi) and live on in git history and tag `archive/pre-slimdown-2026-10-10`. The `deploy/pi/README.md` is retained for reference.
+**Production today** is the Mac mini: the Thoth hub serves immutable release directories (web 5001 → tailnet :8446, API 6001) through launchd; deploys are the hub's release job, not a GitHub workflow. The former GCP pipeline (`deploy.yml`) and Raspberry Pi deployment assets were retired (owner, 2026-10-10: all projects moved off the Pi) and live on in git history and tag `archive/pre-slimdown-2026-10-10`, while `deploy/pi/README.md` remains retained in the repository for reference.
 
 **Production stack** (`docker-compose.production.yml`): `api` (6001), `web` (5001, standalone Next.js), `postgres` (5432), `redis` (6379, AOF), `nginx` (80/443 using `nginx/nginx.conf`) and optional `certbot` (`--profile with-nginx`). Manual equivalent: `pnpm docker:prod` with `.env.prod`; stop with `pnpm docker:prod:down`.
 

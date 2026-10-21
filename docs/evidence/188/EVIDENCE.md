@@ -52,7 +52,7 @@
   2. Stale GCP VM deployment pipeline (`.github/workflows/deploy.yml`) removed from `docs/DEVELOPMENT.md`, matching the Mac mini production target.
   3. Stale planning-tools description updated to offline tests (`scripts/test_*.py`).
   4. Unit Tests job description updated to reflect mock-only execution (no service containers).
-- **Verification**: Verified text in [`docs/DEVELOPMENT.md`](../../DEVELOPMENT.md) lines 10, 114, 149, 163-188.
+- **Verification**: Verified the [testing](../../DEVELOPMENT.md#testing), [CI](../../DEVELOPMENT.md#ci), and [deployment](../../DEVELOPMENT.md#deployment) sections in [DEVELOPMENT.md](../../DEVELOPMENT.md).
 - **Observed Exit Code**: 0
 
 ### AC4 — `batch-processor.util` Unit Test Passing
@@ -156,8 +156,8 @@
 
 ### 3. Investigation of Verify Bot Login 401 Finding
 
-- **Reported Issue**: Verification run failed with 401 Unauthorized attempting to log in with `demo@example.com` / `password`.
-- **Finding**: `demo@example.com` is not a seeded user in Mizano. As defined in `apps/api/prisma/seed.ts:816-821` and the repo guidelines, seeded credentials are:
-  - Admin: `admin@mizano.com` / `[password in seed fixture]`
-  - Other users: `manager@mizano.com`, `accountant@mizano.com`, `sales@mizano.com`, `storekeeper@mizano.com`, `hr@mizano.com` / `[password in seed fixture]`
+- **Reported Issue**: Verification run failed with 401 Unauthorized attempting to log in with unseeded user `demo@example.com` (using unseeded credentials).
+- **Finding**: `demo@example.com` is not a seeded user in Mizano. As defined in `apps/api/prisma/seed.ts:816-821` and the repo guidelines, seeded accounts are:
+  - Admin: `admin@mizano.com` (credentials in seed fixture)
+  - Other users: `manager@mizano.com`, `accountant@mizano.com`, `sales@mizano.com`, `storekeeper@mizano.com`, `hr@mizano.com` (credentials in seed fixture)
 - No authentication logic or credentials were changed by this PR (chore slim-down).
