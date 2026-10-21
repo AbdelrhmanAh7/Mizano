@@ -147,7 +147,7 @@ Rules:
 Checks on PRs and pushes to `master`, by source:
 
 - **`.github/workflows/ci.yml` (GitHub-hosted runners):** runs on pushes to `master` and on PRs to `master`/`develop`, on GitHub-hosted runners only (`ubuntu-latest`; free and unlimited because the repository is public; no self-hosted labels, no secrets beyond `GITHUB_TOKEN`). Four independent parallel jobs, each limited to 5 minutes (`timeout-minutes: 5`; split a job rather than raising the limit): **Install Dependencies** (pnpm 8, Node 20, `prisma generate`), **Lint & Type Check**, **Unit Tests** (mock-only: unit tests mock Prisma and Redis with no external services) and **Build**. Their names are the check names the automerge gates wait for, so keep them stable. A newer push to a PR cancels its older run. The workflow uses `pull_request` (never `pull_request_target`); whether fork PRs need approval before running depends on the repository or organization GitHub Actions policy (by default, approval is required for first-time contributors). E2E is not part of this workflow. The old `deploy.yml` (GCP VM), `ai-implementers.yml` (replaced by the hub) and `demo-planning.yml` workflows were removed in the 2026-10 slim-down ([slimdown-plan.md](slimdown-plan.md)); they remain in git history and in tag `archive/pre-slimdown-2026-10-10`.
-- **Hub `localci` job (Mac mini):** runs the full CI (`pnpm ci:full`: lint, type-check, test, build) locally and posts GitHub commit statuses under the same job names, so the gates see the same check names whichever runner produced them.
+- **Hub `localci` job (Mac mini):** runs the full CI (`pnpm ci:full`: lint, type-check, and tests) locally and posts GitHub commit statuses under the same job names, so the gates see the same check names whichever runner produced them. `pnpm build` runs separately.
 - **`e2e-army` status (hub verify suite):** feature-level E2E for the features a PR touches, run by the hub against a throwaway environment; it is a separate commit status, not a job in `ci.yml`.
 - **Local pre-push hook:** only fast checks (`turbo run type-check test --filter=...[<base>]`, see Git workflow below); full CI, build and E2E are left to the sources above.
 
@@ -162,7 +162,7 @@ Zero-tolerance policy: `pnpm ci:full` must pass with no warnings or errors (no `
 
 ## Deployment
 
-**Production today** is the Mac mini: the Thoth hub serves immutable release directories (web 5001 → tailnet :8446, API 6001) through launchd; deploys are the hub's release job, not a GitHub workflow. The former GCP pipeline (`deploy.yml`) and Raspberry Pi deployment (`deploy/pi/`) were retired (owner, 2026-10-10: all projects moved off the Pi) and live on in git history and tag `archive/pre-slimdown-2026-10-10`.
+**Production today** is the Mac mini: the Thoth hub serves immutable release directories (web 5001 → tailnet :8446, API 6001) through launchd; deploys are the hub's release job, not a GitHub workflow. The former GCP pipeline (`deploy.yml`) and Raspberry Pi deployment scripts (`deploy/pi/scripts/`, `deploy/pi/systemd/`) were retired (owner, 2026-10-10: all projects moved off the Pi) and live on in git history and tag `archive/pre-slimdown-2026-10-10`. The `deploy/pi/README.md` is retained for reference.
 
 **Production stack** (`docker-compose.production.yml`): `api` (6001), `web` (5001, standalone Next.js), `postgres` (5432), `redis` (6379, AOF), `nginx` (80/443 using `nginx/nginx.conf`) and optional `certbot` (`--profile with-nginx`). Manual equivalent: `pnpm docker:prod` with `.env.prod`; stop with `pnpm docker:prod:down`.
 

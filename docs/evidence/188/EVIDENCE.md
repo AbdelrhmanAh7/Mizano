@@ -1,6 +1,6 @@
 # PR #188 Verification Report: Slim-down 1/3 (Dead code, unused deps, Storybook, retired deploy paths)
 
-**Tested commit**: Current branch HEAD on `chore/slim-mz-deadcode`  
+**Tested commit**: `35ff5af6b018644f9ddfbd1dd20aafae043f1982` on `chore/slim-mz-deadcode`  
 **Base**: `origin/master`  
 **Purpose**: Fix open findings on PR #188: pre-push hook rejection (tsc failure TS2307), unresolved merge conflict markers, CodeRabbit review threads on `docs/DEVELOPMENT.md`, and verify test suites.
 
@@ -12,12 +12,14 @@
 
 - **Requirement**: `tsc --noEmit` must pass with exit 0 in `apps/api`, `apps/web`, and all packages with no broken imports or missing type declarations.
 - **Verification Command**:
+
   ```bash
   cd apps/api && pnpm exec tsc --noEmit
   cd ../web && pnpm exec tsc --noEmit
   pnpm --filter @mizano/shared-types run build
   pnpm --filter @mizano/validators run type-check
   ```
+
 - **Observed Exit Code**: 0
 - **Evidence**:
   - `apps/api`: clean, 0 errors
@@ -29,14 +31,18 @@
 
 - **Requirement**: No leftover `<<<<<<< HEAD`, `=======`, or `>>>>>>>` markers anywhere in documentation.
 - **Verification Command**:
+
   ```bash
   python3 -m unittest discover -s scripts -p 'test_no_conflict_markers.py'
   ```
+
 - **Observed Output**:
+
   ```text
   Ran 10 tests in 0.015s
   OK
   ```
+
 - **Observed Exit Code**: 0
 
 ### AC3 — CodeRabbit Review Findings Resolved on `docs/DEVELOPMENT.md`
@@ -46,16 +52,18 @@
   2. Stale GCP VM deployment pipeline (`.github/workflows/deploy.yml`) removed from `docs/DEVELOPMENT.md`, matching the Mac mini production target.
   3. Stale planning-tools description updated to offline tests (`scripts/test_*.py`).
   4. Unit Tests job description updated to reflect mock-only execution (no service containers).
-- **Verification**: Verified text in [`docs/DEVELOPMENT.md`](file:///Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-188/docs/DEVELOPMENT.md) lines 10, 114, 149, 163-188.
+- **Verification**: Verified text in [`docs/DEVELOPMENT.md`](../../DEVELOPMENT.md) lines 10, 114, 149, 163-188.
 - **Observed Exit Code**: 0
 
 ### AC4 — `batch-processor.util` Unit Test Passing
 
 - **Requirement**: `batch-processor.util.ts` restored from master so `batch-processor.util.spec.ts` (added on master in #198/#241) compiles and passes all unit tests.
 - **Verification Command**:
+
   ```bash
   pnpm --filter api exec jest src/modules/ai/utils/batch-processor.util.spec.ts --runInBand
   ```
+
 - **Observed Output**:
 
   ```text
@@ -87,23 +95,30 @@
 
 - **Requirement**: `scripts/test_vision_docs.py` passes all consistency assertions against live milestones.
 - **Verification Command**:
+
   ```bash
   python3 -m unittest discover -s scripts -p 'test_vision_docs.py'
   ```
+
 - **Observed Output**:
+
   ```text
   Ran 4 tests in 0.000s
   OK
   ```
+
 - **Observed Exit Code**: 0
 
-### AC6 — Pi Deploy Worker Gating Spec Passes
+### AC6 — Pi Deploy Worker Gating Spec (Historical Coverage)
 
+- **Note**: This test remains in the tree but targets the retired `deploy.sh` flow and removed systemd units that scheduled `healthcheck.sh`. It is retained as standalone script regression coverage, not as validation of a supported deployment path.
 - **Requirement**: Worker deploy gating tests in `apps/api/src/deploy-worker-gating.spec.ts` pass cleanly.
 - **Verification Command**:
+
   ```bash
   pnpm --filter api exec jest src/deploy-worker-gating.spec.ts --runInBand
   ```
+
 - **Observed Output**:
 
   ```text
@@ -143,6 +158,6 @@
 
 - **Reported Issue**: Verification run failed with 401 Unauthorized attempting to log in with `demo@example.com` / `password`.
 - **Finding**: `demo@example.com` is not a seeded user in Mizano. As defined in `apps/api/prisma/seed.ts:816-821` and the repo guidelines, seeded credentials are:
-  - Admin: `admin@mizano.com` / `password123`
-  - Other users: `manager@mizano.com`, `accountant@mizano.com`, `sales@mizano.com`, `storekeeper@mizano.com`, `hr@mizano.com` / `password123`.
+  - Admin: `admin@mizano.com` / `[password in seed fixture]`
+  - Other users: `manager@mizano.com`, `accountant@mizano.com`, `sales@mizano.com`, `storekeeper@mizano.com`, `hr@mizano.com` / `[password in seed fixture]`
 - No authentication logic or credentials were changed by this PR (chore slim-down).
