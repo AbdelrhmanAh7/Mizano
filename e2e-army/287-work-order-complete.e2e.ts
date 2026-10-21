@@ -32,6 +32,22 @@ async function getWarehouseId(api: string, headers: Record<string, string>): Pro
   return post(api, '/warehouses', headers, { code: `${SEED}-WH`, name: `${SEED}-warehouse` });
 }
 
+async function getInventoryAccountId(api: string, headers: Record<string, string>): Promise<string> {
+  const res = await fetch(`${api}/accounts?limit=500`, { headers });
+  if (res.ok) {
+    const json = (await res.json().catch(() => ({}))) as { data?: Array<{ id?: string; type?: string; name?: string }> };
+    const list = json.data ?? [];
+    const inv = list.find((a) => a.type === 'ASSET' || a.name?.toLowerCase().includes('inventory'));
+    if (inv?.id) return inv.id;
+    if (list.length > 0 && list[0]?.id) return list[0].id;
+  }
+  return post(api, '/accounts', headers, {
+    code: `${SEED}-INV`,
+    name: `${SEED}-inventory`,
+    type: 'ASSET',
+  });
+}
+
 async function getAdjustmentAccountId(api: string, headers: Record<string, string>): Promise<string> {
   const res = await fetch(`${api}/inventory-adjustments/account-options`, { headers });
   if (res.ok) {
@@ -45,7 +61,11 @@ async function getAdjustmentAccountId(api: string, headers: Record<string, strin
     const list = Array.isArray(json) ? json : (json.data ?? []);
     if (list.length > 0 && list[0]?.id) return list[0].id;
   }
-  throw new Error('No account found for inventory adjustment');
+  return post(api, '/accounts', headers, {
+    code: `${SEED}-EXP`,
+    name: `${SEED}-expense`,
+    type: 'EXPENSE',
+  });
 }
 
 // Creates a BOM and a work order through the API and starts it, so the UI can complete it.
@@ -57,18 +77,24 @@ async function createStartedWorkOrder(baseUrl: string): Promise<string> {
     body: JSON.stringify({ email: 'admin@mizano.com', password: 'password123' }),
   });
   expect(login.status, 'POST /auth/login').toBeLessThan(300);
-  const { accessToken } = (await login.json()) as { accessToken?: string };
+  const loginData = (await login.json()) as { accessToken?: string; tokens?: { accessToken?: string } };
+  const accessToken = loginData.tokens?.accessToken ?? loginData.accessToken;
   expect(accessToken, 'accessToken from POST /auth/login').toBeTruthy();
   const headers = { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` };
 
-  const item = (code: string) => ({
-    name: `${SEED}-${code}`,
-    code: `${SEED}-${code}`,
+  const inventoryAccountId = await getInventoryAccountId(api, headers);
+
+  const item = (sku: string) => ({
+    name: `${SEED}-${sku}`,
+    sku: `${SEED}-${sku}`,
     type: 'GOODS',
     unit: 'PCS',
+    sellingPrice: '10.00',
+    costPrice: '5.00',
+    inventoryAccountId,
   });
-  const outputItemId = await post(api, '/inventory/items', headers, item('OUT'));
-  const componentItemId = await post(api, '/inventory/items', headers, item('COMP'));
+  const outputItemId = await post(api, '/items', headers, item('OUT'));
+  const componentItemId = await post(api, '/items', headers, item('COMP'));
 
   // Ensure component has available stock for the BOM requirement (2 * 5 = 10 units)
   const warehouseId = await getWarehouseId(api, headers);
@@ -113,9 +139,13 @@ test(
     await agent.act(
       'click the Complete button and, in the dialog, set Quantity Produced to {qty}',
       {
-        params: { qty: '5' },
+        params: { qty: '0' },
       },
     );
+    await agent.assert('the Complete Production button is disabled');
+    await agent.act('set Quantity Produced to {qty}', {
+      params: { qty: '5' },
+    });
     await agent.act('click Complete Production');
     await agent.assert(
       'the work order is completed and no error toast about a failed request appears',
