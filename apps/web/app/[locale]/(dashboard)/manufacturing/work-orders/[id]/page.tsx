@@ -116,7 +116,7 @@ export default function WorkOrderDetailPage() {
 
   const handleComplete = async () => {
     try {
-      await completeWorkOrder.mutateAsync({ id: workOrderId, producedQuantity });
+      await completeWorkOrder.mutateAsync({ id: workOrderId, quantityProduced: producedQuantity });
       toast({ title: t('workOrders.status.completed') });
       setCompleteDialogOpen(false);
     } catch (error: unknown) {
