@@ -3,9 +3,9 @@
 ## Overview
 
 - **Issue**: #287 (fix: EVIDENCE.md: the cited commits and test output cannot be checked against this diff; split from #263, parent #167)
-- **Base Commit (`origin/master`)**: `230e4ec320129dad77e488933ac5e7b5ff59c1e3`
-- **Tested Code Head**: `f5003bd811d7eb6b5df9468962629ef71bc9d494`
-- **Branch Head**: `f5003bd811d7eb6b5df9468962629ef71bc9d494` (code head tested before docs update)
+- **Base commit**: `d84134508a3f851a5274590048c4eff7197e7a7d` (`origin/master`)
+- **Tested code SHA**: `f5003bd811d7eb6b5df9468962629ef71bc9d494`
+- **Tested head**: `f5003bd811d7eb6b5df9468962629ef71bc9d494`
 - **Branch**: `ai/287`
 - **Supersedes**: part of #263
 - **Originating Sentry Issue**: None (contract naming discrepancy between Next.js client hook and NestJS controller DTO, not an exception reported via Sentry).
@@ -28,7 +28,7 @@
 
 ### 1. Regression Test on Base (Unpatched master)
 
-The test file `apps/web/lib/hooks/use-manufacturing.spec.ts` (staged spec blob SHA `e79825582b6b28ec36efc3853453cd26b43507ba`) was staged onto the unpatched base commit (`origin/master` at `230e4ec320129dad77e488933ac5e7b5ff59c1e3`) to run against master's implementation:
+The test file `apps/web/lib/hooks/use-manufacturing.spec.ts` (staged spec blob SHA `e79825582b6b28ec36efc3853453cd26b43507ba`) was staged onto the unpatched base commit (`origin/master` at `d84134508a3f851a5274590048c4eff7197e7a7d`) to run against master's implementation:
 
 ```bash
 # Staged use-manufacturing.spec.ts onto origin/master and executed:
