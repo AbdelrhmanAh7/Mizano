@@ -21,7 +21,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const ZERO = new Decimal(0);
 
 /** Invoices that are VAT events: issued to the customer and not voided. */
-const TAXABLE_INVOICE_STATUSES: InvoiceStatus[] = [
+export const TAXABLE_INVOICE_STATUSES: InvoiceStatus[] = [
   InvoiceStatus.SENT,
   InvoiceStatus.PARTIALLY_PAID,
   InvoiceStatus.PAID,
@@ -29,7 +29,7 @@ const TAXABLE_INVOICE_STATUSES: InvoiceStatus[] = [
 ];
 
 /** Approved bills (not drafts, not voided). */
-const TAXABLE_BILL_STATUSES: BillStatus[] = [
+export const TAXABLE_BILL_STATUSES: BillStatus[] = [
   BillStatus.OPEN,
   BillStatus.PARTIALLY_PAID,
   BillStatus.PAID,
