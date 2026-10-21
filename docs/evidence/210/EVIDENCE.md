@@ -4,6 +4,7 @@
 
 - **Issue**: #210 (test(api): specs for bank statement import service (#134 follow-up 5/5))
 - **Base**: `origin/master` (merged cleanly into `ai/210`)
+- **Tested commit SHA**: `b233c3d7b37db8755eaae23b0d463d1e40eb3749`
 - **Originating Sentry issue**: None (internal unit test spec suite addition; no linked Sentry issue in brief)
 - **User-facing flow / E2E**: Not user-facing (backend bank statement import service unit testing; test-only change exempt from user-facing e2e requirements).
 - **Changed covering tests**:
