@@ -1,12 +1,12 @@
 # Evidence for Issue #277: Manufacturing: align producedQuantity (web) with quantityProduced (API)
 
 - **Issue**: #277 (fix: qa finding: EVIDENCE.md, split from #263, parent issue #167)
-- **Base commit (`origin/master`)**: `4c006386`
+- **Base commit (`origin/master`)**: `e07f1e3d` (previously `4c006386`, master merged cleanly)
 - **Originating Sentry issue**: None found (contract naming discrepancy between frontend hook and backend controller, not an error originating from Sentry).
 - **Scope & Context**:
   - In PR #263, QA finding `93d3dd86912a` noted that EVIDENCE.md claimed changes in `apps/web/lib/hooks/use-manufacturing.ts`, `apps/web/lib/hooks/use-manufacturing.spec.ts`, and `e2e-army/167-work-order-complete.e2e.ts`, but none of those files appeared in the PR diff.
   - This PR supersedes part of #263 by committing the actual functional fix (`apps/web/lib/hooks/use-manufacturing.ts` sending `quantityProduced`), updating the caller (`apps/web/app/[locale]/(dashboard)/manufacturing/work-orders/[id]/page.tsx`), adding unit tests (`apps/web/lib/hooks/use-manufacturing.spec.ts`), and providing natural-language e2e-army test tagged `@issue-277` and `@issue-167` (`e2e-army/277-work-order-complete.e2e.ts`).
-  - PR #303 CodeRabbit / review finding addressed: deleted the duplicate shim `e2e-army/167-work-order-complete.e2e.ts` to prevent duplicate test registration and parallel worker collision, unified coverage into `e2e-army/277-work-order-complete.e2e.ts` with randomized seed/item codes.
+  - PR #303 CodeRabbit / review finding addressed: deleted the duplicate shim `e2e-army/167-work-order-complete.e2e.ts` to eliminate duplicate test registration and parallel worker collision; unified coverage into `e2e-army/277-work-order-complete.e2e.ts` tagged `@issue-167` with randomized seed/item codes (`RUN_ID`).
 
 ## Acceptance Criteria
 
