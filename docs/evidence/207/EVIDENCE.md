@@ -4,7 +4,7 @@
 
 - **Issue**: #207 (test(api): specs for currency service (base conversion, unrealised FX) — #134 follow-up 2/5)
 - **PR**: #297
-- **Base**: `origin/master` (merged cleanly into `ai/207`)
+- **Base**: `origin/master` (`e07f1e3d7585844a9af23dae48f870087993e4b3`, merged cleanly into `ai/207`)
 - **Originating Sentry issue**: None (pure service spec and tenant-isolation hardening; no linked Sentry issue in brief)
 - **User-facing flow / E2E**: Not user-facing (backend currency calculation and exchange rate service). An API-level `e2e-army` spec is provided at `e2e-army/207-currency-fx-tenant-and-idempotency.e2e.ts`.
 - **Changed covering tests**:
