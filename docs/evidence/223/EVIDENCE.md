@@ -5,50 +5,183 @@
 - **Issue**: #223 (Add general ledger endpoint isolation tests — Part 1/3 of #108)
 - **PR**: #227
 - **Base**: `origin/master` (`e5d9b805e717a6c9367f05566373b526615b6d19`)
-- **Tested Head**: `7b2dd8e1b78d556ce911d17821cab0e0cef0988b`
-- **Originating Sentry issue**: None (pure multi-tenant access control & test coverage requirement)
-- **User-facing flow / E2E**: Backend report isolation with e2e-army gate test at `e2e-army/223-general-ledger-isolation.e2e.ts` and E2E isolation suite at `apps/api/test/general-ledger.isolation-spec.ts`.
+- **Tested Head**: `65403e6593ebbead61f875323a78bc579b691ea4` (the only later commit is this file)
+- **Originating Sentry issue**: None (multi-tenant tenant isolation and authorization hardening)
+- **User-facing flow / E2E**: Backend report endpoint isolation verified via dedicated E2E isolation spec at `apps/api/test/general-ledger.isolation-spec.ts`, regression spec at `apps/api/test/reports.e2e-spec.ts`, and e2e-army test at `e2e-army/223-general-ledger-isolation.e2e.ts`.
 - **Changed covering tests**:
-  - `apps/api/src/modules/reports/controllers/reports.controller.spec.ts` (unit tests for guard & ownership check ordering)
-  - `apps/api/src/modules/reports/services/financial-reports.service.spec.ts` (unit tests for `assertAccountOwnership`)
-  - `apps/api/test/general-ledger.isolation-spec.ts` (end-to-end multi-tenant isolation spec)
-  - `apps/api/test/reports.e2e-spec.ts` (e2e regression suite assertions)
-  - `e2e-army/223-general-ledger-isolation.e2e.ts` (blocking e2e-army gate test)
+  - `apps/api/src/modules/reports/controllers/reports.controller.spec.ts` (unit tests verifying controller guards, permissions, and `assertAccountOwnership` pre-execution)
+  - `apps/api/src/modules/reports/services/financial-reports.service.spec.ts` (unit tests for `assertAccountOwnership` organization scoping and 404 rejection)
+  - `apps/api/test/general-ledger.isolation-spec.ts` (full multi-tenant E2E isolation suite running against PostgreSQL)
+  - `apps/api/test/reports.e2e-spec.ts` (tenant isolation & token rejection regression assertions)
+  - `e2e-army/223-general-ledger-isolation.e2e.ts` (e2e-army gate test covering AC1 own, AC2 foreign, and AC3 invalid/missing tokens)
 
 ---
 
 ## Numbered Acceptance Criteria
 
-1. **AC1 (Owner Access & Ledger Data)**: When a request includes a valid JWT for the owner of the account, `/reports/general-ledger/${accountId}` returns HTTP 200 and the expected ledger entries. The owned account appears in the trial balance report list.
+1. **AC1 (Owner Access & Ledger Data)**: When a request includes a valid JWT for the owner of the account, `/reports/general-ledger/${accountId}` returns HTTP 200 and the expected ledger entries. The owned account appears in the trial balance report list (`/reports/trial-balance`).
 2. **AC2 (Cross-Tenant Isolation & 404 Behavior)**: When a request includes a valid JWT for a user belonging to a different tenant, `/reports/general-ledger/${accountId}` returns HTTP 404 with no financial data leakage. Requesting a non-existent account ID also returns HTTP 404 with identical response structure. Foreign accounts are excluded from the tenant's trial balance list.
 3. **AC3 (Authentication & Token Validation)**: When a request includes a missing, malformed, or wrongly signed JWT token, `/reports/general-ledger/${accountId}` and `/reports/trial-balance` return HTTP 401 Unauthorized.
-4. **AC4 (CORS Configuration for Localhost & 127.0.0.1)**: API CORS configuration automatically expands `127.0.0.1` and `localhost` counterparts for test and verification environments, preventing cross-origin request blocks.
-5. **AC5 (Authentication Error Indication)**: Invalid credential submissions show the explicit error text "Invalid credentials" in the UI alert/toast while preserving localized description messages.
 
 ---
 
 ## Verification Matrix
 
-| AC ID   | Requirement Description                               | Verification Method / Command                                                                                                                           | Observed Result                                                                             | Exit Code | Status     |
-| :------ | :---------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------------------ | :-------- | :--------- |
-| **AC1** | Owner access: HTTP 200 and entries array              | `pnpm --filter api exec jest src/modules/reports/controllers/reports.controller.spec.ts src/modules/reports/services/financial-reports.service.spec.ts` | 10/10 unit tests pass; controller verifies ownership and passes through ledger report       | 0         | **PASSED** |
-| **AC2** | Cross-tenant isolation: HTTP 404 for foreign account  | `financial-reports.service.spec.ts` & `reports.controller.spec.ts`                                                                                      | Throws `NotFoundException` when account does not belong to caller organization              | 0         | **PASSED** |
-| **AC3** | Token validation: HTTP 401 for invalid/missing tokens | `reports.controller.spec.ts`                                                                                                                            | Reflect metadata verifies `JwtAuthGuard` and `PermissionsGuard` applied at controller level | 0         | **PASSED** |
-| **AC4** | CORS expansion for local environments                 | `pnpm --filter api type-check` & `pnpm --filter api lint`                                                                                               | `allowedOrigins` dynamically adds `localhost` counterpart for `127.0.0.1` origins           | 0         | **PASSED** |
-| **AC5** | Invalid credentials error indication                  | `pnpm --filter @mizano/web type-check` & `pnpm --filter @mizano/web lint`                                                                               | Login page sets toast title to "Invalid credentials" with localized description             | 0         | **PASSED** |
-| —       | API TypeScript check                                  | `pnpm --filter api type-check`                                                                                                                          | Clean (0 errors across `tsc --noEmit` and `tsconfig.e2e.json`)                              | 0         | **PASSED** |
-| —       | API ESLint check                                      | `pnpm --filter api lint`                                                                                                                                | Clean (0 errors)                                                                            | 0         | **PASSED** |
-| —       | Web TypeScript check                                  | `pnpm --filter @mizano/web type-check`                                                                                                                  | Clean (0 errors)                                                                            | 0         | **PASSED** |
-| —       | Web ESLint check                                      | `pnpm --filter @mizano/web lint`                                                                                                                        | Clean (0 errors)                                                                            | 0         | **PASSED** |
-| —       | E2E-army hygiene & tests                              | `python3 scripts/test_e2e_army_hygiene.py`                                                                                                              | 11/11 tests PASS                                                                            | 0         | **PASSED** |
-| —       | Evidence freshness & SHA binding                      | `python3 scripts/test_evidence_freshness.py`                                                                                                            | 10/10 tests PASS                                                                            | 0         | **PASSED** |
-| —       | Husky pre-push hook regression                        | `python3 scripts/test_husky_hooks.py`                                                                                                                   | 15/15 tests PASS                                                                            | 0         | **PASSED** |
+| AC ID   | Requirement Description                               | Verification Method / Command                                                                                                                           | Observed Result                                                                                                          | Exit Code | Status     |
+| :------ | :---------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------- | :-------- | :--------- |
+| **AC1** | Owner access: HTTP 200 and entries array              | `pnpm --filter api exec jest test/general-ledger.isolation-spec.ts`                                                                                     | 2/2 AC1 tests pass; returns HTTP 200, account id match, entries array with debits, account present in trial balance      | 0         | **PASSED** |
+| **AC2** | Cross-tenant isolation: HTTP 404 for foreign account  | `pnpm --filter api exec jest test/general-ledger.isolation-spec.ts`                                                                                     | 3/3 AC2 tests pass; returns HTTP 404 for foreign account, 404 for non-existent account, excluded from trial balance list | 0         | **PASSED** |
+| **AC3** | Token validation: HTTP 401 for invalid/missing tokens | `pnpm --filter api exec jest test/general-ledger.isolation-spec.ts`                                                                                     | 1/1 AC3 tests pass; returns HTTP 401 for null token, malformed token string, and token signed with invalid JWT secret    | 0         | **PASSED** |
+| —       | Controller & Service Unit Specifications              | `pnpm --filter api exec jest src/modules/reports/controllers/reports.controller.spec.ts src/modules/reports/services/financial-reports.service.spec.ts` | 10/10 tests pass across 2 test suites; verifies route guards, permissions, and `assertAccountOwnership` tenant scoping   | 0         | **PASSED** |
+| —       | E2E Reports Regression Suite                          | `pnpm --filter api exec jest test/reports.e2e-spec.ts`                                                                                                  | 16/16 tests pass; verifies tenant B sees none of tenant A's figures and invalid/anonymous callers receive 401            | 0         | **PASSED** |
+| —       | Monorepo Type Check                                   | `pnpm type-check`                                                                                                                                       | 6/6 packages clean (`@mizano/shared-types`, `@mizano/validators`, `@mizano/web`, `api` including `tsconfig.e2e.json`)    | 0         | **PASSED** |
+| —       | API Code Linting                                      | `pnpm --filter api lint`                                                                                                                                | 0 errors, 0 warnings across all TypeScript files                                                                         | 0         | **PASSED** |
+| —       | E2E-Army Test Hygiene                                 | `python3 scripts/test_e2e_army_hygiene.py`                                                                                                              | 11/11 unit and file tests pass; no bare imports or duplicate shims                                                       | 0         | **PASSED** |
+| —       | Evidence Freshness & Contract Validation              | `python3 scripts/test_evidence_freshness.py`                                                                                                            | 10/10 tests pass; validated SHA binding, evidence table status parsing, and no stale exclusivity claims                  | 0         | **PASSED** |
+
+---
+
+## Base vs. Head Demonstration: 404 Isolation Failure Without Ownership Check
+
+A core requirement of multi-tenant isolation is that requesting a resource owned by another tenant yields HTTP 404 (indistinguishable from a non-existent ID) rather than leaking existence or data.
+
+### 1. Integration E2E Level (`general-ledger.isolation-spec.ts`)
+
+#### Base Behavior (without tenant ownership filter in `assertAccountOwnership`):
+
+When `assertAccountOwnership` is modified to omit the `organizationId` filter (`where: { id: accountId }` instead of `where: { id: accountId, organizationId }`):
+
+```text
+FAIL test/general-ledger.isolation-spec.ts (8.918 s)
+  General ledger tenant isolation (e2e) @issue-223
+    ✓ AC1: the owner gets 200 and its ledger entries by account id (30 ms)
+    ✓ AC1: the owner sees its account in the trial balance list (7 ms)
+    ✕ AC2: another tenant gets 404 for the foreign account id and no ledger data (11 ms)
+    ✓ AC2: another tenant gets 404 for an unknown account id (same answer as foreign) (7 ms)
+    ✓ AC2: the foreign account never appears in the other tenant trial balance list (5 ms)
+    ✓ AC3: missing, malformed and wrongly signed tokens get 401 on by-id and list (16 ms)
+
+  ● General ledger tenant isolation (e2e) @issue-223 › AC2: another tenant gets 404 for the foreign account id and no ledger data
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 404
+    Received: 200
+
+      59 |   it('AC2: another tenant gets 404 for the foreign account id and no ledger data', async () => {
+      60 |     const res = await b.get(`/reports/general-ledger/${bankA}`);
+    > 61 |     expect(res.status).toBe(404);
+         |                        ^
+      62 |     expect(JSON.stringify(res.body)).not.toContain('GL Isolation Bank');
+      63 |   });
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 5 passed, 6 total
+Exit code: 1
+```
+
+#### Head Behavior (with `assertAccountOwnership` scoped to `organizationId`):
+
+```text
+PASS test/general-ledger.isolation-spec.ts (17.545 s)
+  General ledger tenant isolation (e2e) @issue-223
+    ✓ AC1: the owner gets 200 and its ledger entries by account id (16 ms)
+    ✓ AC1: the owner sees its account in the trial balance list (7 ms)
+    ✓ AC2: another tenant gets 404 for the foreign account id and no ledger data (5 ms)
+    ✓ AC2: another tenant gets 404 for an unknown account id (same answer as foreign) (2 ms)
+    ✓ AC2: the foreign account never appears in the other tenant trial balance list (3 ms)
+    ✓ AC3: missing, malformed and wrongly signed tokens get 401 on by-id and list (5 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       6 passed, 6 total
+Exit code: 0
+```
+
+---
+
+### 2. Controller Wiring Level (`reports.controller.spec.ts`)
+
+#### Base Behavior (without `assertAccountOwnership` call before building ledger):
+
+When `ReportsController.getGeneralLedger` does not explicitly await account ownership verification:
+
+```text
+FAIL src/modules/reports/controllers/reports.controller.spec.ts
+  ReportsController - general ledger wiring (@issue-223)
+    ✓ applies JwtAuthGuard and PermissionsGuard at controller level (1 ms)
+    ✓ requires reports.view on the general ledger and trial balance routes
+    ✕ checks account ownership for the caller organization before building the ledger (1 ms)
+    ✕ stops with the 404 and never builds the ledger when the ownership check fails (1 ms)
+
+  ● ReportsController - general ledger wiring (@issue-223) › checks account ownership for the caller organization before building the ledger
+
+    expect(jest.fn()).toHaveBeenCalledWith(...expected)
+
+    Expected: "org-a", "acc-own"
+    Number of calls: 0
+
+  ● ReportsController - general ledger wiring (@issue-223) › stops with the 404 and never builds the ledger when the ownership check fails
+
+    expect(received).rejects.toThrow()
+
+    Received promise resolved instead of rejected
+    Resolved to value: {"entries": [{"journalId": "j-1"}]}
+
+Test Suites: 1 failed, 1 total
+Tests:       2 failed, 2 passed, 4 total
+Exit code: 1
+```
+
+#### Head Behavior (with controller ownership check):
+
+```text
+PASS src/modules/reports/controllers/reports.controller.spec.ts
+  ReportsController - general ledger wiring (@issue-223)
+    ✓ applies JwtAuthGuard and PermissionsGuard at controller level (1 ms)
+    ✓ requires reports.view on the general ledger and trial balance routes
+    ✓ checks account ownership for the caller organization before building the ledger
+    ✓ stops with the 404 and never builds the ledger when the ownership check fails
+
+Test Suites: 1 passed, 1 total
+Tests:       4 passed, 4 total
+Exit code: 0
+```
 
 ---
 
 ## Detailed Execution Outputs
 
-### Unit Test Execution: Reports Controller & Financial Reports Service
+### E2E Isolation Specification (`general-ledger.isolation-spec.ts`)
+
+Command:
+
+```bash
+export DATABASE_URL=postgresql://mizano@127.0.0.1:55495/mizano_e2e APP_ENV=e2e
+pnpm --filter api exec jest --config test/jest-e2e.json test/general-ledger.isolation-spec.ts
+```
+
+Output:
+
+```text
+PASS test/general-ledger.isolation-spec.ts (17.545 s)
+  General ledger tenant isolation (e2e) @issue-223
+    ✓ AC1: the owner gets 200 and its ledger entries by account id (16 ms)
+    ✓ AC1: the owner sees its account in the trial balance list (7 ms)
+    ✓ AC2: another tenant gets 404 for the foreign account id and no ledger data (5 ms)
+    ✓ AC2: another tenant gets 404 for an unknown account id (same answer as foreign) (2 ms)
+    ✓ AC2: the foreign account never appears in the other tenant trial balance list (3 ms)
+    ✓ AC3: missing, malformed and wrongly signed tokens get 401 on by-id and list (5 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       6 passed, 6 total
+Snapshots:   0 total
+Time:        17.684 s
+Ran all test suites matching /test\/general-ledger.isolation-spec.ts/i.
+```
+
+Exit code: 0
+
+### Unit Tests: Controller & Financial Reports Service
 
 Command:
 
@@ -65,43 +198,74 @@ PASS src/modules/reports/controllers/reports.controller.spec.ts
 Test Suites: 2 passed, 2 total
 Tests:       10 passed, 10 total
 Snapshots:   0 total
-Time:        3.002 s, estimated 4 s
+Time:        3.27 s, estimated 4 s
 Ran all test suites matching /src\/modules\/reports\/controllers\/reports.controller.spec.ts|src\/modules\/reports\/services\/financial-reports.service.spec.ts/i.
 ```
 
-### TypeScript Validation (API)
+Exit code: 0
+
+### E2E Regression Suite (`reports.e2e-spec.ts`)
 
 Command:
 
 ```bash
-pnpm --filter api type-check
+export DATABASE_URL=postgresql://mizano@127.0.0.1:55495/mizano_e2e APP_ENV=e2e
+pnpm --filter api exec jest --config test/jest-e2e.json test/reports.e2e-spec.ts
 ```
 
 Output:
 
 ```text
-> api@0.1.0 type-check /Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-223/apps/api
-> tsc --noEmit && tsc --noEmit -p test/tsconfig.e2e.json
+PASS test/reports.e2e-spec.ts (30.721 s)
+  Reports and dashboard reconcile with the ledger (e2e)
+    tenant A: scenario
+      ✓ seeds the chart, configures accounts and posts an opening balance (1969 ms)
+      ✓ issues invoices, leaves a draft and voids one (1035 ms)
+      ✓ records a payment, voids another, and applies and detaches credit notes (128 ms)
+      ✓ approves bills, leaves a draft and a deleted draft, adds a vendor credit and expenses (184 ms)
+    tenant A: reconciliation
+      ✓ trial balance is balanced and equals the posted ledger (21 ms)
+      ✓ balance sheet balances including current-period earnings (7 ms)
+      ✓ profit and loss, dashboard revenue/expenses and the ledger agree (20 ms)
+      ✓ cash flow ends at the cash balance the dashboard reports (12 ms)
+      ✓ dashboard AR equals the AR control account and the receivables aging total (21 ms)
+      ✓ dashboard AP equals the AP control account and the payables aging net total (7 ms)
+      ✓ customer statements are exact, show credit notes and net voided payments (36 ms)
+      ✓ account balances come from the posted ledger, not Account.openingBalance (29 ms)
+      ✓ dashboard charts exclude draft, void and deleted documents and use decimal strings (63 ms)
+    isolation and authentication
+      ✓ tenant B sees none of tenant A's figures (59 ms)
+      ✓ rejects anonymous callers with 401 (15 ms)
+      ✓ rejects invalid or malformed tokens with 401 (4 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       16 passed, 16 total
+Snapshots:   0 total
+Time:        30.922 s
+Ran all test suites matching /test\/reports.e2e-spec.ts/i.
 ```
 
-Exit code: 0.
+Exit code: 0
 
-### TypeScript Validation (Web)
+### Monorepo Type Check
 
 Command:
 
 ```bash
-pnpm --filter @mizano/web type-check
+pnpm type-check
 ```
 
 Output:
 
 ```text
-> @mizano/web@0.1.0 type-check /Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-223/apps/web
-> tsc --noEmit
+• Packages in scope: @mizano/shared-types, @mizano/validators, @mizano/web, api
+• Running type-check in 4 packages
+ Tasks:    6 successful, 6 total
+Cached:    0 cached, 6 total
+  Time:    9.395s
 ```
 
-Exit code: 0.
+Exit code: 0
 
 ### E2E-Army Test Hygiene
 
@@ -116,14 +280,14 @@ Output:
 ```text
 ...........
 ----------------------------------------------------------------------
-Ran 11 tests in 0.003s
+Ran 11 tests in 0.004s
 
 OK
 ```
 
-Exit code: 0.
+Exit code: 0
 
-### Evidence Freshness & Contract Verification
+### Evidence Document Freshness & Contract Validation
 
 Command:
 
@@ -136,29 +300,21 @@ Output:
 ```text
 ..........
 ----------------------------------------------------------------------
-Ran 10 tests in 0.008s
+Ran 10 tests in 0.011s
 
 OK
 ```
 
-Exit code: 0.
+Exit code: 0
 
 ---
 
-## Root-Cause Debugging & Resolution of Verification Findings
+## Out-of-Scope Reverts and Follow-Up Issues
 
-### Finding 1: CORS Policy Preventing API Requests
+Per manager re-path instructions:
 
-- **Symptom**: Headless browser verification observed console error: `Access to fetch at 'http://localhost:4302/en/reports' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.`
-- **Root Cause**:
-  1. `ops/verify/Mizano.sh` configured `CORS_ORIGIN="http://127.0.0.1:$PORT_WEB"`. When the headless browser navigated to `http://localhost:$PORT_WEB`, requests sent `Origin: http://localhost:$PORT_WEB`, which NestJS rejected because only `127.0.0.1` was registered.
-  2. `apps/web/app/[locale]/(dashboard)/reports/general-ledger/page.tsx` imported `Link` from `'next/link'` rather than `'@/i18n/routing'`, so `<Link href="/reports">` was unlocalized and triggered a 307 redirect via `next-intl` middleware.
-- **Fix**:
-  1. Updated `apps/api/src/main.ts` line 67 to expand `corsOrigins` with `localhost` counterparts whenever `127.0.0.1` is specified (and vice-versa).
-  2. Updated `apps/web/app/[locale]/(dashboard)/reports/general-ledger/page.tsx` line 5 to import `Link` from `'@/i18n/routing'`.
+1. `apps/api/src/main.ts`: Reverted CORS expansion.
+2. `apps/web/app/[locale]/(auth)/login/page.tsx`: Reverted hardcoded 'Invalid credentials' toast title (preserving localized `tErrors('invalidCredentials')` for Arabic and English).
+3. `apps/web/app/[locale]/(dashboard)/reports/general-ledger/page.tsx`: Reverted general-ledger Link import.
 
-### Finding 2: Authentication Error Handling Indicator
-
-- **Symptom**: `Login with invalid credentials failed to show expected error message: 'Timeout 15000ms exceeded' while waiting for 'Invalid credentials' text.`
-- **Root Cause**: `apps/web/messages/en/auth.json` provided `"invalidCredentials": "Invalid email or password"`. The toast title in `login/page.tsx` used `tErrors('invalidCredentials')`, displaying "Invalid email or password" rather than "Invalid credentials".
-- **Fix**: Updated `apps/web/app/[locale]/(auth)/login/page.tsx` to set `title: 'Invalid credentials'` while maintaining `description: tErrors('invalidCredentials')` for localized detail.
+Both CORS interoperability and login toast test runner expectations have been recorded in `AI_QUESTIONS.md` as separate follow-up issues.
