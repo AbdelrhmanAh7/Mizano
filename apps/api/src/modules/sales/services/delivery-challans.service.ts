@@ -252,7 +252,7 @@ export class DeliveryChallansService {
         throw new NotFoundException('Delivery challan not found');
       }
 
-      const tracked = await this.trackedLineItems(organizationId, challan.lines);
+      const tracked = await this.trackedLineItems(organizationId, challan.lines, tx);
 
       // Check inventory availability for tracked items
       for (const line of challan.lines) {
@@ -337,7 +337,7 @@ export class DeliveryChallansService {
         throw new NotFoundException('Delivery challan not found');
       }
 
-      const tracked = await this.trackedLineItems(organizationId, challan.lines);
+      const tracked = await this.trackedLineItems(organizationId, challan.lines, tx);
 
       // Increase inventory (reverse the decrease)
       for (const line of challan.lines) {

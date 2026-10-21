@@ -223,6 +223,64 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
       await expect(service[method](ORG, 'dc-1')).rejects.toThrow(BadRequestException);
       expect(prisma.inventoryMovement.create).not.toHaveBeenCalled();
     });
+
+    it('executes all queries and mutations through the transaction client tx, not prisma', async () => {
+      const tx = createMockPrisma();
+      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) => fn(tx));
+      const c = challan(status, { itemId: 'item-b', warehouseId: 'wh-b' });
+      tx.deliveryChallan.updateMany.mockResolvedValue({ count: 1 } as never);
+      tx.deliveryChallan.findFirst.mockResolvedValue(c as never);
+      tx.item.findFirst.mockResolvedValue({ id: 'item-b', trackInventory: true } as never);
+      tx.warehouse.findFirst.mockResolvedValue({ id: 'wh-b' } as never);
+      tx.inventoryLevel.aggregate.mockResolvedValue({
+        _sum: { quantity: new Decimal(10) },
+      } as never);
+      tx.inventoryLevel.findFirst.mockResolvedValue({
+        id: 'lvl-1',
+        warehouseId: 'wh-b',
+      } as never);
+      tx.item.updateMany.mockResolvedValue({ count: 1 } as never);
+
+      await service[method](ORG, 'dc-1');
+
+      // Assert tx was used for the operations
+      expect(tx.deliveryChallan.updateMany).toHaveBeenCalled();
+      expect(tx.item.findFirst).toHaveBeenCalledWith({
+        where: { id: 'item-b', organizationId: ORG },
+      });
+      expect(tx.inventoryMovement.create).toHaveBeenCalled();
+      expect(tx.item.updateMany).toHaveBeenCalled();
+
+      // Assert prisma was NOT called directly (except $transaction)
+      expect(prisma.deliveryChallan.updateMany).not.toHaveBeenCalled();
+      expect(prisma.item.findFirst).not.toHaveBeenCalled();
+      expect(prisma.warehouse.findFirst).not.toHaveBeenCalled();
+      expect(prisma.inventoryMovement.create).not.toHaveBeenCalled();
+      expect(prisma.item.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('propagates stock move failure out of the transaction so status change rolls back', async () => {
+      const tx = createMockPrisma();
+      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) => fn(tx));
+      const c = challan(status, { itemId: 'item-b', warehouseId: 'wh-b' });
+      tx.deliveryChallan.updateMany.mockResolvedValue({ count: 1 } as never);
+      tx.deliveryChallan.findFirst.mockResolvedValue(c as never);
+      tx.item.findFirst.mockResolvedValue({ id: 'item-b', trackInventory: true } as never);
+      tx.warehouse.findFirst.mockResolvedValue({ id: 'wh-b' } as never);
+      tx.inventoryLevel.aggregate.mockResolvedValue({
+        _sum: { quantity: new Decimal(10) },
+      } as never);
+      tx.inventoryLevel.findFirst.mockResolvedValue({
+        id: 'lvl-1',
+        warehouseId: 'wh-b',
+      } as never);
+      tx.inventoryMovement.create.mockRejectedValue(
+        new Error('stock movement write failed') as never,
+      );
+
+      await expect(service[method](ORG, 'dc-1')).rejects.toThrow('stock movement write failed');
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe.each([
