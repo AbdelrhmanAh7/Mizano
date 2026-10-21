@@ -1,6 +1,6 @@
 import { aiSchedulerProviders, aiSchedulersEnabled } from './ai-schedulers.enabled';
 
-describe('AI scheduler gate (#133 AC3)', () => {
+describe('AI scheduler gate (issue #133)', () => {
   const original = process.env.AI_SCHEDULERS_ENABLED;
   class FakeScheduler {}
   class OtherScheduler {}

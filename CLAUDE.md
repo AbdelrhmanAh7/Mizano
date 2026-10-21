@@ -256,7 +256,7 @@ Browser → API (6001) → Intake job (BullMQ/Redis) → extraction strategies i
 - `OLLAMA_BASE_URL` — Ollama endpoint when enabled (e.g., `http://ollama:11434`)
 - `INTAKE_STORAGE_DIR` — path for original document storage (default: `/data/originals`)
 - `INTAKE_TESSDATA_DIR` — path to Tesseract traineddata files (required offline)
-- `AI_SCHEDULERS_ENABLED` — set `true` to register the AI cron schedulers (default: `false`, see issue #133 AC3)
+- `AI_SCHEDULERS_ENABLED` — set `true` to register the AI cron schedulers (enabled by default in standard/production environments via docker-compose.production.yml and .env.example/.env.prod, defaulting off / false on the Pi profile; see issue #133)
 
 ### Endpoints
 

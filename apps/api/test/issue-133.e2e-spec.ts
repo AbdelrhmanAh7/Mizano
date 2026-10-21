@@ -2,15 +2,17 @@
  * Issue #133: Move intake extraction out of the API process and remove dead Colab wiring.
  *
  * Acceptance coverage:
- *  - AC1: exactly one route handler for `GET ai/narrative/monthly`, and it answers
+ *  - AC1 (starts without tesseract.js/pdf-parse) and AC2 (intake e2e with worker container)
+ *    are deferred to the dedicated worker extraction issue #141.
+ *  - AC3: exactly one route handler for `GET ai/narrative/monthly`, and it answers
  *    (guard 401, not 404) so the single handler's DI graph resolves.
- *  - AC2: `POST/GET internal/tunnel-update` and `ollama-status` return 404.
- *  - AC3: with `AI_SCHEDULERS_ENABLED` unset (enforced in `setup-e2e.ts` before this
+ *  - Dead code removal: `POST/GET internal/tunnel-update` and `ollama-status` return 404.
+ *  - Scheduler gating: with `AI_SCHEDULERS_ENABLED` unset (enforced in `setup-e2e.ts` before this
  *    module is loaded), the `SchedulerRegistry` has none of the AI cron jobs and the
  *    five scheduler providers are not registered — while non-AI cron jobs still exist
  *    (so the assertion inspects a live registry). A positive control boots a second
  *    module graph with the flag set and asserts every `ai:` cron job registers.
- *  - AC4: the scheduled notification checks scope every entity query by
+ *  - Notification cron hardening: the scheduled notification checks scope every entity query by
  *    `organizationId`, bound it with `take`, and page through *all* organizations.
  */
 import { INestApplication, RequestMethod, ValidationPipe } from '@nestjs/common';
@@ -30,7 +32,7 @@ import { AiSalesCrmScheduler } from '../src/modules/ai/schedulers/ai-sales-crm.s
 import { AiSecurityScheduler } from '../src/modules/ai/schedulers/ai-security.scheduler';
 import { createTestApp } from './helpers/app.helper';
 
-// The five AI scheduler classes gated behind AI_SCHEDULERS_ENABLED (#133 AC3).
+// The five AI scheduler classes gated behind AI_SCHEDULERS_ENABLED (issue #133).
 const AI_SCHEDULER_CLASSES = [
   AiOperationsScheduler,
   AiHrOpsScheduler,
@@ -67,7 +69,7 @@ function aiCronNames(classes: readonly SchedulerConstructor[]): string[] {
 /** Number of @Cron methods on the five AI schedulers; must be stable and non-zero. */
 const EXPECTED_AI_CRON_NAMES = aiCronNames(AI_SCHEDULER_CLASSES);
 
-describe('@issue-133 AC1: exactly one route handler for GET ai/narrative', () => {
+describe('@issue-133 AC3: exactly one route handler for GET ai/narrative', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
@@ -75,7 +77,7 @@ describe('@issue-133 AC1: exactly one route handler for GET ai/narrative', () =>
   });
 
   afterAll(async () => {
-    await app.close();
+    await app?.close();
   });
 
   it('registers exactly one GET handler for /ai/narrative/monthly', () => {
@@ -114,7 +116,7 @@ describe('@issue-133 AC1: exactly one route handler for GET ai/narrative', () =>
   });
 });
 
-describe('@issue-133 AC2: dead Colab endpoints return 404', () => {
+describe('@issue-133 dead code removal: ollama-tunnel endpoints return 404', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
@@ -122,7 +124,7 @@ describe('@issue-133 AC2: dead Colab endpoints return 404', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    await app?.close();
   });
 
   it('rejects POST /internal/tunnel-update and GET /internal/ollama-status', async () => {
@@ -147,7 +149,7 @@ describe('@issue-133 AC2: dead Colab endpoints return 404', () => {
   });
 });
 
-describe('@issue-133 AC3: no AI cron jobs with AI_SCHEDULERS_ENABLED unset', () => {
+describe('@issue-133 scheduler gating: no AI cron jobs with AI_SCHEDULERS_ENABLED unset', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
@@ -159,7 +161,7 @@ describe('@issue-133 AC3: no AI cron jobs with AI_SCHEDULERS_ENABLED unset', () 
   });
 
   afterAll(async () => {
-    await app.close();
+    await app?.close();
   });
 
   it('has zero AI cron jobs registered, and the gate itself is inspectable', () => {
@@ -191,7 +193,7 @@ describe('@issue-133 AC3: no AI cron jobs with AI_SCHEDULERS_ENABLED unset', () 
   });
 });
 
-describe('@issue-133 AC3b: AI cron jobs register when AI_SCHEDULERS_ENABLED=true (positive control)', () => {
+describe('@issue-133 scheduler gating: AI cron jobs register when AI_SCHEDULERS_ENABLED=true (positive control)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
@@ -228,7 +230,7 @@ describe('@issue-133 AC3b: AI cron jobs register when AI_SCHEDULERS_ENABLED=true
   });
 
   afterAll(async () => {
-    await app.close();
+    await app?.close();
     delete process.env.AI_SCHEDULERS_ENABLED;
   });
 
@@ -243,7 +245,7 @@ describe('@issue-133 AC3b: AI cron jobs register when AI_SCHEDULERS_ENABLED=true
   });
 });
 
-describe('@issue-133 AC4: notification checks are org-scoped, paginated and bounded', () => {
+describe('@issue-133 notification paging: checks are org-scoped, paginated and bounded', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let notificationsService: NotificationsService;
@@ -255,7 +257,7 @@ describe('@issue-133 AC4: notification checks are org-scoped, paginated and boun
   });
 
   afterAll(async () => {
-    await app.close();
+    await app?.close();
   });
 
   afterEach(() => {

@@ -396,43 +396,38 @@ Unset launcher heap_size_limit: 4395630592
 
 ## Changes by acceptance criterion
 
-| AC   | Change                                                                                                                         |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------ |
-| AC1  | `NarrativeController` / `FinancialNarrativeService` no longer registered in `ai.module.ts`; the forecasting module keeps both  |
-| AC2  | Deleted `ollama-tunnel.controller.ts` (+ spec), its registration, and `services/ollama-proxy/`                                 |
-| AC3  | `ai/schedulers/*` providers only register when `AI_SCHEDULERS_ENABLED=true` (default false); 29 `@Cron` jobs carry `ai:` names |
-| AC4  | Notification cron checks page all orgs by cursor, scope every query by `organizationId` and bound it with `take`               |
-| Misc | `apps/api/Dockerfile` no longer builds `@mizano/validators`; worker merge is written up in `docs/follow-ups.md` (needs #42)    |
+| AC    | Requirement from Issue #133 Brief                                                                 | Status                  | Details                                                                                                                                                                                                                                                                                                                               |
+| ----- | ------------------------------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1   | API container starts without `tesseract.js`/`pdf-parse` loaded                                    | **NOT DONE** (deferred) | Moved to follow-up worker issue / #141. The extraction worker still runs in the API container; worker container extraction is being implemented in #141 (and branches ai/42, ai/39). Documented in `AI_QUESTIONS.md` and `docs/follow-ups.md`.                                                                                        |
+| AC2   | Intake e2e passes with the worker container                                                       | **NOT DONE** (deferred) | Moved to follow-up worker issue / #141. The worker container has not been split out yet; depends on landing the worker entrypoint from #42. Documented in `AI_QUESTIONS.md` and `docs/follow-ups.md`.                                                                                                                                 |
+| AC3   | Only one route handler for `ai/narrative`                                                         | **PASSED**              | Deduplicated `NarrativeController` / `FinancialNarrativeService` registration: removed from `ai.module.ts`, retained exclusively in `ai-forecasting.module.ts`. Verified by `apps/api/test/issue-133.e2e-spec.ts` (1 route registered for `GET /ai/narrative/monthly`, answers 401 guard rather than 404, proving DI graph resolves). |
+| Extra | Dead code deletion, AI schedulers gating, notification cron cursor pagination, Dockerfile cleanup | **PASSED**              | Deleted `ollama-tunnel` controller and `services/ollama-proxy/`; gated 29 AI `@Cron` jobs behind `AI_SCHEDULERS_ENABLED` (default off on Pi profile); paginated notification checks via cursor; removed `@mizano/validators` build.                                                                                                   |
 
 ## Commands run and results
 
-Run from the worktree at `c889201`.
+Run from the worktree at `cf24392` + fixes on branch `ai/133`. See `docs/evidence/133/EVIDENCE.md` for full detailed report.
 
 ```text
 cd apps/api && pnpm lint
-(no warnings or errors printed; exit 0)
-lint: 0 warnings
+(0 warnings, 0 errors; exit 0)
 
 cd apps/api && pnpm type-check
 tsc --noEmit && tsc --noEmit -p test/tsconfig.e2e.json
-(no errors printed)
+(0 issues; exit 0)
 
-node apps/api/_run_tests.js
-Test Suites: 1 failed, 134 passed, 135 total
-Tests:       4 failed, 2184 passed, 2188 total
+pnpm --filter api build
+nest build
+Found 0 issues; compiled 652 files (exit 0)
+
+pnpm --filter api exec jest src/modules/ai/schedulers/ai-schedulers.enabled.spec.ts src/modules/notifications/services/notifications.service.spec.ts
+Test Suites: 2 passed, 2 total
+Tests:       13 passed, 13 total (exit 0)
+
+pnpm --filter api exec jest src/modules/import-export/services/import.service.hardening.spec.ts
+Test Suites: 1 passed, 1 total
+Tests:       9 passed, 9 total (exit 0)
+
+pnpm --filter api exec jest --config ./test/jest-e2e.json issue-133
+Test Suites: 1 passed, 1 total
+Tests:       9 passed, 9 total (exit 0)
 ```
-
-The 4 failures are all in `modules/import-export/services/import.service.hardening.spec.ts` (`csv` call in
-`import.service.ts:87`). That is the `esModuleInterop` drift between `_jest.config.js` and `tsconfig.json` that #134
-removes; this branch does not touch those files. I did not run that spec on `master` in this session, so "fails on
-master" is not verified here.
-
-```text
-E2E: throwaway Postgres 16 on 127.0.0.1:56433, fresh database, prisma migrate deploy, REDIS_URL blank
-cd apps/api && npx jest --config ./test/jest-e2e.json --runInBand
-Test Suites: 12 passed, 12 total
-Tests:       266 passed, 266 total
-```
-
-`test/issue-133.e2e-spec.ts` passed in that run. The root `pnpm lint` / `pnpm ci:full` and `pnpm --filter api build`
-were not run in this session.

@@ -20,7 +20,7 @@ import { ContractAnalysisController } from '../controllers/contract-analysis.con
 import { KnowledgeAssistantController } from '../controllers/knowledge-assistant.controller';
 import { VoiceCommandController } from '../controllers/voice-command.controller';
 
-// Scheduler (registered only when AI_SCHEDULERS_ENABLED=true, see AC3 of #133)
+// Scheduler (registered only when AI_SCHEDULERS_ENABLED=true, see issue #133)
 import { AiNlpChatScheduler } from '../schedulers/ai-nlp-chat.scheduler';
 import { aiSchedulerProviders } from '../schedulers/ai-schedulers.enabled';
 

@@ -1,5 +1,5 @@
 /**
- * AI schedulers are opt-in (issue #133, AC3): the five `ai/schedulers/*` classes
+ * AI schedulers are opt-in (issue #133): the five `ai/schedulers/*` classes
  * are only registered as providers — and their `@Cron` jobs only reach the
  * `SchedulerRegistry` — when `AI_SCHEDULERS_ENABLED=true` is present in the
  * process environment before the module graph loads. `deploy/pi` sets the flag

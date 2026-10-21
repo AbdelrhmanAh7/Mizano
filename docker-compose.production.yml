@@ -32,6 +32,7 @@ services:
       - OLLAMA_MAX_CONCURRENT=${OLLAMA_MAX_CONCURRENT:-1}
       - OLLAMA_NUM_CTX=${OLLAMA_NUM_CTX:-8192}
       - EXTRACTION_STRATEGY=${EXTRACTION_STRATEGY:-vlm}
+      - AI_SCHEDULERS_ENABLED=${AI_SCHEDULERS_ENABLED:-true}
     deploy:
       resources:
         limits:
