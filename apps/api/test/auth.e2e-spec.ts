@@ -95,6 +95,18 @@ describe('Auth (e2e)', () => {
         .send({ ...testUser, email: `weak-${suffix}@mizano.test`, password: 'short' });
       expect(res.status).toBe(400);
     });
+
+    // Sentence-case 'Validation failed' is the API contract for validation errors (#219).
+    it('names the failed password rule in details of a VALIDATION_ERROR (#219)', async () => {
+      const res = await anon.post('/auth/register').send({
+        ...testUser,
+        email: `weak-upper-${suffix}@mizano.test`,
+        password: 'alllowercase1',
+      });
+      expect(res.status).toBe(400);
+      expect(res.body).toMatchObject({ code: 'VALIDATION_ERROR', message: 'Validation failed' });
+      expect(JSON.stringify(res.body.details)).toMatch(/uppercase/i);
+    });
   });
 
   describe('POST /auth/login', () => {
@@ -113,6 +125,15 @@ describe('Auth (e2e)', () => {
         .post('/auth/login')
         .send({ email: testUser.email, password: 'Wrong-password-1' });
       expect(res.status).toBe(401);
+    });
+
+    it('rejects an invalid email with VALIDATION_ERROR', async () => {
+      const res = await anon
+        .post('/auth/login')
+        .send({ email: 'not-an-email', password: 'Password123' });
+      expect(res.status).toBe(400);
+      expect(res.body).toMatchObject({ code: 'VALIDATION_ERROR', message: 'Validation failed' });
+      expect(JSON.stringify(res.body.details)).toMatch(/email/i);
     });
 
     it('rejects a non-existent user', async () => {
@@ -164,7 +185,9 @@ describe('Auth (e2e)', () => {
     });
 
     it('rejects requests with an invalid token', async () => {
-      expect((await anon.withToken('invalid-token').get('/users/me')).status).toBe(401);
+      const res = await anon.withToken('invalid-token').get('/users/me');
+      expect(res.status).toBe(401);
+      expect(res.body.error).toBe('Unauthorized');
     });
 
     it('accepts the token issued by a real login', async () => {
