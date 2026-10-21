@@ -6,7 +6,7 @@ This file covers issue #252 only. It lives in `docs/evidence/252/` per the repos
 - **Pull Request:** #274 (`Supersedes part of #242`, parent issue #185)
 - **Branch:** `ai/252`
 - **Base Commit (`origin/master`):** `e07f1e3d7585844a9af23dae48f870087993e4b3`
-- **Tested Head Commit:** Recorded upon commit on branch `ai/252`
+- **Tested Head Commit:** `05c13c6d465b136dc6d7de7ce201e67c677b3e14`
 - **Originating Sentry issue:** None (originates from CodeRabbit review comment on PR #242)
 - **User-facing flow / E2E:** `e2e-army/252-session-shape.e2e.ts` tagged `feat:mz-auth`, `lvl:ui`, `lvl:api`.
 - **E2E-Army Gate Status:** Pending CI execution on PR #274. On the local workstation, the full multi-service throwaway stack is not run locally per the owner speed rule (2026-10-08). The spec was updated to perform deterministic credential sign-in without hardcoded passwords.
