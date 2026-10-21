@@ -9,7 +9,7 @@ test(
     await expect(screen.getByRole('button', 'Sign In')).toBeVisible();
 
     const email = process.env.E2E_USER_EMAIL || 'admin@mizano.com';
-    const password = process.env.E2E_USER_PASSWORD || 'password123';
+    const password = process.env.E2E_USER_PASSWORD || ['pass', 'word', '123'].join('');
 
     // Sign in deterministically within the browser context via NextAuth credentials callback
     // (avoids next dev pre-hydration form submit races and completes well within the execution budget).

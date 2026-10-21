@@ -6,7 +6,7 @@ This file covers issue #252 only. It lives in `docs/evidence/252/` per the repos
 - **Pull Request:** #274 (`Supersedes part of #242`, parent issue #185)
 - **Branch:** `ai/252`
 - **Base Commit (`origin/master`):** `e07f1e3d7585844a9af23dae48f870087993e4b3`
-- **Tested Head Commit:** `05c13c6d465b136dc6d7de7ce201e67c677b3e14`
+- **Tested Head Commit:** `36ca0cabe9c962c6cbda21a8ff4a2a5a1857272d`
 - **Originating Sentry issue:** None (originates from CodeRabbit review comment on PR #242)
 - **User-facing flow / E2E:** `e2e-army/252-session-shape.e2e.ts` tagged `feat:mz-auth`, `lvl:ui`, `lvl:api`.
 - **E2E-Army Gate Status:** Pending CI execution on PR #274. On the local workstation, the full multi-service throwaway stack is not run locally per the owner speed rule (2026-10-08). The spec was updated to perform deterministic credential sign-in without hardcoded passwords.
@@ -88,16 +88,21 @@ Exit code: 0
 
 ### 3. TypeScript Type-Check (`tsc --noEmit`)
 
+Prerequisite: workspace dependencies built via `pnpm --filter @mizano/shared-types build` (standard monorepo setup; without compiling shared workspace types, `tsc` reports 15 pre-existing missing declaration errors in logger dashboard components).
+
 Command:
 
 ```bash
-cd apps/web && nice -n 10 pnpm exec tsc --noEmit
+pnpm --filter @mizano/shared-types build && cd apps/web && nice -n 10 pnpm exec tsc --noEmit
 ```
 
 Output:
 
 ```text
-(clean run, 0 errors)
+> @mizano/shared-types@0.1.0 build /Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-252/packages/shared-types
+> tsc
+
+(clean run in apps/web, 0 errors)
 Exit code: 0
 ```
 
@@ -234,3 +239,9 @@ Exit code: 0
    - Accurately recorded the e2e-army gate execution status for the tested head as pending remote CI execution on PR #274 (not run locally per owner speed rule 2026-10-08). Recorded base SHA (`e07f1e3d7585844a9af23dae48f870087993e4b3`) and provided first-hand outputs for all locally run verification checks (`route.spec.ts` 3/3, `auth.spec.ts` 15/15, `tsc --noEmit` exit 0, `next lint` exit 0, `test_no_conflict_markers.py` 10/10, Prettier exit 0).
 5. **Review Feedback - Incomplete test implementation for route.spec.ts**:
    - Verified that `apps/web/app/api/auth/[...nextauth]/route.spec.ts` is 100% complete and fully implemented (3 passing tests). It explicitly asserts every single user property (`id`, `email`, `name`, `firstName`, `lastName`, `organizationId`, `role`), `accessToken`, string `expires`, deep equality via `toEqual`, explicit absence of `refreshToken`, error-handling shape, and signed-out `{}`.
+6. **CodeRabbit Thread - Type-check Verification & Pre-existing TypeScript Errors**:
+   - Clarified and documented that running `tsc --noEmit` directly on `apps/web` without first compiling workspace dependencies produces 15 pre-existing missing module declaration errors for `@mizano/shared-types` in `components/logger/logger-dashboard.tsx`. When workspace dependencies are built (`pnpm --filter @mizano/shared-types build`), `apps/web` typecheck runs completely clean with 0 errors and exit code 0.
+7. **QA Findings on NextAuth Session Shape & Refresh Token Removal**:
+   - The NextAuth session callback in `apps/web/lib/auth.ts:150-164` cleanly populates user fields (`id`, `firstName`, `lastName`, `organizationId`, `role`) and `accessToken`, while omitting `refreshToken` from the session JSON.
+   - Refresh token remains securely in the encrypted JWT session cookie and is properly typed in `JWT` and `User` interfaces, but excluded from `Session`.
+   - Unit tests in `route.spec.ts` (3/3 passed) and `auth.spec.ts` (15/15 passed) provide comprehensive regression coverage.
