@@ -153,7 +153,8 @@ export const authOptions: NextAuthOptions = {
       session.user.organizationId = token.organizationId as string;
       session.user.role = token.role as string;
       session.accessToken = token.accessToken as string;
-      session.refreshToken = token.refreshToken as string;
+      // The refresh token stays in the encrypted JWT cookie held by the browser;
+      // /api/auth/session must not include it in the session JSON.
 
       if (token.error) {
         session.error = token.error as string;
@@ -211,7 +212,6 @@ declare module 'next-auth' {
       role: string;
     };
     accessToken: string;
-    refreshToken: string;
     error?: string;
   }
 
