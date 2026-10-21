@@ -12,7 +12,7 @@ import { PERMISSIONS_KEY } from '../../../common/decorators/permissions.decorato
 /**
  * Controller wiring only: guards, permissions and that the ownership check runs before the
  * ledger is built. The tenant isolation itself (real JWTs, real database) is proven in
- * test/general-ledger.isolation.e2e-spec.ts.
+ * test/general-ledger.isolation-spec.ts.
  */
 describe('ReportsController - general ledger wiring (@issue-223)', () => {
   let controller: ReportsController;

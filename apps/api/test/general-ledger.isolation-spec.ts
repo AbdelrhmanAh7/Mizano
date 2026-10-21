@@ -38,7 +38,7 @@ describe('General ledger tenant isolation (e2e) @issue-223', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) await app.close();
   });
 
   it('AC1: the owner gets 200 and its ledger entries by account id', async () => {
