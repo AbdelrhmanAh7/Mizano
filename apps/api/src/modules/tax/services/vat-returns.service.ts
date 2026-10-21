@@ -16,12 +16,13 @@ import { LEGACY_OPENING_JOURNAL_NUMBER } from '../../accounting/services/opening
 import { CreateVatReturnDto } from '../dto/create-vat-return.dto';
 import { RecordVatPaymentDto } from '../dto/record-vat-payment.dto';
 import { VatReturnQueryDto } from '../dto/vat-return-query.dto';
+import { computeVatDraft } from '../utils/vat-draft-calculator';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ZERO = new Decimal(0);
 
 /** Invoices that are VAT events: issued to the customer and not voided. */
-const TAXABLE_INVOICE_STATUSES: InvoiceStatus[] = [
+export const TAXABLE_INVOICE_STATUSES: InvoiceStatus[] = [
   InvoiceStatus.SENT,
   InvoiceStatus.PARTIALLY_PAID,
   InvoiceStatus.PAID,
@@ -29,7 +30,7 @@ const TAXABLE_INVOICE_STATUSES: InvoiceStatus[] = [
 ];
 
 /** Approved bills (not drafts, not voided). */
-const TAXABLE_BILL_STATUSES: BillStatus[] = [
+export const TAXABLE_BILL_STATUSES: BillStatus[] = [
   BillStatus.OPEN,
   BillStatus.PARTIALLY_PAID,
   BillStatus.PAID,
@@ -558,6 +559,20 @@ export class VatReturnsService {
       vatPayable: Decimal.max(figures.netPayable, ZERO).toFixed(4),
       vatRefundable: Decimal.max(figures.netPayable.neg(), ZERO).toFixed(4),
     };
+  }
+
+  /**
+   * Computes VAT return draft from the ledger and recorded invoices/bills, and checks for mismatches
+   * against any stored return for the same period.
+   */
+  async computeDraftFromLedger(organizationId: string, periodStart: string, periodEnd: string) {
+    return computeVatDraft({
+      prisma: this.prisma,
+      vatReturnsService: this,
+      orgId: organizationId,
+      periodStart,
+      periodEnd,
+    });
   }
 
   async getDashboardStats(organizationId: string) {

@@ -588,4 +588,116 @@ describe('VatReturnsService', () => {
       expect(stats.pendingReturns).toBe(1);
     });
   });
+
+  describe('computeDraftFromLedger', () => {
+    it('@issue-114 AC1, AC2: sums invoice and bill taxes inside the period, excludes out-of-period records', async () => {
+      prisma.invoice.aggregate.mockResolvedValue({
+        _sum: { subtotal: dec('1000'), taxAmount: dec('140') },
+      });
+      prisma.bill.aggregate.mockResolvedValue({
+        _sum: { subtotal: dec('500'), taxAmount: dec('70') },
+      });
+      prisma.vATReturn.findFirst.mockResolvedValue(null);
+
+      const draft = await service.computeDraftFromLedger(ORG, '2026-01-01', '2026-03-31');
+
+      expect(draft).toMatchObject({
+        outputVat: '140.0000',
+        inputVat: '70.0000',
+        netVat: '70.0000',
+        totalSales: '1000.0000',
+        totalPurchases: '500.0000',
+        mismatches: [],
+      });
+
+      // Verify date window filter excludes out-of-period records
+      const invoiceFilter = prisma.invoice.aggregate.mock.calls[0][0].where;
+      expect(invoiceFilter.date).toEqual({
+        gte: new Date('2026-01-01T00:00:00.000Z'),
+        lt: new Date('2026-04-01T00:00:00.000Z'),
+      });
+      expect(prisma.vATReturn.create).not.toHaveBeenCalled();
+      expect(prisma.vATReturn.update).not.toHaveBeenCalled();
+    });
+
+    it('@issue-114 AC3: when no stored VAT return exists for the period, mismatches is an empty array', async () => {
+      prisma.invoice.aggregate.mockResolvedValue({
+        _sum: { subtotal: dec('500'), taxAmount: dec('70') },
+      });
+      prisma.bill.aggregate.mockResolvedValue({
+        _sum: { subtotal: dec('200'), taxAmount: dec('28') },
+      });
+      prisma.vATReturn.findFirst.mockResolvedValue(null);
+
+      const draft = await service.computeDraftFromLedger(ORG, '2026-01-01', '2026-01-31');
+
+      expect(draft.mismatches).toEqual([]);
+    });
+
+    it('@issue-114 AC4: when a stored VAT return has a totalVat differing from computed netVat, records a mismatch', async () => {
+      prisma.invoice.aggregate.mockResolvedValue({
+        _sum: { subtotal: dec('1000'), taxAmount: dec('140') },
+      });
+      prisma.bill.aggregate.mockResolvedValue({
+        _sum: { subtotal: dec('500'), taxAmount: dec('70') },
+      });
+      prisma.vATReturn.findFirst.mockResolvedValue({
+        netPayable: dec('60.0000'),
+        outputVAT: dec('140.0000'),
+        inputVAT: dec('70.0000'),
+        totalSales: dec('1000.0000'),
+        totalPurchases: dec('500.0000'),
+      });
+
+      const draft = await service.computeDraftFromLedger(ORG, '2026-01-01', '2026-03-31');
+
+      expect(draft.mismatches).toContainEqual({
+        field: 'netVat',
+        computed: '70.0000',
+        recorded: '60.0000',
+      });
+      expect(prisma.vATReturn.findFirst).toHaveBeenCalledWith({
+        where: {
+          organizationId: ORG,
+          deletedAt: null,
+          startDate: new Date('2026-01-01T00:00:00.000Z'),
+          endDate: new Date('2026-03-31T00:00:00.000Z'),
+        },
+      });
+    });
+
+    it('@issue-114 AC5: throws BadRequestException when periodStart is after periodEnd', async () => {
+      await expect(service.computeDraftFromLedger(ORG, '2026-04-01', '2026-01-01')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.computeDraftFromLedger(ORG, '2026-04-01', '2026-01-01')).rejects.toThrow(
+        'periodStart must be before or equal to periodEnd',
+      );
+    });
+
+    it('@issue-114 AC7: rejects periods longer than 366 days with BadRequestException', async () => {
+      await expect(service.computeDraftFromLedger(ORG, '2025-01-01', '2026-01-03')).rejects.toThrow(
+        'The period must not be longer than 366 days',
+      );
+    });
+
+    it('@issue-114: propagates a findFirst rejection as a logged error', async () => {
+      prisma.invoice.aggregate.mockResolvedValue({
+        _sum: { subtotal: dec('1000'), taxAmount: dec('140') },
+      });
+      prisma.bill.aggregate.mockResolvedValue({
+        _sum: { subtotal: dec('500'), taxAmount: dec('70') },
+      });
+      prisma.vATReturn.findFirst.mockRejectedValue(
+        Object.assign(new Error('Connection failure'), {
+          name: 'PrismaClientInitializationError',
+          code: 'P1001',
+        }),
+      );
+
+      await expect(service.computeDraftFromLedger(ORG, '2026-01-01', '2026-03-31')).rejects.toThrow(
+        'Connection failure',
+      );
+    });
+  });
 });
