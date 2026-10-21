@@ -203,7 +203,7 @@ Not run: the full API suite and a real container start of the worker image (no D
 
 ## Issue #141 — round 2 (CTO review T1/T2 and the IntakeModule slice)
 
-Tested on top of `47e55211` plus the working-tree changes of the commit that adds this section. Local sandbox: no Postgres (`localhost:5435` unreachable) and no Docker, so `test/intake-worker.e2e-spec.ts` was **not** re-run here; it runs on CI.
+Tested commit: `819332f65f88f51f3ffea958cc47611741b3253e` (base `47e55211`, commit adding this section). Local sandbox: no Postgres (`localhost:5435` unreachable) and no Docker, so `test/intake-worker.e2e-spec.ts` was **not** re-run here; it runs on CI.
 
 | REQ                                                                      | Verified by                                                                                                                          |
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
@@ -226,7 +226,7 @@ Behaviour notes: `IntakeWorkerModule` now gets the processor from `IntakeModule`
 
 ### PR #237 Review Resolution (final behaviour, supersedes round 2)
 
-Tested on the merge of `origin/master` into `ai/141` plus the working-tree changes of the commit that adds this section (SHA is in `git log` for this file).
+Tested commit: `451cc181003ac043e76f6c8ef69740d6094a57db` (merge of `origin/master` into `ai/141`, commit adding this section).
 
 Final behaviour of the queue contract: the DB row is the source of truth, so a row is never deleted to report a queue problem.
 
@@ -555,7 +555,7 @@ Unset launcher heap_size_limit: 4395630592
 | AC2b | Cursor endpoints reject the other tenant's id                      | `AC2b: foreign ids as cursor return 404, own ids 200`                                        | PASSED |
 | AC3  | No token or an expired token gets 401 on all 14 routes             | two `AC3:` tests                                                                             | PASSED |
 | AC4  | Existing command, no new services                                  | `jest --config ./test/jest-e2e.json` (`pnpm --filter api test:e2e`)                          | PASSED |
-| AC5  | Change ≤ ~300 lines                                                | 307 changed lines of test and source (see Size)                                              | MET    |
+| AC5  | Change ≤ ~300 lines (metric: added lines of test and source)       | 308 added lines of test and source (285 test + 23 source, see Size)                          | MET    |
 
 **Commands and output** (at `34a8ca9c`, from `apps/api`):
 
@@ -587,7 +587,7 @@ $ pnpm exec eslint "{src,test}/**/*.ts" --max-warnings 0                        
 
 Each trial balance has two tenant filters: the account list and the line totals. Removing only one of them leaks nothing, because foreign totals are keyed by foreign account ids that the org-scoped account list never holds. Removing both makes the AC2 trial balance test fail, as the two trial-balance rows show.
 
-**Size (AC5).** `git diff --numstat origin/master HEAD -- apps/api e2e-army` at the tested commit: `tenant-isolation.e2e-spec.ts` 285, three services 23, e2e-army 0 = 308 added lines of test and source. The earlier 501 came from a 367-line spec and a 108-line e2e-army file; the e2e-army file was removed and the three AC2 list tests were merged. All four earlier reviewer requests stay covered: second general-ledger route, `meta.total`, vendor-credit netting in AP aging, foreign cursor ids.
+**Size (AC5).** Metric: added lines of test and source. `git diff --numstat origin/master HEAD -- apps/api e2e-army` at the tested commit: `tenant-isolation.e2e-spec.ts` 285, three services 23, e2e-army 0 = 308 added lines of test and source. The earlier 501 came from a 367-line spec and a 108-line e2e-army file; the e2e-army file was removed and the three AC2 list tests were merged. All four earlier reviewer requests stay covered: second general-ledger route, `meta.total`, vendor-credit netting in AP aging, foreign cursor ids.
 
 **Suite stability.** Before `34a8ca9c` the unmutated suite failed in about 1 of 7 to 16 consecutive runs on this shared machine, always while seeding or on one request (405 on `POST /bills/:id/approve`, 404 on `POST /vendor-credits`, `socket hang up`), never in an assertion. Cause: supertest binds and releases a fresh ephemeral port per request, and another process can claim it in between. `beforeAll` now calls `app.listen(0, '127.0.0.1')` once. After the change, 60 consecutive runs passed. The cause is inferred from the pattern and the fix, not traced to a specific foreign process.
 
