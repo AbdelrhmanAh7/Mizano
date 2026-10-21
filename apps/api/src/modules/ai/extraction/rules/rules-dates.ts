@@ -54,16 +54,26 @@ const NAMED_RE = new RegExp(
 );
 
 /** Collapse whitespace runs to one space, keeping the line index of every kept character. */
-function collapseWhitespace(input: string): { text: string; toLine: number[] } {
-  let text = '';
+export function collapseWhitespace(input: string): { text: string; toLine: number[] } {
+  const chars: string[] = [];
   const toLine: number[] = [];
+  let inWhitespace = false;
   for (let i = 0; i < input.length; i++) {
-    const isSpace = /\s/.test(input[i]);
-    if (isSpace && text.endsWith(' ')) continue;
-    text += isSpace ? ' ' : input[i];
-    toLine.push(i);
+    const ch = input[i];
+    const isSpace = ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r' || /\s/.test(ch);
+    if (isSpace) {
+      if (!inWhitespace) {
+        chars.push(' ');
+        toLine.push(i);
+        inWhitespace = true;
+      }
+    } else {
+      chars.push(ch);
+      toLine.push(i);
+      inWhitespace = false;
+    }
   }
-  return { text, toLine };
+  return { text: chars.join(''), toLine };
 }
 
 /** First date found in a digit-normalized line, or null. */

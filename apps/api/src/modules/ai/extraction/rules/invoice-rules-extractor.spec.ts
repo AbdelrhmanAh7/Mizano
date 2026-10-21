@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { findAmounts, parseAmount } from './rules-amounts';
-import { parseDate } from './rules-dates';
+import { collapseWhitespace, parseDate } from './rules-dates';
 import { extractInvoiceFields } from './invoice-rules-extractor';
 import { normalizeDigits } from './rules-normalize';
 import { toExtractionResult } from '../rules-strategy.service';
@@ -41,6 +41,33 @@ describe('parseAmount', () => {
   it('rejects values beyond Decimal(19,4) bounds', () => {
     expect(parseAmount('1234567890123456')).toBeNull();
     expect(parseAmount('1.12345')).toBeNull();
+  });
+});
+
+describe('collapseWhitespace', () => {
+  it('collapses whitespace runs and maps indices back to input', () => {
+    const input = '   Date:   15   March   2024   ';
+    const { text, toLine } = collapseWhitespace(input);
+    expect(text).toBe(' Date: 15 March 2024 ');
+    expect(toLine).toHaveLength(text.length);
+    for (let i = 0; i < text.length; i++) {
+      expect(toLine[i]).toBeGreaterThanOrEqual(0);
+      expect(toLine[i]).toBeLessThan(input.length);
+      if (text[i] !== ' ') {
+        expect(input[toLine[i]]).toBe(text[i]);
+      }
+    }
+  });
+
+  it('efficiently handles large inputs with extensive whitespace runs in O(N)', () => {
+    const chunk = 'word     \t\t\n\r   ';
+    const input = chunk.repeat(10000); // 180,000 chars
+    const start = Date.now();
+    const { text, toLine } = collapseWhitespace(input);
+    const durationMs = Date.now() - start;
+    expect(durationMs).toBeLessThan(1000);
+    expect(text.length).toBeLessThan(input.length);
+    expect(toLine.length).toBe(text.length);
   });
 });
 
