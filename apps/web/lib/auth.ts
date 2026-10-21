@@ -155,7 +155,6 @@ export const authOptions: NextAuthOptions = {
       session.accessToken = token.accessToken as string;
       // The refresh token stays in the encrypted JWT cookie (server-side only);
       // /api/auth/session must not expose it to the browser.
-      // session.refreshToken = token.refreshToken as string;
 
       if (token.error) {
         session.error = token.error as string;

@@ -54,23 +54,7 @@ describe('GET /api/auth/session (NextAuth route)', () => {
 
     expect(status).toBe(200);
     // AC1: verify the complete session shape — all reachable user fields,
-    // accessToken, and a string expires value.
-    expect(session).toHaveProperty('user');
-    const user = session.user as Record<string, unknown>;
-    expect(user).toHaveProperty('id', 'user-1');
-    expect(user).toHaveProperty('email', 'admin@mizano.com');
-    expect(user).toHaveProperty('name', 'Admin User');
-    expect(user).toHaveProperty('firstName', 'Admin');
-    expect(user).toHaveProperty('lastName', 'User');
-    expect(user).toHaveProperty('organizationId', 'org-1');
-    expect(user).toHaveProperty('role', 'admin');
-
-    expect(session).toHaveProperty('accessToken', 'access-token-1');
-    expect(typeof session.accessToken).toBe('string');
-    expect(session).toHaveProperty('expires');
-    expect(typeof session.expires).toBe('string');
-
-    // Deep equality ensures no missing or unexpected fields exist.
+    // accessToken, and a string expires value. Deep equality verifies no missing or unexpected fields exist.
     expect(session).toEqual({
       user: {
         name: 'Admin User',
@@ -84,11 +68,9 @@ describe('GET /api/auth/session (NextAuth route)', () => {
       accessToken: 'access-token-1',
       expires: expect.any(String),
     });
+
     // AC2: the refresh token must NOT appear in the client-visible session.
     expect(session).not.toHaveProperty('refreshToken');
-    expect(Object.keys(session)).not.toContain('refreshToken');
-    expect(user).not.toHaveProperty('refreshToken');
-    expect(Object.keys(user)).not.toContain('refreshToken');
     expect(body).not.toContain('refreshToken');
     expect(body).not.toContain('secret-refresh-token');
   });
@@ -101,22 +83,6 @@ describe('GET /api/auth/session (NextAuth route)', () => {
     const session = JSON.parse(body) as Record<string, unknown>;
 
     expect(status).toBe(200);
-    expect(session).toHaveProperty('user');
-    const user = session.user as Record<string, unknown>;
-    expect(user).toHaveProperty('id', 'user-1');
-    expect(user).toHaveProperty('email', 'admin@mizano.com');
-    expect(user).toHaveProperty('name', 'Admin User');
-    expect(user).toHaveProperty('firstName', 'Admin');
-    expect(user).toHaveProperty('lastName', 'User');
-    expect(user).toHaveProperty('organizationId', 'org-1');
-    expect(user).toHaveProperty('role', 'admin');
-
-    expect(session).toHaveProperty('accessToken', 'access-token-1');
-    expect(typeof session.accessToken).toBe('string');
-    expect(session).toHaveProperty('expires');
-    expect(typeof session.expires).toBe('string');
-    expect(session).toHaveProperty('error', 'RefreshAccessTokenError');
-
     expect(session).toEqual({
       user: {
         name: 'Admin User',
@@ -132,9 +98,6 @@ describe('GET /api/auth/session (NextAuth route)', () => {
       error: 'RefreshAccessTokenError',
     });
     expect(session).not.toHaveProperty('refreshToken');
-    expect(Object.keys(session)).not.toContain('refreshToken');
-    expect(user).not.toHaveProperty('refreshToken');
-    expect(Object.keys(user)).not.toContain('refreshToken');
     expect(body).not.toContain('refreshToken');
     expect(body).not.toContain('secret-refresh-token');
   });
