@@ -177,7 +177,28 @@
       "dueDateRequired": "Due date is required",
       "notes": "Notes",
       "project": "Project",
-      "lineItemRequired": "At least one line item is required"
+      "lineItemRequired": "At least one line item is required",
+      "item": "Item",
+      "itemPlaceholder": "Select item",
+      "manualEntry": "Manual Entry",
+      "expenseAccount": "Expense account",
+      "expenseAccountPlaceholder": "Choose an expense account",
+      "searchPlaceholder": "Search...",
+      "noResults": "No results found",
+      "previousPage": "Previous",
+      "nextPage": "Next",
+      "pageOf": "Page {page} of {totalPages}",
+      "description": "Description",
+      "descriptionPlaceholder": "Description",
+      "qty": "Qty",
+      "unitPrice": "Unit Price",
+      "amount": "Amount",
+      "taxPercent": "Tax %",
+      "total": "Total",
+      "subtotal": "Subtotal",
+      "tax": "Tax",
+      "addLine": "Add line",
+      "deleteLine": "Delete line item"
     },
     "table": {
       "billNumber": "Bill #",
@@ -215,7 +236,8 @@
       "quantityInvalid": "Quantity must be a non-negative number",
       "quantityPositive": "Quantity must be greater than zero",
       "rateInvalid": "Rate must be a non-negative number",
-      "taxInvalid": "Tax % must be a non-negative number"
+      "taxInvalid": "Tax % must be a non-negative number",
+      "accountRequired": "Choose an expense account"
     },
     "bulkApprove": {
       "title": "Approve and post {count} bills?",
