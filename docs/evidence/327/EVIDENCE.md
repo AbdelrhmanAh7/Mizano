@@ -5,6 +5,7 @@ This document provides verification evidence for GitHub issue #327 in `Abdelrhma
 - **Issue**: [#327](https://github.com/AbdelrhmanAh7/Mizano/issues/327)
 - **PR**: Supersedes part of #268
 - **Base commit**: `e07f1e3d7585844a9af23dae48f870087993e4b3` (`origin/master`)
+- **Tested head commit**: `85e4d2775bd3d73a3b69032aac368096fbfd37d7`
 - **Tested branch**: `ai/327`
 - **Originating Sentry issue**: None (internal QA finding on PR #268, item `finding:0c995b7c7170`)
 - **Host environment**: Darwin arm64 (macOS), Python 3.12, pnpm 8.14.0, Node.js v20+
