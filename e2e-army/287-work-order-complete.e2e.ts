@@ -22,6 +22,32 @@ async function post(api: string, path: string, headers: Record<string, string>, 
   return id as string;
 }
 
+async function getWarehouseId(api: string, headers: Record<string, string>): Promise<string> {
+  const res = await fetch(`${api}/warehouses`, { headers });
+  if (res.ok) {
+    const json = (await res.json().catch(() => ({}))) as { data?: Array<{ id?: string }> } | Array<{ id?: string }>;
+    const list = Array.isArray(json) ? json : (json.data ?? []);
+    if (list.length > 0 && list[0]?.id) return list[0].id;
+  }
+  return post(api, '/warehouses', headers, { code: `${SEED}-WH`, name: `${SEED}-warehouse` });
+}
+
+async function getAdjustmentAccountId(api: string, headers: Record<string, string>): Promise<string> {
+  const res = await fetch(`${api}/inventory-adjustments/account-options`, { headers });
+  if (res.ok) {
+    const json = (await res.json().catch(() => ({}))) as { data?: Array<{ id?: string }> } | Array<{ id?: string }>;
+    const list = Array.isArray(json) ? json : (json.data ?? []);
+    if (list.length > 0 && list[0]?.id) return list[0].id;
+  }
+  const accRes = await fetch(`${api}/accounts`, { headers });
+  if (accRes.ok) {
+    const json = (await accRes.json().catch(() => ({}))) as { data?: Array<{ id?: string }> } | Array<{ id?: string }>;
+    const list = Array.isArray(json) ? json : (json.data ?? []);
+    if (list.length > 0 && list[0]?.id) return list[0].id;
+  }
+  throw new Error('No account found for inventory adjustment');
+}
+
 // Creates a BOM and a work order through the API and starts it, so the UI can complete it.
 async function createStartedWorkOrder(baseUrl: string): Promise<string> {
   const api = apiBase(baseUrl);
@@ -43,6 +69,20 @@ async function createStartedWorkOrder(baseUrl: string): Promise<string> {
   });
   const outputItemId = await post(api, '/inventory/items', headers, item('OUT'));
   const componentItemId = await post(api, '/inventory/items', headers, item('COMP'));
+
+  // Ensure component has available stock for the BOM requirement (2 * 5 = 10 units)
+  const warehouseId = await getWarehouseId(api, headers);
+  const accountId = await getAdjustmentAccountId(api, headers);
+  await post(api, '/inventory-adjustments', headers, {
+    date: new Date().toISOString().slice(0, 10),
+    warehouseId,
+    itemId: componentItemId,
+    type: 'INCREASE',
+    quantity: 10,
+    reason: 'STOCKTAKE',
+    accountId,
+  });
+
   const bomId = await post(api, '/manufacturing/bom', headers, {
     name: `${SEED}-bom`,
     outputItemId,

@@ -351,7 +351,10 @@ export function useCompleteWorkOrder() {
       quantityProduced?: number;
       producedQuantity?: number;
     }) => {
-      const qty = quantityProduced ?? producedQuantity ?? 0;
+      const qty = quantityProduced ?? producedQuantity;
+      if (qty === undefined) {
+        throw new Error('A completion quantity is required');
+      }
       return workOrderApi.complete(id, qty);
     },
     onSuccess: (_, variables) => {

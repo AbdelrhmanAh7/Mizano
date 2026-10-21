@@ -83,4 +83,19 @@ describe('useCompleteWorkOrder', () => {
     });
     expect(mockApiPost).toHaveBeenCalledTimes(1);
   });
+
+  it('rejects completion when quantity is missing', async () => {
+    const { result } = renderHook(() => useCompleteWorkOrder(), { wrapper: createWrapper() });
+
+    await expect(
+      act(async () => {
+        await result.current.mutateAsync({ id: 'wo1' } as unknown as {
+          id: string;
+          quantityProduced?: number;
+        });
+      }),
+    ).rejects.toThrow('A completion quantity is required');
+
+    expect(mockApiPost).not.toHaveBeenCalled();
+  });
 });
