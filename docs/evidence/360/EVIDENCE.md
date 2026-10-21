@@ -6,7 +6,7 @@ This document provides verification evidence for GitHub issue #360 in `Abdelrhma
 - **PR**: Supersedes part of #341
 - **Parent Issue**: #333
 - **Base Commit (`origin/master`)**: `d740dda95a3297a7605d836ea4aaae7eecdd7bb4`
-- **Tested Head Commit**: `HEAD`
+- **Tested Head Commit**: `500e01a0be5f79116e0be5a73e440445d44ce97e`
 - **Tested Branch**: `ai/360`
 - **Originating Sentry Issue**: None (originates from CodeRabbit review discussion `r4334423649` on PR #341 / parent issue #333).
 - **Host Environment**: Darwin arm64 (macOS), Python 3.14.8 / 3.12, Node.js v20+, pnpm 8.14.0.
