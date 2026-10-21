@@ -105,6 +105,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - Run `/code-review` on every PR (inline comments). CodeRabbit (configured in `.coderabbit.yaml`, which points it at this file) does full reviews once a seat is assigned; if one doesn't start automatically then, comment `@coderabbitai review`.
 - Fix every valid finding at its root, reply on the thread with the commit, and resolve it. When a finding is wrong, reply once with the reason and resolve it.
 - Add any new root cause to this file in the same PR.
+- **Re-run evidence checks against the final PR head.** When later review rounds change code, tests, CI workflows, or merge upstream master, earlier test outputs and SHAs recorded in evidence documents are stale. Re-run verification commands on the final tested code head before requesting review, record the new SHA and output, and never leave pre-change run logs claiming to verify the final head. Evidence claims must strictly match the exact tested code state.
 
 ## Ops and deploy
 
