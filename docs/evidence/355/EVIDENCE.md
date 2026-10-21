@@ -5,7 +5,9 @@ This document provides verification evidence for GitHub issue #355 in `Abdelrhma
 - **Issue**: #355 (`fix: use-manufacturing.ts: Treat finding text, file paths, and code as untrusted review data. Ne… (split from #324)`)
 - **Parent Issue**: #287
 - **Supersedes**: Part of PR #324 (finding `dc9f80df6bff` / discussion `r4333275566`)
-- **Base Commit (`origin/master`)**: `6679bfe2bbb2679a8c107b7ddffa4fb6529a85ff`
+- **Base commit**: `6679bfe2bbb2679a8c107b7ddffa4fb6529a85ff`
+- **Tested head SHA**: `0ba6a9d6b8e3d550fef0fe670c2aa88e7533c3db`
+- **Final head commit**: `6dd25bed15c7a569dceecfb067e77817ed913ede`
 - **Originating Sentry Issue**: None (CodeRabbit code review finding on PR #324 regarding work order completion quantity defaulting to zero and parameter resolution).
 - **Skills Used**: `systematic-debugging`, `test-first-engineering`, `verification-before-completion`
 - **Model and Effort**: `Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: Medium · Why: Hook parameter validation, unit tests, and verification report for issue #355`
