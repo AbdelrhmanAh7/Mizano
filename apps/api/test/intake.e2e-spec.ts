@@ -11,6 +11,10 @@ import { eventually } from './helpers/journey.helper';
 import { ApiHelper } from './helpers/api-client.helper';
 import { ExtractionStrategyResolver } from '../src/modules/ai/extraction/extraction-strategy-resolver.service';
 import { IntakeStorage, sha256Hex } from '../src/modules/ai/intake/intake-storage';
+import { IntakeProcessorService } from '../src/modules/ai/intake/intake-processor.service';
+import { IntakeQueueService } from '../src/modules/ai/intake/intake-queue.service';
+import { DocumentIntakeService } from '../src/modules/ai/services/document-intake.service';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 process.env.INTAKE_RETRY_BASE_MS = '50';
@@ -63,10 +67,22 @@ function pdfFixture(marker: string): Buffer {
   );
 }
 
+/**
+ * The API process only enqueues; in production `IntakeWorkerModule` runs the processor in its own
+ * container. These tests stand in for that worker by registering the processor on the app's queue.
+ */
 async function boot(): Promise<INestApplication> {
-  return createTestApp((builder) =>
+  const app = await createTestApp((builder) =>
     builder.overrideProvider(ExtractionStrategyResolver).useValue(stubResolver),
   );
+  new IntakeProcessorService(
+    app.get(PrismaService),
+    app.get(IntakeStorage),
+    app.get(DocumentIntakeService),
+    app.get(IntakeQueueService),
+    app.get(ConfigService),
+  ).onModuleInit();
+  return app;
 }
 
 describe('Document intake (e2e)', () => {

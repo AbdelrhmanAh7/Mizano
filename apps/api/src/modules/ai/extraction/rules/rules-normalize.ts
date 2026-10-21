@@ -11,19 +11,31 @@ const PERSIAN_ZERO = 0x06f0;
  * - bidi control marks, tatweel and Arabic diacritics are removed
  */
 export function normalizeDigits(input: string): string {
-  let out = '';
+  return normalizeWithOffsets(input).normalized;
+}
+
+/**
+ * Same normalization as {@link normalizeDigits}, plus `toOriginal[i]`: the UTF-16
+ * index in `input` of the source code point that produced `normalized[i]`. A
+ * non-BMP code point (emoji) yields two entries pointing at its first unit.
+ */
+export function normalizeWithOffsets(input: string): { normalized: string; toOriginal: number[] } {
+  let normalized = '';
+  const toOriginal: number[] = [];
+  let pos = 0;
   for (const ch of input) {
     const code = ch.codePointAt(0) ?? 0;
+    let rep = ch;
     if (code >= ARABIC_INDIC_ZERO && code <= ARABIC_INDIC_ZERO + 9) {
-      out += String(code - ARABIC_INDIC_ZERO);
+      rep = String(code - ARABIC_INDIC_ZERO);
     } else if (code >= PERSIAN_ZERO && code <= PERSIAN_ZERO + 9) {
-      out += String(code - PERSIAN_ZERO);
+      rep = String(code - PERSIAN_ZERO);
     } else if (code === 0x066c) {
-      out += ',';
+      rep = ',';
     } else if (code === 0x066b) {
-      out += '.';
+      rep = '.';
     } else if (code === 0x066a) {
-      out += '%';
+      rep = '%';
     } else if (
       code === 0x200e ||
       code === 0x200f ||
@@ -33,12 +45,38 @@ export function normalizeDigits(input: string): string {
       (code >= 0x064b && code <= 0x065f) ||
       code === 0x0670
     ) {
-      // dropped
-    } else {
-      out += ch;
+      rep = '';
     }
+    normalized += rep;
+    for (let k = 0; k < rep.length; k++) toOriginal.push(pos);
+    pos += ch.length;
   }
-  return out;
+  return { normalized, toOriginal };
+}
+
+/**
+ * Translate a `[start, end)` span of normalized text to the original text. The
+ * result is clamped to `[0, originalLength]`, and an end inside a source cluster
+ * (e.g. half of a surrogate pair) widens to cover the whole cluster.
+ */
+export function mapSpanToOriginal(
+  start: number,
+  end: number,
+  toOriginal: number[],
+  originalLength: number,
+): { start: number; end: number } {
+  const n = toOriginal.length;
+  const s = Math.min(Math.max(start, 0), n);
+  const e = Math.min(Math.max(end, s), n);
+  const clamp = (v: number): number => Math.min(Math.max(v, 0), originalLength);
+  const origStart = s < n ? toOriginal[s] : originalLength;
+  if (e <= s) return { start: clamp(origStart), end: clamp(origStart) };
+  const src = toOriginal[e - 1];
+  let runEnd = e;
+  while (runEnd < n && toOriginal[runEnd] === src) runEnd++;
+  let runStart = e - 1;
+  while (runStart > 0 && toOriginal[runStart - 1] === src) runStart--;
+  return { start: clamp(origStart), end: clamp(src + (runEnd - runStart)) };
 }
 
 /** Fold letters for keyword matching only (never used for evidence snippets). */
