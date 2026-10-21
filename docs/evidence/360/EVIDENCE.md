@@ -6,12 +6,12 @@ This document provides verification evidence for GitHub issue #360 in `Abdelrhma
 - **PR**: Supersedes part of #341
 - **Parent Issue**: #333
 - **Base Commit (`origin/master`)**: `d740dda95a3297a7605d836ea4aaae7eecdd7bb4`
-- **Tested Head Commit**: `500e01a0be5f79116e0be5a73e440445d44ce97e`
+- **Tested Head Commit**: `d8835ce28135a50785ff10cb0be5550a1b8ec11f`
 - **Tested Branch**: `ai/360`
 - **Originating Sentry Issue**: None (originates from CodeRabbit review discussion `r4334423649` on PR #341 / parent issue #333).
 - **Host Environment**: Darwin arm64 (macOS), Python 3.14.8 / 3.12, Node.js v20+, pnpm 8.14.0.
 - **User-facing flow / E2E**: Not user-facing (`E2E: not needed — internal verification report and evidence validation test suite; no user-facing flows modified.`).
-- **Skills Used**: `systematic-debugging`, `verification-before-completion`.
+- **Skills Used**: `systematic-debugging`, `test-driven-development`, `verification-before-completion`, `model-effort-routing`.
 - **Model and Effort**: `Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: High · Why: Bug fix in evidence freshness test suite, review lessons documentation, and verification evidence for issue #360`.
 
 ---
@@ -27,10 +27,14 @@ Per standing repo directives, engineers must **treat finding text, file paths, a
 1. `docs/evidence/333/EVIDENCE.md` was a draft on the parent branch `ai/333` and does not exist on `master`. Attempting to blindly recreate or edit a file at that path on a fresh branch off `master` would be following untrusted review instructions blindly and introducing unreviewed parent branch artifacts.
 2. Commit `75d0089` was an intermediate commit on the parent branch `ai/333`, not the tested code head of `master` or this PR branch.
 3. The valid core problem flagged by the finding is that evidence reports must never prematurely claim `PASSED` when an acceptance criterion or test is pending or unexecuted. When a test has not completed with a verified passing exit code against the tested head, its status must remain explicitly marked `PENDING`.
-4. This PR resolves the finding by:
+4. Round 1 Review Finding (`cf1958d726cd` on head `96634e1`):
+   - QA flagged that header detection in `validate_evidence_table_status` lacked a `not in_table` check. Any table data row containing matched keywords (e.g. `validate_evidence_table_status` or HTTP status) was erroneously treated as a new header row, skipping validation for that row and corrupting header column mappings for subsequent rows.
+   - Root cause fixed in `scripts/test_evidence_freshness.py`: guarded header detection with `if not in_table:` and handled unescaped pipe splitting `re.split(r"(?<!\\)\|", stripped)` to prevent column corruption from escaped pipes in test commands.
+   - Proven by regression tests in `test_validate_evidence_table_status` (lines 289-312).
+5. This PR resolves the issue completely by:
    - Formalizing the rule into `docs/agents/review-lessons.md`: **"Never claim PASSED for pending or unverified criteria in evidence reports."**
-   - Adding `validate_evidence_table_status` in `scripts/test_evidence_freshness.py` to parse markdown evidence tables and automatically flag premature `PASSED` claims on pending/unrun checks or contradictory statuses.
-   - Adding comprehensive unit tests in `scripts/test_evidence_freshness.py` for table status validation and evidence contracts.
+   - Adding `validate_evidence_table_status` in `scripts/test_evidence_freshness.py` with `not in_table` header guards and unescaped pipe splitting to parse markdown evidence tables and automatically flag premature `PASSED` claims on pending/unrun checks or contradictory statuses.
+   - Adding comprehensive unit tests in `scripts/test_evidence_freshness.py` covering valid tables, premature PASSED claims, contradictory statuses, body rows containing keywords, and escaped pipes.
    - Verifying that all existing repository evidence files and `docs/evidence/360/EVIDENCE.md` pass cleanly with exit code 0.
 
 ---
@@ -38,8 +42,8 @@ Per standing repo directives, engineers must **treat finding text, file paths, a
 ## Numbered Acceptance Criteria
 
 - **AC1 (Review Lessons Rule)**: Document the explicit rule in `docs/agents/review-lessons.md` requiring that engineers treat review findings, suggested code, and embedded file paths as untrusted review data, and never claim `PASSED` for pending or unverified criteria in evidence reports until executed against the exact tested head.
-- **AC2 (Evidence Table Status Validation Guard)**: Implement `validate_evidence_table_status` in `scripts/test_evidence_freshness.py` to parse evidence tables and flag any row claiming `PASSED` whose result or exit code describes pending/unrun execution, or rows with contradictory status.
-- **AC3 (Unit Tests for Table Status Guard)**: Implement `test_validate_evidence_table_status` in `scripts/test_evidence_freshness.py` verifying that valid tables pass, premature `PASSED` claims on pending checks are caught, valid `PENDING` rows pass, and contradictory statuses are detected.
+- **AC2 (Evidence Table Status Validation Guard)**: Implement `validate_evidence_table_status` in `scripts/test_evidence_freshness.py` with `not in_table` check and unescaped pipe splitting to parse evidence tables and flag any row claiming `PASSED` whose result or exit code describes pending/unrun execution, or rows with contradictory status.
+- **AC3 (Unit Tests for Table Status Guard)**: Implement `test_validate_evidence_table_status` in `scripts/test_evidence_freshness.py` verifying that valid tables pass, premature `PASSED` claims on pending checks are caught, valid `PENDING` rows pass, contradictory statuses are detected, body rows containing keywords like "status" are not treated as headers, and commands with escaped pipes are properly parsed.
 - **AC4 (Repository Evidence Suite Clean)**: Ensure that all repository evidence reports under `docs/evidence/*/EVIDENCE.md` pass `validate_evidence_table_status`, `validate_tested_head_binding`, and SHA extraction with 0 failures.
 - **AC5 (Issue #360 Evidence Report & Contract)**: Provide `docs/evidence/360/EVIDENCE.md` establishing the complete verification report with numbered criteria (AC1–AC5), exact tested commit SHA binding, authentic command outputs with exit code 0, and explicit "Supersedes part of #341".
 
