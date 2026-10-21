@@ -4,7 +4,7 @@ This document provides verification evidence for GitHub issue #326 in `Abdelrhma
 
 - **Issue**: #326 (fix: 167-work-order-complete.e2e.ts: major (Claude Sonnet 5.5·medium): A bare import './277-work-order-com… split from PR #303)
 - **Base commit (`origin/master`)**: `e07f1e3d7585844a9af23dae48f870087993e4b3`
-- **Tested Head (`ai/326`)**: `fdf579dd2d52ec300fa8e434f07a7e3d16aa2ca7`
+- **Tested Code Commit (`ai/326`)**: `fdf579dd2d52ec300fa8e434f07a7e3d16aa2ca7`
 - **Supersedes**: Part of #303 (specifically resolving CodeReview finding `4c59d0fbb73a` / discussion `r4331288511`)
 - **Originating Sentry issue**: None found (internal code review finding on PR #303 regarding duplicate test registration in e2e-army runner).
 - **Skills used**: `model-effort-routing`, `diagnosing-bugs`, `systematic-debugging`, `verification-before-completion`, `test-first`
