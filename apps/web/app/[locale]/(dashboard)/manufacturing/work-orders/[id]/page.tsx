@@ -80,7 +80,7 @@ export default function WorkOrderDetailPage() {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   const [recordDialogOpen, setRecordDialogOpen] = useState(false);
-  const [producedQuantity, setProducedQuantity] = useState<number>(0);
+  const [quantityProduced, setQuantityProduced] = useState<number>(0);
   const [rejectedQuantity, setRejectedQuantity] = useState<number>(0);
   const [wastageQuantity, setWastageQuantity] = useState<number>(0);
   const [productionNotes, setProductionNotes] = useState('');
@@ -116,7 +116,7 @@ export default function WorkOrderDetailPage() {
 
   const handleComplete = async () => {
     try {
-      await completeWorkOrder.mutateAsync({ id: workOrderId, quantityProduced: producedQuantity });
+      await completeWorkOrder.mutateAsync({ id: workOrderId, quantityProduced });
       toast({ title: t('workOrders.status.completed') });
       setCompleteDialogOpen(false);
     } catch (error: unknown) {
@@ -133,7 +133,7 @@ export default function WorkOrderDetailPage() {
   const handleRecordProduction = async () => {
     try {
       await recordProduction.mutateAsync({
-        quantityProduced: producedQuantity,
+        quantityProduced,
         quantityRejected: rejectedQuantity || undefined,
         wastageQuantity: wastageQuantity || undefined,
         notes: productionNotes || undefined,
@@ -141,7 +141,7 @@ export default function WorkOrderDetailPage() {
       });
       toast({ title: 'Production entry recorded' });
       setRecordDialogOpen(false);
-      setProducedQuantity(0);
+      setQuantityProduced(0);
       setRejectedQuantity(0);
       setWastageQuantity(0);
       setProductionNotes('');
@@ -279,7 +279,7 @@ export default function WorkOrderDetailPage() {
               <Button
                 variant="outline"
                 onClick={() => {
-                  setProducedQuantity(1);
+                  setQuantityProduced(1);
                   setProductionDate(new Date().toISOString().split('T')[0]);
                   setRecordDialogOpen(true);
                 }}
@@ -289,7 +289,7 @@ export default function WorkOrderDetailPage() {
               </Button>
               <Button
                 onClick={() => {
-                  setProducedQuantity(workOrder.quantity);
+                  setQuantityProduced(workOrder.quantity);
                   setCompleteDialogOpen(true);
                 }}
               >
@@ -516,8 +516,8 @@ export default function WorkOrderDetailPage() {
                 <Input
                   type="number"
                   min="1"
-                  value={producedQuantity}
-                  onChange={(e) => setProducedQuantity(Number(e.target.value))}
+                  value={quantityProduced}
+                  onChange={(e) => setQuantityProduced(Number(e.target.value))}
                 />
               </div>
               <div className="space-y-2">
@@ -555,7 +555,7 @@ export default function WorkOrderDetailPage() {
             </Button>
             <Button
               onClick={() => void handleRecordProduction()}
-              disabled={recordProduction.isPending || producedQuantity <= 0}
+              disabled={recordProduction.isPending || quantityProduced <= 0}
             >
               {recordProduction.isPending ? 'Recording...' : 'Record Entry'}
             </Button>
@@ -575,14 +575,14 @@ export default function WorkOrderDetailPage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="producedQuantity">Quantity Produced</Label>
+              <Label htmlFor="quantityProduced">Quantity Produced</Label>
               <Input
-                id="producedQuantity"
+                id="quantityProduced"
                 type="number"
                 min="1"
                 max={workOrder.quantity}
-                value={producedQuantity}
-                onChange={(e) => setProducedQuantity(Number(e.target.value))}
+                value={quantityProduced}
+                onChange={(e) => setQuantityProduced(Number(e.target.value))}
               />
               <p className="text-xs text-muted-foreground">
                 Planned quantity: {workOrder.quantity}
@@ -595,7 +595,7 @@ export default function WorkOrderDetailPage() {
             </Button>
             <Button
               onClick={() => void handleComplete()}
-              disabled={completeWorkOrder.isPending || producedQuantity <= 0}
+              disabled={completeWorkOrder.isPending || quantityProduced <= 0}
             >
               {completeWorkOrder.isPending ? 'Completing...' : 'Complete Production'}
             </Button>
