@@ -6,7 +6,7 @@ This document provides verification evidence for GitHub issue #356 in `Abdelrhma
 - **PR**: Supersedes part of #324
 - **Parent Issue**: #287
 - **Base Commit (`origin/master`)**: `6679bfe2bbb2679a8c107b7ddffa4fb6529a85ff`
-- **Tested Head Commit**: `81804f5b5f2a1bb4f686cae45e7f12a2080a2948`
+- **Tested Head Commit**: `71ab4d9771e5fb6a7938157c1577a64ab57c3b2c`
 - **Tested Branch**: `ai/356`
 - **Originating Sentry Issue**: None (internal code review / QA finding on PR #324, item `finding:77a7e799c2f7`, originating from PR #287 review discussion `r4333275606`).
 - **Host Environment**: Darwin arm64 (macOS), Python 3.14.8 / 3.12, Node.js v20+, pnpm 8.14.0.
