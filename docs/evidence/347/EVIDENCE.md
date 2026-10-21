@@ -6,6 +6,7 @@
 - **Parent Issue**: #114
 - **Supersedes part of**: PR #117 (finding `72584f34415c`)
 - **Base Commit**: `113500149241f4890ade939099e376a7a0eddbe2` (`master`)
+- **Tested Head Commit**: `654e0608efd7a9e565b5081250701ad6e13d0a86` (`ai/347`)
 - **Originating Sentry Issue**: None (split finding from PR #117 test coverage audit).
 - **User-facing flow / E2E**: Not user-facing (backend VAT return draft computation and exception detection unit service). No user-facing UI route modified.
 
