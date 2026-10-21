@@ -96,18 +96,19 @@ def validate_evidence_table_status(text: str) -> list[str]:
             headers = []
             continue
 
-        parts = [p.strip() for p in stripped.split("|")[1:-1]]
+        parts = [p.strip().replace(r"\|", "|") for p in re.split(r"(?<!\\)\|", stripped)[1:-1]]
         if not parts:
-            continue
-
-        # Header row detection
-        if any(re.search(r"(?i:criterion|ac id|ac\b|status|exit code)", p) for p in parts):
-            headers = [p.lower() for p in parts]
-            in_table = True
             continue
 
         # Separator row (e.g. |:---|:---|)
         if all(re.match(r"^:?-+:?$", p) for p in parts):
+            continue
+
+        # Header row detection (only when not already inside a table)
+        if not in_table:
+            if any(re.search(r"(?i:criterion|ac id|ac\b|status|exit code)", p) for p in parts):
+                headers = [p.lower() for p in parts]
+                in_table = True
             continue
 
         if in_table and headers and len(parts) == len(headers):
@@ -284,6 +285,31 @@ class EvidenceFreshnessTests(unittest.TestCase):
         contra_violations = validate_evidence_table_status(contradictory)
         self.assertEqual(len(contra_violations), 1)
         self.assertIn("contradictory status", contra_violations[0])
+
+        # Data rows containing keywords like 'status' or 'exit code' must not be treated as headers
+        # or corrupt header mappings for subsequent rows
+        table_with_keyword_in_body = (
+            "| AC ID | Requirement | Command | Observed Result | Exit Code | Status |\n"
+            "| :--- | :--- | :--- | :--- | :--- | :--- |\n"
+            "| **AC1** | Test validate_evidence_table_status function | `pnpm test` | pending execution | 0 | **PASSED** |\n"
+            "| **AC2** | Check HTTP status code handling | `curl http://...` | pending execution | 0 | **PASSED** |\n"
+        )
+        body_violations = validate_evidence_table_status(table_with_keyword_in_body)
+        self.assertEqual(len(body_violations), 2)
+        self.assertIn("claims PASSED but result or exit code is pending/unrun", body_violations[0])
+        self.assertIn("AC1", body_violations[0])
+        self.assertIn("claims PASSED but result or exit code is pending/unrun", body_violations[1])
+        self.assertIn("AC2", body_violations[1])
+
+        # Table rows with escaped pipes in commands must parse columns accurately
+        table_with_escaped_pipes = (
+            "| AC ID | Requirement | Command | Observed Result | Exit Code | Status |\n"
+            "| :--- | :--- | :--- | :--- | :--- | :--- |\n"
+            "| **AC1** | Regex filter test | `jest -t \"foo\\|bar\"` | pending verification | 0 | **PASSED** |\n"
+        )
+        escaped_pipe_violations = validate_evidence_table_status(table_with_escaped_pipes)
+        self.assertEqual(len(escaped_pipe_violations), 1)
+        self.assertIn("claims PASSED but result or exit code is pending/unrun", escaped_pipe_violations[0])
 
     def test_issue_360_evidence_contract(self):
         """docs/evidence/360/EVIDENCE.md must exist and define AC1-AC5 with exit codes and supersedes notice."""
