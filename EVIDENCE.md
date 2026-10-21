@@ -203,7 +203,7 @@ Not run: the full API suite and a real container start of the worker image (no D
 
 ## Issue #141 — round 2 (CTO review T1/T2 and the IntakeModule slice)
 
-Tested on top of `47e55211` plus the working-tree changes of the commit that adds this section. Local sandbox: no Postgres (`localhost:5435` unreachable) and no Docker, so `test/intake-worker.e2e-spec.ts` was **not** re-run here; it runs on CI.
+Tested commit: `819332f65f88f51f3ffea958cc47611741b3253e` (commit adding this section). Local sandbox: no Postgres (`localhost:5435` unreachable) and no Docker, so `test/intake-worker.e2e-spec.ts` was **not** re-run here; it runs on CI.
 
 | REQ                                                                      | Verified by                                                                                                                          |
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
@@ -226,7 +226,7 @@ Behaviour notes: `IntakeWorkerModule` now gets the processor from `IntakeModule`
 
 ### PR #237 Review Resolution (final behaviour, supersedes round 2)
 
-Tested on the merge of `origin/master` into `ai/141` plus the working-tree changes of the commit that adds this section (SHA is in `git log` for this file).
+Tested commit: `451cc181` (commit adding this section).
 
 Final behaviour of the queue contract: the DB row is the source of truth, so a row is never deleted to report a queue problem.
 
@@ -555,7 +555,7 @@ Unset launcher heap_size_limit: 4395630592
 | AC2b | Cursor endpoints reject the other tenant's id                      | `AC2b: foreign ids as cursor return 404, own ids 200`                                        | PASSED |
 | AC3  | No token or an expired token gets 401 on all 14 routes             | two `AC3:` tests                                                                             | PASSED |
 | AC4  | Existing command, no new services                                  | `jest --config ./test/jest-e2e.json` (`pnpm --filter api test:e2e`)                          | PASSED |
-| AC5  | Change ≤ ~300 lines                                                | 307 changed lines of test and source (see Size)                                              | MET    |
+| AC5  | Change ≤ ~300 lines                                                | 308 added lines of test and source (see Size)                                                | MET    |
 
 **Commands and output** (at `34a8ca9c`, from `apps/api`):
 
