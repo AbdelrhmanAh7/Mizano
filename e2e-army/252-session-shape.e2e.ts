@@ -4,7 +4,7 @@ import { expect } from 'e2e';
 test(
   '@issue-252 AC1 AC2: NextAuth session omits refreshToken and shows full user shape',
   { tags: ['feat:mz-auth', 'lvl:ui'] },
-  async ({ app, screen }) => {
+  async ({ app, screen, browser }) => {
     await app.open('/en/login');
     await expect(screen.getByRole('button', 'Sign In')).toBeVisible();
 
@@ -13,7 +13,7 @@ test(
 
     // Sign in deterministically within the browser context via NextAuth credentials callback
     // (avoids next dev pre-hydration form submit races and completes well within the execution budget).
-    const session = await screen.evaluate(
+    const session = await browser.evaluate(
       async ({ email, password }) => {
         const csrfRes = await fetch('/api/auth/csrf');
         const { csrfToken } = await csrfRes.json();

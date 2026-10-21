@@ -6,7 +6,7 @@ This file covers issue #252 only. It lives in `docs/evidence/252/` per the repos
 - **Pull Request:** #274 (`Supersedes part of #242`, parent issue #185)
 - **Branch:** `ai/252`
 - **Base Commit (`origin/master`):** `e07f1e3d7585844a9af23dae48f870087993e4b3`
-- **Tested Head Commit:** `36ca0cabe9c962c6cbda21a8ff4a2a5a1857272d`
+- **Tested Head Commit:** `1f0bdf328f56abe1a0bd04f68f8a84dc3ad9dfc8`
 - **Originating Sentry issue:** None (originates from CodeRabbit review comment on PR #242)
 - **User-facing flow / E2E:** `e2e-army/252-session-shape.e2e.ts` tagged `feat:mz-auth`, `lvl:ui`, `lvl:api`.
 - **E2E-Army Gate Status:** Pending CI execution on PR #274. On the local workstation, the full multi-service throwaway stack is not run locally per the owner speed rule (2026-10-08). The spec was updated to perform deterministic credential sign-in without hardcoded passwords.
@@ -230,7 +230,7 @@ Exit code: 0
 ## Review Findings & Directives Addressed
 
 1. **CTO Directive (PR #274): "Debug e2e-army/252-session-shape.e2e.ts to resolve login flakiness and ensure the e2e-army check passes within the execution budget"**:
-   - Refactored `e2e-army/252-session-shape.e2e.ts` to perform deterministic NextAuth credential sign-in via `screen.evaluate`, eliminating the 40s timeout retry loop and pre-hydration submit race while verifying the rendered UI login screen.
+   - Refactored `e2e-army/252-session-shape.e2e.ts` to perform deterministic NextAuth credential sign-in via `browser.evaluate` with the `browser` fixture, eliminating the 40s timeout retry loop and pre-hydration submit race while verifying the rendered UI login screen.
 2. **CodeRabbit Thread - E2E Waiver Contradiction**:
    - Removed contradictory "E2E: not needed" waiver line. The PR provides `e2e-army/252-session-shape.e2e.ts` tagged `feat:mz-auth` covering the authentication session shape flow.
 3. **CodeRabbit Thread - Hardcoded Seed Credentials in E2E**:
