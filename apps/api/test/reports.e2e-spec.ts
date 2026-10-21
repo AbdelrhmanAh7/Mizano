@@ -8,6 +8,7 @@
  */
 import { INestApplication } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 import { ApiHelper } from './helpers/api-client.helper';
 import { createTestApp, getPrisma, uniqueSuffix } from './helpers/app.helper';
 import { registerTenant, TestTenant } from './helpers/tenant.helper';
@@ -46,7 +47,7 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
     lines: Array<{ quantity: string; rate: string; taxRate?: string }>,
     date: string,
     due: string,
-  ): Promise<{ id: string; grandTotal: string }> {
+  ): Promise<{ id: string; grandTotal: string; invoiceNumber: string }> {
     const res = await a.post('/invoices').send({
       customerId,
       date,
@@ -571,8 +572,209 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
     });
   });
 
+  describe('tenant A: VAT return draft (@issue-348)', () => {
+    const vat = (from: string, to: string): ReturnType<ApiHelper['get']> =>
+      a.get('/tax/vat-returns/draft').query({ periodStart: from, periodEnd: to });
+    const oneLine = (
+      rate: string,
+      taxRate?: string,
+    ): Array<{ quantity: string; rate: string; taxRate?: string }> => [
+      { quantity: '1', rate, taxRate },
+    ];
+    let vatCustomer = '';
+
+    async function postedInvoice(
+      day: number,
+      rate: string,
+      taxRate?: string,
+    ): Promise<{ id: string; invoiceNumber: string }> {
+      const invoice = await createInvoice(
+        vatCustomer,
+        oneLine(rate, taxRate),
+        isoDay(day),
+        isoDay(day + 20),
+      );
+      await sendInvoice(invoice.id);
+      return invoice;
+    }
+
+    it('@issue-348 AC1: sums posted documents in the period, excludes void and draft, flags foreign currency', async () => {
+      vatCustomer = (await a.post('/customers').send({ name: 'VAT Customer' })).body.id;
+      const vatVendor = (await a.post('/vendors').send({ name: 'VAT Vendor' })).body.id;
+      await postedInvoice(205, '1000', '14');
+      const bill = await a.post('/bills').send({
+        vendorId: vatVendor,
+        date: isoDay(206),
+        dueDate: isoDay(230),
+        lines: [
+          { description: 'Line', accountId: acc.rent, quantity: '1', rate: '500', taxRate: '14' },
+        ],
+      });
+      expect((await a.post(`/bills/${bill.body.id}/approve`)).status).toBe(201);
+      const voided = await postedInvoice(208, '1000', '14');
+      expect((await a.patch(`/invoices/${voided.id}/void`)).status).toBe(200);
+      // The API never stamps a foreign code on a postable invoice; mark it the way an imported row would.
+      const foreign = await postedInvoice(210, '100', '14');
+      await prisma.invoice.update({ where: { id: foreign.id }, data: { currencyCode: 'EUR' } });
+      await postedInvoice(211, '300'); // zero-rated: counts as 0, not an exception
+      await createInvoice(vatCustomer, oneLine('1000', '14'), isoDay(212), isoDay(230)); // draft: ignored
+      // A legacy PENDING bill has no approval journal: neither the ledger nor the checks see it.
+      const pending = await a.post('/bills').send({
+        vendorId: vatVendor,
+        date: isoDay(213),
+        dueDate: isoDay(230),
+        lines: [
+          { description: 'Line', accountId: acc.rent, quantity: '1', rate: '100', taxRate: '14' },
+        ],
+      });
+      expect(pending.status).toBe(201);
+      await prisma.bill.update({
+        where: { id: pending.body.id },
+        data: { status: 'PENDING', taxAmount: D('9.99') },
+      });
+
+      const res = await vat(isoDay(200), isoDay(230));
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        label: 'DRAFT, not for filing',
+        currency: expect.stringMatching(/^[A-Z]{3}$/),
+        status: 'incomplete',
+        outputVat: '154.0000',
+        inputVat: '70.0000',
+        netVat: '84.0000',
+        etaMismatches: [],
+      });
+      expect(res.body.exceptions).toEqual([
+        {
+          id: foreign.id,
+          type: 'invoice',
+          documentNumber: foreign.invoiceNumber,
+          reason: 'Foreign currency',
+        },
+      ]);
+    });
+
+    it('@issue-348 AC1: an empty period is a complete draft of zero decimal strings', async () => {
+      const res = await vat(isoDay(300), isoDay(330));
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        status: 'complete',
+        outputVat: '0.0000',
+        inputVat: '0.0000',
+        netVat: '0.0000',
+        exceptions: [],
+        etaMismatches: [],
+      });
+    });
+
+    it('@issue-348 AC1: flags a posted invoice whose header tax differs from line items (ETA mismatch check)', async () => {
+      const edited = await postedInvoice(255, '1000', '14');
+      await prisma.invoice.update({ where: { id: edited.id }, data: { taxAmount: D('139.99') } });
+
+      const res = await vat(isoDay(250), isoDay(260));
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        status: 'incomplete',
+        outputVat: '140.0000',
+        exceptions: [],
+      });
+      expect(res.body.etaMismatches).toEqual([
+        {
+          id: edited.id,
+          type: 'invoice',
+          documentNumber: edited.invoiceNumber,
+          headerTax: '139.9900',
+          lineTax: '140.0000',
+        },
+      ]);
+    });
+
+    it('@issue-348 AC2: a period of 366 days is allowed and 367 is rejected with 400', async () => {
+      const ok = await vat(isoDay(0), isoDay(365));
+      expect(ok.status).toBe(200);
+      const tooLong = await vat(isoDay(0), isoDay(366));
+      expect(tooLong.status).toBe(400);
+      expect(tooLong.body.message).toContain('366 days');
+    });
+
+    it('@issue-348 AC2: an inverted range returns 400', async () => {
+      const inverted = await vat(isoDay(10), isoDay(5));
+      expect(inverted.status).toBe(400);
+      expect(inverted.body.message).toMatch(
+        /(periodStart must be before or equal to periodEnd|from date must be before or equal to to date)/,
+      );
+      expect((await vat('not-a-date', isoDay(5))).status).toBe(400);
+    });
+
+    it('@issue-348 AC2: GET /tax/vat-returns/draft returns 400 when query parameters are missing', async () => {
+      expect((await a.get('/tax/vat-returns/draft')).status).toBe(400);
+      expect((await a.get('/tax/vat-returns/draft').query({ periodStart: isoDay(0) })).status).toBe(
+        400,
+      );
+      expect((await a.get('/tax/vat-returns/draft').query({ periodEnd: isoDay(0) })).status).toBe(
+        400,
+      );
+    });
+
+    it('@issue-348 AC3: GET /tax/vat-returns/draft returns 403 for user lacking tax.view permission', async () => {
+      const noTaxRole = await prisma.role.create({
+        data: { name: `NoTax-${uniqueSuffix()}`, organizationId: tenantA.organizationId },
+      });
+      const noTaxEmail = `e2e-notax-${uniqueSuffix()}@mizano.test`;
+      await prisma.user.create({
+        data: {
+          email: noTaxEmail,
+          name: 'No Tax User',
+          passwordHash: await bcrypt.hash('password123', 10),
+          roleId: noTaxRole.id,
+          organizationId: tenantA.organizationId,
+        },
+      });
+      const login = await anon
+        .post('/auth/login')
+        .send({ email: noTaxEmail, password: 'password123' });
+      expect(login.status).toBe(200);
+      const limitedUser = anon.withToken(login.body.tokens.accessToken as string);
+      const res = await limitedUser.get('/tax/vat-returns/draft').query({
+        periodStart: isoDay(200),
+        periodEnd: isoDay(230),
+      });
+      expect(res.status).toBe(403);
+    });
+
+    it('@issue-348 AC4: GET /tax/vat-returns/draft flags mismatch against stored return', async () => {
+      const pStart = new Date(isoDay(450));
+      const pEnd = new Date(isoDay(470));
+      await prisma.vATReturn.create({
+        data: {
+          organizationId: tenantA.organizationId,
+          period: `Mismatch-${uniqueSuffix()}`,
+          startDate: pStart,
+          endDate: pEnd,
+          outputVAT: D('100.0000'),
+          inputVAT: D('20.0000'),
+          netPayable: D('999.0000'),
+          totalSales: D('0.0000'),
+          totalPurchases: D('0.0000'),
+          status: 'FILED',
+        },
+      });
+      const res = await a.get('/tax/vat-returns/draft').query({
+        periodStart: isoDay(450),
+        periodEnd: isoDay(470),
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('incomplete');
+      expect(res.body.mismatches).toContainEqual({
+        field: 'netVat',
+        computed: '0.0000',
+        recorded: '999.0000',
+      });
+    });
+  });
+
   describe('isolation and authentication', () => {
-    it("tenant B sees none of tenant A's figures", async () => {
+    it("@issue-348 AC5: tenant B sees none of tenant A's figures", async () => {
       expect((await b.get(`/accounts/${acc.bank}/balance`)).status).toBe(404);
       expect((await b.get(`/accounting-reports/general-ledger/${acc.bank}`)).status).toBe(404);
       const foreignStatement = await b.get(`/reports/customer-statement/${customer1}`).query(wide);
@@ -589,9 +791,40 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       expect(trial.accounts).toHaveLength(0);
       const balances = (await b.get('/accounts/balances')).body as Array<{ accountId: string }>;
       expect(balances.some((x) => x.accountId === acc.bank)).toBe(false);
+
+      // Query the exact window where tenant A has VAT data (isoDay(200)..isoDay(230)).
+      // Tenant B owns no documents, so the only acceptable answer is an empty, complete
+      // draft: no tenant A figures (output 140, input 70, one exception) may appear.
+      const vatFrom = isoDay(200);
+      const vatTo = isoDay(230);
+      const unconfigured = await b
+        .get('/tax/vat-returns/draft')
+        .query({ periodStart: vatFrom, periodEnd: vatTo });
+      expect(unconfigured.status).toBe(400);
+      expect(unconfigured.body.message).toContain('VAT Payable');
+      expect((await b.post('/accounts/seed-defaults')).status).toBe(201);
+      const vatDraft = await b
+        .get('/tax/vat-returns/draft')
+        .query({ periodStart: vatFrom, periodEnd: vatTo });
+      expect(vatDraft.status).toBe(200);
+      expect(vatDraft.body).toMatchObject({
+        label: 'DRAFT, not for filing',
+        currency: expect.stringMatching(/^[A-Z]{3}$/),
+        from: new Date(vatFrom).toISOString(),
+        to: new Date(vatTo).toISOString(),
+        status: 'complete',
+        outputVat: '0.0000',
+        inputVat: '0.0000',
+        netVat: '0.0000',
+        totalSales: '0.0000',
+        totalPurchases: '0.0000',
+        mismatches: [],
+        exceptions: [],
+        etaMismatches: [],
+      });
     });
 
-    it('rejects anonymous callers with 401', async () => {
+    it('@issue-348 AC3: rejects anonymous callers with 401', async () => {
       for (const path of [
         '/reports/dashboard',
         '/reports/dashboard/account-balances',
@@ -600,6 +833,7 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
         '/reports/balance-sheet',
         '/reports/profit-and-loss',
         '/reports/trial-balance',
+        '/tax/vat-returns/draft',
         '/accounting-reports/trial-balance',
         '/accounts/balances',
         `/accounts/${acc.bank}/balance`,
