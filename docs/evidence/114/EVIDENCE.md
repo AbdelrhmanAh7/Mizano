@@ -1,6 +1,6 @@
 # Issue #114 — VAT Return Draft from Ledger: Evidence & Verification Report
 
-Tested head: **568c285fb420dcbb399b4b198775dc7632972218** (`ai/114` → PR #117)
+Tested head: **0ddb2271307e3bdf99cc11f8e8de45e57a0650df** (`ai/114` → PR #117)
 
 ---
 
@@ -14,11 +14,11 @@ Tested head: **568c285fb420dcbb399b4b198775dc7632972218** (`ai/114` → PR #117)
 
 **AC4** — When a stored VAT return for the period has a `netPayable` / `outputVAT` / `inputVAT` differing from the computed net, `mismatches` contains an entry `{ field: 'netVat', computed, recorded }`.
 
-**AC5** — A request where `periodStart` is after `periodEnd` returns HTTP 400 with a validation error body.
+**AC5** — A request where `periodStart` is after `periodEnd` returns HTTP 400 with a validation error body. Missing `periodStart` or `periodEnd` returns HTTP 400.
 
 **AC6** — No row is inserted into or updated in the `vat_returns` table by calling the draft endpoint.
 
-**AC7** — Ranges longer than 366 days are rejected with 400.
+**AC7** — Ranges longer than 366 days are rejected with HTTP 400.
 
 **AC8** — Pre-filing document validation checks: documents with foreign currency, null tax, negative tax, or invalid tax rate are listed in `exceptions[]`; documents whose header tax differs from line-item taxes are flagged in `etaMismatches[]`.
 
@@ -54,12 +54,16 @@ Tested head: **568c285fb420dcbb399b4b198775dc7632972218** (`ai/114` → PR #117)
 ### Commands run — all exit 0
 
 ```bash
+# Shared types compilation
+pnpm --filter @mizano/shared-types build
+→ exit 0 (tsc)
+
 # Unit test suites covering changed controllers and services (3 suites, 76 tests)
-pnpm --filter api exec jest --maxWorkers=2 \
+nice -n 10 pnpm --filter api exec jest --maxWorkers=2 \
   src/modules/tax/controllers/vat-return-draft.controller.spec.ts \
   src/modules/tax/services/vat-returns.service.spec.ts \
   src/modules/reports/services/vat-return-draft.service.spec.ts
-→ Test Suites: 3 passed, 3 total; Tests: 76 passed, 76 total (0 failed)
+→ Test Suites: 3 passed, 3 total; Tests: 76 passed, 76 total (0 failed), exit 0
 
 # TypeScript typecheck
 pnpm --filter @mizano/shared-types type-check
@@ -74,7 +78,7 @@ pnpm --filter api lint
 
 # Validators test
 pnpm --filter @mizano/validators test
-→ Test Suites: 1 passed, 1 total; Tests: 12 passed, 12 total (0 failed)
+→ Test Suites: 1 passed, 1 total; Tests: 12 passed, 12 total (0 failed), exit 0
 ```
 
 ---
@@ -98,26 +102,47 @@ pnpm --filter @mizano/validators test
 | `e2e-army/114-vat-return-draft.e2e.ts`                                     | e2e-army verify job (`feat:mz-vat-returns`)                                         | Feature-level blocking gate           |
 | `packages/shared-types/src/entities/reports.ts`                            | Type-check in `pnpm --filter @mizano/shared-types type-check`                       | Shared TypeScript contract            |
 | `docs/reports.md`                                                          | Documentation                                                                       | API reference                         |
+| `docs/evidence/114/EVIDENCE.md`                                            | Documentation                                                                       | Verification evidence                 |
 | `docs/evidence/issue-114.md`                                               | Documentation                                                                       | Verification evidence                 |
 
 ---
 
-## Resolutions to QA findings and CTO directives
+## Bug Fix / Regression Demonstration
 
-1. **Keep ONE endpoint: `GET /tax/vat-returns/draft?periodStart&periodEnd`**:
-   Exposed exclusively under `TaxModule` via `VatReturnDraftController` (`@Controller('tax/vat-returns')`, `@Get('draft')`, `@Permissions('tax.view')`). Deleted `VatReturnDraftController`, its DTO, and its spec from `reports`.
-2. **Revert `@Controller(['vat-returns', 'tax/vat-returns'])`**:
-   `VatReturnsController` reverted to `@Controller('vat-returns')`. All VAT return write and payment routes are unaliased.
-3. **Required query parameters**:
-   `VatReturnDraftQueryDto` updated with `@IsNotEmpty()`, `@IsDateString()` for both `periodStart` and `periodEnd`. Dropped `from`/`to` aliases and manual BadRequest check in controller.
-4. **Prisma `vATReturn.findFirst` error handling & schema comparison**:
-   Empty catch block removed in `vat-draft-calculator.ts`. DB errors bubble up and log via `describeError`. Typed as Prisma `VATReturn`, matches exact `startDate: from, endDate: to` with `deletedAt: null`. Compares real schema fields (`netPayable`, `outputVAT`, `inputVAT`, `totalSales`, `totalPurchases`).
-5. **Removed duplicate response fields**:
-   Removed `outputTax`, `inputTax`, `netPayable` from `VatReturnDraft`. Kept canonical set `outputVat`, `inputVat`, `netVat`, `totalSales`, `totalPurchases`.
-6. **Tests**:
-   `prisma.vATReturn.findFirst` mocked in unit tests. Added tests in `vat-returns.service.spec.ts` and `vat-return-draft.service.spec.ts` asserting that `findFirst` rejection logs and propagates. Added tests in `reports.e2e-spec.ts` covering 400 for missing dates, 403 without `tax.view`, and recorded return mismatch.
-7. **Documentation**:
-   Updated `docs/reports.md` and `docs/evidence/issue-114.md`.
+### Regression 1: Swallowed DB Errors during Stored Return Lookup
+
+- **Base behaviour (`4c0f8934`)**: Stored return lookup used `try { storedReturn = await prisma.vATReturn.findFirst(...) } catch { /* swallow */ }`. If database connection failed or Prisma threw an exception, errors were swallowed, `mismatches` was silently returned as empty (`[]`), and the draft was reported as clean.
+- **Head behaviour (`0ddb2271`)**: Empty catch block removed; Prisma errors bubble up, are logged via `describeError`, and propagate as a 500 server error instead of falsely claiming zero discrepancies.
+- **Covering test**: `vat-returns.service.spec.ts` → asserts that `prisma.vATReturn.findFirst` rejection logs and propagates.
+
+### Regression 2: Route Placement & Write Route Aliasing
+
+- **Base behaviour (`4c0f8934`)**: In round 4/5, draft endpoint was exposed under `/reports/vat-return-draft` with `reports.view` permissions, and later aliased on `VatReturnsController` with `@Controller(['vat-returns', 'tax/vat-returns'])` which duplicated all VAT-return POST, DELETE, and payment write routes.
+- **Head behaviour (`0ddb2271`)**: `VatReturnsController` reverted strictly to `@Controller('vat-returns')`. Dedicated read-only `VatReturnDraftController` registered under `TaxModule` with `@Controller('tax/vat-returns')`, `@Get('draft')`, and `@Permissions('tax.view')`. No write routes aliased.
+- **Covering test**: `vat-return-draft.controller.spec.ts` and `apps/api/test/reports.e2e-spec.ts` → verifies 403 without `tax.view`.
+
+### Regression 3: Optional Period Parameters
+
+- **Base behaviour (`4c0f8934`)**: Query params were optional (`@IsOptional()`), allowing calls with missing dates that resulted in unvalidated date ranges or unexpected behaviour.
+- **Head behaviour (`0ddb2271`)**: `VatReturnDraftQueryDto` enforces `@IsNotEmpty()`, `@IsDateString()` on `periodStart` and `periodEnd`. Requests missing dates return 400 Bad Request.
+- **Covering test**: `e2e-army/114-vat-return-draft.e2e.ts` → asserts missing period dates return 400.
+
+---
+
+## UI Verification (Screenshots / RTL & LTR)
+
+**UI is EXEMPT**:
+
+- Task Brief & Accepted Spec explicitly state:
+  > **Out of scope**: Web/UI changes; the draft is consumed via API in this first slice. Deliberately API-only to fit the 5-file/300-line cap; a follow-up issue should add a draft preview page under apps/web/app/[locale]/(dashboard)/tax/returns/generate/ and persist-on-confirm.
+- Zero files in `apps/web` are modified by this PR.
+- No Playwright screenshots or RTL/LTR web tests are required for this backend-only API endpoint.
+
+---
+
+## Sentry
+
+Link originating Sentry issue: **None** (feature request for proactive VAT return drafting and pre-filing discrepancy surfacing; not an incident regression).
 
 ---
 
@@ -128,9 +153,7 @@ pnpm --filter @mizano/validators test
 - No ETA portal comparison (no real portal credentials): follow-up #119.
 - Filing-corrections metric: follow-up #120.
 
-## Sentry
-
-No Sentry issue linked — this is a new feature with pre-filing discrepancy surfacing.
+---
 
 ## Skills used
 
