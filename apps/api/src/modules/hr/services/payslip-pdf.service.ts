@@ -633,9 +633,17 @@ export class PayslipPdfService {
         [payslip.otherDeductions, 'Other Deductions', 'استقطاعات أخرى'],
       ];
       const deductionSnapshot = nonZeroLines(snapshotDeductions);
+      // Capture otherDeductions value from the snapshot (last entry) to include in reconciliation
+      // without displaying it as a separate line item, avoiding duplicate "Other Deductions" rows.
+      const otherDeductionsFromSnapshot =
+        payslip.otherDeductions && !payslip.otherDeductions.isZero()
+          ? payslip.otherDeductions
+          : new Prisma.Decimal(0);
+      // Filter out the otherDeductions entry from displayed lines
+      const displayDeductions = deductionSnapshot.filter((d) => d.labelEn !== 'Other Deductions');
       deductions.push(
-        ...(deductionSnapshot.length
-          ? deductionSnapshot
+        ...(displayDeductions.length
+          ? displayDeductions
           : jsonLines(payslip.deductions).map((l) => ({
               labelEn: l.name,
               labelAr: l.name,
@@ -649,11 +657,18 @@ export class PayslipPdfService {
       // The stored `totalDeductions` is authoritative when set; calculatePayroll leaves it at its
       // default of 0, so then the total is gross - net. Any part of that total the line items do
       // not explain is shown as one "Other Deductions" row, so the page always reconciles.
+      // Include otherDeductionsFromSnapshot in the itemised base so the reconciliation row
+      // represents the full unexplained amount in a single line.
       const itemised = deductions.reduce((sum, l) => sum.add(l.amount), new Prisma.Decimal(0));
       const stored = payslip.totalDeductions;
+      const calculatedTotal = payslip.grossSalary.sub(payslip.netSalary);
       const totalDeductions =
-        stored && !stored.isZero() ? stored : payslip.grossSalary.sub(payslip.netSalary);
-      const unexplained = totalDeductions.sub(itemised);
+        stored && !stored.isZero()
+          ? stored
+          : calculatedTotal.isNegative()
+            ? new Prisma.Decimal(0)
+            : calculatedTotal;
+      const unexplained = totalDeductions.sub(itemised).add(otherDeductionsFromSnapshot);
       if (!unexplained.isZero()) {
         deductions.push({
           labelEn: 'Other Deductions',

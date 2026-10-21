@@ -514,11 +514,15 @@ describe('PayslipPdfService & renderPayslipPdf', () => {
         grossSalary: new Prisma.Decimal('9500'),
         gosiEmployee: new Prisma.Decimal('600'),
         incomeTax: new Prisma.Decimal('0'),
+        loanDeduction: new Prisma.Decimal('0'),
+        otherDeductions: new Prisma.Decimal('0'),
         deductions: { insurance: 600 },
         totalDeductions: new Prisma.Decimal('600'),
+        taxes: new Prisma.Decimal('0'),
         netSalary: new Prisma.Decimal('8900'),
       });
-      const items = await textItems(await service.generatePayslipPdf(orgId, payslipId, 'en'));
+      const buffer = await service.generatePayslipPdf(orgId, payslipId, 'en');
+      const items = await textItems(buffer);
       const amounts = items.map((i) => i.str.trim());
       expect(amounts.filter((a) => a === '1000.00 EGP')).toHaveLength(1);
       expect(amounts.filter((a) => a === '600.00 EGP')).toHaveLength(2); // the row and the total
