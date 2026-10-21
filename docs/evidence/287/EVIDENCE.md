@@ -4,8 +4,8 @@
 
 - **Issue**: #287 (fix: EVIDENCE.md: the cited commits and test output cannot be checked against this diff; split from #263, parent #167)
 - **Base commit**: `6679bfe2bbb2679a8c107b7ddffa4fb6529a85ff` (`origin/master`)
-- **Tested code SHA**: `f5003bd811d7eb6b5df9468962629ef71bc9d494`
-- **Tested head**: `f5003bd811d7eb6b5df9468962629ef71bc9d494`
+- **Tested code SHA**: `f5003bd82cff28978223cf1abd4f224f45f8a458`
+- **Tested head**: `f5003bd82cff28978223cf1abd4f224f45f8a458`
 - **Branch**: `ai/287`
 - **Supersedes**: part of #263
 - **Originating Sentry Issue**: None (contract naming discrepancy between Next.js client hook and NestJS controller DTO, not an exception reported via Sentry).
@@ -182,7 +182,7 @@ Total diff: 444 changed lines across 5 files (426 insertions, 18 deletions).
 ### Round 1 CodeRabbit Review Findings (Head `bd254dc`)
 
 1. **`apps/web/lib/hooks/use-manufacturing.ts:355` (Reject missing completion quantity)**: `useCompleteWorkOrder` requires an explicit quantity, throwing `new Error('A completion quantity is required')` when absent, rather than defaulting to 0.
-2. **`docs/evidence/287/EVIDENCE.md:8` (Tested Code Head and Branch Head)**: Re-ran checks on the exact tested code head `f5003bd811d7eb6b5df9468962629ef71bc9d494`.
+2. **`docs/evidence/287/EVIDENCE.md:8` (Tested Code Head and Branch Head)**: Re-ran checks on the exact tested code head `f5003bd82cff28978223cf1abd4f224f45f8a458`.
 3. **`docs/evidence/287/EVIDENCE.md:21` (Distinguish E2E test added vs browser run)**: Updated AC3 and Section 6 to distinguish test file addition/structure from runtime CI execution.
 4. **`docs/evidence/287/EVIDENCE.md:35` (Document staged spec on unpatched base)**: Documented the exact staging step and blob SHA (`e79825582b6b28ec36efc3853453cd26b43507ba`) used to execute the regression test against unpatched master.
 5. **`docs/evidence/287/EVIDENCE.md:157` (Correct changed-file totals)**: Calculated exact line counts and totals from the git diff against `origin/master`.
