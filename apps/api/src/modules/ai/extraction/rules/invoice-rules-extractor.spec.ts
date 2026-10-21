@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { findAmounts, parseAmount } from './rules-amounts';
-import { parseDate } from './rules-dates';
+import { collapseWhitespace, parseDate } from './rules-dates';
 import { extractInvoiceFields } from './invoice-rules-extractor';
 import { normalizeDigits } from './rules-normalize';
 import { toExtractionResult } from '../rules-strategy.service';
@@ -44,9 +44,41 @@ describe('parseAmount', () => {
   });
 });
 
+describe('collapseWhitespace', () => {
+  it('collapses whitespace runs and maps indices back to input', () => {
+    const input = '   Date:   15   March   2024   ';
+    const { text, toLine } = collapseWhitespace(input);
+    expect(text).toBe(' Date: 15 March 2024 ');
+    expect(toLine).toHaveLength(text.length);
+    for (let i = 0; i < text.length; i++) {
+      expect(toLine[i]).toBeGreaterThanOrEqual(0);
+      expect(toLine[i]).toBeLessThan(input.length);
+      if (text[i] !== ' ') {
+        expect(input[toLine[i]]).toBe(text[i]);
+      }
+    }
+  });
+
+  it('efficiently handles large inputs with extensive whitespace runs in O(N)', () => {
+    const chunk = 'word     \t\t\n\r   ';
+    const input = chunk.repeat(10000); // 180,000 chars
+    const start = Date.now();
+    const { text, toLine } = collapseWhitespace(input);
+    const durationMs = Date.now() - start;
+    expect(durationMs).toBeLessThan(1000);
+    expect(text.length).toBeLessThan(input.length);
+    expect(toLine.length).toBe(text.length);
+  });
+});
+
 describe('parseDate', () => {
   it('parses day-first, ISO, and named-month dates', () => {
-    expect(parseDate('15/03/2024')).toEqual({ iso: '2024-03-15', ambiguous: false });
+    expect(parseDate('15/03/2024')).toEqual({
+      iso: '2024-03-15',
+      ambiguous: false,
+      start: 0,
+      end: 10,
+    });
     expect(parseDate('2024-06-09')?.iso).toBe('2024-06-09');
     expect(parseDate('12 March 2024')?.iso).toBe('2024-03-12');
     expect(parseDate('9 يونيو 2024')?.iso).toBe('2024-06-09');
@@ -54,7 +86,12 @@ describe('parseDate', () => {
   });
 
   it('flags day/month ambiguity and rejects impossible or Hijri dates', () => {
-    expect(parseDate('01/02/2024')).toEqual({ iso: '2024-02-01', ambiguous: true });
+    expect(parseDate('01/02/2024')).toEqual({
+      iso: '2024-02-01',
+      ambiguous: true,
+      start: 0,
+      end: 10,
+    });
     expect(parseDate('31/02/2024')).toBeNull();
     expect(parseDate('15/03/1445')).toBeNull();
     expect(parseDate('2024-06-09')?.ambiguous).toBe(false);
@@ -254,5 +291,100 @@ describe('toExtractionResult', () => {
     expect(result.vendorAddress).toBeNull();
     expect(result.fieldEvidence?.total?.lineIndex).toBe(10);
     expect(result.fieldConfidence.total).toBeGreaterThan(0);
+  });
+});
+
+describe('extractInvoiceFields offsets map back to the original text', () => {
+  const run = (text: string) => extractInvoiceFields(text);
+
+  it('slices Arabic-Indic digits from the original text', () => {
+    const text = 'total ٤٢٠٠ USD';
+    const r = run(text);
+    expect(r.total?.value.toString()).toBe('4200');
+    expect(text.slice(r.total?.start, r.total?.end)).toBe('٤٢٠٠');
+    expect(r.originalText).toBe(text);
+  });
+
+  it('shifts by the emoji UTF-16 length, not the normalized length', () => {
+    const text = '😀 total ٤٢٠٠ USD';
+    const r = run(text);
+    expect(r.total?.start).toBe(2 + ' total '.length);
+    expect(text.slice(r.total?.start, r.total?.end)).toBe('٤٢٠٠');
+  });
+
+  it('accounts for dropped marks and earlier lines', () => {
+    const text = 'Invoice\r\n‏Subtotal: ١٬٠٠٠٫٥٠\nTotal: 1,150.50';
+    const r = run(text);
+    expect(text.slice(r.subtotal?.start, r.subtotal?.end)).toBe('١٬٠٠٠٫٥٠');
+    expect(text.slice(r.total?.start, r.total?.end)).toBe('1,150.50');
+  });
+
+  it('keeps ASCII spans identical and inside the text', () => {
+    const text = 'Total: 12.50';
+    const r = run(text);
+    expect([r.total?.start, r.total?.end]).toEqual([7, 12]);
+    for (const f of [r.subtotal, r.tax, r.total]) {
+      if (f) {
+        expect(f.start).toBeGreaterThanOrEqual(0);
+        expect(f.end).toBeGreaterThan(f.start as number);
+        expect(f.end).toBeLessThanOrEqual(text.length);
+      }
+    }
+  });
+
+  it('slices invoice number with Arabic-Indic digits', () => {
+    const text = 'Invoice No: INV-٢٠٢٤-٠٠٤٢';
+    const r = run(text);
+    expect(r.invoiceNumber?.value).toBe('INV-2024-0042');
+    expect(text.slice(r.invoiceNumber?.start, r.invoiceNumber?.end)).toBe('INV-٢٠٢٤-٠٠٤٢');
+  });
+
+  it('slices date and dueDate with Arabic-Indic and Eastern Arabic digits', () => {
+    const text = 'Date: ١٥/٠٣/٢٠٢٤\nDue Date: ۰۱-۰۴-۲۰۲۴';
+    const r = run(text);
+    expect(r.date?.value).toBe('2024-03-15');
+    expect(text.slice(r.date?.start, r.date?.end)).toBe('١٥/٠٣/٢٠٢٤');
+    expect(r.dueDate?.value).toBe('2024-04-01');
+    expect(text.slice(r.dueDate?.start, r.dueDate?.end)).toBe('۰۱-۰۴-۲۰۲۴');
+  });
+
+  it('slices the exact substring parseDate parsed when a line has two date-like tokens', () => {
+    const text = 'Date: 15/03/2024 (1445.9.5 H)';
+    const r = run(text);
+    expect(r.date?.value).toBe('2024-03-15');
+    expect(text.slice(r.date?.start, r.date?.end)).toBe('15/03/2024');
+  });
+
+  it('slices month-first-less named dates and dates with irregular spacing', () => {
+    const named = 'Date:   ١٥   March ٢٠٢٤';
+    const r1 = run(named);
+    expect(r1.date?.value).toBe('2024-03-15');
+    expect(named.slice(r1.date?.start, r1.date?.end)).toBe('١٥   March ٢٠٢٤');
+    const spaced = 'Date: 2024 / 03  /  15';
+    const r2 = run(spaced);
+    expect(spaced.slice(r2.date?.start, r2.date?.end)).toBe('2024 / 03  /  15');
+  });
+
+  it('slices tax ID with Arabic-Indic digits', () => {
+    const text = 'الرقم الضريبي: ٣٠٠١٢٣٤٥٦٧٠٠٠٠٣';
+    const r = run(text);
+    expect(r.vendorTaxId?.value).toBe('300123456700003');
+    expect(text.slice(r.vendorTaxId?.start, r.vendorTaxId?.end)).toBe('٣٠٠١٢٣٤٥٦٧٠٠٠٠٣');
+  });
+
+  it('slices line-matched vendor and accounts for multi-code-unit emoji cluster', () => {
+    const text = 'Invoice\n😀\nSupplier: شركة الأمل';
+    const r = run(text);
+    expect(r.vendorName?.value).toBe('شركة الأمل');
+    expect(text.slice(r.vendorName?.start, r.vendorName?.end)).toBe('شركة الأمل');
+    expect(r.vendorName?.start).toBe('Invoice\n'.length + 2 + '\nSupplier: '.length);
+  });
+
+  it('leaves start/end undefined for heuristic vendor', () => {
+    const text = 'شركة الأمل\nTotal: 100';
+    const r = run(text);
+    expect(r.vendorName?.value).toBe('شركة الأمل');
+    expect(r.vendorName?.start).toBeUndefined();
+    expect(r.vendorName?.end).toBeUndefined();
   });
 });
