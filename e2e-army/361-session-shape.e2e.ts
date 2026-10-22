@@ -116,3 +116,14 @@ test(
     expect(JSON.stringify(body)).not.toContain('refreshToken');
   },
 );
+
+test(
+  '@issue-361 @issue-333 AC1 AC2: Arabic login route verifies RTL document direction',
+  { tags: ['feat:mz-auth', 'lvl:ui'] },
+  async ({ app, browser }) => {
+    await app.open('/ar/login');
+    const dir = await browser.evaluate(() => document.documentElement.dir);
+    expect(dir).toBe('rtl');
+  },
+);
+
