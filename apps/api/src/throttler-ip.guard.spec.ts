@@ -9,7 +9,14 @@ import {
   ThrottlerStorage,
 } from '@nestjs/throttler';
 import { Request } from 'express';
-import request = require('supertest');
+import * as requestNamespace from 'supertest';
+
+// Supertest exports a callable function via CommonJS export =.
+// Ensure compatibility whether imported directly as a callable namespace (ts-jest) or via synthetic default.
+const request = (typeof requestNamespace === 'function'
+  ? requestNamespace
+  : (requestNamespace as unknown as { default: typeof requestNamespace })
+      .default) as unknown as typeof requestNamespace;
 import { IpThrottlerGuard, applyTrustProxy, parseTrustedProxies } from './throttler-ip.guard';
 
 class TestableGuard extends IpThrottlerGuard {
