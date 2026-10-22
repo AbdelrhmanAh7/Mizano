@@ -5,10 +5,10 @@
 - **Date**: 2026-10-22
 - **Platform**: macOS (Apple Silicon arm64)
 - **Base SHA (`master`)**: `bf3f67a8459424775d7102e3b2e3a152fe1f1ec7`
-- **Tested Code Head**: `5700ed153d43c0ff50553152ef71950bb9294346`
+- **Tested Code Head**: `7f5b190476a8e3306333335b7dfe7a69ae9150f7`
 - **Originating Sentry Issue**: None (originates from architecture audit #133).
-- **Skills Used**: `verification-before-completion`, `systematic-debugging`, `diagnosing-bugs`, `model-effort-routing`.
-- **Model and Effort**: `Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: High · Why: Backend architecture refactor, scheduler gating, dead code removal, and evidence binding for issue #133`.
+- **Skills Used**: `verification-before-completion`, `systematic-debugging`, `diagnosing-bugs`, `model-effort-routing`, `test-first-engineering`.
+- **Model and Effort**: `Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: High · Why: Fix verification findings (AI insights invalid time value, CORS errors, navigation links), e2e-army test addition, and evidence binding for issue #133`.
 
 ---
 
@@ -55,9 +55,14 @@ Per Issue #133's formal brief and CTO decision (2026-10-12 / 2026-10-18):
 
 | Test File                                                                   | Type | Tests Executed      | Result          |
 | --------------------------------------------------------------------------- | ---- | ------------------- | --------------- |
-| `apps/api/src/modules/ai/schedulers/ai-schedulers.enabled.spec.ts`          | Unit | 14 passed, 0 failed | PASSED (exit 0) |
+| `apps/api/src/modules/ai/schedulers/ai-schedulers.enabled.spec.ts`          | Unit | 17 passed, 0 failed | PASSED (exit 0) |
 | `apps/api/src/modules/notifications/services/notifications.service.spec.ts` | Unit | 6 passed, 0 failed  | PASSED (exit 0) |
 | `apps/api/test/issue-133.e2e-spec.ts`                                       | E2E  | 10 passed, 0 failed | PASSED (exit 0) |
+| `apps/web/app/[locale]/(dashboard)/ai-insights/page.spec.tsx`               | Unit | 1 passed, 0 failed  | PASSED (exit 0) |
+| `apps/web/app/[locale]/(dashboard)/ai-insights/revenue/page.spec.tsx`       | Unit | 2 passed, 0 failed  | PASSED (exit 0) |
+| `apps/web/app/[locale]/(dashboard)/ai-insights/forecast/page.spec.tsx`      | Unit | 2 passed, 0 failed  | PASSED (exit 0) |
+| `apps/web/app/[locale]/(dashboard)/ai-insights/[id]/page.spec.tsx`          | Unit | 5 passed, 0 failed  | PASSED (exit 0) |
+| `e2e-army/133-ai-insights.e2e.ts`                                           | E2E  | Automated army test | Added           |
 
 ---
 
@@ -176,9 +181,8 @@ Time:        10.655 s
 
 ## 5. UI and E2E-Army Gate Status
 
-- **UI Changes**: None. This issue is a backend architecture refactor and dead-code deletion.
-- **E2E-Army Gate**: Pure backend refactor / internal:
-  `E2E: not needed — pure backend refactor / internal (AI scheduler gating, dead ollama tunnel deletion, narrative route dedupe, notification cron pagination)`
+- **UI Changes**: Addressed verification issues on AI Insights subpages (`/en/ai-insights`, `/en/ai-insights/forecast`, `/en/ai-insights/revenue`, `/en/ai-insights/[id]`, `/en/reports/ap-aging`): safe date formatting and locale-aware link routing (`@/i18n/routing`).
+- **E2E-Army Gate**: Natural-language test added at `e2e-army/133-ai-insights.e2e.ts` tagged `feat:mz-ai-insights` covering dashboard navigation, forecast, revenue, and Arabic RTL layout (`/ar/ai-insights`).
 
 ---
 
@@ -198,3 +202,25 @@ Time:        10.655 s
 3. **Hard-Rule Security Clearance (CTO `decision=blocked-hard-rule` / `credentials / secrets`)**:
    - _Hold Cause_: Modifications to `.env.dev`, `.env.local`, `.env.prod`, and `.env.sit` matched `SECRET_PATH` in `prHardRule`, triggering the automated credentials hold.
    - _Resolution_: Reverted `.env.dev`, `.env.local`, `.env.prod`, and `.env.sit` to `origin/master`. Non-example environment files are kept untouched. `AI_SCHEDULERS_ENABLED` is cleanly configured via `.env.example`, `deploy/pi/.env.pi.example`, and compose profile defaults (`docker-compose.production.yml` and `deploy/pi/docker-compose.pi.yml`), completely clearing the hold.
+
+---
+
+## 7. Verification Findings Resolution (Thoth Status / Round 9)
+
+1. **[high] AI Insights pages not loading properly ("Invalid time value")**:
+   - _Symptom_: Error boundary caught `RangeError: Invalid time value` on `/en/ai-insights/revenue` and subpages.
+   - _Root Cause_: In `revenue/page.tsx:256,259`, code did `format(new Date(month.date + '-01'), ...)`. Backend returns `isoDate` formatted as `YYYY-MM-DD` (e.g. `2026-10-01`). Appending `'-01'` created invalid date string `2026-10-01-01`. Additionally, unvalidated `createdAt` in `page.tsx` and `[id]/page.tsx` threw when undefined or unparseable.
+   - _Fix_: Added `parseMonthDate(dateStr)` in `revenue/page.tsx` (only appending `'-01'` if input matches `YYYY-MM`), and `formatDateSafe` helpers in `forecast/page.tsx`, `page.tsx`, and `[id]/page.tsx`.
+   - _Regression Evidence_:
+     - `revenue/page.spec.tsx`: Demonstrates failure on base (`RangeError: Invalid time value`) and passing cleanly on head.
+     - `forecast/page.spec.tsx`: Demonstrates failure on base with empty/invalid dates and passing on head.
+     - `page.spec.tsx`: Demonstrates failure on base with invalid dates and passing on head.
+     - Ran: `pnpm --filter web exec jest "ai-insights"` -> 4 test suites, 10 tests passed (exit 0).
+
+2. **[high] CORS errors affecting multiple pages**:
+   - _Symptom_: Browser console logged: `Access to fetch at 'http://localhost:4309/en/...' (redirected from 'http://127.0.0.1:4309/...') has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource`.
+   - _Root Cause_: Next.js middleware redirected RSC prefetch requests missing the locale prefix to `http://localhost:4309`, crossing origins from `http://127.0.0.1:4309` without CORS headers.
+   - _Fix_:
+     - `apps/web/middleware.ts`: Implemented `applyCorsAndNormalizeRedirect` to rewrite redirect `Location` host to match incoming request `host`, preserving the same origin and eliminating cross-origin redirects. Added standard CORS headers to middleware responses and handled `OPTIONS` preflight.
+     - `apps/web/app/[locale]/(dashboard)/ai-insights/**`: Replaced `next/link` with locale-aware `{ Link } from '@/i18n/routing'` to prevent unnecessary 307 redirects.
+     - `apps/api/src/main.ts`: In non-production, allowed local origins (`localhost` / `127.0.0.1` on any port) to communicate with API without CORS rejection.
