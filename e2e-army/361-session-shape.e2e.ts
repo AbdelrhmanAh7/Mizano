@@ -19,8 +19,8 @@ test(
       timeout: 40_000,
     });
 
-    // Assert that the signed-in UI receives and renders the session user data
-    await expect(screen.getByText(/Welcome back/i)).toBeVisible();
+    // Assert that the signed-in UI receives and renders the session user data (Welcome back, Admin)
+    await expect(screen.getByText(/Welcome back, Admin/i)).toBeVisible();
 
     // Verify the signed-in UI receives the sanitized session
     const session = await browser.evaluate(async () => {
