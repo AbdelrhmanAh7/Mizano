@@ -224,12 +224,27 @@ export class WorkOrdersService {
     return { isAvailable, materials };
   }
 
+  /**
+   * Row-locks the work order (scoped by organization) for the rest of the transaction.
+   * Prevents concurrent completions from both reading IN_PROCESS and writing COMPLETED.
+   */
+  private async lockWorkOrder(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    id: string,
+  ): Promise<void> {
+    await tx.$queryRaw`SELECT id FROM "work_orders" WHERE id = ${id} AND "organizationId" = ${organizationId} FOR UPDATE`;
+  }
+
   async completeWorkOrder(
     organizationId: string,
     id: string,
     dto: { quantityProduced: number; notes?: string },
   ) {
     return this.prisma.$transaction(async (tx) => {
+      // Lock the row first to prevent concurrent completions
+      await this.lockWorkOrder(tx, organizationId, id);
+
       const workOrder = await this.findOne(organizationId, id, tx);
       if (workOrder.status !== WorkOrderStatus.IN_PROCESS) {
         throw new BadRequestException('Work order is not in process');

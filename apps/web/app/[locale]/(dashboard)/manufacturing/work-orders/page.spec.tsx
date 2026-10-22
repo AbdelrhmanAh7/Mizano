@@ -177,6 +177,7 @@ describe('WorkOrdersPage', () => {
       refetch: jest.fn(),
     });
     renderPage();
-    expect(screen.getByText(/IN_PROCESS|workOrders\.status\.inProcess/)).toBeInTheDocument();
+    // The mock returns the translation key; assert the translated label key is rendered
+    expect(screen.getByText('workOrders.status.inProcess')).toBeInTheDocument();
   });
 });
