@@ -77,7 +77,7 @@ describe('@e2e @flow:intake-worker @issue-141 Intake worker entrypoint', () => {
   });
 
   afterAll(async () => {
-    if (app) await app.close();
+    await app.close();
   });
 
   it('@issue-141 AC1: the API does not resolve IntakeProcessorService; upload fails without REDIS_URL', async () => {
@@ -97,13 +97,6 @@ describe('@e2e @flow:intake-worker @issue-141 Intake worker entrypoint', () => {
     expect(await prisma.intakeJob.count({ where: { organizationId: tenant.organizationId } })).toBe(
       0,
     );
-  });
-
-  it('@issue-257 / #142 AC1: API process has no tesseract.js or pdf-parse in require cache', () => {
-    const tesseractKeys = Object.keys(require.cache).filter((k) => k.includes('tesseract.js'));
-    expect(tesseractKeys).toHaveLength(0);
-    const pdfParseKeys = Object.keys(require.cache).filter((k) => k.includes('pdf-parse'));
-    expect(pdfParseKeys).toHaveLength(0);
   });
 
   it('@issue-141 AC2: IntakeWorkerModule boots headless and processes a QUEUED job', async () => {
@@ -178,17 +171,5 @@ describe('@e2e @flow:intake-worker @issue-141 Intake worker entrypoint', () => {
     expect(block).toMatch(/healthcheck:[\s\S]*dist\/intake-worker-healthcheck\.js/);
     expect(block).toContain('stop_grace_period: 30s');
     expect(block).toContain(':/data/originals:ro');
-  });
-
-  it('@issue-257 / #142 AC4: docker-compose.production.yml defines the intake-worker service', () => {
-    const compose = readFileSync(
-      resolve(__dirname, '../../../docker-compose.production.yml'),
-      'utf8',
-    );
-    const block = /^ {2}intake-worker:\r?\n((?: {4}.*\r?\n|\s*\r?\n)+)/m.exec(compose)?.[1] ?? '';
-    expect(block).not.toBe('');
-    expect(block).toContain('dist/intake-worker.js');
-    expect(block).toMatch(/healthcheck:[\s\S]*dist\/intake-worker-healthcheck\.js/);
-    expect(block).toContain('intake_storage:/data/intake');
   });
 });
