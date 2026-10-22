@@ -558,6 +558,8 @@ model Organization {
   smtpPassword   String?
   smtpFromEmail  String?
   smtpFromName   String?
+  // Set server-side whenever smtpPassword changes (#104); null = never tracked.
+  smtpPasswordRotatedAt DateTime?
   baseCurrency   String  @default("SAR")
 
   // General Settings
