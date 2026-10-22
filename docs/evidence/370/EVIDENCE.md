@@ -6,7 +6,7 @@ This document provides verification evidence for GitHub issue #370 in `Abdelrhma
 - **PR**: Supersedes part of #305
 - **Parent Issue**: #256
 - **Base Commit (`origin/master`)**: `e5d9b805563c04df3300f00442fd18f7d82ce560`
-- **Tested Head Commit**: `e16aaae52c2feb6487a3d876b6bf6c2bff25b898`
+- **Tested Head Commit**: `3c560886d1409ae3b7a7fd4f78a455d98a1beabc`
 - **Tested Branch**: `ai/370`
 - **Originating Sentry Issue**: None (originates from review discussion `r4332462811` on PR #305 / parent issue #256).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20.18.0, pnpm 8.14.0, Python 3.14.8.
