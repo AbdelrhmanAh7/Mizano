@@ -6,7 +6,7 @@ This document provides verification evidence for GitHub issue #381 in `Abdelrhma
 - **PR**: Supersedes part of #288
 - **Parent Issue**: #212
 - **Base Commit (`origin/master`)**: `bf3f67a80294e9c79f1bb5bfab65ac637e21658a`
-- **Tested Code Head**: `eac4de0fd8949ccc9888defa2b0a9c46d4453fca`
+- **Tested Code Head**: `879f1e03b4498bc3faa29d3d357622dc4b55f605`
 - **Tested Branch**: `ai/381`
 - **Originating Sentry Issue**: None (originates from review finding `0b2495908c2c` on PR #288 / parent issue #212).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20+, pnpm 8.14.0, Python 3.14.8.
@@ -138,7 +138,7 @@ On base before this fix, `DeliveryChallansService.update` threw a generic `Confl
      Received message: "Only draft challans can be updated"
    ```
 
-### Head Behaviour (`eac4de0fd8949ccc9888defa2b0a9c46d4453fca`)
+### Head Behaviour (`879f1e03b4498bc3faa29d3d357622dc4b55f605`)
 
 With the fix in `delivery-challans.service.ts`:
 
