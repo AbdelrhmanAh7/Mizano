@@ -166,6 +166,7 @@
     "recordPayment": "تسجيل دفعة",
     "voidBill": "إلغاء الفاتورة",
     "form": {
+      "billInfo": "معلومات الفاتورة",
       "billNumber": "رقم الفاتورة",
       "billNumberPlaceholder": "أدخل رقم الفاتورة",
       "vendor": "المورد",
@@ -175,9 +176,21 @@
       "dateRequired": "تاريخ الفاتورة مطلوب",
       "dueDate": "تاريخ الاستحقاق",
       "dueDateRequired": "تاريخ الاستحقاق مطلوب",
+      "reference": "المرجع (رقم مستند المورد)",
+      "currency": "العملة",
       "notes": "ملاحظات",
+      "notesPlaceholder": "أضف ملاحظات أو شروط...",
       "project": "المشروع",
-      "lineItemRequired": "مطلوب عنصر واحد على الأقل"
+      "lineItemRequired": "مطلوب عنصر واحد على الأقل",
+      "lineItems": "بنود الفاتورة",
+      "addLine": "إضافة سطر",
+      "subtotal": "المجموع الفرعي",
+      "tax": "الضريبة",
+      "total": "الإجمالي",
+      "cancel": "إلغاء",
+      "createBill": "إنشاء فاتورة",
+      "updateBill": "تحديث الفاتورة",
+      "saving": "جارٍ الحفظ..."
     },
     "table": {
       "billNumber": "رقم الفاتورة",
