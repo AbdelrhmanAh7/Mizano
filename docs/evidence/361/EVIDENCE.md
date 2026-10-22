@@ -60,7 +60,7 @@ In the PR review debate (`pr-AbdelrhmanAh7/Mizano-363`), the judge review reques
 
 ## Red-to-Green Regression Proof
 
-### 1. Failing on Base (`d740dda9d8ebf6b996aac1b2f83d734c0bc3b2ef`)
+### 1. Failing on Base (`e5d9b805563c04df3300f00442fd18f7d82ce560`)
 
 Before modifying `apps/web/lib/auth.ts`, `apps/web/app/api/auth/[...nextauth]/route.spec.ts` fails with exit code 1 because `refreshToken` leaks in the session response:
 
