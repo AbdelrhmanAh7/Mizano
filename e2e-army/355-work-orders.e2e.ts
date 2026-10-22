@@ -1,3 +1,7 @@
+/**
+ * E2E tests for issue #355: work orders navigation, Arabic RTL, and completion API validation.
+ * Tags: feat:mz-work-orders, feat:mz-bom
+ */
 import { test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 

@@ -1,3 +1,7 @@
+/**
+ * Unit tests covering AC1-AC5 for useCompleteWorkOrder hook (@issue-355).
+ * Validates quantity resolution, explicit zero handling, and error rejection.
+ */
 import { renderHook, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';

@@ -351,6 +351,7 @@ export function useStartWorkOrder() {
 export function useCompleteWorkOrder() {
   const queryClient = useQueryClient();
   return useMutation({
+    // Validates completion parameters: throws when quantity is absent to prevent silent defaulting to zero
     mutationFn: ({
       id,
       quantityProduced,

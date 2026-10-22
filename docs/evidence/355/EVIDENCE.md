@@ -6,7 +6,7 @@ This document provides complete verification evidence for GitHub issue #355 in `
 - **Parent Issue**: #287
 - **Supersedes**: Part of PR #324 (finding `dc9f80df6bff` / discussion `r4333275566`)
 - **Base commit**: `6679bfe2bbb2679a8c107b7ddffa4fb6529a85ff`
-- **Tested head SHA**: `009e210472841ee9d9ab75777650db6460c05c63`
+- **Tested head SHA**: `603e58f435ddb8f4e5f7dbaacd433157e7478eb0`
 - **Originating Sentry Issue**: None (CodeRabbit code review finding on PR #324 regarding work order completion quantity defaulting to zero and parameter resolution).
 - **Skills Used**: `systematic-debugging`, `test-first-engineering`, `verification-before-completion`, `root-cause-debugging`, `model-effort-routing`, `e2e-army`
 - **Model and Effort**: `Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: High · Why: Hook parameter validation, e2e-army test, locale navigation fixes, review resolution, unit tests, and verification report for issue #355`
