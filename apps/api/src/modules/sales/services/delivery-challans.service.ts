@@ -165,6 +165,7 @@ export class DeliveryChallansService {
         },
       });
       if (res.count !== 1) {
+        // Distinguish non-existent/cross-tenant (404), invalid status (400), or concurrent race (409)
         await this.rejectTransition(
           tx,
           organizationId,

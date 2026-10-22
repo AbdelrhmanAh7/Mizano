@@ -20,8 +20,14 @@ function challan(status: ChallanStatus, line: { itemId: string; warehouseId: str
 /** Validation failures must stop before the transaction opens: no write mock may have run. */
 function expectNoWrites(prisma: MockPrismaClient): void {
   expect(prisma.$transaction).not.toHaveBeenCalled();
-  expect(prisma.deliveryChallan.updateMany).not.toHaveBeenCalled();
-  for (const model of [prisma.deliveryChallan, prisma.deliveryChallanLine] as const) {
+  for (const model of [
+    prisma.deliveryChallan,
+    prisma.deliveryChallanLine,
+    prisma.customer,
+    prisma.invoice,
+    prisma.item,
+    prisma.warehouse,
+  ] as const) {
     for (const op of [
       'update',
       'updateMany',
@@ -63,7 +69,6 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
       await expect(service.update(ORG, 'dc-1', dto)).rejects.toThrow(
         new NotFoundException(message),
       );
-      expect(prisma.deliveryChallanLine.deleteMany).not.toHaveBeenCalled();
       expectNoWrites(prisma);
     });
 
@@ -71,7 +76,6 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
       prisma.item.findFirst.mockResolvedValue({ id: 'item-b' } as never);
       const dto = { lines: [{ itemId: 'item-b', quantity: 1, warehouseId: 'wh-a' }] };
       await expect(service.update(ORG, 'dc-1', dto)).rejects.toThrow('Warehouse wh-a not found');
-      expect(prisma.deliveryChallanLine.deleteMany).not.toHaveBeenCalled();
       expectNoWrites(prisma);
     });
 
@@ -135,6 +139,8 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
       await expect(service.update(ORG, 'dc-1', { notes: 'x' })).rejects.toThrow(
         BadRequestException,
       );
+      expect(prisma.deliveryChallanLine.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.deliveryChallanLine.createMany).not.toHaveBeenCalled();
     });
 
     it('rejects and writes no lines when the guarded update matches more than one row', async () => {
