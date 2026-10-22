@@ -27,9 +27,9 @@ BARE_E2E_IMPORT_PATTERN = re.compile(
     re.MULTILINE,
 )
 
-# Pattern matching hardcoded credentials / plaintext password123 in e2e test files
+# Pattern matching hardcoded credentials / plaintext password123 or admin@mizano.com in e2e test files
 HARDCODED_PASSWORD_PATTERN = re.compile(
-    r"""(?:\b(?:pw|password)\s*:\s*['"]password123['"]|['"]password123['"])""",
+    r"""(?:\b(?:pw|password)\s*:\s*['"]password123['"]|['"]password123['"]|\bemail\s*:\s*['"]admin@mizano\.com['"])""",
     re.IGNORECASE,
 )
 
@@ -204,6 +204,15 @@ import './277-work-order-complete.e2e';
         self.assertEqual(len(violations), 1)
         self.assertEqual(violations[0][0], 1)
         self.assertIn("password123", violations[0][1])
+        self.assertIn("admin@mizano.com", violations[0][1])
+
+    def test_hardcoded_email_detected(self):
+        """Hardcoded admin@mizano.com email in login credentials is detected as a violation."""
+        code = "const LOGIN = { email: 'admin@mizano.com' };"
+        violations = find_hardcoded_credential_violations(code)
+        self.assertEqual(len(violations), 1)
+        self.assertEqual(violations[0][0], 1)
+        self.assertIn("admin@mizano.com", violations[0][1])
 
     def test_sanitized_credentials_accepted(self):
         """Dynamic credentials from environment are accepted without violations."""
@@ -294,6 +303,7 @@ class E2EArmyRepositoryHygieneTests(unittest.TestCase):
             f"317 spec contains hardcoded credentials: {violations}",
         )
         self.assertNotIn("password123", content, "317 spec contains hardcoded plaintext password123")
+        self.assertNotIn("admin@mizano.com", content, "317 spec contains hardcoded plaintext admin@mizano.com")
         self.assertIn("process.env", content, "317 spec should source credentials dynamically from env")
 
 
