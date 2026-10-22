@@ -5,7 +5,7 @@
 - **Date**: 2026-10-22
 - **Platform**: macOS (Apple Silicon arm64)
 - **Base SHA (`master`)**: `e5d9b805563c04df3300f00442fd18f7d82ce560`
-- **Tested Code Head**: `b7bd9fa5a27a228067915ac482d5907ec88c1e3c` (final test code; the only later commit is this file)
+- **Tested Code Head**: `256d9ae967e798bd3146bb9cd64f09e1abd30e1b` (final test code; the only later commit is this file)
 
 ---
 
@@ -108,26 +108,29 @@ PASS src/modules/ai/schedulers/ai-schedulers.enabled.spec.ts
     ✓ AI_SCHEDULERS_ENABLED="1" registers no scheduler providers
     ✓ AI_SCHEDULERS_ENABLED="yes" registers no scheduler providers
     ✓ AI_SCHEDULERS_ENABLED=true registers the scheduler providers
-    constructor guards: schedulers refuse instantiation when disabled
-      ✓ AiHrOpsScheduler throws in constructor when AI_SCHEDULERS_ENABLED is false (5 ms)
-      ✓ AiHrOpsScheduler instantiates successfully when AI_SCHEDULERS_ENABLED is true (1 ms)
-      ✓ AiSecurityScheduler throws in constructor when AI_SCHEDULERS_ENABLED is false (1 ms)
-      ✓ AiSecurityScheduler instantiates successfully when AI_SCHEDULERS_ENABLED is true
-      ✓ AiOperationsScheduler throws in constructor when AI_SCHEDULERS_ENABLED is false (2 ms)
-      ✓ AiNlpChatScheduler throws in constructor when AI_SCHEDULERS_ENABLED is false
-      ✓ AiSalesCrmScheduler throws in constructor when AI_SCHEDULERS_ENABLED is false (1 ms)
+    scheduler gating: schedulers instantiate cleanly with isEnabled=false and guard execution when disabled
+      ✓ AiHrOpsScheduler instantiates with isEnabled=false and skips cron execution when disabled (3 ms)
+      ✓ AiHrOpsScheduler instantiates with isEnabled=true when AI_SCHEDULERS_ENABLED is true
+      ✓ AiSecurityScheduler instantiates with isEnabled=false and skips cron execution when disabled
+      ✓ AiSecurityScheduler instantiates with isEnabled=true when AI_SCHEDULERS_ENABLED is true
+      ✓ AiOperationsScheduler instantiates with isEnabled=false and skips cron execution when disabled
+      ✓ AiOperationsScheduler instantiates with isEnabled=true when AI_SCHEDULERS_ENABLED is true
+      ✓ AiNlpChatScheduler instantiates with isEnabled=false and skips cron execution when disabled
+      ✓ AiNlpChatScheduler instantiates with isEnabled=true when AI_SCHEDULERS_ENABLED is true
+      ✓ AiSalesCrmScheduler instantiates with isEnabled=false and skips cron execution when disabled
+      ✓ AiSalesCrmScheduler instantiates with isEnabled=true when AI_SCHEDULERS_ENABLED is true
 PASS src/modules/notifications/services/notifications.service.spec.ts
   NotificationsService movement signs
     ✓ legacy rows report the same low stock (2 ms)
     ✓ new rows report the same low stock
   NotificationsService cursor paging
-    ✓ notifies for every overdue invoice of an org with more than one page (2 ms)
-    ✓ notifies for every upcoming bill of an org with more than one page
+    ✓ notifies for every overdue invoice of an org with more than one page (1 ms)
+    ✓ notifies for every upcoming bill of an org with more than one page (1 ms)
     ✓ checks stock for every goods item of an org with more than one page (1 ms)
     ✓ pages organizations by cursor too, so tenants past the first batch are not skipped (1 ms)
 
 Test Suites: 2 passed, 2 total
-Tests:       20 passed, 20 total
+Tests:       23 passed, 23 total
 Snapshots:   0 total
 Time:        3.15 s
 (exit 0)
@@ -136,7 +139,7 @@ Time:        3.15 s
 ### 4.4 E2E Acceptance Suite
 
 ```bash
-DATABASE_URL="postgresql://mizano:mizano_secret@localhost:5432/mizano_e2e_133?schema=public" pnpm --filter api exec jest --config ./test/jest-e2e.json issue-133
+DATABASE_URL="postgresql://mizano:***@localhost:5432/mizano_e2e_133?schema=public" pnpm --filter api exec jest --config ./test/jest-e2e.json issue-133
 ```
 
 **Output**:
@@ -176,15 +179,19 @@ Time:        10.655 s
 
 ---
 
-## 6. QA Review Findings Resolution (Round 8 / Head 2396ff1)
+## 6. QA Review Findings Resolution & CTO Hard-Rule Alignment
 
 1. **Finding 5e46ab104a1d (`apps/api/src/modules/ai/operations/ai-operations.module.ts:58`)**:
    - _Review finding_: `IntakeQueueService/IntakeProcessorService are still registered as providers in the API module... The extraction worker must be moved to a separate entrypoint and unregistered from the API module before #133 can close.`
    - _Root cause & Resolution_: Master already integrated PR #141 (`b8c0ab1e8b2d`), decoupling `IntakeProcessorService` into `IntakeWorkerModule` and dedicated worker entrypoint `intake-worker.ts`. In `ai-operations.module.ts:57-59`, clarified with explicit comments that `IntakeProcessorService` is decoupled and only the client `IntakeQueueService` is provided for enqueueing. Added an automated regression test in `apps/api/test/issue-133.e2e-spec.ts:194-197` proving `app.get(IntakeProcessorService, { strict: false })` throws in the API container context.
-2. **Finding b49fd5c3ec79 (`apps/api/src/modules/ai/schedulers/ai-hr-ops.scheduler.ts:23`)**:
+2. **Finding b49fd5c3ec79 (`apps/api/src/modules/ai/schedulers/ai-hr-ops.scheduler.ts:23`) & Finding bcd64679ec8b (`apps/api/src/modules/ai/schedulers/ai-security.scheduler.ts:11`)**:
    - _Review finding_: `The guard() method is called in all cron methods but there's no check in the constructor to prevent the service from being registered entirely when AI_SCHEDULERS_ENABLED is false.`
-   - _Root cause & Resolution_: Added constructor validation in `apps/api/src/modules/ai/schedulers/ai-hr-ops.scheduler.ts:28-36` throwing an explicit error (`AiHrOpsScheduler cannot be instantiated when AI_SCHEDULERS_ENABLED is not true`) if instantiated when `AI_SCHEDULERS_ENABLED` is false. Verified with unit tests in `apps/api/src/modules/ai/schedulers/ai-schedulers.enabled.spec.ts:49-75`.
-3. **Finding bcd64679ec8b (`apps/api/src/modules/ai/schedulers/ai-security.scheduler.ts:11`)**:
-   - _Review finding_: `The guard() method is called in all cron methods but there's no check in the constructor to prevent the service from being registered entirely when AI_SCHEDULERS_ENABLED is false.`
-   - _Root cause & Resolution_: Added constructor validation in `apps/api/src/modules/ai/schedulers/ai-security.scheduler.ts:24-32` throwing an explicit error (`AiSecurityScheduler cannot be instantiated when AI_SCHEDULERS_ENABLED is not true`) if instantiated when disabled. Verified with unit tests in `apps/api/src/modules/ai/schedulers/ai-schedulers.enabled.spec.ts:77-103`.
-   - Pattern applied consistently to all 5 AI scheduler classes (`AiHrOpsScheduler`, `AiSecurityScheduler`, `AiOperationsScheduler`, `AiNlpChatScheduler`, `AiSalesCrmScheduler`).
+   - _CTO directive_: `PR 3: Implement scheduler gating via AI_SCHEDULERS_ENABLED without throwing in constructors when disabled.`
+   - _Root cause & Resolution_: Throwing exceptions in provider constructors breaks NestJS dependency injection graph compilation. Instead of throwing, gating is enforced cleanly:
+     - At registration time, `aiSchedulerProviders(...)` omits all five AI schedulers from module provider lists unless `AI_SCHEDULERS_ENABLED=true`.
+     - At instantiation time, constructors set `this.enabled = false` and log the disabled state without throwing.
+     - Schedulers provide `isEnabled(): boolean` and `guard()` short-circuits any `@Cron` executions before reaching Prisma or dependencies.
+     - Verified with 17 unit tests in `apps/api/src/modules/ai/schedulers/ai-schedulers.enabled.spec.ts` covering clean instantiation, `isEnabled()`, and complete no-op short-circuiting on crons.
+3. **Hard-Rule Security Clearance (CTO `decision=blocked-hard-rule` / `credentials / secrets`)**:
+   - _Hold Cause_: Modifications to `.env.dev`, `.env.local`, `.env.prod`, and `.env.sit` matched `SECRET_PATH` in `prHardRule`, triggering the automated credentials hold.
+   - _Resolution_: Reverted `.env.dev`, `.env.local`, `.env.prod`, and `.env.sit` to `origin/master`. Non-example environment files are kept untouched. `AI_SCHEDULERS_ENABLED` is cleanly configured via `.env.example`, `deploy/pi/.env.pi.example`, and compose profile defaults (`docker-compose.production.yml` and `deploy/pi/docker-compose.pi.yml`), completely clearing the hold.
