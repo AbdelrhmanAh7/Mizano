@@ -4,9 +4,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BillForm } from '@/components/purchases/bill-form';
+import { BillForm, type FetchOptionsParams } from '@/components/purchases/bill-form';
 import { useCreateBill } from '@/lib/hooks/use-bills';
 import { useQuery } from '@tanstack/react-query';
 import { accountsApi, itemsApi } from '@/lib/api';
@@ -19,20 +20,36 @@ export default function NewBillPage() {
 
   const createBill = useCreateBill();
 
-  // Fetch accounts for dropdowns
+  // Search and page aware option fetchers
+  const fetchAccounts = useCallback(async (params: FetchOptionsParams) => {
+    const response = await accountsApi.getAll({ ...params, limit: params.limit || 50 });
+    return response.data;
+  }, []);
+
+  const fetchItems = useCallback(async (params: FetchOptionsParams) => {
+    const response = await itemsApi.getAll({ ...params, limit: params.limit || 50 });
+    return response.data;
+  }, []);
+
+  const fetchAccountById = useCallback(async (id: string) => {
+    const response = await accountsApi.getOne(id);
+    return response.data?.data || response.data;
+  }, []);
+
+  // Fetch initial accounts for dropdowns
   const { data: accountsData, isLoading: accountsLoading } = useQuery({
     queryKey: ['accounts'],
     queryFn: async () => {
-      const response = await accountsApi.getAll();
+      const response = await accountsApi.getAll({ limit: 50 });
       return response.data;
     },
   });
 
-  // Fetch items for dropdowns
+  // Fetch initial items for dropdowns
   const { data: itemsData, isLoading: itemsLoading } = useQuery({
     queryKey: ['items'],
     queryFn: async () => {
-      const response = await itemsApi.getAll();
+      const response = await itemsApi.getAll({ limit: 50 });
       return response.data;
     },
   });
@@ -77,6 +94,9 @@ export default function NewBillPage() {
       <BillForm
         accounts={accounts}
         items={items}
+        fetchAccounts={fetchAccounts}
+        fetchItems={fetchItems}
+        fetchAccountById={fetchAccountById}
         onSubmit={handleSubmit}
         onCancel={() => router.push('/purchases/bills')}
         isSubmitting={createBill.isPending}

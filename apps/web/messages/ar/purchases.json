@@ -177,7 +177,28 @@
       "dueDateRequired": "تاريخ الاستحقاق مطلوب",
       "notes": "ملاحظات",
       "project": "المشروع",
-      "lineItemRequired": "مطلوب عنصر واحد على الأقل"
+      "lineItemRequired": "مطلوب عنصر واحد على الأقل",
+      "item": "الصنف",
+      "itemPlaceholder": "اختر صنفاً",
+      "manualEntry": "إدخال يدوي",
+      "expenseAccount": "حساب المصروف",
+      "expenseAccountPlaceholder": "اختر حساب المصروف",
+      "searchPlaceholder": "بحث...",
+      "noResults": "لم يتم العثور على نتائج",
+      "previousPage": "السابق",
+      "nextPage": "التالي",
+      "pageOf": "صفحة {page} من {totalPages}",
+      "description": "الوصف",
+      "descriptionPlaceholder": "الوصف",
+      "qty": "الكمية",
+      "unitPrice": "سعر الوحدة",
+      "amount": "المبلغ",
+      "taxPercent": "نسبة الضريبة",
+      "total": "الإجمالي",
+      "subtotal": "المجموع الفرعي",
+      "tax": "الضريبة",
+      "addLine": "إضافة سطر",
+      "deleteLine": "حذف البند"
     },
     "table": {
       "billNumber": "رقم الفاتورة",
@@ -215,7 +236,8 @@
       "quantityInvalid": "يجب أن تكون الكمية رقمًا غير سالب",
       "quantityPositive": "يجب أن تكون الكمية أكبر من صفر",
       "rateInvalid": "يجب أن يكون السعر رقمًا غير سالب",
-      "taxInvalid": "يجب أن تكون نسبة الضريبة رقمًا غير سالب"
+      "taxInvalid": "يجب أن تكون نسبة الضريبة رقمًا غير سالب",
+      "accountRequired": "اختر حساب المصروف"
     },
     "bulkApprove": {
       "title": "اعتماد وترحيل {count} فاتورة؟",

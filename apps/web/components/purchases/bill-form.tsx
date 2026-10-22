@@ -22,10 +22,12 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Bill } from '@/lib/hooks/use-bills';
 import { useVendors, Vendor } from '@/lib/hooks/use-vendors';
+import { SearchableSelect, type SearchableOption } from './searchable-select';
+import { accountsApi } from '@/lib/api';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { addDays, format } from 'date-fns';
 import { Plus, Trash2 } from 'lucide-react';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useCallback, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { useTranslations } from 'next-intl';
 import { z } from 'zod';
@@ -43,7 +45,7 @@ const OPTIONAL_PERCENT_INPUT = /^(\d{1,3}(\.\d{1,2})?)?$/;
 
 const lineSchema = z.object({
   itemId: z.string().optional(),
-  accountId: z.string().optional(),
+  accountId: z.string().min(1, 'accountRequired'),
   description: z.string().min(1, 'Description is required'),
   // Money/quantities must be valid non-negative decimals: never coerce bad input to 0.
   quantity: z
@@ -84,10 +86,54 @@ export interface BillFormDefaultValues {
   }>;
 }
 
-interface BillFormProps {
+export interface BillFormAccountOption {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+}
+
+export interface BillFormItemOption {
+  id: string;
+  name: string;
+  sku: string;
+  costPrice: string;
+  purchaseAccountId?: string | null;
+  purchaseAccount?: {
+    id: string;
+    name: string;
+    code: string;
+    type?: string;
+  } | null;
+}
+
+export interface FetchOptionsParams {
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface FetchOptionsResult<T> {
+  data: T[];
+  meta?: {
+    page?: number;
+    limit?: number;
+    total?: number;
+    totalPages?: number;
+  };
+}
+
+export interface BillFormProps {
   bill?: Bill | null;
-  accounts?: Array<{ id: string; code: string; name: string; type: string }>;
-  items?: Array<{ id: string; name: string; sku: string; costPrice: string }>;
+  accounts?: BillFormAccountOption[];
+  items?: BillFormItemOption[];
+  fetchAccounts?: (
+    params: FetchOptionsParams,
+  ) => Promise<FetchOptionsResult<BillFormAccountOption> | { data: BillFormAccountOption[] }>;
+  fetchItems?: (
+    params: FetchOptionsParams,
+  ) => Promise<FetchOptionsResult<BillFormItemOption> | { data: BillFormItemOption[] }>;
+  fetchAccountById?: (id: string) => Promise<BillFormAccountOption | null>;
   projects?: Array<{ id: string; name: string }>;
   onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
@@ -103,6 +149,9 @@ export function BillForm({
   bill,
   accounts = [],
   items = [],
+  fetchAccounts,
+  fetchItems,
+  fetchAccountById,
   projects = [],
   onSubmit,
   onCancel,
@@ -113,12 +162,35 @@ export function BillForm({
 }: BillFormProps) {
   const isEditing = !!bill;
   const tValidation = useTranslations('purchases.bills.validation');
+  const tForm = useTranslations('purchases.bills.form');
   const tIntake = useTranslations('ai.intake');
   const { data: vendorsData } = useVendors({ limit: 100 });
   const vendors = useMemo(() => vendorsData?.data || [], [vendorsData?.data]);
 
-  // Filter accounts
-  const _expenseAccounts = accounts.filter((a) => a.type === 'EXPENSE' || a.type === 'ASSET');
+  const [extraAccounts, setExtraAccounts] = useState<BillFormAccountOption[]>([]);
+  const [extraItems, setExtraItems] = useState<BillFormItemOption[]>([]);
+
+  const addExtraAccount = useCallback((acc: BillFormAccountOption) => {
+    setExtraAccounts((prev) => (prev.some((a) => a.id === acc.id) ? prev : [...prev, acc]));
+  }, []);
+
+  const addExtraItem = useCallback((item: BillFormItemOption) => {
+    setExtraItems((prev) => (prev.some((i) => i.id === item.id) ? prev : [...prev, item]));
+  }, []);
+
+  const allAccounts = useMemo(() => {
+    const map = new Map<string, BillFormAccountOption>();
+    accounts.forEach((a) => map.set(a.id, a));
+    extraAccounts.forEach((a) => map.set(a.id, a));
+    return Array.from(map.values());
+  }, [accounts, extraAccounts]);
+
+  const allItems = useMemo(() => {
+    const map = new Map<string, BillFormItemOption>();
+    items.forEach((i) => map.set(i.id, i));
+    extraItems.forEach((i) => map.set(i.id, i));
+    return Array.from(map.values());
+  }, [items, extraItems]);
 
   const form = useForm<BillFormData>({
     resolver: zodResolver(billSchema),
@@ -132,13 +204,14 @@ export function BillForm({
       projectId: scanDefaults?.projectId || '',
       lines: scanDefaults?.lines?.length
         ? scanDefaults.lines.map((l) => ({
+            accountId: '',
             description: l.description,
             quantity: l.quantity,
             rate: l.rate,
             // Scan review leaves an unresolved tax rate empty; do not default it to 0.
             taxRate: l.taxRate ?? '0',
           }))
-        : [{ description: '', quantity: '1', rate: '', taxRate: '0' }],
+        : [{ accountId: '', description: '', quantity: '1', rate: '', taxRate: '0' }],
     },
   });
 
@@ -149,6 +222,14 @@ export function BillForm({
 
   useEffect(() => {
     if (bill) {
+      // Seed any known accounts from bill lines if present
+      bill.lines?.forEach((line) => {
+        const rawAccount = (line as unknown as { account?: BillFormAccountOption }).account;
+        if (rawAccount) {
+          addExtraAccount(rawAccount);
+        }
+      });
+
       form.reset({
         vendorId: bill.vendorId,
         date: bill.date.split('T')[0],
@@ -159,15 +240,15 @@ export function BillForm({
         projectId: bill.projectId || '',
         lines: bill.lines?.map((line) => ({
           itemId: line.itemId || '',
-          accountId: line.accountId || '',
+          accountId: line.accountId ?? '',
           description: line.description,
           quantity: String(line.quantity),
           rate: String(line.rate),
           taxRate: String(line.taxRate || 0),
-        })) || [{ description: '', quantity: '1', rate: '', taxRate: '0' }],
+        })) || [{ accountId: '', description: '', quantity: '1', rate: '', taxRate: '0' }],
       });
     }
-  }, [bill, form]);
+  }, [bill, form, addExtraAccount]);
 
   // Update due date when vendor changes
   const watchVendorId = form.watch('vendorId');
@@ -242,18 +323,121 @@ export function BillForm({
       ? String(extractedTotals.discount)
       : null;
 
-  const handleItemSelect = (index: number, itemId: string) => {
-    if (itemId === 'none') {
+  const handleItemSelect = async (index: number, itemId: string, itemOption?: SearchableOption) => {
+    if (itemId === 'none' || !itemId) {
+      const previousItemId = form.getValues(`lines.${index}.itemId`);
+      const previousItem = allItems.find((i) => i.id === previousItemId);
+      const currentAccountId = form.getValues(`lines.${index}.accountId`);
       form.setValue(`lines.${index}.itemId`, '');
+      if (previousItem?.purchaseAccountId && currentAccountId === previousItem.purchaseAccountId) {
+        form.setValue(`lines.${index}.accountId`, '', {
+          shouldValidate: form.formState.isSubmitted,
+        });
+      }
       return;
     }
-    const item = items.find((i) => i.id === itemId);
+    const item =
+      (itemOption?.data as BillFormItemOption) ||
+      allItems.find((i) => i.id === itemId) ||
+      items.find((i) => i.id === itemId);
+
     if (item) {
+      addExtraItem(item);
       form.setValue(`lines.${index}.itemId`, item.id);
       form.setValue(`lines.${index}.description`, item.name);
       form.setValue(`lines.${index}.rate`, item.costPrice);
+
+      if (item.purchaseAccountId) {
+        if (item.purchaseAccount) {
+          addExtraAccount(item.purchaseAccount as BillFormAccountOption);
+        } else if (!allAccounts.some((a) => a.id === item.purchaseAccountId)) {
+          const getAccountFn =
+            fetchAccountById ||
+            (async (id: string) => {
+              const res = await accountsApi.getOne(id);
+              return (res.data?.data || res.data) as BillFormAccountOption;
+            });
+          try {
+            const acc = await getAccountFn(item.purchaseAccountId);
+            if (acc) addExtraAccount(acc);
+          } catch {
+            // Keep going if lookup fails
+          }
+        }
+        form.setValue(`lines.${index}.accountId`, item.purchaseAccountId, {
+          shouldValidate: form.formState.isSubmitted,
+        });
+      } else {
+        form.setValue(`lines.${index}.accountId`, '', {
+          shouldValidate: form.formState.isSubmitted,
+        });
+      }
     }
   };
+
+  const initialAccountOptions = useMemo(() => {
+    const filtered = allAccounts.filter((a) => a.type === 'EXPENSE' || a.type === 'ASSET');
+    return filtered.map((a) => ({
+      id: a.id,
+      label: `${a.code} · ${a.name}`,
+      sublabel: a.type,
+      data: a,
+    }));
+  }, [allAccounts]);
+
+  const initialItemOptions = useMemo(() => {
+    return [
+      { id: 'none', label: tForm('manualEntry') },
+      ...allItems.map((i) => ({
+        id: i.id,
+        label: i.name,
+        sublabel: i.sku || undefined,
+        data: i,
+      })),
+    ];
+  }, [allItems, tForm]);
+
+  const handleSearchAccounts = useMemo(() => {
+    if (!fetchAccounts) return undefined;
+    return async (search: string, page: number) => {
+      const res = await fetchAccounts({ search, page, limit: 20 });
+      const list: BillFormAccountOption[] = 'data' in res ? res.data : [];
+      const meta = 'meta' in res ? res.meta : undefined;
+      const filtered = list.filter((a) => a.type === 'EXPENSE' || a.type === 'ASSET');
+      return {
+        options: filtered.map((a) => ({
+          id: a.id,
+          label: `${a.code} · ${a.name}`,
+          sublabel: a.type,
+          data: a,
+        })),
+        totalPages: meta?.totalPages ?? 1,
+        total: meta?.total ?? filtered.length,
+      };
+    };
+  }, [fetchAccounts]);
+
+  const handleSearchItems = useMemo(() => {
+    if (!fetchItems) return undefined;
+    return async (search: string, page: number) => {
+      const res = await fetchItems({ search, page, limit: 20 });
+      const list: BillFormItemOption[] = 'data' in res ? res.data : [];
+      const meta = 'meta' in res ? res.meta : undefined;
+      return {
+        options: [
+          ...(page === 1 ? [{ id: 'none', label: tForm('manualEntry') }] : []),
+          ...list.map((i) => ({
+            id: i.id,
+            label: i.name,
+            sublabel: i.sku || undefined,
+            data: i,
+          })),
+        ],
+        totalPages: meta?.totalPages ?? 1,
+        total: meta?.total ? meta.total + 1 : list.length + 1,
+      };
+    };
+  }, [fetchItems, tForm]);
 
   return (
     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
@@ -375,13 +559,14 @@ export function BillForm({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[200px]">Item/Account</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="w-[80px]">Qty</TableHead>
-                <TableHead className="w-[110px]">Unit Price</TableHead>
-                <TableHead className="w-[110px] text-right">Amount</TableHead>
-                <TableHead className="w-[100px]">Tax %</TableHead>
-                <TableHead className="w-[110px] text-right">Total</TableHead>
+                <TableHead className="w-[180px]">{tForm('item')}</TableHead>
+                <TableHead className="w-[180px]">{tForm('expenseAccount')}</TableHead>
+                <TableHead>{tForm('description')}</TableHead>
+                <TableHead className="w-[80px]">{tForm('qty')}</TableHead>
+                <TableHead className="w-[110px]">{tForm('unitPrice')}</TableHead>
+                <TableHead className="w-[110px] text-right">{tForm('amount')}</TableHead>
+                <TableHead className="w-[100px]">{tForm('taxPercent')}</TableHead>
+                <TableHead className="w-[110px] text-right">{tForm('total')}</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -391,28 +576,48 @@ export function BillForm({
 
                 return (
                   <TableRow key={field.id}>
-                    <TableCell>
-                      <Select
+                    <TableCell data-testid={`line-${index}-item`}>
+                      <SearchableSelect
                         value={form.watch(`lines.${index}.itemId`) || 'none'}
-                        onValueChange={(value) => handleItemSelect(index, value)}
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Manual Entry</SelectItem>
-                          {items.map((item) => (
-                            <SelectItem key={item.id} value={item.id}>
-                              {item.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        onValueChange={(value, opt) => handleItemSelect(index, value, opt)}
+                        options={initialItemOptions}
+                        onSearch={handleSearchItems}
+                        placeholder={tForm('itemPlaceholder')}
+                        searchPlaceholder={tForm('searchPlaceholder')}
+                        emptyText={tForm('noResults')}
+                        previousPageText={tForm('previousPage')}
+                        nextPageText={tForm('nextPage')}
+                        pageOfText={(p, tp) => tForm('pageOf', { page: p, totalPages: tp })}
+                        ariaLabel={tForm('item')}
+                        dataTestId={`line-${index}-item-select`}
+                      />
+                    </TableCell>
+                    <TableCell data-testid={`line-${index}-account`}>
+                      <SearchableSelect
+                        value={form.watch(`lines.${index}.accountId`) || ''}
+                        onValueChange={(value) =>
+                          form.setValue(`lines.${index}.accountId`, value, {
+                            shouldValidate: form.formState.isSubmitted,
+                          })
+                        }
+                        options={initialAccountOptions}
+                        onSearch={handleSearchAccounts}
+                        placeholder={tForm('expenseAccountPlaceholder')}
+                        searchPlaceholder={tForm('searchPlaceholder')}
+                        emptyText={tForm('noResults')}
+                        previousPageText={tForm('previousPage')}
+                        nextPageText={tForm('nextPage')}
+                        pageOfText={(p, tp) => tForm('pageOf', { page: p, totalPages: tp })}
+                        ariaLabel={tForm('expenseAccount')}
+                        isInvalid={!!form.formState.errors.lines?.[index]?.accountId}
+                        dataTestId={`line-${index}-account-select`}
+                      />
                     </TableCell>
                     <TableCell>
                       <Input
                         {...form.register(`lines.${index}.description`)}
-                        placeholder="Description"
+                        placeholder={tForm('descriptionPlaceholder')}
+                        aria-label={tForm('description')}
                         className="h-8"
                       />
                     </TableCell>
@@ -421,6 +626,7 @@ export function BillForm({
                         {...form.register(`lines.${index}.quantity`)}
                         type="number"
                         step="0.0001"
+                        aria-label={tForm('qty')}
                         className="h-8"
                       />
                     </TableCell>
@@ -429,6 +635,7 @@ export function BillForm({
                         {...form.register(`lines.${index}.rate`)}
                         type="number"
                         step="0.0001"
+                        aria-label={tForm('unitPrice')}
                         className="h-8"
                       />
                     </TableCell>
@@ -440,6 +647,7 @@ export function BillForm({
                         min={0}
                         step={0.01}
                         placeholder="0.00"
+                        aria-label={tForm('taxPercent')}
                         className="h-8 w-24"
                       />
                     </TableCell>
@@ -454,7 +662,7 @@ export function BillForm({
                           size="icon"
                           className="h-8 w-8"
                           onClick={() => remove(index)}
-                          aria-label="Delete line item"
+                          aria-label={tForm('deleteLine')}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -479,25 +687,28 @@ export function BillForm({
             variant="outline"
             size="sm"
             className="mt-4"
-            onClick={() => append({ description: '', quantity: '1', rate: '', taxRate: '0' })}
+            aria-label={tForm('addLine')}
+            onClick={() =>
+              append({ accountId: '', description: '', quantity: '1', rate: '', taxRate: '0' })
+            }
           >
             <Plus className="mr-2 h-4 w-4" />
-            Add Line
+            {tForm('addLine')}
           </Button>
 
           {/* Totals */}
           <div className="mt-6 flex justify-end">
             <div className="w-64 space-y-2">
               <div className="flex justify-between text-sm">
-                <span>Subtotal</span>
+                <span>{tForm('subtotal')}</span>
                 <span className="font-mono">{totals.subtotal}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span>Tax</span>
+                <span>{tForm('tax')}</span>
                 <span className="font-mono">{totals.taxAmount}</span>
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2">
-                <span>Total</span>
+                <span>{tForm('total')}</span>
                 <span className="font-mono">{totals.grandTotal}</span>
               </div>
             </div>

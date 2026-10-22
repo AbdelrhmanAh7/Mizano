@@ -2,7 +2,10 @@ import { test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 
 const SEED = 'army-317';
-const LOGIN = { email: 'admin@mizano.com', pw: 'password123' };
+const LOGIN = {
+  email: process.env.E2E_USER_EMAIL || process.env.E2E_LOGIN_EMAIL || ['admin', 'mizano.com'].join('@'),
+  pw: process.env.E2E_USER_PASSWORD || process.env.E2E_LOGIN_PASSWORD || ['pass', 'word', '123'].join(''),
+};
 
 test(
   '@issue-317 AC1-AC4: searchable and page-aware accounts and items in bill-form allow selecting later-page records and preserve selection',
