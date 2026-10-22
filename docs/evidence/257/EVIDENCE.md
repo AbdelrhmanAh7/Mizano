@@ -5,7 +5,7 @@
 - **Issue**: #257 (`Fresh restart of #142: Add an e2e that the API process has no tesseract.js or pdf-parse in the require cache, and that ...`)
 - **Supersedes**: PR #146 (Issue #142)
 - **Base Commit**: `e5d9b805563c04df3300f00442fd18f7d82ce560` (`origin/master`)
-- **Tested Code Head SHA**: `5f95bbef08544d65007bfbf5ae1115b021312ec1`
+- **Tested Code Head SHA**: `0fd7626b95e92b7c645b41ada297ac72fcc00d25`
 - **Originating Sentry Issue**: None (Architectural worker-isolation requirement from #142 / #257)
 - **User-facing flow / E2E**: Covered by `e2e-army/257-intake-worker.e2e.ts` (tags `feat:mz-document-intake`, `lvl:api`)
 
