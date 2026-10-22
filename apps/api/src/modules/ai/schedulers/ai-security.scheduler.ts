@@ -27,10 +27,11 @@ export class AiSecurityScheduler {
       this.logger.log(
         'AI_SCHEDULERS_ENABLED is not set to true; AI Security schedulers are disabled',
       );
-      throw new Error(
-        'AiSecurityScheduler cannot be instantiated when AI_SCHEDULERS_ENABLED is not true',
-      );
     }
+  }
+
+  public isEnabled(): boolean {
+    return this.enabled;
   }
 
   private guard(): boolean {

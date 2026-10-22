@@ -39,10 +39,11 @@ export class AiOperationsScheduler {
       this.logger.log(
         'AI_SCHEDULERS_ENABLED is not set to true; AI Operations schedulers are disabled',
       );
-      throw new Error(
-        'AiOperationsScheduler cannot be instantiated when AI_SCHEDULERS_ENABLED is not true',
-      );
     }
+  }
+
+  public isEnabled(): boolean {
+    return this.enabled;
   }
 
   private guard(): boolean {

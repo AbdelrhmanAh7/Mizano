@@ -31,10 +31,11 @@ export class AiSalesCrmScheduler {
       this.logger.log(
         'AI_SCHEDULERS_ENABLED is not set to true; AI Sales/CRM schedulers are disabled',
       );
-      throw new Error(
-        'AiSalesCrmScheduler cannot be instantiated when AI_SCHEDULERS_ENABLED is not true',
-      );
     }
+  }
+
+  public isEnabled(): boolean {
+    return this.enabled;
   }
 
   private guard(): boolean {

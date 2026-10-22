@@ -35,7 +35,7 @@ describe('AI scheduler gate (issue #133)', () => {
     ]);
   });
 
-  describe('constructor guards: schedulers refuse instantiation when disabled', () => {
+  describe('scheduler gating: schedulers instantiate cleanly with isEnabled=false and guard execution when disabled', () => {
     const mockConfigDisabled = {
       get: jest
         .fn()
@@ -56,94 +56,142 @@ describe('AI scheduler gate (issue #133)', () => {
       delete process.env.AI_SCHEDULERS_ENABLED;
     });
 
-    it('AiHrOpsScheduler throws in constructor when AI_SCHEDULERS_ENABLED is false', () => {
-      expect(
-        () =>
-          new AiHrOpsScheduler(
-            {} as any,
-            {} as any,
-            {} as any,
-            {} as any,
-            {} as any,
-            {} as any,
-            mockConfigDisabled,
-          ),
-      ).toThrow('AiHrOpsScheduler cannot be instantiated when AI_SCHEDULERS_ENABLED is not true');
-    });
-
-    it('AiHrOpsScheduler instantiates successfully when AI_SCHEDULERS_ENABLED is true', () => {
-      expect(
-        () =>
-          new AiHrOpsScheduler(
-            {} as any,
-            {} as any,
-            {} as any,
-            {} as any,
-            {} as any,
-            {} as any,
-            mockConfigEnabled,
-          ),
-      ).not.toThrow();
-    });
-
-    it('AiSecurityScheduler throws in constructor when AI_SCHEDULERS_ENABLED is false', () => {
-      expect(
-        () =>
-          new AiSecurityScheduler({} as any, {} as any, {} as any, {} as any, mockConfigDisabled),
-      ).toThrow(
-        'AiSecurityScheduler cannot be instantiated when AI_SCHEDULERS_ENABLED is not true',
+    it('AiHrOpsScheduler instantiates with isEnabled=false and skips cron execution when disabled', async () => {
+      const mockPrisma = { organization: { findMany: jest.fn() } };
+      const scheduler = new AiHrOpsScheduler(
+        mockPrisma as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        mockConfigDisabled,
       );
+      expect(scheduler.isEnabled()).toBe(false);
+      await scheduler.runMonthlyAttritionPrediction();
+      expect(mockPrisma.organization.findMany).not.toHaveBeenCalled();
     });
 
-    it('AiSecurityScheduler instantiates successfully when AI_SCHEDULERS_ENABLED is true', () => {
-      expect(
-        () =>
-          new AiSecurityScheduler({} as any, {} as any, {} as any, {} as any, mockConfigEnabled),
-      ).not.toThrow();
-    });
-
-    it('AiOperationsScheduler throws in constructor when AI_SCHEDULERS_ENABLED is false', () => {
-      expect(
-        () =>
-          new AiOperationsScheduler(
-            {} as any,
-            {} as any,
-            {} as any,
-            {} as any,
-            {} as any,
-            {} as any,
-            {} as any,
-            {} as any,
-            {} as any,
-            {} as any,
-            mockConfigDisabled,
-          ),
-      ).toThrow(
-        'AiOperationsScheduler cannot be instantiated when AI_SCHEDULERS_ENABLED is not true',
+    it('AiHrOpsScheduler instantiates with isEnabled=true when AI_SCHEDULERS_ENABLED is true', () => {
+      const scheduler = new AiHrOpsScheduler(
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        mockConfigEnabled,
       );
+      expect(scheduler.isEnabled()).toBe(true);
     });
 
-    it('AiNlpChatScheduler throws in constructor when AI_SCHEDULERS_ENABLED is false', () => {
-      expect(
-        () => new AiNlpChatScheduler({} as any, {} as any, {} as any, mockConfigDisabled),
-      ).toThrow('AiNlpChatScheduler cannot be instantiated when AI_SCHEDULERS_ENABLED is not true');
-    });
-
-    it('AiSalesCrmScheduler throws in constructor when AI_SCHEDULERS_ENABLED is false', () => {
-      expect(
-        () =>
-          new AiSalesCrmScheduler(
-            {} as any,
-            {} as any,
-            {} as any,
-            {} as any,
-            {} as any,
-            {} as any,
-            mockConfigDisabled,
-          ),
-      ).toThrow(
-        'AiSalesCrmScheduler cannot be instantiated when AI_SCHEDULERS_ENABLED is not true',
+    it('AiSecurityScheduler instantiates with isEnabled=false and skips cron execution when disabled', async () => {
+      const mockPrisma = { organization: { findMany: jest.fn() } };
+      const scheduler = new AiSecurityScheduler(
+        mockPrisma as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        mockConfigDisabled,
       );
+      expect(scheduler.isEnabled()).toBe(false);
+      await scheduler.runDailyFraudScan();
+      expect(mockPrisma.organization.findMany).not.toHaveBeenCalled();
+    });
+
+    it('AiSecurityScheduler instantiates with isEnabled=true when AI_SCHEDULERS_ENABLED is true', () => {
+      const scheduler = new AiSecurityScheduler(
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        mockConfigEnabled,
+      );
+      expect(scheduler.isEnabled()).toBe(true);
+    });
+
+    it('AiOperationsScheduler instantiates with isEnabled=false and skips cron execution when disabled', async () => {
+      const mockPrisma = { organization: { findMany: jest.fn() } };
+      const scheduler = new AiOperationsScheduler(
+        mockPrisma as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        mockConfigDisabled,
+      );
+      expect(scheduler.isEnabled()).toBe(false);
+      await scheduler.runDailyAnomalyScan();
+      expect(mockPrisma.organization.findMany).not.toHaveBeenCalled();
+    });
+
+    it('AiOperationsScheduler instantiates with isEnabled=true when AI_SCHEDULERS_ENABLED is true', () => {
+      const scheduler = new AiOperationsScheduler(
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        mockConfigEnabled,
+      );
+      expect(scheduler.isEnabled()).toBe(true);
+    });
+
+    it('AiNlpChatScheduler instantiates with isEnabled=false and skips cron execution when disabled', async () => {
+      const mockDocService = { checkRetrainingNeeded: jest.fn() };
+      const scheduler = new AiNlpChatScheduler(
+        {} as any,
+        mockDocService as any,
+        {} as any,
+        mockConfigDisabled,
+      );
+      expect(scheduler.isEnabled()).toBe(false);
+      await scheduler.checkDocClassificationRetraining();
+      expect(mockDocService.checkRetrainingNeeded).not.toHaveBeenCalled();
+    });
+
+    it('AiNlpChatScheduler instantiates with isEnabled=true when AI_SCHEDULERS_ENABLED is true', () => {
+      const scheduler = new AiNlpChatScheduler({} as any, {} as any, {} as any, mockConfigEnabled);
+      expect(scheduler.isEnabled()).toBe(true);
+    });
+
+    it('AiSalesCrmScheduler instantiates with isEnabled=false and skips cron execution when disabled', async () => {
+      const mockPrisma = { organization: { findMany: jest.fn() } };
+      const scheduler = new AiSalesCrmScheduler(
+        mockPrisma as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        mockConfigDisabled,
+      );
+      expect(scheduler.isEnabled()).toBe(false);
+      await scheduler.runWeeklyChurnPrediction();
+      expect(mockPrisma.organization.findMany).not.toHaveBeenCalled();
+    });
+
+    it('AiSalesCrmScheduler instantiates with isEnabled=true when AI_SCHEDULERS_ENABLED is true', () => {
+      const scheduler = new AiSalesCrmScheduler(
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        mockConfigEnabled,
+      );
+      expect(scheduler.isEnabled()).toBe(true);
     });
   });
 });

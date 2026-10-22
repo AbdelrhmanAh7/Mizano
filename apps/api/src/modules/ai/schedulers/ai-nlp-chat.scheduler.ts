@@ -25,10 +25,11 @@ export class AiNlpChatScheduler {
       this.logger.log(
         'AI_SCHEDULERS_ENABLED is not set to true; AI NLP/Chat schedulers are disabled',
       );
-      throw new Error(
-        'AiNlpChatScheduler cannot be instantiated when AI_SCHEDULERS_ENABLED is not true',
-      );
     }
+  }
+
+  public isEnabled(): boolean {
+    return this.enabled;
   }
 
   private guard(): boolean {

@@ -31,10 +31,11 @@ export class AiHrOpsScheduler {
       this.logger.log(
         'AI_SCHEDULERS_ENABLED is not set to true; AI HR/Ops schedulers are disabled',
       );
-      throw new Error(
-        'AiHrOpsScheduler cannot be instantiated when AI_SCHEDULERS_ENABLED is not true',
-      );
     }
+  }
+
+  public isEnabled(): boolean {
+    return this.enabled;
   }
 
   private guard(): boolean {
