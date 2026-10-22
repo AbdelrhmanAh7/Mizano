@@ -150,4 +150,21 @@ describe('WorkOrdersService.bulkComplete', () => {
       expect(args?.where).toMatchObject({ id: 'a', organizationId: ORG, deletedAt: null });
     }
   });
+
+  it('enforces period lock date and reports failure when period is locked', async () => {
+    const { prisma, service } = setup({ locked: workOrder('locked') });
+    const futureLock = new Date(Date.now() + 86400000);
+    prisma.organization.findUnique.mockResolvedValue({ lockDate: futureLock } as never);
+
+    await expect(service.completeWorkOrder(ORG, 'locked', { quantityProduced: 3 })).rejects.toThrow(
+      /period is locked/i,
+    );
+
+    const result = await service.bulkComplete(ORG, ['locked']);
+    expect(result).toEqual({
+      processed: 0,
+      total: 1,
+      failures: [{ id: 'locked', reason: expect.stringMatching(/period is locked/i) }],
+    });
+  });
 });

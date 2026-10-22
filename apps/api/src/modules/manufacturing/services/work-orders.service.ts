@@ -4,6 +4,7 @@ import { Item, Prisma, WorkOrderStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
+import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 import { runBulk } from '../../../common/utils/run-bulk';
 import { JournalSourceType } from '../../accounting/services/journals.service';
 
@@ -242,8 +243,21 @@ export class WorkOrdersService {
     dto: { quantityProduced: number; notes?: string },
   ) {
     return this.prisma.$transaction(async (tx) => {
-      // Lock the row first to prevent concurrent completions
+      // Serialize ledger operations and row-lock the order to prevent concurrent completions
+      await lockOrganizationLedger(tx, organizationId);
       await this.lockWorkOrder(tx, organizationId, id);
+
+      // Enforce fiscal lock date
+      const org = await tx.organization.findUnique({
+        where: { id: organizationId },
+        select: { lockDate: true },
+      });
+      const now = new Date();
+      if (org?.lockDate && now <= org.lockDate) {
+        throw new BadRequestException(
+          `This period is locked. Transactions on or before ${org.lockDate.toISOString().split('T')[0]} cannot be modified.`,
+        );
+      }
 
       const workOrder = await this.findOne(organizationId, id, tx);
       if (workOrder.status !== WorkOrderStatus.IN_PROCESS) {

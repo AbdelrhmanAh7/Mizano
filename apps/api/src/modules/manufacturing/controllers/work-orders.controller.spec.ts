@@ -5,6 +5,7 @@
 
 import { ArgumentMetadata, ValidationPipe } from '@nestjs/common';
 import { PATH_METADATA } from '@nestjs/common/constants';
+import { INVALIDATE_CACHE_KEY } from '../../../common/decorators/invalidate-cache.decorator';
 import { BulkIdsDto } from '../../../common/dto/bulk-ids.dto';
 import { WorkOrdersService } from '../services/work-orders.service';
 import { WorkOrdersController } from './work-orders.controller';
@@ -43,9 +44,16 @@ describe('WorkOrdersController', () => {
     expect(metadata).toBe(':id/start');
   });
 
-  it('should have POST /:id/complete route', () => {
+  it('should have POST /:id/complete route with ledger cache invalidation', () => {
     const metadata = Reflect.getMetadata(PATH_METADATA, WorkOrdersController.prototype.complete);
     expect(metadata).toBe(':id/complete');
+    const cachePatterns = Reflect.getMetadata(
+      INVALIDATE_CACHE_KEY,
+      WorkOrdersController.prototype.complete,
+    );
+    expect(cachePatterns).toContain('manufacturing:*');
+    expect(cachePatterns).toContain('journals:*');
+    expect(cachePatterns).toContain('reports:*');
   });
 
   it('should have POST /:id/cancel route', () => {
@@ -61,9 +69,13 @@ describe('WorkOrdersController', () => {
     });
     const meta: ArgumentMetadata = { type: 'body', metatype: BulkIdsDto };
 
-    it('is routed at bulk-complete and validates its body as BulkIdsDto', () => {
+    it('is routed at bulk-complete, invalidates ledger caches, and validates its body as BulkIdsDto', () => {
       const proto = WorkOrdersController.prototype;
       expect(Reflect.getMetadata(PATH_METADATA, proto.bulkComplete)).toBe('bulk-complete');
+      const cachePatterns = Reflect.getMetadata(INVALIDATE_CACHE_KEY, proto.bulkComplete);
+      expect(cachePatterns).toContain('manufacturing:*');
+      expect(cachePatterns).toContain('journals:*');
+      expect(cachePatterns).toContain('reports:*');
       const [, body] = Reflect.getMetadata('design:paramtypes', proto, 'bulkComplete');
       expect(body).toBe(BulkIdsDto);
     });
