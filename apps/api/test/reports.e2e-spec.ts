@@ -569,6 +569,53 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       expect(cashFlow).toHaveLength(30);
       expect(cashFlow.every((d) => FOUR_DP.test(d.cashIn) && FOUR_DP.test(d.net))).toBe(true);
     });
+
+    it('VAT return draft reconciles with the posted ledger and provides draft figures', async () => {
+      const res = await a.get('/tax/vat-returns/draft').query({
+        periodStart: wide.startDate,
+        periodEnd: wide.endDate,
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.label).toBe('DRAFT, not for filing');
+      expect(res.body.currency).toBe('EGP');
+      expect(res.body.status).toBe('complete');
+      expect(res.body.outputVat).toMatch(FOUR_DP);
+      expect(res.body.inputVat).toMatch(FOUR_DP);
+      expect(res.body.netVat).toMatch(FOUR_DP);
+      expect(res.body.totalSales).toMatch(FOUR_DP);
+      expect(res.body.totalPurchases).toMatch(FOUR_DP);
+      expect(D(res.body.outputVat).equals('140')).toBe(true);
+      expect(D(res.body.netVat).equals(D(res.body.outputVat).sub(res.body.inputVat))).toBe(true);
+      expect(Array.isArray(res.body.mismatches)).toBe(true);
+      expect(Array.isArray(res.body.exceptions)).toBe(true);
+      expect(Array.isArray(res.body.etaMismatches)).toBe(true);
+    });
+
+    it('VAT return draft rejects invalid query parameters with 400', async () => {
+      expect((await a.get('/tax/vat-returns/draft')).status).toBe(400);
+      expect(
+        (await a.get('/tax/vat-returns/draft').query({ periodStart: '2026-01-01' })).status,
+      ).toBe(400);
+      expect(
+        (await a.get('/tax/vat-returns/draft').query({ periodEnd: '2026-01-31' })).status,
+      ).toBe(400);
+      expect(
+        (
+          await a.get('/tax/vat-returns/draft').query({
+            periodStart: '2026-02-01',
+            periodEnd: '2026-01-01',
+          })
+        ).status,
+      ).toBe(400);
+      expect(
+        (
+          await a.get('/tax/vat-returns/draft').query({
+            periodStart: '2024-01-01',
+            periodEnd: '2025-01-05',
+          })
+        ).status,
+      ).toBe(400);
+    });
   });
 
   describe('isolation and authentication', () => {
@@ -589,6 +636,17 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       expect(trial.accounts).toHaveLength(0);
       const balances = (await b.get('/accounts/balances')).body as Array<{ accountId: string }>;
       expect(balances.some((x) => x.accountId === acc.bank)).toBe(false);
+
+      const draftB = await b.get('/tax/vat-returns/draft').query({
+        periodStart: wide.startDate,
+        periodEnd: wide.endDate,
+      });
+      expect(draftB.status).toBe(200);
+      expect(D(draftB.body.outputVat).isZero()).toBe(true);
+      expect(D(draftB.body.inputVat).isZero()).toBe(true);
+      expect(D(draftB.body.netVat).isZero()).toBe(true);
+      expect(D(draftB.body.totalSales).isZero()).toBe(true);
+      expect(D(draftB.body.totalPurchases).isZero()).toBe(true);
     });
 
     it('rejects anonymous callers with 401', async () => {
@@ -604,6 +662,7 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
         '/accounts/balances',
         `/accounts/${acc.bank}/balance`,
         `/reports/customer-statement/${customer1}`,
+        '/tax/vat-returns/draft',
       ]) {
         expect((await anon.get(path)).status).toBe(401);
       }

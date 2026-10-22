@@ -89,3 +89,36 @@ test(
     expect(rangeTooLong.status).toBe(400);
   },
 );
+
+test(
+  '@issue-348 AC3: user can navigate to VAT Return from reports and see generation form',
+  { tags: ['feat:mz-vat-returns'] },
+  async ({ app, agent, screen }) => {
+    await app.open('/en/login');
+    await agent.act('sign in as {email} with password {pw}', {
+      params: ADMIN,
+    });
+    await app.open('/en/reports');
+    await agent.act('click on VAT Return');
+    await agent.assert('the VAT return generation form is visible with date inputs');
+    await expect(screen.getByRole('button', { name: /generate/i })).toBeVisible();
+  },
+);
+
+test(
+  '@issue-348 AC4: Arabic VAT return navigation renders in RTL layout',
+  { tags: ['feat:mz-vat-returns'] },
+  async ({ app, agent, browser }) => {
+    await app.open('/ar/login');
+    await agent.act('sign in as {email} with password {pw}', {
+      params: ADMIN,
+    });
+    await app.open('/ar/reports');
+    const dir = await browser.evaluate(() => document.documentElement.dir);
+    expect(dir).toBe('rtl');
+    await agent.act('click on VAT Return');
+    await agent.assert('the VAT return generation form is displayed in Arabic');
+    const formDir = await browser.evaluate(() => document.documentElement.dir);
+    expect(formDir).toBe('rtl');
+  },
+);

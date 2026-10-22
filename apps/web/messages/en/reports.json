@@ -117,8 +117,8 @@
     "description": "Inventory stock levels"
   },
   "vatReport": {
-    "title": "VAT Report",
-    "description": "VAT summary for filing"
+    "title": "VAT Return",
+    "description": "VAT summary and draft for filing"
   },
   "filters": {
     "dateRange": "Date Range",
