@@ -7,7 +7,7 @@
 - **PR**: #346
 - **Supersedes part of**: PR #274 (resolving QA finding `df11332ad23d` / review discussion `r4340860918`)
 - **Base Commit**: `e5d9b805563c04df3300f00442fd18f7d82ce560` (`origin/master`)
-- **Tested Head**: `607cf1e9f6c0a060697f79b9f7f43b169c764194`
+- **Tested Head**: `caafeabfd0e4895d1849e96214b35d46b56095e6`
 - **Originating Sentry Issue**: None found (internal QA/security review finding split from PR #274).
 - **Model · Effort · Why**: `Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: High · Why: Complete implementation, review comments remediation, regression proof, e2e test, and verification report for issue #332`
 - **Skills Used**: `diagnosing-bugs`, `systematic-debugging`, `root-cause-debugging`, `test-first-engineering`, `e2e-army`, `verification-before-completion`, `model-effort-routing`
@@ -177,3 +177,19 @@ With `session.refreshToken` assignment removed and `Session` interface updated:
 - **Visual Changes**: No visual UI elements, styling, CSS, forms, or HTML page layouts were added or modified (UI layout changes exempt; visual screenshots not applicable).
 - **E2E Scenario**: An end-to-end natural-language test `e2e-army/332-session-token-privacy.e2e.ts` is provided, tagged `feat:mz-auth`, using accessible field labels (`screen.getByLabel('Email')`, `screen.getByLabel('Password')`) and asserting both unauthenticated `{}` and authenticated session responses omit `refreshToken`.
 - **Status Consistency**: As recorded in AC5, runtime execution of this end-to-end browser test is unverified locally and is gated on the automated CI verify job (`e2e-army` gate) which spins up the throwaway database and Next.js/NestJS service stack.
+
+---
+
+## Code Review Findings & Resolution (PR #346)
+
+1. **Review Finding 1 (docs/evidence/332/EVIDENCE.md — AC5 Local Verification Status)**:
+   - _Feedback_: Do not mark AC5 as passed from syntax validation alone. The observed result records only syntax validation; it does not prove the authenticated and unauthenticated `/api/auth/session` assertions. Run the E2E test or mark AC5 as unverified. Keep the UI verification statement consistent with that status.
+   - _Resolution_: Updated AC5 in the Verification Matrix to status `**UNVERIFIED LOCALLY (Gated on CI e2e-army runner)**`. Updated the UI Verification section to explicitly document that local runtime execution is unverified and gated on CI's `e2e-army` runner stack, maintaining complete status consistency.
+
+2. **Review Finding 2 (docs/evidence/332/EVIDENCE.md — AC6 Full Quality Gate)**:
+   - _Feedback_: Make the AC6 row match the full quality gate. AC6 requires TypeScript checking, ESLint, and Jest unit/route specs.
+   - _Resolution_: Updated the AC6 row in the Verification Matrix to execute and record all three gates: `pnpm --filter @mizano/web lint && pnpm --filter @mizano/web type-check && pnpm --filter web exec jest apps/web/lib/auth.spec.ts 'app/api/auth/.*route\.spec\.ts' --maxWorkers=2`. Added the dedicated section `## Full Quality Gate Outputs (AC6)` providing the exact command, observed output, and exit code 0 for Typecheck, ESLint, and Jest suites.
+
+3. **Review Finding 3 (e2e-army/332-session-token-privacy.e2e.ts — Accessible Form Locators)**:
+   - _Feedback_: `<input type="password">` does not have ARIA role `textbox` in the accessibility tree, causing `screen.getByRole('textbox', 'Password')` to fail.
+   - _Resolution_: Updated `e2e-army/332-session-token-privacy.e2e.ts` to locate form fields via accessible labels: `screen.getByLabel('Email')` and `screen.getByLabel('Password')`, matching the `<Label htmlFor="...">` elements in `apps/web/app/[locale]/(auth)/login/page.tsx`.
