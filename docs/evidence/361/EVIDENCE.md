@@ -5,8 +5,8 @@ This document provides verification evidence for GitHub issue #361 in `Abdelrhma
 - **Issue**: [#361](https://github.com/AbdelrhmanAh7/Mizano/issues/361)
 - **PR**: Supersedes part of #341
 - **Parent Issue**: #333
-- **Base Commit (`origin/master`)**: `d740dda9d8ebf6b996aac1b2f83d734c0bc3b2ef`
-- **Tested Code Head**: `c481867230490e1033a3ea1487d74a7709536219`
+- **Base Commit (`origin/master`)**: `e5d9b805563c04df3300f00442fd18f7d82ce560`
+- **Tested Head Commit**: `1d99b7623351ec9621b1076f78f6c44933a398eb`
 - **Tested Branch**: `ai/361`
 - **Originating Sentry Issue**: None (originates from review finding `a462d42e4cf1` on PR #341, discussion `r4334423672`, and parent issue #333).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20+, pnpm 8.14.0, Next.js 14.
@@ -32,7 +32,7 @@ In this fresh branch off master for issue #361:
 1. `apps/web/lib/auth.ts`: Removed `session.refreshToken = token.refreshToken as string;` so `refreshToken` is never exposed to the client in NextAuth GET `/api/auth/session`, and removed `refreshToken` from `interface Session`.
 2. `apps/web/app/api/auth/[...nextauth]/route.spec.ts`: Unit test suite verifying that GET `/api/auth/session` returns the complete session shape, omits `refreshToken` across session and serialized body, correctly carries `error` when present, and returns `{}` when unauthenticated.
 3. `e2e-army/361-session-shape.e2e.ts`: Provides UI session test submitting the login form through testing-library `screen` API (`screen.getByRole`, `screen.getByLabel`), asserting URL navigation to authenticated area and validating that the signed-in UI receives the sanitized session. Retains direct credentials callback request as a separate API test for deterministic authentication setup.
-4. `docs/evidence/361/EVIDENCE.md`: Strictly binds the Tested Code Head to the exact tested commit SHA `c481867230490e1033a3ea1487d74a7709536219`.
+4. `docs/evidence/361/EVIDENCE.md`: Strictly binds the Tested Head Commit to `1d99b7623351ec9621b1076f78f6c44933a398eb` (and code implementation commit `c481867230490e1033a3ea1487d74a7709536219`).
 
 ## Acceptance Criteria
 
@@ -98,17 +98,18 @@ Time:        0.278 s, estimated 1 s
 
 ## Verification Report
 
-| Criterion            | Command / Test                                                                                                                   | Observed Result                                                                                                                   | Exit Code | Status  |
-| :------------------- | :------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------- | :-------- | :------ |
-| **AC1, AC2**         | `cd apps/web && nice -n 10 pnpm exec jest --maxWorkers=2 --findRelatedTests 'app/api/auth/[...nextauth]/route.spec.ts'` (test 1) | `✓ returns the signed-in session with all user fields, accessToken and a string expires`                                          | 0         | PASSED  |
-| **AC3**              | `cd apps/web && nice -n 10 pnpm exec jest --maxWorkers=2 --findRelatedTests 'app/api/auth/[...nextauth]/route.spec.ts'` (test 2) | `✓ includes error in the session when token.error is present`                                                                     | 0         | PASSED  |
-| **AC4**              | `cd apps/web && nice -n 10 pnpm exec jest --maxWorkers=2 --findRelatedTests 'app/api/auth/[...nextauth]/route.spec.ts'` (test 3) | `✓ returns an empty object when signed out`                                                                                       | 0         | PASSED  |
-| **Auth Spec**        | `cd apps/web && nice -n 10 pnpm exec jest --maxWorkers=2 --findRelatedTests 'lib/auth.spec.ts'`                                  | `15 passed, 15 total` (token refreshing, cooldowns, revocation)                                                                   | 0         | PASSED  |
-| **AC5**              | `e2e-army/361-session-shape.e2e.ts` (tagged `feat:mz-auth`)                                                                      | Form submission via screen API (`lvl:ui`), credentials callback (`lvl:api`), signed-out state (`lvl:api`); pending PR verify gate | Pending   | PENDING |
-| **Type Check**       | `pnpm --filter web type-check`                                                                                                   | `tsc --noEmit` clean, 0 errors                                                                                                    | 0         | PASSED  |
-| **Lint**             | `pnpm --filter web lint`                                                                                                         | `next lint` clean, 0 errors                                                                                                       | 0         | PASSED  |
-| **E2E Hygiene**      | `python3 -m unittest discover -s scripts -p 'test_e2e_army_hygiene.py'`                                                          | `Ran 11 tests in 0.002s ... OK`                                                                                                   | 0         | PASSED  |
-| **Conflict Markers** | `python3 scripts/test_no_conflict_markers.py`                                                                                    | `Ran 10 tests in 0.029s ... OK`                                                                                                   | 0         | PASSED  |
+| Criterion             | Command / Test                                                                                                                   | Observed Result                                                                                                                   | Exit Code | Status  |
+| :-------------------- | :------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------- | :-------- | :------ |
+| **AC1, AC2**          | `cd apps/web && nice -n 10 pnpm exec jest --maxWorkers=2 --findRelatedTests 'app/api/auth/[...nextauth]/route.spec.ts'` (test 1) | `✓ returns the signed-in session with all user fields, accessToken and a string expires`                                          | 0         | PASSED  |
+| **AC3**               | `cd apps/web && nice -n 10 pnpm exec jest --maxWorkers=2 --findRelatedTests 'app/api/auth/[...nextauth]/route.spec.ts'` (test 2) | `✓ includes error in the session when token.error is present`                                                                     | 0         | PASSED  |
+| **AC4**               | `cd apps/web && nice -n 10 pnpm exec jest --maxWorkers=2 --findRelatedTests 'app/api/auth/[...nextauth]/route.spec.ts'` (test 3) | `✓ returns an empty object when signed out`                                                                                       | 0         | PASSED  |
+| **Auth Spec**         | `cd apps/web && nice -n 10 pnpm exec jest --maxWorkers=2 --findRelatedTests 'lib/auth.spec.ts'`                                  | `15 passed, 15 total` (token refreshing, cooldowns, revocation)                                                                   | 0         | PASSED  |
+| **AC5**               | `e2e-army/361-session-shape.e2e.ts` (tagged `feat:mz-auth`)                                                                      | Form submission via screen API (`lvl:ui`), credentials callback (`lvl:api`), signed-out state (`lvl:api`); pending PR verify gate | Pending   | PENDING |
+| **Type Check**        | `pnpm --filter web type-check`                                                                                                   | `tsc --noEmit` clean, 0 errors                                                                                                    | 0         | PASSED  |
+| **Lint**              | `pnpm --filter web lint`                                                                                                         | `next lint` clean, 0 errors                                                                                                       | 0         | PASSED  |
+| **E2E Hygiene**       | `python3 -m unittest discover -s scripts -p 'test_e2e_army_hygiene.py'`                                                          | `Ran 11 tests in 0.003s ... OK`                                                                                                   | 0         | PASSED  |
+| **Evidence Contract** | `python3 -m unittest discover -s scripts -p 'test_evidence_freshness.py'`                                                        | `Ran 11 tests in 0.025s ... OK`                                                                                                   | 0         | PASSED  |
+| **Conflict Markers**  | `python3 scripts/test_no_conflict_markers.py`                                                                                    | `Ran 10 tests in 0.034s ... OK`                                                                                                   | 0         | PASSED  |
 
 ## Changed Covering Tests
 
