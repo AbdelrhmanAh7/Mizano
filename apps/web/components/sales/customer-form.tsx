@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslations } from 'next-intl';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,35 @@ const customerSchema = z.object({
 });
 
 type CustomerFormData = z.infer<typeof customerSchema>;
+type AddressFormData = z.infer<typeof addressSchema>;
+
+// Empty inputs become null so an edit can clear a field.
+const addressPayload = (address?: AddressFormData) => ({
+  street: address?.street || null,
+  city: address?.city || null,
+  state: address?.state || null,
+  postalCode: address?.postalCode || null,
+  country: address?.country || null,
+});
+
+/**
+ * Body for POST/PATCH /customers. The API DTO takes nested billingAddress/shippingAddress
+ * objects and rejects unknown keys, so flat billingStreet/... fields would be a 400 (#215).
+ */
+export function buildCustomerPayload(data: CustomerFormData): Record<string, unknown> {
+  return {
+    name: data.name,
+    displayName: data.displayName || null,
+    email: data.email || null,
+    phone: data.phone || null,
+    currency: data.currency,
+    taxId: data.taxId || null,
+    paymentTerms: data.paymentTerms || 0,
+    notes: data.notes || null,
+    billingAddress: addressPayload(data.billingAddress),
+    shippingAddress: addressPayload(data.shippingAddress),
+  };
+}
 
 interface CustomerFormProps {
   customer?: Customer | null;
@@ -70,6 +100,7 @@ const paymentTermsOptions = [
 
 export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: CustomerFormProps) {
   const isEditing = !!customer;
+  const t = useTranslations('sales');
 
   const form = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
@@ -129,28 +160,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
   }, [customer, form]);
 
   const handleSubmit = (data: CustomerFormData) => {
-    // Flatten addresses for API
-    const submitData = {
-      name: data.name,
-      displayName: data.displayName || null,
-      email: data.email || null,
-      phone: data.phone || null,
-      currency: data.currency,
-      taxId: data.taxId || null,
-      paymentTerms: data.paymentTerms || 0,
-      notes: data.notes || null,
-      billingStreet: data.billingAddress?.street || null,
-      billingCity: data.billingAddress?.city || null,
-      billingState: data.billingAddress?.state || null,
-      billingPostalCode: data.billingAddress?.postalCode || null,
-      billingCountry: data.billingAddress?.country || null,
-      shippingStreet: data.shippingAddress?.street || null,
-      shippingCity: data.shippingAddress?.city || null,
-      shippingState: data.shippingAddress?.state || null,
-      shippingPostalCode: data.shippingAddress?.postalCode || null,
-      shippingCountry: data.shippingAddress?.country || null,
-    };
-    onSubmit(submitData as Record<string, unknown>);
+    onSubmit(buildCustomerPayload(data));
   };
 
   const copyBillingToShipping = () => {
@@ -163,23 +173,31 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
       {/* Basic Information */}
       <Card>
         <CardHeader>
-          <CardTitle>Basic Information</CardTitle>
+          <CardTitle>{t('customers.form.basicInfo') || 'Basic Information'}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Customer Name *</Label>
-              <Input id="name" placeholder="Enter customer name" {...form.register('name')} />
+              <Label htmlFor="name">{(t('customers.form.name') || 'Customer Name') + ' *'}</Label>
+              <Input
+                id="name"
+                placeholder={t('customers.form.namePlaceholder') || 'Enter customer name'}
+                {...form.register('name')}
+              />
               {form.formState.errors.name && (
                 <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="displayName">Display Name</Label>
+              <Label htmlFor="displayName">
+                {t('customers.form.displayName') || 'Display Name'}
+              </Label>
               <Input
                 id="displayName"
-                placeholder="How to display on documents"
+                placeholder={
+                  t('customers.form.displayNamePlaceholder') || 'How to display on documents'
+                }
                 {...form.register('displayName')}
               />
             </div>
@@ -187,11 +205,11 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('customers.form.email') || 'Email'}</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="customer@example.com"
+                placeholder={t('customers.form.emailPlaceholder') || 'customer@example.com'}
                 {...form.register('email')}
               />
               {form.formState.errors.email && (
@@ -200,7 +218,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
+              <Label htmlFor="phone">{t('customers.form.phone') || 'Phone'}</Label>
               <PhoneInput
                 id="phone"
                 value={form.watch('phone') || ''}
@@ -211,7 +229,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="currency">Currency</Label>
+              <Label htmlFor="currency">{t('customers.form.currency') || 'Currency'}</Label>
               <Select
                 value={form.watch('currency')}
                 onValueChange={(value) => form.setValue('currency', value)}
@@ -230,7 +248,9 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="paymentTerms">Payment Terms</Label>
+              <Label htmlFor="paymentTerms">
+                {t('customers.form.paymentTerms') || 'Payment Terms'}
+              </Label>
               <Select
                 value={String(form.watch('paymentTerms') || 30)}
                 onValueChange={(value) => form.setValue('paymentTerms', parseInt(value))}
@@ -249,16 +269,23 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="taxId">Tax ID</Label>
-              <Input id="taxId" placeholder="Tax ID / VAT Number" {...form.register('taxId')} />
+              <Label htmlFor="taxId">{t('customers.form.taxId') || 'Tax ID'}</Label>
+              <Input
+                id="taxId"
+                placeholder={t('customers.form.taxIdPlaceholder') || 'Tax ID / VAT Number'}
+                {...form.register('taxId')}
+              />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
+            <Label htmlFor="notes">{t('customers.form.notes') || 'Notes'}</Label>
             <Textarea
               id="notes"
-              placeholder="Internal notes about this customer"
+              aria-label="Notes"
+              placeholder={
+                t('customers.form.notesPlaceholder') || 'Internal notes about this customer'
+              }
               {...form.register('notes')}
               rows={3}
             />
@@ -269,14 +296,18 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
       {/* Billing Address */}
       <Card>
         <CardHeader>
-          <CardTitle>Billing Address</CardTitle>
+          <CardTitle>{t('customers.form.billingAddress') || 'Billing Address'}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="billingStreet">Street Address</Label>
+            <Label htmlFor="billingStreet">
+              {t('customers.form.billingStreet') || 'Billing Street Address'}
+            </Label>
             <Textarea
               id="billingStreet"
-              placeholder="Street address"
+              aria-label="Billing Street"
+              data-testid="billing-street"
+              placeholder={t('customers.form.billingStreetPlaceholder') || 'Street address'}
               {...form.register('billingAddress.street')}
               rows={2}
             />
@@ -284,9 +315,12 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="billingCountry">Country</Label>
+              <Label htmlFor="billingCountry">
+                {t('customers.form.billingCountry') || 'Billing Country'}
+              </Label>
               <CountrySelect
                 id="billingCountry"
+                aria-label="Billing Country"
                 value={form.watch('billingAddress.country') || ''}
                 onValueChange={(val) => {
                   form.setValue('billingAddress.country', val);
@@ -296,9 +330,12 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="billingCity">City</Label>
+              <Label htmlFor="billingCity">
+                {t('customers.form.billingCity') || 'Billing City'}
+              </Label>
               <CitySelect
                 id="billingCity"
+                aria-label="Billing City"
                 value={form.watch('billingAddress.city') || ''}
                 onValueChange={(val) => form.setValue('billingAddress.city', val)}
                 country={form.watch('billingAddress.country') || ''}
@@ -308,18 +345,24 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="billingState">State/Province</Label>
+              <Label htmlFor="billingState">
+                {t('customers.form.billingState') || 'Billing State/Province'}
+              </Label>
               <Input
                 id="billingState"
+                aria-label="Billing State"
                 placeholder="State"
                 {...form.register('billingAddress.state')}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="billingPostalCode">Zip/Postal Code</Label>
+              <Label htmlFor="billingPostalCode">
+                {t('customers.form.billingPostalCode') || 'Billing Zip/Postal Code'}
+              </Label>
               <Input
                 id="billingPostalCode"
+                aria-label="Billing Postal Code"
                 placeholder="Postal code"
                 {...form.register('billingAddress.postalCode')}
               />
@@ -332,18 +375,22 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Shipping Address</CardTitle>
+            <CardTitle>{t('customers.form.shippingAddress') || 'Shipping Address'}</CardTitle>
             <Button type="button" variant="outline" size="sm" onClick={copyBillingToShipping}>
-              Copy from Billing
+              {t('customers.form.copyBillingToShipping') || 'Copy from Billing'}
             </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="shippingStreet">Street Address</Label>
+            <Label htmlFor="shippingStreet">
+              {t('customers.form.shippingStreet') || 'Shipping Street Address'}
+            </Label>
             <Textarea
               id="shippingStreet"
-              placeholder="Street address"
+              aria-label="Shipping Street"
+              data-testid="shipping-street"
+              placeholder={t('customers.form.shippingStreetPlaceholder') || 'Street address'}
               {...form.register('shippingAddress.street')}
               rows={2}
             />
@@ -351,9 +398,12 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="shippingCountry">Country</Label>
+              <Label htmlFor="shippingCountry">
+                {t('customers.form.shippingCountry') || 'Shipping Country'}
+              </Label>
               <CountrySelect
                 id="shippingCountry"
+                aria-label="Shipping Country"
                 value={form.watch('shippingAddress.country') || ''}
                 onValueChange={(val) => {
                   form.setValue('shippingAddress.country', val);
@@ -363,9 +413,12 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="shippingCity">City</Label>
+              <Label htmlFor="shippingCity">
+                {t('customers.form.shippingCity') || 'Shipping City'}
+              </Label>
               <CitySelect
                 id="shippingCity"
+                aria-label="Shipping City"
                 value={form.watch('shippingAddress.city') || ''}
                 onValueChange={(val) => form.setValue('shippingAddress.city', val)}
                 country={form.watch('shippingAddress.country') || ''}
@@ -375,18 +428,24 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="shippingState">State/Province</Label>
+              <Label htmlFor="shippingState">
+                {t('customers.form.shippingState') || 'Shipping State/Province'}
+              </Label>
               <Input
                 id="shippingState"
+                aria-label="Shipping State"
                 placeholder="State"
                 {...form.register('shippingAddress.state')}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="shippingPostalCode">Zip/Postal Code</Label>
+              <Label htmlFor="shippingPostalCode">
+                {t('customers.form.shippingPostalCode') || 'Shipping Zip/Postal Code'}
+              </Label>
               <Input
                 id="shippingPostalCode"
+                aria-label="Shipping Postal Code"
                 placeholder="Postal code"
                 {...form.register('shippingAddress.postalCode')}
               />
@@ -398,10 +457,14 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {t('customers.form.cancel') || 'Cancel'}
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : isEditing ? 'Update Customer' : 'Create Customer'}
+          {isSubmitting
+            ? t('customers.form.saving') || 'Saving...'
+            : isEditing
+              ? t('customers.form.updateCustomer') || 'Update Customer'
+              : t('customers.form.createCustomer') || 'Create Customer'}
         </Button>
       </div>
     </form>

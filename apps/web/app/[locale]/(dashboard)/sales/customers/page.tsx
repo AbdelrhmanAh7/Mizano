@@ -194,7 +194,7 @@ function CustomersPageContent() {
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" aria-label="Customer actions">
                 ...
               </Button>
             </DropdownMenuTrigger>

@@ -226,7 +226,7 @@ export function InvoiceForm({
                 onValueChange={(value) => form.setValue('customerId', value)}
                 disabled={isEditing}
               >
-                <SelectTrigger>
+                <SelectTrigger id="customerId" aria-label="Select Customer">
                   <SelectValue placeholder="Select a customer" />
                 </SelectTrigger>
                 <SelectContent>
