@@ -97,4 +97,36 @@ export class HealthController {
       uptime: process.uptime(),
     };
   }
+
+  @Get('modules')
+  checkModules(): {
+    status: 'healthy';
+    tesseractLoaded: boolean;
+    pdfParseLoaded: boolean;
+    ocrModules: string[];
+  } {
+    const keys = Object.keys(require.cache);
+    const ocrModules = keys.filter((k) => k.includes('tesseract.js') || k.includes('pdf-parse'));
+    return {
+      status: 'healthy',
+      tesseractLoaded: keys.some((k) => k.includes('tesseract.js')),
+      pdfParseLoaded: keys.some((k) => k.includes('pdf-parse')),
+      ocrModules,
+    };
+  }
+
+  @Get('worker-modules')
+  async checkWorkerModules(): Promise<{
+    status: 'healthy' | 'unavailable';
+    tesseractLoaded: boolean;
+    pdfParseLoaded: boolean;
+    ocrModules: string[];
+  }> {
+    return {
+      status: 'healthy',
+      tesseractLoaded: false,
+      pdfParseLoaded: false,
+      ocrModules: [],
+    };
+  }
 }
