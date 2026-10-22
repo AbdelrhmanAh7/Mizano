@@ -1,10 +1,11 @@
 # Verification Report — Issue #133
 
 - **Issue**: [#133 [audit] Move intake extraction out of the API process and remove dead Colab wiring](https://github.com/AbdelrhmanAh7/Mizano/issues/133)
-- **PR**: Refs #133 (PR #144 — narrowed per CTO directive to scheduler gating, dead code removal, narrative dedupe, and notification pagination; does **not** close #133)
-- **Date**: 2026-10-21
+- **PR**: Refs #133 (PR #354 — narrowed per CTO directive to scheduler gating, dead code removal, narrative dedupe, and notification pagination; does **not** close #133)
+- **Date**: 2026-10-22
 - **Platform**: macOS (Apple Silicon arm64)
-- **Base SHA (`master`)**: `113500149241f4890ade939099e376a7a0eddbe2`
+- **Base SHA (`master`)**: `e5d9b805563c04df3300f00442fd18f7d82ce560`
+- **Tested Code Head**: `b7bd9fa5a27a228067915ac482d5907ec88c1e3c` (final test code; the only later commit is this file)
 
 ---
 
@@ -20,12 +21,12 @@ Per Issue #133's formal brief and CTO decision (2026-10-12 / 2026-10-18):
 
 ### Additional Scope Delivered from Issue #133 Brief
 
-| Scope Item                   | Requirement from Brief                                                                                         | Status     | Evidence / Verification Method                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Observed Exit Code |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| **Scope-DeadCode**           | Delete `ollama-tunnel` controller and `services/ollama-proxy`                                                  | **PASSED** | Deleted `apps/api/src/modules/ai/controllers/ollama-tunnel.controller.ts`, `apps/api/src/modules/ai/controllers/ollama-tunnel.controller.spec.ts`, and `services/ollama-proxy/`. Verified by `apps/api/test/issue-133.e2e-spec.ts`: `POST /internal/tunnel-update` and `GET /internal/ollama-status` return 404.                                                                                                                                                                                                                        | 0                  |
-| **Scope-Schedulers**         | Gate AI schedulers behind `AI_SCHEDULERS_ENABLED` (defaulting off on Pi profile, enabled on standard profiles) | **PASSED** | 5 AI schedulers (`AiOperationsScheduler`, `AiHrOpsScheduler`, `AiNlpChatScheduler`, `AiSalesCrmScheduler`, `AiSecurityScheduler`) with 29 `@Cron` jobs (out of 36 total API crons) gated behind `AI_SCHEDULERS_ENABLED`. Unset = no AI providers or crons registered. Default off on Pi (`deploy/pi/.env.pi.example`, `deploy/pi/docker-compose.pi.yml`), default enabled in non-Pi profiles (`docker-compose.production.yml`, `.env.*`). Verified by `ai-schedulers.enabled.spec.ts` (7 tests) and `issue-133.e2e-spec.ts` (AC3/AC3b). | 0                  |
-| **Scope-NotificationPaging** | Paginate notification cron queries with cursor, limit, and `organizationId` scope                              | **PASSED** | `notifications.service.ts` refactored with `eachPage` generator: cursor pagination with stable `orderBy: { id: 'asc' }`, `take: NOTIFICATION_QUERY_LIMIT` (100) and `NOTIFICATION_BATCH_SIZE` (50), all queries scoped by `organizationId`. Verified by `notifications.service.spec.ts` (6 tests with > 100 rows per org) and `issue-133.e2e-spec.ts`.                                                                                                                                                                                  | 0                  |
-| **Scope-Dockerfile**         | Remove `@mizano/validators` build from `apps/api/Dockerfile`                                                   | **PASSED** | Removed `pnpm --filter @mizano/validators build` from `apps/api/Dockerfile:37`. Verified container builds without it.                                                                                                                                                                                                                                                                                                                                                                                                                   | 0                  |
+| Scope Item                   | Requirement from Brief                                                                                         | Status     | Evidence / Verification Method                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Observed Exit Code |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| **Scope-DeadCode**           | Delete `ollama-tunnel` controller and `services/ollama-proxy`                                                  | **PASSED** | Deleted `apps/api/src/modules/ai/controllers/ollama-tunnel.controller.ts`, `apps/api/src/modules/ai/controllers/ollama-tunnel.controller.spec.ts`, and `services/ollama-proxy/`. Verified by `apps/api/test/issue-133.e2e-spec.ts`: `POST /internal/tunnel-update` and `GET /internal/ollama-status` return 404.                                                                                                                                                                                                              | 0                  |
+| **Scope-Schedulers**         | Gate AI schedulers behind `AI_SCHEDULERS_ENABLED` (defaulting off on Pi profile, enabled on standard profiles) | **PASSED** | 5 AI schedulers (`AiOperationsScheduler`, `AiHrOpsScheduler`, `AiNlpChatScheduler`, `AiSalesCrmScheduler`, `AiSecurityScheduler`) with 29 `@Cron` jobs (out of 36 total API crons) gated behind `AI_SCHEDULERS_ENABLED`. Unset = no AI providers or crons registered. Default off on Pi (`deploy/pi/.env.pi.example`, `deploy/pi/docker-compose.pi.yml`), default enabled in non-Pi profiles (`docker-compose.production.yml`, `.env.*`). Verified by `ai-schedulers.enabled.spec.ts` (14 tests) and `issue-133.e2e-spec.ts`. | 0                  |
+| **Scope-NotificationPaging** | Paginate notification cron queries with cursor, limit, and `organizationId` scope                              | **PASSED** | `notifications.service.ts` refactored with `eachPage` generator: cursor pagination with stable `orderBy: { id: 'asc' }`, `take: NOTIFICATION_QUERY_LIMIT` (100) and `NOTIFICATION_BATCH_SIZE` (50), all queries scoped by `organizationId`. Verified by `notifications.service.spec.ts` (6 tests with > 100 rows per org) and `issue-133.e2e-spec.ts`.                                                                                                                                                                        | 0                  |
+| **Scope-Dockerfile**         | Remove `@mizano/validators` build from `apps/api/Dockerfile`                                                   | **PASSED** | Removed `pnpm --filter @mizano/validators build` from `apps/api/Dockerfile:37`. Verified container builds without it.                                                                                                                                                                                                                                                                                                                                                                                                         | 0                  |
 
 ---
 
@@ -49,12 +50,11 @@ Per Issue #133's formal brief and CTO decision (2026-10-12 / 2026-10-18):
 
 ## 3. Covering Tests Changed / Added
 
-| Test File                                                                      | Type | Tests Executed     | Result          |
-| ------------------------------------------------------------------------------ | ---- | ------------------ | --------------- |
-| `apps/api/src/modules/ai/schedulers/ai-schedulers.enabled.spec.ts`             | Unit | 7 passed, 0 failed | PASSED (exit 0) |
-| `apps/api/src/modules/notifications/services/notifications.service.spec.ts`    | Unit | 6 passed, 0 failed | PASSED (exit 0) |
-| `apps/api/test/issue-133.e2e-spec.ts`                                          | E2E  | 9 passed, 0 failed | PASSED (exit 0) |
-| `apps/api/src/modules/import-export/services/import.service.hardening.spec.ts` | Unit | 9 passed, 0 failed | PASSED (exit 0) |
+| Test File                                                                   | Type | Tests Executed      | Result          |
+| --------------------------------------------------------------------------- | ---- | ------------------- | --------------- |
+| `apps/api/src/modules/ai/schedulers/ai-schedulers.enabled.spec.ts`          | Unit | 14 passed, 0 failed | PASSED (exit 0) |
+| `apps/api/src/modules/notifications/services/notifications.service.spec.ts` | Unit | 6 passed, 0 failed  | PASSED (exit 0) |
+| `apps/api/test/issue-133.e2e-spec.ts`                                       | E2E  | 10 passed, 0 failed | PASSED (exit 0) |
 
 ---
 
@@ -100,12 +100,36 @@ pnpm --filter api exec jest src/modules/ai/schedulers/ai-schedulers.enabled.spec
 
 ```text
 PASS src/modules/ai/schedulers/ai-schedulers.enabled.spec.ts
+  AI scheduler gate (issue #133)
+    ✓ AI_SCHEDULERS_ENABLED=undefined registers no scheduler providers
+    ✓ AI_SCHEDULERS_ENABLED="" registers no scheduler providers
+    ✓ AI_SCHEDULERS_ENABLED="false" registers no scheduler providers
+    ✓ AI_SCHEDULERS_ENABLED="FALSE" registers no scheduler providers
+    ✓ AI_SCHEDULERS_ENABLED="1" registers no scheduler providers
+    ✓ AI_SCHEDULERS_ENABLED="yes" registers no scheduler providers
+    ✓ AI_SCHEDULERS_ENABLED=true registers the scheduler providers
+    constructor guards: schedulers refuse instantiation when disabled
+      ✓ AiHrOpsScheduler throws in constructor when AI_SCHEDULERS_ENABLED is false (5 ms)
+      ✓ AiHrOpsScheduler instantiates successfully when AI_SCHEDULERS_ENABLED is true (1 ms)
+      ✓ AiSecurityScheduler throws in constructor when AI_SCHEDULERS_ENABLED is false (1 ms)
+      ✓ AiSecurityScheduler instantiates successfully when AI_SCHEDULERS_ENABLED is true
+      ✓ AiOperationsScheduler throws in constructor when AI_SCHEDULERS_ENABLED is false (2 ms)
+      ✓ AiNlpChatScheduler throws in constructor when AI_SCHEDULERS_ENABLED is false
+      ✓ AiSalesCrmScheduler throws in constructor when AI_SCHEDULERS_ENABLED is false (1 ms)
 PASS src/modules/notifications/services/notifications.service.spec.ts
+  NotificationsService movement signs
+    ✓ legacy rows report the same low stock (2 ms)
+    ✓ new rows report the same low stock
+  NotificationsService cursor paging
+    ✓ notifies for every overdue invoice of an org with more than one page (2 ms)
+    ✓ notifies for every upcoming bill of an org with more than one page
+    ✓ checks stock for every goods item of an org with more than one page (1 ms)
+    ✓ pages organizations by cursor too, so tenants past the first batch are not skipped (1 ms)
 
 Test Suites: 2 passed, 2 total
-Tests:       13 passed, 13 total
+Tests:       20 passed, 20 total
 Snapshots:   0 total
-Time:        2.724 s
+Time:        3.15 s
 (exit 0)
 ```
 
@@ -118,46 +142,27 @@ DATABASE_URL="postgresql://mizano:mizano_secret@localhost:5432/mizano_e2e_133?sc
 **Output**:
 
 ```text
-PASS test/issue-133.e2e-spec.ts (6.006 s)
+PASS test/issue-133.e2e-spec.ts (10.55 s)
   @issue-133 AC3: exactly one route handler for GET ai/narrative
-    ✓ registers exactly one GET handler for /ai/narrative/monthly (5 ms)
-    ✓ answers on the single handler (guard 401, not 404), proving the DI graph resolves (15 ms)
+    ✓ registers exactly one GET handler for /ai/narrative/monthly (2 ms)
+    ✓ answers on the single handler (guard 401, not 404), proving the DI graph resolves (8 ms)
   @issue-133 dead code removal: ollama-tunnel endpoints return 404
-    ✓ rejects POST /internal/tunnel-update and GET /internal/ollama-status (14 ms)
+    ✓ rejects POST /internal/tunnel-update and GET /internal/ollama-status (13 ms)
   @issue-133 scheduler gating: no AI cron jobs with AI_SCHEDULERS_ENABLED unset
-    ✓ has zero AI cron jobs registered, and the gate itself is inspectable (1 ms)
-    ✓ does not register any of the five gated scheduler providers
+    ✓ has zero AI cron jobs registered, and the gate itself is inspectable
+    ✓ does not register any of the five gated scheduler providers (1 ms)
+    ✓ does not register IntakeProcessorService in the API application (worker isolation) (1 ms)
   @issue-133 scheduler gating: AI cron jobs register when AI_SCHEDULERS_ENABLED=true (positive control)
-    ✓ registers every ai: cron job from the five scheduler classes (5 ms)
+    ✓ registers every ai: cron job from the five scheduler classes (12 ms)
   @issue-133 notification paging: checks are org-scoped, paginated and bounded
-    ✓ checkOverdueInvoices pages through every org, scoping and bounding each invoice query (9 ms)
-    ✓ checkUpcomingBillPayments scopes and bounds the bill query
-    ✓ checkLowInventory scopes and bounds the item query
+    ✓ checkOverdueInvoices pages through every org, scoping and bounding each invoice query (10 ms)
+    ✓ checkUpcomingBillPayments scopes and bounds the bill query (2 ms)
+    ✓ checkLowInventory scopes and bounds the item query (4 ms)
 
 Test Suites: 1 passed, 1 total
-Tests:       9 passed, 9 total
+Tests:       10 passed, 10 total
 Snapshots:   0 total
-Time:        6.156 s
-(exit 0)
-```
-
-### 4.5 API Build
-
-```bash
-pnpm --filter api build
-```
-
-**Output**:
-
-```text
-> api@0.1.0 build /Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-133/apps/api
-> nest build
-
--  TSC  Initializing type checker...
-✔  TSC  Initializing type checker...
->  TSC  Found 0 issues.
->  SWC  Running...
-Successfully compiled: 652 files with swc (182.42ms)
+Time:        10.655 s
 (exit 0)
 ```
 
@@ -168,3 +173,18 @@ Successfully compiled: 652 files with swc (182.42ms)
 - **UI Changes**: None. This issue is a backend architecture refactor and dead-code deletion.
 - **E2E-Army Gate**: Pure backend refactor / internal:
   `E2E: not needed — pure backend refactor / internal (AI scheduler gating, dead ollama tunnel deletion, narrative route dedupe, notification cron pagination)`
+
+---
+
+## 6. QA Review Findings Resolution (Round 8 / Head 2396ff1)
+
+1. **Finding 5e46ab104a1d (`apps/api/src/modules/ai/operations/ai-operations.module.ts:58`)**:
+   - _Review finding_: `IntakeQueueService/IntakeProcessorService are still registered as providers in the API module... The extraction worker must be moved to a separate entrypoint and unregistered from the API module before #133 can close.`
+   - _Root cause & Resolution_: Master already integrated PR #141 (`b8c0ab1e8b2d`), decoupling `IntakeProcessorService` into `IntakeWorkerModule` and dedicated worker entrypoint `intake-worker.ts`. In `ai-operations.module.ts:57-59`, clarified with explicit comments that `IntakeProcessorService` is decoupled and only the client `IntakeQueueService` is provided for enqueueing. Added an automated regression test in `apps/api/test/issue-133.e2e-spec.ts:194-197` proving `app.get(IntakeProcessorService, { strict: false })` throws in the API container context.
+2. **Finding b49fd5c3ec79 (`apps/api/src/modules/ai/schedulers/ai-hr-ops.scheduler.ts:23`)**:
+   - _Review finding_: `The guard() method is called in all cron methods but there's no check in the constructor to prevent the service from being registered entirely when AI_SCHEDULERS_ENABLED is false.`
+   - _Root cause & Resolution_: Added constructor validation in `apps/api/src/modules/ai/schedulers/ai-hr-ops.scheduler.ts:28-36` throwing an explicit error (`AiHrOpsScheduler cannot be instantiated when AI_SCHEDULERS_ENABLED is not true`) if instantiated when `AI_SCHEDULERS_ENABLED` is false. Verified with unit tests in `apps/api/src/modules/ai/schedulers/ai-schedulers.enabled.spec.ts:49-75`.
+3. **Finding bcd64679ec8b (`apps/api/src/modules/ai/schedulers/ai-security.scheduler.ts:11`)**:
+   - _Review finding_: `The guard() method is called in all cron methods but there's no check in the constructor to prevent the service from being registered entirely when AI_SCHEDULERS_ENABLED is false.`
+   - _Root cause & Resolution_: Added constructor validation in `apps/api/src/modules/ai/schedulers/ai-security.scheduler.ts:24-32` throwing an explicit error (`AiSecurityScheduler cannot be instantiated when AI_SCHEDULERS_ENABLED is not true`) if instantiated when disabled. Verified with unit tests in `apps/api/src/modules/ai/schedulers/ai-schedulers.enabled.spec.ts:77-103`.
+   - Pattern applied consistently to all 5 AI scheduler classes (`AiHrOpsScheduler`, `AiSecurityScheduler`, `AiOperationsScheduler`, `AiNlpChatScheduler`, `AiSalesCrmScheduler`).
