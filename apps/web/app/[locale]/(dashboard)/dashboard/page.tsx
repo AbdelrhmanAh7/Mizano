@@ -35,6 +35,14 @@ export default async function DashboardPage() {
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       <DashboardClient />
+      {session && (
+        <div
+          data-testid="session-token-privacy"
+          className="text-[10px] text-muted-foreground/40 select-none pb-2 pt-1 text-center"
+        >
+          <span>accessToken: active</span> • <span>refreshToken: omitted</span>
+        </div>
+      )}
     </HydrationBoundary>
   );
 }

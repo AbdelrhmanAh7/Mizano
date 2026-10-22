@@ -23,6 +23,13 @@ function getLocale(pathname: string): string {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Rewrite localized API requests (e.g. /en/api/auth/session or /ar/api/auth/session) to /api/...
+  if (/^\/(en|ar)\/api(\/|$)/.test(pathname)) {
+    const url = request.nextUrl.clone();
+    url.pathname = pathname.replace(/^\/(en|ar)/, '');
+    return NextResponse.rewrite(url);
+  }
+
   // Skip middleware for API routes, static files, etc.
   if (pathname.startsWith('/api/') || pathname.startsWith('/_next') || pathname.includes('.')) {
     return NextResponse.next();
