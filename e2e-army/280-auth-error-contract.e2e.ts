@@ -105,5 +105,12 @@ test(
     });
     expect(missing.status).toBe(401);
     expect(missing.body.error).toBe('Unauthorized');
+
+    const invalidCreds = await call(
+      `${api}/auth/login`,
+      json({ email: 'army-280-nonexistent@army-e2e.test', password: 'WrongPassword123' }),
+    );
+    expect(invalidCreds.status).toBe(401);
+    expect(invalidCreds.body.error).toBe('Unauthorized');
   },
 );
