@@ -147,6 +147,10 @@ const workOrderApi = {
     const response = await api.post(`/manufacturing/work-orders/${id}/start`);
     return response.data;
   },
+  /**
+   * Complete a work order by sending the canonical quantityProduced payload.
+   * Matches backend endpoint POST /manufacturing/work-orders/:id/complete.
+   */
   complete: async (id: string, quantityProduced: number) => {
     const response = await api.post(`/manufacturing/work-orders/${id}/complete`, {
       quantityProduced,
@@ -339,6 +343,11 @@ export function useStartWorkOrder() {
   });
 }
 
+/**
+ * Hook to complete a work order.
+ * Accepts either `quantityProduced` or `producedQuantity` (for backwards compatibility).
+ * Throws an error when both are absent or null/undefined, preventing silent defaulting to zero.
+ */
 export function useCompleteWorkOrder() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -351,6 +360,8 @@ export function useCompleteWorkOrder() {
       quantityProduced?: number;
       producedQuantity?: number;
     }) => {
+      // Validate that either quantityProduced or producedQuantity is provided.
+      // Explicit 0 is a valid quantity; missing/null/undefined throws to prevent silent defaulting.
       const quantity = quantityProduced ?? producedQuantity;
       if (quantity === undefined || quantity === null) {
         throw new Error('A completion quantity is required');
