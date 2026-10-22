@@ -50,6 +50,14 @@ In the PR review debate (`pr-AbdelrhmanAh7/Mizano-363`), the judge review reques
 4. **Evidence Document Head Binding:**
    - Strictly binds the Tested Head Commit to `e8ab9e9ac61642381c56b03f52642bd661e62999`.
 
+5. **Resolution of Review Thread on SHA Consistency (`thoth-claude-reviewer`):**
+   - The branch satisfies the review thread:
+     - Base Commit is aligned to `origin/master` (`e5d9b805563c04df3300f00442fd18f7d82ce560`).
+     - Red run regression output is recorded against base `e5d9b805563c04df3300f00442fd18f7d82ce560` (exit code 1).
+     - Green run regression output is recorded against tested code head `e8ab9e9ac61642381c56b03f52642bd661e62999` (exit code 0).
+     - Tested Head Commit is bound to `e8ab9e9ac61642381c56b03f52642bd661e62999`.
+     - All SHA references across headers, regression proofs, and verification matrices strictly agree.
+
 ## Acceptance Criteria
 
 - **AC1 (Complete session shape):** NextAuth GET `/api/auth/session` returns all user fields (`id`, `email`, `name`, `firstName`, `lastName`, `organizationId`, `role`), string `accessToken`, and string `expires`.
