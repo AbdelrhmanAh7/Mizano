@@ -1,13 +1,12 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { Link, useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { CustomerForm } from '@/components/sales/customer-form';
 import { useCreateCustomer } from '@/lib/hooks/use-customers';
-import Link from 'next/link';
 
 export default function NewCustomerPage() {
   const router = useRouter();
