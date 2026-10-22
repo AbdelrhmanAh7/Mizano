@@ -239,24 +239,74 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
         id: 'lvl-1',
         warehouseId: 'wh-b',
       } as never);
+      tx.inventoryLevel.update.mockResolvedValue({ id: 'lvl-1' } as never);
       tx.item.updateMany.mockResolvedValue({ count: 1 } as never);
 
       await service[method](ORG, 'dc-1');
 
-      // Assert tx was used for the operations
+      // Assert tx was used for all reads and writes
       expect(tx.deliveryChallan.updateMany).toHaveBeenCalled();
+      expect(tx.deliveryChallan.findFirst).toHaveBeenCalled();
       expect(tx.item.findFirst).toHaveBeenCalledWith({
         where: { id: 'item-b', organizationId: ORG },
       });
+      expect(tx.warehouse.findFirst).toHaveBeenCalledWith({
+        where: { id: 'wh-b', organizationId: ORG },
+      });
+      if (method === 'issue') {
+        expect(tx.inventoryLevel.aggregate).toHaveBeenCalledWith({
+          where: { itemId: 'item-b', organizationId: ORG, warehouseId: 'wh-b' },
+          _sum: { quantity: true },
+        });
+      }
+      expect(tx.inventoryLevel.findFirst).toHaveBeenCalledWith({
+        where: { itemId: 'item-b', organizationId: ORG, warehouseId: 'wh-b' },
+      });
+      expect(tx.inventoryLevel.update).toHaveBeenCalled();
       expect(tx.inventoryMovement.create).toHaveBeenCalled();
       expect(tx.item.updateMany).toHaveBeenCalled();
 
       // Assert prisma was NOT called directly (except $transaction)
       expect(prisma.deliveryChallan.updateMany).not.toHaveBeenCalled();
+      expect(prisma.deliveryChallan.findFirst).not.toHaveBeenCalled();
       expect(prisma.item.findFirst).not.toHaveBeenCalled();
       expect(prisma.warehouse.findFirst).not.toHaveBeenCalled();
+      expect(prisma.inventoryLevel.aggregate).not.toHaveBeenCalled();
+      expect(prisma.inventoryLevel.findFirst).not.toHaveBeenCalled();
+      expect(prisma.inventoryLevel.update).not.toHaveBeenCalled();
       expect(prisma.inventoryMovement.create).not.toHaveBeenCalled();
       expect(prisma.item.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('throws if root prisma client is accessed during transaction (strict proxy guard)', async () => {
+      const tx = createMockPrisma();
+      const c = challan(status, { itemId: 'item-b', warehouseId: 'wh-b' });
+      tx.deliveryChallan.updateMany.mockResolvedValue({ count: 1 } as never);
+      tx.deliveryChallan.findFirst.mockResolvedValue(c as never);
+      tx.item.findFirst.mockResolvedValue({ id: 'item-b', trackInventory: true } as never);
+      tx.warehouse.findFirst.mockResolvedValue({ id: 'wh-b' } as never);
+      tx.inventoryLevel.aggregate.mockResolvedValue({
+        _sum: { quantity: new Decimal(10) },
+      } as never);
+      tx.inventoryLevel.findFirst.mockResolvedValue({
+        id: 'lvl-1',
+        warehouseId: 'wh-b',
+      } as never);
+      tx.inventoryLevel.update.mockResolvedValue({ id: 'lvl-1' } as never);
+      tx.item.updateMany.mockResolvedValue({ count: 1 } as never);
+
+      const rootPrismaProxy = new Proxy(prisma, {
+        get(_target, prop) {
+          if (prop === '$transaction') {
+            return async (fn: (txClient: unknown) => Promise<unknown>) => fn(tx);
+          }
+          throw new Error(`Leak detected: root prisma.${String(prop)} accessed inside transaction`);
+        },
+      });
+
+      const proxyService = new DeliveryChallansService(rootPrismaProxy as unknown as PrismaService);
+
+      await expect(proxyService[method](ORG, 'dc-1')).resolves.toBeDefined();
     });
 
     it('propagates stock move failure out of the transaction so status change rolls back', async () => {
