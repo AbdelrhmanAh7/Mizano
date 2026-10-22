@@ -363,6 +363,5 @@ class EvidenceFreshnessTests(unittest.TestCase):
         self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
 
 
-
 if __name__ == "__main__":
     unittest.main()
