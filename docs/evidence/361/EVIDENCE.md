@@ -6,7 +6,7 @@ This document provides verification evidence for GitHub issue #361 in `Abdelrhma
 - **PR**: Supersedes part of #341
 - **Parent Issue**: #333
 - **Base Commit (`origin/master`)**: `e5d9b805563c04df3300f00442fd18f7d82ce560`
-- **Tested Head Commit**: `e8ab9e9ac61642381c56b03f52642bd661e62999`
+- **Tested Head Commit**: `52ca506b841e39d5f0e887f9706d288378137ded`
 - **Tested Branch**: `ai/361`
 - **Originating Sentry Issue**: None (originates from review finding `a462d42e4cf1` on PR #341, discussion `r4334423672`, and parent issue #333).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20+, pnpm 8.14.0, Next.js 14, Python 3.14.
@@ -50,14 +50,14 @@ In the PR review debate (`pr-AbdelrhmanAh7/Mizano-363`), the judge review reques
    - Removed retry loops to ensure deterministic execution and prevent misbehavior across navigation.
 
 4. **Evidence Document Head Binding:**
-   - Strictly binds the Tested Head Commit to `e8ab9e9ac61642381c56b03f52642bd661e62999`.
+   - Strictly binds the Tested Head Commit to `52ca506b841e39d5f0e887f9706d288378137ded`.
 
 5. **Resolution of Review Thread on SHA Consistency (`thoth-claude-reviewer`):**
    - The branch satisfies the review thread:
      - Base Commit is aligned to `origin/master` (`e5d9b805563c04df3300f00442fd18f7d82ce560`).
      - Red run regression output is recorded against base `e5d9b805563c04df3300f00442fd18f7d82ce560` (exit code 1).
-     - Green run regression output is recorded against tested code head `e8ab9e9ac61642381c56b03f52642bd661e62999` (exit code 0).
-     - Tested Head Commit is bound to `e8ab9e9ac61642381c56b03f52642bd661e62999`.
+     - Green run regression output is recorded against tested code head `52ca506b841e39d5f0e887f9706d288378137ded` (exit code 0).
+     - Tested Head Commit is bound to `52ca506b841e39d5f0e887f9706d288378137ded`.
      - All SHA references across headers, regression proofs, and verification matrices strictly agree.
 
 ## Acceptance Criteria
@@ -105,7 +105,7 @@ Snapshots:   0 total
 Time:        0.391 s
 ```
 
-### 2. Passing on Head (`e8ab9e9ac61642381c56b03f52642bd661e62999`)
+### 2. Passing on Head (`52ca506b841e39d5f0e887f9706d288378137ded`)
 
 With `session.refreshToken` removed from `apps/web/lib/auth.ts`, all unit and integration tests pass cleanly with exit code 0:
 
