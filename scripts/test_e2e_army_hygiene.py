@@ -202,6 +202,20 @@ class E2EArmyRepositoryHygieneTests(unittest.TestCase):
                 f"File {file_path.name} does not define any active test cases",
             )
 
+    def test_379_e2e_no_hardcoded_credentials(self):
+        """e2e-army/379-bill-rtl-content.e2e.ts must exist and not contain hardcoded credentials or string-splitting fallbacks."""
+        test_file = E2E_ARMY_DIR / "379-bill-rtl-content.e2e.ts"
+        self.assertTrue(test_file.exists(), "379-bill-rtl-content.e2e.ts must exist")
+        content = test_file.read_text(encoding="utf-8")
+        self.assertNotIn("password123", content, "379 spec contains hardcoded plaintext password123")
+        self.assertNotIn("admin@mizano.com", content, "379 spec contains hardcoded email")
+        self.assertIn("process.env", content, "379 spec should source credentials dynamically from env")
+        self.assertNotRegex(
+            content,
+            r"""['"]password123['"]|(?:\.join\(|\.concat\()""",
+            "379 spec evades credential scanner with string splitting",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

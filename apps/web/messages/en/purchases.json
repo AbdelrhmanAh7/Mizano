@@ -166,6 +166,7 @@
     "recordPayment": "Record Payment",
     "voidBill": "Void Bill",
     "form": {
+      "billInfo": "Bill Information",
       "billNumber": "Bill Number",
       "billNumberPlaceholder": "Enter bill number",
       "vendor": "Vendor",
@@ -175,9 +176,21 @@
       "dateRequired": "Bill date is required",
       "dueDate": "Due Date",
       "dueDateRequired": "Due date is required",
+      "reference": "Reference (Vendor Doc #)",
+      "currency": "Currency",
       "notes": "Notes",
+      "notesPlaceholder": "Add notes or terms...",
       "project": "Project",
-      "lineItemRequired": "At least one line item is required"
+      "lineItemRequired": "At least one line item is required",
+      "lineItems": "Line Items",
+      "addLine": "Add Line",
+      "subtotal": "Subtotal",
+      "tax": "Tax",
+      "total": "Total",
+      "cancel": "Cancel",
+      "createBill": "Create Bill",
+      "updateBill": "Update Bill",
+      "saving": "Saving..."
     },
     "table": {
       "billNumber": "Bill #",
