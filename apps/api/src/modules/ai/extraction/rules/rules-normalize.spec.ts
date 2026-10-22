@@ -1,5 +1,5 @@
 import Decimal from 'decimal.js';
-import { normalizeDigits } from './rules-normalize';
+import { mapSpanToOriginal, normalizeDigits, normalizeWithOffsets } from './rules-normalize';
 import { parseAmount, findAmounts } from './rules-amounts';
 import { parseDate } from './rules-dates';
 import { extractInvoiceFields } from './invoice-rules-extractor';
@@ -106,36 +106,76 @@ describe('@issue-109 parseDate: parses normalized Arabic-Indic dates', () => {
   it('parses Arabic-Indic day/month/year dates', () => {
     const normalized = normalizeDigits('٠٧/١٠/٢٠٢٦');
     const result = parseDate(normalized);
-    expect(result).toEqual({ iso: '2026-10-07', ambiguous: true }); // day-first, both <= 12
+    expect(result).toMatchObject({ iso: '2026-10-07', ambiguous: true, start: 0, end: 10 });
   });
 
   it('parses Persian day/month/year dates', () => {
     const normalized = normalizeDigits('۰۷/۱۰/۲۰۲۶');
     const result = parseDate(normalized);
-    expect(result).toEqual({ iso: '2026-10-07', ambiguous: true });
+    expect(result).toMatchObject({ iso: '2026-10-07', ambiguous: true, start: 0, end: 10 });
   });
 
   it('parses Arabic-Indic year-first dates unambiguously', () => {
     const normalized = normalizeDigits('٢٠٢٦/١٠/٠٧');
     const result = parseDate(normalized);
-    expect(result).toEqual({ iso: '2026-10-07', ambiguous: false });
+    expect(result).toMatchObject({ iso: '2026-10-07', ambiguous: false, start: 0, end: 10 });
   });
 
   it('parses mixed separator styles', () => {
-    expect(parseDate(normalizeDigits('٠٧-١٠-٢٠٢٦'))).toEqual({
+    expect(parseDate(normalizeDigits('٠٧-١٠-٢٠٢٦'))).toMatchObject({
       iso: '2026-10-07',
       ambiguous: true,
+      start: 0,
+      end: 10,
     });
-    expect(parseDate(normalizeDigits('٠٧.١٠.٢٠٢٦'))).toEqual({
+    expect(parseDate(normalizeDigits('٠٧.١٠.٢٠٢٦'))).toMatchObject({
       iso: '2026-10-07',
       ambiguous: true,
+      start: 0,
+      end: 10,
     });
   });
 
   // AC4: English dates unchanged
   it('parses English dates unchanged', () => {
-    expect(parseDate('07/10/2026')).toEqual({ iso: '2026-10-07', ambiguous: true });
-    expect(parseDate('2026-10-07')).toEqual({ iso: '2026-10-07', ambiguous: false });
+    expect(parseDate('07/10/2026')).toMatchObject({
+      iso: '2026-10-07',
+      ambiguous: true,
+      start: 0,
+      end: 10,
+    });
+    expect(parseDate('2026-10-07')).toMatchObject({
+      iso: '2026-10-07',
+      ambiguous: false,
+      start: 0,
+      end: 10,
+    });
+  });
+});
+
+describe('normalizeWithOffsets and mapSpanToOriginal', () => {
+  it('tracks original UTF-16 character offsets when characters are converted', () => {
+    const input = 'Date: ١٥/٠٣/٢٠٢٤';
+    const { normalized, toOriginal } = normalizeWithOffsets(input);
+    expect(normalized).toBe('Date: 15/03/2024');
+    expect(toOriginal.length).toBe(normalized.length);
+    const span = mapSpanToOriginal(6, 16, toOriginal, input.length);
+    expect(input.slice(span.start, span.end)).toBe('١٥/٠٣/٢٠٢٤');
+  });
+
+  it('handles removed bidi control marks and tatweel', () => {
+    const input = '\u200e15/03/2024\u200f';
+    const { normalized, toOriginal } = normalizeWithOffsets(input);
+    expect(normalized).toBe('15/03/2024');
+    const span = mapSpanToOriginal(0, 10, toOriginal, input.length);
+    expect(span).toEqual({ start: 1, end: 11 });
+    expect(input.slice(span.start, span.end)).toBe('15/03/2024');
+  });
+
+  it('clamps spans within boundaries', () => {
+    const { toOriginal } = normalizeWithOffsets('hello');
+    expect(mapSpanToOriginal(-2, 10, toOriginal, 5)).toEqual({ start: 0, end: 5 });
+    expect(mapSpanToOriginal(2, 2, toOriginal, 5)).toEqual({ start: 2, end: 2 });
   });
 });
 
