@@ -6,7 +6,7 @@ This document provides complete verification evidence for GitHub issue #355 in `
 - **Parent Issue**: #287
 - **Supersedes**: Supersedes part of #324 (finding `dc9f80df6bff` / discussion `r4333275566`)
 - **Base commit**: `6679bfe2bbb2679a8c107b7ddffa4fb6529a85ff`
-- **Tested head SHA**: `5ea030346c63d5d805e89a153412979282bbb9d9`
+- **Tested head SHA**: `444bd6a81a1c79510bef9f8b98ef06122a86d7c1`
 - **Originating Sentry Issue**: None (CodeRabbit code review finding on PR #324 regarding work order completion quantity defaulting to zero and parameter resolution).
 - **Skills Used**: `systematic-debugging`, `test-first-engineering`, `verification-before-completion`, `root-cause-debugging`, `model-effort-routing`, `e2e-army`
 - **Model and Effort**: `Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: High · Why: Hook parameter validation, e2e-army test, locale navigation fixes, review resolution, unit tests, and verification report for issue #355`
@@ -27,26 +27,27 @@ This document provides complete verification evidence for GitHub issue #355 in `
 
 ## Verification Matrix
 
-| AC ID   | Requirement Description                                            | Test / Command                                                                  | Observed Result                                                                               | Exit Code | Status     |
-| :------ | :----------------------------------------------------------------- | :------------------------------------------------------------------------------ | :-------------------------------------------------------------------------------------------- | :-------- | :--------- |
-| **AC1** | Reject completion when quantity is absent without calling api.post | `pnpm --filter web exec jest lib/hooks/use-manufacturing.spec.ts -t "AC1"`      | 1 test PASS (`rejects completion when both quantityProduced and producedQuantity are absent`) | 0         | **PASSED** |
-| **AC2** | Support `quantityProduced` and boundary value `0`                  | `pnpm --filter web exec jest lib/hooks/use-manufacturing.spec.ts -t "AC2"`      | 2 tests PASS (`calls api.post with quantityProduced`, `allows boundary zero quantity`)        | 0         | **PASSED** |
-| **AC3** | Backward compatibility for `producedQuantity` and boundary `0`     | `pnpm --filter web exec jest lib/hooks/use-manufacturing.spec.ts -t "AC3"`      | 2 tests PASS (`resolves quantity from producedQuantity`, `allows boundary zero quantity`)     | 0         | **PASSED** |
-| **AC4** | Prioritize `quantityProduced` when both fields are provided        | `pnpm --filter web exec jest lib/hooks/use-manufacturing.spec.ts -t "AC4"`      | 1 test PASS (`prioritizes quantityProduced when both ... are provided`)                       | 0         | **PASSED** |
-| **AC5** | Prevent silent default to zero; require explicit quantity          | `pnpm --filter web exec jest lib/hooks/use-manufacturing.spec.ts -t "AC1\|AC2"` | Verified via rejection on missing vs acceptance on explicit 0                                 | 0         | **PASSED** |
-| **AC6** | Navigation & Page rendering with localized routing                 | `pnpm --filter web exec jest 'work-orders/page.spec.tsx'`                       | 7 tests PASS (page mounts, renders links via `@/i18n/routing`, handles dates)                 | 0         | **PASSED** |
-| **AC6** | BOM Detail localized navigation and Jest ESM mock compatibility    | `pnpm --filter web exec jest 'bom/.*page.spec.tsx'`                             | 9 tests PASS (skeleton, empty state, pagination normalisation, localized Link/useRouter)      | 0         | **PASSED** |
-| **E2E** | End-to-end work orders flow & RTL Arabic check                     | `e2e-army/355-work-orders.e2e.ts`                                               | Added for blocking verify gate (`feat:mz-work-orders`, `feat:mz-bom`)                         | —         | **READY**  |
-| —       | Full web unit test suite                                           | `pnpm --filter web test`                                                        | All tests pass (0 failures)                                                                   | 0         | **PASSED** |
-| —       | TypeScript type-check across web workspace                         | `pnpm --filter web type-check`                                                  | Clean (`tsc --noEmit` exits with 0 errors)                                                    | 0         | **PASSED** |
-| —       | Next.js ESLint check across web workspace                          | `pnpm --filter web lint`                                                        | Clean (0 errors)                                                                              | 0         | **PASSED** |
+| AC ID   | Requirement Description                                            | Test / Command                                                                  | Observed Result                                                                                                                           | Exit Code | Status     |
+| :------ | :----------------------------------------------------------------- | :------------------------------------------------------------------------------ | :---------------------------------------------------------------------------------------------------------------------------------------- | :-------- | :--------- |
+| **AC1** | Reject completion when quantity is absent without calling api.post | `pnpm --filter web exec jest lib/hooks/use-manufacturing.spec.ts -t "AC1"`      | 2 tests PASS (`rejects completion when both quantityProduced and producedQuantity are absent`, `rejects completion when quantity is NaN`) | 0         | **PASSED** |
+| **AC2** | Support `quantityProduced` and boundary value `0`                  | `pnpm --filter web exec jest lib/hooks/use-manufacturing.spec.ts -t "AC2"`      | 2 tests PASS (`calls api.post with quantityProduced`, `allows boundary zero quantity`)                                                    | 0         | **PASSED** |
+| **AC3** | Backward compatibility for `producedQuantity` and boundary `0`     | `pnpm --filter web exec jest lib/hooks/use-manufacturing.spec.ts -t "AC3"`      | 2 tests PASS (`resolves quantity from producedQuantity`, `allows boundary zero quantity`)                                                 | 0         | **PASSED** |
+| **AC4** | Prioritize `quantityProduced` when both fields are provided        | `pnpm --filter web exec jest lib/hooks/use-manufacturing.spec.ts -t "AC4"`      | 1 test PASS (`prioritizes quantityProduced when both ... are provided`)                                                                   | 0         | **PASSED** |
+| **AC5** | Prevent silent default to zero; require explicit quantity          | `pnpm --filter web exec jest lib/hooks/use-manufacturing.spec.ts -t "AC1\|AC2"` | Verified via rejection on missing vs acceptance on explicit 0                                                                             | 0         | **PASSED** |
+| **AC6** | Navigation & Page rendering with localized routing                 | `pnpm --filter web exec jest 'work-orders/page.spec.tsx'`                       | 7 tests PASS (page mounts, renders links via `@/i18n/routing`, handles dates)                                                             | 0         | **PASSED** |
+| **AC6** | BOM Detail localized navigation and Jest ESM mock compatibility    | `pnpm --filter web exec jest 'bom/.*page.spec.tsx'`                             | 9 tests PASS (skeleton, empty state, pagination normalisation, localized Link/useRouter)                                                  | 0         | **PASSED** |
+| **E2E** | End-to-end work orders flow & RTL Arabic check                     | `e2e-army/355-work-orders.e2e.ts`                                               | Added for blocking verify gate (`feat:mz-work-orders`, `feat:mz-bom`)                                                                     | —         | **READY**  |
+| —       | Full web unit test suite                                           | `pnpm --filter web test`                                                        | All tests pass (0 failures)                                                                                                               | 0         | **PASSED** |
+| —       | TypeScript type-check across web workspace                         | `pnpm --filter web type-check`                                                  | Clean (`tsc --noEmit` exits with 0 errors)                                                                                                | 0         | **PASSED** |
+| —       | Next.js ESLint check across web workspace                          | `pnpm --filter web lint`                                                        | Clean (0 errors)                                                                                                                          | 0         | **PASSED** |
 
 ---
 
 ## Changed Covering Tests
 
-- `apps/web/lib/hooks/use-manufacturing.spec.ts` (6 unit tests covering AC1-AC5):
+- `apps/web/lib/hooks/use-manufacturing.spec.ts` (7 unit tests covering AC1-AC5):
   - `AC1: rejects completion when both quantityProduced and producedQuantity are absent`
+  - `AC1: rejects completion when quantity is NaN`
   - `AC2: calls api.post with quantityProduced when quantityProduced is provided`
   - `AC2: allows boundary zero quantity when explicitly provided via quantityProduced`
   - `AC3: resolves quantity from producedQuantity for backward compatibility`
@@ -112,7 +113,7 @@ On `master` prior to this fix:
 - `workOrderApi.complete` sends `{ quantityProduced }` matching the backend controller.
 - Manufacturing pages and forms use `@/i18n/routing` for `Link` and `useRouter`, ensuring URLs are correctly localized (`/en/...` and `/ar/...`), avoiding cross-origin redirect hops.
 - `middleware.ts` preserves `request.nextUrl` for all internal redirects and prevents cross-origin host mismatch.
-- Executing unit tests (`use-manufacturing.spec.ts` and `work-orders/page.spec.tsx`) on head passes cleanly (**13 passed tests out of 13**).
+- Executing unit tests (`use-manufacturing.spec.ts`, `work-orders/page.spec.tsx`, and `bom/[id]/page.spec.tsx`) on head passes cleanly (**23 passed tests out of 23, 0 failed**).
 
 ---
 
