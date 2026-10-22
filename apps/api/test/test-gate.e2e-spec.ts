@@ -92,7 +92,19 @@ describe('@issue-134 test gates', () => {
     // Every suite boots a full app on the shared database. In parallel, another suite's intake
     // sweep picks up intake.e2e-spec's jobs with the real extractor and the gate flakes.
     expect(apiE2e).toMatch(/--runInBand/);
-  });
+
+    // Verify pnpm test:e2e executes turbo test:e2e which resolves to api#test:e2e
+    const turboDry = execFileSync('pnpm', ['test:e2e', '--dry=json'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    const turboPlan = JSON.parse(turboDry.slice(turboDry.indexOf('{'))) as {
+      tasks: Array<{ taskId: string; command: string }>;
+    };
+    const apiTask = turboPlan.tasks.find((t) => t.taskId === 'api#test:e2e');
+    expect(apiTask).toBeDefined();
+    expect(apiTask?.command).toMatch(/jest --config \.\/test\/jest-e2e\.json --runInBand/);
+  }, 30_000);
 
   it('@e2e @flow:test-gate @issue-134 AC1: the e2e config collects reports.e2e-spec.ts and every other suite', () => {
     const jestBin = require.resolve('jest/bin/jest', { paths: [apiDir] });
