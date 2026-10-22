@@ -150,6 +150,59 @@ describe('BillForm scan review totals', () => {
     expect(screen.getByText(/accountInvalidType/)).toBeInTheDocument();
   });
 
+  it('rejects submission when a line references an inactive expense account', async () => {
+    const onSubmit = jest.fn();
+    const accounts = [
+      { id: 'acc-exp', code: '5000', name: 'Operating Expense', type: 'EXPENSE', isActive: false },
+    ];
+    const initialBill = {
+      id: 'b1',
+      billNumber: 'B-001',
+      vendorId: 'v1',
+      date: '2026-09-01T00:00:00.000Z',
+      dueDate: '2026-10-01T00:00:00.000Z',
+      reference: 'INV-1',
+      currencyCode: 'USD',
+      notes: '',
+      projectId: '',
+      lines: [
+        {
+          id: 'l1',
+          billId: 'b1',
+          itemId: null,
+          accountId: 'acc-exp',
+          description: 'Office supplies',
+          quantity: 1,
+          rate: 100,
+          taxRate: 0,
+          amount: 100,
+        },
+      ],
+    } as unknown as React.ComponentProps<typeof BillForm>['bill'];
+
+    render(
+      <BillForm
+        defaultVendorId="v1"
+        bill={initialBill}
+        accounts={accounts}
+        onSubmit={onSubmit}
+        onCancel={jest.fn()}
+      />,
+    );
+
+    const submitBtn = screen.getByRole('button', { name: /update bill|create bill/i });
+    const form = submitBtn.closest('form')!;
+    fireEvent.submit(form);
+
+    await waitFor(() => {
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+    expect(screen.getByText(/accountInvalidType/)).toBeInTheDocument();
+  });
+
   it('allows submission when lines reference a valid expense account', async () => {
     const onSubmit = jest.fn();
     const accounts = [

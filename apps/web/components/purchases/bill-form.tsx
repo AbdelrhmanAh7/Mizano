@@ -86,7 +86,7 @@ export interface BillFormDefaultValues {
 
 interface BillFormProps {
   bill?: Bill | null;
-  accounts?: Array<{ id: string; code: string; name: string; type: string }>;
+  accounts?: Array<{ id: string; code: string; name: string; type: string; isActive?: boolean }>;
   items?: Array<{ id: string; name: string; sku: string; costPrice: string }>;
   projects?: Array<{ id: string; name: string }>;
   onSubmit: (data: Record<string, unknown>) => void;
@@ -119,7 +119,8 @@ export function BillForm({
 
   // Filter accounts: only active expense or asset accounts are valid for bill lines
   const expenseAccounts = useMemo(
-    () => accounts.filter((a) => a.type === 'EXPENSE' || a.type === 'ASSET'),
+    () =>
+      accounts.filter((a) => a.isActive !== false && (a.type === 'EXPENSE' || a.type === 'ASSET')),
     [accounts],
   );
   const expenseAccountIds = useMemo(

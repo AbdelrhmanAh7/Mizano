@@ -357,6 +357,21 @@ describe('BillsService', () => {
       ).rejects.toThrow('Bill line accounts must be active expense or asset accounts');
       expect(prisma.bill.update).not.toHaveBeenCalled();
     });
+
+    it('should reject an inactive account when updating draft bill lines', async () => {
+      prisma.bill.findFirst.mockResolvedValue(createMockBill({ status: 'DRAFT' }) as any);
+      prisma.account.findMany.mockResolvedValue([
+        { id: 'inactive-acc', type: AccountType.EXPENSE, isActive: false },
+      ] as any);
+      prisma.account.count.mockResolvedValue(1);
+
+      await expect(
+        service.update(ORG_ID, 'bill-1', {
+          lines: [{ accountId: 'inactive-acc', quantity: '1', rate: '100' }],
+        }),
+      ).rejects.toThrow('Bill line accounts must be active expense or asset accounts');
+      expect(prisma.bill.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('approve (status transition DRAFT -> OPEN)', () => {
@@ -449,6 +464,19 @@ describe('BillsService', () => {
       prisma.bill.findFirst.mockResolvedValue(bill as any);
       prisma.account.findMany.mockResolvedValue([
         { id: 'acc-1', type: AccountType.LIABILITY, isActive: true },
+      ] as any);
+
+      await expect(service.approve(ORG_ID, 'bill-1')).rejects.toThrow(
+        'All bill lines must have an active expense or asset account assigned before approval',
+      );
+      expect(journalsService.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject approval when a line references an inactive account', async () => {
+      const bill = draftBill();
+      prisma.bill.findFirst.mockResolvedValue(bill as any);
+      prisma.account.findMany.mockResolvedValue([
+        { id: 'acc-1', type: AccountType.EXPENSE, isActive: false },
       ] as any);
 
       await expect(service.approve(ORG_ID, 'bill-1')).rejects.toThrow(

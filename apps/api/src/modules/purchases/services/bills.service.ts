@@ -339,10 +339,16 @@ export class BillsService {
       if (lineAccounts.length !== billAccountIds.length) {
         throw new BadRequestException('Account not found');
       }
-      const invalidAccount = lineAccounts.find(
-        (a) => !a.isActive || (a.type !== AccountType.EXPENSE && a.type !== AccountType.ASSET),
+      const inactiveAccount = lineAccounts.find((a) => !a.isActive);
+      if (inactiveAccount) {
+        throw new BadRequestException(
+          'All bill lines must have an active expense or asset account assigned before approval',
+        );
+      }
+      const invalidTypeAccount = lineAccounts.find(
+        (a) => a.type !== AccountType.EXPENSE && a.type !== AccountType.ASSET,
       );
-      if (invalidAccount) {
+      if (invalidTypeAccount) {
         throw new BadRequestException(
           'All bill lines must have an active expense or asset account assigned before approval',
         );
@@ -563,10 +569,16 @@ export class BillsService {
       if (accounts.length !== accountIds.length) {
         throw new BadRequestException('Account not found');
       }
-      const invalidAccount = accounts.find(
-        (a) => !a.isActive || (a.type !== AccountType.EXPENSE && a.type !== AccountType.ASSET),
+      const inactiveAccount = accounts.find((a) => !a.isActive);
+      if (inactiveAccount) {
+        throw new BadRequestException(
+          'Bill line accounts must be active expense or asset accounts',
+        );
+      }
+      const invalidTypeAccount = accounts.find(
+        (a) => a.type !== AccountType.EXPENSE && a.type !== AccountType.ASSET,
       );
-      if (invalidAccount) {
+      if (invalidTypeAccount) {
         throw new BadRequestException(
           'Bill line accounts must be active expense or asset accounts',
         );
