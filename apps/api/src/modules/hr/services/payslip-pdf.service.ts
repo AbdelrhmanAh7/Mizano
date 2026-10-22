@@ -321,7 +321,7 @@ export function renderPayslipPdf(data: PayslipPdfData, lang: 'ar' | 'en'): Promi
         );
         extraY += 14;
       }
-      if (data.employee.position) {
+      if (data.employee.position && data.employee.position.trim()) {
         drawPair(
           doc,
           isAr ? 'المسمى الوظيفي:' : 'Position:',
@@ -477,6 +477,76 @@ export function renderPayslipPdf(data: PayslipPdfData, lang: 'ar' | 'en'): Promi
 
 type Money = Prisma.Decimal;
 
+const KNOWN_ALLOWANCE_LABELS: Record<string, { en: string; ar: string }> = {
+  housing: { en: 'Housing Allowance', ar: 'بدل السكن' },
+  housingallowance: { en: 'Housing Allowance', ar: 'بدل السكن' },
+  transport: { en: 'Transport Allowance', ar: 'بدل الانتقال' },
+  transportation: { en: 'Transport Allowance', ar: 'بدل الانتقال' },
+  transportallowance: { en: 'Transport Allowance', ar: 'بدل الانتقال' },
+  other: { en: 'Other Allowances', ar: 'بدلات أخرى' },
+  otherallowances: { en: 'Other Allowances', ar: 'بدلات أخرى' },
+  overtime: { en: 'Overtime', ar: 'العمل الإضافي' },
+  bonus: { en: 'Bonus', ar: 'المكافآت' },
+  phone: { en: 'Phone Allowance', ar: 'بدل الهاتف' },
+  mobile: { en: 'Mobile Allowance', ar: 'بدل الهاتف' },
+  meal: { en: 'Meal Allowance', ar: 'بدل وجبة' },
+  food: { en: 'Food Allowance', ar: 'بدل وجبة' },
+};
+
+const KNOWN_DEDUCTION_LABELS: Record<string, { en: string; ar: string }> = {
+  insurance: { en: 'Social Insurance', ar: 'التأمينات الاجتماعية' },
+  gosi: { en: 'Social Insurance', ar: 'التأمينات الاجتماعية' },
+  gosiemployee: { en: 'Social Insurance', ar: 'التأمينات الاجتماعية' },
+  tax: { en: 'Income Tax', ar: 'ضريبة الدخل' },
+  taxes: { en: 'Income Tax', ar: 'ضريبة الدخل' },
+  incometax: { en: 'Income Tax', ar: 'ضريبة الدخل' },
+  loan: { en: 'Loan Deduction', ar: 'خصم السلفة' },
+  loandeduction: { en: 'Loan Deduction', ar: 'خصم السلفة' },
+  other: { en: 'Other Deductions', ar: 'استقطاعات أخرى' },
+  otherdeductions: { en: 'Other Deductions', ar: 'استقطاعات أخرى' },
+  penalty: { en: 'Penalties', ar: 'جزاءات' },
+  sanction: { en: 'Sanctions', ar: 'جزاءات' },
+  absence: { en: 'Loss of Pay', ar: 'خصم الغياب' },
+};
+
+function formatLabel(name: string): string {
+  return name
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
+}
+
+function localizeAllowance(key: string): { labelEn: string; labelAr: string } {
+  const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (KNOWN_ALLOWANCE_LABELS[normalized]) {
+    return {
+      labelEn: KNOWN_ALLOWANCE_LABELS[normalized].en,
+      labelAr: KNOWN_ALLOWANCE_LABELS[normalized].ar,
+    };
+  }
+  const formatted = formatLabel(key);
+  return {
+    labelEn: formatted,
+    labelAr: `بدل ${formatted}`,
+  };
+}
+
+function localizeDeduction(key: string): { labelEn: string; labelAr: string } {
+  const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (KNOWN_DEDUCTION_LABELS[normalized]) {
+    return {
+      labelEn: KNOWN_DEDUCTION_LABELS[normalized].en,
+      labelAr: KNOWN_DEDUCTION_LABELS[normalized].ar,
+    };
+  }
+  const formatted = formatLabel(key);
+  return {
+    labelEn: formatted,
+    labelAr: `استقطاع ${formatted}`,
+  };
+}
+
 /** Persisted JSON line items ({ name: amount }) as non-zero decimals; anything else is ignored. */
 function jsonLines(json: unknown): Array<{ name: string; amount: Money }> {
   if (!json || typeof json !== 'object' || Array.isArray(json)) {
@@ -606,11 +676,14 @@ export class PayslipPdfService {
       earnings.push(
         ...(earningSnapshot.length
           ? earningSnapshot
-          : jsonLines(payslip.allowances).map((l) => ({
-              labelEn: l.name,
-              labelAr: l.name,
-              amount: l.amount,
-            }))),
+          : jsonLines(payslip.allowances).map((l) => {
+              const loc = localizeAllowance(l.name);
+              return {
+                labelEn: loc.labelEn,
+                labelAr: loc.labelAr,
+                amount: l.amount,
+              };
+            })),
       );
       const itemisedEarnings = earnings.reduce(
         (sum, l) => sum.add(l.amount),
@@ -633,42 +706,48 @@ export class PayslipPdfService {
         [payslip.otherDeductions, 'Other Deductions', 'استقطاعات أخرى'],
       ];
       const deductionSnapshot = nonZeroLines(snapshotDeductions);
-      // Capture otherDeductions value from the snapshot (last entry) to include in reconciliation
-      // without displaying it as a separate line item, avoiding duplicate "Other Deductions" rows.
-      const otherDeductionsFromSnapshot =
-        payslip.otherDeductions && !payslip.otherDeductions.isZero()
-          ? payslip.otherDeductions
-          : new Prisma.Decimal(0);
-      // Filter out the otherDeductions entry from displayed lines
+      // Filter out 'Other Deductions' from displayed lines so that the unexplained/catch-all
+      // difference row can represent it as a single line item, avoiding double-counting.
       const displayDeductions = deductionSnapshot.filter((d) => d.labelEn !== 'Other Deductions');
       deductions.push(
-        ...(displayDeductions.length
+        ...(deductionSnapshot.length
           ? displayDeductions
-          : jsonLines(payslip.deductions).map((l) => ({
-              labelEn: l.name,
-              labelAr: l.name,
-              amount: l.amount,
-            }))),
+          : jsonLines(payslip.deductions).map((l) => {
+              const loc = localizeDeduction(l.name);
+              return {
+                labelEn: loc.labelEn,
+                labelAr: loc.labelAr,
+                amount: l.amount,
+              };
+            })),
       );
       if (payslip.taxes && !payslip.taxes.isZero()) {
         deductions.push({ labelEn: 'Tax', labelAr: 'الضريبة', amount: payslip.taxes });
       }
 
-      // The stored `totalDeductions` is authoritative when set; calculatePayroll leaves it at its
-      // default of 0, so then the total is gross - net. Any part of that total the line items do
-      // not explain is shown as one "Other Deductions" row, so the page always reconciles.
-      // Include otherDeductionsFromSnapshot in the itemised base so the reconciliation row
-      // represents the full unexplained amount in a single line.
-      const itemised = deductions.reduce((sum, l) => sum.add(l.amount), new Prisma.Decimal(0));
-      const stored = payslip.totalDeductions;
+      // The stored `totalDeductions` must reconcile with gross - net.
+      // If net > gross or stored total does not match gross - net, reject to preserve financial integrity.
       const calculatedTotal = payslip.grossSalary.sub(payslip.netSalary);
-      const totalDeductions =
-        stored && !stored.isZero()
-          ? stored
-          : calculatedTotal.isNegative()
-            ? new Prisma.Decimal(0)
-            : calculatedTotal;
-      const unexplained = totalDeductions.sub(itemised).add(otherDeductionsFromSnapshot);
+      if (calculatedTotal.isNegative()) {
+        throw new UnprocessableEntityException(
+          'Payroll reconciliation failed: net salary cannot exceed gross salary',
+        );
+      }
+      const stored = payslip.totalDeductions;
+      if (stored && !stored.isZero() && !stored.equals(calculatedTotal)) {
+        throw new UnprocessableEntityException(
+          'Payroll reconciliation failed: total deductions does not match gross minus net',
+        );
+      }
+      const totalDeductions = calculatedTotal;
+
+      const itemised = deductions.reduce((sum, l) => sum.add(l.amount), new Prisma.Decimal(0));
+      if (itemised.gt(totalDeductions)) {
+        throw new UnprocessableEntityException(
+          'Payroll reconciliation failed: itemised deductions exceed total deductions',
+        );
+      }
+      const unexplained = totalDeductions.sub(itemised);
       if (!unexplained.isZero()) {
         deductions.push({
           labelEn: 'Other Deductions',
@@ -684,6 +763,9 @@ export class PayslipPdfService {
           amount: formatDecimal(l.amount),
         }));
 
+      const rawPosition = (payslip.employee.position || payslip.employee.jobTitle)?.trim();
+      const position = rawPosition && rawPosition.length > 0 ? rawPosition : null;
+
       const data: PayslipPdfData = {
         organizationName: organization.name,
         currency,
@@ -692,8 +774,8 @@ export class PayslipPdfService {
         employee: {
           name: payslip.employee.name,
           employeeId: payslip.employee.employeeId,
-          department: payslip.employee.department,
-          position: payslip.employee.position ?? payslip.employee.jobTitle,
+          department: payslip.employee.department ?? null,
+          position,
         },
         earnings: toLines(
           capLines(earnings, { labelEn: 'Other Earnings', labelAr: 'استحقاقات أخرى' }),

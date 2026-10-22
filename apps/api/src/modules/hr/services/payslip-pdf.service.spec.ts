@@ -443,6 +443,7 @@ describe('PayslipPdfService & renderPayslipPdf', () => {
         netSalary: new Prisma.Decimal('0'),
         gosiEmployee: new Prisma.Decimal('1000'),
         incomeTax: new Prisma.Decimal('0'),
+        totalDeductions: new Prisma.Decimal('1000'),
       });
       const buffer = await service.generatePayslipPdf(orgId, payslipId, 'ar');
       expect(buffer.slice(0, 4).toString('ascii')).toBe('%PDF');
@@ -528,6 +529,98 @@ describe('PayslipPdfService & renderPayslipPdf', () => {
       expect(amounts.filter((a) => a === '600.00 EGP')).toHaveLength(2); // the row and the total
       expect(amounts).not.toContain('Other Earnings');
       expect(amounts).not.toContain('Other Deductions');
+    });
+
+    it('shows exactly one "Other Deductions" row equaling total when otherDeductions is set', async () => {
+      mockPayrollService.getPayslip.mockResolvedValue({
+        ...mockPrismaPayslip,
+        basicSalary: new Prisma.Decimal('1500'),
+        grossSalary: new Prisma.Decimal('1500'),
+        netSalary: new Prisma.Decimal('1000'),
+        housingAllowance: new Prisma.Decimal('0'),
+        transportAllowance: new Prisma.Decimal('0'),
+        otherAllowances: new Prisma.Decimal('0'),
+        overtime: new Prisma.Decimal('0'),
+        bonus: new Prisma.Decimal('0'),
+        gosiEmployee: new Prisma.Decimal('0'),
+        incomeTax: new Prisma.Decimal('0'),
+        loanDeduction: new Prisma.Decimal('0'),
+        otherDeductions: new Prisma.Decimal('500'),
+        totalDeductions: new Prisma.Decimal('500'),
+        taxes: new Prisma.Decimal('0'),
+        allowances: {},
+        deductions: {},
+      });
+      const buffer = await service.generatePayslipPdf(orgId, payslipId, 'en');
+      const items = await textItems(buffer);
+      const amounts = items.map((i) => i.str.trim());
+      // Expect 500.00 EGP to appear exactly twice: once for the row, once for the total
+      expect(amounts.filter((a) => a === '500.00 EGP')).toHaveLength(2);
+      expect(items.filter((i) => i.str.trim() === 'Other Deductions')).toHaveLength(1);
+    });
+
+    it('does not duplicate otherDeductions when both snapshot and deductions JSON specify it', async () => {
+      mockPayrollService.getPayslip.mockResolvedValue({
+        ...mockPrismaPayslip,
+        basicSalary: new Prisma.Decimal('1500'),
+        grossSalary: new Prisma.Decimal('1500'),
+        netSalary: new Prisma.Decimal('1000'),
+        housingAllowance: new Prisma.Decimal('0'),
+        transportAllowance: new Prisma.Decimal('0'),
+        otherAllowances: new Prisma.Decimal('0'),
+        overtime: new Prisma.Decimal('0'),
+        bonus: new Prisma.Decimal('0'),
+        gosiEmployee: new Prisma.Decimal('0'),
+        incomeTax: new Prisma.Decimal('0'),
+        loanDeduction: new Prisma.Decimal('0'),
+        otherDeductions: new Prisma.Decimal('500'),
+        totalDeductions: new Prisma.Decimal('500'),
+        taxes: new Prisma.Decimal('0'),
+        allowances: {},
+        deductions: { other: 500 },
+      });
+      const buffer = await service.generatePayslipPdf(orgId, payslipId, 'en');
+      const items = await textItems(buffer);
+      const amounts = items.map((i) => i.str.trim());
+      expect(amounts.filter((a) => a === '500.00 EGP')).toHaveLength(2); // once as row, once as total
+    });
+
+    it('rejects a payslip when net salary exceeds gross salary (negative total deductions)', async () => {
+      mockPayrollService.getPayslip.mockResolvedValue({
+        ...mockPrismaPayslip,
+        basicSalary: new Prisma.Decimal('1000'),
+        grossSalary: new Prisma.Decimal('1000'),
+        netSalary: new Prisma.Decimal('1200'),
+        totalDeductions: new Prisma.Decimal('0'),
+      });
+      await expect(service.generatePayslipPdf(orgId, payslipId, 'en')).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+    });
+
+    it('localizes JSON allowance and deduction keys into Arabic in ar mode', async () => {
+      mockPayrollService.getPayslip.mockResolvedValue({
+        ...mockPrismaPayslip,
+        basicSalary: new Prisma.Decimal('10000'),
+        housingAllowance: null,
+        transportAllowance: null,
+        otherAllowances: null,
+        overtime: null,
+        bonus: null,
+        allowances: { housing: 2000, uniform: 100 },
+        grossSalary: new Prisma.Decimal('12100'),
+        gosiEmployee: null,
+        incomeTax: null,
+        loanDeduction: null,
+        otherDeductions: null,
+        deductions: { insurance: 600, damage: 50 },
+        totalDeductions: new Prisma.Decimal('650'),
+        netSalary: new Prisma.Decimal('11450'),
+      });
+      const parsed = await parsePdf(await service.generatePayslipPdf(orgId, payslipId, 'ar'));
+      // In Arabic PDF, shaped Arabic text should be present and raw English keys should not be labels
+      expect(parsed.text).not.toContain('housing');
+      expect(parsed.text).not.toContain('insurance');
     });
 
     it('shows earnings the line items do not explain as one "Other Earnings" row', async () => {
