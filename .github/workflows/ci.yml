@@ -5,7 +5,7 @@
 #
 # Owner rule: every job stays under 5 minutes (timeout-minutes: 5), so the pipeline is split into parallel jobs.
 # The job names are the check names the hub gates and automerge wait for ("Install Dependencies", "Lint & Type Check",
-# "Unit Tests", "Build", "E2E Tests"): keep them stable. Jobs are independent and each installs from the shared pnpm store cache
+# "Unit Tests", "Build"): keep them stable. Jobs are independent and each installs from the shared pnpm store cache
 # (setup-node), so none waits for another and a failed install cannot skip the others silently.
 #
 # Fork PRs: this workflow uses `pull_request` (read-only token, no secrets), never `pull_request_target`; first-time
@@ -99,7 +99,7 @@ jobs:
   # ==========================================
   # Every unit test mocks Prisma and Redis (apps/api/src/test/mocks); the suites pass with an unreachable DATABASE_URL, so
   # the job needs no service containers and no `db:push` (slim-down 2026-10-10, docs/slimdown-plan.md). The real-database
-  # API e2e specs run in the `e2e` job below.
+  # API e2e specs run in nightly.yml.
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -178,58 +178,3 @@ jobs:
         run: pnpm build
         env:
           NEXT_PUBLIC_API_URL: https://api.example.com
-
-  # ==========================================
-  # E2E Tests (real-database API suites)
-  # ==========================================
-  e2e:
-    name: E2E Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: mizano_e2e
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Generate Prisma client
-        run: pnpm db:generate
-
-      - name: Apply database migrations
-        run: pnpm --filter api exec prisma migrate deploy
-        env:
-          # Throwaway credentials of the ephemeral service container above, not secrets.
-          DATABASE_URL: postgresql://test:test@localhost:5432/mizano_e2e
-
-      - name: Run E2E tests
-        run: pnpm test:e2e
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/mizano_e2e
-          # Blank on purpose: the cache and the intake queue run in-process, as in the verified local runs.
-          REDIS_URL: ''
