@@ -4,9 +4,8 @@
 
 - **Issue**: #332 (`fix: qa finding: The PR correctly removes the refreshToken from the NextAuth session r… (split from #274)`)
 - **Parent Issue**: #252
-- **PR**: #346
-- **Supersedes part of**: PR #274 (resolving QA finding `df11332ad23d` / review discussion `r4340860918`)
-- **Base Commit**: `e5d9b805563c04df3300f00442fd18f7d82ce560` (`origin/master`)
+- **PR**: #346 (Supersedes part of #274; resolving QA finding `df11332ad23d` / review discussion `r4340860918`)
+- **Base Commit**: `bf3f67a80294e9c79f1bb5bfab65ac637e21658a` (`origin/master` merged via `c5fee906d07070ca26994236be7856c24cabd45a`)
 - **Tested Head**: `0b2094bbba87abbe364dccbf2cd62d184700d404`
 - **Originating Sentry Issue**: None found (internal QA/security review finding split from PR #274).
 - **Model · Effort · Why**: `Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: High · Why: Complete implementation, review comments remediation, regression proof, e2e test, and verification report for issue #332`
