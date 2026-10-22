@@ -194,14 +194,29 @@ export function DataTable<TData, TValue>({
           aria-label="Select all"
         />
       ),
-      cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
-          onClick={(e) => e.stopPropagation()}
-        />
-      ),
+      cell: ({ row }) => {
+        const item = row.original as Record<string, unknown>;
+        const label =
+          (item?.workOrderNumber as string) ||
+          (item?.journalNumber as string) ||
+          (item?.invoiceNumber as string) ||
+          (item?.number as string) ||
+          (item?.code as string) ||
+          (item?.name as string) ||
+          (item?.id as string) ||
+          '';
+        const ariaLabel = label ? `Select row ${label}` : 'Select row';
+        return (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label={ariaLabel}
+            id={label ? `select-${label}` : undefined}
+            name={label || undefined}
+            onClick={(e) => e.stopPropagation()}
+          />
+        );
+      },
       enableSorting: false,
       enableHiding: false,
       enableResizing: false,
@@ -269,7 +284,11 @@ export function DataTable<TData, TValue>({
   const selectedRows = table.getFilteredSelectedRowModel().rows.map((r) => r.original);
   const hasSelection = selectedRows.length > 0;
   const showToolbar =
-    enableColumnVisibility || enableExport || onExportAll || (enableSelection && hasSelection);
+    enableColumnVisibility ||
+    enableExport ||
+    onExportAll ||
+    (enableSelection && (bulkActions?.length ?? 0) > 0) ||
+    hasSelection;
 
   const handleExport = useCallback(() => {
     exportToCsv(data, columns as ColumnDef<TData, unknown>[], exportFilename);
@@ -313,24 +332,22 @@ export function DataTable<TData, TValue>({
     <div className="flex items-center justify-between gap-2">
       <div className="flex items-center gap-2">
         {hasSelection && (
-          <>
-            <span className="text-sm text-muted-foreground">{selectedRows.length} selected</span>
-            {bulkActions?.map((action) => {
-              const Icon = action.icon;
-              return (
-                <Button
-                  key={action.label}
-                  variant={action.variant || 'outline'}
-                  size="sm"
-                  onClick={() => action.onClick(selectedRows)}
-                >
-                  {Icon && <Icon className="h-4 w-4 me-1" />}
-                  {action.label}
-                </Button>
-              );
-            })}
-          </>
+          <span className="text-sm text-muted-foreground">{selectedRows.length} selected</span>
         )}
+        {bulkActions?.map((action) => {
+          const Icon = action.icon;
+          return (
+            <Button
+              key={action.label}
+              variant={action.variant || 'outline'}
+              size="sm"
+              onClick={() => action.onClick(selectedRows)}
+            >
+              {Icon && <Icon className="h-4 w-4 me-1" />}
+              {action.label}
+            </Button>
+          );
+        })}
       </div>
       <div className="flex items-center gap-2">
         {/* Current-page CSV export (non-virtual) */}

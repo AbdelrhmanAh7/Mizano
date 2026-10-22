@@ -1847,7 +1847,27 @@ async function main() {
       organizationId: orgId,
     },
   });
-  console.log('  ✓ 1 BOM, 2 work orders, 1 production entry');
+  // A draft work order so testing failure reporting in bulk-complete works (#165).
+  await prisma.workOrder.upsert({
+    where: {
+      workOrderNumber_organizationId: {
+        workOrderNumber: 'Invalid-Work-Order',
+        organizationId: orgId,
+      },
+    },
+    update: {},
+    create: {
+      id: 'Invalid-Work-Order',
+      workOrderNumber: 'Invalid-Work-Order',
+      bomId: bom.id,
+      quantity: 1,
+      status: WorkOrderStatus.DRAFT,
+      plannedStartDate: daysAgo(2),
+      notes: 'Draft work order for failure reporting tests',
+      organizationId: orgId,
+    },
+  });
+  console.log('  ✓ 1 BOM, 3 work orders (2 in-process, 1 draft), 1 production entry');
 
   // ─────────────────────────────────────────────────────────
   // 37. PROJECTS + TASKS + TIMESHEETS

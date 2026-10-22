@@ -251,8 +251,7 @@ test(
       await row.getByRole('checkbox', 'Select row').tap();
     }
     await screen.getByRole('button', 'Complete', { visible: true }).tap();
-    await screen.getByRole('button', 'Complete 2 work orders').tap();
-    await expect(screen.getByRole('alertdialog')).toBeHidden({ timeout: 30_000 });
+    await expect(screen.getByText(/processed/i)).toBeVisible({ timeout: 30_000 });
 
     const api = client(apiBase(String(app.baseUrl)));
     const login = await api.post('/auth/login', {

@@ -69,12 +69,29 @@ jest.mock('@/lib/hooks/use-table-params', () => ({
   }),
 }));
 
-jest.mock('@/lib/hooks/use-bulk-action', () => ({
-  useBulkAction: () => ({ execute: jest.fn(), isLoading: false }),
+const mockToast = jest.fn();
+jest.mock('@/components/ui/use-toast', () => ({
+  useToast: () => ({ toast: mockToast }),
 }));
 
-jest.mock('@/components/ui/use-toast', () => ({
-  useToast: () => ({ toast: jest.fn() }),
+const mockExecute = jest.fn().mockResolvedValue({ processed: 1, total: 1, failures: [] });
+jest.mock('@/lib/hooks/use-bulk-action', () => ({
+  readBulkOutcome: (res: unknown, total: number) => {
+    const obj = res as { processed?: number; total?: number; failures?: unknown[] } | undefined;
+    return {
+      processed: obj?.processed ?? total,
+      total: obj?.total ?? total,
+      failures: obj?.failures ?? [],
+    };
+  },
+  useBulkAction: ({ onSuccess }: { onSuccess?: (r: unknown) => void } = {}) => ({
+    execute: (ids: string[]) =>
+      mockExecute(ids).then((r: unknown) => {
+        onSuccess?.(r);
+        return r;
+      }),
+    isLoading: false,
+  }),
 }));
 
 // ── Import after mocks ────────────────────────────────────────────────────────
@@ -179,5 +196,53 @@ describe('WorkOrdersPage', () => {
     renderPage();
     // The mock returns the translation key; assert the translated label key is rendered
     expect(screen.getByText('workOrders.status.inProcess')).toBeInTheDocument();
+  });
+
+  it('renders row checkbox with accessible label including work order number', () => {
+    mockUseWorkOrders.mockReturnValue({
+      data: {
+        data: [{ ...baseWorkOrder, status: 'IN_PROCESS', plannedStartDate: null }],
+        meta: { page: 1, totalPages: 1, total: 1 },
+      },
+      isLoading: false,
+      refetch: jest.fn(),
+    });
+    renderPage();
+    expect(screen.getByRole('checkbox', { name: /WO-001/ })).toBeInTheDocument();
+  });
+
+  it('renders Complete button even when no work orders are selected', () => {
+    mockUseWorkOrders.mockReturnValue({
+      data: {
+        data: [{ ...baseWorkOrder, status: 'IN_PROCESS', plannedStartDate: null }],
+        meta: { page: 1, totalPages: 1, total: 1 },
+      },
+      isLoading: false,
+      refetch: jest.fn(),
+    });
+    renderPage();
+    expect(
+      screen.getByRole('button', { name: 'workOrders.bulkActions.complete' }),
+    ).toBeInTheDocument();
+  });
+
+  it('warns user with toast when Complete is clicked with empty selection', async () => {
+    mockUseWorkOrders.mockReturnValue({
+      data: {
+        data: [{ ...baseWorkOrder, status: 'IN_PROCESS', plannedStartDate: null }],
+        meta: { page: 1, totalPages: 1, total: 1 },
+      },
+      isLoading: false,
+      refetch: jest.fn(),
+    });
+    renderPage();
+    const completeButton = screen.getByRole('button', { name: 'workOrders.bulkActions.complete' });
+    completeButton.click();
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Select at least one work order',
+        variant: 'destructive',
+      }),
+    );
   });
 });

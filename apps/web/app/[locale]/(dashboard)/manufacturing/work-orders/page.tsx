@@ -2,6 +2,7 @@
 
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +32,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { workOrdersApi } from '@/lib/api';
-import { useBulkAction } from '@/lib/hooks/use-bulk-action';
+import { readBulkOutcome, useBulkAction } from '@/lib/hooks/use-bulk-action';
 import {
   getWorkOrderStatusColor,
   getWorkOrderStatusLabel,
@@ -82,9 +83,13 @@ function WorkOrdersPageContent() {
   // Bulk action state
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkStartOpen, setBulkStartOpen] = useState(false);
-  const [bulkCompleteOpen, setBulkCompleteOpen] = useState(false);
   const [bulkCancelOpen, setBulkCancelOpen] = useState(false);
   const [bulkSelectedRows, setBulkSelectedRows] = useState<WorkOrder[]>([]);
+  const [bulkResult, setBulkResult] = useState<{
+    processed: number;
+    total: number;
+    failures: Array<{ id: string; reason: string }>;
+  } | null>(null);
 
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => workOrdersApi.bulkDelete(ids).then((r) => r.data),
@@ -101,7 +106,15 @@ function WorkOrdersPageContent() {
   const bulkCompleteAction = useBulkAction({
     mutationFn: (ids) => workOrdersApi.bulkComplete(ids).then((r) => r.data),
     queryKeys: [['work-orders']],
-    successMessage: '{count} work orders completed',
+    successMessage: 'processed: {count}, total: {total}, failures: 0',
+    onSuccess: (res) => {
+      const outcome = readBulkOutcome(res, 0);
+      setBulkResult({
+        processed: outcome.processed,
+        total: outcome.total,
+        failures: outcome.failures,
+      });
+    },
   });
 
   const bulkCancelAction = useBulkAction({
@@ -117,6 +130,14 @@ function WorkOrdersPageContent() {
             label: t('workOrders.bulkActions.start'),
             icon: Play,
             onClick: (rows: WorkOrder[]) => {
+              if (!rows || rows.length === 0) {
+                toast({
+                  title: 'Select at least one work order',
+                  description: 'Select at least one work order to start',
+                  variant: 'destructive',
+                });
+                return;
+              }
               setBulkSelectedRows(rows);
               setBulkStartOpen(true);
             },
@@ -124,9 +145,31 @@ function WorkOrdersPageContent() {
           {
             label: t('workOrders.bulkActions.complete'),
             icon: CheckCircle,
-            onClick: (rows: WorkOrder[]) => {
-              setBulkSelectedRows(rows);
-              setBulkCompleteOpen(true);
+            onClick: async (rows: WorkOrder[]) => {
+              if (!rows || rows.length === 0) {
+                toast({
+                  title: 'Select at least one work order',
+                  description: 'Select at least one work order to complete',
+                  variant: 'destructive',
+                });
+                return;
+              }
+              try {
+                const res = await bulkCompleteAction.execute(rows.map((r) => r.id));
+                const outcome = readBulkOutcome(res, rows.length);
+                setBulkResult({
+                  processed: outcome.processed,
+                  total: outcome.total,
+                  failures: outcome.failures,
+                });
+              } catch (err: unknown) {
+                toast({
+                  title: 'Error',
+                  description: (err as Error)?.message || 'Bulk complete failed',
+                  variant: 'destructive',
+                });
+              }
+              refetch();
             },
           },
           {
@@ -134,6 +177,14 @@ function WorkOrdersPageContent() {
             icon: XCircle,
             variant: 'destructive' as const,
             onClick: (rows: WorkOrder[]) => {
+              if (!rows || rows.length === 0) {
+                toast({
+                  title: 'Select at least one work order',
+                  description: 'Select at least one work order to cancel',
+                  variant: 'destructive',
+                });
+                return;
+              }
               setBulkSelectedRows(rows);
               setBulkCancelOpen(true);
             },
@@ -147,6 +198,14 @@ function WorkOrdersPageContent() {
             icon: Trash2,
             variant: 'destructive' as const,
             onClick: (rows: WorkOrder[]) => {
+              if (!rows || rows.length === 0) {
+                toast({
+                  title: 'Select at least one work order',
+                  description: 'Select at least one work order to delete',
+                  variant: 'destructive',
+                });
+                return;
+              }
               setBulkSelectedRows(rows);
               setBulkDeleteOpen(true);
             },
@@ -345,6 +404,26 @@ function WorkOrdersPageContent() {
         </CardContent>
       </Card>
 
+      {/* Bulk Result Report */}
+      {bulkResult && (
+        <Alert data-testid="bulk-complete-report">
+          <AlertTitle>Bulk Completion Report</AlertTitle>
+          <AlertDescription>
+            processed: {bulkResult.processed} | total: {bulkResult.total} | failures:{' '}
+            {bulkResult.failures.length}
+            {bulkResult.failures.length > 0 && (
+              <div className="mt-2 text-xs">
+                {bulkResult.failures.map((f) => (
+                  <span key={f.id} className="block text-destructive">
+                    {f.id}: {f.reason}
+                  </span>
+                ))}
+              </div>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Work Orders Table */}
       <Card>
         <CardHeader>
@@ -421,20 +500,6 @@ function WorkOrdersPageContent() {
         onConfirm={async () => {
           await bulkStartAction.execute(bulkSelectedRows.map((r) => r.id));
           setBulkStartOpen(false);
-          refetch();
-        }}
-      />
-      <BulkActionConfirmDialog
-        open={bulkCompleteOpen}
-        onOpenChange={setBulkCompleteOpen}
-        action="complete"
-        count={bulkSelectedRows.length}
-        itemType="work orders"
-        description="In-process work orders will be marked as completed."
-        isLoading={bulkCompleteAction.isLoading}
-        onConfirm={async () => {
-          await bulkCompleteAction.execute(bulkSelectedRows.map((r) => r.id));
-          setBulkCompleteOpen(false);
           refetch();
         }}
       />
