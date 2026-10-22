@@ -6,7 +6,7 @@ This document provides complete verification evidence for GitHub issue #396 in `
 - **PR**: Supersedes part of #357
 - **Parent Issue**: #355
 - **Base Commit (`origin/master`)**: `e5d9b805563c04df3300f00442fd18f7d82ce560`
-- **Tested Head Commit**: `HEAD_COMMIT_PLACEHOLDER`
+- **Tested Head Commit**: `7a4eaa8be890c8a900cbf6fa082c189e18e0d0a7` (the only later commit is this file)
 - **Tested Branch**: `ai/396`
 - **Originating Sentry Issue**: None (originates from CodeRabbit review discussion on PR #357 regarding work order completion quantity null/undefined checks).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v26.10.0, pnpm 8.15.4, Python 3.14.8.
@@ -27,13 +27,17 @@ On `master` prior to this fix:
 1. `useCompleteWorkOrder` mutationFn accepted only `{ id, producedQuantity }` and called `workOrderApi.complete(id, producedQuantity)`.
 2. When callers passed `{ id, quantityProduced }` (the canonical API property) or explicitly passed `null`, the value was not checked for `null` or `undefined`, leading to silent defaulting or sending `{ producedQuantity: undefined }` to the API.
 3. In `apps/web/lib/hooks/use-manufacturing.ts`:
-   - `workOrderApi.complete` sent `{ producedQuantity }` rather than the backend controller's expected `{ quantityProduced }`.
+   - `workOrderApi.complete` sent `{ producedQuantity }`.
+   - In backend controller [`apps/api/src/modules/manufacturing/controllers/work-orders.controller.ts:110-116`](file:///Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-396/apps/api/src/modules/manufacturing/controllers/work-orders.controller.ts#L110-L116) the route `@Post(':id/complete')` expects `@Body() dto: { quantityProduced: number; notes?: string }`, and [`apps/api/src/modules/manufacturing/services/work-orders.service.ts:223-233`](file:///Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-396/apps/api/src/modules/manufacturing/services/work-orders.service.ts#L223-L233) accesses `dto.quantityProduced`.
    - `useCompleteWorkOrder` lacked validation for `null`, `undefined`, or `NaN`.
-4. This PR completely resolves the finding by:
+4. In PR #399 Round 1 review findings:
+   - **Wire contract finding** (`apps/web/lib/hooks/use-manufacturing.ts:150`): Changing the wire payload key exclusively from `producedQuantity` to `quantityProduced` raised concern about contract drift. We verified the backend endpoint and resolved this cleanly: `workOrderApi.complete` now includes BOTH `producedQuantity` and `quantityProduced` in the POST body (`{ producedQuantity: quantity, quantityProduced: quantity }`), ensuring total backward compatibility and guaranteeing the backend controller and service receive the expected field without breaking any existing consumer.
+   - **Evidence freshness finding** (`docs/evidence/396/EVIDENCE.md:8`): `HEAD_COMMIT_PLACEHOLDER` was replaced with the exact tested commit SHA (`7a4eaa8be890c8a900cbf6fa082c189e18e0d0a7`), ensuring freshness validation passes cleanly.
+5. This PR completely resolves the finding by:
    - Updating `useCompleteWorkOrder` to resolve `quantity = quantityProduced ?? producedQuantity`.
    - Explicitly validating that `quantity` is neither `undefined`, `null`, nor `Number.isNaN(quantity)`.
    - Allowing explicit boundary value `0` as a valid quantity.
-   - Aligning `workOrderApi.complete` to send `{ quantityProduced: quantity }`.
+   - Sending dual-key wire payload `{ producedQuantity: quantity, quantityProduced: quantity }` in `workOrderApi.complete`.
    - Adding a unit test suite (`apps/web/lib/hooks/use-manufacturing.spec.ts`) covering all 5 acceptance criteria (9 unit tests).
 
 ---
@@ -43,7 +47,7 @@ On `master` prior to this fix:
 - **AC1 (Reject Undefined)**: The `useCompleteWorkOrder` mutation function must reject completion and throw `new Error('A completion quantity is required')` without calling `api.post` when the completion quantity is omitted or explicitly `undefined`.
 - **AC2 (Reject Null)**: The `useCompleteWorkOrder` mutation function must reject completion and throw `new Error('A completion quantity is required')` without calling `api.post` when either `quantityProduced` or `producedQuantity` is explicitly `null`.
 - **AC3 (Reject NaN)**: The `useCompleteWorkOrder` mutation function must reject completion and throw `new Error('A completion quantity is required')` without calling `api.post` when the quantity is `NaN`.
-- **AC4 (Accept Canonical `quantityProduced` & Zero Boundary)**: The `useCompleteWorkOrder` mutation function must accept valid numeric quantities including explicit boundary value `0` via `quantityProduced`, calling `api.post('/manufacturing/work-orders/:id/complete', { quantityProduced })`.
+- **AC4 (Accept Canonical `quantityProduced` & Zero Boundary)**: The `useCompleteWorkOrder` mutation function must accept valid numeric quantities including explicit boundary value `0` via `quantityProduced`, calling `api.post('/manufacturing/work-orders/:id/complete', { producedQuantity, quantityProduced })`.
 - **AC5 (Backward Compatibility & Precedence)**: The `useCompleteWorkOrder` mutation function must support backward compatibility with `producedQuantity` (including boundary `0`), while prioritizing `quantityProduced` when both parameters are provided.
 
 ---
@@ -55,7 +59,7 @@ On `master` prior to this fix:
 | **AC1** | Reject omitted and undefined completion quantity              | `pnpm --filter web test apps/web/lib/hooks/use-manufacturing.spec.ts -t "AC1"` | 1 passed (`rejects completion when both quantityProduced and producedQuantity are absent/undefined`)                            | 0         | **PASSED** |
 | **AC2** | Reject explicitly null completion quantity                    | `pnpm --filter web test apps/web/lib/hooks/use-manufacturing.spec.ts -t "AC2"` | 2 passed (`rejects completion when quantity is explicitly null`, `rejects completion when producedQuantity is explicitly null`) | 0         | **PASSED** |
 | **AC3** | Reject NaN completion quantity                                | `pnpm --filter web test apps/web/lib/hooks/use-manufacturing.spec.ts -t "AC3"` | 1 passed (`rejects completion when quantity is NaN`)                                                                            | 0         | **PASSED** |
-| **AC4** | Support `quantityProduced` and boundary value `0`             | `pnpm --filter web test apps/web/lib/hooks/use-manufacturing.spec.ts -t "AC4"` | 2 passed (`calls api.post with quantityProduced`, `allows boundary zero quantity`)                                              | 0         | **PASSED** |
+| **AC4** | Support `quantityProduced` and boundary value `0`             | `pnpm --filter web test apps/web/lib/hooks/use-manufacturing.spec.ts -t "AC4"` | 2 passed (`calls api.post with both quantityProduced and producedQuantity`, `allows boundary zero quantity`)                    | 0         | **PASSED** |
 | **AC5** | Backward compatibility with `producedQuantity` and precedence | `pnpm --filter web test apps/web/lib/hooks/use-manufacturing.spec.ts -t "AC5"` | 3 passed (`resolves quantity from producedQuantity`, `allows boundary zero`, `prioritizes quantityProduced`)                    | 0         | **PASSED** |
 | —       | Full unit spec execution for `use-manufacturing`              | `pnpm --filter web test apps/web/lib/hooks/use-manufacturing.spec.ts`          | 9/9 unit tests PASS                                                                                                             | 0         | **PASSED** |
 | —       | TypeScript type-check across web workspace                    | `pnpm --filter web type-check`                                                 | Clean (0 errors across `tsc --noEmit`)                                                                                          | 0         | **PASSED** |
@@ -71,7 +75,7 @@ On `master` prior to this fix:
   - `AC2: rejects completion when quantity is explicitly null`
   - `AC2: rejects completion when producedQuantity is explicitly null`
   - `AC3: rejects completion when quantity is NaN`
-  - `AC4: calls api.post with quantityProduced when quantityProduced is provided`
+  - `AC4: calls api.post with both quantityProduced and producedQuantity when quantityProduced is provided`
   - `AC4: allows boundary zero quantity when explicitly provided via quantityProduced`
   - `AC5: resolves quantity from producedQuantity for backward compatibility`
   - `AC5: allows boundary zero quantity when explicitly provided via producedQuantity`
