@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # Mizano pre-commit: FAST (hard limit 60 s), staged files only (ESLint --fix + Prettier via
-# _lint_staged.js, the Windows-safe lint-staged replacement).
+# _lint_staged.js, the Windows-safe lint-staged replacement; preserves unstaged hunks).
 #
 # Full CI (lint, type-check, unit tests, build, E2E) runs on the Mac mini via
 # the hub's `localci` job, which posts the GitHub commit statuses.
