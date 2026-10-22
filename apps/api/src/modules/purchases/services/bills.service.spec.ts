@@ -178,6 +178,19 @@ describe('BillsService', () => {
       expect(prisma.bill.create).not.toHaveBeenCalled();
     });
 
+    it('should allow creating a draft bill without accountId on lines for intake/import draft lifecycle', async () => {
+      prisma.vendor.findFirst.mockResolvedValue(createMockVendor() as any);
+      prisma.bill.create.mockResolvedValue(createMockBill({ lines: [] }) as any);
+
+      const result = await service.create(ORG_ID, {
+        ...validDto,
+        lines: [{ description: 'Draft intake item', quantity: '2', rate: '100' }],
+      });
+
+      expect(result).toBeDefined();
+      expect(prisma.bill.create).toHaveBeenCalled();
+    });
+
     it('should auto-number the bill when no bill number is given', async () => {
       prisma.vendor.findFirst.mockResolvedValue(createMockVendor() as any);
       prisma.organization.update.mockResolvedValue({
@@ -372,6 +385,19 @@ describe('BillsService', () => {
       ).rejects.toThrow('Bill line accounts must be active expense or asset accounts');
       expect(prisma.bill.update).not.toHaveBeenCalled();
     });
+
+    it('should allow updating draft bill lines without accountId for draft lifecycle', async () => {
+      prisma.bill.findFirst.mockResolvedValue(createMockBill({ status: 'DRAFT' }) as any);
+      prisma.bill.updateMany.mockResolvedValue({ count: 1 });
+      prisma.bill.update.mockResolvedValue(createMockBill({ status: 'DRAFT' }) as any);
+
+      const result = await service.update(ORG_ID, 'bill-1', {
+        lines: [{ description: 'Draft item without account', quantity: '1', rate: '50' }],
+      });
+
+      expect(result).toBeDefined();
+      expect(prisma.bill.update).toHaveBeenCalled();
+    });
   });
 
   describe('approve (status transition DRAFT -> OPEN)', () => {
@@ -481,6 +507,28 @@ describe('BillsService', () => {
 
       await expect(service.approve(ORG_ID, 'bill-1')).rejects.toThrow(
         'All bill lines must have an active expense or asset account assigned before approval',
+      );
+      expect(journalsService.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject approval when a line is missing an accountId', async () => {
+      const bill = {
+        ...draftBill(),
+        lines: [
+          {
+            id: 'line-no-acc',
+            description: 'Line without account',
+            quantity: dec('1'),
+            rate: dec('100'),
+            amount: dec('100'),
+            accountId: null,
+          },
+        ],
+      };
+      prisma.bill.findFirst.mockResolvedValue(bill as any);
+
+      await expect(service.approve(ORG_ID, 'bill-1')).rejects.toThrow(
+        'All bill lines must have an expense account assigned before approval',
       );
       expect(journalsService.create).not.toHaveBeenCalled();
     });

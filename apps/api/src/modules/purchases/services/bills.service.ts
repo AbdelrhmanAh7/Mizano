@@ -326,6 +326,8 @@ export class BillsService {
         throw new BadRequestException('Only draft bills can be approved');
       }
       if (bill.lines.length === 0) throw new BadRequestException('Bill has no lines');
+      // Invariant: Before approval transitions DRAFT -> OPEN and commits ledger postings,
+      // all bill lines must have an assigned accountId of type EXPENSE or ASSET that is active.
       if (bill.lines.some((l) => !l.accountId)) {
         throw new BadRequestException(
           'All bill lines must have an expense account assigned before approval',
@@ -560,6 +562,9 @@ export class BillsService {
       if (!project) throw new BadRequestException('Project not found');
     }
     const lines = dto.lines ?? [];
+    // Draft bills may be created or updated without accountId on lines (intake scan and import draft lifecycle).
+    // When any accountId is specified, it must belong to this organization, be active, and be of type EXPENSE or ASSET.
+    // Completeness of account assignment across all lines is strictly enforced at approval time.
     const accountIds = [...new Set(lines.map((l) => l.accountId).filter(Boolean))] as string[];
     if (accountIds.length) {
       const accounts = await db.account.findMany({

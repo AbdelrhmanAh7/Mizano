@@ -257,4 +257,56 @@ describe('BillForm scan review totals', () => {
       );
     });
   });
+
+  it('allows submission when draft lines do not specify an accountId (draft intake lifecycle)', async () => {
+    const onSubmit = jest.fn();
+    const accounts = [{ id: 'acc-exp', code: '5000', name: 'Operating Expense', type: 'EXPENSE' }];
+    const draftWithoutAccount = {
+      id: 'b1',
+      billNumber: 'B-001',
+      vendorId: 'v1',
+      date: '2026-09-01T00:00:00.000Z',
+      dueDate: '2026-10-01T00:00:00.000Z',
+      reference: 'INV-1',
+      currencyCode: 'USD',
+      notes: '',
+      projectId: '',
+      lines: [
+        {
+          id: 'l1',
+          billId: 'b1',
+          itemId: null,
+          accountId: null,
+          description: 'Office supplies without account',
+          quantity: 1,
+          rate: 100,
+          taxRate: 0,
+          amount: 100,
+        },
+      ],
+    } as unknown as React.ComponentProps<typeof BillForm>['bill'];
+
+    render(
+      <BillForm
+        defaultVendorId="v1"
+        bill={draftWithoutAccount}
+        accounts={accounts}
+        onSubmit={onSubmit}
+        onCancel={jest.fn()}
+      />,
+    );
+
+    const submitBtn = screen.getByRole('button', { name: /update bill|create bill/i });
+    const form = submitBtn.closest('form')!;
+    fireEvent.submit(form);
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          vendorId: 'v1',
+          lines: [expect.objectContaining({ accountId: null })],
+        }),
+      );
+    });
+  });
 });
