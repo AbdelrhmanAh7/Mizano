@@ -365,7 +365,7 @@ export function useCompleteWorkOrder() {
       // Prioritizes canonical quantityProduced when both are provided, falling back to producedQuantity.
       // Explicit 0 is a valid quantity; missing/null/undefined throws to prevent silent defaulting to zero.
       const quantity = quantityProduced ?? producedQuantity;
-      if (quantity === undefined || quantity === null) {
+      if (quantity === undefined || quantity === null || Number.isNaN(quantity)) {
         throw new Error('A completion quantity is required');
       }
       return workOrderApi.complete(id, quantity);

@@ -62,6 +62,18 @@ describe('useCompleteWorkOrder (@issue-355)', () => {
     expect(mockApiPost).not.toHaveBeenCalled();
   });
 
+  it('AC1: rejects completion when quantity is NaN', async () => {
+    const { result } = renderHook(() => useCompleteWorkOrder(), { wrapper: createWrapper() });
+
+    await expect(
+      act(async () => {
+        await result.current.mutateAsync({ id: 'wo-123', quantityProduced: Number.NaN });
+      }),
+    ).rejects.toThrow('A completion quantity is required');
+
+    expect(mockApiPost).not.toHaveBeenCalled();
+  });
+
   it('AC2: calls api.post with quantityProduced when quantityProduced is provided', async () => {
     const { result } = renderHook(() => useCompleteWorkOrder(), { wrapper: createWrapper() });
 
