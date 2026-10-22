@@ -91,6 +91,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Keep error, loading and empty distinct.** Never collapse a failed query into `[]` ("no accounts"). Show an error with Retry, and block submit while a required lookup is loading or failed.
 - **Show the currency of the document**, falling back to the org base currency, never the counterparty's default. The API must actually return the fields the UI relies on (for example `baseCurrency`).
 - **Payment-wide effects get payment-wide warnings.** Voiding a payment affects every allocated bill.
+- **Clear optional fields with null on edit payloads.** When editing existing entities (e.g. `CustomerForm` on `/sales/customers/:id/edit`), transform cleared or empty optional strings and nested address fields into `null` rather than omitting them as `undefined`, so PATCH updates persist deletions in the database rather than retaining stale values. Ensure nested structures match API DTOs and omit unwhitelisted properties (e.g. `notes`). _(#301)_
 
 ## 12. Caches, tests and scope
 
