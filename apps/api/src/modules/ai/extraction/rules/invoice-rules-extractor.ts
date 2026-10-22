@@ -1,7 +1,12 @@
 import Decimal from 'decimal.js';
 import { findAmounts, AmountMatch } from './rules-amounts';
 import { parseDate } from './rules-dates';
-import { foldForMatch, normalizeDigits, splitLines } from './rules-normalize';
+import {
+  foldForMatch,
+  mapSpanToOriginal,
+  normalizeWithOffsets,
+  splitLines,
+} from './rules-normalize';
 
 export interface Evidence {
   /** The source line (trimmed, capped). Document content: never log it. */
@@ -14,7 +19,12 @@ export interface RuleField<T> {
   /** 0..1. Never invented: derived from how the value was found and cross-checks. */
   confidence: number;
   evidence: Evidence;
+  /** `[start, end)` character offsets of the value in the source document passed to `extractInvoiceFields`. */
+  start?: number;
+  end?: number;
 }
+
+type SpanFn = (lineIndex: number, index: number, end: number) => { start: number; end: number };
 
 export type TaxIdCountry = 'EG' | 'SA' | 'AE';
 export type CurrencyCode = 'EGP' | 'SAR' | 'AED';
@@ -184,6 +194,7 @@ function extractDates(
   lines: string[],
   folded: string[],
   scaleFactor: number,
+  span: SpanFn,
 ): {
   date: RuleField<string> | null;
   dueDate: RuleField<string> | null;
@@ -196,12 +207,15 @@ function extractDates(
     const d = parseDate(lines[i]);
     if (!d) return null;
     if (d.ambiguous) ambiguousLines.add(i);
+    const { start, end } = span(i, d.start, d.end);
     return {
       value: d.iso,
       confidence: d.ambiguous
         ? Math.min(AMBIGUOUS_DATE_CAP, base * scaleFactor)
         : base * scaleFactor,
       evidence: evidence(lines, i),
+      start,
+      end,
     };
   };
   for (let i = 0; i < lines.length && !(date && dueDate); i++) {
@@ -425,13 +439,38 @@ function checkConsistency(
  * @param textConfidence 0..1 confidence of the text source (OCR); defaults to 1
  */
 export function extractInvoiceFields(rawText: string, textConfidence = 1): RulesExtraction {
-  const lines = splitLines(normalizeDigits(rawText));
+  const { normalized, toOriginal } = normalizeWithOffsets(rawText);
+  const lines = splitLines(normalized);
+  const lineStarts: number[] = [];
+  let at = 0;
+  for (let i = 0; i < lines.length; i++) {
+    lineStarts.push(at);
+    at += lines[i].length;
+    if (at < normalized.length) {
+      if (normalized.startsWith('\r\n', at)) {
+        at += 2;
+      } else if (normalized[at] === '\n' || normalized[at] === '\r') {
+        at += 1;
+      }
+    }
+  }
+  const span: SpanFn = (
+    lineIndex: number,
+    index: number,
+    end: number,
+  ): { start: number; end: number } =>
+    mapSpanToOriginal(
+      lineStarts[lineIndex] + index,
+      lineStarts[lineIndex] + end,
+      toOriginal,
+      rawText.length,
+    );
   const folded = lines.map(foldForMatch);
   const factor = scale(textConfidence);
   const warnings: string[] = [];
 
   const amounts = findLabeledAmounts(lines, folded, factor);
-  const { date, dueDate, dateAmbiguous } = extractDates(lines, folded, factor);
+  const { date, dueDate, dateAmbiguous } = extractDates(lines, folded, factor, span);
   if (dateAmbiguous) warnings.push('DATE_AMBIGUOUS');
   const result: RulesExtraction = {
     invoiceNumber: extractInvoiceNumber(lines, folded, factor),
