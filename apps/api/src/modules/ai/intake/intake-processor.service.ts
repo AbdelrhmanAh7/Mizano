@@ -167,6 +167,12 @@ export class IntakeProcessorService implements OnModuleInit {
         },
       });
       if (written.count === 0) throw new LeaseLostError();
+      // Diagnostics: store worker's require.cache state (OCR/PDF modules) for health checks.
+      void this.queue.storeWorkerModuleCache(
+        Object.keys(require.cache).filter(
+          (k) => k.includes('tesseract.js') || k.includes('pdf-parse'),
+        ),
+      );
       this.logger.log(`Intake job ${jobId} finished: status=${status} attempts=${job.attempts}`);
     } catch (error) {
       if (error instanceof LeaseLostError) {

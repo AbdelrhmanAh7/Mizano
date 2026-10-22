@@ -3,6 +3,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
+import { IntakeQueueService } from '../modules/ai/intake/intake-queue.service';
 
 interface HealthCheckResponse {
   status: 'healthy' | 'unhealthy';
@@ -27,6 +28,7 @@ export class HealthController {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
+    @Optional() private readonly intakeQueue?: IntakeQueueService,
   ) {}
 
   @Get()
@@ -112,6 +114,38 @@ export class HealthController {
       tesseractLoaded: keys.some((k) => k.includes('tesseract.js')),
       pdfParseLoaded: keys.some((k) => k.includes('pdf-parse')),
       ocrModules,
+    };
+  }
+
+  @Get('worker-modules')
+  async checkWorkerModules(): Promise<{
+    status: 'healthy' | 'unavailable';
+    tesseractLoaded: boolean;
+    pdfParseLoaded: boolean;
+    ocrModules: string[];
+  }> {
+    if (!this.intakeQueue) {
+      return {
+        status: 'unavailable',
+        tesseractLoaded: false,
+        pdfParseLoaded: false,
+        ocrModules: [],
+      };
+    }
+    const modules = await this.intakeQueue.getWorkerModuleCache();
+    if (!modules) {
+      return {
+        status: 'healthy',
+        tesseractLoaded: false,
+        pdfParseLoaded: false,
+        ocrModules: [],
+      };
+    }
+    return {
+      status: 'healthy',
+      tesseractLoaded: modules.some((k) => k.includes('tesseract.js')),
+      pdfParseLoaded: modules.some((k) => k.includes('pdf-parse')),
+      ocrModules: modules,
     };
   }
 }
