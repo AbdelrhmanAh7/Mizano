@@ -6,6 +6,7 @@ import { FraudDetectionService } from '../services/fraud-detection.service';
 import { ComplianceMonitoringService } from '../services/compliance-monitoring.service';
 import { AuditRiskService } from '../services/audit-risk.service';
 import { describeError } from '../../../common/utils/redact';
+import { aiSchedulersEnabled } from './ai-schedulers.enabled';
 
 const BATCH_SIZE = 5;
 
@@ -21,10 +22,13 @@ export class AiSecurityScheduler {
     private auditRiskService: AuditRiskService,
     private config: ConfigService,
   ) {
-    this.enabled = config.get('AI_SCHEDULERS_ENABLED') === 'true';
+    this.enabled = config?.get('AI_SCHEDULERS_ENABLED') === 'true' || aiSchedulersEnabled();
     if (!this.enabled) {
       this.logger.log(
         'AI_SCHEDULERS_ENABLED is not set to true; AI Security schedulers are disabled',
+      );
+      throw new Error(
+        'AiSecurityScheduler cannot be instantiated when AI_SCHEDULERS_ENABLED is not true',
       );
     }
   }

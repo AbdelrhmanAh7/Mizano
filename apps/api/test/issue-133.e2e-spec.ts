@@ -30,6 +30,7 @@ import { AiHrOpsScheduler } from '../src/modules/ai/schedulers/ai-hr-ops.schedul
 import { AiNlpChatScheduler } from '../src/modules/ai/schedulers/ai-nlp-chat.scheduler';
 import { AiSalesCrmScheduler } from '../src/modules/ai/schedulers/ai-sales-crm.scheduler';
 import { AiSecurityScheduler } from '../src/modules/ai/schedulers/ai-security.scheduler';
+import { IntakeProcessorService } from '../src/modules/ai/intake/intake-processor.service';
 import { createTestApp } from './helpers/app.helper';
 
 // The five AI scheduler classes gated behind AI_SCHEDULERS_ENABLED (issue #133).
@@ -190,6 +191,11 @@ describe('@issue-133 scheduler gating: no AI cron jobs with AI_SCHEDULERS_ENABLE
     for (const schedulerClass of AI_SCHEDULER_CLASSES) {
       expect(providerClasses).not.toContain(schedulerClass);
     }
+  });
+
+  it('does not register IntakeProcessorService in the API application (worker isolation)', () => {
+    // Proves IntakeProcessorService is decoupled from the API module graph
+    expect(() => app.get(IntakeProcessorService, { strict: false })).toThrow();
   });
 });
 

@@ -54,6 +54,8 @@ import { ReconciliationAiController } from '../controllers/reconciliation-ai.con
     DocumentIntakeService,
     IntakeJobsService,
     IntakeJobOwnerGuard,
+    // Enqueue-only queue client: IntakeProcessorService (the BullMQ worker) is
+    // deliberately excluded from AiOperationsModule and runs only in IntakeWorkerModule (#141).
     IntakeQueueService,
     { provide: IntakeStorage, useClass: LocalFsIntakeStorage },
     { provide: INTAKE_CLOCK, useValue: monotonicClock },

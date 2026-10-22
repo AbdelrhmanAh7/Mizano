@@ -8,6 +8,7 @@ import { QualityPredictionService } from '../services/quality-prediction.service
 import { PredictiveMaintenanceService } from '../services/predictive-maintenance.service';
 import { ResourceOptimizationService } from '../services/resource-optimization.service';
 import { describeError } from '../../../common/utils/redact';
+import { aiSchedulersEnabled } from './ai-schedulers.enabled';
 
 const BATCH_SIZE = 5;
 
@@ -25,10 +26,13 @@ export class AiHrOpsScheduler {
     private resourceService: ResourceOptimizationService,
     private config: ConfigService,
   ) {
-    this.enabled = config.get('AI_SCHEDULERS_ENABLED') === 'true';
+    this.enabled = config?.get('AI_SCHEDULERS_ENABLED') === 'true' || aiSchedulersEnabled();
     if (!this.enabled) {
       this.logger.log(
         'AI_SCHEDULERS_ENABLED is not set to true; AI HR/Ops schedulers are disabled',
+      );
+      throw new Error(
+        'AiHrOpsScheduler cannot be instantiated when AI_SCHEDULERS_ENABLED is not true',
       );
     }
   }

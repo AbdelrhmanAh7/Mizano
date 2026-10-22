@@ -8,6 +8,7 @@ import { CrossSellService } from '../services/cross-sell.service';
 import { DynamicPricingService } from '../services/dynamic-pricing.service';
 import { PipelineForecastService } from '../services/pipeline-forecast.service';
 import { describeError } from '../../../common/utils/redact';
+import { aiSchedulersEnabled } from './ai-schedulers.enabled';
 
 const BATCH_SIZE = 5;
 
@@ -25,10 +26,13 @@ export class AiSalesCrmScheduler {
     private pipelineService: PipelineForecastService,
     private config: ConfigService,
   ) {
-    this.enabled = config.get('AI_SCHEDULERS_ENABLED') === 'true';
+    this.enabled = config?.get('AI_SCHEDULERS_ENABLED') === 'true' || aiSchedulersEnabled();
     if (!this.enabled) {
       this.logger.log(
         'AI_SCHEDULERS_ENABLED is not set to true; AI Sales/CRM schedulers are disabled',
+      );
+      throw new Error(
+        'AiSalesCrmScheduler cannot be instantiated when AI_SCHEDULERS_ENABLED is not true',
       );
     }
   }

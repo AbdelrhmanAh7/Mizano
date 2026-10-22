@@ -5,6 +5,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { DocumentClassificationService } from '../services/document-classification.service';
 import { KnowledgeAssistantService } from '../services/knowledge-assistant.service';
 import { describeError } from '../../../common/utils/redact';
+import { aiSchedulersEnabled } from './ai-schedulers.enabled';
 
 const BATCH_SIZE = 5;
 
@@ -19,10 +20,13 @@ export class AiNlpChatScheduler {
     private knowledgeService: KnowledgeAssistantService,
     private config: ConfigService,
   ) {
-    this.enabled = config.get('AI_SCHEDULERS_ENABLED') === 'true';
+    this.enabled = config?.get('AI_SCHEDULERS_ENABLED') === 'true' || aiSchedulersEnabled();
     if (!this.enabled) {
       this.logger.log(
         'AI_SCHEDULERS_ENABLED is not set to true; AI NLP/Chat schedulers are disabled',
+      );
+      throw new Error(
+        'AiNlpChatScheduler cannot be instantiated when AI_SCHEDULERS_ENABLED is not true',
       );
     }
   }

@@ -12,6 +12,7 @@ import { LeadScoringService } from '../services/lead-scoring.service';
 import { PatternDetectionService } from '../services/pattern-detection.service';
 import { AiAlertsService } from '../services/ai-alerts.service';
 import { describeError } from '../../../common/utils/redact';
+import { aiSchedulersEnabled } from './ai-schedulers.enabled';
 
 const BATCH_SIZE = 5;
 
@@ -33,10 +34,13 @@ export class AiOperationsScheduler {
     private aiAlertsService: AiAlertsService,
     private config: ConfigService,
   ) {
-    this.enabled = config.get('AI_SCHEDULERS_ENABLED') === 'true';
+    this.enabled = config?.get('AI_SCHEDULERS_ENABLED') === 'true' || aiSchedulersEnabled();
     if (!this.enabled) {
       this.logger.log(
         'AI_SCHEDULERS_ENABLED is not set to true; AI Operations schedulers are disabled',
+      );
+      throw new Error(
+        'AiOperationsScheduler cannot be instantiated when AI_SCHEDULERS_ENABLED is not true',
       );
     }
   }
