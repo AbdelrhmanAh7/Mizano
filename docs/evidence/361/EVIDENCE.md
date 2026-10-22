@@ -6,7 +6,7 @@ This document provides verification evidence for GitHub issue #361 in `Abdelrhma
 - **PR**: Supersedes part of #341
 - **Parent Issue**: #333
 - **Base Commit (`origin/master`)**: `e5d9b805563c04df3300f00442fd18f7d82ce560`
-- **Tested Head Commit**: `52ca506b841e39d5f0e887f9706d288378137ded`
+- **Tested Head Commit**: `145d303c5e478191ba0034f104ef7194c0c19a81`
 - **Tested Branch**: `ai/361`
 - **Originating Sentry Issue**: None (originates from review finding `a462d42e4cf1` on PR #341, discussion `r4334423672`, and parent issue #333).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20+, pnpm 8.14.0, Next.js 14, Python 3.14.
@@ -46,18 +46,20 @@ In the PR review debate (`pr-AbdelrhmanAh7/Mizano-363`), the judge review reques
    - Implemented UI form submission using testing-library `screen` API (`screen.getByRole`, `screen.getByLabel`).
    - Retained direct credentials callback as a separate `lvl:api` test for deterministic authentication setup.
    - Added explicit Arabic RTL verification test confirming `document.documentElement.dir === 'rtl'` on `/ar/login`.
-   - Asserted that the signed-in UI receives and renders session user data (`screen.getByText(/Welcome back/i)`).
+   - Asserted that the signed-in UI receives and renders session user data (`screen.getByText(/Welcome back, Admin/i)`).
    - Removed retry loops to ensure deterministic execution and prevent misbehavior across navigation.
 
 4. **Evidence Document Head Binding:**
-   - Strictly binds the Tested Head Commit to `52ca506b841e39d5f0e887f9706d288378137ded`.
+   - Strictly binds the Tested Head Commit to `145d303c5e478191ba0034f104ef7194c0c19a81`.
 
-5. **Resolution of Review Thread on SHA Consistency (`thoth-claude-reviewer`):**
-   - The branch satisfies the review thread:
+5. **Resolution of Review Thread on SHA Consistency & CodeRabbit Findings:**
+   - The branch satisfies all review threads:
      - Base Commit is aligned to `origin/master` (`e5d9b805563c04df3300f00442fd18f7d82ce560`).
      - Red run regression output is recorded against base `e5d9b805563c04df3300f00442fd18f7d82ce560` (exit code 1).
-     - Green run regression output is recorded against tested code head `52ca506b841e39d5f0e887f9706d288378137ded` (exit code 0).
-     - Tested Head Commit is bound to `52ca506b841e39d5f0e887f9706d288378137ded`.
+     - Green run regression output is recorded against tested code head `145d303c5e478191ba0034f104ef7194c0c19a81` (exit code 0).
+     - Tested Head Commit is bound to `145d303c5e478191ba0034f104ef7194c0c19a81`.
+     - CodeRabbit review thread on `e2e-army/361-session-shape.e2e.ts:23`: Assert that the signed-in UI receives and renders the session user data (`screen.getByText(/Welcome back, Admin/i)` / `'Welcome back, Admin'`).
+     - CodeRabbit review thread on `docs/evidence/361/EVIDENCE.md:9`: Update tested head to `145d303c5e478191ba0034f104ef7194c0c19a81` and re-verify all checks cleanly.
      - All SHA references across headers, regression proofs, and verification matrices strictly agree.
 
 ## Acceptance Criteria
@@ -66,7 +68,7 @@ In the PR review debate (`pr-AbdelrhmanAh7/Mizano-363`), the judge review reques
 - **AC2 (Refresh token omission):** NextAuth GET `/api/auth/session` strictly omits `refreshToken` from the session object, `session.user`, and serialized JSON payload. The refresh token stays securely in the encrypted HTTP-only JWT cookie.
 - **AC3 (Error session coverage):** When `token.error` is present (e.g. `RefreshAccessTokenError`), the returned session includes `error: 'RefreshAccessTokenError'` alongside complete user fields and `accessToken`, while strictly omitting `refreshToken`.
 - **AC4 (Signed-out session coverage):** When unauthenticated, GET `/api/auth/session` returns HTTP 200 with an empty object `{}`.
-- **AC5 (E2E session coverage via screen API & RTL):** `e2e-army/361-session-shape.e2e.ts` tests session shape and refresh token omission from both UI (`lvl:ui`) and API (`lvl:api`) perspectives under tag `feat:mz-auth`. The UI test exercises login form submission through the testing-library `screen` API, asserts that the signed-in UI renders the session user data via `screen.getByText(/Welcome back/i)`, and verifies that the signed-in UI receives the sanitized session. An additional UI test asserts Arabic RTL direction (`dir="rtl"`) on `/ar/login`. The direct credentials request is retained as a separate API check.
+- **AC5 (E2E session coverage via screen API & RTL):** `e2e-army/361-session-shape.e2e.ts` tests session shape and refresh token omission from both UI (`lvl:ui`) and API (`lvl:api`) perspectives under tag `feat:mz-auth`. The UI test exercises login form submission through the testing-library `screen` API, asserts that the signed-in UI renders the session user data via `screen.getByText(/Welcome back, Admin/i)`, and verifies that the signed-in UI receives the sanitized session. An additional UI test asserts Arabic RTL direction (`dir="rtl"`) on `/ar/login`. The direct credentials request is retained as a separate API check.
 
 ## Red-to-Green Regression Proof
 
@@ -105,7 +107,7 @@ Snapshots:   0 total
 Time:        0.391 s
 ```
 
-### 2. Passing on Head (`52ca506b841e39d5f0e887f9706d288378137ded`)
+### 2. Passing on Head (`145d303c5e478191ba0034f104ef7194c0c19a81`)
 
 With `session.refreshToken` removed from `apps/web/lib/auth.ts`, all unit and integration tests pass cleanly with exit code 0:
 
@@ -140,7 +142,7 @@ Time:        0.278 s, estimated 1 s
 ## UI Verification (Screenshots / RTL & LTR)
 
 - **UI Flow Coverage**: Tested via `e2e-army/361-session-shape.e2e.ts` under tag `feat:mz-auth`. Per repo rules, Playwright E2E gate is retired and replaced by `e2e-army` (tester-army/e2e), which gates PR merges.
-- **LTR Route**: Exercises login form submission at `/en/login` via testing-library `screen` API (`screen.getByLabel('Email')`, `screen.getByLabel('Password')`, `screen.getByRole('button', 'Sign In')`), verifies redirect to authenticated dashboard/onboarding, and asserts that the signed-in header renders the session user data via `screen.getByText(/Welcome back/i)`.
+- **LTR Route**: Exercises login form submission at `/en/login` via testing-library `screen` API (`screen.getByLabel('Email')`, `screen.getByLabel('Password')`, `screen.getByRole('button', 'Sign In')`), verifies redirect to authenticated dashboard/onboarding, and asserts that the signed-in header renders the session user data via `screen.getByText(/Welcome back, Admin/i)`.
 - **RTL Route**: Exercises Arabic localized route `/ar/login` and evaluates `document.documentElement.dir === 'rtl'`, ensuring the Arabic interface renders with right-to-left layout direction.
 - **Screenshots**: Managed through the automated `e2e-army` runner artifact capture during gate execution.
 
