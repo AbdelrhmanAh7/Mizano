@@ -1,6 +1,15 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { PayrollStatus } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { dec } from '../../../test/helpers/decimal.helpers';
+import {
+  expectBalanced,
+  realJournalsService,
+  writtenJournals,
+} from '../../../test/helpers/ledger.helpers';
+import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
+import { JournalsService } from '../../accounting/services/journals.service';
 import { PayrollService } from './payroll.service';
 
 describe('PayrollService (payslips cross-tenant scoping)', () => {
@@ -33,7 +42,11 @@ describe('PayrollService (payslips cross-tenant scoping)', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [PayrollService, { provide: PrismaService, useValue: mockPrisma }],
+      providers: [
+        PayrollService,
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: JournalsService, useValue: {} },
+      ],
     }).compile();
 
     service = module.get<PayrollService>(PayrollService);
@@ -144,5 +157,72 @@ describe('PayrollService (payslips cross-tenant scoping)', () => {
       });
       expect(result).toEqual(mockPayslip);
     });
+  });
+});
+
+describe('PayrollService postings (#130)', () => {
+  const ORG = 'org-1';
+  const run = {
+    id: 'run-1',
+    month: 8,
+    year: 2026,
+    status: PayrollStatus.PROCESSED,
+    totalGross: dec('787.88'),
+    totalNet: dec('569.45'),
+    totalDeductions: dec('218.43'),
+    organizationId: ORG,
+  };
+  let prisma: MockPrismaClient;
+
+  function serviceWithLock(lockDate: Date | null = null): PayrollService {
+    return new PayrollService(
+      prisma as unknown as PrismaService,
+      realJournalsService(prisma, lockDate),
+    );
+  }
+
+  beforeEach(() => {
+    prisma = createMockPrisma();
+    prisma.payrollRun.findFirst.mockResolvedValue(run as never);
+    prisma.payrollRun.updateMany.mockResolvedValue({ count: 1 });
+    prisma.account.findFirst.mockImplementation((({ where }: { where: { type: string } }) =>
+      Promise.resolve({ id: `acc-${where.type}` })) as never);
+  });
+
+  it('posts one balanced PAYROLL journal dated on the period end', async () => {
+    await serviceWithLock().markAsPaid(ORG, run.id);
+
+    const [journal, ...rest] = writtenJournals(prisma);
+    expect(rest).toHaveLength(0);
+    expectBalanced(journal.lines);
+    expect(journal.sourceType).toBe('PAYROLL');
+    expect(journal.sourceId).toBe(run.id);
+    expect(journal.date.toISOString()).toBe('2026-08-31T00:00:00.000Z');
+    expect(prisma.payrollRun.update).toHaveBeenCalledWith({
+      where: { id: run.id },
+      data: { journalId: 'journal-new' },
+    });
+  });
+
+  it('rejects the posting when the lock date covers the payroll period', async () => {
+    const service = serviceWithLock(new Date('2026-08-31T00:00:00.000Z'));
+
+    await expect(service.markAsPaid(ORG, run.id)).rejects.toThrow(/locked/);
+    expect(prisma.journal.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a concurrent second payment without posting', async () => {
+    prisma.payrollRun.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(serviceWithLock().markAsPaid(ORG, run.id)).rejects.toThrow(ConflictException);
+    expect(prisma.journal.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses to post deductions without a payroll liability account', async () => {
+    prisma.account.findFirst.mockImplementation((({ where }: { where: { type: string } }) =>
+      Promise.resolve(where.type === 'LIABILITY' ? null : { id: `acc-${where.type}` })) as never);
+
+    await expect(serviceWithLock().markAsPaid(ORG, run.id)).rejects.toThrow(BadRequestException);
+    expect(prisma.journal.create).not.toHaveBeenCalled();
   });
 });

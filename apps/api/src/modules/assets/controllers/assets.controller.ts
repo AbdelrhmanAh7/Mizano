@@ -10,13 +10,14 @@ import {
   Put,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
-import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { CurrentOrg, InvalidatesLedger, Permissions } from '../../../common/decorators';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 import {
   AssetDetailResponse,
   AssetListResponse,
@@ -36,6 +37,7 @@ import { DepreciationService } from '../services/depreciation.service';
 @ApiBearerAuth()
 @Controller('assets')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseInterceptors(CacheInvalidationInterceptor)
 export class AssetsController {
   constructor(
     private readonly assetsService: AssetsService,
@@ -113,6 +115,7 @@ export class AssetsController {
 
   @Post(':id/dispose')
   @Permissions('assets.delete')
+  @InvalidatesLedger('assets:*')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Dispose an asset (sell or write off)' })
   @ApiParam({ name: 'id', description: 'Asset ID' })
@@ -141,6 +144,7 @@ export class AssetsController {
 
   @Post(':id/depreciate')
   @Permissions('assets.update')
+  @InvalidatesLedger('assets:*')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Run depreciation for a specific asset' })
   @ApiParam({ name: 'id', description: 'Asset ID' })
@@ -155,6 +159,7 @@ export class AssetsController {
 
   @Post('depreciation/run')
   @Permissions('assets.update')
+  @InvalidatesLedger('assets:*')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Run monthly depreciation for all assets' })
   @ApiResponse({ status: 200, type: DepreciationRunResponse })
@@ -166,6 +171,7 @@ export class AssetsController {
 
   @Post('schedule/:scheduleId/reverse')
   @Permissions('assets.update')
+  @InvalidatesLedger('assets:*')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Reverse a depreciation entry' })
   @ApiParam({ name: 'scheduleId', description: 'Schedule ID' })
