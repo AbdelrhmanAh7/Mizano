@@ -158,15 +158,18 @@ export interface VatReturnDraft {
   currency: string;
   from?: string;
   to?: string;
-  periodStart: string;
-  periodEnd: string;
+  periodStart?: string;
+  periodEnd?: string;
   status: 'complete' | 'incomplete';
   outputVat: string;
   inputVat: string;
   netVat: string;
-  totalSales: string;
-  totalPurchases: string;
-  mismatches: VatReturnDraftMismatch[];
+  outputTax?: string;
+  inputTax?: string;
+  netPayable?: string;
+  totalSales?: string;
+  totalPurchases?: string;
+  mismatches?: VatReturnDraftMismatch[];
   exceptions: VatReturnDraftException[];
   etaMismatches: VatReturnDraftEtaMismatch[];
 }
