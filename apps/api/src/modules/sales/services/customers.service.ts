@@ -18,19 +18,20 @@ export class CustomersService {
   ) {}
 
   async create(organizationId: string, createCustomerDto: CreateCustomerDto) {
+    const { billingAddress, shippingAddress, ...rest } = createCustomerDto;
     const customer = await this.prisma.customer.create({
       data: {
-        ...createCustomerDto,
-        billingStreet: createCustomerDto.billingAddress?.street,
-        billingCity: createCustomerDto.billingAddress?.city,
-        billingState: createCustomerDto.billingAddress?.state,
-        billingPostalCode: createCustomerDto.billingAddress?.postalCode,
-        billingCountry: createCustomerDto.billingAddress?.country,
-        shippingStreet: createCustomerDto.shippingAddress?.street,
-        shippingCity: createCustomerDto.shippingAddress?.city,
-        shippingState: createCustomerDto.shippingAddress?.state,
-        shippingPostalCode: createCustomerDto.shippingAddress?.postalCode,
-        shippingCountry: createCustomerDto.shippingAddress?.country,
+        ...rest,
+        billingStreet: billingAddress?.street ?? null,
+        billingCity: billingAddress?.city ?? null,
+        billingState: billingAddress?.state ?? null,
+        billingPostalCode: billingAddress?.postalCode ?? null,
+        billingCountry: billingAddress?.country ?? null,
+        shippingStreet: shippingAddress?.street ?? null,
+        shippingCity: shippingAddress?.city ?? null,
+        shippingState: shippingAddress?.state ?? null,
+        shippingPostalCode: shippingAddress?.postalCode ?? null,
+        shippingCountry: shippingAddress?.country ?? null,
         organizationId,
       },
     });
@@ -161,20 +162,26 @@ export class CustomersService {
       throw new NotFoundException('Customer not found');
     }
 
+    const { billingAddress, shippingAddress, ...rest } = updateCustomerDto;
+
     const updatedCustomer = await this.prisma.customer.update({
       where: { id },
       data: {
-        ...updateCustomerDto,
-        billingStreet: updateCustomerDto.billingAddress?.street,
-        billingCity: updateCustomerDto.billingAddress?.city,
-        billingState: updateCustomerDto.billingAddress?.state,
-        billingPostalCode: updateCustomerDto.billingAddress?.postalCode,
-        billingCountry: updateCustomerDto.billingAddress?.country,
-        shippingStreet: updateCustomerDto.shippingAddress?.street,
-        shippingCity: updateCustomerDto.shippingAddress?.city,
-        shippingState: updateCustomerDto.shippingAddress?.state,
-        shippingPostalCode: updateCustomerDto.shippingAddress?.postalCode,
-        shippingCountry: updateCustomerDto.shippingAddress?.country,
+        ...rest,
+        ...(billingAddress !== undefined && {
+          billingStreet: billingAddress ? (billingAddress.street ?? null) : null,
+          billingCity: billingAddress ? (billingAddress.city ?? null) : null,
+          billingState: billingAddress ? (billingAddress.state ?? null) : null,
+          billingPostalCode: billingAddress ? (billingAddress.postalCode ?? null) : null,
+          billingCountry: billingAddress ? (billingAddress.country ?? null) : null,
+        }),
+        ...(shippingAddress !== undefined && {
+          shippingStreet: shippingAddress ? (shippingAddress.street ?? null) : null,
+          shippingCity: shippingAddress ? (shippingAddress.city ?? null) : null,
+          shippingState: shippingAddress ? (shippingAddress.state ?? null) : null,
+          shippingPostalCode: shippingAddress ? (shippingAddress.postalCode ?? null) : null,
+          shippingCountry: shippingAddress ? (shippingAddress.country ?? null) : null,
+        }),
       },
     });
 
