@@ -104,7 +104,7 @@ describe('useCompleteWorkOrder (@issue-396)', () => {
     expect(mockApiPost).not.toHaveBeenCalled();
   });
 
-  it('AC4: calls api.post with quantityProduced when quantityProduced is provided', async () => {
+  it('AC4: calls api.post with both quantityProduced and producedQuantity when quantityProduced is provided', async () => {
     const { result } = renderHook(() => useCompleteWorkOrder(), { wrapper: createWrapper() });
 
     await act(async () => {
@@ -112,6 +112,7 @@ describe('useCompleteWorkOrder (@issue-396)', () => {
     });
 
     expect(mockApiPost).toHaveBeenCalledWith('/manufacturing/work-orders/wo-123/complete', {
+      producedQuantity: 5,
       quantityProduced: 5,
     });
     expect(mockApiPost).toHaveBeenCalledTimes(1);
@@ -125,6 +126,7 @@ describe('useCompleteWorkOrder (@issue-396)', () => {
     });
 
     expect(mockApiPost).toHaveBeenCalledWith('/manufacturing/work-orders/wo-123/complete', {
+      producedQuantity: 0,
       quantityProduced: 0,
     });
     expect(mockApiPost).toHaveBeenCalledTimes(1);
@@ -138,6 +140,7 @@ describe('useCompleteWorkOrder (@issue-396)', () => {
     });
 
     expect(mockApiPost).toHaveBeenCalledWith('/manufacturing/work-orders/wo-123/complete', {
+      producedQuantity: 10,
       quantityProduced: 10,
     });
     expect(mockApiPost).toHaveBeenCalledTimes(1);
@@ -151,6 +154,7 @@ describe('useCompleteWorkOrder (@issue-396)', () => {
     });
 
     expect(mockApiPost).toHaveBeenCalledWith('/manufacturing/work-orders/wo-123/complete', {
+      producedQuantity: 0,
       quantityProduced: 0,
     });
     expect(mockApiPost).toHaveBeenCalledTimes(1);
@@ -168,6 +172,7 @@ describe('useCompleteWorkOrder (@issue-396)', () => {
     });
 
     expect(mockApiPost).toHaveBeenCalledWith('/manufacturing/work-orders/wo-123/complete', {
+      producedQuantity: 7,
       quantityProduced: 7,
     });
     expect(mockApiPost).toHaveBeenCalledTimes(1);

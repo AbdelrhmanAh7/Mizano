@@ -148,12 +148,16 @@ const workOrderApi = {
     return response.data;
   },
   /**
-   * Complete a work order by sending the canonical quantityProduced payload.
-   * Matches backend endpoint POST /manufacturing/work-orders/:id/complete.
+   * Complete a work order by sending the completion quantity.
+   * Matches backend endpoint POST /manufacturing/work-orders/:id/complete
+   * (see apps/api/src/modules/manufacturing/controllers/work-orders.controller.ts:110-116 and
+   * apps/api/src/modules/manufacturing/services/work-orders.service.ts:223-233 where dto.quantityProduced is consumed).
+   * Sends both quantityProduced and producedQuantity for backward compatibility and wire contract safety.
    */
-  complete: async (id: string, quantityProduced: number) => {
+  complete: async (id: string, quantity: number) => {
     const response = await api.post(`/manufacturing/work-orders/${id}/complete`, {
-      quantityProduced,
+      producedQuantity: quantity,
+      quantityProduced: quantity,
     });
     return response.data;
   },
