@@ -8,9 +8,9 @@
 - **Originating Sentry Issue:** None (security / accounting integrity finding raised during PR #230 review).
 - **Base Commit (`origin/master`):** `e07f1e3d7585844a9af23dae48f870087993e4b3`
 - **Tested Code Head:** `9df6b3ee81d434cc6137b8376f3ed797034bcb50`
-- **Tested Branch:** `ai/318`
+- **Tested Branch:** `ai/318-p2` (layer 2 of stack, rebased onto `ai/318`)
 - **Host Environment:** Darwin arm64 (macOS), Node.js v20+, pnpm 8.14.0
-- **Model and Effort:** Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: High · Why: Fix account active check and invalid type check in bills.service assertReferences and approve methods, add regression tests for inactive accounts, and update verification report
+- **Model and Effort:** Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: High · Why: Restack ai/318-p2 onto ai/318, resolve EVIDENCE.md conflict keeping both layers' intent, verify typecheck, lint, and unit tests
 - **Skills Used:** `systematic-debugging`, `diagnosing-bugs`, `verification-before-completion`, `model-effort-routing`
 
 ---
