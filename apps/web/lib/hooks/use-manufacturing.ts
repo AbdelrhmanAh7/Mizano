@@ -147,9 +147,17 @@ const workOrderApi = {
     const response = await api.post(`/manufacturing/work-orders/${id}/start`);
     return response.data;
   },
-  complete: async (id: string, producedQuantity: number) => {
+  /**
+   * Complete a work order by sending the completion quantity.
+   * Matches backend endpoint POST /manufacturing/work-orders/:id/complete
+   * (see apps/api/src/modules/manufacturing/controllers/work-orders.controller.ts:110-116 and
+   * apps/api/src/modules/manufacturing/services/work-orders.service.ts:223-233 where dto.quantityProduced is consumed).
+   * Sends both quantityProduced and producedQuantity for backward compatibility and wire contract safety.
+   */
+  complete: async (id: string, quantity: number) => {
     const response = await api.post(`/manufacturing/work-orders/${id}/complete`, {
-      producedQuantity,
+      producedQuantity: quantity,
+      quantityProduced: quantity,
     });
     return response.data;
   },
@@ -339,11 +347,33 @@ export function useStartWorkOrder() {
   });
 }
 
+/**
+ * Hook to complete a work order.
+ * Accepts either `quantityProduced` or `producedQuantity` (for backwards compatibility).
+ * Throws an error when both are absent or null/undefined, preventing silent defaulting to zero.
+ */
 export function useCompleteWorkOrder() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, producedQuantity }: { id: string; producedQuantity: number }) =>
-      workOrderApi.complete(id, producedQuantity),
+    // Validates completion parameters: throws when quantity is absent or null/undefined/NaN to prevent silent defaulting to zero
+    mutationFn: ({
+      id,
+      quantityProduced,
+      producedQuantity,
+    }: {
+      id: string;
+      quantityProduced?: number;
+      producedQuantity?: number;
+    }) => {
+      // Validate that either quantityProduced or producedQuantity is provided.
+      // Prioritizes canonical quantityProduced when both are provided, falling back to producedQuantity.
+      // Explicit 0 is a valid quantity; missing/null/undefined/NaN throws to prevent silent defaulting to zero.
+      const quantity = quantityProduced ?? producedQuantity;
+      if (quantity === undefined || quantity === null || Number.isNaN(quantity)) {
+        throw new Error('A completion quantity is required');
+      }
+      return workOrderApi.complete(id, quantity);
+    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       queryClient.invalidateQueries({ queryKey: ['work-orders', variables.id] });
