@@ -5,7 +5,7 @@
 - **Issue**: #257 (`Fresh restart of #142: Add an e2e that the API process has no tesseract.js or pdf-parse in the require cache, and that ...`)
 - **Supersedes**: PR #146 (Issue #142)
 - **Base Commit**: `e5d9b805563c04df3300f00442fd18f7d82ce560` (`origin/master`)
-- **Tested Code Head SHA**: `5028de6e` (commit on `ai/257`)
+- **Tested Code Head SHA**: `5ea5ef4c` (commit on `ai/257`)
 - **Originating Sentry Issue**: None (Architectural worker-isolation requirement from #142 / #257)
 - **User-facing flow / E2E**: Covered by `e2e-army/257-intake-worker.e2e.ts` (tags `feat:mz-document-intake`, `lvl:api`, `lvl:job`)
 
@@ -94,7 +94,7 @@
   - `apps/api/src/modules/ai/utils/pdf-extractor.util.ts` executed `const pdfParseModule = require('pdf-parse');` at module top-level. Because `document-intake.service.ts` imports this utility and is included in `AiOperationsModule` -> `AiModule` -> `AppModule`, booting `apps/api` unconditionally loaded `pdf-parse` into Node's `require.cache`.
   - `docker-compose.production.yml` did not define the `intake-worker` container service, leaving production environments without a dedicated worker process for background extraction jobs.
   - Previous E2E test `e2e-army/257-intake-worker.e2e.ts` in commit `97940bf` only exercised HTTP endpoints without checking `require.cache` or process module isolation (flagged by QA findings `cc1dc5211ed1` and `4793f8c71b59`).
-- **Head behaviour (`5028de6e`)**:
+- **Head behaviour (`5ea5ef4c`)**:
   - `pdf-extractor.util.ts` requires `pdf-parse` lazily inside `extractTextFromPdf()` via `getPdfParseModule()`. Importing `pdf-extractor.util.ts` or `document-intake.service.ts` no longer loads `pdf-parse` into `require.cache`.
   - `HealthController` provides `GET /api/health/modules`, allowing internal/e2e inspections to verify that `tesseractLoaded` and `pdfParseLoaded` are `false` and `ocrModules` is empty `[]`.
   - `HealthController` provides `GET /api/health/worker-modules`, retrieving the worker's `require.cache` state from Redis (populated by `IntakeProcessorService` after each job).
