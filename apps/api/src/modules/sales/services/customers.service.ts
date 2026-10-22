@@ -10,6 +10,24 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateCustomerDto } from '../dto/create-customer.dto';
 import { UpdateCustomerDto } from '../dto/update-customer.dto';
 
+type Address = CreateCustomerDto['billingAddress'];
+
+/** The DTO's nested address objects are not Prisma fields: map them onto the flat customer columns. */
+function addressColumns(billing: Address, shipping: Address) {
+  return {
+    billingStreet: billing?.street,
+    billingCity: billing?.city,
+    billingState: billing?.state,
+    billingPostalCode: billing?.postalCode,
+    billingCountry: billing?.country,
+    shippingStreet: shipping?.street,
+    shippingCity: shipping?.city,
+    shippingState: shipping?.state,
+    shippingPostalCode: shipping?.postalCode,
+    shippingCountry: shipping?.country,
+  };
+}
+
 @Injectable()
 export class CustomersService {
   constructor(
@@ -18,19 +36,11 @@ export class CustomersService {
   ) {}
 
   async create(organizationId: string, createCustomerDto: CreateCustomerDto) {
+    const { billingAddress, shippingAddress, ...rest } = createCustomerDto;
     const customer = await this.prisma.customer.create({
       data: {
-        ...createCustomerDto,
-        billingStreet: createCustomerDto.billingAddress?.street,
-        billingCity: createCustomerDto.billingAddress?.city,
-        billingState: createCustomerDto.billingAddress?.state,
-        billingPostalCode: createCustomerDto.billingAddress?.postalCode,
-        billingCountry: createCustomerDto.billingAddress?.country,
-        shippingStreet: createCustomerDto.shippingAddress?.street,
-        shippingCity: createCustomerDto.shippingAddress?.city,
-        shippingState: createCustomerDto.shippingAddress?.state,
-        shippingPostalCode: createCustomerDto.shippingAddress?.postalCode,
-        shippingCountry: createCustomerDto.shippingAddress?.country,
+        ...rest,
+        ...addressColumns(billingAddress, shippingAddress),
         organizationId,
       },
     });
@@ -161,20 +171,12 @@ export class CustomersService {
       throw new NotFoundException('Customer not found');
     }
 
+    const { billingAddress, shippingAddress, ...rest } = updateCustomerDto;
     const updatedCustomer = await this.prisma.customer.update({
       where: { id },
       data: {
-        ...updateCustomerDto,
-        billingStreet: updateCustomerDto.billingAddress?.street,
-        billingCity: updateCustomerDto.billingAddress?.city,
-        billingState: updateCustomerDto.billingAddress?.state,
-        billingPostalCode: updateCustomerDto.billingAddress?.postalCode,
-        billingCountry: updateCustomerDto.billingAddress?.country,
-        shippingStreet: updateCustomerDto.shippingAddress?.street,
-        shippingCity: updateCustomerDto.shippingAddress?.city,
-        shippingState: updateCustomerDto.shippingAddress?.state,
-        shippingPostalCode: updateCustomerDto.shippingAddress?.postalCode,
-        shippingCountry: updateCustomerDto.shippingAddress?.country,
+        ...rest,
+        ...addressColumns(billingAddress, shippingAddress),
       },
     });
 
