@@ -3,8 +3,9 @@
 ## Overview
 
 - **Issue**: #307 (`[blocker] check "Unit Tests" is red on 3 PRs (one shared cause?)`)
+- **PR**: #417
 - **Base Commit**: `bf3f67a80b7d8b5c986c757f4955c3c0ca65ddcb` (`master`)
-- **Tested Head**: `d9fff63e`
+- **Tested Head**: `89956434b757f6946512c5b058b931590633621d`
 - **Originating Sentry Issue**: None (CI build/test compilation error and blocker-breaker group detection, not a runtime Sentry issue).
 - **User-facing flow / E2E**: Not user-facing. E2E: not needed — internal unit test import fix (`supertest` callable require import) and failure classification. No UI or routing changes.
 
@@ -18,10 +19,10 @@
 
 ## Numbered Acceptance Criteria
 
-1. **AC1 (Callable Supertest Import)**: `throttler-ip.guard.spec.ts` uses callable CommonJS import syntax `import request = require('supertest')`, eliminating TS2349 compilation failure while executing all 25 unit test cases (HTTP requests, proxy trust chains, and login throttling).
+1. **AC1 (Callable Supertest Import)**: `throttler-ip.guard.spec.ts` uses ESM namespace import with callable fallback `requestNamespace.default ?? requestNamespace`, eliminating TS2349 compilation failure while executing all 25 unit test cases (HTTP requests, proxy trust chains, and login throttling) without raw CommonJS require import.
 2. **AC2 (Failure Disambiguation across CI Group)**: Evidence and classification demonstrates that CI check "Unit Tests" failures across PRs #81, #146, and #229 were distinct root causes (PR #81: supertest TS2349 compilation error in `throttler-ip.guard.spec.ts`; PR #146: intake worker deploy config assertion in `worker-deploy-config.spec.ts`; PR #229: deploy workflow triggers assertion in `deploy-workflow.spec.ts`), proving that the blocker breaker group heuristic falsely clustered 3 separate issues.
 3. **AC3 (Gate & Workflow Preservation)**: No CI workflows (`.github/workflows/*`), package manifests, build scripts, or merge/review gates are modified, deleted, or weakened.
-4. **AC4 (Review Lesson Recorded)**: Review lesson documenting the CommonJS/TypeScript callable import requirement for `supertest` is recorded in `docs/agents/review-lessons.md`.
+4. **AC4 (Review Lesson Recorded)**: Review lesson documenting callable CommonJS imports across module resolution modes without raw require imports is recorded in `docs/agents/review-lessons.md`.
 5. **AC5 (Clean Local Verification & Pre-push Gates)**: Local verification suite passes cleanly: `throttler-ip.guard.spec.ts` 25/25 pass, `pnpm --filter api run type-check` exits 0, `pnpm --filter api run lint` exits 0.
 
 ---
@@ -36,7 +37,7 @@
 | **AC2** | Disambiguate PR #146 failure signature        | `gh run view 39039462614 --job 117415804951`                                    | Log confirms failure in `worker-deploy-config.spec.ts:98:22` (intake worker deploy config assertion)                         | 0         | **PASSED** |
 | **AC2** | Disambiguate PR #229 failure signature        | `gh run view 39491266427 --job 118864749554`                                    | Log confirms failure in `deploy-workflow.spec.ts:35:51` (deploy workflow triggers assertion)                                 | 0         | **PASSED** |
 | **AC3** | Verify no workflow or CI config modifications | `git status --porcelain`                                                        | Only `apps/api/src/throttler-ip.guard.spec.ts`, `docs/agents/review-lessons.md`, and `docs/evidence/307/EVIDENCE.md` touched | 0         | **PASSED** |
-| **AC4** | Review lesson documented                      | `git diff docs/agents/review-lessons.md`                                        | CommonJS callable import rule added to section 12                                                                            | 0         | **PASSED** |
+| **AC4** | Review lesson documented                      | `git diff docs/agents/review-lessons.md`                                        | Callable import rule across module modes added to section 12                                                                 | 0         | **PASSED** |
 | **AC5** | API TypeScript type-check                     | `pnpm --filter api run type-check`                                              | Clean (0 errors across `tsc --noEmit` and `test/tsconfig.e2e.json`)                                                          | 0         | **PASSED** |
 | **AC5** | API ESLint check                              | `pnpm --filter api run lint`                                                    | Clean (0 errors, 0 warnings across all api source/test files)                                                                | 0         | **PASSED** |
 
@@ -53,7 +54,7 @@
       Type originates at this import. A namespace-style import cannot be called or constructed, and will cause a failure at runtime. Consider using a default import or import require here instead.
     ```
 - **Head behaviour**:
-  - `throttler-ip.guard.spec.ts:12` uses `import request = require('supertest');`.
+  - `throttler-ip.guard.spec.ts:12` uses ESM namespace import with callable fallback `requestNamespace.default ?? requestNamespace`.
   - Verified with `typescript` compiler: zero diagnostics emitted (clean callable signature).
   - All 25 unit tests pass cleanly.
 
