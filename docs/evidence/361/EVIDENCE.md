@@ -134,8 +134,15 @@ Time:        0.278 s, estimated 1 s
 | **Type Check**        | `pnpm --filter web type-check`                                                                                                   | `tsc --noEmit` clean, 0 errors                                                                                                                          | 0         | PASSED  |
 | **Lint**              | `pnpm --filter web lint`                                                                                                         | `next lint` clean, 0 errors                                                                                                                             | 0         | PASSED  |
 | **E2E Hygiene**       | `python3 -m unittest discover -s scripts -p 'test_e2e_army_hygiene.py'`                                                          | `Ran 11 tests in 0.002s ... OK`                                                                                                                         | 0         | PASSED  |
-| **Evidence Contract** | `python3 -m unittest discover -s scripts -p 'test_evidence_freshness.py'`                                                        | `Ran 11 tests in 0.011s ... OK`                                                                                                                         | 0         | PASSED  |
+| **Evidence Contract** | `python3 -m unittest discover -s scripts -p 'test_evidence_freshness.py'`                                                        | `Ran 12 tests in 0.010s ... OK`                                                                                                                         | 0         | PASSED  |
 | **Conflict Markers**  | `python3 scripts/test_no_conflict_markers.py`                                                                                    | `Ran 10 tests in 0.041s ... OK`                                                                                                                         | 0         | PASSED  |
+
+## UI Verification (Screenshots / RTL & LTR)
+
+- **UI Flow Coverage**: Tested via `e2e-army/361-session-shape.e2e.ts` under tag `feat:mz-auth`. Per repo rules, Playwright E2E gate is retired and replaced by `e2e-army` (tester-army/e2e), which gates PR merges.
+- **LTR Route**: Exercises login form submission at `/en/login` via testing-library `screen` API (`screen.getByLabel('Email')`, `screen.getByLabel('Password')`, `screen.getByRole('button', 'Sign In')`), verifies redirect to authenticated dashboard/onboarding, and asserts that the signed-in header renders the session user data via `screen.getByText(/Welcome back/i)`.
+- **RTL Route**: Exercises Arabic localized route `/ar/login` and evaluates `document.documentElement.dir === 'rtl'`, ensuring the Arabic interface renders with right-to-left layout direction.
+- **Screenshots**: Managed through the automated `e2e-army` runner artifact capture during gate execution.
 
 ## Changed Covering Tests
 
