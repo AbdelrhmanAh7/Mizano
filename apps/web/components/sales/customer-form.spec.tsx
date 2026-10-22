@@ -133,12 +133,12 @@ describe('CustomerForm localization and accessible labels (#372 QA finding regre
     expect(elementsWithAria.length).toBeGreaterThanOrEqual(10);
     elementsWithAria.forEach((el) => {
       const label = el.getAttribute('aria-label') || '';
+      expect(label).not.toContain(' / ');
       expect(label).not.toContain('مشاركة');
       expect(label).not.toContain('مشاركة الشارع');
       expect(label).not.toContain('مشاركة الدولة');
       expect(label).not.toContain('مشاركة المدينة');
       expect(label).not.toContain('مشاركة البريد');
-      expect(label).not.toContain(' / ');
     });
   });
 
