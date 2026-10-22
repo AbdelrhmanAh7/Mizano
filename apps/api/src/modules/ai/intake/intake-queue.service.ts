@@ -166,13 +166,15 @@ export class IntakeQueueService implements OnModuleDestroy {
     }
   }
 
-  /** Get the underlying Redis client for diagnostics (worker process only). */
+  /** Get the underlying Redis client for diagnostics. */
   private async getRedisClient(): Promise<Redis | null> {
     if (!this.redisUrl) return null;
     try {
-      const client = (this.worker ?? this.queue)?.client;
-      if (!client) return null;
-      return (await client) as unknown as Redis;
+      if (this.worker) {
+        return (await this.worker.client) as unknown as Redis;
+      }
+      const queue = this.getQueue(this.redisUrl);
+      return (await queue.client) as unknown as Redis;
     } catch {
       return null;
     }
