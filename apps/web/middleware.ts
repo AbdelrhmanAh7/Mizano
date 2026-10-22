@@ -44,7 +44,7 @@ export async function middleware(request: NextRequest) {
     // Has a cookie — verify token to redirect authenticated users to dashboard
     const token = await getToken({ req: request });
     if (token && !pathname.includes('/dashboard')) {
-      return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url));
+      return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.nextUrl));
     }
     return intlMiddleware(request);
   }
@@ -53,9 +53,9 @@ export async function middleware(request: NextRequest) {
   if (pathWithoutLocale === '/') {
     const token = await getToken({ req: request });
     if (token) {
-      return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url));
+      return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.nextUrl));
     } else {
-      return NextResponse.redirect(new URL(`/${locale}/onboarding`, request.url));
+      return NextResponse.redirect(new URL(`/${locale}/onboarding`, request.nextUrl));
     }
   }
 
@@ -63,10 +63,17 @@ export async function middleware(request: NextRequest) {
   const token = await getToken({ req: request });
   if (!token) {
     if (!pathname.includes('/login')) {
-      const loginUrl = new URL(`/${locale}/login`, request.url);
+      const loginUrl = new URL(`/${locale}/login`, request.nextUrl);
       loginUrl.searchParams.set('callbackUrl', pathname);
       return NextResponse.redirect(loginUrl);
     }
+  }
+
+  // Ensure locale prefix is present to prevent cross-origin host mismatches during redirects
+  if (!pathname.match(/^\/(en|ar)(\/|$)/)) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/${locale}${pathname}`;
+    return NextResponse.redirect(url);
   }
 
   // Handle i18n routing

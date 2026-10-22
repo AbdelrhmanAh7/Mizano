@@ -23,6 +23,16 @@ jest.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+jest.mock('@/i18n/routing', () => ({
+  Link: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
+  useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
+  usePathname: () => '/manufacturing/work-orders',
+}));
+
 jest.mock('next/link', () => {
   const Link = ({ href, children }: { href: string; children: React.ReactNode }) => (
     <a href={href}>{children}</a>

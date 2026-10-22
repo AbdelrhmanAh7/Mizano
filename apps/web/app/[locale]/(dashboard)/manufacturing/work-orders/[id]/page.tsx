@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { Link, useRouter } from '@/i18n/routing';
 import {
   ArrowLeft,
   Trash2,
@@ -116,7 +116,7 @@ export default function WorkOrderDetailPage() {
 
   const handleComplete = async () => {
     try {
-      await completeWorkOrder.mutateAsync({ id: workOrderId, producedQuantity });
+      await completeWorkOrder.mutateAsync({ id: workOrderId, quantityProduced: producedQuantity });
       toast({ title: t('workOrders.status.completed') });
       setCompleteDialogOpen(false);
     } catch (error: unknown) {

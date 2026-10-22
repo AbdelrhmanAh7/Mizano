@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState } from 'react';
-import Link from 'next/link';
+import { Link } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
 import { Plus, RefreshCw, Eye, Edit, Trash2, Filter } from 'lucide-react';
 import { type ColumnDef } from '@tanstack/react-table';
