@@ -900,7 +900,7 @@ Exit code: 1 (reverted immediately after validation with `git checkout -- EVIDEN
 - **Scope**: Layer 2 [2/2] — #162 complete (#162 items 1–3): p0 delivery-challan org-scoping fix, test hardening, and atomic stock moves in `issue` / `markReturned`
 - **Base Commit (`origin/master`)**: `e5d9b805`
 - **Tested Branch**: `ai/212-p2`
-- **Tested Head**: `cbdaaff9` (final implementation head on branch before merge)
+- **Tested Head Commit**: `fa30739b`
 - **Originating Sentry issue**: none (findings from PR-cycle audit 2026-10-11, CodeRabbit CHANGES_REQUESTED on #162)
 - **UI screenshots**: none (API-only service change, no user-facing UI flow)
 - **e2e-army**: `E2E: not needed — API-only service-layer fix with no UI flow or screen changes`

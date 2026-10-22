@@ -6,7 +6,7 @@ This document provides verification evidence for GitHub issue #212 in `Abdelrhma
 - **PR**: #291 (branch `ai/212-p2`)
 - **Scope**: Layer 2 [2/2] — #162 complete (#162 items 1–3): p0 delivery-challan org-scoping fix, test hardening, and atomic stock moves in `issue` / `markReturned`
 - **Base Commit (`origin/master`)**: `e5d9b805`
-- **Tested Head Commit**: `cbdaaff9` (implementation at `cbdaaff9968284e82ce9fdd3b143bc53ebe3c19d`)
+- **Tested Head Commit**: `fa30739b`
 - **Tested Branch**: `ai/212-p2`
 - **Originating Sentry Issue**: None (findings from PR-cycle audit 2026-10-11, CodeRabbit CHANGES_REQUESTED on #162)
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20+, pnpm 8.14.0
