@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { format } from 'date-fns';
-import Link from 'next/link';
+import { Link } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -77,7 +77,10 @@ export default function APAgingReportPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t('apAging.title')}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t('apAging.title')}
+            <span className="sr-only"> (A/P Aging)</span>
+          </h1>
           <p className="text-muted-foreground">As of {format(asOfDate, 'MMMM d, yyyy')}</p>
         </div>
       </div>

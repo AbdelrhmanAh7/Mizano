@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import { Link } from '@/i18n/routing';
 import { format } from 'date-fns';
 import { ArrowLeft, TrendingUp, Target, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,13 @@ interface ForecastDataPoint {
   isHistorical: boolean;
   actualRevenue?: number;
   predictedRevenue?: number;
+}
+
+function parseMonthDate(dateStr: string): Date {
+  if (!dateStr) return new Date();
+  const dateToParse = /^\d{4}-\d{2}$/.test(dateStr) ? `${dateStr}-01` : dateStr;
+  const d = new Date(dateToParse);
+  return isNaN(d.getTime()) ? new Date() : d;
 }
 
 export default function RevenueForecastPage() {
@@ -93,7 +100,10 @@ export default function RevenueForecastPage() {
               </Link>
             </Button>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+                <Badge variant="outline">Revenue Insights</Badge>
+              </div>
               <p className="text-muted-foreground">{t('subtitle')}</p>
             </div>
           </div>
@@ -128,7 +138,10 @@ export default function RevenueForecastPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+              <Badge variant="outline">Revenue Insights</Badge>
+            </div>
             <p className="text-muted-foreground">{t('subtitle')}</p>
           </div>
         </div>
@@ -252,11 +265,9 @@ export default function RevenueForecastPage() {
               >
                 <div className="flex items-center gap-4">
                   <div className="text-center min-w-[60px]">
-                    <p className="text-lg font-bold">
-                      {format(new Date(month.date + '-01'), 'MMM')}
-                    </p>
+                    <p className="text-lg font-bold">{format(parseMonthDate(month.date), 'MMM')}</p>
                     <p className="text-xs text-muted-foreground">
-                      {format(new Date(month.date + '-01'), 'yyyy')}
+                      {format(parseMonthDate(month.date), 'yyyy')}
                     </p>
                   </div>
                   <div>

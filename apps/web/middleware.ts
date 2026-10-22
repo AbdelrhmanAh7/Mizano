@@ -5,6 +5,38 @@ import { routing } from './i18n/routing';
 
 const intlMiddleware = createMiddleware(routing);
 
+function applyCorsAndNormalizeRedirect(request: NextRequest, response: NextResponse): NextResponse {
+  // If redirect location host differs from request host, preserve incoming host
+  const location = response.headers.get('location');
+  const reqHost = request.headers.get('host');
+  if (location && reqHost) {
+    try {
+      const locUrl = new URL(location, request.url);
+      if (locUrl.host !== reqHost) {
+        locUrl.host = reqHost;
+        locUrl.protocol = request.nextUrl.protocol;
+        response.headers.set('location', locUrl.toString());
+      }
+    } catch {
+      // ignore invalid URL
+    }
+  }
+
+  // Add CORS headers for RSC fetches and cross-origin requests (e.g. 127.0.0.1 <-> localhost)
+  const origin = request.headers.get('origin');
+  if (origin) {
+    response.headers.set('Access-Control-Allow-Origin', origin);
+    response.headers.set('Access-Control-Allow-Credentials', 'true');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    response.headers.set(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Authorization, X-Requested-With, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Url',
+    );
+  }
+
+  return response;
+}
+
 // Define public paths that don't require authentication
 const publicPaths = ['/login', '/register', '/onboarding'];
 
@@ -21,6 +53,21 @@ function getLocale(pathname: string): string {
 }
 
 export async function middleware(request: NextRequest) {
+  // Handle CORS preflight
+  if (request.method === 'OPTIONS') {
+    const origin = request.headers.get('origin') || '*';
+    return new NextResponse(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Credentials': 'true',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers':
+          'Content-Type, Authorization, X-Requested-With, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Url',
+      },
+    });
+  }
+
   const { pathname } = request.nextUrl;
 
   // Skip middleware for API routes, static files, etc.
@@ -39,23 +86,32 @@ export async function middleware(request: NextRequest) {
       request.cookies.get('next-auth.session-token') ||
       request.cookies.get('__Secure-next-auth.session-token');
     if (!sessionCookie) {
-      return intlMiddleware(request);
+      return applyCorsAndNormalizeRedirect(request, intlMiddleware(request));
     }
     // Has a cookie — verify token to redirect authenticated users to dashboard
     const token = await getToken({ req: request });
     if (token && !pathname.includes('/dashboard')) {
-      return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url));
+      return applyCorsAndNormalizeRedirect(
+        request,
+        NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url)),
+      );
     }
-    return intlMiddleware(request);
+    return applyCorsAndNormalizeRedirect(request, intlMiddleware(request));
   }
 
   // Root path: redirect based on auth state
   if (pathWithoutLocale === '/') {
     const token = await getToken({ req: request });
     if (token) {
-      return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url));
+      return applyCorsAndNormalizeRedirect(
+        request,
+        NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url)),
+      );
     } else {
-      return NextResponse.redirect(new URL(`/${locale}/onboarding`, request.url));
+      return applyCorsAndNormalizeRedirect(
+        request,
+        NextResponse.redirect(new URL(`/${locale}/onboarding`, request.url)),
+      );
     }
   }
 
@@ -65,12 +121,12 @@ export async function middleware(request: NextRequest) {
     if (!pathname.includes('/login')) {
       const loginUrl = new URL(`/${locale}/login`, request.url);
       loginUrl.searchParams.set('callbackUrl', pathname);
-      return NextResponse.redirect(loginUrl);
+      return applyCorsAndNormalizeRedirect(request, NextResponse.redirect(loginUrl));
     }
   }
 
   // Handle i18n routing
-  return intlMiddleware(request);
+  return applyCorsAndNormalizeRedirect(request, intlMiddleware(request));
 }
 
 export const config = {

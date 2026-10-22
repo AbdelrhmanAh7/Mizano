@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { Link } from '@/i18n/routing';
 import { ArrowLeft, Users, TrendingUp, DollarSign, Star, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';

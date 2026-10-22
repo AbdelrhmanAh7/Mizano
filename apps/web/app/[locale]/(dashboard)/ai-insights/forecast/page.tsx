@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import { Link } from '@/i18n/routing';
 import { format } from 'date-fns';
 import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -42,14 +43,23 @@ export default function CashFlowForecastPage() {
   const endingBalance = forecast[forecast.length - 1]?.predictedBalance || 0;
   const lowestBalance = forecast.length > 0 ? Math.min(...forecast.map((f) => f.lowerBound)) : 0;
 
-  const chartData = forecast.map((f) => ({
-    date: format(new Date(f.date), 'MMM d'),
-    balance: f.predictedBalance,
-    lowerBound: f.lowerBound,
-    upperBound: f.upperBound,
-    inflow: f.predictedInflow,
-    outflow: f.predictedOutflow,
-  }));
+  const chartData = forecast.map((f) => {
+    let dateLabel = f.date || '';
+    if (f.date) {
+      const d = new Date(f.date);
+      if (!isNaN(d.getTime())) {
+        dateLabel = format(d, 'MMM d');
+      }
+    }
+    return {
+      date: dateLabel,
+      balance: f.predictedBalance,
+      lowerBound: f.lowerBound,
+      upperBound: f.upperBound,
+      inflow: f.predictedInflow,
+      outflow: f.predictedOutflow,
+    };
+  });
 
   if (isLoading) {
     return (
@@ -77,7 +87,10 @@ export default function CashFlowForecastPage() {
               </Link>
             </Button>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+                <Badge variant="outline">AI Forecast</Badge>
+              </div>
               <p className="text-muted-foreground">{t('subtitle')}</p>
             </div>
           </div>
@@ -114,7 +127,10 @@ export default function CashFlowForecastPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+              <Badge variant="outline">AI Forecast</Badge>
+            </div>
             <p className="text-muted-foreground">{t('subtitle')}</p>
           </div>
         </div>
