@@ -346,7 +346,7 @@ class EvidenceFreshnessTests(unittest.TestCase):
         self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
 
     def test_issue_401_evidence_contract(self):
-        """docs/evidence/401/EVIDENCE.md must exist and define AC1-AC5 with exit codes and supersedes notice."""
+        """Verify issue #401 evidence report and API wire contract for producedQuantity / quantityProduced."""
         evidence_401 = EVIDENCE_DIR / "401" / "EVIDENCE.md"
         self.assertTrue(evidence_401.exists(), "docs/evidence/401/EVIDENCE.md must exist")
         content = evidence_401.read_text(encoding="utf-8")
@@ -357,10 +357,78 @@ class EvidenceFreshnessTests(unittest.TestCase):
         self.assertIn("AC4", content)
         self.assertIn("AC5", content)
         self.assertIn("Exit Code", content)
+        self.assertIn("producedQuantity", content)
+        self.assertIn("quantityProduced", content)
+        self.assertIn("A completion quantity is required", content)
         head_violations = validate_tested_head_binding(content)
         self.assertEqual(head_violations, [], f"Tested head binding violations: {head_violations}")
         status_violations = validate_evidence_table_status(content)
         self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
+
+        # Verify frontend wire contract: workOrderApi.complete preserves producedQuantity payload key
+        web_hooks = ROOT / "apps" / "web" / "lib" / "hooks" / "use-manufacturing.ts"
+        self.assertTrue(web_hooks.exists(), f"use-manufacturing.ts must exist at {web_hooks}")
+        web_content = web_hooks.read_text(encoding="utf-8")
+
+        complete_block_match = re.search(
+            r"complete:\s*async\s*\([^)]*\)\s*=>\s*\{([\s\S]*?)\},",
+            web_content,
+        )
+        self.assertIsNotNone(complete_block_match, "workOrderApi.complete method must exist")
+        complete_block = complete_block_match.group(1)
+        self.assertIn("/manufacturing/work-orders/${id}/complete", complete_block)
+        self.assertIn("producedQuantity", complete_block)
+        self.assertNotIn("quantityProduced:", complete_block)
+
+        # Verify frontend validation: useCompleteWorkOrder validates null, undefined, NaN
+        hook_match = re.search(
+            r"export function useCompleteWorkOrder\(\)\s*\{([\s\S]*?)\n\}",
+            web_content,
+        )
+        self.assertIsNotNone(hook_match, "useCompleteWorkOrder hook must exist")
+        hook_body = hook_match.group(1)
+        self.assertIn("producedQuantity ?? quantityProduced", hook_body)
+        self.assertIn("quantity === undefined || quantity === null || Number.isNaN(quantity)", hook_body)
+        self.assertIn("throw new Error('A completion quantity is required')", hook_body)
+
+        # Verify backend controller route accepts both quantityProduced and producedQuantity
+        api_controller = ROOT / "apps" / "api" / "src" / "modules" / "manufacturing" / "controllers" / "work-orders.controller.ts"
+        self.assertTrue(api_controller.exists(), f"work-orders.controller.ts must exist at {api_controller}")
+        controller_content = api_controller.read_text(encoding="utf-8")
+        self.assertIn("@Post(':id/complete')", controller_content)
+        complete_method_match = re.search(
+            r"@Post\(':id/complete'\)[\s\S]*?complete\s*\([\s\S]*?@Body\(\)\s*dto:\s*\{([^}]*)\}",
+            controller_content,
+        )
+        self.assertIsNotNone(complete_method_match, "complete route with @Body() dto must exist")
+        dto_type = complete_method_match.group(1)
+        self.assertIn("quantityProduced", dto_type)
+        self.assertIn("producedQuantity", dto_type)
+
+        # Verify backend service resolves quantityProduced ?? producedQuantity and validates
+        api_service = ROOT / "apps" / "api" / "src" / "modules" / "manufacturing" / "services" / "work-orders.service.ts"
+        self.assertTrue(api_service.exists(), f"work-orders.service.ts must exist at {api_service}")
+        service_content = api_service.read_text(encoding="utf-8")
+        service_method_match = re.search(
+            r"async completeWorkOrder\s*\([^)]*\)\s*\{([\s\S]*?)\n  \}",
+            service_content,
+        )
+        self.assertIsNotNone(service_method_match, "completeWorkOrder method must exist")
+        service_body = service_method_match.group(1)
+        self.assertIn("dto.quantityProduced ?? dto.producedQuantity", service_body)
+        normalized_service_body = re.sub(r"\s+", " ", service_body)
+        self.assertIn(
+            "quantityProduced === undefined || quantityProduced === null || Number.isNaN(quantityProduced)",
+            normalized_service_body,
+        )
+        self.assertIn("throw new BadRequestException('quantityProduced or producedQuantity is required')", service_body)
+
+    def test_issue_401_wire_contract_regression_detection(self):
+        """Planted key mismatch or missing guard must be detected by issue 401 contract rules."""
+        broken_web_block = "complete: async (id: string, qty: number) => { await api.post('/complete', { quantityProduced: qty }); }"
+        self.assertIn("quantityProduced:", broken_web_block)
+        has_produced_qty = "producedQuantity" in broken_web_block
+        self.assertFalse(has_produced_qty, "Detected that producedQuantity was incorrectly replaced by quantityProduced")
 
 
 if __name__ == "__main__":

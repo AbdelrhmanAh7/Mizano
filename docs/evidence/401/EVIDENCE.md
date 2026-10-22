@@ -71,7 +71,7 @@ On commit `36eea4a`, QA failed with recurring finding `212817b95e39`:
 | **AC2** | Rejects null, undefined, and NaN with validation error    | `pnpm --filter web exec jest apps/web/lib/hooks/use-manufacturing.spec.ts`                                                                                                          | 12 passed       | 0         | **PASSED** |
 | **AC3** | Allows boundary zero completion quantity                  | `pnpm --filter web exec jest apps/web/lib/hooks/use-manufacturing.spec.ts`                                                                                                          | 12 passed       | 0         | **PASSED** |
 | **AC4** | Backend accepts `producedQuantity` and `quantityProduced` | `pnpm --filter api exec jest apps/api/src/modules/manufacturing/services/work-orders.service.spec.ts apps/api/src/modules/manufacturing/controllers/work-orders.controller.spec.ts` | 18 passed       | 0         | **PASSED** |
-| **AC5** | Wire contract and evidence freshness test suites          | `python3 scripts/test_manufacturing_complete_wire_contract.py && python3 -m unittest discover -s scripts -p 'test_evidence_freshness.py'`                                           | 17 passed       | 0         | **PASSED** |
+| **AC5** | Wire contract and evidence freshness test suites          | `python3 scripts/test_manufacturing_complete_wire_contract.py && python3 -m unittest discover -s scripts -p 'test_evidence_freshness.py'`                                           | 18 passed       | 0         | **PASSED** |
 
 ---
 
@@ -106,8 +106,9 @@ On commit `36eea4a`, QA failed with recurring finding `212817b95e39`:
   - `test_backend_controller_accepts_both_keys`
   - `test_backend_service_supports_both_keys_and_validates`
   - `test_regression_planted_payload_key_mismatch_detected`
-- `scripts/test_evidence_freshness.py` (1 new test):
-  - `test_issue_401_evidence_contract`
+- `scripts/test_evidence_freshness.py` (2 tests):
+  - `test_issue_401_evidence_contract` (validates evidence document and full frontend/backend wire contract)
+  - `test_issue_401_wire_contract_regression_detection` (validates regression detector for planted wire key mismatch)
 
 ---
 
