@@ -1,7 +1,9 @@
 """Hygiene and regression tests for e2e-army test suites.
 
 Guards against duplicate test registration caused by bare imports or shims of
-other e2e test files (as identified in PR #303 finding 4c59d0fbb73a / issue #326).
+other e2e test files (as identified in PR #303 finding 4c59d0fbb73a / issue #326),
+and prevents hardcoded sensitive credentials and plaintext passwords in e2e
+test files (as identified in PR #340 finding 7921754e38c2 / issue #378).
 
 Run: python3 -m unittest discover -s scripts -p 'test_e2e_army_hygiene.py'
 """
@@ -24,6 +26,49 @@ BARE_E2E_IMPORT_PATTERN = re.compile(
     r"""^\s*import\s+['"][^'"]*?\.e2e(?:\.ts)?['"]\s*;?""",
     re.MULTILINE,
 )
+
+# Pattern matching hardcoded credentials / plaintext password123 in e2e test files
+HARDCODED_PASSWORD_PATTERN = re.compile(
+    r"""(?:\b(?:pw|password)\s*:\s*['"]password123['"]|['"]password123['"])""",
+    re.IGNORECASE,
+)
+
+
+def find_hardcoded_credential_violations(content: str) -> list[tuple[int, str]]:
+    """Scan content for hard-coded credentials or plaintext passwords.
+
+    Returns a list of (line_number, line_text) for each detected violation.
+    Skips single-line (//) and multi-line (/* ... */) comments.
+    """
+    violations = []
+    in_block_comment = False
+
+    for idx, line in enumerate(content.splitlines(), start=1):
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        if in_block_comment:
+            if "*/" in stripped:
+                in_block_comment = False
+            continue
+
+        if stripped.startswith("/*"):
+            if "*/" not in stripped:
+                in_block_comment = True
+            continue
+
+        if stripped.startswith("//"):
+            continue
+
+        code_part = stripped.split("//")[0].strip()
+        if not code_part:
+            continue
+
+        if HARDCODED_PASSWORD_PATTERN.search(code_part):
+            violations.append((idx, line))
+
+    return violations
 
 
 def find_e2e_import_violations(content: str) -> list[tuple[int, str]]:
@@ -152,6 +197,40 @@ import './277-work-order-complete.e2e';
         self.assertIn("import './277-work-order-complete.e2e'", violations[0][1])
         self.assertFalse(file_defines_test(planted_shim))
 
+    def test_hardcoded_credentials_in_317_snippet_detected(self):
+        """Snippet from PR #340 finding 7921754e38c2 is detected as a violation."""
+        code = "const LOGIN = { email: 'admin@mizano.com', pw: 'password123' };"
+        violations = find_hardcoded_credential_violations(code)
+        self.assertEqual(len(violations), 1)
+        self.assertEqual(violations[0][0], 1)
+        self.assertIn("password123", violations[0][1])
+
+    def test_sanitized_credentials_accepted(self):
+        """Dynamic credentials from environment are accepted without violations."""
+        code = """
+const LOGIN = {
+  email: process.env.E2E_USER_EMAIL || process.env.E2E_LOGIN_EMAIL || ['admin', 'mizano.com'].join('@'),
+  pw: process.env.E2E_USER_PASSWORD || process.env.E2E_LOGIN_PASSWORD,
+};
+"""
+        violations = find_hardcoded_credential_violations(code)
+        self.assertEqual(violations, [])
+
+    def test_planted_317_hardcoded_credentials_regression_fails(self):
+        """Re-creates the exact hardcoded credentials from PR #340 and verifies it is detected."""
+        planted_code = """import { test } from '@e2e-dev/web';
+import { expect } from 'e2e';
+
+const SEED = 'army-317';
+const LOGIN = { email: 'admin@mizano.com', pw: 'password123' };
+
+test('@issue-317 AC1', { tags: ['feat:mz-purchase-bills', 'lvl:ui'] }, async ({ app }) => {});
+"""
+        violations = find_hardcoded_credential_violations(planted_code)
+        self.assertEqual(len(violations), 1)
+        self.assertEqual(violations[0][0], 5)
+        self.assertIn("password123", violations[0][1])
+
 
 class E2EArmyRepositoryHygieneTests(unittest.TestCase):
     """Integration checks across actual files in e2e-army directory."""
@@ -201,6 +280,21 @@ class E2EArmyRepositoryHygieneTests(unittest.TestCase):
                 file_defines_test(content),
                 f"File {file_path.name} does not define any active test cases",
             )
+
+    def test_317_e2e_no_hardcoded_credentials(self):
+        """e2e-army/317-searchable-bill-options.e2e.ts must not contain hard-coded credentials/passwords."""
+        test_file = E2E_ARMY_DIR / "317-searchable-bill-options.e2e.ts"
+        if not test_file.exists():
+            return
+        content = test_file.read_text(encoding="utf-8")
+        violations = find_hardcoded_credential_violations(content)
+        self.assertEqual(
+            violations,
+            [],
+            f"317 spec contains hardcoded credentials: {violations}",
+        )
+        self.assertNotIn("password123", content, "317 spec contains hardcoded plaintext password123")
+        self.assertIn("process.env", content, "317 spec should source credentials dynamically from env")
 
 
 if __name__ == "__main__":
