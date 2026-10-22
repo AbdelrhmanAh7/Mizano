@@ -5,7 +5,7 @@
 - **Issue**: #212 (`Follow-up: findings merged under an open CHANGES_REQUESTED (#162, #143, #107) - audit 2026-10-11`)
 - **PR**: #288 (Slice 1 — #162 items 1–2: p0 delivery-challan org-scoping fix and test hardening)
 - **Base Commit**: `e5d9b805563c04df3300f00442fd18f7d82ce560` (`origin/master`)
-- **Tested Head Commit**: `e5714ade8e57cde3a658ec2981315a13a57eb2c1`
+- **Tested Head Commit**: `2955ba5659629e0acc86c169f40ee3e740089e64`
 - **Tested Branch**: `ai/212`
 - **Originating Sentry Issue**: None (Technical debt / security audit follow-up from CodeRabbit findings on PR #162).
 - **User-facing flow / E2E**: Not user-facing (backend delivery challans service unit test suite and service-level transition handling). No user-facing UI route modified. Waiver: `E2E: not needed — API-only service-layer fix with no UI flow or screen changes`.
