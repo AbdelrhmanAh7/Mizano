@@ -98,6 +98,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Every endpoint that posts or reverses uses one `@InvalidatesLedger(...)`,** imports included.
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
+- **Isolate require cache assertions from parser executions.** When testing that heavy or worker-only modules (such as OCR or PDF parsing) are not loaded in the API require cache, test within an isolated module registry (e.g. `jest.isolateModules`) loading the API app module tree. Never co-locate cache assertions in the same test file with invocations that load the parser into the shared cache. Never use hardcoded mock endpoints that inspect nothing. _(#391)_
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.
 
 ## Review process
