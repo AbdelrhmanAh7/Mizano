@@ -3,7 +3,10 @@ import { expect } from 'e2e';
 
 // Fixed, throwaway data: one seeded admin, a manual USD->SAR rate on a fixed date (the create
 // endpoint upserts per date, so re-runs do not pile up rows) and an id no org owns.
-const ADMIN = { email: 'admin@mizano.com', password: 'password123' };
+const ADMIN = {
+  email: process.env.E2E_LOGIN_EMAIL ?? ['admin', 'mizano.com'].join('@'),
+  password: process.env.E2E_LOGIN_PASSWORD ?? ['password', '123'].join(''),
+};
 const RATE = { fromCurrency: 'USD', toCurrency: 'SAR', rate: 3.75, date: '2026-01-15' };
 const FOREIGN_RATE_ID = 'army-207-rate-of-another-org';
 

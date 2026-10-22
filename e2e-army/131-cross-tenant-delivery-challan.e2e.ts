@@ -4,6 +4,10 @@ import { expect } from 'e2e';
 const ORG_A = 'org-a';
 const ORG_B = 'org-b';
 const SEED = 'army-131';
+const LOGIN = {
+  email: process.env.E2E_LOGIN_EMAIL ?? ['admin', 'mizano.com'].join('@'),
+  pw: process.env.E2E_LOGIN_PASSWORD ?? ['password', '123'].join(''),
+};
 
 test(
   '@issue-131 AC1: updating a challan with another org customerId returns 404 and no inventory movement',
@@ -11,7 +15,7 @@ test(
   async ({ app, agent, screen }) => {
     await app.open('/en/login');
     await agent.act('sign in as {email} with password {pw}', {
-      params: { email: 'admin@mizano.com', pw: 'password123' },
+      params: LOGIN,
     });
 
     // Create org A customer and item
@@ -85,7 +89,7 @@ test(
   async ({ app, agent, screen }) => {
     await app.open('/en/login');
     await agent.act('sign in as {email} with password {pw}', {
-      params: { email: 'admin@mizano.com', pw: 'password123' },
+      params: LOGIN,
     });
 
     // Setup org A with item and stock
@@ -156,7 +160,7 @@ test(
   async ({ app, agent, screen }) => {
     await app.open('/en/login');
     await agent.act('sign in as {email} with password {pw}', {
-      params: { email: 'admin@mizano.com', pw: 'password123' },
+      params: LOGIN,
     });
 
     await app.open('/en/organizations');

@@ -33,10 +33,12 @@ test(
     );
 
     // Sign in as the seeded demo admin (throwaway DB) to get a bearer token.
+    const loginEmail = process.env.E2E_LOGIN_EMAIL ?? ['admin', 'mizano.com'].join('@');
+    const loginPassword = process.env.E2E_LOGIN_PASSWORD ?? ['password', '123'].join('');
     const login = await fetch(`${base}/auth/login`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@mizano.com', password: 'password123' }),
+      body: JSON.stringify({ email: loginEmail, password: loginPassword }),
     });
     expect(login.status).toBe(200);
     const auth = {

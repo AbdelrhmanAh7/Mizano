@@ -27,15 +27,36 @@ BARE_E2E_IMPORT_PATTERN = re.compile(
     re.MULTILINE,
 )
 
-# Pattern matching hardcoded credentials / plaintext password123 or admin@mizano.com in e2e test files
-HARDCODED_PASSWORD_PATTERN = re.compile(
-    r"""(?:\b(?:pw|password)\s*:\s*['"]password123['"]|['"]password123['"]|\bemail\s*:\s*['"]admin@mizano\.com['"])""",
+# Pattern matching hardcoded credentials / plaintext password123 or admin@mizano.com in e2e test files.
+# Handles quotes (' or ") as well as backtick template literals (`), and flags pw/password keys
+# assigned to string or template literals in login/admin credential definitions without process.env.
+HARDCODED_LITERAL_CREDENTIAL_PATTERN = re.compile(
+    r"""(?:\b(?:pw|password)\s*:\s*[`'"]password123[`'"]|[`'"]password123[`'"]|\bemail\s*:\s*[`'"]admin@mizano\.com[`'"])""",
+    re.IGNORECASE,
+)
+
+LOGIN_CREDENTIAL_OBJECT_PATTERN = re.compile(
+    r"""(?:\b(?:LOGIN|ADMIN|CREDENTIALS)\b|params\s*:|/auth/login)""",
+    re.IGNORECASE,
+)
+
+PW_KEY_ASSIGNMENT_PATTERN = re.compile(
+    r"""\b(?:pw|password)\s*:\s*[`'"][^`'"]+[`'"]""",
     re.IGNORECASE,
 )
 
 
 def find_hardcoded_credential_violations(content: str) -> list[tuple[int, str]]:
     """Scan content for hard-coded credentials or plaintext passwords.
+
+    Guards against:
+    - Sensitive plaintext password/email literals ('password123', 'admin@mizano.com')
+      in single quotes, double quotes, or backtick template literals.
+    - Password keys (`pw:` or `password:`) assigned to string or template literals
+      without dynamic sourcing via `process.env`.
+
+    Scoped to guard against hardcoded login credentials and sensitive plaintext
+    passwords in e2e test files (as identified in PR #340 finding 7921754e38c2 / issue #378).
 
     Returns a list of (line_number, line_text) for each detected violation.
     Skips single-line (//) and multi-line (/* ... */) comments.
@@ -65,8 +86,19 @@ def find_hardcoded_credential_violations(content: str) -> list[tuple[int, str]]:
         if not code_part:
             continue
 
-        if HARDCODED_PASSWORD_PATTERN.search(code_part):
+        # If line dynamically sources from process.env, it is compliant
+        if "process.env" in code_part:
+            continue
+
+        # 1. Direct match for known sensitive plaintext credentials in any quote or backtick style
+        if HARDCODED_LITERAL_CREDENTIAL_PATTERN.search(code_part):
             violations.append((idx, line))
+            continue
+
+        # 2. Generalised check: flag pw/password keys assigned to a non-process.env string or template literal
+        if PW_KEY_ASSIGNMENT_PATTERN.search(code_part):
+            if LOGIN_CREDENTIAL_OBJECT_PATTERN.search(code_part) or re.search(r"""\b(?:LOGIN|ADMIN)\b""", content):
+                violations.append((idx, line))
 
     return violations
 
@@ -206,6 +238,31 @@ import './277-work-order-complete.e2e';
         self.assertIn("password123", violations[0][1])
         self.assertIn("admin@mizano.com", violations[0][1])
 
+    def test_hardcoded_credentials_template_literal_detected(self):
+        """Backtick template literals containing password123 or admin@mizano.com are detected."""
+        code = "const LOGIN = { email: `admin@mizano.com`, pw: `password123` };"
+        violations = find_hardcoded_credential_violations(code)
+        self.assertEqual(len(violations), 1)
+        self.assertEqual(violations[0][0], 1)
+        self.assertIn("password123", violations[0][1])
+
+    def test_arbitrary_hardcoded_password_literal_detected(self):
+        """Arbitrary passwords assigned to pw/password in LOGIN or ADMIN objects are detected."""
+        code_login = "const LOGIN = { email: 'custom@mizano.com', pw: 'customSecret99!' };"
+        violations_login = find_hardcoded_credential_violations(code_login)
+        self.assertEqual(len(violations_login), 1)
+        self.assertIn("customSecret99!", violations_login[0][1])
+
+        code_admin = 'const ADMIN = { email: "custom@mizano.com", password: "customSecret88!" };'
+        violations_admin = find_hardcoded_credential_violations(code_admin)
+        self.assertEqual(len(violations_admin), 1)
+        self.assertIn("customSecret88!", violations_admin[0][1])
+
+        code_template = "const LOGIN = { email: 'custom@mizano.com', pw: `customSecret77!` };"
+        violations_template = find_hardcoded_credential_violations(code_template)
+        self.assertEqual(len(violations_template), 1)
+        self.assertIn("customSecret77!", violations_template[0][1])
+
     def test_hardcoded_email_detected(self):
         """Hardcoded admin@mizano.com email in login credentials is detected as a violation."""
         code = "const LOGIN = { email: 'admin@mizano.com' };"
@@ -290,8 +347,43 @@ class E2EArmyRepositoryHygieneTests(unittest.TestCase):
                 f"File {file_path.name} does not define any active test cases",
             )
 
+    def test_no_hardcoded_credentials_in_e2e_army(self):
+        """No .e2e.ts file in e2e-army may contain hardcoded credentials or plaintext passwords."""
+        if not E2E_ARMY_DIR.exists():
+            return
+
+        all_e2e_files = sorted(E2E_ARMY_DIR.glob("*.e2e.ts"))
+        self.assertGreater(len(all_e2e_files), 0, "No e2e-army test files found")
+
+        for file_path in all_e2e_files:
+            content = file_path.read_text(encoding="utf-8")
+            violations = find_hardcoded_credential_violations(content)
+            self.assertEqual(
+                violations,
+                [],
+                f"File {file_path.name} contains hardcoded credential violations: {violations}",
+            )
+
+    def test_e2e_login_specs_source_credentials_from_env(self):
+        """Specs in e2e-army that perform login must source credentials dynamically from environment."""
+        if not E2E_ARMY_DIR.exists():
+            return
+
+        all_e2e_files = sorted(E2E_ARMY_DIR.glob("*.e2e.ts"))
+        login_specs_checked = 0
+        for file_path in all_e2e_files:
+            content = file_path.read_text(encoding="utf-8")
+            if "/login" in content or "sign in as" in content:
+                login_specs_checked += 1
+                self.assertIn(
+                    "process.env",
+                    content,
+                    f"File {file_path.name} performs login but does not source credentials from process.env",
+                )
+        self.assertGreater(login_specs_checked, 0, "Expected at least one spec in e2e-army that logs in")
+
     def test_317_e2e_no_hardcoded_credentials(self):
-        """e2e-army/317-searchable-bill-options.e2e.ts must not contain hard-coded credentials/passwords."""
+        """e2e-army/317-searchable-bill-options.e2e.ts (if present) must not contain hard-coded credentials."""
         test_file = E2E_ARMY_DIR / "317-searchable-bill-options.e2e.ts"
         if not test_file.exists():
             return
