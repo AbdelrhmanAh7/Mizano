@@ -68,6 +68,7 @@ export class FakeIntakeJobTable {
         maxAttempts: 3,
         lastError: null,
         result: null,
+        stageTimingsMs: null,
         forceType: null,
         strategy: null,
         language: null,
@@ -97,6 +98,11 @@ export class FakeIntakeJobTable {
         row.updatedAt = new Date();
       }
       return { count: hit.length };
+    }),
+    delete: jest.fn(async ({ where }: { where: Where }) => {
+      const idx = this.rows.findIndex((r) => matches(r as unknown as Row, where));
+      if (idx >= 0) this.rows.splice(idx, 1);
+      return { count: idx >= 0 ? 1 : 0 };
     }),
   };
 }

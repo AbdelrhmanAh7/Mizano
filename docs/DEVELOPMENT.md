@@ -21,7 +21,7 @@ pnpm db:seed
 pnpm dev                # docker-compose up -d && turbo dev → web :5001, API :6001
 ```
 
-Never initialize, migrate or reset a shared or production database from a workstation. AI routes need an inference backend (`OLLAMA_BASE_URL`) until the CPU extraction work lands; they return errors rather than fake results when it is missing.
+Never initialize, migrate or reset a shared or production database from a workstation. AI routes need an inference backend (`OLLAMA_BASE_URL`) until the CPU extraction work lands; they return errors rather than fake results when it is missing. Document intake processing requires Redis (`REDIS_URL`) and the intake worker (`intake-worker.ts`); without Redis, the API fails fast with a clear error instead of leaving uploads queued indefinitely.
 
 | Service    | Local port | URL                                                |
 | ---------- | ---------- | -------------------------------------------------- |
@@ -119,6 +119,24 @@ The E2E suites boot the full app against one shared database, so `test:e2e` runs
 
 Unit-test infrastructure lives in `apps/api/src/test/`: `mocks/prisma.mock.ts` (deep Prisma mock, transactions call back with the mock), `mocks/redis.mock.ts` (in-memory cache), `mocks/{sharp,tesseract}.mock.js` (heavy native/OCR libraries), `helpers/test-utils.ts` (typed factories) and `helpers/decimal.helpers.ts`. Unit tests must not need Redis, PostgreSQL, Ollama or the network.
 
+### API E2E against a throwaway PostgreSQL
+
+`pnpm ci:full` runs no E2E spec, and every `apps/api/test/*.e2e-spec.ts` needs a real PostgreSQL 16 (row locking is part of what they prove, so never point them at SQLite or an in-memory database). Any empty database works, including `pnpm docker:up` on port 5435. For a clean run that cannot touch developer data, start a throwaway cluster from the repo root:
+
+```bash
+initdb -D $TMPDIR/mz-pg/data -U mizano --auth=trust -E UTF8 --locale=C
+pg_ctl -D $TMPDIR/mz-pg/data -l $TMPDIR/mz-pg/pg.log \
+  -o "-p 55494 -c listen_addresses=127.0.0.1" -w start
+createdb -h 127.0.0.1 -p 55494 -U mizano mizano_e2e
+pnpm --filter @mizano/shared-types --filter @mizano/validators build   # ts-jest resolves the package types
+export DATABASE_URL=postgresql://mizano@127.0.0.1:55494/mizano_e2e APP_ENV=e2e
+(cd apps/api && npx prisma migrate deploy)                              # same command as the Pi deploy
+(cd apps/api && npx jest --config ./test/jest-e2e.json --runInBand)     # or one spec: test/posting-integrity.e2e-spec.ts
+pg_ctl -D $TMPDIR/mz-pg/data stop
+```
+
+`APP_ENV=e2e` has no `.env` file, so no developer environment is loaded. Without `REDIS_URL` the cache falls back to memory, so Redis is optional. `setup-e2e.ts` sets the JWT secrets. A CI job for these specs would need a `postgres:16` service plus the `migrate deploy` and `test:e2e` steps above; CI changes are owner-only, so propose them in `AI_QUESTIONS.md`.
+
 Rules:
 
 - After any change run the affected spec, then the full API and web suites before finishing.
@@ -144,7 +162,7 @@ Zero-tolerance policy: `pnpm ci:full` must pass with no warnings or errors (no `
 
 - Branch from current `master`; one issue, branch and worktree per worker (`demo/<issue>-<topic>` during the sprint). Every change goes through a PR linked to an issue, using `.github/pull_request_template.md`, with independent review of the exact tested head.
 - Conventional commits enforced by commitlint (`commitlint.config.js`): types `feat fix docs style refactor perf test build ci chore revert`, lower-case subject, max 72 characters, no trailing period.
-- Hooks (husky): `pre-commit` runs `_lint_staged.js` (ESLint `--fix` + Prettier on staged files, Windows-safe replacement for lint-staged); `commit-msg` runs commitlint; `pre-push` runs `turbo run type-check test --filter=...[<base>]` (type-check + unit tests for the changed packages and their dependents — every package when root config such as `package.json`/`pnpm-lock.yaml`/`turbo.json` changes, or when the pushed commit differs from checked-out HEAD; ~20–40 s, ≤ 2.5 min cold for all packages; no lint, build or E2E). Both hooks run under a watchdog: 60 s for pre-commit, 290 s for pre-push (the 5-minute rule). The full CI (`pnpm ci:full`, build, E2E) runs on CI / via the hub's `localci` job, which posts the GitHub commit statuses. Hooks work in linked worktrees and skip with a one-line note when that worktree has no `node_modules` (they never install); bypass deliberately with `HUSKY=0` (or `SKIP_LOCAL_CI=1` for pre-push).
+- Hooks (husky): `pre-commit` runs `_lint_staged.js` (ESLint `--fix` + Prettier on staged files, Windows-safe replacement for lint-staged; preserves unstaged hunks); `commit-msg` runs commitlint; `pre-push` runs `turbo run type-check test --filter=...[<base>]` (type-check + unit tests for the changed packages and their dependents — every package when root config such as `package.json`/`pnpm-lock.yaml`/`pnpm-workspace.yaml`/`.npmrc`/`turbo.json`/`tsconfig*` changes, or when the pushed commit differs from checked-out HEAD; 0.7 s for 0 pkgs, 3.4 s warm turbo cache, ~20–40 s cold for changed package, ≤ 2.5 min cold for all packages; no lint, build or E2E). Both hooks run under a watchdog: 60 s for pre-commit, 290 s for pre-push (the 5-minute rule). The full CI (`pnpm ci:full`, build, E2E) runs on CI / via the hub's `localci` job, which posts the GitHub commit statuses. Hooks work in linked worktrees and skip with a one-line note when that worktree has no `node_modules` (they never install); bypass deliberately with `HUSKY=0` (or `SKIP_LOCAL_CI=1` for pre-push).
 - Prettier: single quotes, semicolons, trailing commas, width 100 (`.prettierrc`).
 
 ## Deployment
@@ -154,7 +172,7 @@ Zero-tolerance policy: `pnpm ci:full` must pass with no warnings or errors (no `
 1. skips the rollout only for the reviewed planning-only paths in `docs/planning/rollout-exemption.json`;
 2. builds `apps/api/Dockerfile` and `apps/web/Dockerfile`, pushing `ghcr.io/abdelrhmanah7/mizano-{api,web}` tagged with the short SHA and `latest`;
 3. copies `docker-compose.production.yml`, `apps/api/prisma/` and `nginx/` to the VM, writes `~/mizano/.env` from repository secrets;
-4. starts PostgreSQL/Redis, syncs the DB password, restarts `api`, `web`, `nginx`, then runs `prisma migrate deploy` and the idempotent seed;
+4. starts PostgreSQL/Redis, syncs the DB password, restarts `api`, `web`, `nginx`, then runs `prisma migrate deploy` and the seed (which aborts with exit 1 under `NODE_ENV=production` unless `SEED_ALLOW_PROD=1`, so demo users are never created in production by accident);
 5. checks `GET /api/health` over SSH.
 
 Required secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `PRODUCTION_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `NEXTAUTH_SECRET`.
