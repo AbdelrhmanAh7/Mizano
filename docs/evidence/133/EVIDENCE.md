@@ -4,8 +4,11 @@
 - **PR**: Refs #133 (PR #354 — narrowed per CTO directive to scheduler gating, dead code removal, narrative dedupe, and notification pagination; does **not** close #133)
 - **Date**: 2026-10-22
 - **Platform**: macOS (Apple Silicon arm64)
-- **Base SHA (`master`)**: `e5d9b805563c04df3300f00442fd18f7d82ce560`
-- **Tested Code Head**: `256d9ae967e798bd3146bb9cd64f09e1abd30e1b` (final test code; the only later commit is this file)
+- **Base SHA (`master`)**: `bf3f67a8459424775d7102e3b2e3a152fe1f1ec7`
+- **Tested Code Head**: `5700ed153d43c0ff50553152ef71950bb9294346`
+- **Originating Sentry Issue**: None (originates from architecture audit #133).
+- **Skills Used**: `verification-before-completion`, `systematic-debugging`, `diagnosing-bugs`, `model-effort-routing`.
+- **Model and Effort**: `Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: High · Why: Backend architecture refactor, scheduler gating, dead code removal, and evidence binding for issue #133`.
 
 ---
 
