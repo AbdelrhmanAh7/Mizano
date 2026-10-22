@@ -8,23 +8,19 @@ test(
     const email = process.env.E2E_USER_EMAIL || 'admin@mizano.com';
     const password = process.env.E2E_USER_PASSWORD || ['pass', 'word', '123'].join('');
 
-    // Submit the login form through testing-library screen API.
-    // Retries up to 3 times to handle next dev compilation / pre-hydration timing safely.
-    for (let i = 0; i < 3; i++) {
-      await app.open('/en/login');
-      await expect(screen.getByRole('button', 'Sign In')).toBeVisible();
-      await screen.getByLabel('Email').fill(email);
-      await screen.getByLabel('Password').fill(password);
-      await screen.getByRole('button', 'Sign In').tap();
-      try {
-        await expect(browser).toHaveURL(/\/en\/(dashboard|onboarding|accounting|sales)/, {
-          timeout: 40_000,
-        });
-        break;
-      } catch (e) {
-        if (i === 2) throw e;
-      }
-    }
+    // Submit the login form through testing-library screen API
+    await app.open('/en/login');
+    await expect(screen.getByRole('button', 'Sign In')).toBeVisible();
+    await screen.getByLabel('Email').fill(email);
+    await screen.getByLabel('Password').fill(password);
+    await screen.getByRole('button', 'Sign In').tap();
+
+    await expect(browser).toHaveURL(/\/en\/(dashboard|onboarding|accounting|sales)/, {
+      timeout: 40_000,
+    });
+
+    // Assert that the signed-in UI receives and renders the session user data
+    await expect(screen.getByText(/Welcome back/i)).toBeVisible();
 
     // Verify the signed-in UI receives the sanitized session
     const session = await browser.evaluate(async () => {

@@ -46,6 +46,8 @@ In the PR review debate (`pr-AbdelrhmanAh7/Mizano-363`), the judge review reques
    - Implemented UI form submission using testing-library `screen` API (`screen.getByRole`, `screen.getByLabel`).
    - Retained direct credentials callback as a separate `lvl:api` test for deterministic authentication setup.
    - Added explicit Arabic RTL verification test confirming `document.documentElement.dir === 'rtl'` on `/ar/login`.
+   - Asserted that the signed-in UI receives and renders session user data (`screen.getByText(/Welcome back/i)`).
+   - Removed retry loops to ensure deterministic execution and prevent misbehavior across navigation.
 
 4. **Evidence Document Head Binding:**
    - Strictly binds the Tested Head Commit to `e8ab9e9ac61642381c56b03f52642bd661e62999`.
@@ -64,7 +66,7 @@ In the PR review debate (`pr-AbdelrhmanAh7/Mizano-363`), the judge review reques
 - **AC2 (Refresh token omission):** NextAuth GET `/api/auth/session` strictly omits `refreshToken` from the session object, `session.user`, and serialized JSON payload. The refresh token stays securely in the encrypted HTTP-only JWT cookie.
 - **AC3 (Error session coverage):** When `token.error` is present (e.g. `RefreshAccessTokenError`), the returned session includes `error: 'RefreshAccessTokenError'` alongside complete user fields and `accessToken`, while strictly omitting `refreshToken`.
 - **AC4 (Signed-out session coverage):** When unauthenticated, GET `/api/auth/session` returns HTTP 200 with an empty object `{}`.
-- **AC5 (E2E session coverage via screen API & RTL):** `e2e-army/361-session-shape.e2e.ts` tests session shape and refresh token omission from both UI (`lvl:ui`) and API (`lvl:api`) perspectives under tag `feat:mz-auth`. The UI test exercises login form submission through the testing-library `screen` API and verifies that the signed-in UI receives the sanitized session. An additional UI test asserts Arabic RTL direction (`dir="rtl"`) on `/ar/login`. The direct credentials request is retained as a separate API check.
+- **AC5 (E2E session coverage via screen API & RTL):** `e2e-army/361-session-shape.e2e.ts` tests session shape and refresh token omission from both UI (`lvl:ui`) and API (`lvl:api`) perspectives under tag `feat:mz-auth`. The UI test exercises login form submission through the testing-library `screen` API, asserts that the signed-in UI renders the session user data via `screen.getByText(/Welcome back/i)`, and verifies that the signed-in UI receives the sanitized session. An additional UI test asserts Arabic RTL direction (`dir="rtl"`) on `/ar/login`. The direct credentials request is retained as a separate API check.
 
 ## Red-to-Green Regression Proof
 
