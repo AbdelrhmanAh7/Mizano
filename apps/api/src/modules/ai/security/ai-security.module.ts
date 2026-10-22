@@ -12,7 +12,7 @@ import { AuditRiskController } from '../controllers/audit-risk.controller';
 import { ComplianceMonitoringController } from '../controllers/compliance-monitoring.controller';
 import { FraudDetectionController } from '../controllers/fraud-detection.controller';
 
-// Scheduler (registered only when AI_SCHEDULERS_ENABLED=true, see issue #133)
+// Scheduler (registered only when AI_SCHEDULERS_ENABLED=true, see issue #133 scheduler gating)
 import { AiSecurityScheduler } from '../schedulers/ai-security.scheduler';
 import { aiSchedulerProviders } from '../schedulers/ai-schedulers.enabled';
 
