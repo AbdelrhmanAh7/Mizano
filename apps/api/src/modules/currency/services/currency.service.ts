@@ -44,7 +44,7 @@ export class CurrencyService {
     if (existing) {
       // Update existing rate
       return this.prisma.exchangeRate.update({
-        where: { id: existing.id },
+        where: { id: existing.id, organizationId },
         data: {
           rate: new Decimal(dto.rate),
           source: dto.source || 'MANUAL',
@@ -74,7 +74,7 @@ export class CurrencyService {
     }
 
     return this.prisma.exchangeRate.update({
-      where: { id },
+      where: { id, organizationId },
       data: {
         rate: new Decimal(dto.rate),
         source: dto.source,
@@ -91,7 +91,7 @@ export class CurrencyService {
       throw new NotFoundException('Exchange rate not found');
     }
 
-    await this.prisma.exchangeRate.delete({ where: { id } });
+    await this.prisma.exchangeRate.delete({ where: { id, organizationId } });
     return { message: 'Exchange rate deleted' };
   }
 
