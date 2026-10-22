@@ -508,7 +508,7 @@ export class ReportsController {
   @CacheResponse('reports:general-ledger')
   @CacheTTL(600)
   @ApiOperation({ summary: 'Get General Ledger for account' })
-  public async getGeneralLedger(
+  async getGeneralLedger(
     @CurrentOrg() orgId: string,
     @Param('accountId') accountId: string,
     @Query('startDate') startDate?: string,

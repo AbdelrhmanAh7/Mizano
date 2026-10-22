@@ -131,7 +131,9 @@ describe('FinancialReportsService', () => {
   describe('assertAccountOwnership (#223)', () => {
     it('asserts the account belongs to the caller organization and returns Promise<void>', async () => {
       prisma.account.findFirst.mockResolvedValue({ id: 'acc-cash' } as never);
-      const res = await service.assertAccountOwnership(ORG_ID, 'acc-cash');
+      const promise = service.assertAccountOwnership(ORG_ID, 'acc-cash');
+      expect(promise).toBeInstanceOf(Promise);
+      const res = await promise;
       expect(res).toBeUndefined();
       expect(prisma.account.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'acc-cash', organizationId: ORG_ID } }),
