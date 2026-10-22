@@ -5,7 +5,7 @@
 - **Issue**: #257 (`Fresh restart of #142: Add an e2e that the API process has no tesseract.js or pdf-parse in the require cache, and that ...`)
 - **Supersedes**: PR #146 (Issue #142)
 - **Base Commit**: `e5d9b805563c04df3300f00442fd18f7d82ce560` (`origin/master`)
-- **Tested Code Head SHA**: `77389e59324f1ea1120bc40129d1a6e7dd8958a5`
+- **Tested Code Head SHA**: `5f95bbef08544d65007bfbf5ae1115b021312ec1`
 - **Originating Sentry Issue**: None (Architectural worker-isolation requirement from #142 / #257)
 - **User-facing flow / E2E**: Covered by `e2e-army/257-intake-worker.e2e.ts` (tags `feat:mz-document-intake`, `lvl:api`)
 
@@ -23,6 +23,7 @@
    - Unit test for `HealthController.checkModules()` asserting `tesseractLoaded: false`, `pdfParseLoaded: false`, `ocrModules: []`
 3. `apps/api/src/modules/ai/intake/intake.worker.spec.ts`:
    - Unit test asserting API `require.cache` has 0 occurrences of `tesseract.js` or `pdf-parse`
+   - Unit test asserting worker extraction loads `pdf-parse` into `require.cache` during document processing
    - Unit test verifying `docker-compose.production.yml` defines the `intake-worker` service running `dist/intake-worker.js` with non-HTTP heartbeat healthcheck
 4. `apps/api/src/modules/ai/utils/pdf-extractor.util.spec.ts`:
    - 3 unit tests verifying `extractTextFromPdf` works with lazy `pdf-parse` loading and zero-offset Uint8Array buffer slices
@@ -47,9 +48,10 @@
 | ------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | --------- | ---------- |
 | **AC1** | No `tesseract.js` or `pdf-parse` in API require cache | `pnpm --filter api exec jest src/health/health.controller.spec.ts`                                                                | 3/3 tests PASS (reports clean module cache)                                                               | 0         | **PASSED** |
 | **AC1** | No OCR modules in unit test require cache             | `pnpm --filter api exec jest src/modules/ai/intake/intake.worker.spec.ts -t "API require.cache has no tesseract.js or pdf-parse"` | 1 test PASS                                                                                               | 0         | **PASSED** |
+| **AC1** | Worker extraction loads `pdf-parse` into cache        | `pnpm --filter api exec jest src/modules/ai/intake/intake.worker.spec.ts -t "worker extraction loads pdf-parse"`                  | 1 test PASS                                                                                               | 0         | **PASSED** |
 | **AC1** | Lazy `pdf-parse` extractor zero-offset handling       | `pnpm --filter api exec jest src/modules/ai/utils/pdf-extractor.util.spec.ts`                                                     | 3/3 tests PASS                                                                                            | 0         | **PASSED** |
 | **AC2** | E2E army tests for require cache and intake flow      | `e2e-army/257-intake-worker.e2e.ts`                                                                                               | 5 scenarios covering require cache checks before/after upload, 401 unauth, 201 queued job, 400 empty body | —         | **PASSED** |
-| **AC3** | Worker headless execution & lifecycle                 | `pnpm --filter api exec jest src/modules/ai/intake/intake.worker.spec.ts`                                                         | 6/6 tests PASS (IntakeModule exports, createIntakeWorker bare context, graceful shutdown)                 | 0         | **PASSED** |
+| **AC3** | Worker headless execution & lifecycle                 | `pnpm --filter api exec jest src/modules/ai/intake/intake.worker.spec.ts`                                                         | 7/7 tests PASS (IntakeModule exports, createIntakeWorker bare context, graceful shutdown)                 | 0         | **PASSED** |
 | **AC4** | Compose worker service & Dockerfile intake dir        | `pnpm --filter api exec jest src/modules/ai/intake/intake.worker.spec.ts -t "docker-compose.production.yml"`                      | 1 test PASS (`dist/intake-worker.js`, heartbeat probe, volume)                                            | 0         | **PASSED** |
 | **AC4** | Worker deploy gating & health script                  | `pnpm --filter api exec jest src/deploy-worker-gating.spec.ts`                                                                    | 3/3 tests PASS (wait_healthy, healthcheck.sh check_worker)                                                | 0         | **PASSED** |
 | **AC5** | TypeScript type checking                              | `pnpm --filter api type-check`                                                                                                    | Clean (0 errors across `tsc --noEmit` and `test/tsconfig.e2e.json`)                                       | 0         | **PASSED** |

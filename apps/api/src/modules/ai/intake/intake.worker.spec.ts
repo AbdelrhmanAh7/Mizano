@@ -151,4 +151,17 @@ describe('docker-compose.production.yml intake-worker @issue-257 @issue-142', ()
     const pdfParseKeys = Object.keys(require.cache).filter((k) => k.includes('pdf-parse'));
     expect(pdfParseKeys).toHaveLength(0);
   });
+
+  it('worker extraction loads pdf-parse into require.cache during document processing', async () => {
+    const { extractTextFromPdf } = await import('../utils/pdf-extractor.util');
+    const pdfBytes = Buffer.from(
+      '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n' +
+        '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n' +
+        '4 0 obj<</Length 35>>stream\nBT /F1 12 Tf 20 100 Td (Invoice Test) Tj ET\nendstream endobj\n' +
+        '5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n',
+    );
+    await extractTextFromPdf(pdfBytes);
+    const pdfParseKeys = Object.keys(require.cache).filter((k) => k.includes('pdf-parse'));
+    expect(pdfParseKeys.length).toBeGreaterThan(0);
+  });
 });
