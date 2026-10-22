@@ -20,14 +20,6 @@ describe('HealthController', () => {
     expect(modules.ocrModules).toEqual([]);
   });
 
-  it('reports worker module cache as healthy with empty modules', async () => {
-    const workerModules = await controller.checkWorkerModules();
-    expect(workerModules.status).toBe('healthy');
-    expect(workerModules.tesseractLoaded).toBe(false);
-    expect(workerModules.pdfParseLoaded).toBe(false);
-    expect(workerModules.ocrModules).toEqual([]);
-  });
-
   it('reports liveness', () => {
     const live = controller.liveness();
     expect(live.alive).toBe(true);

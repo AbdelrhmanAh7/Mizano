@@ -114,19 +114,4 @@ export class HealthController {
       ocrModules,
     };
   }
-
-  @Get('worker-modules')
-  async checkWorkerModules(): Promise<{
-    status: 'healthy' | 'unavailable';
-    tesseractLoaded: boolean;
-    pdfParseLoaded: boolean;
-    ocrModules: string[];
-  }> {
-    return {
-      status: 'healthy',
-      tesseractLoaded: false,
-      pdfParseLoaded: false,
-      ocrModules: [],
-    };
-  }
 }

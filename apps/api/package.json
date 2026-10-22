@@ -137,6 +137,7 @@
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
     "moduleNameMapper": {
+      "^@mizano/shared-types$": "<rootDir>/../../../packages/shared-types/src/index.ts",
       "^@mizano/validators$": "<rootDir>/../../../packages/validators/src/index.ts"
     },
     "setupFilesAfterEnv": [
