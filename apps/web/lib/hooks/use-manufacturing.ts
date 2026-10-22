@@ -361,7 +361,8 @@ export function useCompleteWorkOrder() {
       producedQuantity?: number;
     }) => {
       // Validate that either quantityProduced or producedQuantity is provided.
-      // Explicit 0 is a valid quantity; missing/null/undefined throws to prevent silent defaulting.
+      // Prioritizes canonical quantityProduced when both are provided, falling back to producedQuantity.
+      // Explicit 0 is a valid quantity; missing/null/undefined throws to prevent silent defaulting to zero.
       const quantity = quantityProduced ?? producedQuantity;
       if (quantity === undefined || quantity === null) {
         throw new Error('A completion quantity is required');

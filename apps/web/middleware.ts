@@ -42,6 +42,7 @@ export async function middleware(request: NextRequest) {
       return intlMiddleware(request);
     }
     // Has a cookie — verify token to redirect authenticated users to dashboard
+    // Uses request.nextUrl to preserve incoming request origin/host and prevent cross-origin redirect CORS errors
     const token = await getToken({ req: request });
     if (token && !pathname.includes('/dashboard')) {
       return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.nextUrl));
