@@ -43,6 +43,35 @@ const customerSchema = z.object({
 });
 
 type CustomerFormData = z.infer<typeof customerSchema>;
+type AddressFormData = z.infer<typeof addressSchema>;
+
+// Empty inputs become null so an edit can clear a field.
+const addressPayload = (address?: AddressFormData) => ({
+  street: address?.street || null,
+  city: address?.city || null,
+  state: address?.state || null,
+  postalCode: address?.postalCode || null,
+  country: address?.country || null,
+});
+
+/**
+ * Body for POST/PATCH /customers. The API DTO takes nested billingAddress/shippingAddress
+ * objects and rejects unknown keys, so flat billingStreet/... fields would be a 400 (#260).
+ */
+export function buildCustomerPayload(data: CustomerFormData): Record<string, unknown> {
+  return {
+    name: data.name,
+    displayName: data.displayName || null,
+    email: data.email || null,
+    phone: data.phone || null,
+    currency: data.currency,
+    taxId: data.taxId || null,
+    paymentTerms: data.paymentTerms || 0,
+    notes: data.notes || null,
+    billingAddress: addressPayload(data.billingAddress),
+    shippingAddress: addressPayload(data.shippingAddress),
+  };
+}
 
 interface CustomerFormProps {
   customer?: Customer | null;
@@ -129,28 +158,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
   }, [customer, form]);
 
   const handleSubmit = (data: CustomerFormData) => {
-    // Flatten addresses for API
-    const submitData = {
-      name: data.name,
-      displayName: data.displayName || null,
-      email: data.email || null,
-      phone: data.phone || null,
-      currency: data.currency,
-      taxId: data.taxId || null,
-      paymentTerms: data.paymentTerms || 0,
-      notes: data.notes || null,
-      billingStreet: data.billingAddress?.street || null,
-      billingCity: data.billingAddress?.city || null,
-      billingState: data.billingAddress?.state || null,
-      billingPostalCode: data.billingAddress?.postalCode || null,
-      billingCountry: data.billingAddress?.country || null,
-      shippingStreet: data.shippingAddress?.street || null,
-      shippingCity: data.shippingAddress?.city || null,
-      shippingState: data.shippingAddress?.state || null,
-      shippingPostalCode: data.shippingAddress?.postalCode || null,
-      shippingCountry: data.shippingAddress?.country || null,
-    };
-    onSubmit(submitData as Record<string, unknown>);
+    onSubmit(buildCustomerPayload(data));
   };
 
   const copyBillingToShipping = () => {
