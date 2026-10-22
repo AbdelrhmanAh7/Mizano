@@ -296,6 +296,7 @@ export class PdfService {
         employeeId: payslip.employee.employeeNumber || payslip.employee.employeeId,
         department: payslip.employee.department || undefined,
         position: payslip.employee.position || payslip.employee.jobTitle || undefined,
+        jobTitle: payslip.employee.jobTitle || payslip.employee.position || undefined,
         email: payslip.employee.email || undefined,
         bankAccount: payslip.employee.bankAccount || undefined,
       },
