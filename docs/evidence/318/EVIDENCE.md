@@ -6,8 +6,8 @@
 - **Parent PR / Issue:** Split from PR #230 (parent issue #216).
 - **Supersedes:** Supersedes part of #230.
 - **Originating Sentry Issue:** None (security / accounting integrity finding raised during PR #230 review).
-- **Base Commit (`origin/master`):** `f362ff2769493998be770c8abaf556f890c5da23`
-- **Tested Code Head:** `731a4d630df0a483d1f6b0a9c0d43a3283f0af5d`
+- **Base Commit (`origin/master`):** `bf3f67a80294e9c79f1bb5bfab65ac637e21658a`
+- **Tested Code Head:** `65f6a2a3e40758250465c29184fc42c6da45be8c`
 - **Tested Branch:** `ai/318`
 - **Host Environment:** Darwin arm64 (macOS), Node.js v20+, pnpm 8.14.0
 - **Model and Effort:** Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: High · Why: Enforce active expense and asset account validation across bills service create/update/approve boundaries and web form schema, verify Arabic RTL layout, and provide exhaustive test evidence
@@ -56,7 +56,7 @@
       Resolved to value: undefined
   Exit code: 1
   ```
-- **On Head (`731a4d63`):**
+- **On Head (`65f6a2a3`):**
   ```text
   PASS src/modules/purchases/services/bills.service.spec.ts
     ✓ should reject a bill line with an account of invalid type on create (1 ms)
@@ -74,7 +74,7 @@
       Resolved to value: undefined
   Exit code: 1
   ```
-- **On Head (`731a4d63`):**
+- **On Head (`65f6a2a3`):**
   ```text
   PASS src/modules/purchases/services/bills.service.spec.ts
     ✓ should reject an inactive account on create (1 ms)
@@ -91,7 +91,7 @@
       Received: Promise continued to updateMany without validating account type
   Exit code: 1
   ```
-- **On Head (`731a4d63`):**
+- **On Head (`65f6a2a3`):**
   ```text
   PASS src/modules/purchases/services/bills.service.spec.ts
     ✓ should reject an account of invalid type when updating draft bill lines (1 ms)
@@ -108,7 +108,7 @@
       Received: Promise continued to updateMany without validating account active status
   Exit code: 1
   ```
-- **On Head (`731a4d63`):**
+- **On Head (`65f6a2a3`):**
   ```text
   PASS src/modules/purchases/services/bills.service.spec.ts
     ✓ should reject an inactive account when updating draft bill lines (1 ms)
@@ -125,7 +125,7 @@
       Received: Promise continued to updateMany without checking account type
   Exit code: 1
   ```
-- **On Head (`731a4d63`):**
+- **On Head (`65f6a2a3`):**
   ```text
   PASS src/modules/purchases/services/bills.service.spec.ts
     ✓ should reject approval when a line references an invalid account type (1 ms)
@@ -142,7 +142,7 @@
       Received: Promise continued to updateMany without checking account active status
   Exit code: 1
   ```
-- **On Head (`731a4d63`):**
+- **On Head (`65f6a2a3`):**
   ```text
   PASS src/modules/purchases/services/bills.service.spec.ts
     ✓ should reject approval when a line references an inactive account (1 ms)
@@ -159,7 +159,7 @@
       Received: onSubmit called with inactive account
   Exit code: 1
   ```
-- **On Head (`731a4d63`):**
+- **On Head (`65f6a2a3`):**
   ```text
   PASS components/purchases/bill-form.scan.spec.tsx
     ✓ rejects submission when a line references an inactive expense account (27 ms)
