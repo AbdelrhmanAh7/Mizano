@@ -6,7 +6,7 @@ This document provides verification evidence for GitHub issue #387 in `Abdelrhma
 - **PR**: Supersedes part of #329
 - **Parent Issue**: #301
 - **Base Commit (`origin/master`)**: `bf3f67a80294e9c79f1bb5bfab65ac637e21658a`
-- **Tested Code Head SHA**: `ea5b4dd540ef68d4aec1bb2d9e72e8c0b4acb606`
+- **Tested Code Head SHA**: `b5081d3f1aa1a269e30fcbaca9e41af9c556d9f6`
 - **Tested Branch**: `ai/387`
 - **Originating Sentry Issue**: None (originates from QA / review finding `5a4511201d22` on PR #329 / parent issue #301).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20.18.0, pnpm 8.14.0, Python 3.14.8.
@@ -49,10 +49,10 @@ In PR #329 (split from parent issue #301), QA review finding `5a4511201d22` flag
 
 ## Numbered Acceptance Criteria
 
-- **AC1 (Nested Address Structure)**: `buildCustomerPayload` transforms form data into nested `billingAddress` and `shippingAddress` objects matching `CreateCustomerDto` and `UpdateCustomerDto`, omitting flat database fields (`billingStreet`, `billingCity`, etc.).
-- **AC2 (Null Conversion for Cleared Optional Strings)**: Cleared or empty optional strings (`displayName`, `email`, `phone`, `taxId`, `priceListId`) in `buildCustomerPayload` are converted to `null` instead of `undefined` or `""`, ensuring PATCH requests update the database to clear existing values.
-- **AC3 (Null Conversion for Cleared Address Fields)**: Cleared or empty nested address fields (`street`, `city`, `state`, `postalCode`, `country`) within `billingAddress` or `shippingAddress` are transformed to `null` so address components can be cleared on update.
-- **AC4 (Whitelist Hygiene / Dropped Notes)**: `buildCustomerPayload` drops unwhitelisted properties such as `notes` so that API validation pipes with `forbidNonWhitelisted: true` do not reject customer submissions with 400 Bad Request.
+- **AC1 (Nested Address Structure)**: `buildCustomerPayload` transforms form input containing address fields into nested `billingAddress` and `shippingAddress` objects conforming to `CreateCustomerDto` and `UpdateCustomerDto`, omitting flat address properties.
+- **AC2 (Null Conversion for Cleared Optional Strings)**: Empty string or whitespace-only inputs for optional fields (`displayName`, `email`, `phone`, `taxId`, `priceListId`) are converted to `null` so that `PATCH` requests explicitly clear database values.
+- **AC3 (Null Conversion for Cleared Address Fields)**: Empty string or whitespace-only subfields in `billingAddress` and `shippingAddress` are converted to `null`. When an address is provided as `null`, all subfields are set to `null`.
+- **AC4 (Whitelist Hygiene / Dropped Notes)**: Unwhitelisted properties (`notes`) are omitted from the generated customer payload so that API validation pipes with `forbidNonWhitelisted: true` do not reject customer submissions with 400 Bad Request.
 - **AC5 (CustomerForm Integration)**: `CustomerForm` delegates `handleSubmit` to `buildCustomerPayload` and re-exports `buildCustomerPayload`, submitting conforming nested payloads to the sales API.
 - **AC6 (Natural-Language E2E Army Verification)**: `e2e-army/387-customer-payload.e2e.ts` covers customer creation with nested address formatting, Arabic RTL verification, and clearing optional fields on PATCH.
 - **AC7 (Evidence & Freshness Contract)**: `docs/evidence/387/EVIDENCE.md` binds tested head SHA and verifies all acceptance criteria with exit code 0, validated by `scripts/test_evidence_freshness.py`.
@@ -92,3 +92,25 @@ In PR #329 (split from parent issue #301), QA review finding `5a4511201d22` flag
   - `CustomerForm` delegates to `buildCustomerPayload` and re-exports it.
   - All 15 unit tests in `customer-payload.spec.ts` pass with exit code 0.
   - Python evidence freshness contract passes with exit code 0.
+
+---
+
+## Pre-Push Verification Commands & Results
+
+```bash
+# 1. Unit tests for customer payload & form integration
+pnpm --filter web exec jest apps/web/components/sales/customer-payload.spec.ts
+# PASS components/sales/customer-payload.spec.ts (15 tests passed, exit code 0)
+
+# 2. Type-check web
+pnpm --filter web type-check
+# Exit code: 0
+
+# 3. Lint web
+pnpm --filter web lint
+# Exit code: 0
+
+# 4. Evidence freshness contract
+python3 scripts/test_evidence_freshness.py
+# Ran 12 tests in 0.016s - OK (exit code: 0)
+```
