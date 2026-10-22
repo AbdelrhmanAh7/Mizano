@@ -37,6 +37,19 @@ jest.mock('next/link', () => {
   return Link;
 });
 
+jest.mock('@/i18n/routing', () => ({
+  Link: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    prefetch: jest.fn(),
+  }),
+}));
+
 const mockUseBOM = jest.fn();
 const mockUseWorkOrdersByBom = jest.fn();
 const mockUseDeleteBOM = jest.fn();
