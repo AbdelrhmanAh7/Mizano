@@ -36,6 +36,36 @@ const nextConfig = {
     optimizePackageImports: ['lucide-react', 'date-fns'],
   },
 
+  async redirects() {
+    return [
+      {
+        source: '/crm/customers',
+        destination: '/sales/customers',
+        permanent: false,
+      },
+      {
+        source: '/crm/customers/new',
+        destination: '/sales/customers/new',
+        permanent: false,
+      },
+      {
+        source: '/:locale(en|ar)/crm/customers',
+        destination: '/:locale/sales/customers',
+        permanent: false,
+      },
+      {
+        source: '/:locale(en|ar)/crm/customers/new',
+        destination: '/:locale/sales/customers/new',
+        permanent: false,
+      },
+      {
+        source: '/:locale(en|ar)/crm/customers/:id/edit',
+        destination: '/:locale/sales/customers/:id/edit',
+        permanent: false,
+      },
+    ];
+  },
+
   async headers() {
     return [
       {
@@ -50,6 +80,12 @@ const nextConfig = {
       {
         source: '/:path*',
         headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET, POST, PUT, DELETE, PATCH, OPTIONS' },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'X-Requested-With, Content-Type, Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Url',
+          },
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           {

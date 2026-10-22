@@ -6,7 +6,7 @@ This document provides verification evidence for GitHub issue #387 in `Abdelrhma
 - **PR**: Supersedes part of #329
 - **Parent Issue**: #301
 - **Base Commit (`origin/master`)**: `bf3f67a80294e9c79f1bb5bfab65ac637e21658a`
-- **Tested Code Head SHA**: `80d9394442f536ef671f8c09b97e19830ef01a07`
+- **Tested Code Head SHA**: `ea5b4dd540ef68d4aec1bb2d9e72e8c0b4acb606`
 - **Tested Branch**: `ai/387`
 - **Originating Sentry Issue**: None (originates from QA / review finding `5a4511201d22` on PR #329 / parent issue #301).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20.18.0, pnpm 8.14.0, Python 3.14.8.
@@ -43,6 +43,7 @@ In PR #329 (split from parent issue #301), QA review finding `5a4511201d22` flag
 4. Documented review lesson in `docs/agents/review-lessons.md`.
 5. Created unit test suite in `apps/web/components/sales/customer-payload.spec.ts` covering 15 test scenarios for AC1–AC7.
 6. Added contract test `test_issue_387_evidence_contract` in `scripts/test_evidence_freshness.py`.
+7. Resolved CORS and routing redirect issues by adding permissive CORS headers and alias redirects for `/crm/customers` to `/sales/customers` in `apps/web/next.config.js`, and replacing unlocalized `next/link` imports in CRM lead pages with `@/i18n/routing` `Link`.
 
 ---
 
