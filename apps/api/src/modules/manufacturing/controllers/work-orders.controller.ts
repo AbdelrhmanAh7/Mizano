@@ -110,7 +110,7 @@ export class WorkOrdersController {
   complete(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
-    @Body() dto: { quantityProduced: number; notes?: string },
+    @Body() dto: { quantityProduced?: number; producedQuantity?: number; notes?: string },
   ) {
     return this.workOrdersService.completeWorkOrder(orgId, id, dto);
   }

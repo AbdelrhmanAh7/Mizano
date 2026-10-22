@@ -147,17 +147,9 @@ const workOrderApi = {
     const response = await api.post(`/manufacturing/work-orders/${id}/start`);
     return response.data;
   },
-  /**
-   * Complete a work order by sending the completion quantity.
-   * Matches backend endpoint POST /manufacturing/work-orders/:id/complete
-   * (see apps/api/src/modules/manufacturing/controllers/work-orders.controller.ts:110-116 and
-   * apps/api/src/modules/manufacturing/services/work-orders.service.ts:223-233 where dto.quantityProduced is consumed).
-   * Sends both quantityProduced and producedQuantity for wire contract safety and backward compatibility.
-   */
-  complete: async (id: string, quantity: number) => {
+  complete: async (id: string, producedQuantity: number) => {
     const response = await api.post(`/manufacturing/work-orders/${id}/complete`, {
-      producedQuantity: quantity,
-      quantityProduced: quantity,
+      producedQuantity,
     });
     return response.data;
   },
@@ -352,14 +344,14 @@ export function useCompleteWorkOrder() {
   return useMutation({
     mutationFn: ({
       id,
-      quantityProduced,
       producedQuantity,
+      quantityProduced,
     }: {
       id: string;
-      quantityProduced?: number;
       producedQuantity?: number;
+      quantityProduced?: number;
     }) => {
-      const quantity = quantityProduced ?? producedQuantity;
+      const quantity = producedQuantity ?? quantityProduced;
       if (quantity === undefined || quantity === null || Number.isNaN(quantity)) {
         throw new Error('A completion quantity is required');
       }

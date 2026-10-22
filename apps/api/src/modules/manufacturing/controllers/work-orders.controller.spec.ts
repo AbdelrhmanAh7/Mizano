@@ -49,4 +49,32 @@ describe('WorkOrdersController', () => {
     const metadata = Reflect.getMetadata(PATH_METADATA, WorkOrdersController.prototype.cancel);
     expect(metadata).toBe(':id/cancel');
   });
+
+  describe('complete delegation', () => {
+    it('delegates to workOrdersService.completeWorkOrder with producedQuantity dto', async () => {
+      const mockService = {
+        completeWorkOrder: jest.fn().mockResolvedValue({ id: 'wo-1', status: 'COMPLETED' }),
+      };
+      const controller = new WorkOrdersController(mockService as any);
+
+      const result = await controller.complete('org-1', 'wo-1', { producedQuantity: 5 });
+      expect(mockService.completeWorkOrder).toHaveBeenCalledWith('org-1', 'wo-1', {
+        producedQuantity: 5,
+      });
+      expect(result).toEqual({ id: 'wo-1', status: 'COMPLETED' });
+    });
+
+    it('delegates to workOrdersService.completeWorkOrder with quantityProduced dto', async () => {
+      const mockService = {
+        completeWorkOrder: jest.fn().mockResolvedValue({ id: 'wo-1', status: 'COMPLETED' }),
+      };
+      const controller = new WorkOrdersController(mockService as any);
+
+      const result = await controller.complete('org-1', 'wo-1', { quantityProduced: 10 });
+      expect(mockService.completeWorkOrder).toHaveBeenCalledWith('org-1', 'wo-1', {
+        quantityProduced: 10,
+      });
+      expect(result).toEqual({ id: 'wo-1', status: 'COMPLETED' });
+    });
+  });
 });

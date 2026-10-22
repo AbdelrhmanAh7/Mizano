@@ -1,3 +1,5 @@
+import { BadRequestException } from '@nestjs/common';
+import { WorkOrderStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { WorkOrdersService } from './work-orders.service';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -31,5 +33,100 @@ describe('WorkOrdersService movement signs', () => {
       where: { itemId: 'item', organizationId: 'org' },
       select: { quantity: true, movementType: true },
     });
+  });
+});
+
+describe('WorkOrdersService.completeWorkOrder wire-contract (@issue-401)', () => {
+  let prisma: ReturnType<typeof createMockPrisma>;
+  let service: WorkOrdersService;
+  let consumeSpy: jest.SpyInstance;
+  let addFinishedGoodsSpy: jest.SpyInstance;
+  let createCogmSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    prisma = createMockPrisma();
+    service = new WorkOrdersService(prisma as unknown as PrismaService);
+    jest.spyOn(service, 'findOne').mockResolvedValue({
+      id: 'wo-1',
+      status: WorkOrderStatus.IN_PROCESS,
+      notes: 'existing note',
+    } as never);
+    consumeSpy = jest.spyOn(service as any, 'consumeMaterials').mockResolvedValue(undefined);
+    addFinishedGoodsSpy = jest
+      .spyOn(service as any, 'addFinishedGoods')
+      .mockResolvedValue(undefined);
+    createCogmSpy = jest.spyOn(service as any, 'createCOGMJournal').mockResolvedValue('journal-1');
+    prisma.workOrder.update.mockResolvedValue({
+      id: 'wo-1',
+      status: WorkOrderStatus.COMPLETED,
+    } as never);
+  });
+
+  it('completes work order when legacy frontend producedQuantity payload key is provided', async () => {
+    const result = await service.completeWorkOrder('org-1', 'wo-1', {
+      producedQuantity: 5,
+    });
+
+    expect(consumeSpy).toHaveBeenCalledWith('org-1', expect.anything(), 5);
+    expect(addFinishedGoodsSpy).toHaveBeenCalledWith('org-1', expect.anything(), 5);
+    expect(createCogmSpy).toHaveBeenCalledWith('org-1', expect.anything(), 5);
+    expect(prisma.workOrder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'wo-1' },
+        data: expect.objectContaining({
+          status: WorkOrderStatus.COMPLETED,
+          journalId: 'journal-1',
+        }),
+      }),
+    );
+    expect(result.status).toBe(WorkOrderStatus.COMPLETED);
+  });
+
+  it('completes work order when canonical quantityProduced payload key is provided', async () => {
+    const result = await service.completeWorkOrder('org-1', 'wo-1', {
+      quantityProduced: 8,
+    });
+
+    expect(consumeSpy).toHaveBeenCalledWith('org-1', expect.anything(), 8);
+    expect(addFinishedGoodsSpy).toHaveBeenCalledWith('org-1', expect.anything(), 8);
+    expect(createCogmSpy).toHaveBeenCalledWith('org-1', expect.anything(), 8);
+    expect(result.status).toBe(WorkOrderStatus.COMPLETED);
+  });
+
+  it('allows explicit boundary zero completion quantity via producedQuantity', async () => {
+    const result = await service.completeWorkOrder('org-1', 'wo-1', {
+      producedQuantity: 0,
+    });
+
+    expect(consumeSpy).toHaveBeenCalledWith('org-1', expect.anything(), 0);
+    expect(addFinishedGoodsSpy).toHaveBeenCalledWith('org-1', expect.anything(), 0);
+    expect(result.status).toBe(WorkOrderStatus.COMPLETED);
+  });
+
+  it('rejects with BadRequestException when completion quantity is omitted or undefined', async () => {
+    await expect(service.completeWorkOrder('org-1', 'wo-1', {} as any)).rejects.toThrow(
+      new BadRequestException('quantityProduced or producedQuantity is required'),
+    );
+  });
+
+  it('rejects with BadRequestException when completion quantity is null or NaN', async () => {
+    await expect(
+      service.completeWorkOrder('org-1', 'wo-1', { producedQuantity: null as any }),
+    ).rejects.toThrow(new BadRequestException('quantityProduced or producedQuantity is required'));
+
+    await expect(
+      service.completeWorkOrder('org-1', 'wo-1', { quantityProduced: NaN }),
+    ).rejects.toThrow(new BadRequestException('quantityProduced or producedQuantity is required'));
+  });
+
+  it('rejects with BadRequestException when work order is not IN_PROCESS', async () => {
+    jest.spyOn(service, 'findOne').mockResolvedValueOnce({
+      id: 'wo-1',
+      status: WorkOrderStatus.DRAFT,
+    } as never);
+
+    await expect(
+      service.completeWorkOrder('org-1', 'wo-1', { producedQuantity: 10 }),
+    ).rejects.toThrow(new BadRequestException('Work order is not in process'));
   });
 });
