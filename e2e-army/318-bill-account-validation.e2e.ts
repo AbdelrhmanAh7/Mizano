@@ -86,20 +86,65 @@ test(
       }),
     });
     expect(validCreateRes.status).toBe(201);
+    const createdBill = await validCreateRes.json();
+    const billId = createdBill.id ?? createdBill.data?.id;
+    expect(billId).toBeDefined();
+
+    // 3. Attempting to update draft bill lines with an invalid account type (LIABILITY) is rejected with 400
+    const invalidUpdateRes = await fetch(`${base}/purchases/bills/${billId}`, {
+      method: 'PUT',
+      headers: auth,
+      body: JSON.stringify({
+        lines: [
+          {
+            description: 'Updated with liability account',
+            quantity: '1',
+            rate: '100',
+            accountId: liabilityAccount!.id,
+          },
+        ],
+      }),
+    });
+    expect(invalidUpdateRes.status).toBe(400);
+    const updateErr = await invalidUpdateRes.json();
+    expect(updateErr.message).toMatch(/expense or asset/i);
   },
 );
 
 test(
   '@issue-318 AC4 AC6: bill-form displays in RTL on Arabic and respects expense/asset account filtering',
   { tags: ['feat:mz-purchase-bills', 'lvl:ui'] },
-  async ({ app, agent, screen, browser }) => {
-    await app.open('/ar/login');
-    await agent.act('sign in as {email} with password {pw}', {
-      params: { email: 'admin@mizano.com', pw: 'password123' },
-    });
+  async ({ app, screen, browser }) => {
+    // next dev compiles on first hit and a submit before hydration is a plain GET: retry the form like tests/Mizano.e2e.ts
+    for (let i = 0; i < 3; i++) {
+      await app.open('/en/login');
+      if (
+        await screen
+          .getByRole('button', 'Sign In')
+          .isVisible()
+          .catch(() => false)
+      ) {
+        await screen.getByRole('textbox', 'Email').fill('admin@mizano.com');
+        await screen.getByRole('textbox', 'Password').fill('password123');
+        await screen.getByRole('button', 'Sign In').tap();
+        try {
+          await expect(browser).toHaveURL(
+            /\/en\/(dashboard|onboarding|accounting|sales|purchases)/,
+            {
+              timeout: 40_000,
+            },
+          );
+          break;
+        } catch (e) {
+          if (i === 2) throw e;
+        }
+      }
+    }
 
     await app.open('/ar/purchases/bills/new');
     expect(await browser.evaluate(() => document.documentElement.dir)).toBe('rtl');
-    await agent.assert('the bill form page loads in Arabic RTL');
+    expect(await browser.evaluate(() => /[\u0600-\u06FF]/.test(document.body.innerText))).toBe(
+      true,
+    );
   },
 );
