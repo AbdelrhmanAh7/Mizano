@@ -92,8 +92,11 @@ describe('Auth (e2e)', () => {
     it('rejects a weak password', async () => {
       const res = await anon
         .post('/auth/register')
-        .send({ ...testUser, email: `weak-${suffix}@mizano.test`, password: 'short' });
+        .send({ ...testUser, email: `weak-${suffix}@mizano.test`, password: 'alllowercase1' });
       expect(res.status).toBe(400);
+      expect(res.body.code).toBe('VALIDATION_ERROR');
+      expect(res.body.message).toBe('Validation Failed');
+      expect(JSON.stringify(res.body.details)).toMatch(/uppercase/i);
     });
   });
 
@@ -108,11 +111,22 @@ describe('Auth (e2e)', () => {
       expect(JSON.stringify(res.body)).not.toMatch(/passwordHash/i);
     });
 
+    it('rejects an invalid login payload with VALIDATION_ERROR', async () => {
+      const res = await anon
+        .post('/auth/login')
+        .send({ email: 'not-an-email', password: 'password123' });
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('VALIDATION_ERROR');
+      expect(res.body.message).toBe('Validation Failed');
+      expect(JSON.stringify(res.body.details)).toMatch(/email/i);
+    });
+
     it('rejects an invalid password', async () => {
       const res = await anon
         .post('/auth/login')
         .send({ email: testUser.email, password: 'Wrong-password-1' });
       expect(res.status).toBe(401);
+      expect(res.body.error).toBe('Unauthorized');
     });
 
     it('rejects a non-existent user', async () => {
@@ -120,6 +134,7 @@ describe('Auth (e2e)', () => {
         .post('/auth/login')
         .send({ email: `nobody-${suffix}@mizano.test`, password: 'Password123' });
       expect(res.status).toBe(401);
+      expect(res.body.error).toBe('Unauthorized');
     });
   });
 
@@ -160,11 +175,15 @@ describe('Auth (e2e)', () => {
 
   describe('Protected endpoints', () => {
     it('rejects requests without a token', async () => {
-      expect((await anon.get('/users/me')).status).toBe(401);
+      const res = await anon.get('/users/me');
+      expect(res.status).toBe(401);
+      expect(res.body.error).toBe('Unauthorized');
     });
 
     it('rejects requests with an invalid token', async () => {
-      expect((await anon.withToken('invalid-token').get('/users/me')).status).toBe(401);
+      const res = await anon.withToken('invalid-token').get('/users/me');
+      expect(res.status).toBe(401);
+      expect(res.body.error).toBe('Unauthorized');
     });
 
     it('accepts the token issued by a real login', async () => {

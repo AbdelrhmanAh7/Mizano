@@ -65,6 +65,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Money-bearing imports require the same per-entity create permission as the single-record routes.**
 - **Adding auth to a server endpoint or socket changes its contract: update every client in the same PR** (send the token, handle expiry and reconnect). A server-only change silently breaks the client. _(events gateway vs `use-realtime`)_
 
+- **Normalize error response contracts across all validation exceptions.** Enforce `message: 'Validation Failed'` (Title Case) and `code: 'VALIDATION_ERROR'` for all validation failures (class-validator, direct validation exceptions, and database validation), not just class-validator string arrays, and consistently return `error: 'Unauthorized'` for 401 status codes. Never leak raw internal error objects into response details on non-validation errors. _(#280)_
+
 - **Use concrete DTO classes for `@Query()` parameters.** Intersections erase the runtime metatype, bypassing ValidationPipe transformation and leaving Prisma pagination values as strings. Decorate all service and existing client filters, preserve service defaults, and test through the real pipe options.
 
 ## 8. Voided and deleted records
