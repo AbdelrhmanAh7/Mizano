@@ -6,8 +6,8 @@
 - **Parent Issue**: #252
 - **PR**: #346
 - **Supersedes part of**: PR #274 (resolving QA finding `df11332ad23d` / review discussion `r4340860918`)
-- **Base Commit**: `d740dda9d8ebf6b996aac1b2f83d734c0bc3b2ef` (`origin/master`)
-- **Tested Head**: `ef068ef6fae80976a23b01237357bd96af3260cc`
+- **Base Commit**: `e5d9b805563c04df3300f00442fd18f7d82ce560` (`origin/master`)
+- **Tested Head**: `607cf1e9f6c0a060697f79b9f7f43b169c764194`
 - **Originating Sentry Issue**: None found (internal QA/security review finding split from PR #274).
 - **Model · Effort · Why**: `Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: High · Why: Complete implementation, review comments remediation, regression proof, e2e test, and verification report for issue #332`
 - **Skills Used**: `diagnosing-bugs`, `systematic-debugging`, `root-cause-debugging`, `test-first-engineering`, `e2e-army`, `verification-before-completion`, `model-effort-routing`
@@ -34,21 +34,21 @@
 2. **AC2 (Session Interface Privacy)**: The `next-auth` module declaration in `apps/web/lib/auth.ts` defines `interface Session` without `refreshToken`, ensuring client components and TypeScript callers cannot access or expect `session.refreshToken`.
 3. **AC3 (Route-Level Endpoint Verification)**: `apps/web/app/api/auth/[...nextauth]/route.spec.ts` verifies that `GET /api/auth/session` returns status 200 with the exact expected session shape, with no `refreshToken` in the JSON body or serialized text, and returns `{}` for unauthenticated callers.
 4. **AC4 (Unit-Level Session Invariants)**: `apps/web/lib/auth.spec.ts` verifies that even when `token.refreshToken` is present in the JWT token passed to the session callback, `session.refreshToken` is undefined and omitted from `Object.keys(session)`.
-5. **AC5 (Authenticated E2E Verification)**: `e2e-army/332-session-token-privacy.e2e.ts` tags `feat:mz-auth`, signs in through the `/en/login` UI form as demo admin, forwards the session cookie to `/api/auth/session` (and evaluates inside browser context), and verifies `refreshToken` is omitted from both the authenticated response and the unauthenticated response.
+5. **AC5 (Authenticated E2E Verification)**: `e2e-army/332-session-token-privacy.e2e.ts` tags `feat:mz-auth`, signs in through the `/en/login` UI form as demo admin using accessible labels (`screen.getByLabel`), forwards the session cookie to `/api/auth/session` (and evaluates inside browser context), and verifies `refreshToken` is omitted from both the authenticated response and the unauthenticated response.
 6. **AC6 (Clean Pre-Push Quality Gates)**: TypeScript type-checking (`tsc --noEmit`), ESLint (`next lint`), and Jest unit/route specs pass cleanly with exit code 0.
 
 ---
 
 ## Verification Matrix
 
-| AC ID   | Requirement Description                     | Test / Command                                                                     | Observed Result                                                                | Exit Code | Status     |
-| :------ | :------------------------------------------ | :--------------------------------------------------------------------------------- | :----------------------------------------------------------------------------- | :-------- | :--------- |
-| **AC1** | Session callback drops `refreshToken`       | `pnpm --filter web exec jest apps/web/lib/auth.spec.ts -t "omits refreshToken"`    | 2 tests PASS (`omits refreshToken...`, `sets session.error...`)                | 0         | **PASSED** |
-| **AC2** | `Session` interface excludes `refreshToken` | `pnpm --filter @mizano/shared-types build && pnpm --filter @mizano/web type-check` | Clean tsc run (`tsc --noEmit` exits 0 with 0 errors)                           | 0         | **PASSED** |
-| **AC3** | Route endpoint omits `refreshToken`         | `pnpm --filter web exec jest 'app/api/auth/.*route\.spec\.ts' --maxWorkers=2`      | 3 tests PASS (authenticated shape, error propagation, unauthenticated `{}`)    | 0         | **PASSED** |
-| **AC4** | Unit session callback isolation             | `pnpm --filter web exec jest apps/web/lib/auth.spec.ts --maxWorkers=2`             | 17/17 tests PASS across isolation, logout, refresher, session callback         | 0         | **PASSED** |
-| **AC5** | Authenticated E2E natural-language test     | `e2e-army/332-session-token-privacy.e2e.ts`                                        | Validated test syntax, tagged `feat:mz-auth`, covers UI login + cookie session | 0         | **PASSED** |
-| **AC6** | Linter & Typecheck                          | `pnpm --filter @mizano/web lint`                                                   | Clean lint execution (0 errors)                                                | 0         | **PASSED** |
+| AC ID   | Requirement Description                                  | Test / Command                                                                                                                                                                    | Observed Result                                                                                                                                     | Exit Code | Status                                               |
+| :------ | :------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------- | :-------- | :--------------------------------------------------- |
+| **AC1** | Session callback drops `refreshToken`                    | `pnpm --filter web exec jest apps/web/lib/auth.spec.ts -t "omits refreshToken"`                                                                                                   | 2 tests PASS (`omits refreshToken...`, `sets session.error...`)                                                                                     | 0         | **PASSED**                                           |
+| **AC2** | `Session` interface excludes `refreshToken`              | `pnpm --filter @mizano/shared-types build && pnpm --filter @mizano/web type-check`                                                                                                | Clean tsc run (`tsc --noEmit` exits 0 with 0 errors)                                                                                                | 0         | **PASSED**                                           |
+| **AC3** | Route endpoint omits `refreshToken`                      | `pnpm --filter web exec jest 'app/api/auth/.*route\.spec\.ts' --maxWorkers=2`                                                                                                     | 3 tests PASS (authenticated shape, error propagation, unauthenticated `{}`)                                                                         | 0         | **PASSED**                                           |
+| **AC4** | Unit session callback isolation                          | `pnpm --filter web exec jest apps/web/lib/auth.spec.ts --maxWorkers=2`                                                                                                            | 17/17 tests PASS across isolation, logout, refresher, session callback                                                                              | 0         | **PASSED**                                           |
+| **AC5** | Authenticated E2E natural-language test                  | `e2e-army/332-session-token-privacy.e2e.ts` (CI verify job `e2e-army` gate)                                                                                                       | Test file syntax and typing validated; tags `feat:mz-auth`, covers UI login via `screen.getByLabel` and cookie-forwarded session privacy assertion. | N/A       | **UNVERIFIED LOCALLY (Gated on CI e2e-army runner)** |
+| **AC6** | Full Quality Gates (Lint, Typecheck, Unit & Route Specs) | `pnpm --filter @mizano/web lint && pnpm --filter @mizano/web type-check && pnpm --filter web exec jest apps/web/lib/auth.spec.ts 'app/api/auth/.*route\.spec\.ts' --maxWorkers=2` | Lint: 0 errors; Typecheck: clean (exit 0); Jest: 20/20 tests PASS (17 auth.spec.ts, 3 route.spec.ts)                                                | 0         | **PASSED**                                           |
 
 ---
 
@@ -96,28 +96,84 @@ With `session.refreshToken` assignment removed and `Session` interface updated:
 
 - **Command**: `pnpm --filter web exec jest apps/web/lib/auth.spec.ts --maxWorkers=2`
 - **Output**:
+
   ```text
   PASS lib/auth.spec.ts
   Test Suites: 1 passed, 1 total
   Tests:       17 passed, 17 total
+  Snapshots:   0 total
+  Time:        0.302 s
   ```
+
 - **Exit code**: `0` (PASS)
 
 - **Command**: `pnpm --filter web exec jest 'app/api/auth/.*route\.spec\.ts' --maxWorkers=2`
 - **Output**:
+
   ```text
   PASS app/api/auth/[...nextauth]/route.spec.ts
   Test Suites: 1 passed, 1 total
   Tests:       3 passed, 3 total
+  Snapshots:   0 total
+  Time:        0.596 s
   ```
+
+- **Exit code**: `0` (PASS)
+
+---
+
+## Full Quality Gate Outputs (AC6)
+
+### 1. Typecheck
+
+- **Command**: `pnpm --filter @mizano/shared-types build && pnpm --filter @mizano/web type-check`
+- **Output**:
+
+  ```text
+  > @mizano/shared-types@0.1.0 build
+  > tsc
+
+  > @mizano/web@0.1.0 type-check
+  > tsc --noEmit
+  ```
+
+- **Exit code**: `0` (PASS)
+
+### 2. ESLint
+
+- **Command**: `pnpm --filter @mizano/web lint`
+- **Output**:
+
+  ```text
+  > @mizano/web@0.1.0 lint
+  > next lint
+  ```
+
+- **Exit code**: `0` (PASS — 0 errors)
+
+### 3. Jest Unit & Route Specs
+
+- **Command**: `pnpm --filter web exec jest apps/web/lib/auth.spec.ts 'app/api/auth/.*route\.spec\.ts' --maxWorkers=2`
+- **Output**:
+
+  ```text
+  PASS lib/auth.spec.ts
+  PASS app/api/auth/[...nextauth]/route.spec.ts
+
+  Test Suites: 2 passed, 2 total
+  Tests:       20 passed, 20 total
+  Snapshots:   0 total
+  ```
+
 - **Exit code**: `0` (PASS)
 
 ---
 
 ## UI Verification (Screenshots / RTL & LTR)
 
-**UI Layout Changes Exempt**:
+**UI Layout Changes Exempt & Local Verification Status**:
 
-- This issue modifies backend authentication session callback handling in `apps/web/lib/auth.ts` and the NextAuth session API endpoint.
-- No visual UI elements, styles, forms, or HTML page layouts were added or modified.
-- The end-to-end user-facing flow is verified via `e2e-army/332-session-token-privacy.e2e.ts`, which interacts with the `/en/login` UI form and asserts the session endpoint behavior.
+- **Backend / API Scope**: This issue modifies backend authentication session callback handling in `apps/web/lib/auth.ts` and the NextAuth session API endpoint to prevent sensitive refresh token leakage to client-side code.
+- **Visual Changes**: No visual UI elements, styling, CSS, forms, or HTML page layouts were added or modified (UI layout changes exempt; visual screenshots not applicable).
+- **E2E Scenario**: An end-to-end natural-language test `e2e-army/332-session-token-privacy.e2e.ts` is provided, tagged `feat:mz-auth`, using accessible field labels (`screen.getByLabel('Email')`, `screen.getByLabel('Password')`) and asserting both unauthenticated `{}` and authenticated session responses omit `refreshToken`.
+- **Status Consistency**: As recorded in AC5, runtime execution of this end-to-end browser test is unverified locally and is gated on the automated CI verify job (`e2e-army` gate) which spins up the throwaway database and Next.js/NestJS service stack.

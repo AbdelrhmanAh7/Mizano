@@ -16,8 +16,8 @@ test(
     for (let i = 0; i < 3; i++) {
       await app.open('/en/login');
       await expect(screen.getByRole('button', 'Sign In')).toBeVisible();
-      await screen.getByRole('textbox', 'Email').fill('admin@mizano.com');
-      await screen.getByRole('textbox', 'Password').fill('password123');
+      await screen.getByLabel('Email').fill('admin@mizano.com');
+      await screen.getByLabel('Password').fill('password123');
       await screen.getByRole('button', 'Sign In').tap();
       try {
         await expect(browser).toHaveURL(/\/en\/(dashboard|onboarding|accounting|sales)/, {
