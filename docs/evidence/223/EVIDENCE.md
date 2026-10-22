@@ -5,7 +5,7 @@
 - **Issue**: #223 (Add general ledger endpoint isolation tests — Part 1/3 of #108)
 - **PR**: #227
 - **Base**: `origin/master` (`e5d9b805e717a6c9367f05566373b526615b6d19`)
-- **Tested Head**: `f84f36bf98e8d1d4000e560216312a72ef7065c9`
+- **Tested Head**: `943494e41772b2af63ae883649f5282cb55eefc1`
 - **Originating Sentry issue**: None (multi-tenant tenant isolation and authorization hardening)
 - **User-facing flow / E2E**: Backend report endpoint isolation verified via dedicated E2E isolation spec at `apps/api/test/general-ledger.isolation-spec.ts`, regression spec at `apps/api/test/reports.e2e-spec.ts`, and e2e-army test at `e2e-army/223-general-ledger-isolation.e2e.ts`.
 - **Changed covering tests**:
@@ -321,19 +321,19 @@ Both CORS interoperability and login toast test runner expectations have been re
 
 ---
 
-## Review Findings Resolution (Round 3 on Head 6e3b179)
+## Review Findings Resolution (Rounds 3 & 4 on Heads 6e3b179 & 1b917db)
 
 ### 1. `apps/api/src/modules/reports/controllers/reports.controller.ts:508`
 
 - **Finding**: The `getGeneralLedger` method is missing the 'async' keyword in its signature despite being marked as async and using await.
-- **Root Cause & Fix**: Method signature explicitly declared `public async getGeneralLedger(...)` at [reports.controller.ts:509](file:///Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-223/apps/api/src/modules/reports/controllers/reports.controller.ts#L509).
-- **Covering Test**: Added unit test at [reports.controller.spec.ts:53](file:///Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-223/apps/api/src/modules/reports/controllers/reports.controller.spec.ts#L53) explicitly proving `ReportsController.prototype.getGeneralLedger.constructor.name === 'AsyncFunction'`.
+- **Root Cause & Fix**: Method signature explicitly declared `async getGeneralLedger(...)` at [reports.controller.ts:511](file:///Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-223/apps/api/src/modules/reports/controllers/reports.controller.ts#L511) adhering strictly to standard NestJS controller method conventions across the module.
+- **Covering Test**: Added unit test at [reports.controller.spec.ts:53](file:///Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-223/apps/api/src/modules/reports/controllers/reports.controller.spec.ts#L53) explicitly proving `ReportsController.prototype.getGeneralLedger.constructor.name === 'AsyncFunction'` and verifying `controller.getGeneralLedger(...)` returns a `Promise`.
 
 ### 2. `apps/api/src/modules/reports/services/financial-reports.service.ts:625`
 
 - **Finding**: The `assertAccountOwnership` method's return type annotation should be `Promise<void>` since it throws `NotFoundException` when account not found, violating the contract of returning account data.
 - **Root Cause & Fix**: Changed return type annotation to `Promise<void>` at [financial-reports.service.ts:625](file:///Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-223/apps/api/src/modules/reports/services/financial-reports.service.ts#L625), selecting only `{ id: true }` and returning void upon successful ownership assertion. In `getGeneralLedger`, account retrieval is performed in parallel via `Promise.all` alongside currency and prior totals.
-- **Covering Test**: Updated unit test at [financial-reports.service.spec.ts:132](file:///Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-223/apps/api/src/modules/reports/services/financial-reports.service.spec.ts#L132) asserting that `service.assertAccountOwnership(ORG_ID, 'acc-cash')` resolves `undefined` (`Promise<void>`).
+- **Covering Test**: Updated unit test at [financial-reports.service.spec.ts:131](file:///Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-223/apps/api/src/modules/reports/services/financial-reports.service.spec.ts#L131) explicitly asserting that `service.assertAccountOwnership(ORG_ID, 'acc-cash')` returns an `instanceof Promise` and resolves `undefined` (`Promise<void>`).
 
 ### 3. `apps/api/src/modules/reports/controllers/reports.controller.ts:505` (Non-blocking)
 
@@ -347,4 +347,4 @@ Both CORS interoperability and login toast test runner expectations have been re
 
 ### 5. Tested SHA Binding
 
-- All test results and verification matrix entries are bound to commit `f84f36bf98e8d1d4000e560216312a72ef7065c9`.
+- All test results and verification matrix entries are bound to commit `943494e41772b2af63ae883649f5282cb55eefc1`.
