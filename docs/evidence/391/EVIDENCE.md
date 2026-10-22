@@ -6,13 +6,13 @@ This document provides verification evidence for GitHub issue #391 in `Abdelrhma
 - **PR**: Supersedes part of #330
 - **Parent Issue**: #257, #142
 - **Base Commit (`origin/master`)**: `e5d9b805563c04df3300f00442fd18f7d82ce560`
-- **Tested Head Commit**: `1110be6d859b20d366300438db0786cf89f131a4`
-- **Tested Branch**: `ai/391`
+- **Tested Head Commit**: `c940bed48564aadb5184e649c2d2d42fe10355c2`
+- **Tested Branch**: `ai/391-p2`
 - **Originating Sentry Issue**: None (originates from review finding on PR #330 / parent issue #257 / #142, item `finding:cc1dc5211ed1`).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v26.10.0, pnpm 8.14.0, Python 3.14.8.
 - **User-facing flow / E2E**: Not user-facing (`E2E: not needed — backend worker isolation and health module check; covered by e2e-army lvl:api test at e2e-army/257-intake-worker.e2e.ts.`).
 - **Skills Used**: `systematic-debugging`, `test-first-engineering`, `verification-before-completion`, `model-effort-routing`.
-- **Model and Effort**: `Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: High · Why: Complete implementation of worker module isolation, resolving PR #393 review threads, and evidence verification`.
+- **Model and Effort**: `Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: High · Why: Re-run verification checks on PR head c940bed, update evidence head binding for PR #394, and resolve CodeRabbit review feedback`.
 
 ---
 
@@ -44,17 +44,21 @@ This PR resolves the issue completely by:
 - **AC2 (E2E-Army Worker Isolation Test)**: Provide natural-language API-level E2E test in `e2e-army/257-intake-worker.e2e.ts` checking `require.cache` state before and after document intake uploads.
 - **AC3 (Isolated Unit Test for AppModule Require Cache)**: Implement isolated unit test in `apps/api/src/modules/ai/intake/api-cache-isolation.spec.ts` using `jest.isolateModules` that imports the full `AppModule` and verifies `require.cache` has 0 occurrences of `tesseract.js` or `pdf-parse`.
 - **AC4 (Prune Misleading Dead Code)**: Remove hardcoded `checkWorkerModules` endpoint from `health.controller.ts` and remove cache assertions from `intake.worker.spec.ts`.
+- **AC5 (PR size, branch hygiene, and supersedes notice)**: Clean branch off `origin/master`, total PR diff touches 0 files in `.github/workflows/`, passes all local package type-check, lint, and unit tests, and PR body says "Supersedes part of #330".
 
 ---
 
 ## Verification Matrix
 
-| AC ID   | Requirement Description                   | Verification Method / Command                                                   | Observed Result                                          | Exit Code | Status     |
-| :------ | :---------------------------------------- | :------------------------------------------------------------------------------ | :------------------------------------------------------- | :-------- | :--------- |
-| **AC1** | Real `GET /health/modules` cache check    | `pnpm --filter api exec jest src/health/health.controller.spec.ts`              | 3/3 tests PASS                                           | 0         | **PASSED** |
-| **AC2** | E2E-army natural language test            | `node -e "require('fs').readFileSync('e2e-army/257-intake-worker.e2e.ts')"`     | File exists, tagged `feat:mz-document-intake`, `lvl:api` | 0         | **PASSED** |
-| **AC3** | Isolated AppModule cache test             | `pnpm --filter api exec jest src/modules/ai/intake/api-cache-isolation.spec.ts` | 1/1 test PASS (tesseractKeys: [], pdfParseKeys: [])      | 0         | **PASSED** |
-| **AC4** | Clean worker unit tests without dead code | `pnpm --filter api exec jest src/modules/ai/intake/intake.worker.spec.ts`       | 4/4 tests PASS                                           | 0         | **PASSED** |
+| AC ID   | Requirement Description                   | Verification Method / Command                                                   | Observed Result                                                             | Exit Code | Status     |
+| :------ | :---------------------------------------- | :------------------------------------------------------------------------------ | :-------------------------------------------------------------------------- | :-------- | :--------- |
+| **AC1** | Real `GET /health/modules` cache check    | `pnpm --filter api exec jest src/health/health.controller.spec.ts`              | 3/3 tests PASS                                                              | 0         | **PASSED** |
+| **AC2** | E2E-army natural language test            | `node -e "require('fs').readFileSync('e2e-army/257-intake-worker.e2e.ts')"`     | File exists, tagged `feat:mz-document-intake`, `lvl:api`                    | 0         | **PASSED** |
+| **AC3** | Isolated AppModule cache test             | `pnpm --filter api exec jest src/modules/ai/intake/api-cache-isolation.spec.ts` | 1/1 test PASS (tesseractKeys: [], pdfParseKeys: [])                         | 0         | **PASSED** |
+| **AC4** | Clean worker unit tests without dead code | `pnpm --filter api exec jest src/modules/ai/intake/intake.worker.spec.ts`       | 4/4 tests PASS                                                              | 0         | **PASSED** |
+| **AC5** | API TypeScript type checking              | `pnpm --filter api type-check`                                                  | Clean type check (`tsc --noEmit && tsc --noEmit -p test/tsconfig.e2e.json`) | 0         | **PASSED** |
+| **AC5** | API ESLint check                          | `pnpm --filter api lint`                                                        | Clean lint check (0 errors, 0 warnings across all files)                    | 0         | **PASSED** |
+| **AC5** | Evidence freshness & contract check       | `python3 -m unittest discover -s scripts -p 'test_evidence_freshness.py'`       | 11/11 tests PASS (including test_issue_391_evidence_contract)               | 0         | **PASSED** |
 
 ---
 
@@ -98,4 +102,14 @@ On `master`:
 1. `pdf-extractor.util.ts` lazily requires `pdf-parse` only during `extractTextFromPdf()`.
 2. `HealthController` provides `GET /health/modules` which inspects `require.cache` dynamically.
 3. `api-cache-isolation.spec.ts` executes in an isolated sandbox with `jest.isolateModules`, loads `AppModule`, and asserts that neither `tesseract.js` nor `pdf-parse` is present in `require.cache`.
-4. All unit tests, typechecks, lints, and evidence checks pass cleanly with exit code 0.
+4. All unit tests, typechecks, lints, and evidence checks pass cleanly with exit code 0 when re-run on head `c940bed48564aadb5184e649c2d2d42fe10355c2`.
+
+---
+
+## UI Verification (Screenshots / RTL & LTR)
+
+**UI is EXEMPT**:
+
+- This issue is a backend process isolation fix and health check diagnostic for worker intake extraction.
+- No frontend files in `apps/web` or UI routes are modified.
+- No Playwright screenshots or RTL/LTR layout tests are required.
