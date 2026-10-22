@@ -8,6 +8,7 @@
 - **Supersedes part of**: PR #230 (finding `6d7da0e1be8d`)
 - **Branch**: `ai/317`
 - **Base Commit**: `e5d9b805563c04df3300f00442fd18f7d82ce560` (`origin/master`)
+- **Tested Head Commit**: `9d74334882ce99c258d4a97127e7ae2a3da7efc5`
 - **Originating Sentry Issue**: None (originates from review finding `6d7da0e1be8d` on PR #230 and QA review finding `7921754e38c2` on PR #340).
 - **User-facing flow / E2E**: `e2e-army/317-searchable-bill-options.e2e.ts` (tagged `feat:mz-purchase-bills`, `lvl:ui`).
 
