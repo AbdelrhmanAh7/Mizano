@@ -6,7 +6,7 @@ This document provides verification evidence for GitHub issue #401 in `Abdelrhma
 - **PR**: Supersedes part of #399
 - **Parent Issue**: #396
 - **Base Commit (`origin/master`)**: `bf3f67a80294e9c79f1bb5bfab65ac637e21658a`
-- **Tested Head Commit**: `a45170a3f6949348a12d302c87cbcbdbe65888a4`
+- **Tested Head Commit**: `11c0cfc83b8b1db80fce37d97746142c98d6dd5b`
 - **Tested Branch**: `ai/401`
 - **Originating Sentry Issue**: None (originates from review finding `finding:0446a0590934` on PR #399 / discussion `r4348007798`).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20.18.0, pnpm 8.14.0, Python 3.14.8.
