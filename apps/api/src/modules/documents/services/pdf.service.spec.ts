@@ -66,6 +66,7 @@ describe('PdfService HTML safety', () => {
       },
       bill: { findMany: jest.fn().mockResolvedValue([]) },
       journalLine: { findMany: jest.fn().mockResolvedValue([]) },
+      payslip: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     service = new PdfService(prisma as unknown as PrismaService);
   });
@@ -151,5 +152,72 @@ describe('PdfService HTML safety', () => {
 
     await service.generateAgingReportPdf('org-1', 'payables', '2026-06-01');
     expectSafeHtml(lastHtml());
+  });
+
+  it('payslip PDF generator includes employee jobTitle when position is not set', async () => {
+    prisma.payslip.findFirst.mockResolvedValue({
+      id: 'payslip-123',
+      baseSalary: '4500.00',
+      grossSalary: '4500.00',
+      grossPay: null,
+      totalDeductions: '0.00',
+      netSalary: '4500.00',
+      netPay: null,
+      employee: {
+        name: `Emp ${XSS}`,
+        employeeId: 'EMP-99',
+        employeeNumber: null,
+        department: 'Operations',
+        jobTitle: `Logistics Lead ${XSS}`,
+        position: null,
+        email: 'emp@mizano.com',
+        bankAccount: 'EG1234567890',
+      },
+      payrollRun: {
+        month: 10,
+        year: 2026,
+        periodStart: new Date('2026-10-01'),
+        periodEnd: new Date('2026-10-31'),
+        payDate: new Date('2026-10-28'),
+      },
+    });
+
+    const pdf = await service.generatePayslipPdf('org-1', 'payslip-123');
+    expect(pdf.toString()).toBe('%PDF');
+    expect(lastHtml()).toContain('Logistics Lead &lt;script&gt;');
+    expectSafeHtml(lastHtml());
+  });
+
+  it('payslip PDF generator prefers position over jobTitle when both are set', async () => {
+    prisma.payslip.findFirst.mockResolvedValue({
+      id: 'payslip-456',
+      baseSalary: '6000.00',
+      grossSalary: '6000.00',
+      grossPay: null,
+      totalDeductions: '0.00',
+      netSalary: '6000.00',
+      netPay: null,
+      employee: {
+        name: 'Sarah Connor',
+        employeeId: 'EMP-100',
+        employeeNumber: 'E100',
+        department: 'Security',
+        jobTitle: 'Field Agent',
+        position: 'Head of Security',
+        email: null,
+        bankAccount: null,
+      },
+      payrollRun: {
+        month: 10,
+        year: 2026,
+        periodStart: null,
+        periodEnd: null,
+        payDate: null,
+      },
+    });
+
+    await service.generatePayslipPdf('org-1', 'payslip-456');
+    expect(lastHtml()).toContain('Head of Security');
+    expect(lastHtml()).not.toContain('Field Agent');
   });
 });

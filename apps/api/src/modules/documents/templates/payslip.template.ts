@@ -18,6 +18,7 @@ export interface PayslipData {
     employeeId: string;
     department?: string;
     position?: string;
+    jobTitle?: string;
     email?: string;
     bankAccount?: string;
   };
@@ -93,11 +94,11 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
                   : ''
               }
               ${
-                payslip.employee.position
+                payslip.employee.position || payslip.employee.jobTitle
                   ? `
                 <tr>
                   <td style="padding: 3px 15px 3px 0; color: #6B7280;">Position:</td>
-                  <td>${escapeHtml(payslip.employee.position)}</td>
+                  <td>${escapeHtml(payslip.employee.position || payslip.employee.jobTitle || '')}</td>
                 </tr>
               `
                   : ''
