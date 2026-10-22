@@ -2,7 +2,7 @@
 
 - **Issue**: #134 (`[audit] Run the 11 e2e suites in a gate and unify the two API jest configs`)
 - **Base (`origin/master`)**: `e5d9b805563c04df3300f00442fd18f7d82ce560`
-- **Tested head**: `490f1503666bf9d9fd8c442f3523ecde9d07469b` on branch `ai/134` (it adds the final `e2e` job to `.github/workflows/ci.yml`, enforces `test-gate.e2e-spec.ts` against the committed workflow, unifies the API unit test config to `_jest.config.js`, pins dates in AI specs, and delegates ledger service specs to follow-up issues #206-#210)
+- **Tested head**: `84f873aaf8c9ca020f2c461c4174f87ae9468983` on branch `ai/134` (it adds the final `e2e` job to `.github/workflows/ci.yml`, enforces `test-gate.e2e-spec.ts` against the committed workflow, unifies the API unit test config to `_jest.config.js`, pins dates in AI specs, delegates ledger service specs to follow-up issues #206-#210, makes `app.listen()` idempotent, and registers the intake processor in `intake-timings.e2e-spec.ts`)
 - **Environment**: macOS (Darwin 24.3.0), Node v26.10.0, pnpm 8.14.0, PostgreSQL 16
 - **CI Workflow Authorization**: CTO authorized the `.github/workflows/ci.yml` `e2e` job edit in PR #211.
 
