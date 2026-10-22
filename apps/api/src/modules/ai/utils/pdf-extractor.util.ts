@@ -1,6 +1,17 @@
 // pdf-parse v2.x exports { PDFParse } as named export (v1 exported default function)
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const pdfParseModule = require('pdf-parse');
+// Lazily required so importing this file in the API does not pull pdf-parse into require.cache
+interface PdfParseExports {
+  PDFParse?: new (data: Uint8Array) => {
+    getText: () => Promise<{ text?: string; total?: number }>;
+  };
+  default?: (data: Uint8Array) => Promise<{ text?: string; numpages?: number }>;
+  (data: Uint8Array): Promise<{ text?: string; numpages?: number }>;
+}
+
+function getPdfParseModule(): PdfParseExports {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return require('pdf-parse');
+}
 
 export interface PdfExtractionResult {
   text: string;
@@ -17,6 +28,8 @@ export interface PdfExtractionResult {
  * and the caller should fall back to OCR (tesseract.js).
  */
 export async function extractTextFromPdf(buffer: Buffer): Promise<PdfExtractionResult> {
+  const pdfParseModule = getPdfParseModule();
+
   // pdf.js (pdf-parse v1) can misread a pooled Buffer whose byteOffset > 0 on Node 25+.
   // new Uint8Array(buffer) treats the Buffer as ArrayLike and copies into a fresh ArrayBuffer
   // whose byteOffset is 0 and byteLength equals buffer.length exactly. (#87)

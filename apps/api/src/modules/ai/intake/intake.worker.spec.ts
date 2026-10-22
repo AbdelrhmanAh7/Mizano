@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { EventEmitter } from 'events';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -127,5 +129,26 @@ describe('registerGracefulShutdown', () => {
     signals.emit('SIGINT');
     await settle();
     expect(exit).toHaveBeenCalledWith(1);
+  });
+});
+
+describe('docker-compose.production.yml intake-worker @issue-257 @issue-142', () => {
+  it('defines the intake-worker service with dist/intake-worker.js', () => {
+    const compose = readFileSync(
+      resolve(__dirname, '../../../../../../docker-compose.production.yml'),
+      'utf8',
+    );
+    const block = /^ {2}intake-worker:\r?\n((?: {4}.*\r?\n|\s*\r?\n)+)/m.exec(compose)?.[1] ?? '';
+    expect(block).not.toBe('');
+    expect(block).toContain('dist/intake-worker.js');
+    expect(block).toMatch(/healthcheck:[\s\S]*dist\/intake-worker-healthcheck\.js/);
+    expect(block).toContain('intake_storage:/data/intake');
+  });
+
+  it('API require.cache has no tesseract.js or pdf-parse', () => {
+    const tesseractKeys = Object.keys(require.cache).filter((k) => k.includes('tesseract.js'));
+    expect(tesseractKeys).toHaveLength(0);
+    const pdfParseKeys = Object.keys(require.cache).filter((k) => k.includes('pdf-parse'));
+    expect(pdfParseKeys).toHaveLength(0);
   });
 });

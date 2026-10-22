@@ -46,8 +46,9 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nestjs
 
-# Change ownership
-RUN chown -R nestjs:nodejs /app
+# Change ownership. /data/intake is the intake volume mount point: a fresh named volume copies
+# owner and mode from this directory, so it must be writable by the runtime user (api and worker).
+RUN mkdir -p /data/intake && chown -R nestjs:nodejs /app /data/intake
 
 USER nestjs
 

@@ -28,7 +28,58 @@ async function accessToken(api: string): Promise<string> {
 }
 
 test(
-  '@issue-257 AC1: an upload without a session is rejected before any job exists',
+  '@issue-257 AC1: API process has no tesseract.js or pdf-parse in require cache',
+  { tags: ['feat:mz-document-intake', 'lvl:api'] },
+  async ({ app }) => {
+    const api = apiBase(String(app.baseUrl));
+    const res = await fetch(`${api}/health/modules`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      status: string;
+      tesseractLoaded: boolean;
+      pdfParseLoaded: boolean;
+      ocrModules: string[];
+    };
+    expect(body.status).toBe('healthy');
+    expect(body.tesseractLoaded).toBe(false);
+    expect(body.pdfParseLoaded).toBe(false);
+    expect(body.ocrModules).toEqual([]);
+  },
+);
+
+test(
+  '@issue-257 AC1: require cache remains free of tesseract.js and pdf-parse after invoice upload',
+  { tags: ['feat:mz-document-intake', 'lvl:api'] },
+  async ({ app }) => {
+    const api = apiBase(String(app.baseUrl));
+    const token = await accessToken(api);
+    const headers = { authorization: `Bearer ${token}` };
+
+    const form = new FormData();
+    form.append('file', pdfFixture('army-257-cache-isolation'), 'inv.pdf');
+    const uploadRes = await fetch(`${api}/ai/document-intake/process`, {
+      method: 'POST',
+      headers,
+      body: form,
+    });
+    expect(uploadRes.status).toBe(201);
+
+    const checkRes = await fetch(`${api}/health/modules`);
+    expect(checkRes.status).toBe(200);
+    const body = (await checkRes.json()) as {
+      status: string;
+      tesseractLoaded: boolean;
+      pdfParseLoaded: boolean;
+      ocrModules: string[];
+    };
+    expect(body.tesseractLoaded).toBe(false);
+    expect(body.pdfParseLoaded).toBe(false);
+    expect(body.ocrModules).toEqual([]);
+  },
+);
+
+test(
+  '@issue-257 AC2: an upload without a session is rejected before any job exists',
   { tags: ['feat:mz-document-intake', 'lvl:api'] },
   async ({ app }) => {
     const api = apiBase(String(app.baseUrl));
