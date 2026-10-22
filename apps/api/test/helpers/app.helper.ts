@@ -43,6 +43,13 @@ export async function createTestApp(
   // 127.0.0.1:<port>, so requests reach that process (a local proxy answered 407, hang-ups, a
   // foreign 200). An explicit 127.0.0.1 bind only gets a port nobody else holds there.
   await app.listen(0, '127.0.0.1');
+  const originalListen = app.listen.bind(app);
+  app.listen = (async (...args: Parameters<INestApplication['listen']>) => {
+    if (app.getHttpServer()?.listening) {
+      return app;
+    }
+    return originalListen(...args);
+  }) as INestApplication['listen'];
   return app;
 }
 

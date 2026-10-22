@@ -100,7 +100,22 @@ Exit code: 0
 ### Changes in `auth.e2e-spec.ts` and `helpers/app.helper.ts`
 
 - `createTestApp()` now explicitly binds to `'127.0.0.1'` instead of wildcard binding, avoiding port collision on localhost.
+- `createTestApp()` makes `app.listen()` idempotent so suites that explicitly invoke `await app.listen(0, '127.0.0.1')` (such as `tenant-isolation.e2e-spec.ts`) do not throw `Listen method has been called more than once without closing`.
 - `auth.e2e-spec.ts` asserts that `address.address` is `'127.0.0.1'`. No existing assertions were removed or loosened.
+
+## CI Failure Resolution (PR #390 `E2E Tests` failing check)
+
+- **Failing Check**: GitHub Actions `E2E Tests`
+- **Root Cause**:
+  1. `tenant-isolation.e2e-spec.ts`: called `await app.listen(0, '127.0.0.1')` in `beforeAll`. When `createTestApp()` was updated to listen on `127.0.0.1`, calling `app.listen` a second time triggered NestJS ExpressAdapter error: `Error: Listen method has been called more than once without closing.`, causing 7 test failures.
+  2. `intake-timings.e2e-spec.ts`: under CI with `REDIS_URL: ''`, the suite uploaded documents but never initialized `IntakeProcessorService` (unlike `intake.e2e-spec.ts`), leaving documents in `QUEUED` status and timing out against the 20s polling interval.
+- **Fix**:
+  1. `apps/api/test/helpers/app.helper.ts`: wrapped `app.listen` so that if `app.getHttpServer()?.listening` is already true, it returns `app` directly without attempting to re-listen.
+  2. `apps/api/test/intake-timings.e2e-spec.ts`: initialized `IntakeProcessorService` with `app.get('INTAKE_CLOCK')` in `beforeAll`, enabling in-process queue processing when Redis is absent.
+- **Evidence**:
+  - `pnpm --filter api exec jest --config ./test/jest-e2e.json test/tenant-isolation.e2e-spec.ts`: 7 passed, 0 failed (exit code 0).
+  - `pnpm --filter api exec jest --config ./test/jest-e2e.json test/intake-timings.e2e-spec.ts`: 4 passed, 0 failed (exit code 0).
+  - `pnpm --filter api exec jest --config ./test/jest-e2e.json test/test-gate.e2e-spec.ts`: 5 passed, 0 failed (exit code 0).
 
 ## QA Finding Resolution (Round 9, Finding fb6a8c43c730)
 
