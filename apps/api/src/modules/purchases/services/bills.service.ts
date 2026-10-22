@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { BillStatus, Prisma } from '@prisma/client';
+import { AccountType, BillStatus, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
@@ -326,9 +326,33 @@ export class BillsService {
         throw new BadRequestException('Only draft bills can be approved');
       }
       if (bill.lines.length === 0) throw new BadRequestException('Bill has no lines');
+      // Invariant: Before approval transitions DRAFT -> OPEN and commits ledger postings,
+      // all bill lines must have an assigned accountId of type EXPENSE or ASSET that is active.
       if (bill.lines.some((l) => !l.accountId)) {
         throw new BadRequestException(
           'All bill lines must have an expense account assigned before approval',
+        );
+      }
+      const billAccountIds = [...new Set(bill.lines.map((l) => l.accountId as string))];
+      const lineAccounts = await tx.account.findMany({
+        where: { id: { in: billAccountIds }, organizationId, deletedAt: null },
+        select: { id: true, type: true, isActive: true },
+      });
+      if (lineAccounts.length !== billAccountIds.length) {
+        throw new BadRequestException('Account not found');
+      }
+      const inactiveAccount = lineAccounts.find((a) => !a.isActive);
+      if (inactiveAccount) {
+        throw new BadRequestException(
+          'All bill lines must have an active expense or asset account assigned before approval',
+        );
+      }
+      const invalidTypeAccount = lineAccounts.find(
+        (a) => a.type !== AccountType.EXPENSE && a.type !== AccountType.ASSET,
+      );
+      if (invalidTypeAccount) {
+        throw new BadRequestException(
+          'All bill lines must have an active expense or asset account assigned before approval',
         );
       }
 
@@ -538,12 +562,32 @@ export class BillsService {
       if (!project) throw new BadRequestException('Project not found');
     }
     const lines = dto.lines ?? [];
+    // Draft bills may be created or updated without accountId on lines (intake scan and import draft lifecycle).
+    // When any accountId is specified, it must belong to this organization, be active, and be of type EXPENSE or ASSET.
+    // Completeness of account assignment across all lines is strictly enforced at approval time.
     const accountIds = [...new Set(lines.map((l) => l.accountId).filter(Boolean))] as string[];
     if (accountIds.length) {
-      const found = await db.account.count({
+      const accounts = await db.account.findMany({
         where: { id: { in: accountIds }, organizationId, deletedAt: null },
+        select: { id: true, type: true, isActive: true },
       });
-      if (found !== accountIds.length) throw new BadRequestException('Account not found');
+      if (accounts.length !== accountIds.length) {
+        throw new BadRequestException('Account not found');
+      }
+      const inactiveAccount = accounts.find((a) => !a.isActive);
+      if (inactiveAccount) {
+        throw new BadRequestException(
+          'Bill line accounts must be active expense or asset accounts',
+        );
+      }
+      const invalidTypeAccount = accounts.find(
+        (a) => a.type !== AccountType.EXPENSE && a.type !== AccountType.ASSET,
+      );
+      if (invalidTypeAccount) {
+        throw new BadRequestException(
+          'Bill line accounts must be active expense or asset accounts',
+        );
+      }
     }
     const itemIds = [...new Set(lines.map((l) => l.itemId).filter(Boolean))] as string[];
     if (itemIds.length) {
