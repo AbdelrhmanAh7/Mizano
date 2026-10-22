@@ -6,6 +6,7 @@
 - **PR**: #413
 - **Supersedes part of**: PR #340 (findings `725f701a4546`, `e2e-army/317-searchable-bill-options.e2e.ts:47`, `e2e-army/317-searchable-bill-options.e2e.ts:48`, and `apps/web/components/purchases/bill-form.spec.tsx:519`)
 - **Base Commit**: `5a0839681b202880be79c3975cde8091b95794c5` (branch `ai/379` off `master` `e5d9b8053a25121bc6a74bbf3192f153f31741ca`)
+- **Tested Commit**: `58ff558803a1139e765633a7708312ab63c07b19`
 - **Originating Sentry Issue**: None (split QA/CodeRabbit review findings on PR #340 and PR #413).
 - **User-facing flow / E2E**: Feature E2E in `e2e-army/379-bill-rtl-content.e2e.ts` (`feat:mz-purchase-bills`, `lvl:ui`).
 
