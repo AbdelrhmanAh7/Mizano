@@ -342,8 +342,21 @@ export function useStartWorkOrder() {
 export function useCompleteWorkOrder() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, producedQuantity }: { id: string; producedQuantity: number }) =>
-      workOrderApi.complete(id, producedQuantity),
+    mutationFn: ({
+      id,
+      producedQuantity,
+      quantityProduced,
+    }: {
+      id: string;
+      producedQuantity?: number;
+      quantityProduced?: number;
+    }) => {
+      const quantity = producedQuantity ?? quantityProduced;
+      if (quantity === undefined || quantity === null || Number.isNaN(quantity)) {
+        throw new Error('A completion quantity is required');
+      }
+      return workOrderApi.complete(id, quantity);
+    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       queryClient.invalidateQueries({ queryKey: ['work-orders', variables.id] });

@@ -223,14 +223,21 @@ export class WorkOrdersService {
   async completeWorkOrder(
     organizationId: string,
     id: string,
-    dto: { quantityProduced: number; notes?: string },
+    dto: { quantityProduced?: number; producedQuantity?: number; notes?: string },
   ) {
     const workOrder = await this.findOne(organizationId, id);
     if (workOrder.status !== WorkOrderStatus.IN_PROCESS) {
       throw new BadRequestException('Work order is not in process');
     }
 
-    const quantityProduced = dto.quantityProduced;
+    const quantityProduced = dto.quantityProduced ?? dto.producedQuantity;
+    if (
+      quantityProduced === undefined ||
+      quantityProduced === null ||
+      Number.isNaN(quantityProduced)
+    ) {
+      throw new BadRequestException('quantityProduced or producedQuantity is required');
+    }
 
     // Consume materials proportionally
     await this.consumeMaterials(organizationId, workOrder, quantityProduced);
