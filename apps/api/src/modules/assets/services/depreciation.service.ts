@@ -100,10 +100,10 @@ export class DepreciationService {
       }
 
       try {
-        const posted = await this.prisma.$transaction(async (tx) => {
-          // Validate schedule consistency against purchase price and salvage value
-          this.validateScheduleConsistency(asset, scheduleEntry);
+        // Validate schedule consistency against purchase price and salvage value before starting transaction
+        this.validateScheduleConsistency(asset, scheduleEntry);
 
+        const posted = await this.prisma.$transaction(async (tx) => {
           // Claim the period first: only one concurrent run flips executedAt from null
           const claimed = await tx.depreciationSchedule.updateMany({
             where: { id: scheduleEntry.id, organizationId, executedAt: null },
@@ -419,7 +419,15 @@ export class DepreciationService {
       const lastExecuted = executedSchedules[0];
 
       if (lastExecuted) {
-        this.validateScheduleConsistency(schedule.asset, lastExecuted);
+        if (
+          lastExecuted.bookValue.lessThan(schedule.asset.salvageValue) ||
+          lastExecuted.accumulatedTotal.isNegative() ||
+          lastExecuted.bookValue.greaterThan(schedule.asset.purchasePrice)
+        ) {
+          this.logger.warn(
+            `Inconsistent depreciation schedule history detected during reversal for asset ${schedule.assetId}, schedule ${lastExecuted.id}`,
+          );
+        }
       }
 
       await tx.asset.update({
@@ -453,9 +461,9 @@ export class DepreciationService {
       );
     }
 
-    if (!scheduleEntry.bookValue.plus(scheduleEntry.accumulatedTotal).equals(asset.purchasePrice)) {
+    if (scheduleEntry.bookValue.greaterThan(asset.purchasePrice)) {
       throw new Error(
-        `Schedule entry ${scheduleEntry.id} book value (${scheduleEntry.bookValue}) + accumulated depreciation (${scheduleEntry.accumulatedTotal}) must equal asset purchase price (${asset.purchasePrice})`,
+        `Schedule entry ${scheduleEntry.id} book value (${scheduleEntry.bookValue}) cannot exceed asset purchase price (${asset.purchasePrice})`,
       );
     }
   }
