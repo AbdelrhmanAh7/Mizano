@@ -147,9 +147,9 @@ const workOrderApi = {
     const response = await api.post(`/manufacturing/work-orders/${id}/start`);
     return response.data;
   },
-  complete: async (id: string, producedQuantity: number) => {
+  complete: async (id: string, quantityProduced: number) => {
     const response = await api.post(`/manufacturing/work-orders/${id}/complete`, {
-      producedQuantity,
+      quantityProduced,
     });
     return response.data;
   },
@@ -339,11 +339,33 @@ export function useStartWorkOrder() {
   });
 }
 
+export type CompleteWorkOrderInput = {
+  id: string;
+} & (
+  | { quantityProduced: number; producedQuantity?: number }
+  | { producedQuantity: number; quantityProduced?: number }
+);
+
+export function resolveQuantityProduced(input: {
+  quantityProduced?: number | null;
+  producedQuantity?: number | null;
+}): number {
+  const qty = input.quantityProduced ?? input.producedQuantity;
+  if (qty === undefined || qty === null || Number.isNaN(qty)) {
+    throw new Error(
+      'A valid completion quantity (quantityProduced or producedQuantity) is required',
+    );
+  }
+  return qty;
+}
+
 export function useCompleteWorkOrder() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, producedQuantity }: { id: string; producedQuantity: number }) =>
-      workOrderApi.complete(id, producedQuantity),
+    mutationFn: (variables: CompleteWorkOrderInput) => {
+      const quantity = resolveQuantityProduced(variables);
+      return workOrderApi.complete(variables.id, quantity);
+    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       queryClient.invalidateQueries({ queryKey: ['work-orders', variables.id] });
