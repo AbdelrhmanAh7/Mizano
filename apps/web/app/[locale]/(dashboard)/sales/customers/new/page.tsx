@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { CustomerForm } from '@/components/sales/customer-form';
 import { useCreateCustomer } from '@/lib/hooks/use-customers';
-import Link from 'next/link';
+import { Link } from '@/i18n/routing';
 
 export default function NewCustomerPage() {
   const router = useRouter();

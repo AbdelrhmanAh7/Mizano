@@ -43,7 +43,7 @@ import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Eye, Plus, RefreshCw, Trash2, UserPlus } from 'lucide-react';
-import Link from 'next/link';
+import { Link } from '@/i18n/routing';
 import { Suspense, useState } from 'react';
 import { useTranslations } from 'next-intl';
 

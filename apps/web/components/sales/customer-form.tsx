@@ -352,7 +352,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="billingCountry">Country</Label>
+              <Label htmlFor="billingCountry">{isArabic ? 'دولة' : 'Country'}</Label>
               <CountrySelect
                 id="billingCountry"
                 value={form.watch('billingAddress.country') || ''}
@@ -364,7 +364,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="billingCity">City</Label>
+              <Label htmlFor="billingCity">{isArabic ? 'المدينة' : 'City'}</Label>
               <CitySelect
                 id="billingCity"
                 value={form.watch('billingAddress.city') || ''}
@@ -425,7 +425,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="shippingCountry">Country</Label>
+              <Label htmlFor="shippingCountry">{isArabic ? 'دولة' : 'Country'}</Label>
               <CountrySelect
                 id="shippingCountry"
                 value={form.watch('shippingAddress.country') || ''}
@@ -437,7 +437,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="shippingCity">City</Label>
+              <Label htmlFor="shippingCity">{isArabic ? 'المدينة' : 'City'}</Label>
               <CitySelect
                 id="shippingCity"
                 value={form.watch('shippingAddress.city') || ''}

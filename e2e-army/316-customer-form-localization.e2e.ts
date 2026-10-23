@@ -43,5 +43,16 @@ test(
 
     // AC2: Once country is selected, CitySelect becomes enabled
     await agent.assert('the billing city input is now enabled for city entry');
+
+    // 5. Verify /en/crm/leads/new and /ar/crm/leads/new load cleanly with Create Customer link and CitySelect
+    await app.open('/en/crm/leads/new');
+    await expect(screen.getByPlaceholder('Select a country first')).toBeDisabled();
+    await expect(screen.getByRole('link', { name: 'Create Customer' })).toBeVisible();
+
+    await app.open('/ar/crm/leads/new');
+    const arDir = await browser.evaluate(() => document.documentElement.dir);
+    expect(arDir).toBe('rtl');
+    await expect(screen.getByPlaceholder('اختر الدولة أولاً')).toBeDisabled();
+    await expect(screen.getByRole('link', { name: 'إنشاء عميل' })).toBeVisible();
   },
 );

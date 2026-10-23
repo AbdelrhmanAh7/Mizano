@@ -67,8 +67,17 @@ async function bootstrap() {
   const corsOrigins = corsOriginRaw
     ? corsOriginRaw.split(',').map((o) => o.trim())
     : ['http://localhost:5001'];
+  const allOrigins = Array.from(
+    new Set(
+      corsOrigins.flatMap((o) => {
+        if (o.includes('127.0.0.1')) return [o, o.replace('127.0.0.1', 'localhost')];
+        if (o.includes('localhost')) return [o, o.replace('localhost', '127.0.0.1')];
+        return [o];
+      }),
+    ),
+  );
   app.enableCors({
-    origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
+    origin: allOrigins.length === 1 ? allOrigins[0] : allOrigins,
     credentials: true,
   });
 

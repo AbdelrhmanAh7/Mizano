@@ -101,6 +101,20 @@ describe('CustomerForm - Submit Button & Action Localization', () => {
       expect(button).toHaveAttribute('aria-label', 'إنشاء عميل');
       expect(button).toHaveTextContent('إنشاء عميل');
     });
+
+    it('localizes address field labels (Country / City) in English', () => {
+      mockLocale = 'en';
+      render(<CustomerForm {...defaultProps} customer={null} />);
+      expect(screen.getAllByText('Country').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('City').length).toBeGreaterThan(0);
+    });
+
+    it('localizes address field labels (دولة / المدينة) in Arabic', () => {
+      mockLocale = 'ar';
+      render(<CustomerForm {...defaultProps} customer={null} />);
+      expect(screen.getAllByText('دولة').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('المدينة').length).toBeGreaterThan(0);
+    });
   });
 
   describe('AC5: Update mode button text & aria-label', () => {
