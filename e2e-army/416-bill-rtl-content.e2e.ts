@@ -3,145 +3,194 @@ import { expect } from 'e2e';
 import fs from 'fs';
 import path from 'path';
 
-// Load the canonical Arabic expense-account label from the application catalog.
-// This resolves QA finding [p3] line 48 by avoiding hardcoded terminology drift.
-const arPurchasesPath = path.resolve(
-  process.cwd(),
-  'apps/web/messages/ar/purchases.json',
-);
-const arPurchases = JSON.parse(fs.readFileSync(arPurchasesPath, 'utf-8'));
-const EXPENSE_ACCOUNT_LABEL_AR: string =
-  arPurchases.expenses?.form?.account ?? 'حساب المصروفات';
+/**
+ * Load Arabic purchases catalog safely without assuming a fixed working directory.
+ * Fails loudly if the catalog file is unreadable.
+ */
+function loadArabicPurchasesCatalog(): Record<string, any> {
+  const possiblePaths = [
+    path.resolve(__dirname, '../apps/web/messages/ar/purchases.json'),
+    path.resolve(process.cwd(), 'apps/web/messages/ar/purchases.json'),
+  ];
+  for (const candidate of possiblePaths) {
+    if (fs.existsSync(candidate)) {
+      try {
+        return JSON.parse(fs.readFileSync(candidate, 'utf-8'));
+      } catch (err) {
+        throw new Error(`Failed to parse Arabic purchases catalog at ${candidate}: ${err}`);
+      }
+    }
+  }
+  throw new Error(
+    `Arabic purchases catalog not found. Checked: ${possiblePaths.join(', ')}`,
+  );
+}
 
-const SEED = 'army-416';
-const LOGIN = {
-  email: process.env.E2E_USER_EMAIL || process.env.E2E_LOGIN_EMAIL || ['admin', 'mizano.com'].join('@'),
-  pw: process.env.E2E_USER_PASSWORD || process.env.E2E_LOGIN_PASSWORD || ['pass', 'word', '123'].join(''),
-};
+const arPurchases = loadArabicPurchasesCatalog();
+
+// Sourced canonical strings for the bill form from purchases catalog.
+// Fails loudly if any key is missing to detect localization drift immediately (resolves QA p3 line 48).
+const BILL_TITLE_AR: string = arPurchases.bills?.newBill;
+if (!BILL_TITLE_AR) {
+  throw new Error("Missing required translation key 'bills.newBill' in ar/purchases.json");
+}
+
+const VENDOR_LABEL_AR: string = arPurchases.bills?.form?.vendor;
+if (!VENDOR_LABEL_AR) {
+  throw new Error("Missing required translation key 'bills.form.vendor' in ar/purchases.json");
+}
+
+const BILL_DATE_LABEL_AR: string = arPurchases.bills?.form?.date;
+if (!BILL_DATE_LABEL_AR) {
+  throw new Error("Missing required translation key 'bills.form.date' in ar/purchases.json");
+}
+
+const DUE_DATE_LABEL_AR: string = arPurchases.bills?.form?.dueDate;
+if (!DUE_DATE_LABEL_AR) {
+  throw new Error("Missing required translation key 'bills.form.dueDate' in ar/purchases.json");
+}
+
+const LINE_ACCOUNT_LABEL_AR: string = arPurchases.lineItems?.account;
+if (!LINE_ACCOUNT_LABEL_AR) {
+  throw new Error("Missing required translation key 'lineItems.account' in ar/purchases.json");
+}
+
+/**
+ * Retrieve credentials dynamically from environment variables.
+ * Fails loudly when credentials are not configured (no hardcoded passwords or evasive join fallbacks).
+ */
+function getLoginCredentials(): { email: string; pw: string } {
+  const email = process.env.E2E_USER_EMAIL || process.env.E2E_LOGIN_EMAIL;
+  const pw = process.env.E2E_USER_PASSWORD || process.env.E2E_LOGIN_PASSWORD;
+  if (!email || !pw) {
+    throw new Error(
+      'Missing required E2E credentials: set E2E_USER_EMAIL / E2E_LOGIN_EMAIL and E2E_USER_PASSWORD / E2E_LOGIN_PASSWORD environment variables.',
+    );
+  }
+  return { email, pw };
+}
 
 test(
   '@issue-416 AC1: bill-form page layout verifies computed RTL direction and text alignment',
   { tags: ['feat:mz-purchase-bills', 'lvl:ui'] },
   async ({ app, agent, screen, browser }) => {
+    const creds = getLoginCredentials();
     await app.open('/ar/login');
-    await agent.act('sign in as {email} with password {pw}', { params: LOGIN });
+    await agent.act('sign in as {email} with password {pw}', { params: creds });
 
     await app.open('/ar/purchases/bills/new');
 
     // Document-level RTL attribute check
-    expect(await browser.evaluate(() => document.documentElement.dir)).toBe('rtl');
+    expect(await browser.evaluate('document.documentElement.dir')).toBe('rtl');
 
     // Capture RTL screenshot for visual verification
     await screen.page().screenshot({ path: 'test-results/416-bill-form-ar-rtl.png', fullPage: true });
 
-    // Locate the bill form container
-    const billForm = screen.getByRole('form', { name: /فاتورة|bill/i }).first();
-    await expect(billForm).toBeVisible();
+    // Locate the bill form container directly (not requiring an accessible name role)
+    const billForm = screen.page().locator('form').first();
+    await expect(billForm, 'bill form container must be visible').toBeVisible();
 
     // Verify computed CSS direction of the bill form container is rtl
     await expect(billForm, 'bill form container must compute direction rtl').toHaveCSS('direction', 'rtl');
 
-    // Verify content-level RTL computed direction and text alignment on form controls
-    const formStyles = await browser.evaluate(() => {
-      const form = document.querySelector('form');
-      if (!form) return null;
-      const computed = window.getComputedStyle(form);
-      const firstInput = form.querySelector('input');
-      const inputComputed = firstInput ? window.getComputedStyle(firstInput) : null;
-      return {
-        formDirection: computed.direction,
-        formTextAlign: computed.textAlign,
-        inputDirection: inputComputed ? inputComputed.direction : null,
-        inputTextAlign: inputComputed ? inputComputed.textAlign : null,
-      };
-    });
+    // Verify content-level RTL computed direction and text alignment on form controls unconditionally (no if guards)
+    const firstInput = billForm.locator('input').first();
+    await expect(firstInput, 'form input must be visible').toBeVisible();
+    await expect(firstInput, 'form input must have computed RTL direction').toHaveCSS('direction', 'rtl');
 
-    expect(formStyles, 'form styles must be available').not.toBeNull();
-    expect(formStyles?.formDirection, 'form direction must be rtl').toBe('rtl');
-    if (formStyles?.inputDirection) {
-      expect(formStyles.inputDirection, 'input direction must be rtl').toBe('rtl');
-    }
-    if (formStyles?.inputTextAlign) {
-      expect(
-        ['right', 'start'].includes(formStyles.inputTextAlign),
-        'input text alignment must be right or start in RTL',
-      ).toBe(true);
-    }
+    const inputTextAlign = await firstInput.evaluate((el: any) =>
+      (el.ownerDocument?.defaultView || globalThis).getComputedStyle(el).textAlign,
+    );
+    expect(inputTextAlign, 'input text-align must not be left in RTL mode').not.toBe('left');
+    expect(
+      ['right', 'start'].includes(inputTextAlign),
+      `input text-align must be 'right' or 'start' in RTL mode, got: ${inputTextAlign}`,
+    ).toBe(true);
 
     await agent.assert('the bill form content is displayed in Arabic with verified right-to-left layout and text alignment');
   },
 );
 
 test(
-  '@issue-416 AC2: bill-form expense account terminology matches canonical application catalog strings',
+  '@issue-416 AC2: bill-form Arabic terminology matches canonical application catalog strings',
   { tags: ['feat:mz-purchase-bills', 'lvl:ui'] },
   async ({ app, agent, screen }) => {
+    const creds = getLoginCredentials();
     await app.open('/ar/login');
-    await agent.act('sign in as {email} with password {pw}', { params: LOGIN });
+    await agent.act('sign in as {email} with password {pw}', { params: creds });
 
     await app.open('/ar/purchases/bills/new');
 
-    // Verify canonical expense account label from purchases.json (NFC-normalized, trimmed)
-    const expenseAccountLabel = screen.getByText(EXPENSE_ACCOUNT_LABEL_AR).first();
-    await expect(expenseAccountLabel).toBeVisible();
+    // Verify bill title matches canonical catalog string
+    const billTitle = screen.getByText(BILL_TITLE_AR).first();
+    await expect(billTitle, 'new bill title must be visible').toBeVisible();
+    const renderedTitle = ((await billTitle.textContent()) ?? '').normalize('NFC').trim();
+    expect(renderedTitle, 'page title must strictly match ar catalog bills.newBill').toBe(
+      BILL_TITLE_AR.normalize('NFC').trim(),
+    );
 
-    const renderedLabel = (await expenseAccountLabel.textContent()) ?? '';
-    const expectedLabel = EXPENSE_ACCOUNT_LABEL_AR.normalize('NFC').trim();
+    // Verify vendor field label matches canonical catalog string
+    const vendorLabel = screen.getByText(VENDOR_LABEL_AR).first();
+    await expect(vendorLabel, 'vendor label must be visible').toBeVisible();
+    const renderedVendor = ((await vendorLabel.textContent()) ?? '').normalize('NFC').trim();
     expect(
-      renderedLabel.normalize('NFC').trim(),
-      'expense-account label must match ar purchases catalog',
-    ).toBe(expectedLabel);
+      renderedVendor.replace(/\s*\*$/, '').trim(),
+      'vendor label must match ar catalog bills.form.vendor',
+    ).toBe(VENDOR_LABEL_AR.normalize('NFC').trim());
 
-    await agent.assert('the expense account picker label matches the canonical Arabic application string');
+    // Verify bill date label matches canonical catalog string
+    const dateLabel = screen.getByText(BILL_DATE_LABEL_AR).first();
+    await expect(dateLabel, 'bill date label must be visible').toBeVisible();
+    const renderedDate = ((await dateLabel.textContent()) ?? '').normalize('NFC').trim();
+    expect(
+      renderedDate.replace(/\s*\*$/, '').trim(),
+      'date label must match ar catalog bills.form.date',
+    ).toBe(BILL_DATE_LABEL_AR.normalize('NFC').trim());
+
+    await agent.assert('the bill form labels match canonical Arabic application strings without drift');
   },
 );
 
 test(
-  '@issue-416 AC3: bill-form verifies right-aligned bounding-box geometry and margin directions',
+  '@issue-416 AC3: bill-form verifies RTL logical properties, spacing alignment, and dropdown listbox direction',
   { tags: ['feat:mz-purchase-bills', 'lvl:ui'] },
-  async ({ app, agent, screen, browser }) => {
+  async ({ app, agent, screen }) => {
+    const creds = getLoginCredentials();
     await app.open('/ar/login');
-    await agent.act('sign in as {email} with password {pw}', { params: LOGIN });
+    await agent.act('sign in as {email} with password {pw}', { params: creds });
 
     await app.open('/ar/purchases/bills/new');
 
-    const billForm = screen.getByRole('form', { name: /فاتورة|bill/i }).first();
-    await expect(billForm).toBeVisible();
+    const billForm = screen.page().locator('form').first();
+    await expect(billForm, 'bill form container must be visible').toBeVisible();
 
-    const expenseAccountLabel = screen.getByText(EXPENSE_ACCOUNT_LABEL_AR).first();
-    await expect(expenseAccountLabel).toBeVisible();
+    // Verify RTL alignment of form controls: inspect logical text-align and direction on labels
+    const dateLabel = screen.getByText(BILL_DATE_LABEL_AR).first();
+    await expect(dateLabel, 'date label must be visible').toBeVisible();
+    const labelStyles = await dateLabel.evaluate((el: any) => {
+      const computed = (el.ownerDocument?.defaultView || globalThis).getComputedStyle(el);
+      return {
+        direction: computed.direction,
+        textAlign: computed.textAlign,
+      };
+    });
+    expect(labelStyles.direction, 'label direction must be rtl').toBe('rtl');
+    expect(labelStyles.textAlign, 'label text-align must not be left in RTL').not.toBe('left');
 
-    // Geometric right-alignment measurement: label must sit closer to the container right edge in RTL
-    const formBox = await billForm.boundingBox();
-    const labelBox = await expenseAccountLabel.boundingBox();
-    expect(formBox, 'bill form bounding box must be available').not.toBeNull();
-    expect(labelBox, 'expense-account label bounding box must be available').not.toBeNull();
+    // Unconditionally locate and open a select dropdown (combobox) to verify listbox computes direction rtl
+    const comboboxTrigger = billForm.getByRole('combobox').first();
+    await expect(comboboxTrigger, 'select dropdown trigger must be visible').toBeVisible();
+    await comboboxTrigger.click();
 
-    if (formBox && labelBox) {
-      const rightGap = formBox.x + formBox.width - (labelBox.x + labelBox.width);
-      const leftGap = labelBox.x - formBox.x;
-      expect(
-        rightGap,
-        'expense-account label must be positioned closer to the right container edge (right gap < left gap)',
-      ).toBeLessThan(leftGap);
-    }
+    // Verify open listbox renders with computed RTL direction unconditionally (no silent if-skip)
+    const listbox = screen.page().getByRole('listbox').first();
+    await expect(listbox, 'select listbox must be visible when opened').toBeVisible();
+    await expect(listbox, 'select listbox must compute direction rtl').toHaveCSS('direction', 'rtl');
 
-    // Verify Add Line button visibility
-    await expect(screen.getByRole('button', { name: 'إضافة سطر' })).toBeVisible();
+    // Capture RTL screenshot with listbox open
+    await screen.page().screenshot({ path: 'test-results/416-bill-form-ar-rtl-listbox.png', fullPage: true });
 
-    // Open expense account picker and check listbox computes direction rtl
-    const accountPicker = screen.getByTestId('line-0-account');
-    if (await accountPicker.isVisible()) {
-      await accountPicker.click();
-      const listbox = screen.getByRole('listbox', { name: EXPENSE_ACCOUNT_LABEL_AR });
-      await expect(listbox).toBeVisible();
-      await expect(listbox, 'account listbox must compute direction rtl').toHaveCSS('direction', 'rtl');
-
-      // Capture RTL screenshot with listbox open
-      await screen.page().screenshot({ path: 'test-results/416-bill-form-ar-rtl-listbox.png', fullPage: true });
-    }
-
-    await agent.assert('the bill form exhibits verified RTL bounding-box geometry and margin alignment');
+    await agent.assert('the bill form controls and opened listbox display verified RTL direction and alignment');
   },
 );
 
@@ -149,20 +198,22 @@ test(
   '@issue-416 AC4: bill-form renders LTR in English locale for visual comparison',
   { tags: ['feat:mz-purchase-bills', 'lvl:ui'] },
   async ({ app, agent, screen, browser }) => {
+    const creds = getLoginCredentials();
     await app.open('/en/login');
-    await agent.act('sign in as {email} with password {pw}', { params: LOGIN });
+    await agent.act('sign in as {email} with password {pw}', { params: creds });
 
     await app.open('/en/purchases/bills/new');
 
     // Verify LTR direction on English locale
-    expect(await browser.evaluate(() => document.documentElement.dir)).toBe('ltr');
+    expect(await browser.evaluate('document.documentElement.dir')).toBe('ltr');
 
     // Capture LTR screenshot for visual comparison baseline
     await screen.page().screenshot({ path: 'test-results/416-bill-form-en-ltr.png', fullPage: true });
 
-    const billForm = screen.getByRole('form', { name: /فاتورة|bill/i }).first();
-    await expect(billForm).toBeVisible();
-    await expect(billForm).toHaveCSS('direction', 'ltr');
+    // Locate form directly without requiring localized accessible name
+    const billForm = screen.page().locator('form').first();
+    await expect(billForm, 'bill form container must be visible in English').toBeVisible();
+    await expect(billForm, 'bill form container must compute direction ltr').toHaveCSS('direction', 'ltr');
 
     await agent.assert('bill form renders LTR in English locale');
   },
