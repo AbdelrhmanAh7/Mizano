@@ -5,8 +5,8 @@ This document provides verification evidence for GitHub issue #373 in `Abdelrhma
 - **Issue**: [#373](https://github.com/AbdelrhmanAh7/Mizano/issues/373)
 - **PR**: Supersedes part of #302
 - **Parent Issue**: #259
-- **Base Commit (`origin/master`)**: `a449f1aad52493e129e06beee47dbc560fecc475`
-- **Tested Head Commit**: `c068c3487e9f6e13e0c30bee36547d5fe0110979`
+- **Base Commit (`origin/master`)**: `fe78168dcf256ad29f2dfcd1fa89c33c1d67496a`
+- **Tested Head Commit**: `b57532fbe2d671a130c828fd3d71520b22843c80`
 - **Tested Branch**: `ai/373`
 - **Originating Sentry Issue**: None (originates from CodeRabbit QA review findings `fe27756e991d`, `46f48f134604`, `ee45814ef057`, `dd5561c077e9`, and 404 routing issue on PR #302 / issue #259).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20+, pnpm 8.14.0.
@@ -124,7 +124,7 @@ Root causes:
 4. CitySelect ternary duplicate branches removed dependency guidance.
 5. Accessing `/en/crm/customers/new` or `/ar/crm/customers/new` resulted in 404 Not Found.
 
-### Head Behaviour (commit `c068c348` on `ai/373`)
+### Head Behaviour (commit `b57532fb` on `ai/373`)
 
 After applying the localization and accessibility fixes, forwarding aria-label props, adding CRM customer alias routes and redirects, and merging master:
 
