@@ -46,8 +46,8 @@ export function CitySelect({
         aria-label={ariaLabel}
         value={value || ''}
         onChange={(e) => onValueChange?.(e.target.value)}
-        placeholder={country ? 'Enter city name' : 'Select a country first'}
-        disabled={disabled || !country}
+        placeholder={country ? 'Enter city name' : 'Enter city name'}
+        disabled={disabled}
       />
     );
   }

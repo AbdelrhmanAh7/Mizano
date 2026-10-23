@@ -6,11 +6,11 @@ This document provides verification evidence for GitHub issue #372 in `Abdelrhma
 - **PR Notice**: Supersedes part of #302
 - **Parent Issue**: #259
 - **Base Commit (`origin/master`)**: `bf3f67a80294e9c79f1bb5bfab65ac637e21658a`
-- **Tested Head Commit**: `0ab93fc90425436567c026237929173368a29a5e`
+- **Tested Head Commit**: `b9cc030c60893b74da5f90c4429d1877755c78f5`
 - **Tested Branch**: `ai/372`
 - **Originating Sentry Issue**: None (originates from review finding `46f48f134604` on PR #302 / discussion comment `6302678519`).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20.18.0, pnpm 8.14.0.
-- **Skills Used**: `systematic-debugging`, `diagnosing-bugs`, `e2e-army`, `test-first engineering`, `verification-before-completion`, `react-best-practices`.
+- **Skills Used**: `systematic-debugging`, `test-first`, `e2e-army`, `verification-before-completion`.
 - **Model and Effort**: `Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: High · Why: Complete fix for customer-form accessible Arabic labels, regression tests, and verification report for issue #372`.
 
 ---
@@ -37,7 +37,7 @@ In PR #302 (split from parent issue #259: customer form enhancements), QA findin
 4. Extended `CitySelect`, `CountrySelect`, and `PhoneInput` to accept `'aria-label'?: string` and pass it down to their respective focusable input or trigger elements.
 5. In `apps/web/components/sales/customer-form.tsx`, replaced all hardcoded and slash-stacked labels with single-locale `t('customers.form.<field>')` references, completely removing any "مشاركة …" text.
 6. Added a comprehensive regression unit test in `apps/web/components/sales/customer-form.spec.tsx` verifying both locales, proper MSA terminology, and strict absence of "مشاركة" fragments.
-7. Enhanced e2e-army natural-language test in `e2e-army/372-customer-form-labels.e2e.ts` tagged with `feat:mz-customers` with deterministic DOM assertions checking both Arabic RTL and English LTR customer form views and preventing vacuous passes.
+7. Added an e2e-army natural-language test in `e2e-army/372-customer-form-labels.e2e.ts` tagged with `feat:mz-customers` checking both Arabic RTL and English LTR customer form views.
 
 ---
 
@@ -96,21 +96,21 @@ FAIL components/sales/customer-form.spec.tsx
 
 **Observed exit code on base**: `1` (Test failed).
 
-### Head Behaviour (`0ab93fc90425436567c026237929173368a29a5e`)
+### Head Behaviour (`b9cc030c60893b74da5f90c4429d1877755c78f5`)
 
 Running `pnpm --filter @mizano/web test -- --testPathPattern="customer-form.spec"` on head:
 
 ```
 PASS components/sales/customer-form.spec.tsx
   CustomerForm localization and accessible labels (#372 QA finding regression)
-    ✓ renders single-locale English labels without bilingual keyword stacking or invalid phrases (31 ms)
-    ✓ renders correct MSA Arabic labels in Arabic locale without mistranslated "مشاركة" fragments (32 ms)
-    ✓ handles cancel and submit actions with localized button labels (15 ms)
+    ✓ renders single-locale English labels without bilingual keyword stacking or invalid phrases (32 ms)
+    ✓ renders correct MSA Arabic labels in Arabic locale without mistranslated "مشاركة" fragments (14 ms)
+    ✓ handles cancel and submit actions with localized button labels (82 ms)
 
 Test Suites: 1 passed, 1 total
 Tests:       3 passed, 3 total
 Snapshots:   0 total
-Time:        0.304 s
+Time:        0.489 s
 Ran all test suites matching /customer-form.spec/i.
 ```
 
