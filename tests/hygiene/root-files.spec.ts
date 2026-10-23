@@ -15,9 +15,45 @@ describe('Root Files Hygiene Guard', () => {
     expect(tracked).toBe('');
   });
 
-  it('asserts AI_QUESTIONS.md does not exist at repository root', () => {
-    const exists = fs.existsSync(aiQuestionsPath);
-    expect(exists).toBe(false);
+  it('asserts AI_QUESTIONS.md is ignored by git ignore rules via git check-ignore', () => {
+    const checkIgnore = execSync('git check-ignore AI_QUESTIONS.md', {
+      cwd: rootDir,
+      encoding: 'utf8',
+    }).trim();
+    expect(checkIgnore).toBe('AI_QUESTIONS.md');
+  });
+
+  it('asserts git add AI_QUESTIONS.md is rejected by git unless forced', () => {
+    const dummyContent = '# Temporary scratch questions\n';
+    const existedBefore = fs.existsSync(aiQuestionsPath);
+
+    try {
+      if (!existedBefore) {
+        fs.writeFileSync(aiQuestionsPath, dummyContent, 'utf8');
+      }
+
+      let rejected = false;
+      try {
+        execSync('git add AI_QUESTIONS.md', {
+          cwd: rootDir,
+          encoding: 'utf8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+      } catch {
+        rejected = true;
+      }
+      expect(rejected).toBe(true);
+
+      const tracked = execSync('git ls-files AI_QUESTIONS.md', {
+        cwd: rootDir,
+        encoding: 'utf8',
+      }).trim();
+      expect(tracked).toBe('');
+    } finally {
+      if (!existedBefore && fs.existsSync(aiQuestionsPath)) {
+        fs.unlinkSync(aiQuestionsPath);
+      }
+    }
   });
 
   it('asserts .gitignore contains /AI_QUESTIONS.md ignore rule', () => {
