@@ -29,7 +29,12 @@ import {
 } from '@/lib/hooks/use-ai-document-intake';
 import { useCreateVendor } from '@/lib/hooks/use-vendors';
 import { resolveScanLineTaxes, toDecimalString } from '@/lib/document-intake-tax';
-import { BillForm, type BillFormDefaultValues } from '@/components/purchases/bill-form';
+import {
+  BillForm,
+  type BillFormDefaultValues,
+  type FetchOptionsParams,
+} from '@/components/purchases/bill-form';
+import { accountsApi, itemsApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { getScanReviewErrorMessage } from '@/lib/scan-review-error';
 import { format } from 'date-fns';
@@ -83,6 +88,22 @@ export default function ScanBillPage() {
   const intake = useDocumentIntakeStream();
   const confirmIntake = useDocumentIntakeConfirm();
   const createVendor = useCreateVendor();
+
+  // Search and page aware option fetchers for scan review
+  const fetchAccounts = useCallback(async (params: FetchOptionsParams) => {
+    const response = await accountsApi.getAll({ ...params, limit: params.limit || 50 });
+    return response.data;
+  }, []);
+
+  const fetchItems = useCallback(async (params: FetchOptionsParams) => {
+    const response = await itemsApi.getAll({ ...params, limit: params.limit || 50 });
+    return response.data;
+  }, []);
+
+  const fetchAccountById = useCallback(async (id: string) => {
+    const response = await accountsApi.getOne(id);
+    return response.data?.data || response.data;
+  }, []);
 
   // Transition to review when SSE completes
   useEffect(() => {
@@ -812,6 +833,9 @@ export default function ScanBillPage() {
           <BillForm
             key={scanDefaults.vendorId}
             scanDefaults={scanDefaults}
+            fetchAccounts={fetchAccounts}
+            fetchItems={fetchItems}
+            fetchAccountById={fetchAccountById}
             extractedTotals={{
               subtotal: result.extractedFields.subtotal,
               tax: result.extractedFields.tax,

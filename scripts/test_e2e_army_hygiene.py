@@ -203,5 +203,15 @@ class E2EArmyRepositoryHygieneTests(unittest.TestCase):
             )
 
 
+    def test_317_e2e_no_hardcoded_credentials(self):
+        """e2e-army/317-searchable-bill-options.e2e.ts must not contain hard-coded credentials/passwords."""
+        test_file = E2E_ARMY_DIR / "317-searchable-bill-options.e2e.ts"
+        if not test_file.exists():
+            return
+        content = test_file.read_text(encoding="utf-8")
+        self.assertNotIn("password123", content, "317 spec contains hardcoded plaintext password123")
+        self.assertIn("process.env", content, "317 spec should source credentials dynamically from env")
+
+
 if __name__ == "__main__":
     unittest.main()
