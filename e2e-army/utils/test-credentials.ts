@@ -60,9 +60,9 @@ export function loadTestCredentials(): TestCredentials {
   if (!email || !password) {
     throw new Error(
       'Missing required environment variables for e2e tests:\n' +
-      '  E2E_LOGIN_EMAIL (or TEST_USER_EMAIL) - email for test admin user\n' +
-      '  E2E_LOGIN_PASSWORD (or TEST_USER_PASSWORD) - password for test admin user\n' +
-      'These must be configured in CI or provided locally via .env.test.'
+        '  E2E_LOGIN_EMAIL (or TEST_USER_EMAIL) - email for test admin user\n' +
+        '  E2E_LOGIN_PASSWORD (or TEST_USER_PASSWORD) - password for test admin user\n' +
+        'These must be configured in CI or provided locally via .env.test.',
     );
   }
 
