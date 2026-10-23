@@ -7,7 +7,7 @@ This document provides verification evidence for GitHub issue #373 in `Abdelrhma
 - **Parent Issue**: #259
 - **Base Commit (`origin/master`)**: `bf3f67a80294e9c79f1bb5bfab65ac637e21658a`
 - **Tested Head Commit**: `3a4e64c79ab4f0fd3e5edf398d04da3317ed0cd2`
-- **Tested Branch**: `ai/373`
+- **Tested Branch**: `ai/373-p2` (stack layer 2, rebased on `origin/ai/373` at `ea3d8678`)
 - **Originating Sentry Issue**: None (originates from CodeRabbit QA review findings `fe27756e991d`, `46f48f134604`, and related items on PR #302 / issue #259).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20+, pnpm 8.14.0.
 - **User-facing flow / E2E**: Covered by `e2e-army/373-customer-form-labels.e2e.ts` tagged `feat:mz-customers`.
@@ -142,3 +142,17 @@ All 10 unit test specifications pass cleanly with exit code 0.
 - **English Layout (LTR)**: Verified via `customer-form.spec.tsx` and `e2e-army/373-customer-form-labels.e2e.ts`. All form fields render with single-locale English labels ("Customer Name", "Billing Street", "Shipping Street", "Create Customer", "Update Customer") and standard LTR alignment.
 - **Arabic Layout (RTL)**: Verified via `customer-form.spec.tsx` and `e2e-army/373-customer-form-labels.e2e.ts`. When `/ar/sales/customers/new` is loaded, the page direction is `dir="rtl"`, and all form elements display natural Modern Standard Arabic terminology ("اسم العميل", "شارع الفوترة", "دولة الفوترة", "مدينة الفوترة", "الرمز البريدي لعنوان الفوترة", "إنشاء عميل", "نسخ من الفوترة").
 - **Accessibility Tree**: Inputs are cleanly associated with their respective `<Label>` components via matching IDs and single-locale `aria-label` attributes, with zero mixed-direction bilingual keyword stuffing.
+
+---
+
+## Stack Layer 2 Restack & Verification Details (`ai/373-p2`)
+
+- **Layer**: 2 of 3 (stack `AbdelrhmanAh7/Mizano#373`)
+- **Base Layer**: `origin/ai/373` (`ea3d8678d6b6f8ee5d89fb11687fb6de1922210f`)
+- **Rebase Status**: Cleanly rebased `ai/373-p2` onto `origin/ai/373` with zero conflicts.
+- **Verification Commands Executed**:
+  1. `pnpm --filter @mizano/web test -- components/sales/customer-form.spec.tsx components/ui/city-select.spec.tsx` -> 2 passed, 10 tests passed (Exit Code: 0)
+  2. `pnpm --filter @mizano/shared-types run build` -> Clean build (Exit Code: 0)
+  3. `pnpm --filter @mizano/web type-check` -> `tsc --noEmit` passed with 0 errors (Exit Code: 0)
+  4. `pnpm --filter @mizano/web lint` -> `next lint` passed with 0 errors (Exit Code: 0)
+  5. `python3 -m unittest discover -s scripts -p 'test_evidence_freshness.py'` -> 12 tests passed (Exit Code: 0)
