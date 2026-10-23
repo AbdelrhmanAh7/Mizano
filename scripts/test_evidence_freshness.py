@@ -49,12 +49,26 @@ def extract_tested_head(text: str) -> str | None:
     return match.group(1) if match else None
 
 
-def validate_tested_head_binding(text: str, expected_head_sha: str = None) -> list[str]:
+def extract_base_sha(text: str) -> str | None:
+    """Extract the base commit SHA from an evidence document."""
+    base_pattern = (
+        r"(?i:(?:base commit|base))\s*[:\s*`()a-zA-Z0-9_/.-]+?([0-9a-fA-F]{7,40})"
+    )
+    match = re.search(base_pattern, text)
+    return match.group(1) if match else None
+
+
+def validate_tested_head_binding(
+    text: str,
+    expected_head_sha: str = None,
+    disallow_base_sha: bool = True,
+) -> list[str]:
     """Validate that the evidence document defines a valid tested head SHA and matches expected branch head.
 
     Checks:
     - Evidence header contains a valid tested code head or tested head SHA (7 to 40 hex chars).
     - If expected_head_sha is provided, verifies that the tested head matches (exact or prefix match).
+    - If disallow_base_sha is True and base SHA is present, verifies that tested head does not match base commit.
     """
     violations = []
     tested_head = extract_tested_head(text)
@@ -72,6 +86,16 @@ def validate_tested_head_binding(text: str, expected_head_sha: str = None) -> li
             violations.append(
                 f"Recorded tested head ({tested_head}) does not match expected branch head ({expected_head_sha})"
             )
+
+    if disallow_base_sha:
+        base_sha = extract_base_sha(text)
+        if base_sha:
+            base_clean = base_sha.strip().lower()
+            tested_clean = tested_head.strip().lower()
+            if base_clean.startswith(tested_clean) or tested_clean.startswith(base_clean):
+                violations.append(
+                    f"Recorded tested head ({tested_head}) matches base commit SHA ({base_sha}); tested head must bind to the commit containing the fix"
+                )
 
     return violations
 
@@ -228,6 +252,15 @@ class EvidenceFreshnessTests(unittest.TestCase):
         self.assertEqual(len(missing_res), 1)
         self.assertIn("missing valid tested code head", missing_res[0])
 
+        # Tested head matching base commit
+        same_as_base = (
+            "- **Base**: `origin/master` (`e07f1e3d7585844a9af23dae48f870087993e4b3`)\n"
+            "- **Tested Head**: `e07f1e3d7585844a9af23dae48f870087993e4b3`\n"
+        )
+        base_match_res = validate_tested_head_binding(same_as_base)
+        self.assertEqual(len(base_match_res), 1)
+        self.assertIn("matches base commit SHA", base_match_res[0])
+
     def test_issue_327_evidence_contract(self):
         """docs/evidence/327/EVIDENCE.md must exist and define AC1-AC4 with exit codes and supersedes notice."""
         evidence_327 = EVIDENCE_DIR / "327" / "EVIDENCE.md"
@@ -362,6 +395,22 @@ class EvidenceFreshnessTests(unittest.TestCase):
         status_violations = validate_evidence_table_status(content)
         self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
 
+    def test_issue_402_evidence_contract(self):
+        """docs/evidence/402/EVIDENCE.md must exist and define AC1-AC5 with exit codes and supersedes notice."""
+        evidence_402 = EVIDENCE_DIR / "402" / "EVIDENCE.md"
+        self.assertTrue(evidence_402.exists(), "docs/evidence/402/EVIDENCE.md must exist")
+        content = evidence_402.read_text(encoding="utf-8")
+        self.assertIn("Supersedes part of #390", content)
+        self.assertIn("AC1", content)
+        self.assertIn("AC2", content)
+        self.assertIn("AC3", content)
+        self.assertIn("AC4", content)
+        self.assertIn("AC5", content)
+        self.assertIn("Exit Code", content)
+        head_violations = validate_tested_head_binding(content, expected_head_sha="1f8f64e2")
+        self.assertEqual(head_violations, [], f"Tested head binding violations: {head_violations}")
+        status_violations = validate_evidence_table_status(content)
+        self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
 
 if __name__ == "__main__":
     unittest.main()
