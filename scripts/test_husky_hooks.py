@@ -47,20 +47,33 @@ def _git_env(overrides=None):
     all variables from `git rev-parse --local-env-vars` (e.g. GIT_DIR, GIT_WORK_TREE,
     GIT_INDEX_FILE, GIT_OBJECT_DIRECTORY, GIT_COMMON_DIR, GIT_PREFIX) are stripped.
     Applies explicit overrides last so test-specific values take precedence.
+    Setting an override key to None removes it from the resulting environment.
     """
     clean = {
         k: v for k, v in os.environ.items()
         if not k.startswith("GIT_") or k in _GIT_ENV_ALLOWLIST
     }
     if overrides:
-        clean.update(overrides)
+        for k, v in overrides.items():
+            if v is None:
+                clean.pop(k, None)
+            else:
+                clean[k] = str(v)
     return clean
 
 
-GIT_ENV_CLEAN = _git_env()
+def __getattr__(name):
+    """Dynamically provide isolated environments for backward-compatibility attributes.
+
+    Prevents static module-level environment snapshots from going stale across tests.
+    """
+    if name == "GIT_ENV_CLEAN":
+        return _git_env()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def git(cwd, *args, env=None):
+    """Execute git command in cwd isolated from inherited repository environment variables."""
     return subprocess.run(
         ["git", *args], cwd=cwd, check=True, capture_output=True, text=True, env=_git_env(env)
     ).stdout.strip()
@@ -126,6 +139,10 @@ class PrePushHookTests(unittest.TestCase):
         return git(self.repo, "rev-parse", "HEAD")
 
     def push(self, lines, **env):
+        """Execute .husky/pre-push isolated from inherited Git repository environment variables.
+
+        Strips SKIP_LOCAL_CI by default unless explicitly provided in env overrides.
+        """
         clean = _git_env(env)
         if "SKIP_LOCAL_CI" not in env:
             clean.pop("SKIP_LOCAL_CI", None)
@@ -270,6 +287,7 @@ class PreCommitHookTests(unittest.TestCase):
         (self.repo / "_lint_staged.js").write_text(js)
 
     def run_hook(self, **env):
+        """Execute .husky/pre-commit isolated from inherited Git repository environment variables."""
         clean = _git_env(env)
         return subprocess.run(["sh", str(self.repo / ".husky" / "pre-commit")], cwd=self.repo,
                               env=clean, capture_output=True, text=True, timeout=60)
@@ -505,6 +523,27 @@ class GitEnvironmentIsolationTests(unittest.TestCase):
         # Verify decoy repository remained untouched
         self.assertEqual(git(decoy, "rev-parse", "HEAD"), decoy_head)
         self.assertEqual((decoy / ".git" / "index").read_bytes(), decoy_index)
+
+    def test_git_env_clean_module_attribute_is_dynamic(self):
+        import scripts.test_husky_hooks as mod
+
+        with mock.patch.dict(os.environ, {"GIT_DIR": "/decoy/.git", "SENTINEL_DYN_A": "alpha"}):
+            env_a = mod.GIT_ENV_CLEAN
+            self.assertNotIn("GIT_DIR", env_a)
+            self.assertEqual(env_a.get("SENTINEL_DYN_A"), "alpha")
+
+        with mock.patch.dict(os.environ, {"GIT_DIR": "/decoy/.git", "SENTINEL_DYN_B": "beta"}):
+            env_b = mod.GIT_ENV_CLEAN
+            self.assertNotIn("GIT_DIR", env_b)
+            self.assertEqual(env_b.get("SENTINEL_DYN_B"), "beta")
+            self.assertNotIn("SENTINEL_DYN_A", env_b)
+
+    def test_git_env_removes_keys_with_none_override(self):
+        with mock.patch.dict(os.environ, {"KEEP_ME": "yes", "REMOVE_ME": "temporary"}):
+            scrubbed = _git_env({"REMOVE_ME": None, "ADDED": "new"})
+            self.assertIn("KEEP_ME", scrubbed)
+            self.assertEqual(scrubbed.get("ADDED"), "new")
+            self.assertNotIn("REMOVE_ME", scrubbed)
 
 
 if __name__ == "__main__":
