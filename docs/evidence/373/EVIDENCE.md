@@ -6,7 +6,7 @@ This document provides verification evidence for GitHub issue #373 in `Abdelrhma
 - **PR**: Supersedes part of #302
 - **Parent Issue**: #259
 - **Base Commit (`origin/master`)**: `a449f1aad52493e129e06beee47dbc560fecc475`
-- **Tested Head Commit**: `024cd060221944ec0b482009e48b957c6634880b`
+- **Tested Head Commit**: `702c50b7957b294cf1accf4cd52d7993f300d706`
 - **Tested Branch**: `ai/373`
 - **Originating Sentry Issue**: None (originates from CodeRabbit QA review findings `fe27756e991d`, `46f48f134604`, and related items on PR #302 / issue #259).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20+, pnpm 8.14.0.
@@ -115,19 +115,19 @@ Root causes:
 3. Submit button and 'Copy from Billing' button lacked distinct localized aria-labels.
 4. CitySelect ternary duplicate branches removed dependency guidance.
 
-### Head Behaviour (commit `024cd060` on `ai/373`)
+### Head Behaviour (commit `702c50b7` on `ai/373`)
 
-After applying the localization and accessibility fixes and merging master:
+After applying the localization and accessibility fixes, forwarding aria-label props, and merging master:
 
 ```text
 PASS components/sales/customer-form.spec.tsx
-PASS components/sales/customer-form.spec.ts
 PASS components/ui/city-select.spec.tsx
+PASS components/sales/customer-form.spec.ts
 
 Test Suites: 3 passed, 3 total
 Tests:       23 passed, 23 total
 Snapshots:   0 total
-Time:        1.435 s
+Time:        0.516 s, estimated 1 s
 Exit status 0
 ```
 
