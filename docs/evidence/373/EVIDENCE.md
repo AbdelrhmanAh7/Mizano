@@ -5,8 +5,8 @@ This document provides verification evidence for GitHub issue #373 in `Abdelrhma
 - **Issue**: [#373](https://github.com/AbdelrhmanAh7/Mizano/issues/373)
 - **PR**: Supersedes part of #302
 - **Parent Issue**: #259
-- **Base Commit (`origin/master`)**: `8b89a7554ff33f164ee86693e653b303d1b7ab23`
-- **Tested Head Commit**: `c0fd1f4b1fc7161b40283ea0e93fb242bbbf7bc5`
+- **Base Commit (`origin/master`)**: `a449f1aad52493e129e06beee47dbc560fecc475`
+- **Tested Head Commit**: `024cd060221944ec0b482009e48b957c6634880b`
 - **Tested Branch**: `ai/373`
 - **Originating Sentry Issue**: None (originates from CodeRabbit QA review findings `fe27756e991d`, `46f48f134604`, and related items on PR #302 / issue #259).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20+, pnpm 8.14.0.
@@ -115,7 +115,7 @@ Root causes:
 3. Submit button and 'Copy from Billing' button lacked distinct localized aria-labels.
 4. CitySelect ternary duplicate branches removed dependency guidance.
 
-### Head Behaviour (commit `c0fd1f4b` on `ai/373`)
+### Head Behaviour (commit `024cd060` on `ai/373`)
 
 After applying the localization and accessibility fixes and merging master:
 
