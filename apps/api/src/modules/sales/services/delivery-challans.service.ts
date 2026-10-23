@@ -165,7 +165,13 @@ export class DeliveryChallansService {
         },
       });
       if (res.count !== 1) {
-        throw new ConflictException('Only draft challans can be updated');
+        await this.rejectTransition(
+          tx,
+          organizationId,
+          id,
+          ChallanStatus.DRAFT,
+          'Only draft challans can be updated',
+        );
       }
 
       if (dto.lines) {
