@@ -3,9 +3,10 @@
 This document provides verification evidence for GitHub issue #323 in `AbdelrhmanAh7/Mizano` (follow-up from #312, PR #451).
 
 - **Issue**: [#323](https://github.com/AbdelrhmanAh7/Mizano/issues/323)
-- **PR**: [#451](https://github.com/AbdelrhmanAh7/Mizano/pull/451)
+- **PR**: [#451](https://github.com/AbdelrhmanAh7/Mizano/pull/451) (Supersedes part of #312)
+- **Parent Issue**: #279
 - **Base Commit (`origin/master`)**: `8ec35a547d80eb5c815d514e1fa921564e67d94a`
-- **Tested Head Commit**: `4e5261cc1db39ee2ce68da8ab1eb26b6680ec378`
+- **Tested Head Commit**: `4e5261ccf1590c25896c348063a2fc77ec9445d5`
 - **Tested Branch**: `ai/323`
 - **Originating Sentry Issue**: None (originates from QA Second Opinion non-blocking review finding on PR #312 / issue #279).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20.18.0, pnpm 8.14.0, Python 3.14.8.
