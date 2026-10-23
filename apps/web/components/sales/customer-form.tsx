@@ -51,6 +51,43 @@ interface CustomerFormProps {
   isSubmitting?: boolean;
 }
 
+/**
+ * Builds a customer API payload from form data.
+ * Returns a DTO-compliant object with nested address structures.
+ * Omits empty optional fields to satisfy strict schema validation.
+ */
+export function buildCustomerPayload(data: CustomerFormData): Record<string, unknown> {
+  const optional = (v?: string): string | undefined =>
+    v && v.trim() !== '' ? v.trim() : undefined;
+
+  const optionalNumber = (v?: number): number | undefined =>
+    v !== undefined && v !== null ? v : undefined;
+
+  const addressOrUndefined = (addr?: z.infer<typeof addressSchema>) => {
+    if (!addr) return undefined;
+    const street = optional(addr.street);
+    const city = optional(addr.city);
+    const state = optional(addr.state);
+    const postalCode = optional(addr.postalCode);
+    const country = optional(addr.country);
+    if (!street && !city && !state && !postalCode && !country) return undefined;
+    return { street, city, state, postalCode, country };
+  };
+
+  return {
+    name: data.name,
+    displayName: optional(data.displayName),
+    email: optional(data.email),
+    phone: optional(data.phone),
+    currency: data.currency || 'USD',
+    taxId: optional(data.taxId),
+    paymentTerms: optionalNumber(data.paymentTerms),
+    notes: optional(data.notes),
+    billingAddress: addressOrUndefined(data.billingAddress),
+    shippingAddress: addressOrUndefined(data.shippingAddress),
+  };
+}
+
 const currencies = [
   { value: 'USD', label: 'USD - US Dollar' },
   { value: 'EUR', label: 'EUR - Euro' },
@@ -129,28 +166,8 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
   }, [customer, form]);
 
   const handleSubmit = (data: CustomerFormData) => {
-    // Flatten addresses for API
-    const submitData = {
-      name: data.name,
-      displayName: data.displayName || null,
-      email: data.email || null,
-      phone: data.phone || null,
-      currency: data.currency,
-      taxId: data.taxId || null,
-      paymentTerms: data.paymentTerms || 0,
-      notes: data.notes || null,
-      billingStreet: data.billingAddress?.street || null,
-      billingCity: data.billingAddress?.city || null,
-      billingState: data.billingAddress?.state || null,
-      billingPostalCode: data.billingAddress?.postalCode || null,
-      billingCountry: data.billingAddress?.country || null,
-      shippingStreet: data.shippingAddress?.street || null,
-      shippingCity: data.shippingAddress?.city || null,
-      shippingState: data.shippingAddress?.state || null,
-      shippingPostalCode: data.shippingAddress?.postalCode || null,
-      shippingCountry: data.shippingAddress?.country || null,
-    };
-    onSubmit(submitData as Record<string, unknown>);
+    const submitData = buildCustomerPayload(data);
+    onSubmit(submitData);
   };
 
   const copyBillingToShipping = () => {
