@@ -5,8 +5,8 @@ This document provides verification evidence for GitHub issue #373 in `Abdelrhma
 - **Issue**: [#373](https://github.com/AbdelrhmanAh7/Mizano/issues/373)
 - **PR**: Supersedes part of #302
 - **Parent Issue**: #259
-- **Base Commit (`origin/master`)**: `bf3f67a80294e9c79f1bb5bfab65ac637e21658a`
-- **Tested Head Commit**: `3a4e64c79ab4f0fd3e5edf398d04da3317ed0cd2`
+- **Base Commit (`origin/master`)**: `8ec35a547d80eb5c815d514e1fa921564e67d94a`
+- **Tested Head Commit**: `b21059671aa127605ac9bfedd2050219228c6366`
 - **Tested Branch**: `ai/373`
 - **Originating Sentry Issue**: None (originates from CodeRabbit QA review findings `fe27756e991d`, `46f48f134604`, and related items on PR #302 / issue #259).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20+, pnpm 8.14.0.
@@ -72,13 +72,13 @@ In PR #302 (split from parent issue #259), QA flagged review finding `fe27756e99
 ## Changed Covering Tests
 
 - `apps/web/components/sales/customer-form.spec.tsx`:
-  - `CustomerForm buildCustomerPayload (#373) › nests the addresses and keeps notes, with no flat address keys`
-  - `CustomerForm buildCustomerPayload (#373) › sends empty inputs as null so an edit can clear them`
   - `CustomerForm localization and accessible labels (#373 AC1, AC2) › renders single-locale English labels without bilingual keyword stacking or invalid phrases (AC1)`
   - `CustomerForm localization and accessible labels (#373 AC2) › renders correct MSA Arabic labels in Arabic locale without mistranslated "مشاركة" fragments (AC2)`
   - `CustomerForm submit button and action accessibility (#373 AC3, AC4) › differentiates create vs update in English and Arabic on submit button (AC3)`
   - `CustomerForm submit button and action accessibility (#373 AC4) › uses consistent translation key for copy from billing button text and aria-label (AC4)`
   - `CustomerForm submit button and action accessibility (#373 AC6) › submits nested address payload when form is submitted (AC6)`
+- `apps/web/components/sales/customer-form.spec.ts`:
+  - 15 exhaustive DTO schema boundary validation specs for `buildCustomerPayload` testing standard input, minimal fields, whitespace trimming, empty/partial addresses, and schema compliance against `@mizano/validators`.
 - `apps/web/components/ui/city-select.spec.tsx`:
   - `CitySelect (#373 AC5) › renders disabled input with "Select a country first" when country is not selected`
   - `CitySelect (#373 AC5) › renders enabled input with "Enter city name" when country without preset cities is selected`
@@ -96,9 +96,6 @@ When the regression tests were run against base:
 
 ```text
 FAIL components/sales/customer-form.spec.tsx
-  CustomerForm buildCustomerPayload (#373)
-    ✕ nests the addresses and keeps notes, with no flat address keys
-    ✕ sends empty inputs as null so an edit can clear them
   CustomerForm localization and accessible labels (#373 AC1, AC2)
     ✕ renders single-locale English labels without bilingual keyword stacking or invalid phrases (AC1)
     ✕ renders correct MSA Arabic labels in Arabic locale without mistranslated "مشاركة" fragments (AC2)
@@ -107,7 +104,7 @@ FAIL components/sales/customer-form.spec.tsx
     ✕ uses consistent translation key for copy from billing button text and aria-label (AC4)
 
 Test Suites: 1 failed, 1 total
-Tests:       6 failed, 6 total
+Tests:       4 failed, 4 total
 Exit status 1
 ```
 
@@ -116,24 +113,25 @@ Root causes:
 1. `customer-form.tsx` lacked `next-intl` integration (`useTranslations`).
 2. Hardcoded English labels and placeholders with no Arabic localization or aria-labels.
 3. Submit button and 'Copy from Billing' button lacked distinct localized aria-labels.
-4. `buildCustomerPayload` was missing, flattening addresses into non-whitelisted DTO properties.
+4. CitySelect ternary duplicate branches removed dependency guidance.
 
-### Head Behaviour (commit `3a4e64c7` on `ai/373`)
+### Head Behaviour (commit `b2105967` on `ai/373`)
 
-After applying the localization and accessibility fixes:
+After applying the localization and accessibility fixes and merging master:
 
 ```text
 PASS components/sales/customer-form.spec.tsx
+PASS components/sales/customer-form.spec.ts
 PASS components/ui/city-select.spec.tsx
 
-Test Suites: 2 passed, 2 total
-Tests:       10 passed, 10 total
+Test Suites: 3 passed, 3 total
+Tests:       23 passed, 23 total
 Snapshots:   0 total
-Time:        1.305 s
+Time:        1.435 s
 Exit status 0
 ```
 
-All 10 unit test specifications pass cleanly with exit code 0.
+All 23 unit test specifications pass cleanly with exit code 0.
 
 ---
 
