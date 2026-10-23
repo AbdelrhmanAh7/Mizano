@@ -65,3 +65,28 @@ test(
     await agent.assert('the bill form labels match Arabic application strings');
   },
 );
+
+test(
+  '@issue-379 AC6: language switcher navigates between English and Arabic RTL bill form',
+  { tags: ['feat:mz-purchase-bills', 'lvl:ui'] },
+  async ({ app, agent, screen, browser }) => {
+    test.skip(
+      !LOGIN.email || !LOGIN.pw,
+      'E2E credentials not configured (set E2E_USER_EMAIL / E2E_USER_PASSWORD or E2E_LOGIN_EMAIL / E2E_LOGIN_PASSWORD)',
+    );
+    await app.open('/en/login');
+    await agent.act('sign in as {email} with password {pw}', { params: LOGIN });
+
+    await app.open('/en/purchases/bills/new');
+    expect(await browser.evaluate(() => document.documentElement.dir)).toBe('ltr');
+
+    // Click Language button and then Arabic link
+    await agent.act('click the Language button to open language selector');
+    await agent.act('click the Arabic link to switch language to Arabic');
+
+    // Verify page navigated to Arabic RTL bill form
+    expect(await browser.evaluate(() => document.documentElement.dir)).toBe('rtl');
+    await expect(screen.getByRole('button', { name: 'إنشاء فاتورة' })).toBeVisible();
+    await agent.assert('the bill form is now displayed in Arabic with right-to-left layout');
+  },
+);
