@@ -34,7 +34,9 @@
       "paymentTerms": "Payment Terms",
       "priceList": "Price List",
       "billingAddress": "Billing Address",
-      "shippingAddress": "Shipping Address"
+      "shippingAddress": "Shipping Address",
+      "submitCreate": "Create Customer",
+      "submitUpdate": "Update Customer"
     },
     "table": {
       "name": "Name",

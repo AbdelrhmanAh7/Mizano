@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Customer } from '@/lib/hooks/use-customers';
+import { useTranslations } from 'next-intl';
 
 const addressSchema = z.object({
   street: z.string().optional(),
@@ -107,6 +108,8 @@ const paymentTermsOptions = [
 
 export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: CustomerFormProps) {
   const isEditing = !!customer;
+  const t = useTranslations('sales.customers.form');
+  const tc = useTranslations('common');
 
   const form = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
@@ -415,10 +418,16 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {tc('buttons.cancel')}
         </Button>
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : isEditing ? 'Update Customer' : 'Create Customer'}
+        <Button
+          type="submit"
+          disabled={isSubmitting}
+          aria-label={
+            isSubmitting ? tc('loading.saving') : isEditing ? t('submitUpdate') : t('submitCreate')
+          }
+        >
+          {isSubmitting ? tc('loading.saving') : isEditing ? t('submitUpdate') : t('submitCreate')}
         </Button>
       </div>
     </form>
