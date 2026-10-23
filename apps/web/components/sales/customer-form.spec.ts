@@ -185,7 +185,9 @@ describe('buildCustomerPayload - DTO boundary validation', () => {
     const result = createCustomerSchema.safeParse(payload);
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues.some((i) => i.path.includes('email'))).toBe(true);
+      expect(
+        result.error.issues.some((i: { path: (string | number)[] }) => i.path.includes('email')),
+      ).toBe(true);
     }
   });
 
@@ -195,7 +197,9 @@ describe('buildCustomerPayload - DTO boundary validation', () => {
     const result = createCustomerSchema.safeParse(payload);
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues.some((i) => i.path.includes('currency'))).toBe(true);
+      expect(
+        result.error.issues.some((i: { path: (string | number)[] }) => i.path.includes('currency')),
+      ).toBe(true);
     }
   });
 
@@ -205,7 +209,11 @@ describe('buildCustomerPayload - DTO boundary validation', () => {
     const result = createCustomerSchema.safeParse(payload);
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues.some((i) => i.path.includes('paymentTerms'))).toBe(true);
+      expect(
+        result.error.issues.some((i: { path: (string | number)[] }) =>
+          i.path.includes('paymentTerms'),
+        ),
+      ).toBe(true);
     }
   });
 
@@ -215,7 +223,11 @@ describe('buildCustomerPayload - DTO boundary validation', () => {
     const result = createCustomerSchema.safeParse(payload);
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues.some((i) => i.path.includes('paymentTerms'))).toBe(true);
+      expect(
+        result.error.issues.some((i: { path: (string | number)[] }) =>
+          i.path.includes('paymentTerms'),
+        ),
+      ).toBe(true);
     }
   });
 
