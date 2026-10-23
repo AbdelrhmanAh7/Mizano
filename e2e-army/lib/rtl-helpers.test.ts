@@ -1,7 +1,7 @@
 import {
   isRightAligned,
   isRtlComputedStyle,
-  resolveExpenseAccountLabel,
+  resolveBillFormLabels,
   normalizeArabicText,
   isRtlMarginDirection,
 } from './rtl-helpers';
@@ -56,22 +56,79 @@ describe('rtl-helpers', () => {
     });
   });
 
-  describe('resolveExpenseAccountLabel', () => {
-    it('returns canonical string from catalog when present', () => {
+  describe('resolveBillFormLabels', () => {
+    it('returns canonical strings from catalog when present', () => {
       const catalog = {
-        expenses: {
+        bills: {
           form: {
-            account: 'حساب المصروفات الرسمي',
+            newBill: 'فاتورة جديدة مخصصة',
+            vendor: 'المورد المخصص',
+            date: 'تاريخ مخصص',
+            dueDate: 'استحقاق مخصص',
+            reference: 'مرجع مخصص',
+            currency: 'عملة مخصصة',
+            lineItems: 'بنود مخصصة',
+            addLine: 'إضافة مخصصة',
+            cancel: 'إلغاء مخصص',
+            createBill: 'إنشاء مخصص',
+            notes: 'ملاحظات مخصصة',
+            subtotal: 'فرعي مخصص',
+            tax: 'ضريبة مخصصة',
+            total: 'إجمالي مخصص',
+          },
+          lineItems: {
+            item: 'صنف مخصص',
+            account: 'حساب مخصص',
+            description: 'وصف مخصص',
+            quantity: 'كمية مخصصة',
+            rate: 'سعر مخصص',
+            tax: 'ضريبة مخصصة',
+            amount: 'مبلغ مخصص',
           },
         },
       };
-      expect(resolveExpenseAccountLabel(catalog)).toBe('حساب المصروفات الرسمي');
+      const labels = resolveBillFormLabels(catalog);
+      expect(labels.billTitle).toBe('فاتورة جديدة مخصصة');
+      expect(labels.vendor).toBe('المورد المخصص');
+      expect(labels.billDate).toBe('تاريخ مخصص');
+      expect(labels.dueDate).toBe('استحقاق مخصص');
+      expect(labels.reference).toBe('مرجع مخصص');
+      expect(labels.currency).toBe('عملة مخصصة');
+      expect(labels.lineItemsTitle).toBe('بنود مخصصة');
+      expect(labels.itemColumn).toBe('صنف مخصص');
+      expect(labels.accountColumn).toBe('حساب مخصص');
+      expect(labels.descriptionColumn).toBe('وصف مخصص');
+      expect(labels.qtyColumn).toBe('كمية مخصصة');
+      expect(labels.rateColumn).toBe('سعر مخصص');
+      expect(labels.amountColumn).toBe('مبلغ مخصص');
+      expect(labels.taxRateColumn).toBe('ضريبة مخصصة');
+      expect(labels.totalColumn).toBe('مبلغ مخصص');
+      expect(labels.addLine).toBe('إضافة مخصصة');
+      expect(labels.cancel).toBe('إلغاء مخصص');
+      expect(labels.createBill).toBe('إنشاء مخصص');
+      expect(labels.notes).toBe('ملاحظات مخصصة');
+      expect(labels.subtotal).toBe('فرعي مخصص');
+      expect(labels.tax).toBe('ضريبة مخصصة');
+      expect(labels.total).toBe('إجمالي مخصص');
     });
 
-    it('returns default canonical string when catalog entry is missing or empty', () => {
-      expect(resolveExpenseAccountLabel(null)).toBe('حساب المصروفات');
-      expect(resolveExpenseAccountLabel({})).toBe('حساب المصروفات');
-      expect(resolveExpenseAccountLabel({ expenses: {} })).toBe('حساب المصروفات');
+    it('returns default canonical strings when catalog entry is missing or empty', () => {
+      const labels = resolveBillFormLabels(null);
+      expect(labels.billTitle).toBe('فاتورة جديدة');
+      expect(labels.vendor).toBe('المورد');
+      expect(labels.accountColumn).toBe('الحساب');
+      expect(labels.itemColumn).toBe('الصنف');
+      expect(labels.addLine).toBe('إضافة سطر');
+      expect(labels.createBill).toBe('إنشاء فاتورة');
+
+      const labels2 = resolveBillFormLabels({});
+      expect(labels2.accountColumn).toBe('الحساب');
+
+      const labels3 = resolveBillFormLabels({ bills: {} });
+      expect(labels3.accountColumn).toBe('الحساب');
+
+      const labels4 = resolveBillFormLabels({ bills: { form: {}, lineItems: {} } });
+      expect(labels4.accountColumn).toBe('الحساب');
     });
   });
 

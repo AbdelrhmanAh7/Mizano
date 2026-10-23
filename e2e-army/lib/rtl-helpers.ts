@@ -21,10 +21,32 @@ export interface MarginStyles {
   marginInlineEnd?: string;
 }
 
-export interface CatalogStructure {
-  expenses?: {
+export interface BillFormCatalogStructure {
+  bills?: {
     form?: {
+      vendor?: string;
+      date?: string;
+      dueDate?: string;
+      reference?: string;
+      currency?: string;
+      lineItems?: string;
+      addLine?: string;
+      cancel?: string;
+      createBill?: string;
+      notes?: string;
+      subtotal?: string;
+      tax?: string;
+      total?: string;
+      newBill?: string;
+    };
+    lineItems?: {
+      item?: string;
       account?: string;
+      description?: string;
+      quantity?: string;
+      rate?: string;
+      tax?: string;
+      amount?: string;
     };
   };
 }
@@ -56,10 +78,60 @@ export function isRtlComputedStyle(styles: ComputedLayoutStyles | null | undefin
 }
 
 /**
- * Resolves the canonical expense account Arabic label from catalog with fallback.
+ * Resolves the canonical bill form Arabic labels from catalog with fallbacks.
  */
-export function resolveExpenseAccountLabel(catalog?: CatalogStructure | null): string {
-  return catalog?.expenses?.form?.account ?? 'حساب المصروفات';
+export function resolveBillFormLabels(catalog?: BillFormCatalogStructure | null): {
+  billTitle: string;
+  vendor: string;
+  billDate: string;
+  dueDate: string;
+  reference: string;
+  currency: string;
+  lineItemsTitle: string;
+  itemColumn: string;
+  accountColumn: string;
+  descriptionColumn: string;
+  qtyColumn: string;
+  rateColumn: string;
+  amountColumn: string;
+  taxRateColumn: string;
+  totalColumn: string;
+  addLine: string;
+  cancel: string;
+  createBill: string;
+  notes: string;
+  subtotal: string;
+  tax: string;
+  total: string;
+} {
+  const bills = catalog?.bills ?? {};
+  const form = bills.form ?? {};
+  const lineItems = bills.lineItems ?? {};
+
+  return {
+    billTitle: form.newBill ?? 'فاتورة جديدة',
+    vendor: form.vendor ?? 'المورد',
+    billDate: form.date ?? 'تاريخ الفاتورة',
+    dueDate: form.dueDate ?? 'تاريخ الاستحقاق',
+    reference: form.reference ?? 'المرجع (رقم وثيقة المورد)',
+    currency: form.currency ?? 'العملة',
+    lineItemsTitle: form.lineItems ?? 'بنود الفاتورة',
+    itemColumn: lineItems.item ?? 'الصنف',
+    accountColumn: lineItems.account ?? 'الحساب',
+    descriptionColumn: lineItems.description ?? 'الوصف',
+    qtyColumn: lineItems.quantity ?? 'الكمية',
+    rateColumn: lineItems.rate ?? 'السعر',
+    amountColumn: lineItems.amount ?? 'المبلغ',
+    taxRateColumn: lineItems.tax ?? 'نسبة الضريبة',
+    totalColumn: lineItems.amount ?? 'الإجمالي',
+    addLine: form.addLine ?? 'إضافة سطر',
+    cancel: form.cancel ?? 'إلغاء',
+    createBill: form.createBill ?? 'إنشاء فاتورة',
+    notes: form.notes ?? 'ملاحظات',
+    subtotal: form.subtotal ?? 'المجموع الفرعي',
+    tax: form.tax ?? 'الضريبة',
+    total: form.total ?? 'الإجمالي',
+  };
 }
 
 /**
