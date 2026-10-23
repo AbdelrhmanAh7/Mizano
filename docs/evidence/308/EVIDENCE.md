@@ -1,17 +1,17 @@
 # Evidence for Issue #308: Isolate Husky Hook Test Fixture Subprocesses from Inherited Git Environment
 
-This document provides verification evidence for GitHub issue #308 and PR #467 in `AbdelrhmanAh7/Mizano` (follow-up from PR #205, non-blocking review finding on `scripts/test_husky_hooks.py:25`).
+This document provides verification evidence for GitHub issue #308 and stacked PRs (#467 `ai/308` and #469 `ai/308-p2`) in `AbdelrhmanAh7/Mizano` (follow-up from PR #205, non-blocking review finding on `scripts/test_husky_hooks.py:25`).
 
 - **Issue**: [#308](https://github.com/AbdelrhmanAh7/Mizano/issues/308)
-- **PR**: [#467](https://github.com/AbdelrhmanAh7/Mizano/pull/467)
+- **PR**: [#467](https://github.com/AbdelrhmanAh7/Mizano/pull/467) (layer 1 `ai/308`) and [#469](https://github.com/AbdelrhmanAh7/Mizano/pull/469) (stack layer 2 `ai/308-p2`)
 - **Base Commit (`origin/master`)**: `97de4c1ee6353d712f51152a46637b77d61c6b65`
-- **Tested Head Commit**: `60c151c3606f7cb9c02ff59b6fdbb8d003117fe4`
-- **Tested Branch**: `ai/308`
+- **Tested Head Commit**: `640f32cd350d83300db6e836c8c3dcbd2f8423af` (layer 1 `origin/ai/308`) / restacked `ai/308-p2`
+- **Tested Branch**: `ai/308-p2` (stacked on `origin/ai/308`)
 - **Originating Sentry Issue**: None (originates from non-blocking CodeRabbit review finding on PR #205 at `scripts/test_husky_hooks.py:25`).
 - **Host Environment**: Darwin arm64 (macOS), Python 3.14.8, Git 2.50.1, Node.js v20.18.0, pnpm 8.14.0.
 - **User-facing flow / E2E**: Not user-facing (`E2E: not needed — developer tooling test fixture in scripts/test_husky_hooks.py; no user-facing flows modified.`).
 - **Skills Used**: `systematic-debugging`, `diagnosing-bugs`, `tdd`, `verification-before-completion`, `model-effort-routing`.
-- **Model and Effort**: `Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: High · Why: Address CodeRabbit review finding on base failure mechanism in docs/evidence/308/EVIDENCE.md, verify AC1-AC5 across all 21 test cases, and document accurate root cause analysis.`
+- **Model and Effort**: `Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: High · Why: Restack and resolve merge conflict on ai/308-p2 onto origin/ai/308, verifying Acceptance Criteria AC1-AC5 across both stack layers and executing all 21 test suite cases.`
 
 ---
 
