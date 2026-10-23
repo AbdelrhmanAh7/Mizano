@@ -90,6 +90,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 ## 11. Web UI
 
 - **Every new string needs en and ar,** including dialog titles, confirm and cancel buttons, placeholders, selector labels and report row names. Shared components accept localized label props.
+- **Assert actual RTL layout and localized text in Arabic UI tests, not just `dir="rtl"`.** Verify computed CSS direction (`direction === 'rtl'`), alignment, or margin directions on container elements, and match Arabic button text ("إنشاء فاتورة" / "إلغاء") against actual message catalogs rather than asserting English strings in Arabic tests. _(#379)_
 - **Keep error, loading and empty distinct.** Never collapse a failed query into `[]` ("no accounts"). Show an error with Retry, and block submit while a required lookup is loading or failed.
 - **Show the currency of the document**, falling back to the org base currency, never the counterparty's default. The API must actually return the fields the UI relies on (for example `baseCurrency`).
 - **Payment-wide effects get payment-wide warnings.** Voiding a payment affects every allocated bill.
