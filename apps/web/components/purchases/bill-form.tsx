@@ -114,6 +114,7 @@ export function BillForm({
   const isEditing = !!bill;
   const tValidation = useTranslations('purchases.bills.validation');
   const tIntake = useTranslations('ai.intake');
+  const tForm = useTranslations('purchases.bills.form');
   const { data: vendorsData } = useVendors({ limit: 100 });
   const vendors = useMemo(() => vendorsData?.data || [], [vendorsData?.data]);
 
@@ -260,19 +261,21 @@ export function BillForm({
       {/* Bill Info */}
       <Card>
         <CardHeader>
-          <CardTitle>Bill Information</CardTitle>
+          <CardTitle>{tForm('billInfo')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Vendor */}
             <div className="space-y-2">
-              <Label htmlFor="vendorId">Vendor *</Label>
+              <Label htmlFor="vendorId">
+                {tForm('vendor')} <span className="text-destructive">*</span>
+              </Label>
               <Select
                 value={form.watch('vendorId')}
                 onValueChange={(value) => form.setValue('vendorId', value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select vendor" />
+                  <SelectValue placeholder={tForm('vendorPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {vendors.map((vendor: Vendor) => (
@@ -289,7 +292,9 @@ export function BillForm({
 
             {/* Date */}
             <div className="space-y-2">
-              <Label htmlFor="date">Bill Date *</Label>
+              <Label htmlFor="date">
+                {tForm('date')} <span className="text-destructive">*</span>
+              </Label>
               <Input id="date" type="date" {...form.register('date')} />
               {form.formState.errors.date && (
                 <p className="text-sm text-red-500">{form.formState.errors.date.message}</p>
@@ -298,7 +303,9 @@ export function BillForm({
 
             {/* Due Date */}
             <div className="space-y-2">
-              <Label htmlFor="dueDate">Due Date *</Label>
+              <Label htmlFor="dueDate">
+                {tForm('dueDate')} <span className="text-destructive">*</span>
+              </Label>
               <Input id="dueDate" type="date" {...form.register('dueDate')} />
               {form.formState.errors.dueDate && (
                 <p className="text-sm text-red-500">{form.formState.errors.dueDate.message}</p>
@@ -310,13 +317,13 @@ export function BillForm({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Reference */}
             <div className="space-y-2">
-              <Label htmlFor="reference">Reference (Vendor Doc #)</Label>
+              <Label htmlFor="reference">{tForm('reference')}</Label>
               <Input id="reference" {...form.register('reference')} placeholder="e.g. INV-001" />
             </div>
 
             {/* Currency */}
             <div className="space-y-2">
-              <Label htmlFor="currencyCode">Currency</Label>
+              <Label htmlFor="currencyCode">{tForm('currency')}</Label>
               <Select
                 value={form.watch('currencyCode') || ''}
                 onValueChange={(value) =>
@@ -369,7 +376,7 @@ export function BillForm({
       {/* Line Items */}
       <Card>
         <CardHeader>
-          <CardTitle>Line Items</CardTitle>
+          <CardTitle>{tForm('lineItems')}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -482,22 +489,22 @@ export function BillForm({
             onClick={() => append({ description: '', quantity: '1', rate: '', taxRate: '0' })}
           >
             <Plus className="mr-2 h-4 w-4" />
-            Add Line
+            {tForm('addLine')}
           </Button>
 
           {/* Totals */}
           <div className="mt-6 flex justify-end">
             <div className="w-64 space-y-2">
               <div className="flex justify-between text-sm">
-                <span>Subtotal</span>
+                <span>{tForm('subtotal')}</span>
                 <span className="font-mono">{totals.subtotal}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span>Tax</span>
+                <span>{tForm('tax')}</span>
                 <span className="font-mono">{totals.taxAmount}</span>
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2">
-                <span>Total</span>
+                <span>{tForm('total')}</span>
                 <span className="font-mono">{totals.grandTotal}</span>
               </div>
             </div>
@@ -539,20 +546,20 @@ export function BillForm({
       {/* Notes */}
       <Card>
         <CardHeader>
-          <CardTitle>Notes</CardTitle>
+          <CardTitle>{tForm('notes')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <Textarea {...form.register('notes')} placeholder="Add notes or terms..." rows={3} />
+          <Textarea {...form.register('notes')} placeholder={tForm('notesPlaceholder')} rows={3} />
         </CardContent>
       </Card>
 
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {tForm('cancel')}
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : isEditing ? 'Update Bill' : 'Create Bill'}
+          {isSubmitting ? tForm('saving') : isEditing ? tForm('updateBill') : tForm('createBill')}
         </Button>
       </div>
     </form>

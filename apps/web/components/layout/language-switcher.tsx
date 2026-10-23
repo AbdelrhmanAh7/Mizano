@@ -1,7 +1,8 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { locales, localeNames, type Locale } from '@/i18n/config';
 import {
   DropdownMenu,
@@ -14,35 +15,49 @@ import { Languages } from 'lucide-react';
 
 export function LanguageSwitcher() {
   const locale = useLocale();
-  const router = useRouter();
   const pathname = usePathname();
   const t = useTranslations('settings.appearance');
 
-  const switchLocale = (newLocale: Locale) => {
-    // Replace current locale in pathname with new locale
-    const newPathname = pathname.replace(`/${locale}`, `/${newLocale}`);
-    router.push(newPathname);
-    router.refresh();
+  const getTargetUrl = (targetLocale: Locale) => {
+    if (!pathname) return `/${targetLocale}`;
+    if (pathname.startsWith(`/${locale}`)) {
+      return pathname.replace(`/${locale}`, `/${targetLocale}`);
+    }
+    return `/${targetLocale}${pathname.startsWith('/') ? pathname : `/${pathname}`}`;
   };
+
+  const buttonLabel = locale === 'en' ? 'Language' : 'اللغة (Language)';
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" title={t('language')} aria-label={t('language')}>
+        <Button variant="ghost" size="icon" title={t('language')} aria-label={buttonLabel}>
           <Languages className="h-5 w-5" />
-          <span className="sr-only">{t('language')}</span>
+          <span className="sr-only">{buttonLabel}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {locales.map((loc) => (
-          <DropdownMenuItem
-            key={loc}
-            onClick={() => switchLocale(loc)}
-            className={locale === loc ? 'bg-accent' : ''}
-          >
-            {localeNames[loc]}
-          </DropdownMenuItem>
-        ))}
+        {locales.map((loc) => {
+          const targetUrl = getTargetUrl(loc);
+          const isArabic = loc === 'ar';
+          return (
+            <DropdownMenuItem key={loc} asChild className={locale === loc ? 'bg-accent' : ''}>
+              <Link
+                href={targetUrl}
+                hrefLang={loc}
+                role="link"
+                aria-label={isArabic ? 'Arabic (العربية)' : 'English'}
+                className="flex w-full items-center justify-between cursor-pointer"
+              >
+                <span>{localeNames[loc]}</span>
+                {isArabic && <span className="text-xs text-muted-foreground ml-2">Arabic</span>}
+                {!isArabic && locale === 'ar' && (
+                  <span className="text-xs text-muted-foreground mr-2">English</span>
+                )}
+              </Link>
+            </DropdownMenuItem>
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );
