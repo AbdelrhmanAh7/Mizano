@@ -18,6 +18,7 @@ interface PhoneInputProps {
   placeholder?: string;
   id?: string;
   disabled?: boolean;
+  'aria-label'?: string;
 }
 
 function parsePhoneValue(value: string): { countryCode: string; number: string } {
@@ -42,6 +43,7 @@ export function PhoneInput({
   placeholder,
   id,
   disabled,
+  'aria-label': ariaLabel,
 }: PhoneInputProps) {
   const parsed = useMemo(() => parsePhoneValue(value), [value]);
   const [selectedCountry, setSelectedCountry] = useState(parsed.countryCode || defaultCountry);
@@ -90,6 +92,7 @@ export function PhoneInput({
       <div className="flex-1">
         <Input
           id={id}
+          aria-label={ariaLabel}
           type="tel"
           inputMode="numeric"
           placeholder={placeholder || `${maxLength} digits`}
