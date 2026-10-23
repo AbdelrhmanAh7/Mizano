@@ -77,11 +77,14 @@ export class DepreciationService {
 
     for (const asset of activeAssets) {
       // Get the schedule entry for this month
-      const scheduleEntry = await this.prisma.depreciationSchedule.findFirst({
+      // Get the schedule entry for this month using composite unique constraint with organization scoping
+      const scheduleEntry = await this.prisma.depreciationSchedule.findUnique({
         where: {
-          assetId: asset.id,
-          month: currentMonth,
-          year: currentYear,
+          assetId_month_year: {
+            assetId: asset.id,
+            month: currentMonth,
+            year: currentYear,
+          },
           organizationId,
         },
       });
@@ -98,6 +101,9 @@ export class DepreciationService {
 
       try {
         const posted = await this.prisma.$transaction(async (tx) => {
+          // Validate schedule consistency against purchase price and salvage value
+          this.validateScheduleConsistency(asset, scheduleEntry);
+
           // Claim the period first: only one concurrent run flips executedAt from null
           const claimed = await tx.depreciationSchedule.updateMany({
             where: { id: scheduleEntry.id, organizationId, executedAt: null },
@@ -210,8 +216,15 @@ export class DepreciationService {
       throw new Error('Asset not found or not active');
     }
 
-    const scheduleEntry = await this.prisma.depreciationSchedule.findFirst({
-      where: { assetId, month: targetMonth, year: targetYear, organizationId },
+    const scheduleEntry = await this.prisma.depreciationSchedule.findUnique({
+      where: {
+        assetId_month_year: {
+          assetId,
+          month: targetMonth,
+          year: targetYear,
+        },
+        organizationId,
+      },
     });
 
     if (!scheduleEntry) {
@@ -222,11 +235,14 @@ export class DepreciationService {
       throw new Error('Depreciation already executed for this period');
     }
 
+    // Validate schedule consistency against purchase price and salvage value
+    this.validateScheduleConsistency(asset, scheduleEntry);
+
     const result = await this.prisma.$transaction(async (tx) => {
       // Claim the period first: only one concurrent run flips executedAt from null
       const claimed = await tx.depreciationSchedule.updateMany({
         where: { id: scheduleEntry.id, organizationId, executedAt: null },
-        data: { executedAt: new Date() },
+        data: { executedAt: today },
       });
       if (claimed.count === 0) {
         throw new Error('Depreciation already executed for this period');
@@ -402,6 +418,10 @@ export class DepreciationService {
 
       const lastExecuted = executedSchedules[0];
 
+      if (lastExecuted) {
+        this.validateScheduleConsistency(schedule.asset, lastExecuted);
+      }
+
       await tx.asset.update({
         where: { id: schedule.assetId, organizationId },
         data: {
@@ -411,6 +431,33 @@ export class DepreciationService {
         },
       });
     });
+  }
+
+  /**
+   * Validate that schedule entry values are consistent with the asset's
+   * purchase price and salvage value.
+   */
+  private validateScheduleConsistency(
+    asset: { purchasePrice: Decimal; salvageValue: Decimal; id: string },
+    scheduleEntry: { bookValue: Decimal; accumulatedTotal: Decimal; id: string },
+  ): void {
+    if (scheduleEntry.bookValue.lessThan(asset.salvageValue)) {
+      throw new Error(
+        `Schedule entry ${scheduleEntry.id} book value (${scheduleEntry.bookValue}) cannot be less than asset salvage value (${asset.salvageValue})`,
+      );
+    }
+
+    if (scheduleEntry.accumulatedTotal.isNegative()) {
+      throw new Error(
+        `Schedule entry ${scheduleEntry.id} accumulated depreciation (${scheduleEntry.accumulatedTotal}) cannot be negative`,
+      );
+    }
+
+    if (!scheduleEntry.bookValue.plus(scheduleEntry.accumulatedTotal).equals(asset.purchasePrice)) {
+      throw new Error(
+        `Schedule entry ${scheduleEntry.id} book value (${scheduleEntry.bookValue}) + accumulated depreciation (${scheduleEntry.accumulatedTotal}) must equal asset purchase price (${asset.purchasePrice})`,
+      );
+    }
   }
 
   private async generateJournalNumber(

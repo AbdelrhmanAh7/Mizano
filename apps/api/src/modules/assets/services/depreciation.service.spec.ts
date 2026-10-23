@@ -115,7 +115,23 @@ describe('DepreciationService', () => {
         data,
       ),
     );
-    // Serves both lookups: by period (assetId, month, year) and by id (reverse).
+    // Serves unique lookup: composite key (assetId, month, year) with organizationId scoping.
+    mock(prisma.depreciationSchedule.findUnique).mockImplementation(async ({ where }) => {
+      const assetId = where.assetId_month_year?.assetId ?? where.assetId;
+      const month = where.assetId_month_year?.month ?? where.month;
+      const year = where.assetId_month_year?.year ?? where.year;
+      const hit = schedules.find(
+        (s) =>
+          (where.organizationId === undefined || s.organizationId === where.organizationId) &&
+          (where.id === undefined || s.id === where.id) &&
+          (assetId === undefined ||
+            (s.assetId === assetId && s.month === month && s.year === year)),
+      );
+      return hit
+        ? { ...hit, asset: assets.find((a) => a.id === hit.assetId), journal: null }
+        : null;
+    });
+    // Serves lookups by period or by id (reverse).
     mock(prisma.depreciationSchedule.findFirst).mockImplementation(async ({ where }) => {
       const hit = schedules.find(
         (s) =>
@@ -280,6 +296,96 @@ describe('DepreciationService', () => {
       const sl = assets.find((a) => a.id === 'sl')!;
       expect(sl.currentBookValue.toFixed(4)).toBe('1487.5000');
     });
+
+    it('queries schedule entry via findUnique composite key with organization scoping', async () => {
+      await service.runDepreciationForAsset(ORG_A, 'sl', 3, 2026);
+
+      expect(prisma.depreciationSchedule.findUnique).toHaveBeenCalledWith({
+        where: {
+          assetId_month_year: {
+            assetId: 'sl',
+            month: 3,
+            year: 2026,
+          },
+          organizationId: ORG_A,
+        },
+      });
+    });
+
+    it('uses today timestamp consistently for executedAt when claiming period', async () => {
+      const originalDate = Date;
+      let dateCallCount = 0;
+      const initialTime = FIXED_NOW;
+      const laterTime = new Date(FIXED_NOW.getTime() + 5000);
+
+      const spy = jest.spyOn(global, 'Date').mockImplementation((...args: any[]) => {
+        if (args.length === 0) {
+          dateCallCount++;
+          // First call is `const today = new Date()` at entry
+          return dateCallCount === 1 ? initialTime : laterTime;
+        }
+        return new (originalDate as any)(...args);
+      });
+
+      try {
+        await service.runDepreciationForAsset(ORG_A, 'sl', 3, 2026);
+      } finally {
+        spy.mockRestore();
+      }
+
+      const claimCall = mock(prisma.depreciationSchedule.updateMany).mock.calls.find(
+        ([arg]) => arg.where.id === 'sch-sl-2026-03',
+      );
+      expect(claimCall).toBeDefined();
+      expect(claimCall![0].data.executedAt).toEqual(initialTime);
+    });
+  });
+
+  describe('schedule value consistency validation', () => {
+    it('rejects manual depreciation when schedule book value is less than asset salvage value', async () => {
+      const sch = schedules.find((s) => s.assetId === 'sl')!;
+      sch.bookValue = new Decimal('200.0000'); // salvage is 250.0000
+      sch.accumulatedTotal = new Decimal('2300.0000');
+
+      await expect(service.runDepreciationForAsset(ORG_A, 'sl', 3, 2026)).rejects.toThrow(
+        /less than asset salvage value/,
+      );
+      expect(prisma.journal.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects manual depreciation when book value + accumulated depreciation != purchase price', async () => {
+      const sch = schedules.find((s) => s.assetId === 'sl')!;
+      sch.bookValue = new Decimal('1400.0000'); // 1400 + 1012.5 = 2412.5 != 2500 purchase price
+
+      await expect(service.runDepreciationForAsset(ORG_A, 'sl', 3, 2026)).rejects.toThrow(
+        /must equal asset purchase price/,
+      );
+      expect(prisma.journal.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects manual depreciation when accumulated depreciation is negative', async () => {
+      const sch = schedules.find((s) => s.assetId === 'sl')!;
+      sch.accumulatedTotal = new Decimal('-10.0000');
+      sch.bookValue = new Decimal('2510.0000');
+
+      await expect(service.runDepreciationForAsset(ORG_A, 'sl', 3, 2026)).rejects.toThrow(
+        /cannot be negative/,
+      );
+      expect(prisma.journal.create).not.toHaveBeenCalled();
+    });
+
+    it('skips corrupted asset in monthly depreciation and does not update asset or create journal for it', async () => {
+      const sch = schedules.find((s) => s.assetId === 'sl')!;
+      sch.bookValue = new Decimal('200.0000'); // corrupted: below salvage value
+
+      const result = await service.runMonthlyDepreciation(ORG_A);
+
+      // Only db and last succeed, sl is skipped
+      expect(result.processed).toBe(2);
+      expect(result.journalsCreated).toBe(2);
+      const slAsset = assets.find((a) => a.id === 'sl')!;
+      expect(slAsset.currentBookValue.toFixed(4)).toBe('1525.0000'); // unchanged initial book value
+    });
   });
 
   describe('reverseDepreciation', () => {
@@ -384,6 +490,9 @@ describe('DepreciationService', () => {
         expect(arg.data.organizationId).toBe(ORG_A);
       }
       const touched = [
+        ...mock(prisma.depreciationSchedule.findUnique).mock.calls.map(
+          ([a]) => a.where.assetId_month_year?.assetId,
+        ),
         ...mock(prisma.depreciationSchedule.findFirst).mock.calls.map(([a]) => a.where.assetId),
         ...mock(prisma.depreciationSchedule.update).mock.calls.map(([a]) => a.where.id),
         ...mock(prisma.asset.update).mock.calls.map(([a]) => a.where.id),
@@ -402,6 +511,7 @@ describe('DepreciationService', () => {
         id: 'other',
         organizationId: ORG_A,
       });
+      expect(prisma.depreciationSchedule.findUnique).not.toHaveBeenCalled();
       expect(prisma.depreciationSchedule.findFirst).not.toHaveBeenCalled();
       expect(prisma.journal.create).not.toHaveBeenCalled();
     });
@@ -440,6 +550,7 @@ describe('DepreciationService', () => {
         prisma.asset.findMany,
         prisma.asset.findFirst,
         prisma.asset.update,
+        prisma.depreciationSchedule.findUnique,
         prisma.depreciationSchedule.findFirst,
         prisma.depreciationSchedule.findMany,
         prisma.depreciationSchedule.updateMany,
