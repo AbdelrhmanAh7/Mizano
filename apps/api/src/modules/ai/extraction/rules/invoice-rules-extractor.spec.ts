@@ -64,6 +64,21 @@ describe('parseDate', () => {
     expect(parseDate('3 تشرين الثاني 2024')?.iso).toBe('2024-11-03');
   });
 
+  it('parses Latin month names case-insensitively (upper, lower, mixed)', () => {
+    expect(parseDate('15 JAN 2024')?.iso).toBe('2024-01-15');
+    expect(parseDate('15 Jan 2024')?.iso).toBe('2024-01-15');
+    expect(parseDate('15 jan 2024')?.iso).toBe('2024-01-15');
+  });
+
+  it('returns the same date on repeated calls (no stale lastIndex from global regex)', () => {
+    const text = 'Invoice Date: 15 Jan 2024';
+    const first = parseDate(text);
+    const second = parseDate(text);
+    expect(first?.iso).toBe('2024-01-15');
+    expect(second?.iso).toBe('2024-01-15');
+    expect(first).toEqual(second);
+  });
+
   it('flags day/month ambiguity and rejects impossible or Hijri dates', () => {
     expect(parseDate('01/02/2024')).toEqual({
       iso: '2024-02-01',
