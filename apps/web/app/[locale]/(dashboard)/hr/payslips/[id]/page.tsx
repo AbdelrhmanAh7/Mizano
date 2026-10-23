@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { ArrowLeft, Download, Printer, Mail, Building2 } from 'lucide-react';
@@ -15,7 +16,8 @@ import {
   getPayrollStatusColor,
   formatCurrency,
 } from '@/lib/hooks/use-hr';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
+import { api } from '@/lib/api';
 
 const months = [
   'January',
@@ -35,7 +37,32 @@ const months = [
 export default function PayslipDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const t = useTranslations('hr');
+  const locale = useLocale();
   const { data: payslip, isLoading } = usePayslip(id);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    setIsDownloading(true);
+    try {
+      const response = await api.get(`/payroll/payslips/${id}/pdf`, {
+        params: { lang: locale },
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `payslip-${id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error('Failed to download payslip PDF', err);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -100,9 +127,14 @@ export default function PayslipDetailPage({ params }: { params: { id: string } }
             <Printer className="mr-2 h-4 w-4" />
             Print
           </Button>
-          <Button variant="outline">
+          <Button
+            variant="outline"
+            data-testid="download-pdf-button"
+            onClick={handleDownloadPdf}
+            disabled={isDownloading}
+          >
             <Download className="mr-2 h-4 w-4" />
-            Download PDF
+            {locale === 'ar' ? 'تحميل PDF' : 'Download PDF'}
           </Button>
           <Button variant="outline">
             <Mail className="mr-2 h-4 w-4" />

@@ -1757,6 +1757,7 @@ async function main() {
       },
       update: {},
       create: {
+        id: `payslip-feb-2026-${ps.empId}`,
         payrollRunId: payroll.id,
         employeeId: empMap[ps.empId],
         basicSalary: ps.basic,
