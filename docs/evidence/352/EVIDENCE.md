@@ -1,5 +1,9 @@
 # Evidence for Issue #352: Stronger RTL and Arabic-string checks in the searchable bill options e2e test
 
+- **Issue**: #352
+- **Base Commit**: `8ec35a547d80eb5c815d514e1fa921564e67d94a`
+- **Tested Head Commit**: `53bb6bcf36b66bfe446480c885a9ccf9ce39c604`
+
 ## Explicit Numbered Acceptance Criteria
 
 | AC   | Requirement (from spec)                                                                              | Test Implementation                                                                                   | Verification Method               |

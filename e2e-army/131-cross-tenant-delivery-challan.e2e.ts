@@ -4,6 +4,10 @@ import { expect } from 'e2e';
 const ORG_A = 'org-a';
 const ORG_B = 'org-b';
 const SEED = 'army-131';
+const LOGIN = {
+  email: process.env.E2E_LOGIN_EMAIL,
+  pw: process.env.E2E_LOGIN_PASSWORD,
+};
 
 test(
   '@issue-131 AC1: updating a challan with another org customerId returns 404 and no inventory movement',
@@ -11,7 +15,7 @@ test(
   async ({ app, agent, screen }) => {
     await app.open('/en/login');
     await agent.act('sign in as {email} with password {pw}', {
-      params: { email: 'admin@mizano.com', pw: 'password123' },
+      params: LOGIN,
     });
 
     // Create org A customer and item
@@ -47,9 +51,12 @@ test(
     await agent.act('switch to organization {org}', { params: { org: ORG_A } });
 
     await app.open('/en/sales/delivery-challans');
-    await agent.act('create a draft supply challan for customer {cust} with item {item} qty {qty}', {
-      params: { cust: `${SEED}-cust-a`, item: `${SEED}-item-a`, qty: '5' },
-    });
+    await agent.act(
+      'create a draft supply challan for customer {cust} with item {item} qty {qty}',
+      {
+        params: { cust: `${SEED}-cust-a`, item: `${SEED}-item-a`, qty: '5' },
+      },
+    );
     const challanNumber = await agent.extract('the challan number of the created challan');
 
     // Try to update the challan with org B's customer ID (should fail with 404)
@@ -76,7 +83,7 @@ test(
     await agent.assert('no inventory movement exists for challan {challan}', {
       params: { challan: challanNumber },
     });
-  }
+  },
 );
 
 test(
@@ -85,7 +92,7 @@ test(
   async ({ app, agent, screen }) => {
     await app.open('/en/login');
     await agent.act('sign in as {email} with password {pw}', {
-      params: { email: 'admin@mizano.com', pw: 'password123' },
+      params: LOGIN,
     });
 
     // Setup org A with item and stock
@@ -121,9 +128,12 @@ test(
     await agent.act('switch to organization {org}', { params: { org: ORG_A } });
 
     await app.open('/en/sales/delivery-challans');
-    await agent.act('create a draft supply challan for customer {cust} with item {item} qty {qty}', {
-      params: { cust: `${SEED}-cust-a-issue`, item: `${SEED}-item-a-issue`, qty: '5' },
-    });
+    await agent.act(
+      'create a draft supply challan for customer {cust} with item {item} qty {qty}',
+      {
+        params: { cust: `${SEED}-cust-a-issue`, item: `${SEED}-item-a-issue`, qty: '5' },
+      },
+    );
     const challanNumber = await agent.extract('the challan number of the created challan');
 
     // Manually manipulate the challan line to reference org B's item (simulating a cross-tenant attack)
@@ -147,7 +157,7 @@ test(
     await agent.assert('an IN inventory movement exists for challan {challan} and item {item}', {
       params: { challan: challanNumber, item: `${SEED}-item-a-issue` },
     });
-  }
+  },
 );
 
 test(
@@ -156,7 +166,7 @@ test(
   async ({ app, agent, screen }) => {
     await app.open('/en/login');
     await agent.act('sign in as {email} with password {pw}', {
-      params: { email: 'admin@mizano.com', pw: 'password123' },
+      params: LOGIN,
     });
 
     await app.open('/en/organizations');
@@ -178,9 +188,12 @@ test(
     });
 
     await app.open('/en/sales/delivery-challans');
-    await agent.act('create a draft supply challan for customer {cust} with item {item} qty {qty}', {
-      params: { cust: `${SEED}-cust-race`, item: `${SEED}-item-race`, qty: '5' },
-    });
+    await agent.act(
+      'create a draft supply challan for customer {cust} with item {item} qty {qty}',
+      {
+        params: { cust: `${SEED}-cust-race`, item: `${SEED}-item-race`, qty: '5' },
+      },
+    );
     const challanNumber = await agent.extract('the challan number of the created challan');
 
     // Issue the challan (changes status from DRAFT to ISSUED)
@@ -192,5 +205,5 @@ test(
       params: { challan: challanNumber, notes: 'should fail' },
     });
     await agent.assert('an error says only draft challans can be updated');
-  }
+  },
 );

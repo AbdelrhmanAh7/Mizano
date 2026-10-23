@@ -3,7 +3,10 @@ import { expect } from 'e2e';
 
 // Fixed, throwaway data: one seeded admin, a manual USD->SAR rate on a fixed date (the create
 // endpoint upserts per date, so re-runs do not pile up rows) and an id no org owns.
-const ADMIN = { email: 'admin@mizano.com', password: 'password123' };
+const ADMIN = {
+  email: process.env.E2E_LOGIN_EMAIL,
+  password: process.env.E2E_LOGIN_PASSWORD,
+};
 const RATE = { fromCurrency: 'USD', toCurrency: 'SAR', rate: 3.75, date: '2026-01-15' };
 const FOREIGN_RATE_ID = 'army-207-rate-of-another-org';
 
@@ -18,6 +21,9 @@ function unwrap<T>(body: unknown): T {
 }
 
 async function signIn(api: string): Promise<Record<string, string>> {
+  if (!ADMIN.email || !ADMIN.password) {
+    throw new Error('E2E_LOGIN_EMAIL and E2E_LOGIN_PASSWORD must be configured in environment');
+  }
   const res = await fetch(`${api}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
