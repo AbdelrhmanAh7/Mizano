@@ -117,7 +117,11 @@ export function transformJournal(journal: RawJournal): Journal {
   return {
     ...journal,
     entryDate: journal.date, // alias
-    description: journal.notes, // alias
+    description:
+      journal.notes ||
+      journal.reference ||
+      (journal.lines && journal.lines.find((l) => l.description)?.description) ||
+      null, // alias
     status,
   };
 }

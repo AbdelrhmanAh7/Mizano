@@ -48,6 +48,7 @@
   },
   "workOrders": {
     "title": "Work Orders",
+    "description": "Manage manufacturing work orders and track production",
     "newWorkOrder": "New Work Order",
     "editWorkOrder": "Edit Work Order",
     "deleteWorkOrder": "Delete Work Order",

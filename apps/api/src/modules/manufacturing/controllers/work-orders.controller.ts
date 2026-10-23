@@ -10,7 +10,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentOrg, Permissions } from '../../../common/decorators';
+import { BulkIdsDto } from '../../../common/dto/bulk-ids.dto';
+import { CurrentOrg, InvalidatesLedger, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import {
@@ -106,6 +107,7 @@ export class WorkOrdersController {
 
   @Post(':id/complete')
   @Permissions('manufacturing.edit')
+  @InvalidatesLedger('manufacturing:*', 'items:*', 'inventory:*')
   @ApiOperation({ summary: 'Complete work order and record COGM' })
   complete(
     @CurrentOrg() orgId: string,
@@ -146,8 +148,9 @@ export class WorkOrdersController {
 
   @Post('bulk-complete')
   @Permissions('manufacturing.edit')
-  @ApiOperation({ summary: 'Bulk complete work orders' })
-  bulkComplete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+  @InvalidatesLedger('manufacturing:*', 'items:*', 'inventory:*')
+  @ApiOperation({ summary: 'Bulk complete in-process work orders at planned quantity (COGM)' })
+  bulkComplete(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.workOrdersService.bulkComplete(orgId, dto.ids);
   }
 

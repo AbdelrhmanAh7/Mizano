@@ -1831,7 +1831,43 @@ async function main() {
       organizationId: orgId,
     },
   });
-  console.log('  ✓ 1 BOM, 1 work order, 1 production entry');
+  // A second in-process order so the demo can bulk-complete two work orders (#165).
+  await prisma.workOrder.upsert({
+    where: { workOrderNumber_organizationId: { workOrderNumber: 'WO-002', organizationId: orgId } },
+    update: {},
+    create: {
+      id: 'wo-002',
+      workOrderNumber: 'WO-002',
+      bomId: bom.id,
+      quantity: 2,
+      status: WorkOrderStatus.IN_PROCESS,
+      plannedStartDate: daysAgo(4),
+      actualStartDate: daysAgo(3),
+      notes: 'Workstation batch for branch office',
+      organizationId: orgId,
+    },
+  });
+  // A draft work order so testing failure reporting in bulk-complete works (#165).
+  await prisma.workOrder.upsert({
+    where: {
+      workOrderNumber_organizationId: {
+        workOrderNumber: 'Invalid-Work-Order',
+        organizationId: orgId,
+      },
+    },
+    update: {},
+    create: {
+      id: 'Invalid-Work-Order',
+      workOrderNumber: 'Invalid-Work-Order',
+      bomId: bom.id,
+      quantity: 1,
+      status: WorkOrderStatus.DRAFT,
+      plannedStartDate: daysAgo(2),
+      notes: 'Draft work order for failure reporting tests',
+      organizationId: orgId,
+    },
+  });
+  console.log('  ✓ 1 BOM, 3 work orders (2 in-process, 1 draft), 1 production entry');
 
   // ─────────────────────────────────────────────────────────
   // 37. PROJECTS + TASKS + TIMESHEETS

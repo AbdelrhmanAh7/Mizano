@@ -11,6 +11,7 @@ interface BulkFailure {
 
 interface BulkOutcome {
   processed: number;
+  total: number;
   failures: BulkFailure[];
 }
 
@@ -21,13 +22,22 @@ export function readBulkOutcome(result: unknown, requested: number): BulkOutcome
       ? (result as { data: unknown }).data
       : result;
   if (body && typeof body === 'object' && 'processed' in body) {
-    const { processed, failures } = body as { processed: unknown; failures?: unknown };
+    const { processed, total, failures } = body as {
+      processed: unknown;
+      total?: unknown;
+      failures?: unknown;
+    };
+    const processedNum = typeof processed === 'number' ? processed : 0;
+    const failuresArr = Array.isArray(failures) ? (failures as BulkFailure[]) : [];
+    const totalNum =
+      typeof total === 'number' ? total : requested || processedNum + failuresArr.length;
     return {
-      processed: typeof processed === 'number' ? processed : 0,
-      failures: Array.isArray(failures) ? (failures as BulkFailure[]) : [],
+      processed: processedNum,
+      total: totalNum,
+      failures: failuresArr,
     };
   }
-  return { processed: requested, failures: [] };
+  return { processed: requested, total: requested, failures: [] };
 }
 
 interface UseBulkActionOptions<TResult = unknown> {
@@ -61,19 +71,20 @@ export function useBulkAction<TResult = unknown>({
       for (const key of queryKeys) {
         queryClient.invalidateQueries({ queryKey: key });
       }
-      const { processed, failures } = readBulkOutcome(result, ids.length);
+      const outcome = readBulkOutcome(result, ids.length);
+      const { processed, total, failures } = outcome;
       if (failures.length === 0) {
         toast({
           title: 'Success',
-          description: successMessage.replace('{count}', String(processed)),
+          description: successMessage
+            .replace('{count}', String(processed))
+            .replace('{total}', String(total)),
         });
       } else {
-        const reasons = Array.from(new Set(failures.map((f) => f.reason)))
-          .slice(0, 3)
-          .join('; ');
+        const failedDetails = failures.map((f) => `${f.id}: ${f.reason}`).join('; ');
         toast({
           title: processed > 0 ? 'Partially completed' : 'Nothing was processed',
-          description: `${processed} of ${processed + failures.length} succeeded. ${failures.length} failed: ${reasons}`,
+          description: `processed: ${processed}, total: ${total}, failures: ${failures.length} (${failedDetails})`,
           variant: processed > 0 ? 'default' : 'destructive',
         });
       }

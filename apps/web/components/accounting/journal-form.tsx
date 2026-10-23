@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Account, flattenAccountsTree } from '@/lib/hooks/use-accounts';
 import { Journal, calculateJournalTotals, formatJournalAmount } from '@/lib/hooks/use-journals';
+import { useTranslations } from 'next-intl';
 
 const journalLineSchema = z.object({
   accountId: z.string().min(1, 'Account is required'),
@@ -53,6 +54,7 @@ export function JournalForm({
 }: JournalFormProps) {
   const isEditing = !!journal;
   const flattenedAccounts = flattenAccountsTree(accounts);
+  const t = useTranslations('accounting.journals.form');
 
   const form = useForm<JournalFormData>({
     resolver: zodResolver(journalSchema),
@@ -146,8 +148,13 @@ export function JournalForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="notes">Notes</Label>
-          <Input id="notes" placeholder="Optional notes" {...form.register('notes')} />
+          <Label htmlFor="notes">{t('description')}</Label>
+          <Input
+            id="notes"
+            placeholder={t('descriptionPlaceholder')}
+            aria-label={t('description')}
+            {...form.register('notes')}
+          />
         </div>
       </div>
 

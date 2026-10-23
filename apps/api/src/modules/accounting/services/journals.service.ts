@@ -41,6 +41,7 @@ export enum JournalSourceType {
   OPENING_BALANCE = 'OPENING_BALANCE',
   /** sourceId is `${profileId}:${YYYY-MM-DD}` so each scheduled run posts once. */
   RECURRING_JOURNAL = 'RECURRING_JOURNAL',
+  WORK_ORDER_COMPLETION = 'WORK_ORDER_COMPLETION',
 }
 
 export interface JournalSource {
