@@ -95,6 +95,22 @@ Error-log endpoints (`/api/logger/*`) and the `/logger` WebSocket require a sign
 
 The `ollama-proxy` container (`services/ollama-proxy`) has no default `WEBHOOK_SECRET`: it refuses to start when the variable is missing or a placeholder such as `change-me`. Set the same value as the API's `OLLAMA_WEBHOOK_SECRET`.
 
+### Payslip PDF export
+
+Generate a deterministic, single-page payslip PDF in Arabic (default) or English using exact decimal strings:
+
+```bash
+# Arabic export (default)
+curl -s -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  "http://localhost:6001/api/payslips/<PAYSLIP_ID>/pdf?lang=ar" \
+  --output payslip-ar.pdf
+
+# English export
+curl -s -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  "http://localhost:6001/api/payslips/<PAYSLIP_ID>/pdf?lang=en" \
+  --output payslip-en.pdf
+```
+
 ## Database
 
 - Schema: `apps/api/prisma/schema.prisma`; migrations in `apps/api/prisma/migrations/`; seed in `apps/api/prisma/seed.ts` (`prisma db seed`).

@@ -5,11 +5,12 @@ import { PayrollService } from './services/payroll.service';
 import { EmployeesController } from './controllers/employees.controller';
 import { AttendanceController } from './controllers/attendance.controller';
 import { PayrollController } from './controllers/payroll.controller';
+import { PayslipsController } from './controllers/payslips.controller';
 import { PrismaModule } from '../../prisma/prisma.module';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [EmployeesController, AttendanceController, PayrollController],
+  controllers: [EmployeesController, AttendanceController, PayrollController, PayslipsController],
   providers: [EmployeesService, AttendanceService, PayrollService],
   exports: [EmployeesService, AttendanceService, PayrollService],
 })

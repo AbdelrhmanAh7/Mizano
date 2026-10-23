@@ -15,7 +15,9 @@ import {
   getPayrollStatusColor,
   formatCurrency,
 } from '@/lib/hooks/use-hr';
-import { useTranslations } from 'next-intl';
+import { useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
+import { documentsApi, downloadBlob } from '@/lib/hooks/use-documents';
 
 const months = [
   'January',
@@ -35,7 +37,22 @@ const months = [
 export default function PayslipDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const t = useTranslations('hr');
+  const locale = useLocale();
+  const [downloading, setDownloading] = useState(false);
   const { data: payslip, isLoading } = usePayslip(id);
+
+  const handleDownloadPdf = async () => {
+    try {
+      setDownloading(true);
+      const lang = locale === 'ar' ? 'ar' : 'en';
+      const blob = await documentsApi.getPayslipPdf(id, lang);
+      downloadBlob(blob, `payslip-${id}.pdf`);
+    } catch {
+      // Safe no-op on network error
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -100,9 +117,20 @@ export default function PayslipDetailPage({ params }: { params: { id: string } }
             <Printer className="mr-2 h-4 w-4" />
             Print
           </Button>
-          <Button variant="outline">
+          <Button
+            variant="outline"
+            onClick={handleDownloadPdf}
+            disabled={downloading}
+            data-testid="download-pdf-button"
+          >
             <Download className="mr-2 h-4 w-4" />
-            Download PDF
+            {downloading
+              ? locale === 'ar'
+                ? 'جاري التحميل...'
+                : 'Downloading...'
+              : locale === 'ar'
+                ? 'تحميل PDF'
+                : 'Download PDF'}
           </Button>
           <Button variant="outline">
             <Mail className="mr-2 h-4 w-4" />
