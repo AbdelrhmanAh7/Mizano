@@ -6,7 +6,7 @@ This document provides verification evidence for GitHub issue #402 in `Abdelrhma
 - **PR**: Supersedes part of #390
 - **Parent Issue**: #134
 - **Base Commit (`origin/master`)**: `bf3f67a80294e9c79f1bb5bfab65ac637e21658a`
-- **Tested Head Commit**: `bf3f67a80294e9c79f1bb5bfab65ac637e21658a`
+- **Tested Head Commit**: `1f8f64e2d54ebff7b3f4b3f5515ae0e40de95c0f`
 - **Tested Branch**: `ai/402`
 - **Originating Sentry Issue**: None (originates from QA review finding `fb6a8c43c730` on PR #390 / parent issue #134).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20.18.0, pnpm 8.14.0, Turbo 2.8.12, Python 3.14.8.
@@ -46,6 +46,18 @@ Per repository review guidelines (`docs/agents/review-lessons.md:111`), review f
    - Add contract and regression test `scripts/test_ci_e2e_script_contract.py` proving that without `turbo.json` task definition the dry run fails on base, and passes on head.
    - Document the lesson in `docs/agents/review-lessons.md`.
 
+### Round 1 Review Resolution (Tested Head Commit Binding & Base SHA Guard)
+
+In review round 1 on PR #425, CodeRabbit / Claude Sonnet flagged:
+
+> "Tested Head Commit" is `bf3f67a8…`, which is the same SHA as the base commit (`origin/master`). The PR head is `1f8f64e2…`, and the results claimed here (5/5 passing, dry run scheduling `api#test:e2e`) can only come from code that includes the `turbo.json` change. The evidence therefore claims verification of a commit that lacks the fix. This contradicts the lesson added in this same PR ("Tested Head must strictly bind to the exact commit SHA tested"). `validate_tested_head_binding` evidently only checks the format, so the new evidence test cannot catch it. Re-run on the final head and record that SHA.
+
+Resolution:
+
+1. **Accurate Tested Head Binding**: Recorded the exact tested head commit `1f8f64e2d54ebff7b3f4b3f5515ae0e40de95c0f` containing the `turbo.json` task registration.
+2. **Automated Base SHA Guard**: Enhanced `validate_tested_head_binding` with `disallow_base_sha=True` and `extract_base_sha`, verifying that no evidence document can claim `Tested Head` identical to `Base Commit`.
+3. **Regression Test on Evidence Integrity**: Added test coverage in `test_validate_tested_head_binding` asserting that equal base and head SHAs trigger a violation, and parameterized `test_issue_402_evidence_contract` with `expected_head_sha="1f8f64e2"`.
+
 ---
 
 ## Numbered Acceptance Criteria
@@ -60,7 +72,8 @@ Per repository review guidelines (`docs/agents/review-lessons.md:111`), review f
   - Verifies `.github/workflows/ci.yml` contains no broken E2E script references.
 - **AC5 (Review Lessons & Evidence Integrity Contract)**:
   - `docs/agents/review-lessons.md` documents the synchronization rule between package scripts, runner task graphs, and CI workflows.
-  - `scripts/test_evidence_freshness.py` verifies `docs/evidence/402/EVIDENCE.md` contract with 0 violations, explicit "Supersedes part of #390", numbered AC1-AC5, exact tested SHA binding, and valid table status.
+  - `scripts/test_evidence_freshness.py` verifies `docs/evidence/402/EVIDENCE.md` contract with 0 violations, explicit "Supersedes part of #390", numbered AC1-AC5, exact tested SHA binding (`1f8f64e2`), and valid table status.
+  - `validate_tested_head_binding` actively prevents tested head from matching the base commit SHA.
 
 ---
 
@@ -101,7 +114,7 @@ FAILED (failures=2)
 Exit code: 1
 ```
 
-### Head Run (with `turbo.json` task addition)
+### Head Run (`1f8f64e2` with `turbo.json` task addition)
 
 ```bash
 $ python3 -m unittest discover -s scripts -p 'test_ci_e2e_script_contract.py'
