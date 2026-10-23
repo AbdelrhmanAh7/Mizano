@@ -156,26 +156,70 @@ describe('@issue-109 parseDate: parses normalized Arabic-Indic dates', () => {
 describe('normalizeWithOffsets and mapSpanToOriginal', () => {
   it('tracks original UTF-16 character offsets when characters are converted', () => {
     const input = 'Date: ١٥/٠٣/٢٠٢٤';
-    const { normalized, toOriginal } = normalizeWithOffsets(input);
+    const { normalized, normalizedToSourceOffsets } = normalizeWithOffsets(input);
     expect(normalized).toBe('Date: 15/03/2024');
-    expect(toOriginal.length).toBe(normalized.length);
-    const span = mapSpanToOriginal(6, 16, toOriginal, input.length);
+    expect(normalizedToSourceOffsets.length).toBe(normalized.length);
+    const span = mapSpanToOriginal(6, 16, normalizedToSourceOffsets, input.length);
     expect(input.slice(span.start, span.end)).toBe('١٥/٠٣/٢٠٢٤');
   });
 
   it('handles removed bidi control marks and tatweel', () => {
     const input = '\u200e15/03/2024\u200f';
-    const { normalized, toOriginal } = normalizeWithOffsets(input);
+    const { normalized, normalizedToSourceOffsets } = normalizeWithOffsets(input);
     expect(normalized).toBe('15/03/2024');
-    const span = mapSpanToOriginal(0, 10, toOriginal, input.length);
+    const span = mapSpanToOriginal(0, 10, normalizedToSourceOffsets, input.length);
     expect(span).toEqual({ start: 1, end: 11 });
     expect(input.slice(span.start, span.end)).toBe('15/03/2024');
   });
 
   it('clamps spans within boundaries', () => {
-    const { toOriginal } = normalizeWithOffsets('hello');
-    expect(mapSpanToOriginal(-2, 10, toOriginal, 5)).toEqual({ start: 0, end: 5 });
-    expect(mapSpanToOriginal(2, 2, toOriginal, 5)).toEqual({ start: 2, end: 2 });
+    const { normalizedToSourceOffsets } = normalizeWithOffsets('hello');
+    expect(mapSpanToOriginal(-2, 10, normalizedToSourceOffsets, 5)).toEqual({ start: 0, end: 5 });
+    expect(mapSpanToOriginal(2, 2, normalizedToSourceOffsets, 5)).toEqual({ start: 2, end: 2 });
+  });
+
+  it('returns empty output and empty offsets for empty input', () => {
+    const { normalized, normalizedToSourceOffsets } = normalizeWithOffsets('');
+    expect(normalized).toBe('');
+    expect(normalizedToSourceOffsets).toEqual([]);
+  });
+
+  it('preserves Western text and Latin letters with identity offsets', () => {
+    const input = 'Date: 15/03/2024';
+    const { normalized, normalizedToSourceOffsets } = normalizeWithOffsets(input);
+    expect(normalized).toBe(input);
+    expect(normalizedToSourceOffsets).toEqual(input.split('').map((_, i) => i));
+  });
+
+  it('normalizes only Arabic-Indic digits in mixed Arabic/Latin text, preserving surrounding offsets', () => {
+    const input = 'تاريخ ١٥/٠٣/٢٠٢٤ invoice';
+    const { normalized, normalizedToSourceOffsets } = normalizeWithOffsets(input);
+    expect(normalized).toBe('تاريخ 15/03/2024 invoice');
+    // Arabic word "تاريخ " (6 chars) should have identity offsets
+    for (let i = 0; i < 6; i++) {
+      expect(normalizedToSourceOffsets[i]).toBe(i);
+    }
+    // Digits ١٥/٠٣/٢٠٢٤ (10 chars) should map to their source positions (6-15)
+    for (let i = 6; i < 16; i++) {
+      expect(normalizedToSourceOffsets[i]).toBe(i);
+    }
+    // " invoice" (8 chars) should have identity offsets
+    for (let i = 16; i < 24; i++) {
+      expect(normalizedToSourceOffsets[i]).toBe(i);
+    }
+  });
+
+  it('normalizes Extended Arabic-Indic (Persian) digits ۰-۹ (U+06F0-U+06F9) with correct offsets', () => {
+    const input = '۰۱/۲۳/۴۵۶۷';
+    const { normalized, normalizedToSourceOffsets } = normalizeWithOffsets(input);
+    expect(normalized).toBe('01/23/4567');
+    expect(normalizedToSourceOffsets.length).toBe(normalized.length);
+    // Each Persian digit maps to its source position
+    for (let i = 0; i < normalized.length; i++) {
+      expect(normalizedToSourceOffsets[i]).toBe(i);
+    }
+    const span = mapSpanToOriginal(0, 10, normalizedToSourceOffsets, input.length);
+    expect(input.slice(span.start, span.end)).toBe('۰۱/۲۳/۴۵۶۷');
   });
 });
 

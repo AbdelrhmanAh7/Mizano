@@ -439,7 +439,7 @@ function checkConsistency(
  * @param textConfidence 0..1 confidence of the text source (OCR); defaults to 1
  */
 export function extractInvoiceFields(rawText: string, textConfidence = 1): RulesExtraction {
-  const { normalized, toOriginal } = normalizeWithOffsets(rawText);
+  const { normalized, normalizedToSourceOffsets } = normalizeWithOffsets(rawText);
   const lines = splitLines(normalized);
   const lineStarts: number[] = [];
   let at = 0;
@@ -462,7 +462,7 @@ export function extractInvoiceFields(rawText: string, textConfidence = 1): Rules
     mapSpanToOriginal(
       lineStarts[lineIndex] + index,
       lineStarts[lineIndex] + end,
-      toOriginal,
+      normalizedToSourceOffsets,
       rawText.length,
     );
   const folded = lines.map(foldForMatch);
