@@ -35,6 +35,18 @@ HARDCODED_LITERAL_CREDENTIAL_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# Pattern matching obfuscated joined credential strings (e.g. ['admin', 'mizano.com'].join(...) or ['password', '123'].join(...))
+OBFUSCATED_JOIN_CREDENTIAL_PATTERN = re.compile(
+    r"""\[[^\]]*?['"`](?:password|admin|mizano\.com)[^\]]*?\]\s*\.\s*join""",
+    re.IGNORECASE,
+)
+
+# Pattern matching fallback expressions providing hardcoded default credentials or passwords when sourcing from process.env
+ENV_CREDENTIAL_FALLBACK_PATTERN = re.compile(
+    r"""(?:\b(?:pw|password|email|admin|login|auth|credentials)\b.*?process\.env\.[A-Z0-9_]+|process\.env\.(?:E2E_)?(?:LOGIN_|USER_)?(?:PASSWORD|PW|EMAIL|SECRET))\s*(?:\?\?|\|\|)\s*(?:[`'"][^`'"]+[`'"]|\[[^\]]+\]\s*\.\s*join)""",
+    re.IGNORECASE,
+)
+
 LOGIN_CREDENTIAL_OBJECT_PATTERN = re.compile(
     r"""(?:\b(?:LOGIN|ADMIN|CREDENTIALS)\b|params\s*:|/auth/login)""",
     re.IGNORECASE,
@@ -47,11 +59,13 @@ PW_KEY_ASSIGNMENT_PATTERN = re.compile(
 
 
 def find_hardcoded_credential_violations(content: str) -> list[tuple[int, str]]:
-    """Scan content for hard-coded credentials or plaintext passwords.
+    """Scan content for hard-coded credentials, plaintext passwords, or default fallbacks.
 
     Guards against:
     - Sensitive plaintext password/email literals ('password123', 'admin@mizano.com')
       in single quotes, double quotes, or backtick template literals.
+    - Obfuscated joined credential strings (e.g. ['password', '123'].join('')).
+    - Default fallback credentials in environment variable lookups (e.g. process.env.E2E_LOGIN_PASSWORD ?? '...').
     - Password keys (`pw:` or `password:`) assigned to string or template literals
       without dynamic sourcing via `process.env`.
 
@@ -86,16 +100,26 @@ def find_hardcoded_credential_violations(content: str) -> list[tuple[int, str]]:
         if not code_part:
             continue
 
-        # If line dynamically sources from process.env, it is compliant
-        if "process.env" in code_part:
-            continue
-
         # 1. Direct match for known sensitive plaintext credentials in any quote or backtick style
         if HARDCODED_LITERAL_CREDENTIAL_PATTERN.search(code_part):
             violations.append((idx, line))
             continue
 
-        # 2. Generalised check: flag pw/password keys assigned to a non-process.env string or template literal
+        # 2. Match obfuscated joined credential strings (e.g. ['admin', 'mizano.com'].join)
+        if OBFUSCATED_JOIN_CREDENTIAL_PATTERN.search(code_part):
+            violations.append((idx, line))
+            continue
+
+        # 3. Match default fallback credentials provided to process.env credential lookups
+        if ENV_CREDENTIAL_FALLBACK_PATTERN.search(code_part):
+            violations.append((idx, line))
+            continue
+
+        # If line dynamically sources from process.env without fallback credentials, it is compliant
+        if "process.env" in code_part:
+            continue
+
+        # 4. Generalised check: flag pw/password keys assigned to a non-process.env string or template literal
         if PW_KEY_ASSIGNMENT_PATTERN.search(code_part):
             if LOGIN_CREDENTIAL_OBJECT_PATTERN.search(code_part) or re.search(r"""\b(?:LOGIN|ADMIN)\b""", content):
                 violations.append((idx, line))
@@ -275,12 +299,48 @@ import './277-work-order-complete.e2e';
         """Dynamic credentials from environment are accepted without violations."""
         code = """
 const LOGIN = {
-  email: process.env.E2E_USER_EMAIL || process.env.E2E_LOGIN_EMAIL || ['admin', 'mizano.com'].join('@'),
+  email: process.env.E2E_USER_EMAIL || process.env.E2E_LOGIN_EMAIL,
   pw: process.env.E2E_USER_PASSWORD || process.env.E2E_LOGIN_PASSWORD,
 };
 """
         violations = find_hardcoded_credential_violations(code)
         self.assertEqual(violations, [])
+
+    def test_env_fallback_with_obfuscated_join_detected(self):
+        """Default fallback credentials using obfuscated join in process.env lookups are detected."""
+        code_email = "const loginEmail = process.env.E2E_LOGIN_EMAIL ?? ['admin', 'mizano.com'].join('@');"
+        violations_email = find_hardcoded_credential_violations(code_email)
+        self.assertEqual(len(violations_email), 1)
+        self.assertEqual(violations_email[0][0], 1)
+        self.assertIn("mizano.com", violations_email[0][1])
+
+        code_password = "const loginPassword = process.env.E2E_LOGIN_PASSWORD ?? ['password', '123'].join('');"
+        violations_password = find_hardcoded_credential_violations(code_password)
+        self.assertEqual(len(violations_password), 1)
+        self.assertEqual(violations_password[0][0], 1)
+        self.assertIn("password", violations_password[0][1])
+
+    def test_env_fallback_with_hardcoded_password_detected(self):
+        """Default fallback with literal password123 in process.env fallback is detected."""
+        code = "const loginPassword = process.env.E2E_LOGIN_PASSWORD ?? 'password123';"
+        violations = find_hardcoded_credential_violations(code)
+        self.assertEqual(len(violations), 1)
+        self.assertEqual(violations[0][0], 1)
+        self.assertIn("password123", violations[0][1])
+
+    def test_env_fallback_with_arbitrary_string_password_detected(self):
+        """Default fallback with arbitrary non-empty string in credential/password lookup is detected."""
+        code = "const pw = process.env.E2E_LOGIN_PASSWORD ?? 'arbitraryFallbackSecret!';"
+        violations = find_hardcoded_credential_violations(code)
+        self.assertEqual(len(violations), 1)
+        self.assertEqual(violations[0][0], 1)
+        self.assertIn("arbitraryFallbackSecret!", violations[0][1])
+
+        code_or = "const pw = process.env.PASSWORD || 'arbitraryFallbackSecret2!';"
+        violations_or = find_hardcoded_credential_violations(code_or)
+        self.assertEqual(len(violations_or), 1)
+        self.assertEqual(violations_or[0][0], 1)
+        self.assertIn("arbitraryFallbackSecret2!", violations_or[0][1])
 
     def test_planted_317_hardcoded_credentials_regression_fails(self):
         """Re-creates the exact hardcoded credentials from PR #340 and verifies it is detected."""
@@ -363,6 +423,25 @@ class E2EArmyRepositoryHygieneTests(unittest.TestCase):
                 [],
                 f"File {file_path.name} contains hardcoded credential violations: {violations}",
             )
+
+    def test_no_hardcoded_credential_fallbacks_in_e2e_army(self):
+        """No .e2e.ts file in e2e-army may use default fallback credentials or obfuscated joins."""
+        if not E2E_ARMY_DIR.exists():
+            return
+
+        all_e2e_files = sorted(E2E_ARMY_DIR.glob("*.e2e.ts"))
+        for file_path in all_e2e_files:
+            content = file_path.read_text(encoding="utf-8")
+            for idx, line in enumerate(content.splitlines(), start=1):
+                clean_line = line.split("//")[0].strip()
+                self.assertFalse(
+                    bool(OBFUSCATED_JOIN_CREDENTIAL_PATTERN.search(clean_line)),
+                    f"File {file_path.name}:{idx} uses obfuscated credential join fallback: {line}",
+                )
+                self.assertFalse(
+                    bool(ENV_CREDENTIAL_FALLBACK_PATTERN.search(clean_line)),
+                    f"File {file_path.name}:{idx} uses default fallback credentials in env lookup: {line}",
+                )
 
     def test_e2e_login_specs_source_credentials_from_env(self):
         """Specs in e2e-army that perform login must source credentials dynamically from environment."""

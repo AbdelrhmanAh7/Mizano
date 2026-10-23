@@ -33,8 +33,11 @@ test(
     );
 
     // Sign in as the seeded demo admin (throwaway DB) to get a bearer token.
-    const loginEmail = process.env.E2E_LOGIN_EMAIL ?? ['admin', 'mizano.com'].join('@');
-    const loginPassword = process.env.E2E_LOGIN_PASSWORD ?? ['password', '123'].join('');
+    const loginEmail = process.env.E2E_LOGIN_EMAIL;
+    const loginPassword = process.env.E2E_LOGIN_PASSWORD;
+    if (!loginEmail || !loginPassword) {
+      throw new Error('E2E_LOGIN_EMAIL and E2E_LOGIN_PASSWORD must be configured in environment');
+    }
     const login = await fetch(`${base}/auth/login`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
