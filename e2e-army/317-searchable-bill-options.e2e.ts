@@ -67,6 +67,9 @@ test(
     // FR-004: Keep the existing document.documentElement.dir check.
     expect(await browser.evaluate(() => document.documentElement.dir)).toBe('rtl');
 
+    // Capture RTL screenshot for visual verification
+    await screen.page().screenshot({ path: 'test-results/352-bill-form-ar-rtl.png', fullPage: true });
+
     // Locate the bill form container. The form is the main <form> element on the page.
     const billForm = screen.getByRole('form', { name: /فاتورة|bill/i }).first();
     await expect(billForm).toBeVisible();
@@ -109,6 +112,32 @@ test(
     await expect(listbox).toBeVisible();
     await expect(listbox, 'account listbox must compute direction rtl').toHaveCSS('direction', 'rtl');
 
+    // Capture RTL screenshot with listbox open
+    await screen.page().screenshot({ path: 'test-results/352-bill-form-ar-rtl-listbox.png', fullPage: true });
+
     await agent.assert('each bill line has searchable item and expense account pickers in Arabic with verified RTL layout');
+  },
+);
+
+test(
+  '@issue-352 AC1-AC4: bill-form renders LTR in English locale for visual comparison',
+  { tags: ['feat:mz-purchase-bills', 'lvl:ui'] },
+  async ({ app, agent, screen, browser }) => {
+    await app.open('/en/login');
+    await agent.act('sign in as {email} with password {pw}', { params: LOGIN });
+
+    await app.open('/en/purchases/bills/new');
+
+    // Verify LTR direction on English locale
+    expect(await browser.evaluate(() => document.documentElement.dir)).toBe('ltr');
+
+    // Capture LTR screenshot for visual comparison
+    await screen.page().screenshot({ path: 'test-results/352-bill-form-en-ltr.png', fullPage: true });
+
+    const billForm = screen.getByRole('form', { name: /فاتورة|bill/i }).first();
+    await expect(billForm).toBeVisible();
+    await expect(billForm).toHaveCSS('direction', 'ltr');
+
+    await agent.assert('bill form renders LTR in English locale');
   },
 );
