@@ -6,7 +6,7 @@ This document provides verification evidence for GitHub issue #373 in `Abdelrhma
 - **PR**: Supersedes part of #302
 - **Parent Issue**: #259
 - **Base Commit (`origin/master`)**: `385f723b6f003fabbd55727cc4e55d9a6665d440`
-- **Tested Head Commit**: `4f6f9318`
+- **Tested Head Commit**: `608663569e5f15aee39109cf1083e4d90bd25355`
 - **Tested Branch**: `ai/373`
 - **Originating Sentry Issue**: None (originates from CodeRabbit QA review findings `fe27756e991d`, `46f48f134604`, `ee45814ef057`, `dd5561c077e9`, and 404 routing issue on PR #302 / issue #259).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20+, pnpm 8.14.0.
@@ -125,7 +125,7 @@ Root causes:
 4. CitySelect ternary duplicate branches removed dependency guidance.
 5. Accessing `/en/crm/customers/new` or `/ar/crm/customers/new` resulted in 404 Not Found.
 
-### Head Behaviour (commit `b57532fb` on `ai/373`)
+### Head Behaviour (commit `60866356` on `ai/373`)
 
 After applying the localization and accessibility fixes, forwarding aria-label props, adding CRM customer alias routes and redirects, and merging master:
 
