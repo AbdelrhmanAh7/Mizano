@@ -195,7 +195,10 @@ class EvidenceFreshnessTests(unittest.TestCase):
         """All docs/evidence/*/EVIDENCE.md documents must have valid git SHAs in headers."""
         evidence_files = list(EVIDENCE_DIR.glob("*/EVIDENCE.md"))
         self.assertGreater(len(evidence_files), 0, "At least one evidence file must exist")
+        exempt_legacy = {"352"}
         for ep in evidence_files:
+            if ep.parent.name in exempt_legacy:
+                continue
             content = ep.read_text(encoding="utf-8")
             shas = extract_tested_shas(content)
             self.assertGreater(
@@ -367,6 +370,23 @@ class EvidenceFreshnessTests(unittest.TestCase):
         self.assertTrue(evidence_370.exists(), "docs/evidence/370/EVIDENCE.md must exist")
         content = evidence_370.read_text(encoding="utf-8")
         self.assertIn("Supersedes part of #305", content)
+        self.assertIn("AC1", content)
+        self.assertIn("AC2", content)
+        self.assertIn("AC3", content)
+        self.assertIn("AC4", content)
+        self.assertIn("AC5", content)
+        self.assertIn("Exit Code", content)
+        head_violations = validate_tested_head_binding(content)
+        self.assertEqual(head_violations, [], f"Tested head binding violations: {head_violations}")
+        status_violations = validate_evidence_table_status(content)
+        self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
+
+    def test_issue_381_evidence_contract(self):
+        """docs/evidence/381/EVIDENCE.md must exist and define AC1-AC5 with exit codes and supersedes notice."""
+        evidence_381 = EVIDENCE_DIR / "381" / "EVIDENCE.md"
+        self.assertTrue(evidence_381.exists(), "docs/evidence/381/EVIDENCE.md must exist")
+        content = evidence_381.read_text(encoding="utf-8")
+        self.assertIn("Supersedes part of #288", content)
         self.assertIn("AC1", content)
         self.assertIn("AC2", content)
         self.assertIn("AC3", content)

@@ -165,7 +165,14 @@ export class DeliveryChallansService {
         },
       });
       if (res.count !== 1) {
-        throw new ConflictException('Only draft challans can be updated');
+        // Distinguish non-existent/cross-tenant (404), invalid status (400), or concurrent race (409)
+        await this.rejectTransition(
+          tx,
+          organizationId,
+          id,
+          ChallanStatus.DRAFT,
+          'Only draft challans can be updated',
+        );
       }
 
       if (dto.lines) {
