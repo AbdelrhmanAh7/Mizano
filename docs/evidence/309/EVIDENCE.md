@@ -7,9 +7,10 @@ This document provides verification evidence for GitHub issue #309 in `Abdelrhma
 - **Parent PR**: [#255](https://github.com/AbdelrhmanAh7/Mizano/pull/255)
 - **Base Commit (`origin/master`)**: `f230535d2d0b57e7eb16a0429f459e992144b6c3`
 - **Tested Head Commit**: `d0e27f5adafbdcc16de9a63c9b57696de8e1be4c`
+- **Tested Branch**: `ai/309`
 - **Originating Sentry Issue**: None (non-blocking review findings from QA & CodeRabbit on PR #255 / PR #494).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20.18.0, pnpm 8.14.0.
-- **User-facing flow / E2E**: E2E not needed — internal backend depreciation service query optimization, consistency validation, and test suite refactoring.
+- **User-facing flow / E2E**: E2E not needed — internal backend depreciation service query optimization, consistency validation, and test suite refactoring; no user-facing frontend flows or routes modified.
 - **Skills Used**: `model-effort-routing`, `systematic-debugging`, `diagnosing-bugs`, `tdd`, `verification-before-completion`.
 - **Model and Effort**: Tool: Antigravity (Gemini 3.8 Flash) + Claude (free) · Effort: High · Why: Fix review findings on PR #494 for Issue #309, addressing schedule consistency validation, transaction lifecycle, reverse path remediation, timestamp testing hygiene, spec modularity/readability, and additional QA findings on reverse path query optimization and exact sum validation.
 
@@ -32,6 +33,7 @@ Issue #309 addresses non-blocking review findings from #255:
 - `apps/api/src/modules/assets/services/depreciation.service.spec.ts` (focused core depreciation execution and journal generation tests)
 - `apps/api/src/modules/assets/services/depreciation-validation.service.spec.ts` (focused validation, idempotency, retry, and tenant-scoping tests)
 - `apps/api/src/modules/assets/services/depreciation.test-fixtures.ts` (shared test fixtures, Prisma mock setup, and assertions)
+- `scripts/test_evidence_freshness.py` (contract tests verifying evidence document completeness and freshness)
 
 ---
 
@@ -41,7 +43,7 @@ Issue #309 addresses non-blocking review findings from #255:
 2. **AC2 (Schedule Consistency Validation Before DB Transaction)**: Before creating journal entries or updating asset balances, the service validates that `scheduleEntry.bookValue` is not less than `asset.salvageValue`, `scheduleEntry.accumulatedTotal` is non-negative, and `scheduleEntry.bookValue` does not exceed `asset.purchasePrice`. **Additionally**, the fundamental accounting identity `bookValue + accumulatedTotal == purchasePrice` is enforced. In `runMonthlyDepreciation`, validation runs before opening `$transaction`, logging errors and skipping corrupted records without unneeded DB transactions.
 3. **AC3 (Reversal Remediation Path Preserved)**: `reverseDepreciation` restores asset book value and accumulated depreciation from executed schedule history without throwing validation errors if past historical records were inconsistent, ensuring bad postings can always be remediated.
 4. **AC4 (Consistent Entry Timestamp)**: In `runDepreciationForAsset`, `executedAt` when claiming the period via `updateMany` uses `today` (captured at method entry), matching `runMonthlyDepreciation`.
-5. **AC5 (Spec Modularity & Readability)**: The 570+ line spec is modularized into focused test files and a shared fixture (`depreciation.service.spec.ts`, `depreciation-validation.service.spec.ts`, `depreciation.test-fixtures.ts`), each under 190 lines, with all 23 unit tests passing, clean TypeScript typechecks (`pnpm --filter api type-check`), and zero ESLint errors or warnings.
+5. **AC5 (Spec Modularity & Readability)**: The 570+ line spec is modularized into focused test files and a shared fixture (`depreciation.service.spec.ts`, `depreciation-validation.service.spec.ts`, `depreciation.test-fixtures.ts`), each under 190 lines, with all 23 unit tests passing, clean TypeScript typechecks (`pnpm --filter api type-check`), and zero ESLint errors or warnings (`pnpm --filter api lint`).
 
 ---
 
@@ -89,3 +91,12 @@ Issue #309 addresses non-blocking review findings from #255:
 3. Reversal remediation succeeds without throwing even if historical records were inconsistent.
 4. `today` timestamp captured at entry is used consistently for `executedAt`.
 5. Spec is decomposed into modular files (`depreciation.service.spec.ts`, `depreciation-validation.service.spec.ts`, `depreciation.test-fixtures.ts`), all under 190 lines each, with 23 passing tests.
+
+---
+
+## UI Verification (Screenshots / RTL & LTR)
+
+**UI is EXEMPT**:
+
+- This issue modifies backend NestJS asset depreciation service logic (`apps/api/src/modules/assets/services/depreciation.service.ts`), unit tests, and verification evidence.
+- No frontend React UI components, CSS styling, or routes are altered.
