@@ -12,6 +12,7 @@ storybook-static
 # Environment files (actual secrets)
 .env
 .env.production
+.env.test
 
 # Allow environment templates (no secrets, only placeholders)
 !.env.local

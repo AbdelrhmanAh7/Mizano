@@ -1,19 +1,17 @@
 import { test } from '@e2e-dev/web';
 import { expect } from 'e2e';
+import { loadTestCredentialsLegacy } from './utils/test-credentials';
 
+// Credentials must be configured in CI via environment variables:
+//   E2E_LOGIN_EMAIL (or TEST_USER_EMAIL) and E2E_LOGIN_PASSWORD (or TEST_USER_PASSWORD).
+// For local test execution, placeholder values are loaded from .env.test (gitignored).
 const SEED = 'army-317';
-const LOGIN = {
-  email: process.env.E2E_LOGIN_EMAIL,
-  pw: process.env.E2E_LOGIN_PASSWORD,
-};
+const LOGIN = loadTestCredentialsLegacy();
 
 test(
   '@issue-317 AC1-AC4: searchable and page-aware accounts and items in bill-form allow selecting later-page records and preserve selection',
   { tags: ['feat:mz-purchase-bills', 'lvl:ui'] },
   async ({ app, agent, screen }) => {
-    if (!LOGIN.email || !LOGIN.pw) {
-      throw new Error('E2E_LOGIN_EMAIL and E2E_LOGIN_PASSWORD must be configured in environment');
-    }
     await app.open('/en/login');
     await agent.act('sign in as {email} with password {pw}', { params: LOGIN });
 
@@ -51,9 +49,6 @@ test(
   '@issue-317 AC6: bill-form item and account search controls are displayed in Arabic and RTL',
   { tags: ['feat:mz-purchase-bills', 'lvl:ui'] },
   async ({ app, agent, screen, browser }) => {
-    if (!LOGIN.email || !LOGIN.pw) {
-      throw new Error('E2E_LOGIN_EMAIL and E2E_LOGIN_PASSWORD must be configured in environment');
-    }
     await app.open('/ar/login');
     await agent.act('sign in as {email} with password {pw}', { params: LOGIN });
 

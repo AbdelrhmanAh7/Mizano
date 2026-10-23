@@ -490,11 +490,27 @@ class E2EArmyRepositoryHygieneTests(unittest.TestCase):
             content = file_path.read_text(encoding="utf-8")
             if "/login" in content or "sign in as" in content:
                 login_specs_checked += 1
-                self.assertIn(
-                    "process.env",
-                    content,
-                    f"File {file_path.name} performs login but does not source credentials from process.env",
-                )
+                # Check if the file directly uses process.env or imports a helper that does
+                uses_env_directly = "process.env" in content
+                uses_helper = "loadTestCredentials" in content or "loadTestCredentialsLegacy" in content
+
+                # If using helper, verify the helper sources from process.env
+                if uses_helper and not uses_env_directly:
+                    helper_file = E2E_ARMY_DIR / "utils" / "test-credentials.ts"
+                    if helper_file.exists():
+                        helper_content = helper_file.read_text(encoding="utf-8")
+                        self.assertIn(
+                            "process.env",
+                            helper_content,
+                            f"Helper {helper_file.name} must source credentials from process.env",
+                        )
+                    else:
+                        self.fail(f"File {file_path.name} imports credential helper but helper not found")
+                elif not uses_env_directly:
+                    self.fail(
+                        f"File {file_path.name} performs login but does not source credentials from process.env "
+                        "(directly or via helper)"
+                    )
         self.assertGreater(login_specs_checked, 0, "Expected at least one spec in e2e-army that logs in")
 
     def test_317_e2e_no_hardcoded_credentials(self):
@@ -510,7 +526,85 @@ class E2EArmyRepositoryHygieneTests(unittest.TestCase):
         )
         self.assertNotIn("password123", content, "317 spec contains hardcoded plaintext password123")
         self.assertNotIn("admin@mizano.com", content, "317 spec contains hardcoded plaintext admin@mizano.com")
-        self.assertIn("process.env", content, "317 spec should source credentials dynamically from env")
+
+        # Verify credentials are sourced from process.env (directly or via helper)
+        uses_env_directly = "process.env" in content
+        uses_helper = "loadTestCredentials" in content or "loadTestCredentialsLegacy" in content
+        if uses_helper and not uses_env_directly:
+            helper_file = E2E_ARMY_DIR / "utils" / "test-credentials.ts"
+            self.assertTrue(helper_file.exists(), "Credential helper must exist")
+            helper_content = helper_file.read_text(encoding="utf-8")
+            self.assertIn("process.env", helper_content, "Helper must source credentials from process.env")
+        elif not uses_env_directly:
+            self.fail("317 spec should source credentials dynamically from env (directly or via helper)")
+
+    def test_credential_helper_sources_from_env_without_fallbacks(self):
+        """e2e-army/utils/test-credentials.ts must exist and source credentials from process.env with zero hardcoded fallbacks."""
+        helper_file = E2E_ARMY_DIR / "utils" / "test-credentials.ts"
+        self.assertTrue(helper_file.exists(), "Credential helper e2e-army/utils/test-credentials.ts must exist")
+        content = helper_file.read_text(encoding="utf-8")
+        violations = find_hardcoded_credential_violations(content)
+        self.assertEqual(violations, [], f"Credential helper contains hardcoded credential violations: {violations}")
+        self.assertIn("process.env", content, "Helper must source credentials from process.env")
+        self.assertIn("loadTestCredentials", content, "Helper must export loadTestCredentials")
+        self.assertIn("loadTestCredentialsLegacy", content, "Helper must export loadTestCredentialsLegacy")
+        self.assertNotIn("password123", content, "Helper must not contain hardcoded plaintext password123")
+        self.assertNotIn("admin@mizano.com", content, "Helper must not contain hardcoded plaintext admin@mizano.com")
+
+    def test_credential_helper_runtime_behavior(self):
+        """Verify loadTestCredentials() and loadTestCredentialsLegacy() runtime contracts using node."""
+        import subprocess
+
+        helper_file = E2E_ARMY_DIR / "utils" / "test-credentials.ts"
+        self.assertTrue(helper_file.exists(), "Helper file must exist")
+        node_script = """
+const ts = require('typescript');
+const fs = require('fs');
+const path = require('path');
+
+const helperPath = path.resolve('e2e-army/utils/test-credentials.ts');
+const code = fs.readFileSync(helperPath, 'utf-8');
+const result = ts.transpileModule(code, { compilerOptions: { module: ts.ModuleKind.CommonJS } });
+const mod = {};
+const fn = new Function('exports', 'process', 'require', result.outputText);
+
+// 1. Throws descriptive error when required env vars are missing
+let threw = false;
+try {
+  fn(mod, { env: {}, cwd: () => '/nonexistent' }, require);
+  mod.loadTestCredentials();
+} catch (e) {
+  threw = true;
+  if (!e.message.includes('Missing required environment variables for e2e tests')) {
+    throw new Error('Unexpected error message: ' + e.message);
+  }
+}
+if (!threw) throw new Error('Expected loadTestCredentials to throw when env vars are missing');
+
+// 2. Loads credentials from E2E_LOGIN_EMAIL and E2E_LOGIN_PASSWORD
+fn(mod, { env: { E2E_LOGIN_EMAIL: 'admin@ci.local', E2E_LOGIN_PASSWORD: 'ci-secret-password' }, cwd: () => '/nonexistent' }, require);
+const creds1 = mod.loadTestCredentials();
+if (creds1.email !== 'admin@ci.local' || creds1.password !== 'ci-secret-password') {
+  throw new Error('Failed to load E2E_LOGIN_* credentials');
+}
+const legacy1 = mod.loadTestCredentialsLegacy();
+if (legacy1.email !== 'admin@ci.local' || legacy1.pw !== 'ci-secret-password') {
+  throw new Error('Failed to load legacy credentials');
+}
+
+// 3. Supports TEST_USER_EMAIL and TEST_USER_PASSWORD
+fn(mod, { env: { TEST_USER_EMAIL: 'user@ci.local', TEST_USER_PASSWORD: 'user-secret-password' }, cwd: () => '/nonexistent' }, require);
+const creds2 = mod.loadTestCredentials();
+if (creds2.email !== 'user@ci.local' || creds2.password !== 'user-secret-password') {
+  throw new Error('Failed to load TEST_USER_* credentials');
+}
+
+process.stdout.write('OK');
+"""
+        res = subprocess.run(["node", "-e", node_script], capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, f"Credential helper runtime validation failed: {res.stderr}")
+        self.assertIn("OK", res.stdout)
+
 
 
 if __name__ == "__main__":

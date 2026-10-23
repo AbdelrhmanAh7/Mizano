@@ -6,7 +6,7 @@ This document provides verification evidence for GitHub issue #378 in `Abdelrhma
 - **PR**: Supersedes part of #340
 - **Parent Issue**: #317
 - **Base Commit (`origin/master`)**: `bf3f67a80294e9c79f1bb5bfab65ac637e21658a`
-- **Tested Head Commit**: `737bd818`
+- **Tested Head Commit**: `0130cadd88c40734d6e53cee3004d1a455740e30`
 - **Tested Branch**: `ai/378`
 - **Originating Sentry Issue**: None (originates from review finding `7921754e38c2` / comment 6308811548 on PR #340 / parent issue #317).
 - **Host Environment**: Darwin arm64 (macOS), Python 3.14.8, Node.js v20.18.0, pnpm 8.14.0.
@@ -65,6 +65,8 @@ In Round 2 review, QA flagged three major recurring findings:
      Removed default fallback credentials. Defined `ADMIN` using direct `process.env` references and added runtime validation in `signIn`.
    - **`e2e-army/317-searchable-bill-options.e2e.ts:7-9`** (NEW):
      Created the missing spec file with `LOGIN` credentials sourced exclusively from `process.env.E2E_LOGIN_EMAIL` and `process.env.E2E_LOGIN_PASSWORD` with runtime validation (no fallbacks). This resolves the original PR #340 finding `7921754e38c2` for this file.
+   - **`.env.test`** (NEW): Added placeholder test credentials file (ignored by git) for local test runs with clear documentation that values must be overridden in CI.
+   - **`e2e-army/utils/test-credentials.ts`** (NEW): Reusable helper `loadTestCredentials()` / `loadTestCredentialsLegacy()` that loads credentials from `process.env` with descriptive error messages. Used by `317-searchable-bill-options.e2e.ts` to avoid duplicating validation logic.
 2. **Hardened Detection Tooling in `scripts/test_e2e_army_hygiene.py`**:
    - Added `OBFUSCATED_JOIN_CREDENTIAL_PATTERN` to flag joined array tricks like `['admin', 'mizano.com'].join` and `['password', '123'].join`.
    - Added `ENV_CREDENTIAL_FALLBACK_PATTERN` to flag non-empty string literals and join expressions provided as `??` or `||` fallbacks in credential lookups.
@@ -134,12 +136,16 @@ In Round 2 review, QA flagged three major recurring findings:
   - `test_process_env_assignments_not_flagged` (NEW)
   - `test_no_hardcoded_credentials_in_e2e_army`
   - `test_no_hardcoded_credential_fallbacks_in_e2e_army`
-  - `test_e2e_login_specs_source_credentials_from_env`
-  - `test_317_e2e_no_hardcoded_credentials` (UPDATED: now requires file existence)
+  - `test_e2e_login_specs_source_credentials_from_env` (UPDATED: verifies helper usage)
+  - `test_317_e2e_no_hardcoded_credentials` (UPDATED: verifies helper usage)
 - `scripts/test_evidence_freshness.py`:
   - `test_issue_378_evidence_contract`
 - `e2e-army/317-searchable-bill-options.e2e.ts` (NEW):
   - Two test cases for bill-form searchable options (EN/LTR and AR/RTL)
+- `e2e-army/utils/test-credentials.ts` (NEW):
+  - Reusable `loadTestCredentials()` and `loadTestCredentialsLegacy()` helpers
+- `.env.test` (NEW): Placeholder credentials for local test runs (gitignored)
+- `.gitignore` (UPDATED): Added `.env.test` to ignored files
 
 ---
 
@@ -162,15 +168,18 @@ In Round 2 review, QA flagged three major recurring findings:
      ```
    - **Detector loophole**: The blanket `process.env` check allowed hardcoded `pw:`/`password:` values on the same line as `process.env` assignments to go undetected (e.g., `const LOGIN = { email: process.env.EMAIL, pw: 'hardcoded' };` would pass).
 
-### Head Behaviour (this branch, commit `737bd818`)
+### Head Behaviour (this branch, commit `0130cadd88c40734d6e53cee3004d1a455740e30`)
 
 1. `find_hardcoded_credential_violations` accurately flags plaintext passwords (`password123`), template literals (`` `password123` ``), arbitrary passwords assigned in login/admin objects, sensitive login emails (`admin@mizano.com`), joined array obfuscations, and default fallback credentials in `process.env` lookups.
 2. **Per-assignment detection**: Each `pw:`/`password:` assignment is checked individually. Hardcoded values mixed with `process.env` on the same line are flagged; pure `process.env` assignments pass.
 3. All hardcoded fallback credentials removed from `e2e-army/104-smtp-rotation-stamp.e2e.ts`, `e2e-army/131-cross-tenant-delivery-challan.e2e.ts`, and `e2e-army/207-currency-fx-tenant-and-idempotency.e2e.ts`.
 4. **NEW** `e2e-army/317-searchable-bill-options.e2e.ts` created with `LOGIN` sourced exclusively from `process.env` (no fallbacks), resolving the original PR #340 finding `7921754e38c2` for this file.
-5. `scripts/test_e2e_army_hygiene.py` runs all 26 unit and integration tests cleanly with exit code 0.
-6. `test_issue_378_evidence_contract` and all 12 tests in `scripts/test_evidence_freshness.py` pass with exit code 0.
-7. All specs in `e2e-army/` are sanitized and comply with credential hygiene rules.
+5. **NEW** `.env.test` file added (gitignored) with placeholder credentials for local test runs.
+6. **NEW** `e2e-army/utils/test-credentials.ts` helper utility providing `loadTestCredentials()` and `loadTestCredentialsLegacy()` for consistent credential loading across e2e tests.
+7. **UPDATED** `test_e2e_login_specs_source_credentials_from_env` and `test_317_e2e_no_hardcoded_credentials` to verify credential sourcing via helper utilities.
+8. `scripts/test_e2e_army_hygiene.py` runs all 26 unit and integration tests cleanly with exit code 0.
+9. `test_issue_378_evidence_contract` and all 12 tests in `scripts/test_evidence_freshness.py` pass with exit code 0.
+10. All specs in `e2e-army/` are sanitized and comply with credential hygiene rules.
 
 ---
 
