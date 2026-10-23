@@ -522,6 +522,25 @@ class EvidenceFreshnessTests(unittest.TestCase):
         status_violations = validate_evidence_table_status(content)
         self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
 
+    def test_issue_465_evidence_contract(self):
+        """docs/evidence/465/EVIDENCE.md must exist and define AC1-AC5 with exit codes and supersedes notice."""
+        evidence_465 = EVIDENCE_DIR / "465" / "EVIDENCE.md"
+        self.assertTrue(evidence_465.exists(), "docs/evidence/465/EVIDENCE.md must exist")
+        content = evidence_465.read_text(encoding="utf-8")
+        self.assertIn("Supersedes part of #418", content)
+        self.assertIn("AC1", content)
+        self.assertIn("AC2", content)
+        self.assertIn("AC3", content)
+        self.assertIn("AC4", content)
+        self.assertIn("AC5", content)
+        self.assertIn("Exit Code", content)
+        head_violations = validate_tested_head_binding(content, expected_head_sha="2108f90")
+        self.assertEqual(head_violations, [], f"Tested head binding violations: {head_violations}")
+        status_violations = validate_evidence_table_status(content)
+        self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
+        ac5_violations = validate_evidence_ac5(content)
+        self.assertEqual(ac5_violations, [], f"AC5 violations: {ac5_violations}")
+
     def test_validate_evidence_ac5_passes_compliant_document(self):
         """validate_evidence_ac5 passes document containing AC5 with TypeScript typecheck and ESLint verification."""
         compliant = (
