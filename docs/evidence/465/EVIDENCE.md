@@ -16,6 +16,51 @@ This document provides verification evidence for GitHub issue #465 in `Abdelrhma
 
 ---
 
+## Context & Finding Summary
+
+In PR #418 (split from parent issue #381), code review finding `15f00d60d228` flagged:
+
+> **major** (glm): New test verifies 404 response when the guarded update finds no row and 400 response when the challan is already ISSUED.
+> Discussion: https://github.com/AbdelrhmanAh7/Mizano/pull/418#discussion_r4357147053
+
+### Investigation & Root Cause
+
+1. In `apps/api/src/modules/sales/services/delivery-challans.service.ts`, `update()` performs an atomic guarded update via:
+   ```ts
+   const res = await tx.deliveryChallan.updateMany({
+     where: { id, organizationId, deletedAt: null, status: ChallanStatus.DRAFT },
+     data: { ... },
+   });
+   ```
+2. On `master`, when `res.count !== 1`, line 168 previously threw an unconditional generic `ConflictException('Only draft challans can be updated')` (HTTP 409).
+3. Throwing a generic 409 was incorrect when:
+   - A challan ID did not exist or belonged to a different organization (which must return HTTP 404 `NotFoundException`);
+   - A challan existed in the organization but had already transitioned out of `DRAFT` (such as `ISSUED`), which must return HTTP 400 `BadRequestException`.
+4. In `delivery-challans.service.spec.ts`, tests only checked `expect(prisma.deliveryChallan.update).not.toHaveBeenCalled()`, which was incomplete because `updateMany`, `create`, `delete`, and `$transaction` were not comprehensively asserted across models.
+
+### Resolution
+
+1. Updated line 167 in `apps/api/src/modules/sales/services/delivery-challans.service.ts` to call:
+   ```ts
+   await this.rejectTransition(
+     tx,
+     organizationId,
+     id,
+     ChallanStatus.DRAFT,
+     'Only draft challans can be updated',
+   );
+   ```
+   matching the existing transition rejection pattern in `issue()` and `markReturned()`.
+2. Implemented `expectNoWrites(prisma)` in `apps/api/src/modules/sales/services/delivery-challans.service.spec.ts` asserting that `$transaction`, `updateMany`, and all write operations (`create`, `createMany`, `update`, `updateMany`, `delete`, `deleteMany`, `upsert`) on `deliveryChallan`, `deliveryChallanLine`, `customer`, `invoice`, `item`, and `warehouse` are never called during validation failures.
+3. Added unit tests for `update()` in `apps/api/src/modules/sales/services/delivery-challans.service.spec.ts` verifying:
+   - 404 `NotFoundException` and no line writes when the guarded update finds no row in the organization;
+   - 400 `BadRequestException` when the guarded update finds the challan already `ISSUED`;
+   - 409 `ConflictException` when the guarded update matches more than one row.
+4. Added `e2e-army/465-delivery-challan-update-guard.e2e.ts` verifying that updating a cross-tenant / non-existent delivery challan returns 404.
+5. In QA round 1, resolved hardcoded admin credentials by sourcing credentials dynamically and added `scripts/test_e2e_army_hygiene.py`.
+
+---
+
 ## Changed Covering Tests
 
 - `apps/api/src/modules/sales/services/delivery-challans.service.spec.ts` (unit tests verifying 404 response on no match in org, 400 response when challan is already ISSUED, 409 response on multi-row match/conflict, and no line deletion/creation side-effects)
@@ -39,7 +84,7 @@ This document provides verification evidence for GitHub issue #465 in `Abdelrhma
 | AC ID   | Requirement Description                                           | Test / Verification Command                                                                                                                                                              | Observed Result                                                                  | Exit Code | Status     |
 | :------ | :---------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------- | :-------- | :--------- |
 | **AC1** | 404 when guarded update finds no row in org                       | `pnpm --filter api exec jest apps/api/src/modules/sales/services/delivery-challans.service.spec.ts -t "answers 404 and writes no lines when the guarded update finds no row in the org"` | PASS: rejects with NotFoundException, deleteMany/createMany not called           | 0         | **PASSED** |
-| **AC2** | 400 when guarded update finds challan already ISSUED              | `pnpm --filter api exec jest apps/api/src/modules/sales/services/delivery-challans.service.spec.ts -t "answers 400 when the guarded update finds the challan already ISSUED"`            | PASS: rejects with BadRequestException, deleteMany/createMany not called         | 0         | **PASSED** |
+| **AC2** | 400 when guarded update finds challan already ISSUED              | `pnpm --filter api exec jest apps/api/src/modules/sales/services/delivery-challans.service.spec.ts -t "answers 400 when the guarded update finds the challan already ISSUED"`          | PASS: rejects with BadRequestException, deleteMany/createMany not called         | 0         | **PASSED** |
 | **AC3** | 409 when guarded update matches >1 row                            | `pnpm --filter api exec jest apps/api/src/modules/sales/services/delivery-challans.service.spec.ts -t "rejects and writes no lines when the guarded update matches more than one row"`   | PASS: rejects with ConflictException, deleteMany/createMany not called           | 0         | **PASSED** |
 | **AC4** | E2E API guard returns 404 for non-existent/cross-tenant challan   | `e2e-army/465-delivery-challan-update-guard.e2e.ts`                                                                                                                                      | Validated request-level e2e test tagged `feat:mz-sales-delivery-challans`        | 0         | **PASSED** |
 | **AC5** | E2E test hygiene: no hardcoded credentials or plaintext passwords | `python3 -m unittest discover -s scripts -p 'test_e2e_army_hygiene.py'`                                                                                                                  | Ran 14 tests in 0.004s: OK (all tests pass, snippet detected, 465 spec clean)    | 0         | **PASSED** |
@@ -65,6 +110,40 @@ This document provides verification evidence for GitHub issue #465 in `Abdelrhma
   2. A challan that was already ISSUED threw HTTP 409 Conflict instead of HTTP 400 BadRequestException.
 - Consequently, tests asserting 404 on missing challan and 400 on ISSUED challan failed on base with `ConflictException: Only draft challans can be updated`.
 
+```text
+● DeliveryChallansService tenant scoping (#131) › update › answers 404 and writes no lines when the guarded update finds no row in the org
+
+  expect(received).rejects.toThrow(expected)
+
+  Expected constructor: NotFoundException
+  Received constructor: ConflictException
+
+  Received message: "Only draft challans can be updated"
+
+        166 |       });
+        167 |       if (res.count !== 1) {
+      > 168 |         throw new ConflictException('Only draft challans can be updated');
+            |               ^
+        169 |       }
+```
+
+```text
+● DeliveryChallansService tenant scoping (#131) › update › answers 400 when the guarded update finds the challan already ISSUED
+
+  expect(received).rejects.toThrow(expected)
+
+  Expected constructor: BadRequestException
+  Received constructor: ConflictException
+
+  Received message: "Only draft challans can be updated"
+
+        166 |       });
+        167 |       if (res.count !== 1) {
+      > 168 |         throw new ConflictException('Only draft challans can be updated');
+            |               ^
+        169 |       }
+```
+
 ### Head Behaviour (`ai/465`, commit `2108f90bb441c33d50c1d1fd3926c7520f68df78`)
 
 - In `DeliveryChallansService.update()`, non-match delegates to `rejectTransition()`:
@@ -84,6 +163,13 @@ This document provides verification evidence for GitHub issue #465 in `Abdelrhma
   - If found but status is not `DRAFT` (e.g. `ISSUED`), throws `BadRequestException('Only draft challans can be updated')` (HTTP 400).
   - If found in expected status (concurrency collision), throws `ConflictException('Only draft challans can be updated')` (HTTP 409).
 - In `e2e-army/465-delivery-challan-update-guard.e2e.ts`, hardcoded admin credentials were removed and replaced with dynamic environment credentials and disposable throwaway tenant authentication.
+- Running the full test suite produces 26 passed tests with 0 failures:
+  ```text
+  PASS src/modules/sales/services/delivery-challans.service.spec.ts
+  Tests:       26 passed, 26 total
+  Time:        1.972 s, estimated 3 s
+  Ran all test suites matching /apps\/api\/src\/modules\/sales\/services\/delivery-challans.service.spec.ts/i.
+  ```
 
 ---
 
