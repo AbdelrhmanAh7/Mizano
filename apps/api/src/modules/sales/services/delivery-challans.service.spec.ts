@@ -17,6 +17,31 @@ function challan(status: ChallanStatus, line: { itemId: string; warehouseId: str
   };
 }
 
+/** Validation failures must stop before the transaction opens: no write mock may have run. */
+function expectNoWrites(prisma: MockPrismaClient): void {
+  expect(prisma.$transaction).not.toHaveBeenCalled();
+  for (const model of [
+    prisma.deliveryChallan,
+    prisma.deliveryChallanLine,
+    prisma.customer,
+    prisma.invoice,
+    prisma.item,
+    prisma.warehouse,
+  ] as const) {
+    for (const op of [
+      'update',
+      'updateMany',
+      'create',
+      'createMany',
+      'delete',
+      'deleteMany',
+      'upsert',
+    ] as const) {
+      expect((model as unknown as Record<string, jest.Mock>)[op]).not.toHaveBeenCalled();
+    }
+  }
+}
+
 describe('DeliveryChallansService tenant scoping (#131)', () => {
   let prisma: MockPrismaClient;
   let service: DeliveryChallansService;
@@ -44,16 +69,14 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
       await expect(service.update(ORG, 'dc-1', dto)).rejects.toThrow(
         new NotFoundException(message),
       );
-      expect(prisma.deliveryChallanLine.deleteMany).not.toHaveBeenCalled();
-      expect(prisma.deliveryChallan.update).not.toHaveBeenCalled();
+      expectNoWrites(prisma);
     });
 
     it('rejects a warehouse outside the org before writing', async () => {
       prisma.item.findFirst.mockResolvedValue({ id: 'item-b' } as never);
       const dto = { lines: [{ itemId: 'item-b', quantity: 1, warehouseId: 'wh-a' }] };
       await expect(service.update(ORG, 'dc-1', dto)).rejects.toThrow('Warehouse wh-a not found');
-      expect(prisma.deliveryChallanLine.deleteMany).not.toHaveBeenCalled();
-      expect(prisma.deliveryChallan.update).not.toHaveBeenCalled();
+      expectNoWrites(prisma);
     });
 
     it('looks every reference up within the org', async () => {
@@ -84,6 +107,45 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
     it('rejects with 409 and writes no lines when the challan is no longer DRAFT', async () => {
       prisma.item.findFirst.mockResolvedValue({ id: 'item-b' } as never);
       prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 0 } as never);
+      await expect(
+        service.update(ORG, 'dc-1', { lines: [{ itemId: 'item-b', quantity: 1 }] }),
+      ).rejects.toThrow(ConflictException);
+      expect(prisma.deliveryChallanLine.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.deliveryChallanLine.createMany).not.toHaveBeenCalled();
+    });
+
+    it('answers 404 and writes no lines when the guarded update finds no row in the org', async () => {
+      prisma.item.findFirst.mockResolvedValue({ id: 'item-b' } as never);
+      prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 0 } as never);
+      prisma.deliveryChallan.findFirst
+        .mockResolvedValueOnce(
+          challan(ChallanStatus.DRAFT, { itemId: 'item-b', warehouseId: null }) as never,
+        )
+        .mockResolvedValueOnce(null as never);
+      await expect(
+        service.update(ORG, 'dc-1', { lines: [{ itemId: 'item-b', quantity: 1 }] }),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.deliveryChallanLine.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.deliveryChallanLine.createMany).not.toHaveBeenCalled();
+    });
+
+    it('answers 400 when the guarded update finds the challan already ISSUED', async () => {
+      prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 0 } as never);
+      prisma.deliveryChallan.findFirst
+        .mockResolvedValueOnce(
+          challan(ChallanStatus.DRAFT, { itemId: 'item-b', warehouseId: null }) as never,
+        )
+        .mockResolvedValueOnce({ status: ChallanStatus.ISSUED } as never);
+      await expect(service.update(ORG, 'dc-1', { notes: 'x' })).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.deliveryChallanLine.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.deliveryChallanLine.createMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects and writes no lines when the guarded update matches more than one row', async () => {
+      prisma.item.findFirst.mockResolvedValue({ id: 'item-b' } as never);
+      prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 2 } as never);
       await expect(
         service.update(ORG, 'dc-1', { lines: [{ itemId: 'item-b', quantity: 1 }] }),
       ).rejects.toThrow(ConflictException);
