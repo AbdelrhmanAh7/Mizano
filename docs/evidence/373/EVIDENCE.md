@@ -5,13 +5,13 @@ This document provides verification evidence for GitHub issue #373 in `Abdelrhma
 - **Issue**: [#373](https://github.com/AbdelrhmanAh7/Mizano/issues/373)
 - **PR**: Supersedes part of #302
 - **Parent Issue**: #259
-- **Base Commit (`origin/master`)**: `8ec35a547d80eb5c815d514e1fa921564e67d94a`
-- **Tested Head Commit**: `b21059671aa127605ac9bfedd2050219228c6366`
+- **Base Commit (`origin/master`)**: `8b89a7554ff33f164ee86693e653b303d1b7ab23`
+- **Tested Head Commit**: `c0fd1f4b1fc7161b40283ea0e93fb242bbbf7bc5`
 - **Tested Branch**: `ai/373`
 - **Originating Sentry Issue**: None (originates from CodeRabbit QA review findings `fe27756e991d`, `46f48f134604`, and related items on PR #302 / issue #259).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20+, pnpm 8.14.0.
 - **User-facing flow / E2E**: Covered by `e2e-army/373-customer-form-labels.e2e.ts` tagged `feat:mz-customers`.
-- **Skills Used**: `systematic-debugging`, `test-first engineering`, `verification-before-completion`, `e2e-army`, `model-effort-routing`, `react-best-practices`.
+- **Skills Used**: `systematic-debugging`, `diagnosing-bugs`, `test-first engineering`, `verification-before-completion`, `e2e-army`, `model-effort-routing`, `react-best-practices`.
 - **Model and Effort**: `Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: High · Why: Customer form accessibility, single-locale next-intl localization, Arabic MSA terminology, submit button distinction, CitySelect state preservation, e2e-army test, and evidence reporting`.
 
 ---
@@ -115,7 +115,7 @@ Root causes:
 3. Submit button and 'Copy from Billing' button lacked distinct localized aria-labels.
 4. CitySelect ternary duplicate branches removed dependency guidance.
 
-### Head Behaviour (commit `b2105967` on `ai/373`)
+### Head Behaviour (commit `c0fd1f4b` on `ai/373`)
 
 After applying the localization and accessibility fixes and merging master:
 
