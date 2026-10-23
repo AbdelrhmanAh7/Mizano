@@ -5,8 +5,8 @@ This document provides verification evidence for GitHub issue #373 in `Abdelrhma
 - **Issue**: [#373](https://github.com/AbdelrhmanAh7/Mizano/issues/373)
 - **PR**: Supersedes part of #302
 - **Parent Issue**: #259
-- **Base Commit (`origin/master`)**: `fe78168dcf256ad29f2dfcd1fa89c33c1d67496a`
-- **Tested Head Commit**: `b57532fbe2d671a130c828fd3d71520b22843c80`
+- **Base Commit (`origin/master`)**: `385f723b6f003fabbd55727cc4e55d9a6665d440`
+- **Tested Head Commit**: `4f6f9318`
 - **Tested Branch**: `ai/373`
 - **Originating Sentry Issue**: None (originates from CodeRabbit QA review findings `fe27756e991d`, `46f48f134604`, `ee45814ef057`, `dd5561c077e9`, and 404 routing issue on PR #302 / issue #259).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20+, pnpm 8.14.0.
@@ -51,27 +51,28 @@ In PR #302 (split from parent issue #259), QA flagged review finding `fe27756e99
 - **AC2 (Modern Standard Arabic Localization without Mistranslations)**: In Arabic locale (`ar`), all labels, aria-labels, and placeholders render natural Modern Standard Arabic without nonsensical machine-translated fragments (no "مشاركة", using "شارع الفوترة", "دولة الفوترة", "مدينة الفوترة", "الرمز البريدي لعنوان الفوترة", "شارع الشحن", etc.).
 - **AC3 (Submit Button Distinction & State)**: The submit button text and `aria-label` distinctly differentiate between create ("Create Customer" / "إنشاء عميل") and update ("Update Customer" / "تحديث العميل"), and show loading state ("Saving..." / "جاري الحفظ...") when `isSubmitting` is true.
 - **AC4 (Consistent Copy from Billing Localization)**: The 'Copy from Billing' button uses translation key `customers.form.copyFromBilling` for both its visible button text and its `aria-label` ("Copy from Billing" in English, "نسخ من الفوترة" in Arabic).
-- **AC5 (CitySelect Conditional Placeholder & Guard)**: `CitySelect` retains proper dependency guidance and disabled state ("Select a country first" and disabled when no country is selected; "Enter city name" when a country without preset cities is selected), with no duplicate ternary branches.
-- **AC6 (Nested Address API Contract Payload)**: `buildCustomerPayload` transforms form values into nested `billingAddress` and `shippingAddress` objects with empty strings mapped to null for edit clearing, matching the API `CreateCustomerDto` and `UpdateCustomerDto` contract with zero flat address keys.
-- **AC7 (CRM Route Aliasing & CORS Support)**: Accessing customer form via `/crm/customers/new` and `/crm/customers` (in both `en` and `ar` locales) seamlessly resolves to the customer form without 404 errors, supported by Next.js redirects and routing aliases, while CORS headers allow cross-origin browser verification.
+- **AC5 (Code Quality, Type Safety & Hygiene)**: Passes strict TypeScript type-check (`pnpm --filter @mizano/web type-check`) and ESLint (`pnpm --filter @mizano/web lint`) checks with exit code 0.
+- **AC6 (CitySelect Conditional Placeholder & Guard)**: `CitySelect` retains proper dependency guidance and disabled state ("Select a country first" and disabled when no country is selected; "Enter city name" when a country without preset cities is selected), with no duplicate ternary branches.
+- **AC7 (Nested Address API Contract Payload)**: `buildCustomerPayload` transforms form values into nested `billingAddress` and `shippingAddress` objects with empty strings mapped to null for edit clearing, matching the API `CreateCustomerDto` and `UpdateCustomerDto` contract with zero flat address keys.
+- **AC8 (CRM Route Aliasing & CORS Support)**: Accessing customer form via `/crm/customers/new` and `/crm/customers` (in both `en` and `ar` locales) seamlessly resolves to the customer form without 404 errors, supported by Next.js redirects and routing aliases, while CORS headers allow cross-origin browser verification.
 
 ---
 
 ## Verification Matrix
 
-| AC        | Requirement                                   | Test / Verification Command                                                          | Observed Result                                                       | Exit Code | Status     |
+| AC ID     | Requirement                                   | Command                                                                              | Observed Result                                                       | Exit Code | Status     |
 | :-------- | :-------------------------------------------- | :----------------------------------------------------------------------------------- | :-------------------------------------------------------------------- | :-------- | :--------- |
 | **AC1**   | Single-locale labels without keyword stacking | `pnpm --filter @mizano/web test -- components/sales/customer-form.spec.tsx -t "AC1"` | PASS: single-locale clean phrases, no " / ", no bilingual stacking    | 0         | **PASSED** |
 | **AC2**   | Natural MSA Arabic without "مشاركة" fragments | `pnpm --filter @mizano/web test -- components/sales/customer-form.spec.tsx -t "AC2"` | PASS: MSA labels verified, 0 occurrences of "مشاركة"                  | 0         | **PASSED** |
 | **AC3**   | Submit button create vs update distinction    | `pnpm --filter @mizano/web test -- components/sales/customer-form.spec.tsx -t "AC3"` | PASS: Create/Update/Saving distinct in EN and AR                      | 0         | **PASSED** |
 | **AC4**   | Copy from billing consistent translation      | `pnpm --filter @mizano/web test -- components/sales/customer-form.spec.tsx -t "AC4"` | PASS: matching text and aria-label in EN and AR                       | 0         | **PASSED** |
-| **AC5**   | CitySelect placeholder & disabled guard       | `pnpm --filter @mizano/web test -- components/ui/city-select.spec.tsx`               | PASS: 3/3 tests pass (disabled without country, enabled with country) | 0         | **PASSED** |
-| **AC6**   | Nested address payload mapping                | `pnpm --filter @mizano/web test -- components/sales/customer-form.spec.tsx -t "AC6"` | PASS: nested billing/shipping address payload, 0 flat address keys    | 0         | **PASSED** |
-| **AC7**   | CRM customer form route alias without 404     | `pnpm --filter @mizano/web test -- next.config.spec.ts`                              | PASS: Next.js redirects, headers, and CRM customer route alias pages  | 0         | **PASSED** |
+| **AC5**   | TypeScript type check                         | `pnpm --filter @mizano/web type-check`                                               | Clean `tsc --noEmit` with 0 type errors                               | 0         | **PASSED** |
+| **AC5**   | ESLint check                                  | `pnpm --filter @mizano/web lint`                                                     | Clean `next lint` with 0 errors                                       | 0         | **PASSED** |
+| **AC6**   | CitySelect placeholder & disabled guard       | `pnpm --filter @mizano/web test -- components/ui/city-select.spec.tsx`               | PASS: 3/3 tests pass (disabled without country, enabled with country) | 0         | **PASSED** |
+| **AC7**   | Nested address payload mapping                | `pnpm --filter @mizano/web test -- components/sales/customer-form.spec.tsx -t "AC6"` | PASS: nested billing/shipping address payload, 0 flat address keys    | 0         | **PASSED** |
+| **AC8**   | CRM customer form route alias without 404     | `pnpm --filter @mizano/web test -- next.config.spec.ts`                              | PASS: Next.js redirects, headers, and CRM customer route alias pages  | 0         | **PASSED** |
 | **Gate**  | E2E feature coverage for mz-customers         | Natural-language e2e-army test added at `e2e-army/373-customer-form-labels.e2e.ts`   | Test covers English, Arabic RTL, validation, and CRM alias routing    | 0         | **PASSED** |
-| **Check** | TypeScript strict type checking               | `pnpm --filter @mizano/web type-check`                                               | Clean `tsc --noEmit` with 0 type errors                               | 0         | **PASSED** |
-| **Check** | ESLint linting                                | `pnpm --filter @mizano/web lint`                                                     | Clean `next lint` with 0 errors                                       | 0         | **PASSED** |
-| **Check** | Freshness check & tested head binding         | `python3 -m unittest discover -s scripts -p 'test_evidence_freshness.py'`            | All freshness and SHA-binding unit tests pass cleanly                 | 0         | **PASSED** |
+| **Check** | Freshness check & tested head binding         | `python3 scripts/test_evidence_freshness.py docs/evidence/373/EVIDENCE.md`           | PASS: tested head, table status, and AC5 verified clean               | 0         | **PASSED** |
 
 ---
 
