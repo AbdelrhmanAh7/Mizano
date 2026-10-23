@@ -26,6 +26,11 @@ test(
     const arDir = await browser.evaluate(() => document.documentElement.dir);
     expect(arDir).toBe('rtl');
 
+    // Capture Arabic RTL screenshot for visual verification
+    if (typeof screen.page === 'function') {
+      await screen.page().screenshot({ path: 'test-results/372-customer-form-ar-rtl.png', fullPage: true });
+    }
+
     // Deterministic DOM checks for specific billing address input aria-labels in Arabic
     const arFieldAriaLabels = await browser.evaluate(() => {
       const getAria = (id: string) => document.getElementById(id)?.getAttribute('aria-label') || '';
@@ -96,6 +101,11 @@ test(
     // English locale check: document direction must be LTR
     const enDir = await browser.evaluate(() => document.documentElement.dir);
     expect(enDir).toBe('ltr');
+
+    // Capture English LTR screenshot for visual comparison
+    if (typeof screen.page === 'function') {
+      await screen.page().screenshot({ path: 'test-results/372-customer-form-en-ltr.png', fullPage: true });
+    }
 
     // Deterministic DOM checks for specific input aria-labels in English
     const enFieldAriaLabels = await browser.evaluate(() => {

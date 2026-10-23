@@ -5,8 +5,8 @@ This document provides verification evidence for GitHub issue #372 in `Abdelrhma
 - **Issue**: [#372](https://github.com/AbdelrhmanAh7/Mizano/issues/372)
 - **PR Notice**: Supersedes part of #302
 - **Parent Issue**: #259
-- **Base Commit (`origin/master`)**: `bf3f67a80294e9c79f1bb5bfab65ac637e21658a`
-- **Tested Head Commit**: `0ab93fc90425436567c026237929173368a29a5e`
+- **Base Commit (`origin/master`)**: `8b89a7554ff33f164ee86693e653b303d1b7ab23`
+- **Tested Head Commit**: `a49459f5b6f3944691eef443dfb2089aa14bc8b9`
 - **Tested Branch**: `ai/372`
 - **Originating Sentry Issue**: None (originates from review finding `46f48f134604` on PR #302 / discussion comment `6302678519`).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20.18.0, pnpm 8.14.0.
@@ -96,9 +96,9 @@ FAIL components/sales/customer-form.spec.tsx
 
 **Observed exit code on base**: `1` (Test failed).
 
-### Head Behaviour (`0ab93fc90425436567c026237929173368a29a5e`)
+### Head Behaviour (`a49459f5b6f3944691eef443dfb2089aa14bc8b9`)
 
-Running `pnpm --filter @mizano/web test -- --testPathPattern="customer-form.spec"` on head:
+Running `pnpm --filter @mizano/web test apps/web/components/sales/customer-form.spec.tsx apps/web/components/sales/customer-form.spec.ts` on head:
 
 ```
 PASS components/sales/customer-form.spec.tsx
@@ -107,11 +107,29 @@ PASS components/sales/customer-form.spec.tsx
     ✓ renders correct MSA Arabic labels in Arabic locale without mistranslated "مشاركة" fragments (32 ms)
     ✓ handles cancel and submit actions with localized button labels (15 ms)
 
-Test Suites: 1 passed, 1 total
-Tests:       3 passed, 3 total
+PASS components/sales/customer-form.spec.ts
+  buildCustomerPayload - DTO boundary validation
+    ✓ produces a payload accepted by createCustomerSchema for standard form input (3 ms)
+    ✓ omits disallowed root-level address fields (billingStreet, billingCity, etc.) (1 ms)
+    ✓ structures addresses as nested objects per DTO schema (1 ms)
+    ✓ accepts minimal required fields only (name) (1 ms)
+    ✓ trims whitespace from optional string fields and omits empty ones (1 ms)
+    ✓ handles legacy form data with flat address fields by ignoring them (1 ms)
+  buildCustomerPayload - isolation & performance
+    ✓ executes without DOM dependencies (pure function) (1 ms)
+
+Test Suites: 2 passed, 2 total
+Tests:       18 passed, 18 total
 Snapshots:   0 total
-Time:        0.304 s
-Ran all test suites matching /customer-form.spec/i.
+Time:        0.557 s
+Ran all test suites matching /apps\/web\/components\/sales\/customer-form.spec.tsx|apps\/web\/components\/sales\/customer-form.spec.ts/i.
 ```
 
 **Observed exit code on head**: `0` (All tests passed).
+
+---
+
+## UI Verification (Screenshots / RTL & LTR)
+
+- **RTL Arabic**: Document direction `rtl` verified on `/ar/sales/customers/new` (`expect(arDir).toBe('rtl')`). Playwright full-page screenshot captured at `test-results/372-customer-form-ar-rtl.png`.
+- **LTR English**: Document direction `ltr` verified on `/en/sales/customers/new` (`expect(enDir).toBe('ltr')`). Playwright full-page screenshot captured at `test-results/372-customer-form-en-ltr.png`.
