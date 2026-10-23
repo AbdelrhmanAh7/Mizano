@@ -317,12 +317,21 @@ describe('extractInvoiceFields date offsets map back to original text', () => {
   });
 
   it('slices day-first named dates and dates with irregular spacing', () => {
+    // Arabic-Indic digits (U+0660 to U+0669: ٠١٢٣٤٥٦٧٨٩) appear on real Saudi/Arabic invoices.
+    // The pipeline must normalize them to ASCII 0-9 before date parsing.
+    // This case must not be rewritten into Western digits; doing so would silently drop coverage.
     const named = 'Date:   ١٥   March ٢٠٢٤';
     const r1 = extractInvoiceFields(named);
     expect(r1.date?.value).toBe('2024-03-15');
     expect(r1.date?.start).toBeDefined();
     expect(r1.date?.end).toBeDefined();
     expect(named.slice(r1.date?.start, r1.date?.end)).toBe('١٥   March ٢٠٢٤');
+
+    // Equivalence: same date with Western digits must yield identical result.
+    const western = 'Date:   15   March 2024';
+    const r1w = extractInvoiceFields(western);
+    expect(r1w.date?.value).toBe('2024-03-15');
+    expect(r1w.date?.value).toBe(r1.date?.value);
 
     const spaced = 'Date: 2024 / 03  /  15';
     const r2 = extractInvoiceFields(spaced);
