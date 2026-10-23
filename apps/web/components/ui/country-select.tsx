@@ -15,6 +15,7 @@ interface CountrySelectProps {
   placeholder?: string;
   disabled?: boolean;
   id?: string;
+  'aria-label'?: string;
 }
 
 export function CountrySelect({
@@ -23,10 +24,11 @@ export function CountrySelect({
   placeholder = 'Select country',
   disabled,
   id,
+  'aria-label': ariaLabel,
 }: CountrySelectProps) {
   return (
     <Select value={value || ''} onValueChange={onValueChange} disabled={disabled}>
-      <SelectTrigger id={id}>
+      <SelectTrigger id={id} aria-label={ariaLabel}>
         <SelectValue placeholder={placeholder}>
           {value
             ? countries.find((c) => c.name === value || c.code === value)

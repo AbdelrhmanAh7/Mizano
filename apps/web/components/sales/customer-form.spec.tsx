@@ -180,14 +180,17 @@ describe('CustomerForm submit button and action accessibility (#373 AC3, AC4)', 
       'Saving...',
     );
 
-    // Arabic create
+    // Arabic create: verify it does NOT collapse into generic 'حفظ' or contain slash stacking
     testLocale = 'ar';
     rerender(<CustomerForm onSubmit={jest.fn()} onCancel={jest.fn()} />);
     const arCreateBtn = screen.getByRole('button', { name: 'إنشاء عميل' });
     expect(arCreateBtn).toBeInTheDocument();
     expect(arCreateBtn).toHaveAttribute('aria-label', 'إنشاء عميل');
+    const arCreateAriaLabel = arCreateBtn.getAttribute('aria-label');
+    expect(arCreateAriaLabel).not.toBe('حفظ');
+    expect(arCreateAriaLabel).not.toContain(' / ');
 
-    // Arabic update
+    // Arabic update: distinct from create, not generic 'حفظ', no slash stacking
     rerender(
       <CustomerForm
         customer={{ id: 'c-1', name: 'عميل حالي' } as unknown as Customer}
@@ -198,6 +201,10 @@ describe('CustomerForm submit button and action accessibility (#373 AC3, AC4)', 
     const arUpdateBtn = screen.getByRole('button', { name: 'تحديث العميل' });
     expect(arUpdateBtn).toBeInTheDocument();
     expect(arUpdateBtn).toHaveAttribute('aria-label', 'تحديث العميل');
+    const arUpdateAriaLabel = arUpdateBtn.getAttribute('aria-label');
+    expect(arUpdateAriaLabel).not.toBe('حفظ');
+    expect(arUpdateAriaLabel).not.toEqual(arCreateAriaLabel);
+    expect(arUpdateAriaLabel).not.toContain(' / ');
 
     // Arabic saving
     rerender(
