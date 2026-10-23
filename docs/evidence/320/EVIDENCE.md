@@ -7,6 +7,7 @@
 - **Supersedes**: PR #128
 - **PR**: #450
 - **Base Commit**: `9d6ff9222c15112282ad813aa5b47a9504ef5647` (`master`)
+- **Tested Head Commit**: `5266f7fb08f4d485730ff9aef39b77001e65de98` (final test code; the only later commit is this file)
 - **Originating Sentry Issue**: None (feature request / clean restart of #125).
 - **User-facing flow / E2E**: Feature E2E covered in `e2e-army/320-ap-reconciliation.e2e.ts` (`feat:mz-financial-reports`, `feat:mz-dashboard`, `feat:mz-aging-reports`, `lvl:api`). Pure backend REST API endpoint (`GET /api/reports/reconciliation/ap`); no frontend UI changes in this issue.
 
