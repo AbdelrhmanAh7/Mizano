@@ -6,6 +6,7 @@ import { AiModule } from '../ai/ai.module';
 import { TaxModule } from '../tax/tax.module';
 import { ReportsController } from './controllers/reports.controller';
 import { AgingReportsService } from './services/aging-reports.service';
+import { ApReconciliationService } from './services/ap-reconciliation.service';
 import { DashboardService } from './services/dashboard.service';
 import { FinancialReportsService } from './services/financial-reports.service';
 import { VatReturnDraftService } from './services/vat-return-draft.service';
@@ -16,9 +17,16 @@ import { VatReturnDraftService } from './services/vat-return-draft.service';
   providers: [
     FinancialReportsService,
     AgingReportsService,
+    ApReconciliationService,
     DashboardService,
     VatReturnDraftService,
   ],
-  exports: [FinancialReportsService, AgingReportsService, DashboardService, VatReturnDraftService],
+  exports: [
+    FinancialReportsService,
+    AgingReportsService,
+    ApReconciliationService,
+    DashboardService,
+    VatReturnDraftService,
+  ],
 })
 export class ReportsModule {}
