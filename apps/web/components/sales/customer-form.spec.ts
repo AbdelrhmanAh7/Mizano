@@ -1,3 +1,8 @@
+jest.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => key,
+  useLocale: () => 'en',
+}));
+
 import { buildCustomerPayload } from './customer-form';
 import { createCustomerSchema } from '@mizano/validators';
 

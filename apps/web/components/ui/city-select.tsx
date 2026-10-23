@@ -19,6 +19,7 @@ interface CitySelectProps {
   placeholder?: string;
   disabled?: boolean;
   id?: string;
+  'aria-label'?: string;
 }
 
 function useSafeLocale(): string {
@@ -36,25 +37,29 @@ export function CitySelect({
   placeholder,
   disabled,
   id,
+  'aria-label': ariaLabel,
 }: CitySelectProps) {
   const locale = useSafeLocale();
   const isArabic = locale.startsWith('ar');
-  const hasCountry = Boolean(country && country.trim());
+  const hasCountry = Boolean(country && country.trim().length > 0);
 
   const cities = useMemo(() => {
     if (!hasCountry || !country) return [];
+    const normalizedCountry = country.trim();
     // Find country code from name
-    const countryObj = countries.find((c) => c.name === country || c.code === country);
+    const countryObj = countries.find(
+      (c) => c.name === normalizedCountry || c.code === normalizedCountry,
+    );
     if (!countryObj) return [];
     return citiesByCountry[countryObj.code] || [];
   }, [hasCountry, country]);
 
-  // If no cities data for this country, fall back to text input
+  // If no country or no pre-seeded cities data for this country, fall back to text input
   if (cities.length === 0) {
     const defaultNoCountryPlaceholder = isArabic ? 'اختر الدولة أولاً' : 'Select a country first';
     const defaultCityPlaceholder = isArabic ? 'أدخل اسم المدينة' : 'Enter city name';
     const inputPlaceholder = hasCountry
-      ? placeholder || defaultCityPlaceholder
+      ? (placeholder ?? defaultCityPlaceholder)
       : defaultNoCountryPlaceholder;
 
     return (
@@ -64,15 +69,16 @@ export function CitySelect({
         onChange={(e) => onValueChange?.(e.target.value)}
         placeholder={inputPlaceholder}
         disabled={disabled || !hasCountry}
+        aria-label={ariaLabel}
       />
     );
   }
 
-  const selectPlaceholder = placeholder || (isArabic ? 'اختر المدينة' : 'Select city');
+  const selectPlaceholder = placeholder ?? (isArabic ? 'اختر المدينة' : 'Select city');
 
   return (
     <Select value={value || ''} onValueChange={onValueChange} disabled={disabled || !hasCountry}>
-      <SelectTrigger id={id}>
+      <SelectTrigger id={id} aria-label={ariaLabel}>
         <SelectValue placeholder={selectPlaceholder} />
       </SelectTrigger>
       <SelectContent className="max-h-[300px]">

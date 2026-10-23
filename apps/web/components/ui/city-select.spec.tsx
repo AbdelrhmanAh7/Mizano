@@ -9,7 +9,7 @@ jest.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }));
 
-describe('CitySelect', () => {
+describe('CitySelect component (#316 AC1 & AC2)', () => {
   beforeEach(() => {
     mockLocale = 'en';
   });
@@ -19,22 +19,31 @@ describe('CitySelect', () => {
       mockLocale = 'en';
       render(<CitySelect id="city" />);
       const input = screen.getByPlaceholderText('Select a country first');
+      expect(input).toBeInTheDocument();
       expect(input).toBeDisabled();
     });
 
-    it('is disabled and shows "Select a country first" in English when country is empty string or whitespace', () => {
+    it('is disabled and shows "Select a country first" in English when country is empty string', () => {
       mockLocale = 'en';
-      const { rerender } = render(<CitySelect id="city" country="" />);
-      expect(screen.getByPlaceholderText('Select a country first')).toBeDisabled();
-
-      rerender(<CitySelect id="city" country="   " />);
-      expect(screen.getByPlaceholderText('Select a country first')).toBeDisabled();
+      render(<CitySelect id="city" country="" />);
+      const input = screen.getByPlaceholderText('Select a country first');
+      expect(input).toBeInTheDocument();
+      expect(input).toBeDisabled();
     });
 
-    it('is disabled and shows "اختر الدولة أولاً" in Arabic when country is not selected', () => {
+    it('treats whitespace-only country as unselected, disabling input and showing guidance', () => {
+      mockLocale = 'en';
+      render(<CitySelect id="city" country="   " />);
+      const input = screen.getByPlaceholderText('Select a country first');
+      expect(input).toBeInTheDocument();
+      expect(input).toBeDisabled();
+    });
+
+    it('displays Arabic guidance placeholder "اختر الدولة أولاً" and remains disabled when locale is "ar"', () => {
       mockLocale = 'ar';
       render(<CitySelect id="city" />);
       const input = screen.getByPlaceholderText('اختر الدولة أولاً');
+      expect(input).toBeInTheDocument();
       expect(input).toBeDisabled();
     });
   });
@@ -44,14 +53,16 @@ describe('CitySelect', () => {
       mockLocale = 'en';
       render(<CitySelect id="city" country="UnknownCountry123" />);
       const input = screen.getByPlaceholderText('Enter city name');
-      expect(input).not.toBeDisabled();
+      expect(input).toBeInTheDocument();
+      expect(input).toBeEnabled();
     });
 
     it('is enabled and shows "أدخل اسم المدينة" in Arabic for a country without pre-populated cities', () => {
       mockLocale = 'ar';
       render(<CitySelect id="city" country="UnknownCountry123" />);
       const input = screen.getByPlaceholderText('أدخل اسم المدينة');
-      expect(input).not.toBeDisabled();
+      expect(input).toBeInTheDocument();
+      expect(input).toBeEnabled();
     });
 
     it('respects custom placeholder when provided', () => {
@@ -59,7 +70,22 @@ describe('CitySelect', () => {
       render(
         <CitySelect id="city" country="UnknownCountry123" placeholder="Custom City Placeholder" />,
       );
-      expect(screen.getByPlaceholderText('Custom City Placeholder')).not.toBeDisabled();
+      const input = screen.getByPlaceholderText('Custom City Placeholder');
+      expect(input).toBeInTheDocument();
+      expect(input).toBeEnabled();
+    });
+
+    it('passes aria-label to input when rendered as fallback', () => {
+      mockLocale = 'en';
+      render(
+        <CitySelect
+          id="city"
+          country="UnknownCountry123"
+          aria-label="City of residence"
+        />,
+      );
+      const input = screen.getByLabelText('City of residence');
+      expect(input).toBeInTheDocument();
     });
   });
 
@@ -68,6 +94,7 @@ describe('CitySelect', () => {
       mockLocale = 'en';
       render(<CitySelect id="city" country="UnknownCountry123" disabled={true} />);
       const input = screen.getByPlaceholderText('Enter city name');
+      expect(input).toBeInTheDocument();
       expect(input).toBeDisabled();
     });
   });
