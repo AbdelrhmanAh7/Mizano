@@ -44,40 +44,49 @@ const customerSchema = z.object({
 });
 
 type CustomerFormData = z.infer<typeof customerSchema>;
-type AddressFormData = z.infer<typeof addressSchema>;
-
-const addressPayload = (address?: AddressFormData) => ({
-  street: address?.street || null,
-  city: address?.city || null,
-  state: address?.state || null,
-  postalCode: address?.postalCode || null,
-  country: address?.country || null,
-});
-
-/**
- * Body for POST/PATCH /customers. The API DTO takes nested billingAddress/shippingAddress
- * objects and rejects unknown keys, so flat billingStreet/... fields would be a 400.
- */
-export function buildCustomerPayload(data: CustomerFormData): Record<string, unknown> {
-  return {
-    name: data.name,
-    displayName: data.displayName || null,
-    email: data.email || null,
-    phone: data.phone || null,
-    currency: data.currency,
-    taxId: data.taxId || null,
-    paymentTerms: data.paymentTerms || 0,
-    notes: data.notes || null,
-    billingAddress: addressPayload(data.billingAddress),
-    shippingAddress: addressPayload(data.shippingAddress),
-  };
-}
 
 interface CustomerFormProps {
   customer?: Customer | null;
   onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
+}
+
+/**
+ * Builds a customer API payload from form data.
+ * Returns a DTO-compliant object with nested address structures.
+ * Omits empty optional fields to satisfy strict schema validation.
+ */
+export function buildCustomerPayload(data: CustomerFormData): Record<string, unknown> {
+  const optional = (v?: string): string | undefined =>
+    v && v.trim() !== '' ? v.trim() : undefined;
+
+  const optionalNumber = (v?: number): number | undefined =>
+    v !== undefined && v !== null ? v : undefined;
+
+  const addressOrUndefined = (addr?: z.infer<typeof addressSchema>) => {
+    if (!addr) return undefined;
+    const street = optional(addr.street);
+    const city = optional(addr.city);
+    const state = optional(addr.state);
+    const postalCode = optional(addr.postalCode);
+    const country = optional(addr.country);
+    if (!street && !city && !state && !postalCode && !country) return undefined;
+    return { street, city, state, postalCode, country };
+  };
+
+  return {
+    name: data.name,
+    displayName: optional(data.displayName),
+    email: optional(data.email),
+    phone: optional(data.phone),
+    currency: data.currency || 'USD',
+    taxId: optional(data.taxId),
+    paymentTerms: optionalNumber(data.paymentTerms),
+    notes: optional(data.notes),
+    billingAddress: addressOrUndefined(data.billingAddress),
+    shippingAddress: addressOrUndefined(data.shippingAddress),
+  };
 }
 
 const currencies = [
@@ -160,7 +169,8 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
   }, [customer, form]);
 
   const handleSubmit = (data: CustomerFormData) => {
-    onSubmit(buildCustomerPayload(data));
+    const submitData = buildCustomerPayload(data);
+    onSubmit(submitData);
   };
 
   const copyBillingToShipping = () => {

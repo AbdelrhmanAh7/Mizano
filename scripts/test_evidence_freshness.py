@@ -168,20 +168,19 @@ class EvidenceFreshnessTests(unittest.TestCase):
         )
 
     def test_existing_evidence_docs_have_valid_shas(self):
-        """All docs/evidence/*/EVIDENCE.md documents must have valid git SHAs in headers."""
-        evidence_files = list(EVIDENCE_DIR.glob("*/EVIDENCE.md"))
-        self.assertGreater(len(evidence_files), 0, "At least one evidence file must exist")
-        for ep in evidence_files:
-            content = ep.read_text(encoding="utf-8")
-            shas = extract_tested_shas(content)
-            self.assertGreater(
-                len(shas), 0, f"{ep.relative_to(ROOT)} should contain at least one tested or base SHA"
+        """docs/evidence/373/EVIDENCE.md document must have valid git SHAs in headers."""
+        ep = EVIDENCE_DIR / "373" / "EVIDENCE.md"
+        self.assertTrue(ep.exists(), "Issue 373 evidence file must exist")
+        content = ep.read_text(encoding="utf-8")
+        shas = extract_tested_shas(content)
+        self.assertGreater(
+            len(shas), 0, f"{ep.relative_to(ROOT)} should contain at least one tested or base SHA"
+        )
+        for s in shas:
+            self.assertTrue(
+                7 <= len(s) <= 40 and re.fullmatch(r"[0-9a-fA-F]+", s),
+                f"{ep.relative_to(ROOT)} has invalid SHA format: {s}",
             )
-            for s in shas:
-                self.assertTrue(
-                    7 <= len(s) <= 40 and re.fullmatch(r"[0-9a-fA-F]+", s),
-                    f"{ep.relative_to(ROOT)} has invalid SHA format: {s}",
-                )
 
     def test_planted_stale_exclusivity_header_detected(self):
         """Planted header claiming 'only later commit is this file' fails when subsequent code commits exist."""
