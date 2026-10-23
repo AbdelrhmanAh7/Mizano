@@ -6,7 +6,7 @@ This document provides verification evidence for GitHub issue #378 in `Abdelrhma
 - **PR**: Supersedes part of #340
 - **Parent Issue**: #317
 - **Base Commit (`origin/master`)**: `bf3f67a80294e9c79f1bb5bfab65ac637e21658a`
-- **Tested Head Commit**: `8bca0dfce5cd62357b5bb1cfc42cd2016360fdb5`
+- **Tested Head Commit**: `737bd818`
 - **Tested Branch**: `ai/378`
 - **Originating Sentry Issue**: None (originates from review finding `7921754e38c2` / comment 6308811548 on PR #340 / parent issue #317).
 - **Host Environment**: Darwin arm64 (macOS), Python 3.14.8, Node.js v20.18.0, pnpm 8.14.0.
@@ -63,16 +63,21 @@ In Round 2 review, QA flagged three major recurring findings:
      Removed default fallback credentials. Defined `LOGIN` using direct `process.env` references.
    - **`e2e-army/207-currency-fx-tenant-and-idempotency.e2e.ts:7-8, 24-27`**:
      Removed default fallback credentials. Defined `ADMIN` using direct `process.env` references and added runtime validation in `signIn`.
-2. **Hardened Detection Tooling in `scripts/test_e2e_army_hygiene.py:38-48, 88-106`**:
+   - **`e2e-army/317-searchable-bill-options.e2e.ts:7-9`** (NEW):
+     Created the missing spec file with `LOGIN` credentials sourced exclusively from `process.env.E2E_LOGIN_EMAIL` and `process.env.E2E_LOGIN_PASSWORD` with runtime validation (no fallbacks). This resolves the original PR #340 finding `7921754e38c2` for this file.
+2. **Hardened Detection Tooling in `scripts/test_e2e_army_hygiene.py`**:
    - Added `OBFUSCATED_JOIN_CREDENTIAL_PATTERN` to flag joined array tricks like `['admin', 'mizano.com'].join` and `['password', '123'].join`.
    - Added `ENV_CREDENTIAL_FALLBACK_PATTERN` to flag non-empty string literals and join expressions provided as `??` or `||` fallbacks in credential lookups.
-   - Modified `find_hardcoded_credential_violations` so that lines containing `process.env` are still actively checked for literal credentials, obfuscated joins, and default fallback credentials.
+   - **Fixed detector loophole**: Replaced the blanket `if "process.env" in code_part: continue` with per-assignment checking in `find_hardcoded_credential_violations`. Now each `pw:`/`password:` assignment is evaluated individually — assignments using `process.env` are compliant, while hardcoded string/template literals on the same line are flagged.
 3. **Comprehensive Unit & Integration Regression Tests (`scripts/test_e2e_army_hygiene.py`)**:
    - `test_env_fallback_with_obfuscated_join_detected`: Verifies detection of `['admin', 'mizano.com'].join('@')` and `['password', '123'].join('')` in `process.env` fallbacks.
    - `test_env_fallback_with_hardcoded_password_detected`: Verifies detection of `password123` literals in `process.env` fallbacks.
    - `test_env_fallback_with_arbitrary_string_password_detected`: Verifies detection of arbitrary password strings in `??` and `||` fallbacks.
    - `test_no_hardcoded_credential_fallbacks_in_e2e_army`: Integration test scanning all `*.e2e.ts` files in `e2e-army/` to guarantee zero fallback credentials or obfuscated joins exist.
    - `test_sanitized_credentials_accepted`: Updated to assert that pure environment variable sourcing (without fallbacks) passes cleanly.
+   - **NEW** `test_mixed_process_env_and_hardcoded_on_same_line_detected`: Verifies that hardcoded `pw:`/`password:` assignments mixed with `process.env` assignments on the same line are detected.
+   - **NEW** `test_process_env_assignments_not_flagged`: Verifies that `pw:`/`password:` assignments using `process.env` are not flagged even when on the same line.
+   - **UPDATED** `test_317_e2e_no_hardcoded_credentials`: Now requires the 317 spec file to exist and validates it contains no hardcoded credentials.
 4. **Updated Review Lessons (`docs/agents/review-lessons.md:89`)**:
    - Explicitly updated the rule to forbid default fallback credentials in environment variable lookups.
 
@@ -90,20 +95,26 @@ In Round 2 review, QA flagged three major recurring findings:
   5. Default fallback credentials in `process.env` lookups (`?? 'password123'`, `?? 'arbitrarySecret'`, `|| '...'`);
   6. Planted 317 test code regression;
   7. Sanitized dynamic credentials from environment variables without fallbacks passing cleanly.
+  8. **Hardcoded `pw:`/`password:` assignments mixed with `process.env` on same line are detected** (NEW).
+  9. **Pure `process.env` assignments for `pw:`/`password:` on same line are NOT flagged** (NEW).
 - **AC4 (Repository-wide E2E Integration Hygiene Check)**: `test_no_hardcoded_credentials_in_e2e_army`, `test_no_hardcoded_credential_fallbacks_in_e2e_army`, and `test_e2e_login_specs_source_credentials_from_env` in `scripts/test_e2e_army_hygiene.py` verify that all `*.e2e.ts` files in `e2e-army/` contain zero hardcoded credentials, zero default credential fallbacks, and specs that log in source credentials via `process.env`.
 - **AC5 (Automated Evidence & Contract Verification)**: `docs/evidence/378/EVIDENCE.md` documents all criteria, exit codes, exact tested head binding, and supersedes notice, verified by `test_issue_378_evidence_contract` in `scripts/test_evidence_freshness.py`.
+- **AC6 (317 Searchable Bill Options Spec)**: `e2e-army/317-searchable-bill-options.e2e.ts` exists, defines active tests for bill-form searchable options (AC1-AC4, AC6 from issue #317), sources credentials via `process.env` without fallbacks, and passes `test_317_e2e_no_hardcoded_credentials`.
 
 ---
 
 ## Verification Matrix
 
-| AC ID   | Requirement Description                                          | Verification Method / Command                                                                                                              | Observed Result                                                                             | Exit Code | Status     |
-| :------ | :--------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------ | :-------- | :--------- |
-| **AC1** | Document hardcoded credentials hygiene rule in review lessons    | `python3 -m unittest discover -s scripts -p 'test_e2e_army_hygiene.py'`                                                                    | Rule verified in `docs/agents/review-lessons.md`, 24 tests PASS                             | 0         | **PASSED** |
-| **AC2** | Implement generalised credential violation detector              | `python3 -m unittest scripts.test_e2e_army_hygiene.E2EArmyImportDetectorUnitTests.test_hardcoded_credentials_in_317_snippet_detected`      | 1 test PASS (`find_hardcoded_credential_violations` successfully detects violation)         | 0         | **PASSED** |
-| **AC3** | Comprehensive unit regression tests for detection & sanitization | `python3 -m unittest scripts.test_e2e_army_hygiene.E2EArmyImportDetectorUnitTests.test_planted_317_hardcoded_credentials_regression_fails` | 1 test PASS (planted code detected at line 5 with exit code 0)                              | 0         | **PASSED** |
-| **AC4** | Repository-wide e2e hygiene integration check                    | `python3 -m unittest scripts.test_e2e_army_hygiene.E2EArmyRepositoryHygieneTests.test_no_hardcoded_credentials_in_e2e_army`                | 1 test PASS (all e2e-army specs verified clean of hardcoded credentials and fallbacks)      | 0         | **PASSED** |
-| **AC5** | Evidence contract verification                                   | `python3 -m unittest scripts.test_evidence_freshness.EvidenceFreshnessTests.test_issue_378_evidence_contract`                              | 1 test PASS (contract AC1-AC5, Exit Code, Supersedes notice, tested head binding validated) | 0         | **PASSED** |
+| AC ID   | Requirement Description                                          | Verification Method / Command                                                                                                                 | Observed Result                                                                             | Exit Code | Status     |
+| :------ | :--------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------ | :-------- | :--------- |
+| **AC1** | Document hardcoded credentials hygiene rule in review lessons    | `python3 -m unittest discover -s scripts -p 'test_e2e_army_hygiene.py'`                                                                       | Rule verified in `docs/agents/review-lessons.md`, 26 tests PASS                             | 0         | **PASSED** |
+| **AC2** | Implement generalised credential violation detector              | `python3 -m unittest scripts.test_e2e_army_hygiene.E2EArmyImportDetectorUnitTests.test_hardcoded_credentials_in_317_snippet_detected`         | 1 test PASS (`find_hardcoded_credential_violations` successfully detects violation)         | 0         | **PASSED** |
+| **AC3** | Comprehensive unit regression tests for detection & sanitization | `python3 -m unittest scripts.test_e2e_army_hygiene.E2EArmyImportDetectorUnitTests.test_planted_317_hardcoded_credentials_regression_fails`    | 1 test PASS (planted code detected at line 5 with exit code 0)                              | 0         | **PASSED** |
+| **AC3** | Mixed process.env/hardcoded detection                            | `python3 -m unittest scripts.test_e2e_army_hygiene.E2EArmyImportDetectorUnitTests.test_mixed_process_env_and_hardcoded_on_same_line_detected` | 1 test PASS (hardcoded pw on same line as process.env detected)                             | 0         | **PASSED** |
+| **AC3** | Pure process.env assignments not flagged                         | `python3 -m unittest scripts.test_e2e_army_hygiene.E2EArmyImportDetectorUnitTests.test_process_env_assignments_not_flagged`                   | 1 test PASS (process.env assignments on same line not flagged)                              | 0         | **PASSED** |
+| **AC4** | Repository-wide e2e hygiene integration check                    | `python3 -m unittest scripts.test_e2e_army_hygiene.E2EArmyRepositoryHygieneTests.test_no_hardcoded_credentials_in_e2e_army`                   | 1 test PASS (all e2e-army specs verified clean of hardcoded credentials and fallbacks)      | 0         | **PASSED** |
+| **AC5** | Evidence contract verification                                   | `python3 -m unittest scripts.test_evidence_freshness.EvidenceFreshnessTests.test_issue_378_evidence_contract`                                 | 1 test PASS (contract AC1-AC6, Exit Code, Supersedes notice, tested head binding validated) | 0         | **PASSED** |
+| **AC6** | 317 searchable bill options spec exists and is sanitized         | `python3 -m unittest scripts.test_e2e_army_hygiene.E2EArmyRepositoryHygieneTests.test_317_e2e_no_hardcoded_credentials`                       | 1 test PASS (317 spec exists, no hardcoded credentials, uses process.env)                   | 0         | **PASSED** |
 
 ---
 
@@ -119,12 +130,16 @@ In Round 2 review, QA flagged three major recurring findings:
   - `test_env_fallback_with_arbitrary_string_password_detected`
   - `test_sanitized_credentials_accepted`
   - `test_planted_317_hardcoded_credentials_regression_fails`
+  - `test_mixed_process_env_and_hardcoded_on_same_line_detected` (NEW)
+  - `test_process_env_assignments_not_flagged` (NEW)
   - `test_no_hardcoded_credentials_in_e2e_army`
   - `test_no_hardcoded_credential_fallbacks_in_e2e_army`
   - `test_e2e_login_specs_source_credentials_from_env`
-  - `test_317_e2e_no_hardcoded_credentials`
+  - `test_317_e2e_no_hardcoded_credentials` (UPDATED: now requires file existence)
 - `scripts/test_evidence_freshness.py`:
   - `test_issue_378_evidence_contract`
+- `e2e-army/317-searchable-bill-options.e2e.ts` (NEW):
+  - Two test cases for bill-form searchable options (EN/LTR and AR/RTL)
 
 ---
 
@@ -136,6 +151,7 @@ In Round 2 review, QA flagged three major recurring findings:
    - `find_hardcoded_credential_violations` did not exist in `scripts/test_e2e_army_hygiene.py`.
    - Hardcoded plaintext credentials such as `const LOGIN = { email: 'admin@mizano.com', pw: 'password123' };` in e2e tests went completely undetected by automated repository test hygiene checks.
    - `test_issue_378_evidence_contract` failed because `docs/evidence/378/EVIDENCE.md` was missing.
+   - The file `e2e-army/317-searchable-bill-options.e2e.ts` did not exist on master; the original hardcoded version (commit `ce1bc460`) existed only on branch `ai/317`.
 2. On commit `222870fa`:
    - Hardcoded fallback credentials using obfuscated joins (`['admin', 'mizano.com'].join('@')` / `['password', '123'].join('')`) in `104-smtp-rotation-stamp.e2e.ts`, `131-cross-tenant-delivery-challan.e2e.ts`, and `207-currency-fx-tenant-and-idempotency.e2e.ts` bypassed detection due to `if "process.env" in code_part: continue`.
    - When the detector was hardened to catch fallbacks, the regression test reproduced and failed:
@@ -144,15 +160,17 @@ In Round 2 review, QA flagged three major recurring findings:
      AssertionError: True is not false : File 104-smtp-rotation-stamp.e2e.ts:36 uses obfuscated credential join fallback: const loginEmail = process.env.E2E_LOGIN_EMAIL ?? ['admin', 'mizano.com'].join('@');
      FAILED (failures=2)
      ```
+   - **Detector loophole**: The blanket `process.env` check allowed hardcoded `pw:`/`password:` values on the same line as `process.env` assignments to go undetected (e.g., `const LOGIN = { email: process.env.EMAIL, pw: 'hardcoded' };` would pass).
 
-### Head Behaviour (this branch, commit `8bca0dfce5cd62357b5bb1cfc42cd2016360fdb5`)
+### Head Behaviour (this branch, commit `737bd818`)
 
 1. `find_hardcoded_credential_violations` accurately flags plaintext passwords (`password123`), template literals (`` `password123` ``), arbitrary passwords assigned in login/admin objects, sensitive login emails (`admin@mizano.com`), joined array obfuscations, and default fallback credentials in `process.env` lookups.
-2. All hardcoded fallback credentials removed from `e2e-army/104-smtp-rotation-stamp.e2e.ts`, `e2e-army/131-cross-tenant-delivery-challan.e2e.ts`, and `e2e-army/207-currency-fx-tenant-and-idempotency.e2e.ts`.
-3. `scripts/test_e2e_army_hygiene.py` runs all 24 unit and integration tests cleanly with exit code 0.
-4. `test_issue_378_evidence_contract` and all 12 tests in `scripts/test_evidence_freshness.py` pass with exit code 0.
-5. All 104 python tests in `scripts/test_*.py` pass cleanly.
-6. All specs in `e2e-army/` are sanitized and comply with credential hygiene rules.
+2. **Per-assignment detection**: Each `pw:`/`password:` assignment is checked individually. Hardcoded values mixed with `process.env` on the same line are flagged; pure `process.env` assignments pass.
+3. All hardcoded fallback credentials removed from `e2e-army/104-smtp-rotation-stamp.e2e.ts`, `e2e-army/131-cross-tenant-delivery-challan.e2e.ts`, and `e2e-army/207-currency-fx-tenant-and-idempotency.e2e.ts`.
+4. **NEW** `e2e-army/317-searchable-bill-options.e2e.ts` created with `LOGIN` sourced exclusively from `process.env` (no fallbacks), resolving the original PR #340 finding `7921754e38c2` for this file.
+5. `scripts/test_e2e_army_hygiene.py` runs all 26 unit and integration tests cleanly with exit code 0.
+6. `test_issue_378_evidence_contract` and all 12 tests in `scripts/test_evidence_freshness.py` pass with exit code 0.
+7. All specs in `e2e-army/` are sanitized and comply with credential hygiene rules.
 
 ---
 
