@@ -115,14 +115,17 @@ def find_hardcoded_credential_violations(content: str) -> list[tuple[int, str]]:
             violations.append((idx, line))
             continue
 
-        # If line dynamically sources from process.env without fallback credentials, it is compliant
-        if "process.env" in code_part:
-            continue
-
-        # 4. Generalised check: flag pw/password keys assigned to a non-process.env string or template literal
-        if PW_KEY_ASSIGNMENT_PATTERN.search(code_part):
+        # 4. Generalised check: flag pw/password keys assigned to a non-process.env string or template literal.
+        # Check each pw/password assignment individually to avoid missing hardcoded values mixed with process.env on the same line.
+        for pw_match in PW_KEY_ASSIGNMENT_PATTERN.finditer(code_part):
+            assignment = pw_match.group(0)
+            # If this specific assignment uses process.env, it's compliant
+            if "process.env" in assignment:
+                continue
+            # Otherwise, if we're in a LOGIN/ADMIN/CREDENTIALS context or login-related code, flag it
             if LOGIN_CREDENTIAL_OBJECT_PATTERN.search(code_part) or re.search(r"""\b(?:LOGIN|ADMIN)\b""", content):
                 violations.append((idx, line))
+                break  # One violation per line is enough
 
     return violations
 
@@ -357,6 +360,39 @@ test('@issue-317 AC1', { tags: ['feat:mz-purchase-bills', 'lvl:ui'] }, async ({ 
         self.assertEqual(violations[0][0], 5)
         self.assertIn("password123", violations[0][1])
 
+    def test_mixed_process_env_and_hardcoded_on_same_line_detected(self):
+        """Hardcoded pw/password on same line as process.env assignments are detected."""
+        # Simulates: const LOGIN = { email: process.env.EMAIL, pw: 'hardcoded' };
+        code = "const LOGIN = { email: process.env.E2E_LOGIN_EMAIL, pw: 'hardcodedSecret!' };"
+        violations = find_hardcoded_credential_violations(code)
+        self.assertEqual(len(violations), 1)
+        self.assertEqual(violations[0][0], 1)
+        self.assertIn("hardcodedSecret!", violations[0][1])
+
+        # Also test with password key
+        code2 = 'const ADMIN = { email: process.env.E2E_LOGIN_EMAIL, password: "hardcodedPass!" };'
+        violations2 = find_hardcoded_credential_violations(code2)
+        self.assertEqual(len(violations2), 1)
+        self.assertEqual(violations2[0][0], 1)
+        self.assertIn("hardcodedPass!", violations2[0][1])
+
+        # Template literal version
+        code3 = "const LOGIN = { email: process.env.E2E_LOGIN_EMAIL, pw: `hardcodedTemplate!` };"
+        violations3 = find_hardcoded_credential_violations(code3)
+        self.assertEqual(len(violations3), 1)
+        self.assertEqual(violations3[0][0], 1)
+        self.assertIn("hardcodedTemplate!", violations3[0][1])
+
+    def test_process_env_assignments_not_flagged(self):
+        """Assignments using process.env for pw/password are not flagged even on same line."""
+        code = "const LOGIN = { email: process.env.E2E_LOGIN_EMAIL, pw: process.env.E2E_LOGIN_PASSWORD };"
+        violations = find_hardcoded_credential_violations(code)
+        self.assertEqual(violations, [])
+
+        code2 = 'const ADMIN = { email: process.env.EMAIL, password: process.env.PASSWORD };'
+        violations2 = find_hardcoded_credential_violations(code2)
+        self.assertEqual(violations2, [])
+
 
 class E2EArmyRepositoryHygieneTests(unittest.TestCase):
     """Integration checks across actual files in e2e-army directory."""
@@ -462,10 +498,9 @@ class E2EArmyRepositoryHygieneTests(unittest.TestCase):
         self.assertGreater(login_specs_checked, 0, "Expected at least one spec in e2e-army that logs in")
 
     def test_317_e2e_no_hardcoded_credentials(self):
-        """e2e-army/317-searchable-bill-options.e2e.ts (if present) must not contain hard-coded credentials."""
+        """e2e-army/317-searchable-bill-options.e2e.ts must not contain hard-coded credentials."""
         test_file = E2E_ARMY_DIR / "317-searchable-bill-options.e2e.ts"
-        if not test_file.exists():
-            return
+        self.assertTrue(test_file.exists(), "317-searchable-bill-options.e2e.ts must exist")
         content = test_file.read_text(encoding="utf-8")
         violations = find_hardcoded_credential_violations(content)
         self.assertEqual(
