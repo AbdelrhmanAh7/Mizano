@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import enSales from '@/messages/en/sales.json';
 import arSales from '@/messages/ar/sales.json';
@@ -142,7 +142,7 @@ describe('CustomerForm localization and accessible labels (#372 QA finding regre
     });
   });
 
-  it('handles cancel and submit actions with localized button labels', async () => {
+  it('handles cancel and submit actions with localized button labels in English and Arabic', async () => {
     const handleCancel = jest.fn();
     const handleSubmit = jest.fn();
 
@@ -180,5 +180,32 @@ describe('CustomerForm localization and accessible labels (#372 QA finding regre
 
     expect(screen.getByRole('button', { name: 'إلغاء' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'تحديث العميل' })).toBeInTheDocument();
+  });
+
+  it('handles form submission with Arabic localized inputs and create button', async () => {
+    const onCancel = jest.fn();
+    const onSubmit = jest.fn();
+
+    testLocale = 'ar';
+    render(<CustomerForm onSubmit={onSubmit} onCancel={onCancel} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'إلغاء' }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(screen.getByLabelText('اسم العميل'), {
+      target: { value: 'شركة النيل للتجارة' },
+    });
+    fireEvent.change(screen.getByLabelText('شارع الفوترة'), {
+      target: { value: 'شارع التحرير' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'إنشاء عميل' }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'شركة النيل للتجارة',
+        billingStreet: 'شارع التحرير',
+      }),
+    );
   });
 });
