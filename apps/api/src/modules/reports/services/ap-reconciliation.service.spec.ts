@@ -299,6 +299,14 @@ describe('@issue-320 ApReconciliationService.reconcileApControl', () => {
     );
   });
 
+  it('is a complete class definition with properly closed methods and constructor', () => {
+    expect(typeof ApReconciliationService).toBe('function');
+    expect(ApReconciliationService.prototype.reconcileApControl).toBeDefined();
+    const instance = new ApReconciliationService({} as any);
+    expect(instance).toBeInstanceOf(ApReconciliationService);
+    expect(typeof instance.reconcileApControl).toBe('function');
+  });
+
   describe('AP control account discovery filtering (CTO P2)', () => {
     it('(a) a bill with a discount or negative line crediting an expense account leaves controlBalance unchanged', async () => {
       const { tx, service } = setup({

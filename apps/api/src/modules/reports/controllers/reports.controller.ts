@@ -1,10 +1,11 @@
 import { Controller, Get, Param, Query, Res, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { CacheResponse, CacheTTL, CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { PdfService } from '../../documents/services/pdf.service';
+import { ApReconciliationResponseDto } from '../dto/ap-reconciliation.dto';
 import { AgingReportsService } from '../services/aging-reports.service';
 import { ApReconciliationService } from '../services/ap-reconciliation.service';
 import { DashboardService } from '../services/dashboard.service';
@@ -546,6 +547,29 @@ export class ReportsController {
     summary: 'Reconcile the AP subledger with the AP control account (read-only backend API)',
     description:
       'Returns subledgerTotal, controlBalance, difference, and ok status as of date. Backend REST API only; no web UI.',
+  })
+  @ApiQuery({
+    name: 'asOf',
+    required: false,
+    description: 'Cutoff date (YYYY-MM-DD)',
+    example: '2026-10-23',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'AP subledger vs control account reconciliation summary',
+    type: ApReconciliationResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - invalid date parameter format',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid or missing bearer token',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - requires reports.view permission',
   })
   getApReconciliation(@CurrentOrg() orgId: string, @Query('asOf') asOf?: string) {
     return this.apReconciliationService.reconcileApControl(orgId, asOf);

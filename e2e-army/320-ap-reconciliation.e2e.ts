@@ -26,6 +26,7 @@ function login(root: string): Promise<string> {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password }),
+    signal: AbortSignal.timeout(15_000),
   }).then(async (res) => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { tokens: { accessToken: string } };
@@ -39,6 +40,7 @@ const cents = (value: string): bigint => BigInt(value.replace('.', ''));
 async function reconcile(root: string, asOf: string): Promise<Reconciliation> {
   const res = await fetch(`${root}/reports/reconciliation/ap?asOf=${asOf}`, {
     headers: { authorization: `Bearer ${await login(root)}` },
+    signal: AbortSignal.timeout(15_000),
   });
   expect(res.status).toBe(200);
   return (await res.json()) as Reconciliation;
@@ -80,9 +82,12 @@ test(
     const root = apiRoot(app.baseUrl);
     const bad = await fetch(`${root}/reports/reconciliation/ap?asOf=2026-02-30`, {
       headers: { authorization: `Bearer ${await login(root)}` },
+      signal: AbortSignal.timeout(15_000),
     });
     expect(bad.status).toBe(400);
-    const anonymous = await fetch(`${root}/reports/reconciliation/ap?asOf=2026-03-31`);
+    const anonymous = await fetch(`${root}/reports/reconciliation/ap?asOf=2026-03-31`, {
+      signal: AbortSignal.timeout(15_000),
+    });
     expect(anonymous.status).toBe(401);
   },
 );

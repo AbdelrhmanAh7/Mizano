@@ -250,9 +250,15 @@ export class ApReconciliationService {
     ]);
 
     const accountIds = new Set(used.map((l) => l.accountId));
-    if (org?.defaultApAccountId) accountIds.add(org.defaultApAccountId);
-    if (org?.defaultVatPayableAccountId) accountIds.delete(org.defaultVatPayableAccountId);
-    if (accountIds.size === 0) return { balance: new Wide(0), currencyCode };
+    if (org?.defaultApAccountId) {
+      accountIds.add(org.defaultApAccountId);
+    }
+    if (org?.defaultVatPayableAccountId) {
+      accountIds.delete(org.defaultVatPayableAccountId);
+    }
+    if (accountIds.size === 0) {
+      return { balance: new Wide(0), currencyCode };
+    }
 
     const totals = await sumPostedLinesByAccount(
       tx as ReportPrisma,
@@ -261,7 +267,9 @@ export class ApReconciliationService {
       [...accountIds],
     );
     let balance: Decimal = new Wide(0);
-    for (const t of totals.values()) balance = balance.add(wide(t.credit)).sub(wide(t.debit));
+    for (const t of totals.values()) {
+      balance = balance.add(wide(t.credit)).sub(wide(t.debit));
+    }
     return { balance, currencyCode };
   }
 }
