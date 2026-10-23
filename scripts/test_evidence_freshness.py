@@ -595,6 +595,24 @@ class EvidenceFreshnessTests(unittest.TestCase):
         ac5_violations = validate_evidence_ac5(content)
         self.assertEqual(ac5_violations, [], f"AC5 violations: {ac5_violations}")
 
+    def test_issue_306_evidence_contract(self):
+        """docs/evidence/306/EVIDENCE.md must exist and define AC1-AC5 with exit codes."""
+        evidence_306 = EVIDENCE_DIR / "306" / "EVIDENCE.md"
+        self.assertTrue(evidence_306.exists(), "docs/evidence/306/EVIDENCE.md must exist")
+        content = evidence_306.read_text(encoding="utf-8")
+        self.assertIn("AC1", content)
+        self.assertIn("AC2", content)
+        self.assertIn("AC3", content)
+        self.assertIn("AC4", content)
+        self.assertIn("AC5", content)
+        self.assertIn("Exit Code", content)
+        head_violations = validate_tested_head_binding(content, expected_head_sha="9df9b0e0")
+        self.assertEqual(head_violations, [], f"Tested head binding violations: {head_violations}")
+        status_violations = validate_evidence_table_status(content)
+        self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
+        ac5_violations = validate_evidence_ac5(content)
+        self.assertEqual(ac5_violations, [], f"AC5 violations: {ac5_violations}")
+
     def test_cli_validation_mode_succeeds_on_compliant_file(self):
         """CLI mode validates compliant evidence file and outputs PASS with exit code 0."""
         import subprocess
