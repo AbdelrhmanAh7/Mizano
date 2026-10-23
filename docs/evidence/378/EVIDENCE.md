@@ -5,9 +5,9 @@ This document provides verification evidence for GitHub issue #378 in `Abdelrhma
 - **Issue**: [#378](https://github.com/AbdelrhmanAh7/Mizano/issues/378)
 - **PR**: Supersedes part of #340
 - **Parent Issue**: #317
-- **Base Commit (`origin/master`)**: `bf3f67a80294e9c79f1bb5bfab65ac637e21658a`
-- **Tested Head Commit**: `83922646f8be07a38388e9245d6ca206022b2c6d`
-- **Tested Branch**: `ai/378-p2`
+- **Base Commit (`origin/master`)**: `8b89a7554ff33f164ee86693e653b303d1b7ab23`
+- **Tested Head Commit**: `252ca283190c8faeea3b44fba2907ab9e1728623`
+- **Tested Branch**: `ai/378`
 - **Originating Sentry Issue**: None (originates from review finding `7921754e38c2` / comment 6308811548 on PR #340 / parent issue #317).
 - **Host Environment**: Darwin arm64 (macOS), Python 3.14.8, Node.js v20.18.0, pnpm 8.14.0.
 - **User-facing flow / E2E**: Not user-facing (`E2E: not needed — internal test suite hygiene / hardcoded credentials detection and prevention in e2e test files; no user-facing flows modified.`).
@@ -170,7 +170,7 @@ In Round 2 review, QA flagged three major recurring findings:
      ```
    - **Detector loophole**: The blanket `process.env` check allowed hardcoded `pw:`/`password:` values on the same line as `process.env` assignments to go undetected (e.g., `const LOGIN = { email: process.env.EMAIL, pw: 'hardcoded' };` would pass).
 
-### Head Behaviour (this branch, commit `83922646f8be07a38388e9245d6ca206022b2c6d`)
+### Head Behaviour (this branch, commit `252ca283190c8faeea3b44fba2907ab9e1728623`)
 
 1. `find_hardcoded_credential_violations` accurately flags plaintext passwords (`password123`), template literals (`` `password123` ``), arbitrary passwords assigned in login/admin objects, sensitive login emails (`admin@mizano.com`), joined array obfuscations, and default fallback credentials in `process.env` lookups.
 2. **Per-assignment detection**: Each `pw:`/`password:` assignment is checked individually. Hardcoded values mixed with `process.env` on the same line are flagged; pure `process.env` assignments pass.
@@ -181,7 +181,7 @@ In Round 2 review, QA flagged three major recurring findings:
 7. **UPDATED** `test_e2e_login_specs_source_credentials_from_env` and `test_317_e2e_no_hardcoded_credentials` to verify credential sourcing via helper utilities.
 8. **NEW** `test_credential_helper_sources_from_env_without_fallbacks` and `test_credential_helper_runtime_behavior` proving the helper is clean and functions correctly.
 9. `scripts/test_e2e_army_hygiene.py` runs all 28 unit and integration tests cleanly with exit code 0.
-10. `test_issue_378_evidence_contract` and all 12 tests in `scripts/test_evidence_freshness.py` pass with exit code 0.
+10. `test_issue_378_evidence_contract` and all 13 tests in `scripts/test_evidence_freshness.py` pass with exit code 0.
 11. All specs in `e2e-army/` are sanitized and comply with credential hygiene rules.
 
 ---
