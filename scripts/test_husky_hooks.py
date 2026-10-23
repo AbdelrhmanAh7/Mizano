@@ -126,9 +126,9 @@ class PrePushHookTests(unittest.TestCase):
         return git(self.repo, "rev-parse", "HEAD")
 
     def push(self, lines, **env):
-        clean = _git_env()
-        clean.pop("SKIP_LOCAL_CI", None)
-        clean.update(env)
+        clean = _git_env(env)
+        if "SKIP_LOCAL_CI" not in env:
+            clean.pop("SKIP_LOCAL_CI", None)
         stdin = "".join(f"{line}\n" for line in lines)
         result = subprocess.run(
             ["sh", str(self.repo / ".husky" / "pre-push"), "origin", "url"],
@@ -319,6 +319,33 @@ class PreCommitHookTests(unittest.TestCase):
 
         unstaged = git(self.repo, "diff", "--name-only").split()
         self.assertIn("partial.md", unstaged, "Partially staged file had its unstaged hunks staged")
+
+    def test_run_hook_isolates_from_inherited_git_env_with_decoy(self):
+        decoy = self.tmp / "decoy_precommit"
+        decoy.mkdir()
+        git(decoy, "init", "-q", "-b", "master")
+        git(decoy, "config", "user.email", "d@example.com")
+        git(decoy, "config", "user.name", "d")
+        git(decoy, "config", "commit.gpgsign", "false")
+        (decoy / "decoy.txt").write_text("decoy content")
+        git(decoy, "add", "decoy.txt")
+        git(decoy, "commit", "-q", "-m", "decoy commit")
+        decoy_head = git(decoy, "rev-parse", "HEAD")
+        decoy_index = (decoy / ".git" / "index").read_bytes()
+
+        decoy_env = {
+            "GIT_DIR": str(decoy / ".git"),
+            "GIT_WORK_TREE": str(decoy),
+            "GIT_INDEX_FILE": str(decoy / ".git" / "index"),
+            "GIT_COMMON_DIR": str(decoy / ".git"),
+            "MIZANO_TEST_SENTINEL": "precommit-sentinel",
+        }
+        with mock.patch.dict(os.environ, decoy_env):
+            result = self.run_hook()
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(self.log.read_text().split(), ["staged.md"])
+            self.assertEqual(git(decoy, "rev-parse", "HEAD"), decoy_head)
+            self.assertEqual((decoy / ".git" / "index").read_bytes(), decoy_index)
 
 
 class GitEnvironmentIsolationTests(unittest.TestCase):
