@@ -112,9 +112,9 @@ export function BillForm({
   extractedTotals,
 }: BillFormProps) {
   const isEditing = !!bill;
+  const tForm = useTranslations('purchases.bills.form');
   const tValidation = useTranslations('purchases.bills.validation');
   const tIntake = useTranslations('ai.intake');
-  const tForm = useTranslations('purchases.bills.form');
   const { data: vendorsData } = useVendors({ limit: 100 });
   const vendors = useMemo(() => vendorsData?.data || [], [vendorsData?.data]);
 
@@ -261,7 +261,7 @@ export function BillForm({
       {/* Bill Info */}
       <Card>
         <CardHeader>
-          <CardTitle>{tForm('billInfo')}</CardTitle>
+          <CardTitle>{tForm('billInformation')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -331,10 +331,10 @@ export function BillForm({
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select currency" />
+                  <SelectValue placeholder={tForm('currency')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="default">Default</SelectItem>
+                  <SelectItem value="default">{tForm('defaultCurrency')}</SelectItem>
                   <SelectItem value="USD">USD — US Dollar</SelectItem>
                   <SelectItem value="EUR">EUR — Euro</SelectItem>
                   <SelectItem value="EGP">EGP — Egyptian Pound</SelectItem>
@@ -348,7 +348,7 @@ export function BillForm({
             {/* Project */}
             {projects.length > 0 && (
               <div className="space-y-2">
-                <Label htmlFor="projectId">Project (Optional)</Label>
+                <Label htmlFor="projectId">{tForm('project')}</Label>
                 <Select
                   value={form.watch('projectId') || ''}
                   onValueChange={(value) =>
@@ -356,7 +356,7 @@ export function BillForm({
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select project" />
+                    <SelectValue placeholder={tForm('selectProject')} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No Project</SelectItem>
@@ -382,13 +382,13 @@ export function BillForm({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[200px]">Item/Account</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="w-[80px]">Qty</TableHead>
-                <TableHead className="w-[110px]">Unit Price</TableHead>
-                <TableHead className="w-[110px] text-right">Amount</TableHead>
-                <TableHead className="w-[100px]">Tax %</TableHead>
-                <TableHead className="w-[110px] text-right">Total</TableHead>
+                <TableHead className="w-[200px]">{tForm('item')}</TableHead>
+                <TableHead>{tForm('description')}</TableHead>
+                <TableHead className="w-[80px]">{tForm('qty')}</TableHead>
+                <TableHead className="w-[110px]">{tForm('rate')}</TableHead>
+                <TableHead className="w-[110px] text-right">{tForm('amount')}</TableHead>
+                <TableHead className="w-[100px]">{tForm('taxRate')}</TableHead>
+                <TableHead className="w-[110px] text-right">{tForm('total')}</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
