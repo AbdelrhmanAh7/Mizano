@@ -11,7 +11,7 @@ This document provides verification evidence for GitHub issue #381 in `Abdelrhma
 - **Originating Sentry Issue**: None (originates from review finding `0b2495908c2c` on PR #288 / parent issue #212).
 - **Host Environment**: Darwin arm64 (macOS), Node.js v20+, pnpm 8.14.0, Python 3.14.8.
 - **User-facing flow / E2E**: User-facing API endpoint covered by `e2e-army/381-delivery-challan-scoping.e2e.ts` (`@issue-381 AC1 AC2: delivery challan update outside org or non-existent returns 404 with no writes`).
-- **Skills Used**: `model-effort-routing`, `systematic-debugging`, `test-driven-development`, `verification-before-completion`.
+- **Skills Used**: `gh-stack`, `model-effort-routing`, `systematic-debugging`, `test-driven-development`, `verification-before-completion`.
 - **Model and Effort**: `Tool: Antigravity (agy) · Model: Gemini 3.8 Flash · Effort: Medium · Why: Delivery challan update transition error handling, expectNoWrites assertion, unit tests, and verification report for issue #381`.
 
 ---
@@ -66,13 +66,13 @@ In PR #288 (split from parent issue #212), code review finding `0b2495908c2c` fl
 
 ## Verification Matrix
 
-| AC ID   | Requirement Description                        | Verification Method / Command                                                                                                                                                                                                                                                                                                            | Observed Result     | Exit Code | Status     |
-| :------ | :--------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------ | :-------- | :--------- |
-| **AC1** | 404 on missing row and 400 on non-draft status | `pnpm --filter api exec jest -t "answers 404 and writes no lines when the guarded update finds no row in the org\|answers 400 when the guarded update finds the challan already ISSUED" apps/api/src/modules/sales/services/delivery-challans.service.spec.ts`                                                                           | 2 passed, 0 failed  | 0         | **PASSED** |
-| **AC2** | Exception resolution via `rejectTransition`    | `pnpm --filter api exec jest -t "rejects with 409 and writes no lines when the challan is no longer DRAFT\|answers 404 and writes no lines when the guarded update finds no row in the org\|answers 400 when the guarded update finds the challan already ISSUED" apps/api/src/modules/sales/services/delivery-challans.service.spec.ts` | 3 passed, 0 failed  | 0         | **PASSED** |
-| **AC3** | Multi-row guarded update conflict handling     | `pnpm --filter api exec jest -t "rejects and writes no lines when the guarded update matches more than one row" apps/api/src/modules/sales/services/delivery-challans.service.spec.ts`                                                                                                                                                   | 1 passed, 0 failed  | 0         | **PASSED** |
-| **AC4** | `expectNoWrites` asserts no database writes    | `pnpm --filter api exec jest -t "rejects a (customer\|invoice\|item\|warehouse) outside the org before writing" apps/api/src/modules/sales/services/delivery-challans.service.spec.ts`                                                                                                                                                   | 4 passed, 0 failed  | 0         | **PASSED** |
-| **AC5** | All 26 delivery challans service tests pass    | `pnpm --filter api exec jest apps/api/src/modules/sales/services/delivery-challans.service.spec.ts`                                                                                                                                                                                                                                      | 26 passed, 0 failed | 0         | **PASSED** |
+| AC ID | Requirement Description | Verification Method / Command | Observed Result | Exit Code | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **AC1** | 404 on missing row and 400 on non-draft status | `pnpm --filter api exec jest -t "answers 404 and writes no lines when the guarded update finds no row in the org\|answers 400 when the guarded update finds the challan already ISSUED" apps/api/src/modules/sales/services/delivery-challans.service.spec.ts` | 2 passed, 0 failed | 0 | **PASSED** |
+| **AC2** | Exception resolution via `rejectTransition` | `pnpm --filter api exec jest -t "rejects with 409 and writes no lines when the challan is no longer DRAFT\|answers 404 and writes no lines when the guarded update finds no row in the org\|answers 400 when the guarded update finds the challan already ISSUED" apps/api/src/modules/sales/services/delivery-challans.service.spec.ts` | 3 passed, 0 failed | 0 | **PASSED** |
+| **AC3** | Multi-row guarded update conflict handling | `pnpm --filter api exec jest -t "rejects and writes no lines when the guarded update matches more than one row" apps/api/src/modules/sales/services/delivery-challans.service.spec.ts` | 1 passed, 0 failed | 0 | **PASSED** |
+| **AC4** | `expectNoWrites` asserts no database writes | `pnpm --filter api exec jest -t "rejects a (customer\|invoice\|item\|warehouse) outside the org before writing" apps/api/src/modules/sales/services/delivery-challans.service.spec.ts` | 4 passed, 0 failed | 0 | **PASSED** |
+| **AC5** | All 26 delivery challans service tests pass | `pnpm --filter api exec jest apps/api/src/modules/sales/services/delivery-challans.service.spec.ts` | 26 passed, 0 failed | 0 | **PASSED** |
 
 ---
 
@@ -97,13 +97,10 @@ In PR #288 (split from parent issue #212), code review finding `0b2495908c2c` fl
 On base before this fix, `DeliveryChallansService.update` threw a generic `ConflictException('Only draft challans can be updated')`:
 
 1. When the guarded update found no row in the organization, running:
-
    ```bash
    pnpm --filter api exec jest -t "answers 404 and writes no lines when the guarded update finds no row in the org" apps/api/src/modules/sales/services/delivery-challans.service.spec.ts
    ```
-
    failed with:
-
    ```text
    ● DeliveryChallansService tenant scoping (#131) › update › answers 404 and writes no lines when the guarded update finds no row in the org
 
@@ -119,15 +116,11 @@ On base before this fix, `DeliveryChallansService.update` threw a generic `Confl
                |               ^
            169 |       }
    ```
-
 2. When the guarded update found the challan already in `ISSUED` status, running:
-
    ```bash
    pnpm --filter api exec jest -t "answers 400 when the guarded update finds the challan already ISSUED" apps/api/src/modules/sales/services/delivery-challans.service.spec.ts
    ```
-
    failed with:
-
    ```text
    ● DeliveryChallansService tenant scoping (#131) › update › answers 400 when the guarded update finds the challan already ISSUED
 
@@ -141,7 +134,6 @@ On base before this fix, `DeliveryChallansService.update` threw a generic `Confl
 ### Head Behaviour (`879f1e03b4498bc3faa29d3d357622dc4b55f605`)
 
 With the fix in `delivery-challans.service.ts`:
-
 1. `DeliveryChallansService.update` delegates to `this.rejectTransition(tx, organizationId, id, ChallanStatus.DRAFT, 'Only draft challans can be updated')`.
 2. A missing challan row in the organization throws `NotFoundException` (404).
 3. A non-draft challan row throws `BadRequestException` (400).
@@ -160,3 +152,13 @@ With the fix in `delivery-challans.service.ts`:
 
 - This issue modifies backend business logic (`apps/api/src/modules/sales/services/delivery-challans.service.ts`), backend unit tests (`apps/api/src/modules/sales/services/delivery-challans.service.spec.ts`), an API-level e2e-army test (`e2e-army/381-delivery-challan-scoping.e2e.ts`), and verification evidence documentation.
 - No frontend UI components, screens, styling, or localized text are altered.
+
+---
+
+## Skills Used
+
+- `gh-stack`: Resolved rebase conflict cleanly preserving intent of both layers in the stack.
+- `model-effort-routing`: Explicitly recorded Tool + Model + Effort for all steps.
+- `systematic-debugging`: Identified root cause of status code leaking and lack of transaction/write assertion coverage in delivery-challan update.
+- `test-driven-development`: Added tests expecting `NotFoundException` (404), `BadRequestException` (400), and `expectNoWrites` before verifying service behavior.
+- `verification-before-completion`: Executed Jest unit test suite, TypeScript typecheck, ESLint, and Python evidence freshness test suite, verifying all checks exit 0.
