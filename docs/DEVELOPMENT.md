@@ -7,7 +7,7 @@ Setup, environments, database, testing, CI, git workflow and deployment for Miza
 - Node 20 (CI and Docker images use Node 20; `engines` allows >=18)
 - pnpm 8.14 via `corepack enable` (pinned in `packageManager`)
 - Docker with Compose for PostgreSQL 16 and Redis 7
-- Python 3 only for the planning scripts in `scripts/`
+- Python 3 only for the offline test scripts in `scripts/`
 
 ## Quick start
 
@@ -105,13 +105,13 @@ Troubleshooting: `docker ps` to confirm `mizano-postgres`/`mizano-redis`, `redis
 
 ## Testing
 
-| Layer          | Location                                                   | Run                                                     |
-| -------------- | ---------------------------------------------------------- | ------------------------------------------------------- |
-| API unit       | `apps/api/src/**/*.spec.ts`                                | `node apps/api/_run_tests.js [--testPathPattern=…]`     |
-| Web unit       | `apps/web/**/*.spec.ts(x)` (Jest + Testing Library, jsdom) | `cd apps/web && npx jest [--testPathPattern=…]`         |
-| API E2E        | `apps/api/test/*.e2e-spec.ts` (supertest, `jest-e2e.json`) | `pnpm test:e2e` against a seeded database               |
-| Browser E2E    | not wired yet                                              | tracked by the seeded API/browser journey issue         |
-| Planning tools | `scripts/test_*.py`                                        | `python -m unittest discover -s scripts -p 'test_*.py'` |
+| Layer          | Location                                                   | Run                                                      |
+| -------------- | ---------------------------------------------------------- | -------------------------------------------------------- |
+| API unit       | `apps/api/src/**/*.spec.ts`                                | `node apps/api/_run_tests.js [--testPathPattern=…]`      |
+| Web unit       | `apps/web/**/*.spec.ts(x)` (Jest + Testing Library, jsdom) | `cd apps/web && npx jest [--testPathPattern=…]`          |
+| API E2E        | `apps/api/test/*.e2e-spec.ts` (supertest, `jest-e2e.json`) | `pnpm test:e2e` against a seeded database                |
+| Browser E2E    | not wired yet                                              | tracked by the seeded API/browser journey issue          |
+| Planning tools | `scripts/test_*.py`                                        | `python3 -m unittest discover -s scripts -p 'test_*.py'` |
 
 `_run_tests.js`, `_jest.config.js` and `_jest_resolver.js` make the API suite resolve pnpm's store on Windows/WSL; use them instead of calling Jest directly.
 
@@ -146,12 +146,10 @@ Rules:
 
 Checks on PRs and pushes to `master`, by source:
 
-- **`.github/workflows/ci.yml` (GitHub-hosted runners):** runs on pushes to `master` and on PRs to `master`/`develop`, on GitHub-hosted runners only (`ubuntu-latest`; free and unlimited because the repository is public; no self-hosted labels, no secrets beyond `GITHUB_TOKEN`). Four independent parallel jobs, each limited to 5 minutes (`timeout-minutes: 5`; split a job rather than raising the limit): **Install Dependencies** (pnpm 8, Node 20, `prisma generate`), **Lint & Type Check**, **Unit Tests** (PostgreSQL 16 and Redis 7 service containers, `db:push`) and **Build**. Their names are the check names the automerge gates wait for, so keep them stable. A newer push to a PR cancels its older run. The workflow uses `pull_request` (never `pull_request_target`); fork PRs run only after approval in the repository settings. E2E is not part of this workflow. `deploy.yml` stays disabled (it needs deployment secrets).
-- **Hub `localci` job (Mac mini):** runs the full CI (`pnpm ci:full`: lint, type-check, test, build) locally and posts GitHub commit statuses under the same job names, so the gates see the same check names whichever runner produced them.
+- **`.github/workflows/ci.yml` (GitHub-hosted runners):** runs on pushes to `master` and on PRs to `master`/`develop`, on GitHub-hosted runners only (`ubuntu-latest`; free and unlimited because the repository is public; no self-hosted labels, no secrets beyond `GITHUB_TOKEN`). Four independent parallel jobs, each limited to 5 minutes (`timeout-minutes: 5`; split a job rather than raising the limit): **Install Dependencies** (pnpm 8, Node 20, `prisma generate`), **Lint & Type Check**, **Unit Tests** (mock-only: unit tests mock Prisma and Redis with no external services) and **Build**. Their names are the check names the automerge gates wait for, so keep them stable. A newer push to a PR cancels its older run. The workflow uses `pull_request` (never `pull_request_target`); whether fork PRs need approval before running depends on the repository or organization GitHub Actions policy (by default, approval is required for first-time contributors). E2E is not part of this workflow. The old `deploy.yml` (GCP VM), `ai-implementers.yml` (replaced by the hub) and `demo-planning.yml` workflows were removed in the 2026-10 slim-down ([slimdown-plan.md](slimdown-plan.md)); they remain in git history and in tag `archive/pre-slimdown-2026-10-10`.
+- **Hub `localci` job (Mac mini):** runs the full CI (`pnpm ci:full`: lint, type-check, and tests) locally and posts GitHub commit statuses under the same job names, so the gates see the same check names whichever runner produced them. `pnpm build` runs separately.
 - **`e2e-army` status (hub verify suite):** feature-level E2E for the features a PR touches, run by the hub against a throwaway environment; it is a separate commit status, not a job in `ci.yml`.
 - **Local pre-push hook:** only fast checks (`turbo run type-check test --filter=...[<base>]`, see Git workflow below); full CI, build and E2E are left to the sources above.
-
-`.github/workflows/demo-planning.yml` validates and syncs `docs/planning/` metadata with `scripts/sync-demo-planning.py`; see the [planning guide](planning/README.md).
 
 Zero-tolerance policy: `pnpm ci:full` must pass with no warnings or errors (no `any`, no unused symbols, no `console.log` in the API, explicit return types on exports, no unexplained `eslint-disable`/`@ts-ignore`, floating promises handled).
 
@@ -164,17 +162,7 @@ Zero-tolerance policy: `pnpm ci:full` must pass with no warnings or errors (no `
 
 ## Deployment
 
-**Production pipeline** (`.github/workflows/deploy.yml`): after CI succeeds on `master` (or on release/manual dispatch) it
-
-1. skips the rollout only for the reviewed planning-only paths in `docs/planning/rollout-exemption.json`;
-2. builds `apps/api/Dockerfile` and `apps/web/Dockerfile`, pushing `ghcr.io/abdelrhmanah7/mizano-{api,web}` tagged with the short SHA and `latest`;
-3. copies `docker-compose.production.yml`, `apps/api/prisma/` and `nginx/` to the VM, writes `~/mizano/.env` from repository secrets;
-4. starts PostgreSQL/Redis, syncs the DB password, restarts `api`, `web`, `nginx`, then runs `prisma migrate deploy` and the seed (which aborts with exit 1 under `NODE_ENV=production` unless `SEED_ALLOW_PROD=1`, so demo users are never created in production by accident);
-5. checks `GET /api/health` over SSH.
-
-Required secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `PRODUCTION_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `NEXTAUTH_SECRET`.
-
-The workflow still pulls an Ollama vision model on the host; the CPU-only demo mandate replaces that through the deployment/runtime issues (immutable digest deploys, restore and rollback evidence). Never report a deployment as verified without health and acceptance evidence for the exact SHA.
+**Production today** is the Mac mini: the Thoth hub serves immutable release directories (web 5001 → tailnet :8446, API 6001) through launchd; deploys are the hub's release job, not a GitHub workflow. The former GCP pipeline (`deploy.yml`) and Raspberry Pi deployment assets were retired (owner, 2026-10-10: all projects moved off the Pi) and live on in git history and tag `archive/pre-slimdown-2026-10-10`, while `deploy/pi/README.md` remains retained in the repository for reference.
 
 **Production stack** (`docker-compose.production.yml`): `api` (6001), `web` (5001, standalone Next.js), `postgres` (5432), `redis` (6379, AOF), `nginx` (80/443 using `nginx/nginx.conf`) and optional `certbot` (`--profile with-nginx`). Manual equivalent: `pnpm docker:prod` with `.env.prod`; stop with `pnpm docker:prod:down`.
 
@@ -183,5 +171,3 @@ The workflow still pulls an Ollama vision model on the host; the CPU-only demo m
 **Operations.** Back up PostgreSQL daily, for example `docker exec mizano-postgres pg_dump -U mizano mizano_db | gzip > /backups/mizano-$(date +%Y%m%d).sql.gz`, and keep uploaded originals with the same retention. Generate secrets with `openssl rand -base64 48`; never commit them or paste them into issues.
 
 Historical VPS sizing and provider notes: [archive/deployment-requirements-2026-03.md](archive/deployment-requirements-2026-03.md).
-
-**Raspberry Pi 5.** The tiny live deployment (compose, Cloudflare Tunnel, digest deploys, encrypted backups, monitoring) is documented in [deploy/pi/README.md](../deploy/pi/README.md).
