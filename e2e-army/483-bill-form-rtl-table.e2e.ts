@@ -1,14 +1,5 @@
 import { test } from '@e2e-dev/web';
 import { expect } from 'e2e';
-import fs from 'fs';
-import path from 'path';
-
-// Load Arabic labels from the application's message catalog
-const arPurchasesPath = path.resolve(
-  process.cwd(),
-  'apps/web/messages/ar/purchases.json',
-);
-const arPurchases = JSON.parse(fs.readFileSync(arPurchasesPath, 'utf-8'));
 
 const SEED = 'army-483';
 const LOGIN = {
