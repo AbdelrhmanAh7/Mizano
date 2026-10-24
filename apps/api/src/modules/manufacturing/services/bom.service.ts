@@ -37,10 +37,11 @@ export class BomService {
     });
     if (!outputItem) throw new NotFoundException('Output item not found');
 
-    // Check for existing active BOM for this item
-    if (dto.isActive) {
+    // Check for existing active BOM for this item. A BOM is active unless the caller
+    // says otherwise (see isActive below), so an omitted flag must be checked too.
+    if (dto.isActive ?? true) {
       const existing = await this.prisma.bOM.findFirst({
-        where: { outputItemId: dto.outputItemId, organizationId, isActive: true },
+        where: { outputItemId: dto.outputItemId, organizationId, isActive: true, deletedAt: null },
       });
       if (existing) {
         throw new BadRequestException('An active BOM already exists for this item');

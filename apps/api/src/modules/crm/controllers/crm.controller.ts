@@ -12,7 +12,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
-import { DealStage } from '@prisma/client';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
@@ -24,12 +23,8 @@ import {
   ActivityQueryDto,
   CreateActivityDto,
 } from '../services/activities.service';
-import {
-  CreateDealDto,
-  DealQueryDto,
-  DealsService,
-  UpdateDealDto,
-} from '../services/deals.service';
+import { CreateDealDto, UpdateDealDto, UpdateDealStageDto } from '../dto/deal.dto';
+import { DealQueryDto, DealsService } from '../services/deals.service';
 import {
   CreateLeadDto,
   LeadQueryDto,
@@ -230,7 +225,7 @@ export class CrmController {
   updateDealStage(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
-    @Body() dto: { stage: DealStage },
+    @Body() dto: UpdateDealStageDto,
   ) {
     return this.dealsService.updateStage(orgId, id, dto.stage);
   }

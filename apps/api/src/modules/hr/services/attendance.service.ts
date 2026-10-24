@@ -160,14 +160,19 @@ export class AttendanceService {
   async getAttendanceByEmployee(
     organizationId: string,
     employeeId: string,
-    startDate: string,
-    endDate: string,
+    startDate?: string,
+    endDate?: string,
   ) {
+    // Both bounds are optional: `new Date(undefined)` is an Invalid Date, which
+    // Prisma rejects (HTTP 400) when a caller lists an employee without a range.
+    const date: Prisma.DateTimeFilter = {};
+    if (startDate) date.gte = new Date(startDate);
+    if (endDate) date.lte = new Date(endDate);
     return this.prisma.attendance.findMany({
       where: {
         employeeId,
         organizationId,
-        date: { gte: new Date(startDate), lte: new Date(endDate) },
+        ...(Object.keys(date).length > 0 ? { date } : {}),
       },
       orderBy: { date: 'desc' },
     });
