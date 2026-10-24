@@ -384,9 +384,10 @@
     "account": "Account",
     "description": "Description",
     "quantity": "Qty",
-    "rate": "Rate",
-    "tax": "Tax",
-    "amount": "Amount"
+    "rate": "Unit Price",
+    "tax": "Tax %",
+    "amount": "Amount",
+    "total": "Total"
   },
   "overview": {
     "quickActions": "Quick Actions",

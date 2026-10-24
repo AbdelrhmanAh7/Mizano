@@ -384,9 +384,10 @@
     "account": "الحساب",
     "description": "الوصف",
     "quantity": "الكمية",
-    "rate": "السعر",
-    "tax": "الضريبة",
-    "amount": "المبلغ"
+    "rate": "سعر الوحدة",
+    "tax": "% الضريبة",
+    "amount": "المبلغ",
+    "total": "الإجمالي"
   },
   "overview": {
     "quickActions": "إجراءات سريعة",
