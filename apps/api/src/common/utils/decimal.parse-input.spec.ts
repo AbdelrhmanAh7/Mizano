@@ -7,9 +7,16 @@ describe('DecimalUtils.parseInput', () => {
     'rejects %p with a 400 that names the field',
     (value) => {
       expect(() => DecimalUtils.parseInput(value as string, 'rate')).toThrow(BadRequestException);
-      expect(() => DecimalUtils.parseInput(value as string, 'rate')).toThrow(
-        'rate must be a valid number',
-      );
+      try {
+        DecimalUtils.parseInput(value as string, 'rate');
+        throw new Error('expected parseInput to throw');
+      } catch (e) {
+        expect((e as BadRequestException).getResponse()).toMatchObject({
+          code: 'VALIDATION_ERROR',
+          message: 'Validation Failed',
+          errors: { rate: ['rate must be a valid number'] },
+        });
+      }
     },
   );
 

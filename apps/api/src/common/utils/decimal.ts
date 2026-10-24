@@ -39,7 +39,12 @@ export class DecimalUtils {
     } catch {
       // fall through to the validation error below
     }
-    throw new BadRequestException(`${field} must be a valid number`);
+    throw new BadRequestException({
+      statusCode: 400,
+      code: 'VALIDATION_ERROR',
+      message: 'Validation Failed',
+      errors: { [field]: [`${field} must be a valid number`] },
+    });
   }
 
   /** Sum an array of Decimal-like values. */

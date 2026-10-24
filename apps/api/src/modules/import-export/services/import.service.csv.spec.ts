@@ -2,6 +2,12 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { createMockPrisma } from '../../../test/mocks/prisma.mock';
 import { ImportService } from './import.service';
 
+// Mirror the swc build, where `import * as csv` is a non-callable wrapper and the parser is on `default`.
+jest.mock('csv-parser', () => {
+  const parser = jest.requireActual<(...args: unknown[]) => unknown>('csv-parser');
+  return { __esModule: true, default: parser };
+});
+
 describe('ImportService CSV parsing', () => {
   let service: ImportService;
 
