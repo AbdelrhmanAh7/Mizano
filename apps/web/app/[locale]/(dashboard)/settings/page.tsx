@@ -12,11 +12,13 @@ import {
   Palette,
   Receipt,
   ScrollText,
+  Send,
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import type { LucideIcon } from 'lucide-react';
+import { TelegramLinkManager } from '@/components/settings/telegram-link-manager';
 
 interface SettingsItem {
   titleKey: string;
@@ -116,12 +118,19 @@ const settingsGroups: SettingsGroup[] = [
         href: '/settings/audit-logs',
         icon: ScrollText,
       },
+      {
+        titleKey: 'telegram',
+        descriptionKey: 'telegram',
+        href: '/settings/telegram',
+        icon: Send,
+      },
     ],
   },
 ];
 
 export default function SettingsPage() {
   const t = useTranslations('settings');
+  const tNav = useTranslations('navigation');
 
   return (
     <div className="space-y-8">
@@ -130,6 +139,34 @@ export default function SettingsPage() {
         <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
         <p className="text-muted-foreground">{t('description')}</p>
       </div>
+
+      {/* Settings Navigation Menu */}
+      <nav aria-label="Settings navigation" className="flex flex-wrap gap-2 border-b pb-4">
+        <Link
+          href="/settings"
+          className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+        >
+          {tNav('settings')}
+        </Link>
+        <Link
+          href="/settings/organization"
+          className="rounded-md border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          {t('hub.organization.title')}
+        </Link>
+        <Link
+          href="/settings/financial"
+          className="rounded-md border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          {t('hub.financial.title')}
+        </Link>
+        <Link
+          href="/settings/telegram"
+          className="rounded-md border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          {t('hub.telegram.title')}
+        </Link>
+      </nav>
 
       {/* Settings Groups */}
       {settingsGroups.map((group) => (
@@ -163,6 +200,11 @@ export default function SettingsPage() {
           </div>
         </div>
       ))}
+
+      {/* Direct Telegram Link Management Section on Settings Page */}
+      <div className="pt-4 border-t space-y-4">
+        <TelegramLinkManager />
+      </div>
     </div>
   );
 }

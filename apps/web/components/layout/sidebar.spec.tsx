@@ -257,6 +257,23 @@ describe('Sidebar', () => {
     expect(settingsItems.length).toBeGreaterThanOrEqual(1);
   });
 
+  it('renders Telegram Links navigation item when on /settings route', () => {
+    mockPathname = '/en/settings';
+    render(<Sidebar />);
+    const telegramItems = screen.getAllByText('telegramLinks');
+    expect(telegramItems.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('toggles settings expansion to show Telegram Links when clicked', () => {
+    mockPathname = '/en/dashboard';
+    render(<Sidebar />);
+    const settingsButtons = screen.getAllByText('settings');
+    fireEvent.click(settingsButtons[0]);
+
+    const telegramItems = screen.getAllByText('telegramLinks');
+    expect(telegramItems.length).toBeGreaterThanOrEqual(1);
+  });
+
   it('renders Reports navigation item for users with reports permission', () => {
     render(<Sidebar />);
     const reportsItems = screen.getAllByText('reports');

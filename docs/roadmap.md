@@ -10,6 +10,8 @@ Core ledger (AP/AR, reports, Arabic/English) + invoice intake (web upload, CPU-o
 
 ## Milestones
 
+Telegram implementation checkpoint: [PR #58](https://github.com/AbdelrhmanAh7/Mizano/pull/58) supplies long polling, verified private-channel binding and durable replay identity. [Setup and limits](telegram-intake.md) distinguish source implementation from merged/deployed/live acceptance.
+
 | Milestone             | Issues                                      |
 | --------------------- | ------------------------------------------- |
 | P1 Pi platform        | #38, #39, #40, #41, #43                     |
