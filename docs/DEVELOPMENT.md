@@ -164,7 +164,7 @@ Zero-tolerance policy: `pnpm ci:full` must pass with no warnings or errors (no `
 
 ## Deployment
 
-**Production pipeline** (`.github/workflows/deploy.yml`): after CI succeeds on `master` (or on release/manual dispatch) it
+**Production pipeline** (`.github/workflows/deploy.yml`): manual dispatch only since 2026-10-10. The GCP host has been unreachable since 2026-10-01, and the automatic run after every green CI on `master` failed its SSH step and turned `master` red (MZ #102, #113). DEPLOY #25 re-enables the automatic trigger after a manual SSH check passes; `apps/api/src/common/utils/deploy-workflow.spec.ts` fails until that change is made deliberately. When run, it
 
 1. skips the rollout only for the reviewed planning-only paths in `docs/planning/rollout-exemption.json`;
 2. builds `apps/api/Dockerfile` and `apps/web/Dockerfile`, pushing `ghcr.io/abdelrhmanah7/mizano-{api,web}` tagged with the short SHA and `latest`;
