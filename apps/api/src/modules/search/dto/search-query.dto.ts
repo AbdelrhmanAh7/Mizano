@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsIn,
@@ -59,6 +59,16 @@ export class GlobalSearchQueryDto {
     isArray: true,
   })
   @IsOptional()
+  // `?types=customer` arrives as a plain string and `?types=customer,vendor` as one
+  // comma-joined string; only repeated keys give an array. Normalise all three forms.
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string'
+      ? value
+          .split(',')
+          .map((v) => v.trim())
+          .filter(Boolean)
+      : value,
+  )
   @IsArray()
   @IsIn(SEARCH_ENTITY_TYPES, { each: true })
   types?: SearchEntityType[];

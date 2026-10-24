@@ -541,7 +541,7 @@ export class BillsService {
     const accountIds = [...new Set(lines.map((l) => l.accountId).filter(Boolean))] as string[];
     if (accountIds.length) {
       const found = await db.account.count({
-        where: { id: { in: accountIds }, organizationId, deletedAt: null },
+        where: { id: { in: accountIds }, organizationId, deletedAt: null, isActive: true },
       });
       if (found !== accountIds.length) throw new BadRequestException('Account not found');
     }
