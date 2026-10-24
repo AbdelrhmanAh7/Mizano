@@ -102,7 +102,13 @@ export class TimesheetsController {
   ) {
     // weekStartDate is accepted as an alias; weekStart wins when both are sent
     const week = weekStart || weekStartDate;
-    if (!week) throw new BadRequestException('weekStart (or weekStartDate) is required');
+    if (!week) {
+      throw new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        message: 'Validation Failed',
+        errors: { weekStart: ['weekStart (or weekStartDate) is required'] },
+      });
+    }
     return this.timesheetsService.getWeeklySummary(orgId, user.id, week);
   }
 

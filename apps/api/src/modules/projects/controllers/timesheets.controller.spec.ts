@@ -33,4 +33,19 @@ describe('TimesheetsController.getWeeklySummary', () => {
     );
     expect(service.getWeeklySummary).not.toHaveBeenCalled();
   });
+
+  it('400 body carries the standard validation code, message and weekStart error', () => {
+    const { controller } = make();
+    try {
+      controller.getWeeklySummary('org', user, undefined, undefined);
+      throw new Error('expected BadRequestException');
+    } catch (e) {
+      expect(e).toBeInstanceOf(BadRequestException);
+      expect((e as BadRequestException).getResponse()).toEqual({
+        code: 'VALIDATION_ERROR',
+        message: 'Validation Failed',
+        errors: { weekStart: ['weekStart (or weekStartDate) is required'] },
+      });
+    }
+  });
 });
