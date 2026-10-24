@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -105,8 +106,58 @@ const paymentTermsOptions = [
   { value: 60, label: 'Net 60' },
 ];
 
+function useSafeLocale(): string {
+  try {
+    return useLocale();
+  } catch {
+    return 'en';
+  }
+}
+
+function useSafeTranslations() {
+  try {
+    return useTranslations('sales');
+  } catch {
+    return null;
+  }
+}
+
 export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: CustomerFormProps) {
   const isEditing = !!customer;
+  const locale = useSafeLocale();
+  const isArabic = locale.startsWith('ar');
+  const t = useSafeTranslations();
+
+  const getTranslation = (key: string, fallback: string): string => {
+    if (!t) return fallback;
+    try {
+      const val = t(key);
+      if (!val || val === key || val.endsWith(`.${key.split('.').pop()}`)) {
+        return fallback;
+      }
+      return val;
+    } catch {
+      return fallback;
+    }
+  };
+
+  const submitText = isSubmitting
+    ? getTranslation('customers.form.saving', isArabic ? 'جارٍ الحفظ…' : 'Saving...')
+    : isEditing
+      ? getTranslation(
+          'customers.form.updateCustomer',
+          isArabic ? 'تحديث العميل' : 'Update Customer',
+        )
+      : getTranslation(
+          'customers.form.createCustomer',
+          isArabic ? 'إنشاء عميل' : 'Create Customer',
+        );
+
+  const cancelText = getTranslation('customers.form.cancel', isArabic ? 'إلغاء' : 'Cancel');
+  const copyFromBillingText = getTranslation(
+    'customers.form.copyFromBilling',
+    isArabic ? 'نسخ من عنوان الفوترة' : 'Copy from Billing',
+  );
 
   const form = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
@@ -301,7 +352,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="billingCountry">Country</Label>
+              <Label htmlFor="billingCountry">{isArabic ? 'دولة' : 'Country'}</Label>
               <CountrySelect
                 id="billingCountry"
                 value={form.watch('billingAddress.country') || ''}
@@ -313,7 +364,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="billingCity">City</Label>
+              <Label htmlFor="billingCity">{isArabic ? 'المدينة' : 'City'}</Label>
               <CitySelect
                 id="billingCity"
                 value={form.watch('billingAddress.city') || ''}
@@ -350,8 +401,14 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Shipping Address</CardTitle>
-            <Button type="button" variant="outline" size="sm" onClick={copyBillingToShipping}>
-              Copy from Billing
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={copyBillingToShipping}
+              aria-label={copyFromBillingText}
+            >
+              {copyFromBillingText}
             </Button>
           </div>
         </CardHeader>
@@ -368,7 +425,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="shippingCountry">Country</Label>
+              <Label htmlFor="shippingCountry">{isArabic ? 'دولة' : 'Country'}</Label>
               <CountrySelect
                 id="shippingCountry"
                 value={form.watch('shippingAddress.country') || ''}
@@ -380,7 +437,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="shippingCity">City</Label>
+              <Label htmlFor="shippingCity">{isArabic ? 'المدينة' : 'City'}</Label>
               <CitySelect
                 id="shippingCity"
                 value={form.watch('shippingAddress.city') || ''}
@@ -415,10 +472,10 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {cancelText}
         </Button>
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : isEditing ? 'Update Customer' : 'Create Customer'}
+        <Button type="submit" disabled={isSubmitting} aria-label={submitText}>
+          {submitText}
         </Button>
       </div>
     </form>

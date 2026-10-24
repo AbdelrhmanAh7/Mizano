@@ -4,11 +4,14 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useLocale } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { PhoneInput } from '@/components/ui/phone-input';
+import { CountrySelect } from '@/components/ui/country-select';
+import { CitySelect } from '@/components/ui/city-select';
 import {
   Select,
   SelectContent,
@@ -41,6 +44,8 @@ const leadSchema = z.object({
   companyName: z.string().optional(),
   email: z.string().email('Invalid email').optional().or(z.literal('')),
   phone: z.string().optional(),
+  country: z.string().optional(),
+  city: z.string().optional(),
   source: z.enum([
     'FACEBOOK_ADS',
     'GOOGLE_ADS',
@@ -59,11 +64,21 @@ interface LeadFormProps {
   lead?: Lead;
 }
 
+function useSafeLocale(): string {
+  try {
+    return useLocale();
+  } catch {
+    return 'en';
+  }
+}
+
 export function LeadForm({ lead }: LeadFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const createLead = useCreateLead();
   const updateLead = useUpdateLead();
+  const locale = useSafeLocale();
+  const isArabic = locale.startsWith('ar');
 
   const form = useForm<LeadFormData>({
     resolver: zodResolver(leadSchema),
@@ -73,6 +88,8 @@ export function LeadForm({ lead }: LeadFormProps) {
           companyName: lead.companyName || '',
           email: lead.email || '',
           phone: lead.phone || '',
+          country: ((lead.customFields as Record<string, unknown>)?.country as string) || '',
+          city: ((lead.customFields as Record<string, unknown>)?.city as string) || '',
           source: lead.source,
           notes: lead.notes || '',
         }
@@ -81,6 +98,8 @@ export function LeadForm({ lead }: LeadFormProps) {
           companyName: '',
           email: '',
           phone: '',
+          country: '',
+          city: '',
           source: 'WEBSITE' as const,
           notes: '',
         },
@@ -88,14 +107,25 @@ export function LeadForm({ lead }: LeadFormProps) {
 
   const handleSubmit = async (data: LeadFormData) => {
     try {
+      const { country, city, ...rest } = data;
+      const payload = {
+        ...rest,
+        customFields: {
+          ...((lead?.customFields as Record<string, unknown>) || {}),
+          country,
+          city,
+        },
+      };
       if (lead) {
-        await updateLead.mutateAsync({ id: lead.id, data });
+        await updateLead.mutateAsync({ id: lead.id, data: payload as unknown as Partial<Lead> });
         toast({ title: 'Lead updated successfully' });
         router.push(`/crm/leads/${lead.id}`);
       } else {
-        const result = await createLead.mutateAsync(data);
+        const result = await createLead.mutateAsync(
+          payload as unknown as Parameters<typeof createLead.mutateAsync>[0],
+        );
         toast({ title: 'Lead created successfully' });
-        router.push(`/crm/leads/${result?.id || result?.data?.id}`);
+        router.push(`/crm/leads/${result?.id || (result as { data?: { id?: string } })?.data?.id}`);
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -108,6 +138,18 @@ export function LeadForm({ lead }: LeadFormProps) {
   };
 
   const isPending = createLead.isPending || updateLead.isPending;
+
+  const submitLabel = isPending
+    ? isArabic
+      ? 'جارٍ الحفظ…'
+      : 'Saving...'
+    : lead
+      ? isArabic
+        ? 'تحديث العميل المحتمل'
+        : 'Update Lead'
+      : isArabic
+        ? 'إنشاء عميل'
+        : 'Create Customer';
 
   return (
     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
@@ -156,6 +198,30 @@ export function LeadForm({ lead }: LeadFormProps) {
             </div>
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="country">{isArabic ? 'دولة' : 'Country'}</Label>
+              <CountrySelect
+                id="country"
+                value={form.watch('country') || ''}
+                onValueChange={(val) => {
+                  form.setValue('country', val);
+                  form.setValue('city', '');
+                }}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="city">{isArabic ? 'المدينة' : 'City'}</Label>
+              <CitySelect
+                id="city"
+                value={form.watch('city') || ''}
+                onValueChange={(val) => form.setValue('city', val)}
+                country={form.watch('country') || ''}
+              />
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label>Source *</Label>
             <Select
@@ -191,8 +257,8 @@ export function LeadForm({ lead }: LeadFormProps) {
         <Button type="button" variant="outline" onClick={() => router.back()}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isPending}>
-          {isPending ? 'Saving...' : lead ? 'Update Lead' : 'Create Lead'}
+        <Button type="submit" disabled={isPending} aria-label={submitLabel}>
+          {submitLabel}
         </Button>
       </div>
     </form>
