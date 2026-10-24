@@ -112,3 +112,7 @@ services/vlm-service/models/
 **/*.pt
 **/*.pth
 .claude/worktrees/
+
+# Agent scratchpad
+/AI_QUESTIONS.md
+
