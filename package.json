@@ -27,7 +27,7 @@
     "test:web": "pnpm --filter @mizano/web test",
     "test:watch": "pnpm --filter api test:watch",
     "test:cov": "pnpm --filter api test:cov",
-    "test:e2e": "pnpm --filter api test:e2e",
+    "test:e2e": "turbo test:e2e",
     "// — CI ———————————————————————————": "",
     "ci": "turbo lint type-check test && pnpm format",
     "ci:full": "turbo lint type-check test",

@@ -68,6 +68,16 @@ describe('ChurnPredictionService', () => {
     prisma.customerAiProfile.upsert.mockResolvedValue({} as any);
   });
 
+  // Pin the clock: fixtures and the service both read "now", so results must not depend on the
+  // day the suite runs.
+  beforeEach(() => {
+    jest.useFakeTimers({ now: new Date('2025-12-15T12:00:00Z') });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   describe('predictChurnRisk', () => {
     it('should throw error when customer not found', async () => {
       prisma.customer.findFirst.mockResolvedValue(null as any);

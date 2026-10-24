@@ -3,11 +3,16 @@
  * PostgreSQL. Only the extraction strategy and the worker clock are stubbed.
  */
 import { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { IntakeJobStatus } from '@prisma/client';
 import { createTestApp, getPrisma, uniqueSuffix } from './helpers/app.helper';
 import { registerTenant, TestTenant } from './helpers/tenant.helper';
 import { eventually } from './helpers/journey.helper';
 import { ExtractionStrategyResolver } from '../src/modules/ai/extraction/extraction-strategy-resolver.service';
+import { IntakeProcessorService } from '../src/modules/ai/intake/intake-processor.service';
+import { IntakeQueueService } from '../src/modules/ai/intake/intake-queue.service';
+import { IntakeStorage } from '../src/modules/ai/intake/intake-storage';
+import { DocumentIntakeService } from '../src/modules/ai/services/document-intake.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 process.env.INTAKE_RETRY_BASE_MS = '50';
@@ -110,6 +115,14 @@ describe('@e2e @flow:intake-timings @issue-126 intake stage timings', () => {
         .overrideProvider('INTAKE_CLOCK')
         .useValue(stubClock),
     );
+    new IntakeProcessorService(
+      app.get(PrismaService),
+      app.get(IntakeStorage),
+      app.get(DocumentIntakeService),
+      app.get(IntakeQueueService),
+      app.get(ConfigService),
+      app.get('INTAKE_CLOCK'),
+    ).onModuleInit();
     prisma = getPrisma(app);
     tenant = await registerTenant(app, 'Timings');
   });
