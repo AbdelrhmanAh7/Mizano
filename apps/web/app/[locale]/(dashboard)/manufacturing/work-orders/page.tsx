@@ -44,7 +44,7 @@ import { useTableParams } from '@/lib/hooks/use-table-params';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { CheckCircle, Eye, Filter, Play, Plus, RefreshCw, Trash2, XCircle } from 'lucide-react';
-import Link from 'next/link';
+import { Link } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
 

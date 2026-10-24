@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { Link, useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft, Edit, Trash2, Package, Layers, DollarSign, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
