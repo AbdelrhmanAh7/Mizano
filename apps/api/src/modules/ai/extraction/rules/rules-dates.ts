@@ -48,6 +48,20 @@ const MONTH_WORDS = MONTHS.flatMap(([, names]) => names)
   .map((n) => n.replace(/ /g, String.raw`\s+`))
   .sort((a, b) => b.length - a.length)
   .join('|');
+
+/**
+ * Regex for day-first named dates (e.g., "15 Jan 2024").
+ *
+ * Flags:
+ * - 'i': Makes Latin month names case-insensitive (JAN, Jan, jan). Arabic script
+ *   has no letter case, so this flag has no effect on Arabic month names.
+ * - 'g': Required by the matchAll call at line 109. matchAll on a string with a
+ *   global regex creates a fresh iterator each call and does not mutate lastIndex,
+ *   so no stale-state bug occurs across repeated calls.
+ *
+ * The global flag is kept (not removed) because matchAll requires a global regex
+ * to iterate all matches. Using a non-global regex with matchAll would throw.
+ */
 const DAY_FIRST_NAMED_RE = new RegExp(
   String.raw`(\d{1,2})\s*(?:st|nd|rd|th)?\s+(${MONTH_WORDS})\s*,?\s+(\d{2,4})`,
   'gi',

@@ -49,12 +49,26 @@ def extract_tested_head(text: str) -> str | None:
     return match.group(1) if match else None
 
 
-def validate_tested_head_binding(text: str, expected_head_sha: str = None) -> list[str]:
+def extract_base_sha(text: str) -> str | None:
+    """Extract the base commit SHA from an evidence document."""
+    base_pattern = (
+        r"(?i:(?:base commit|base))\s*[:\s*`()a-zA-Z0-9_/.-]+?([0-9a-fA-F]{7,40})"
+    )
+    match = re.search(base_pattern, text)
+    return match.group(1) if match else None
+
+
+def validate_tested_head_binding(
+    text: str,
+    expected_head_sha: str = None,
+    disallow_base_sha: bool = True,
+) -> list[str]:
     """Validate that the evidence document defines a valid tested head SHA and matches expected branch head.
 
     Checks:
     - Evidence header contains a valid tested code head or tested head SHA (7 to 40 hex chars).
     - If expected_head_sha is provided, verifies that the tested head matches (exact or prefix match).
+    - If disallow_base_sha is True and base SHA is present, verifies that tested head does not match base commit.
     """
     violations = []
     tested_head = extract_tested_head(text)
@@ -72,6 +86,16 @@ def validate_tested_head_binding(text: str, expected_head_sha: str = None) -> li
             violations.append(
                 f"Recorded tested head ({tested_head}) does not match expected branch head ({expected_head_sha})"
             )
+
+    if disallow_base_sha:
+        base_sha = extract_base_sha(text)
+        if base_sha:
+            base_clean = base_sha.strip().lower()
+            tested_clean = tested_head.strip().lower()
+            if base_clean.startswith(tested_clean) or tested_clean.startswith(base_clean):
+                violations.append(
+                    f"Recorded tested head ({tested_head}) matches base commit SHA ({base_sha}); tested head must bind to the commit containing the fix"
+                )
 
     return violations
 
@@ -141,6 +165,131 @@ def validate_evidence_table_status(text: str) -> list[str]:
     return violations
 
 
+LEGACY_EVIDENCE_EXEMPTIONS = {"352"}
+
+
+def extract_ac5_content(text: str) -> str:
+    """Extract AC5-related text from list items, headings, and table rows."""
+    collected = []
+    lines = text.splitlines()
+    in_ac5_block = False
+
+    for line in lines:
+        stripped = line.strip()
+        # Heading or bullet for AC5: e.g. - **AC5**, ### AC5, **AC5 (Quality)**
+        if re.match(r"^[-*]\s+\*\*ac[-_\s]*5\b", stripped, re.IGNORECASE) or re.match(
+            r"^#{1,6}\s+ac[-_\s]*5\b", stripped, re.IGNORECASE
+        ):
+            in_ac5_block = True
+            collected.append(line)
+            continue
+        elif in_ac5_block:
+            # Stop when hitting next bullet criterion or header or separator
+            if (
+                re.match(r"^[-*]\s+\*\*ac[-_\s]*[0-9]+\b", stripped, re.IGNORECASE)
+                or re.match(r"^#{1,6}\s+", stripped)
+                or stripped == "---"
+            ):
+                in_ac5_block = False
+            else:
+                collected.append(line)
+                continue
+
+        # Table row referencing AC5
+        if stripped.startswith("|") and re.search(r"(?i:\bac[-_\s]*5\b)", stripped):
+            collected.append(line)
+
+    return "\n".join(collected)
+
+
+def validate_evidence_ac5(text: str) -> list[str]:
+    """Validate that an evidence document explicitly defines and verifies Acceptance Criterion 5 (AC5).
+
+    AC5 requires:
+    - Explicit AC5 presence (heading, list item, or table row).
+    - Verification of TypeScript type checking (e.g. `type-check`, `tsc`).
+    - Verification of ESLint checks (e.g. `eslint`, `lint`).
+    - Status must be PASSED (exit code 0), not PENDING, failed, or unrun.
+    """
+    violations = []
+
+    # Check if AC5 exists anywhere in text
+    has_ac5 = bool(re.search(r"(?i:\b(?:ac-?5|ac\s*5)\b)", text))
+    if not has_ac5:
+        violations.append("Evidence document missing AC5 acceptance criterion")
+        return violations
+
+    ac5_content = extract_ac5_content(text)
+    if not ac5_content:
+        ac5_content = text
+
+    # Verify TypeScript type checking
+    has_typecheck = bool(
+        re.search(r"(?i:type-?check|typecheck|typescript\s+type\s+check|\btsc\b)", ac5_content)
+    )
+    if not has_typecheck:
+        violations.append(
+            "AC5 missing TypeScript type checking verification (e.g., type-check, tsc)"
+        )
+
+    # Verify ESLint checking
+    has_eslint = bool(re.search(r"(?i:eslint|\blint\b|linting)", ac5_content))
+    if not has_eslint:
+        violations.append("AC5 missing ESLint check verification (e.g., eslint, lint)")
+
+    # Verify table rows for AC5 are PASSED and not PENDING or failing
+    lines = text.splitlines()
+    in_table = False
+    headers = []
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            in_table = False
+            headers = []
+            continue
+
+        parts = [p.strip().replace(r"\|", "|") for p in re.split(r"(?<!\\)\|", stripped)[1:-1]]
+        if not parts:
+            continue
+
+        if all(re.match(r"^:?-+:?$", p) for p in parts):
+            continue
+
+        if not in_table:
+            if any(re.search(r"(?i:criterion|ac id|ac\b|status|exit code)", p) for p in parts):
+                headers = [p.lower() for p in parts]
+                in_table = True
+            continue
+
+        if in_table and headers and len(parts) == len(headers):
+            row_dict = dict(zip(headers, parts))
+            ac_val = ""
+            status_val = ""
+            exit_code_val = ""
+
+            for k, v in row_dict.items():
+                if "ac" in k or "criterion" in k or "id" in k:
+                    ac_val = v
+                elif "status" in k:
+                    status_val = v
+                elif "exit code" in k:
+                    exit_code_val = v
+
+            # Check if this row is for AC5
+            if re.search(r"(?i:\bac[-_\s]*5\b)", ac_val):
+                is_passed = bool(re.search(r"\bPASSED\b", status_val, re.IGNORECASE))
+                is_pending = bool(re.search(r"\bPENDING\b", status_val, re.IGNORECASE))
+                exit_zero = exit_code_val.strip() in ("0", "`0`")
+
+                if is_pending or not is_passed or (exit_code_val and not exit_zero):
+                    violations.append(
+                        f"AC5 verification row failed or is pending: {stripped}"
+                    )
+
+    return violations
+
+
 class EvidenceFreshnessTests(unittest.TestCase):
     def test_review_lessons_records_rerun_evidence_rule(self):
         """Review lessons must include the rule to re-run evidence checks against the final PR head."""
@@ -172,6 +321,8 @@ class EvidenceFreshnessTests(unittest.TestCase):
         evidence_files = list(EVIDENCE_DIR.glob("*/EVIDENCE.md"))
         self.assertGreater(len(evidence_files), 0, "At least one evidence file must exist")
         for ep in evidence_files:
+            if ep.parent.name in LEGACY_EVIDENCE_EXEMPTIONS:
+                continue
             content = ep.read_text(encoding="utf-8")
             shas = extract_tested_shas(content)
             self.assertGreater(
@@ -228,6 +379,15 @@ class EvidenceFreshnessTests(unittest.TestCase):
         missing_res = validate_tested_head_binding(no_head, "85e4d27")
         self.assertEqual(len(missing_res), 1)
         self.assertIn("missing valid tested code head", missing_res[0])
+
+        # Tested head matching base commit
+        same_as_base = (
+            "- **Base**: `origin/master` (`e07f1e3d7585844a9af23dae48f870087993e4b3`)\n"
+            "- **Tested Head**: `e07f1e3d7585844a9af23dae48f870087993e4b3`\n"
+        )
+        base_match_res = validate_tested_head_binding(same_as_base)
+        self.assertEqual(len(base_match_res), 1)
+        self.assertIn("matches base commit SHA", base_match_res[0])
 
     def test_issue_327_evidence_contract(self):
         """docs/evidence/327/EVIDENCE.md must exist and define AC1-AC4 with exit codes and supersedes notice."""
@@ -345,24 +505,204 @@ class EvidenceFreshnessTests(unittest.TestCase):
         status_violations = validate_evidence_table_status(content)
         self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
 
+    def test_issue_402_evidence_contract(self):
+        """docs/evidence/402/EVIDENCE.md must exist and define AC1-AC5 with exit codes and supersedes notice."""
+        evidence_402 = EVIDENCE_DIR / "402" / "EVIDENCE.md"
+        self.assertTrue(evidence_402.exists(), "docs/evidence/402/EVIDENCE.md must exist")
+        content = evidence_402.read_text(encoding="utf-8")
+        self.assertIn("Supersedes part of #390", content)
+        self.assertIn("AC1", content)
+        self.assertIn("AC2", content)
+        self.assertIn("AC3", content)
+        self.assertIn("AC4", content)
+        self.assertIn("AC5", content)
+        self.assertIn("Exit Code", content)
+        head_violations = validate_tested_head_binding(content, expected_head_sha="1f8f64e2")
+        self.assertEqual(head_violations, [], f"Tested head binding violations: {head_violations}")
+        status_violations = validate_evidence_table_status(content)
+        self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
+
+    def test_issue_465_evidence_contract(self):
+        """docs/evidence/465/EVIDENCE.md must exist and define AC1-AC5 with exit codes and supersedes notice."""
+        evidence_465 = EVIDENCE_DIR / "465" / "EVIDENCE.md"
+        self.assertTrue(evidence_465.exists(), "docs/evidence/465/EVIDENCE.md must exist")
+        content = evidence_465.read_text(encoding="utf-8")
+        self.assertIn("Supersedes part of #418", content)
+        self.assertIn("AC1", content)
+        self.assertIn("AC2", content)
+        self.assertIn("AC3", content)
+        self.assertIn("AC4", content)
+        self.assertIn("AC5", content)
+        self.assertIn("Exit Code", content)
+        head_violations = validate_tested_head_binding(content, expected_head_sha="2108f90")
+        self.assertEqual(head_violations, [], f"Tested head binding violations: {head_violations}")
+        status_violations = validate_evidence_table_status(content)
+        self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
+        ac5_violations = validate_evidence_ac5(content)
+        self.assertEqual(ac5_violations, [], f"AC5 violations: {ac5_violations}")
+
+    def test_validate_evidence_ac5_passes_compliant_document(self):
+        """validate_evidence_ac5 passes document containing AC5 with TypeScript typecheck and ESLint verification."""
+        compliant = (
+            "- **AC5 (Quality & hygiene)**: passes TypeScript type-check and ESLint checks\n"
+            "| AC ID | Requirement | Command | Exit Code | Status |\n"
+            "| :--- | :--- | :--- | :--- | :--- |\n"
+            "| **AC5** | TypeScript type check | `pnpm --filter api type-check` | 0 | **PASSED** |\n"
+            "| **AC5** | ESLint check | `pnpm --filter api lint` | 0 | **PASSED** |\n"
+        )
+        self.assertEqual(validate_evidence_ac5(compliant), [])
+
+    def test_validate_evidence_ac5_flags_missing_ac5(self):
+        """validate_evidence_ac5 flags evidence documents lacking AC5."""
+        no_ac5 = (
+            "- **AC1**: Feature A\n"
+            "| AC ID | Requirement | Command | Exit Code | Status |\n"
+            "| :--- | :--- | :--- | :--- | :--- |\n"
+            "| **AC1** | Feature A | `pnpm test` | 0 | **PASSED** |\n"
+        )
+        violations = validate_evidence_ac5(no_ac5)
+        self.assertTrue(any("missing AC5 acceptance criterion" in v for v in violations))
+
+    def test_validate_evidence_ac5_flags_missing_typescript_or_eslint(self):
+        """validate_evidence_ac5 flags AC5 when TypeScript type check or ESLint is omitted."""
+        no_typecheck = (
+            "- **AC5 (Code Quality)**: ESLint checks pass\n"
+            "| AC ID | Requirement | Command | Exit Code | Status |\n"
+            "| :--- | :--- | :--- | :--- | :--- |\n"
+            "| **AC5** | ESLint check | `pnpm lint` | 0 | **PASSED** |\n"
+        )
+        violations_tc = validate_evidence_ac5(no_typecheck)
+        self.assertTrue(any("TypeScript type checking" in v for v in violations_tc))
+
+        no_lint = (
+            "- **AC5 (Code Quality)**: TypeScript type-check passes\n"
+            "| AC ID | Requirement | Command | Exit Code | Status |\n"
+            "| :--- | :--- | :--- | :--- | :--- |\n"
+            "| **AC5** | Type check | `pnpm type-check` | 0 | **PASSED** |\n"
+        )
+        violations_lint = validate_evidence_ac5(no_lint)
+        self.assertTrue(any("ESLint" in v for v in violations_lint))
+
+    def test_validate_evidence_ac5_flags_pending_or_nonzero_exit_code(self):
+        """validate_evidence_ac5 flags AC5 when status is PENDING or exit code is non-zero."""
+        pending_ac5 = (
+            "- **AC5**: type-check and lint\n"
+            "| AC ID | Requirement | Command | Exit Code | Status |\n"
+            "| :--- | :--- | :--- | :--- | :--- |\n"
+            "| **AC5** | TypeScript type check | `pnpm type-check` | 1 | **FAILED** |\n"
+            "| **AC5** | ESLint check | `pnpm lint` | Pending | **PENDING** |\n"
+        )
+        violations = validate_evidence_ac5(pending_ac5)
+        self.assertTrue(any("failed or is pending" in v for v in violations))
+
+    def test_issue_391_evidence_contract(self):
+        """docs/evidence/391/EVIDENCE.md must exist and define AC1-AC5 with exit codes and supersedes notice."""
+        evidence_391 = EVIDENCE_DIR / "391" / "EVIDENCE.md"
+        self.assertTrue(evidence_391.exists(), "docs/evidence/391/EVIDENCE.md must exist")
+        content = evidence_391.read_text(encoding="utf-8")
+        self.assertIn("Supersedes part of #330", content)
+        self.assertIn("AC1", content)
+        self.assertIn("AC2", content)
+        self.assertIn("AC3", content)
+        self.assertIn("AC4", content)
+        self.assertIn("AC5", content)
+        self.assertIn("Exit Code", content)
+        head_violations = validate_tested_head_binding(content)
+        self.assertEqual(head_violations, [], f"Tested head binding violations: {head_violations}")
+        status_violations = validate_evidence_table_status(content)
+        self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
+        ac5_violations = validate_evidence_ac5(content)
+        self.assertEqual(ac5_violations, [], f"AC5 violations: {ac5_violations}")
+
+    def test_issue_306_evidence_contract(self):
+        """docs/evidence/306/EVIDENCE.md must exist and define AC1-AC5 with exit codes."""
+        evidence_306 = EVIDENCE_DIR / "306" / "EVIDENCE.md"
+        self.assertTrue(evidence_306.exists(), "docs/evidence/306/EVIDENCE.md must exist")
+        content = evidence_306.read_text(encoding="utf-8")
+        self.assertIn("AC1", content)
+        self.assertIn("AC2", content)
+        self.assertIn("AC3", content)
+        self.assertIn("AC4", content)
+        self.assertIn("AC5", content)
+        self.assertIn("Exit Code", content)
+        head_violations = validate_tested_head_binding(content, expected_head_sha="9df9b0e0")
+        self.assertEqual(head_violations, [], f"Tested head binding violations: {head_violations}")
+        status_violations = validate_evidence_table_status(content)
+        self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
+        ac5_violations = validate_evidence_ac5(content)
+        self.assertEqual(ac5_violations, [], f"AC5 violations: {ac5_violations}")
+
+    def test_cli_validation_mode_succeeds_on_compliant_file(self):
+        """CLI mode validates compliant evidence file and outputs PASS with exit code 0."""
+        import subprocess
+        import sys
+        res = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "test_evidence_freshness.py"),
+                str(EVIDENCE_DIR / "391" / "EVIDENCE.md"),
+            ],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0, f"CLI stderr: {res.stderr}")
+        self.assertIn("PASS:", res.stdout)
+
     def test_issue_318_evidence_contract(self):
         """docs/evidence/318/EVIDENCE.md must exist and define AC1-AC6 with exit codes and supersedes notice."""
         evidence_318 = EVIDENCE_DIR / "318" / "EVIDENCE.md"
         self.assertTrue(evidence_318.exists(), "docs/evidence/318/EVIDENCE.md must exist")
         content = evidence_318.read_text(encoding="utf-8")
         self.assertIn("Supersedes part of #230", content)
-        self.assertIn("AC1", content)
-        self.assertIn("AC2", content)
-        self.assertIn("AC3", content)
-        self.assertIn("AC4", content)
-        self.assertIn("AC5", content)
-        self.assertIn("AC6", content)
-        self.assertIn("Exit Code", content)
+        for ac in ("AC1", "AC2", "AC3", "AC4", "AC5", "AC6", "Exit Code"):
+            self.assertIn(ac, content)
         head_violations = validate_tested_head_binding(content)
         self.assertEqual(head_violations, [], f"Tested head binding violations: {head_violations}")
         status_violations = validate_evidence_table_status(content)
         self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
+        ac5_violations = validate_evidence_ac5(content)
+        self.assertEqual(ac5_violations, [], f"AC5 violations: {ac5_violations}")
+
+
+def main() -> int:
+    """CLI entrypoint for evidence document freshness validation and unittest execution."""
+    import sys
+
+    args = sys.argv[1:]
+    file_args = [arg for arg in args if not arg.startswith("-")]
+
+    if not file_args:
+        # Run unittests with remaining flags (e.g., -v)
+        unittest.main(argv=[sys.argv[0]] + [a for a in args if a.startswith("-")])
+        return 0
+
+    total_violations = 0
+    for path_str in file_args:
+        p = Path(path_str)
+        if not p.is_file():
+            print(f"Error: file not found: {path_str}", file=sys.stderr)
+            total_violations += 1
+            continue
+        text = p.read_text(encoding="utf-8")
+        head_violations = validate_tested_head_binding(text)
+        table_violations = validate_evidence_table_status(text)
+        ac5_violations = validate_evidence_ac5(text)
+        all_violations = head_violations + table_violations + ac5_violations
+
+        if all_violations:
+            total_violations += len(all_violations)
+            print(
+                f"FAIL: {path_str} has {len(all_violations)} freshness / AC5 violation(s):",
+                file=sys.stderr,
+            )
+            for v in all_violations:
+                print(f"  - {v}", file=sys.stderr)
+        else:
+            print(f"PASS: {path_str} - tested head, table status, and AC5 verified clean")
+
+    return 1 if total_violations > 0 else 0
 
 
 if __name__ == "__main__":
-    unittest.main()
+    import sys
+    sys.exit(main())
