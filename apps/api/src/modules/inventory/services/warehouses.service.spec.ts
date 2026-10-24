@@ -13,7 +13,11 @@ describe('WarehousesService address mapping', () => {
   it('stores the DTO address in the street column on create (no unknown `address` field reaches Prisma)', async () => {
     const { prisma, service } = setup();
     prisma.warehouse.findFirst.mockResolvedValue(null);
-    prisma.warehouse.create.mockResolvedValue({ id: 'w1', code: 'WH', street: '1 Nile Street' } as never);
+    prisma.warehouse.create.mockResolvedValue({
+      id: 'w1',
+      code: 'WH',
+      street: '1 Nile Street',
+    } as never);
 
     const result = await service.create('org1', {
       code: 'WH',
@@ -21,8 +25,14 @@ describe('WarehousesService address mapping', () => {
       address: '1 Nile Street',
     });
 
-    const data = (prisma.warehouse.create.mock.calls[0][0] as { data: Record<string, unknown> }).data;
-    expect(data).toMatchObject({ code: 'WH', name: 'Main', street: '1 Nile Street', organizationId: 'org1' });
+    const data = (prisma.warehouse.create.mock.calls[0][0] as { data: Record<string, unknown> })
+      .data;
+    expect(data).toMatchObject({
+      code: 'WH',
+      name: 'Main',
+      street: '1 Nile Street',
+      organizationId: 'org1',
+    });
     expect(data).not.toHaveProperty('address');
     expect(result.address).toBe('1 Nile Street');
   });
@@ -34,7 +44,8 @@ describe('WarehousesService address mapping', () => {
 
     await service.create('org1', { code: 'WH', name: 'Main' });
 
-    const data = (prisma.warehouse.create.mock.calls[0][0] as { data: Record<string, unknown> }).data;
+    const data = (prisma.warehouse.create.mock.calls[0][0] as { data: Record<string, unknown> })
+      .data;
     expect(data).not.toHaveProperty('street');
     expect(data).not.toHaveProperty('address');
   });
@@ -46,14 +57,19 @@ describe('WarehousesService address mapping', () => {
 
     const result = await service.update('org1', 'w1', { address: '2 Corniche' });
 
-    expect(prisma.warehouse.update).toHaveBeenCalledWith({ where: { id: 'w1' }, data: { street: '2 Corniche' } });
+    expect(prisma.warehouse.update).toHaveBeenCalledWith({
+      where: { id: 'w1' },
+      data: { street: '2 Corniche' },
+    });
     expect(result.address).toBe('2 Corniche');
   });
 
   it('keeps the duplicate-code 409 and the missing-warehouse 404', async () => {
     const { prisma, service } = setup();
     prisma.warehouse.findFirst.mockResolvedValueOnce({ id: 'w0' } as never);
-    await expect(service.create('org1', { code: 'WH', name: 'x' })).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.create('org1', { code: 'WH', name: 'x' })).rejects.toBeInstanceOf(
+      ConflictException,
+    );
 
     prisma.warehouse.findFirst.mockResolvedValueOnce(null);
     await expect(service.findOne('org1', 'nope')).rejects.toBeInstanceOf(NotFoundException);

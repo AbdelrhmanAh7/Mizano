@@ -83,7 +83,10 @@ export class AssetsService {
    */
   private async assertAccountsBelongToOrganization(
     organizationId: string,
-    dto: Pick<CreateAssetDto, 'assetAccountId' | 'depreciationAccountId' | 'accumulatedDeprAccountId'>,
+    dto: Pick<
+      CreateAssetDto,
+      'assetAccountId' | 'depreciationAccountId' | 'accumulatedDeprAccountId'
+    >,
   ): Promise<void> {
     const ids = [
       ...new Set([dto.assetAccountId, dto.depreciationAccountId, dto.accumulatedDeprAccountId]),

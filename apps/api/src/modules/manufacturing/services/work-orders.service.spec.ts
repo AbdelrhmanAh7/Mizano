@@ -91,6 +91,33 @@ describe('WorkOrdersService.completeWorkOrder stock read models', () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
+  it('runs the COGM journal and the COMPLETED update in the same transaction', async () => {
+    const { prisma, service } = setup();
+    const journal = jest
+      .spyOn(
+        service as unknown as { createCOGMJournal: (tx: unknown) => Promise<null> },
+        'createCOGMJournal',
+      )
+      .mockResolvedValue(null);
+    await service.completeWorkOrder('org', 'wo1', { quantityProduced: 1 });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(journal.mock.calls[0][0]).toBe(prisma);
+    expect(prisma.workOrder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'COMPLETED' }) }),
+    );
+  });
+
+  it('does not mark the work order completed when the journal fails', async () => {
+    const { prisma, service } = setup();
+    jest
+      .spyOn(service as unknown as { createCOGMJournal: () => Promise<null> }, 'createCOGMJournal')
+      .mockRejectedValue(new Error('journal failed'));
+    await expect(service.completeWorkOrder('org', 'wo1', { quantityProduced: 1 })).rejects.toThrow(
+      'journal failed',
+    );
+    expect(prisma.workOrder.update).not.toHaveBeenCalled();
+  });
+
   it('changes no stock when there is no default warehouse', async () => {
     const { prisma, service } = setup();
     prisma.warehouse.findFirst.mockResolvedValue(null);

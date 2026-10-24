@@ -22,11 +22,15 @@ describe('Deal DTOs', () => {
   });
 
   it('rejects a deal without a name, a negative amount and an unknown stage', async () => {
-    expect((await check(CreateDealDto, { expectedAmount: 1 })).map((e) => e.property)).toContain('dealName');
-    expect((await check(CreateDealDto, { ...valid, expectedAmount: -1 })).map((e) => e.property)).toContain(
-      'expectedAmount',
+    expect((await check(CreateDealDto, { expectedAmount: 1 })).map((e) => e.property)).toContain(
+      'dealName',
     );
-    expect((await check(CreateDealDto, { ...valid, stage: 'LIMBO' })).map((e) => e.property)).toContain('stage');
+    expect(
+      (await check(CreateDealDto, { ...valid, expectedAmount: -1 })).map((e) => e.property),
+    ).toContain('expectedAmount');
+    expect(
+      (await check(CreateDealDto, { ...valid, stage: 'LIMBO' })).map((e) => e.property),
+    ).toContain('stage');
   });
 
   it('rejects unknown fields', async () => {
@@ -36,7 +40,9 @@ describe('Deal DTOs', () => {
   it('allows partial updates but still validates the fields that are sent', async () => {
     expect(await check(UpdateDealDto, { notes: 'call back' })).toEqual([]);
     expect(await check(UpdateDealDto, { lostReason: 'price' })).toEqual([]);
-    expect((await check(UpdateDealDto, { stage: 'LIMBO' })).map((e) => e.property)).toContain('stage');
+    expect((await check(UpdateDealDto, { stage: 'LIMBO' })).map((e) => e.property)).toContain(
+      'stage',
+    );
   });
 
   it('validates the stage-move body', async () => {

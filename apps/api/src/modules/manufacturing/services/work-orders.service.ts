@@ -232,31 +232,37 @@ export class WorkOrdersService {
 
     const quantityProduced = dto.quantityProduced;
 
-    // Stock movements, inventory levels and item stock change together or not at all
-    await this.prisma.$transaction(async (tx) => {
+    // Stock, COGM journal and status change together or not at all, so a retry never double-posts stock
+    return this.prisma.$transaction(async (tx) => {
       // Consume materials proportionally
       await this.consumeMaterials(tx, organizationId, workOrder, quantityProduced);
 
       // Add finished goods to inventory
       await this.addFinishedGoods(tx, organizationId, workOrder, quantityProduced);
-    });
 
-    // Create COGM journal entry
-    const journalId = await this.createCOGMJournal(organizationId, workOrder, quantityProduced);
+      // Create COGM journal entry
+      const journalId = await this.createCOGMJournal(
+        tx,
+        organizationId,
+        workOrder,
+        quantityProduced,
+      );
 
-    // Update work order as completed
-    return this.prisma.workOrder.update({
-      where: { id },
-      data: {
-        status: WorkOrderStatus.COMPLETED,
-        completedDate: new Date(),
-        notes: dto.notes || workOrder.notes,
-        journalId,
-      },
+      // Update work order as completed
+      return tx.workOrder.update({
+        where: { id },
+        data: {
+          status: WorkOrderStatus.COMPLETED,
+          completedDate: new Date(),
+          notes: dto.notes || workOrder.notes,
+          journalId,
+        },
+      });
     });
   }
 
   private async createCOGMJournal(
+    tx: Prisma.TransactionClient,
     organizationId: string,
     workOrder: WorkOrderWithBom,
     quantityProduced: number,
@@ -289,16 +295,16 @@ export class WorkOrdersService {
 
     // Find inventory accounts
     // Finished goods account (from output item or default ASSET inventory account)
-    const outputItem = await this.prisma.item.findFirst({
+    const outputItem = await tx.item.findFirst({
       where: { id: bom.outputItemId, organizationId },
       select: { inventoryAccountId: true },
     });
 
     const finishedGoodsAccount = outputItem?.inventoryAccountId
-      ? await this.prisma.account.findFirst({
+      ? await tx.account.findFirst({
           where: { id: outputItem.inventoryAccountId, organizationId },
         })
-      : await this.prisma.account.findFirst({
+      : await tx.account.findFirst({
           where: {
             organizationId,
             type: 'ASSET',
@@ -308,7 +314,7 @@ export class WorkOrdersService {
         });
 
     // Raw materials account (find a second inventory/asset account or use same)
-    const rawMaterialsAccount = await this.prisma.account.findFirst({
+    const rawMaterialsAccount = await tx.account.findFirst({
       where: {
         organizationId,
         type: 'ASSET',
@@ -325,7 +331,7 @@ export class WorkOrdersService {
       return null;
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    {
       const journalNumber = await this.generateJournalNumberTx(tx, organizationId);
 
       const journalLines: Array<{
@@ -393,7 +399,7 @@ export class WorkOrdersService {
       });
 
       return journal.id;
-    });
+    }
   }
 
   private async generateJournalNumberTx(
