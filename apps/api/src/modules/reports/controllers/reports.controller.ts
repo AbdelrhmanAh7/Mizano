@@ -1,11 +1,13 @@
 import { Controller, Get, Param, Query, Res, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { CacheResponse, CacheTTL, CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { PdfService } from '../../documents/services/pdf.service';
+import { ApReconciliationResponseDto } from '../dto/ap-reconciliation.dto';
 import { AgingReportsService } from '../services/aging-reports.service';
+import { ApReconciliationService } from '../services/ap-reconciliation.service';
 import { DashboardService } from '../services/dashboard.service';
 import { FinancialReportsService } from '../services/financial-reports.service';
 import { FinancialNarrativeService } from '../../ai/services/financial-narrative.service';
@@ -19,6 +21,7 @@ export class ReportsController {
   constructor(
     private readonly financialReportsService: FinancialReportsService,
     private readonly agingReportsService: AgingReportsService,
+    private readonly apReconciliationService: ApReconciliationService,
     private readonly dashboardService: DashboardService,
     private readonly pdfService: PdfService,
     private readonly narrativeService: FinancialNarrativeService,
@@ -528,6 +531,48 @@ export class ReportsController {
   @ApiOperation({ summary: 'Get Accounts Payable Aging' })
   getPayablesAging(@CurrentOrg() orgId: string, @Query('asOfDate') asOfDate?: string) {
     return this.agingReportsService.getPayablesAging(orgId, asOfDate);
+  }
+
+  /**
+   * Reconcile the AP subledger with the AP control account (read-only backend check).
+   *
+   * @note Backend REST API endpoint (GET /api/reports/reconciliation/ap).
+   * There is NO web page, link, or UI button in apps/web for this issue (frontend UI is out of
+   * scope per issue #320 spec and CTO decision; frontend report page is tracked separately).
+   * Verified by e2e-army/320-ap-reconciliation.e2e.ts and api e2e tests.
+   */
+  @Get('reconciliation/ap')
+  @Permissions('reports.view')
+  @ApiOperation({
+    summary: 'Reconcile the AP subledger with the AP control account (read-only backend API)',
+    description:
+      'Returns subledgerTotal, controlBalance, difference, and ok status as of date. Backend REST API only; no web UI.',
+  })
+  @ApiQuery({
+    name: 'asOf',
+    required: false,
+    description: 'Cutoff date (YYYY-MM-DD)',
+    example: '2026-10-23',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'AP subledger vs control account reconciliation summary',
+    type: ApReconciliationResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - invalid date parameter format',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid or missing bearer token',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - requires reports.view permission',
+  })
+  getApReconciliation(@CurrentOrg() orgId: string, @Query('asOf') asOf?: string) {
+    return this.apReconciliationService.reconcileApControl(orgId, asOf);
   }
 
   @Get('customer-statement/:customerId')
