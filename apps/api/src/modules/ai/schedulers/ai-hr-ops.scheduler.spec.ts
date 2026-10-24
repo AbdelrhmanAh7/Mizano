@@ -28,7 +28,12 @@ describe('aiHrOpsSchedulerProvider', () => {
   it.each([undefined, 'false', ''])(
     'does not instantiate the scheduler when AI_SCHEDULERS_ENABLED=%p',
     async (flag) => {
-      expect(await resolveScheduler(flag)).not.toBeInstanceOf(AiHrOpsScheduler);
+      const resolved = await resolveScheduler(flag);
+      expect(resolved).not.toBeInstanceOf(AiHrOpsScheduler);
+      // inert: plain empty object, no cron handlers, so @nestjs/schedule finds nothing to register
+      expect(Object.getPrototypeOf(resolved)).toBe(Object.prototype);
+      expect(Object.keys(resolved as object)).toEqual([]);
+      expect(resolved).not.toHaveProperty('runMonthlyAttritionPrediction');
     },
   );
 
