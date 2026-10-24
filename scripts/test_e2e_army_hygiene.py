@@ -278,6 +278,23 @@ class E2EArmyRepositoryHygieneTests(unittest.TestCase):
         self.assertNotIn("admin@mizano.com", content, "465 spec contains hardcoded plaintext admin@mizano.com")
         self.assertIn("process.env", content, "465 spec should source credentials dynamically from env")
 
+    def test_416_e2e_no_hardcoded_credentials(self):
+        """e2e-army/416-bill-rtl-content.e2e.ts must not contain hard-coded credentials/passwords."""
+        test_file = E2E_ARMY_DIR / "416-bill-rtl-content.e2e.ts"
+        if not test_file.exists():
+            return
+        content = test_file.read_text(encoding="utf-8")
+        violations = find_hardcoded_credential_violations(content)
+        self.assertEqual(
+            violations,
+            [],
+            f"416 spec contains hardcoded credentials: {violations}",
+        )
+        self.assertNotIn("password123", content, "416 spec contains hardcoded plaintext password123")
+        self.assertNotIn("admin@mizano.com", content, "416 spec contains hardcoded plaintext admin@mizano.com")
+        self.assertIn("process.env", content, "416 spec should source credentials dynamically from env")
+
+
 
 if __name__ == "__main__":
     unittest.main()
