@@ -1,6 +1,7 @@
-import { IsArray, IsBoolean, IsInt, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsInt, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
+import { IsStrictBoolean } from '../../../common/dto/strict-boolean';
 
 class DashboardWidgetDto {
   @ApiProperty({ example: 'ai-pulse', description: 'Widget identifier' })
@@ -8,7 +9,7 @@ class DashboardWidgetDto {
   id: string;
 
   @ApiProperty({ example: true, description: 'Whether widget is visible' })
-  @IsBoolean()
+  @IsStrictBoolean()
   visible: boolean;
 
   @ApiProperty({ example: 0, description: 'Display order position' })
