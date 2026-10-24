@@ -79,19 +79,23 @@ export class AttendanceController {
 
   @Get('summary/:employeeId')
   @Permissions('hr.view')
-  @ApiOperation({ summary: 'Get attendance summary for employee' })
+  @ApiOperation({
+    summary: 'Get attendance summary for employee (month + year, or startDate/endDate)',
+  })
   getSummary(
     @CurrentOrg() orgId: string,
     @Param('employeeId') employeeId: string,
-    @Query('month') month: string,
-    @Query('year') year: string,
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
-    return this.attendanceService.getAttendanceSummary(
-      orgId,
-      employeeId,
-      parseInt(month),
-      parseInt(year),
-    );
+    return this.attendanceService.getAttendanceSummary(orgId, employeeId, {
+      month: month === undefined || month === '' ? undefined : Number(month),
+      year: year === undefined || year === '' ? undefined : Number(year),
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+    });
   }
 
   @Put(':id')

@@ -25,6 +25,7 @@ import {
   SendDocumentDto,
   SendPayslipsDto,
   StatementQueryDto,
+  resolveStatementPeriod,
   SendResultResponse,
   BulkSendResultResponse,
 } from '../dto/documents.dto';
@@ -196,8 +197,8 @@ export class DocumentsController {
   @Permissions('sales.view')
   @ApiOperation({ summary: 'Generate customer statement PDF' })
   @ApiParam({ name: 'customerId', description: 'Customer ID' })
-  @ApiQuery({ name: 'dateFrom', required: true, description: 'Statement start date' })
-  @ApiQuery({ name: 'dateTo', required: true, description: 'Statement end date' })
+  @ApiQuery({ name: 'dateFrom', required: false, description: 'Statement start date' })
+  @ApiQuery({ name: 'dateTo', required: false, description: 'Statement end date' })
   @ApiResponse({ status: 200, description: 'PDF file' })
   async getStatementPdf(
     @CurrentOrg() orgId: string,
@@ -205,8 +206,7 @@ export class DocumentsController {
     @Query() query: StatementQueryDto,
     @Res() res: Response,
   ): Promise<void> {
-    const dateFrom = new Date(query.dateFrom);
-    const dateTo = new Date(query.dateTo);
+    const { dateFrom, dateTo } = resolveStatementPeriod(query);
 
     const pdfBuffer = await this.pdfService.generateStatementPdf(
       orgId,
