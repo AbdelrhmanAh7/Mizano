@@ -28,6 +28,11 @@
       "inputs": ["src/**", "test/**", "jest.config.*", "tsconfig.json"],
       "outputs": ["coverage/**"]
     },
+    "test:e2e": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "passThroughEnv": ["DATABASE_URL", "REDIS_URL", "APP_ENV"]
+    },
     "type-check": {
       "dependsOn": ["^build"],
       "inputs": ["src/**/*.ts", "src/**/*.tsx", "tsconfig.json", "package.json"],
