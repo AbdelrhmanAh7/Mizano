@@ -12,21 +12,70 @@ import subprocess
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 PRE_PUSH = ROOT / ".husky" / "pre-push"
 PRE_COMMIT = ROOT / ".husky" / "pre-commit"
 ZERO = "0" * 40
 
-GIT_ENV_CLEAN = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+# Adapted from pre-commit's no_git_env (pre_commit/git.py, MIT License)
+# Non-locating Git variables allowed to pass through from the inherited environment
+_GIT_ENV_ALLOWLIST = frozenset({
+    "GIT_AUTHOR_DATE",
+    "GIT_AUTHOR_EMAIL",
+    "GIT_AUTHOR_NAME",
+    "GIT_COMMITTER_DATE",
+    "GIT_COMMITTER_EMAIL",
+    "GIT_COMMITTER_NAME",
+    "GIT_EXEC_PATH",
+    "GIT_SSH",
+    "GIT_SSH_COMMAND",
+    "GIT_SSL_CAINFO",
+    "GIT_SSL_NO_VERIFY",
+    "GIT_HTTP_PROXY_AUTHMETHOD",
+    "GIT_ALLOW_PROTOCOL",
+    "GIT_ASKPASS",
+    "GIT_TERMINAL_PROMPT",
+})
+
+
+def _git_env(overrides=None):
+    """Return a scrubbed copy of os.environ isolating subprocesses from inherited Git repo state.
+
+    Drops inherited GIT_* variables except the non-locating allowlist, ensuring that
+    all variables from `git rev-parse --local-env-vars` (e.g. GIT_DIR, GIT_WORK_TREE,
+    GIT_INDEX_FILE, GIT_OBJECT_DIRECTORY, GIT_COMMON_DIR, GIT_PREFIX) are stripped.
+    Applies explicit overrides last so test-specific values take precedence.
+    Setting an override key to None removes it from the resulting environment.
+    """
+    clean = {
+        k: v for k, v in os.environ.items()
+        if not k.startswith("GIT_") or k in _GIT_ENV_ALLOWLIST
+    }
+    if overrides:
+        for k, v in overrides.items():
+            if v is None:
+                clean.pop(k, None)
+            else:
+                clean[k] = str(v)
+    return clean
+
+
+def __getattr__(name):
+    """Dynamically provide isolated environments for backward-compatibility attributes.
+
+    Prevents static module-level environment snapshots from going stale across tests.
+    """
+    if name == "GIT_ENV_CLEAN":
+        return _git_env()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def git(cwd, *args, env=None):
-    clean = dict(GIT_ENV_CLEAN)
-    if env:
-        clean.update(env)
+    """Execute git command in cwd isolated from inherited repository environment variables."""
     return subprocess.run(
-        ["git", *args], cwd=cwd, check=True, capture_output=True, text=True, env=clean
+        ["git", *args], cwd=cwd, check=True, capture_output=True, text=True, env=_git_env(env)
     ).stdout.strip()
 
 
@@ -90,9 +139,13 @@ class PrePushHookTests(unittest.TestCase):
         return git(self.repo, "rev-parse", "HEAD")
 
     def push(self, lines, **env):
-        clean = dict(GIT_ENV_CLEAN)
-        clean.pop("SKIP_LOCAL_CI", None)
-        clean.update(env)
+        """Execute .husky/pre-push isolated from inherited Git repository environment variables.
+
+        Strips SKIP_LOCAL_CI by default unless explicitly provided in env overrides.
+        """
+        clean = _git_env(env)
+        if "SKIP_LOCAL_CI" not in env:
+            clean.pop("SKIP_LOCAL_CI", None)
         stdin = "".join(f"{line}\n" for line in lines)
         result = subprocess.run(
             ["sh", str(self.repo / ".husky" / "pre-push"), "origin", "url"],
@@ -234,8 +287,8 @@ class PreCommitHookTests(unittest.TestCase):
         (self.repo / "_lint_staged.js").write_text(js)
 
     def run_hook(self, **env):
-        clean = dict(GIT_ENV_CLEAN)
-        clean.update(env)
+        """Execute .husky/pre-commit isolated from inherited Git repository environment variables."""
+        clean = _git_env(env)
         return subprocess.run(["sh", str(self.repo / ".husky" / "pre-commit")], cwd=self.repo,
                               env=clean, capture_output=True, text=True, timeout=60)
 
@@ -284,6 +337,213 @@ class PreCommitHookTests(unittest.TestCase):
 
         unstaged = git(self.repo, "diff", "--name-only").split()
         self.assertIn("partial.md", unstaged, "Partially staged file had its unstaged hunks staged")
+
+    def test_run_hook_isolates_from_inherited_git_env_with_decoy(self):
+        decoy = self.tmp / "decoy_precommit"
+        decoy.mkdir()
+        git(decoy, "init", "-q", "-b", "master")
+        git(decoy, "config", "user.email", "d@example.com")
+        git(decoy, "config", "user.name", "d")
+        git(decoy, "config", "commit.gpgsign", "false")
+        (decoy / "decoy.txt").write_text("decoy content")
+        git(decoy, "add", "decoy.txt")
+        git(decoy, "commit", "-q", "-m", "decoy commit")
+        decoy_head = git(decoy, "rev-parse", "HEAD")
+        decoy_index = (decoy / ".git" / "index").read_bytes()
+
+        decoy_env = {
+            "GIT_DIR": str(decoy / ".git"),
+            "GIT_WORK_TREE": str(decoy),
+            "GIT_INDEX_FILE": str(decoy / ".git" / "index"),
+            "GIT_COMMON_DIR": str(decoy / ".git"),
+            "MIZANO_TEST_SENTINEL": "precommit-sentinel",
+        }
+        with mock.patch.dict(os.environ, decoy_env):
+            result = self.run_hook()
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(self.log.read_text().split(), ["staged.md"])
+            self.assertEqual(git(decoy, "rev-parse", "HEAD"), decoy_head)
+            self.assertEqual((decoy / ".git" / "index").read_bytes(), decoy_index)
+
+
+class GitEnvironmentIsolationTests(unittest.TestCase):
+    """Validate subprocess environment isolation against inherited Git-specific variables."""
+
+    def test_git_env_helper_scrubs_local_vars_and_preserves_allowlist(self):
+        local_vars_out = subprocess.run(
+            ["git", "rev-parse", "--local-env-vars"],
+            capture_output=True, text=True, check=True,
+        ).stdout.splitlines()
+        local_vars = [v.strip() for v in local_vars_out if v.strip()]
+
+        simulated_env = {
+            "PATH": os.environ.get("PATH", "/usr/bin"),
+            "MIZANO_TEST_SENTINEL": "sentinel-42",
+            "GIT_EXEC_PATH": "/opt/custom/git/exec",
+            "GIT_AUTHOR_NAME": "inherited-author",
+        }
+        for var in local_vars:
+            simulated_env[var] = f"/decoy/{var.lower()}"
+
+        with mock.patch.dict(os.environ, simulated_env, clear=True):
+            cleaned = _git_env({"GIT_AUTHOR_NAME": "explicit-fixture-author"})
+
+        for var in local_vars:
+            self.assertNotIn(var, cleaned, f"Repo-local variable {var} must be stripped")
+
+        self.assertEqual(cleaned.get("MIZANO_TEST_SENTINEL"), "sentinel-42")
+        self.assertEqual(cleaned.get("PATH"), simulated_env["PATH"])
+        self.assertEqual(cleaned.get("GIT_EXEC_PATH"), "/opt/custom/git/exec")
+        self.assertEqual(cleaned.get("GIT_AUTHOR_NAME"), "explicit-fixture-author")
+
+    def test_git_and_push_helpers_do_not_touch_decoy_repo(self):
+        tmp = Path(tempfile.mkdtemp(prefix="mz-decoy-"))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+
+        decoy = tmp / "decoy_repo"
+        decoy.mkdir()
+        git(decoy, "init", "-q", "-b", "master")
+        git(decoy, "config", "user.email", "decoy@example.com")
+        git(decoy, "config", "user.name", "decoy")
+        git(decoy, "config", "commit.gpgsign", "false")
+        (decoy / "decoy.txt").write_text("decoy content")
+        git(decoy, "add", "decoy.txt")
+        git(decoy, "commit", "-q", "-m", "decoy commit")
+
+        decoy_head = git(decoy, "rev-parse", "HEAD")
+        decoy_index = (decoy / ".git" / "index").read_bytes()
+        decoy_refs = git(decoy, "show-ref")
+
+        # Simulate inherited Git environment pointing at the decoy repository
+        decoy_env = {
+            "GIT_DIR": str(decoy / ".git"),
+            "GIT_WORK_TREE": str(decoy),
+            "GIT_INDEX_FILE": str(decoy / ".git" / "index"),
+            "GIT_COMMON_DIR": str(decoy / ".git"),
+        }
+
+        with mock.patch.dict(os.environ, decoy_env):
+            # Target repository where fixture operations should take place
+            target = tmp / "target_repo"
+            target.mkdir()
+            git(target, "init", "-q", "-b", "master")
+            git(target, "config", "user.email", "target@example.com")
+            git(target, "config", "user.name", "target")
+            git(target, "config", "commit.gpgsign", "false")
+            (target / "target.txt").write_text("target content")
+            git(target, "add", "target.txt")
+            git(target, "commit", "-q", "-m", "target commit")
+
+            target_head = git(target, "rev-parse", "HEAD")
+            self.assertNotEqual(target_head, decoy_head)
+            self.assertTrue((target / "target.txt").exists())
+
+            # Bare remote for push test
+            bare_remote = tmp / "bare.git"
+            bare_remote.mkdir()
+            git(bare_remote, "init", "--bare", "-q")
+            git(target, "remote", "add", "origin", str(bare_remote))
+            # Test fixture git pushing to bare remote
+            git(target, "push", "-q", "origin", "master")
+
+        # Verify decoy repository remained completely untouched
+        self.assertEqual(git(decoy, "rev-parse", "HEAD"), decoy_head)
+        self.assertEqual((decoy / ".git" / "index").read_bytes(), decoy_index)
+        self.assertEqual(git(decoy, "show-ref"), decoy_refs)
+        self.assertFalse((decoy / "target.txt").exists())
+
+    def test_run_hook_isolates_from_inherited_git_env(self):
+        tmp = Path(tempfile.mkdtemp(prefix="mz-hook-iso-"))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+
+        decoy = tmp / "decoy_repo"
+        decoy.mkdir()
+        git(decoy, "init", "-q", "-b", "master")
+        git(decoy, "config", "user.email", "decoy@example.com")
+        git(decoy, "config", "user.name", "decoy")
+        git(decoy, "config", "commit.gpgsign", "false")
+        (decoy / "decoy.txt").write_text("decoy content")
+        git(decoy, "add", "decoy.txt")
+        git(decoy, "commit", "-q", "-m", "decoy initial")
+
+        decoy_head = git(decoy, "rev-parse", "HEAD")
+        decoy_index = (decoy / ".git" / "index").read_bytes()
+
+        env_log = tmp / "hook_env.log"
+        # Script logs variable NAMES only, never values (FR-006 secrets policy)
+        hook_py = (
+            f"#!/usr/bin/env python3\n"
+            f"import os\n"
+            f"from pathlib import Path\n"
+            f"names = sorted(os.environ.keys())\n"
+            f"Path({str(env_log)!r}).write_text('\\n'.join(names))\n"
+        )
+
+        target = tmp / "target_repo"
+        target.mkdir()
+        git(target, "init", "-q", "-b", "master")
+        git(target, "config", "user.email", "target@example.com")
+        git(target, "config", "user.name", "target")
+        git(target, "config", "commit.gpgsign", "false")
+        (target / ".husky").mkdir()
+        hook_path = target / ".husky" / "pre-commit"
+        hook_path.write_text(hook_py)
+        hook_path.chmod(0o755)
+
+        decoy_env = {
+            "GIT_DIR": str(decoy / ".git"),
+            "GIT_WORK_TREE": str(decoy),
+            "GIT_INDEX_FILE": str(decoy / ".git" / "index"),
+            "GIT_COMMON_DIR": str(decoy / ".git"),
+            "MIZANO_TEST_SENTINEL": "hook-sentinel-value",
+        }
+
+        with mock.patch.dict(os.environ, decoy_env):
+            # Run hook through runner in target repo
+            clean = _git_env({"EXTRA_OVERRIDE": "present"})
+            res = subprocess.run(
+                [str(hook_path)],
+                cwd=target, env=clean, capture_output=True, text=True, timeout=60,
+            )
+            self.assertEqual(res.returncode, 0, f"Hook failed: {res.stdout} {res.stderr}")
+
+        received_names = set(env_log.read_text().splitlines())
+        local_vars_out = subprocess.run(
+            ["git", "rev-parse", "--local-env-vars"],
+            capture_output=True, text=True, check=True,
+        ).stdout.splitlines()
+        local_vars = {v.strip() for v in local_vars_out if v.strip()}
+
+        # Verify no repo-locating variables leaked to the hook
+        leaked = received_names.intersection(local_vars)
+        self.assertEqual(leaked, set(), f"Leaked local Git variables: {leaked}")
+        self.assertIn("MIZANO_TEST_SENTINEL", received_names)
+        self.assertIn("EXTRA_OVERRIDE", received_names)
+
+        # Verify decoy repository remained untouched
+        self.assertEqual(git(decoy, "rev-parse", "HEAD"), decoy_head)
+        self.assertEqual((decoy / ".git" / "index").read_bytes(), decoy_index)
+
+    def test_git_env_clean_module_attribute_is_dynamic(self):
+        import scripts.test_husky_hooks as mod
+
+        with mock.patch.dict(os.environ, {"GIT_DIR": "/decoy/.git", "SENTINEL_DYN_A": "alpha"}):
+            env_a = mod.GIT_ENV_CLEAN
+            self.assertNotIn("GIT_DIR", env_a)
+            self.assertEqual(env_a.get("SENTINEL_DYN_A"), "alpha")
+
+        with mock.patch.dict(os.environ, {"GIT_DIR": "/decoy/.git", "SENTINEL_DYN_B": "beta"}):
+            env_b = mod.GIT_ENV_CLEAN
+            self.assertNotIn("GIT_DIR", env_b)
+            self.assertEqual(env_b.get("SENTINEL_DYN_B"), "beta")
+            self.assertNotIn("SENTINEL_DYN_A", env_b)
+
+    def test_git_env_removes_keys_with_none_override(self):
+        with mock.patch.dict(os.environ, {"KEEP_ME": "yes", "REMOVE_ME": "temporary"}):
+            scrubbed = _git_env({"REMOVE_ME": None, "ADDED": "new"})
+            self.assertIn("KEEP_ME", scrubbed)
+            self.assertEqual(scrubbed.get("ADDED"), "new")
+            self.assertNotIn("REMOVE_ME", scrubbed)
 
 
 if __name__ == "__main__":
