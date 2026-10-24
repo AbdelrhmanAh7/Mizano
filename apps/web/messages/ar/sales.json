@@ -34,7 +34,12 @@
       "paymentTerms": "شروط الدفع",
       "priceList": "قائمة الأسعار",
       "billingAddress": "عنوان الفوترة",
-      "shippingAddress": "عنوان الشحن"
+      "shippingAddress": "عنوان الشحن",
+      "createCustomer": "إنشاء عميل",
+      "updateCustomer": "تحديث العميل",
+      "saving": "جارٍ الحفظ…",
+      "cancel": "إلغاء",
+      "copyFromBilling": "نسخ من عنوان الفوترة"
     },
     "table": {
       "name": "الاسم",
