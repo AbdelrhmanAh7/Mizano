@@ -174,7 +174,7 @@ describe('DepreciationService - Validation, Idempotency & Tenant Scoping', () =>
       await expect(ctx.service.reverseDepreciation(ORG_A, 'sch-other-2026-03')).rejects.toThrow(
         'Depreciation schedule not found',
       );
-      expect(mock(ctx.prisma.depreciationSchedule.findFirst).mock.calls[0][0].where).toEqual({
+      expect(mock(ctx.prisma.depreciationSchedule.findUnique).mock.calls[0][0].where).toEqual({
         id: 'sch-other-2026-03',
         organizationId: ORG_A,
       });
@@ -201,7 +201,6 @@ describe('DepreciationService - Validation, Idempotency & Tenant Scoping', () =>
         ctx.prisma.asset.findFirst,
         ctx.prisma.asset.update,
         ctx.prisma.depreciationSchedule.findUnique,
-        ctx.prisma.depreciationSchedule.findFirst,
         ctx.prisma.depreciationSchedule.findMany,
         ctx.prisma.depreciationSchedule.updateMany,
         ctx.prisma.depreciationSchedule.update,

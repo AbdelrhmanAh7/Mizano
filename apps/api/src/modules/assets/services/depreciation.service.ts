@@ -371,7 +371,7 @@ export class DepreciationService {
    * Reverse a depreciation entry
    */
   async reverseDepreciation(organizationId: string, scheduleId: string): Promise<void> {
-    const schedule = await this.prisma.depreciationSchedule.findFirst({
+    const schedule = await this.prisma.depreciationSchedule.findUnique({
       where: { id: scheduleId, organizationId },
       include: {
         asset: true,
@@ -464,6 +464,15 @@ export class DepreciationService {
     if (scheduleEntry.bookValue.greaterThan(asset.purchasePrice)) {
       throw new Error(
         `Schedule entry ${scheduleEntry.id} book value (${scheduleEntry.bookValue}) cannot exceed asset purchase price (${asset.purchasePrice})`,
+      );
+    }
+
+    // Ensure the schedule entry maintains the fundamental accounting identity:
+    // purchasePrice = accumulatedDepreciation + bookValue
+    const computedPurchasePrice = scheduleEntry.bookValue.plus(scheduleEntry.accumulatedTotal);
+    if (!computedPurchasePrice.equals(asset.purchasePrice)) {
+      throw new Error(
+        `Schedule entry ${scheduleEntry.id} book value (${scheduleEntry.bookValue}) + accumulated depreciation (${scheduleEntry.accumulatedTotal}) must equal asset purchase price (${asset.purchasePrice})`,
       );
     }
   }
