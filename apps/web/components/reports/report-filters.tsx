@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { format, startOfMonth, endOfMonth, startOfYear, subMonths, subYears } from 'date-fns';
+import { useFormatter, useLocale, useTranslations } from 'next-intl';
+import { startOfMonth, endOfMonth, startOfYear, subMonths, subYears } from 'date-fns';
+import { ar, enUS } from 'date-fns/locale';
 import { CalendarIcon, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -31,13 +33,13 @@ interface ReportFiltersProps {
 }
 
 const presetOptions = [
-  { value: 'this-month', label: 'This Month' },
-  { value: 'last-month', label: 'Last Month' },
-  { value: 'this-quarter', label: 'This Quarter' },
-  { value: 'last-quarter', label: 'Last Quarter' },
-  { value: 'this-year', label: 'This Year' },
-  { value: 'last-year', label: 'Last Year' },
-  { value: 'custom', label: 'Custom' },
+  { value: 'this-month', labelKey: 'thisMonth' },
+  { value: 'last-month', labelKey: 'lastMonth' },
+  { value: 'this-quarter', labelKey: 'thisQuarter' },
+  { value: 'last-quarter', labelKey: 'lastQuarter' },
+  { value: 'this-year', labelKey: 'thisYear' },
+  { value: 'last-year', labelKey: 'lastYear' },
+  { value: 'custom', labelKey: 'custom' },
 ];
 
 export function ReportFilters({
@@ -50,6 +52,9 @@ export function ReportFilters({
   onExport,
   isExporting,
 }: ReportFiltersProps) {
+  const t = useTranslations('reports');
+  const formatter = useFormatter();
+  const calendarLocale = useLocale() === 'ar' ? ar : enUS;
   const [preset, setPreset] = useState('this-month');
 
   const handlePresetChange = (value: string) => {
@@ -100,12 +105,12 @@ export function ReportFilters({
         <>
           <Select value={preset} onValueChange={handlePresetChange}>
             <SelectTrigger className="w-40">
-              <SelectValue placeholder="Select period" />
+              <SelectValue placeholder={t('filters.selectPeriod')} />
             </SelectTrigger>
             <SelectContent>
               {presetOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
-                  {option.label}
+                  {t(`filters.${option.labelKey}`)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -117,11 +122,16 @@ export function ReportFilters({
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-[140px] justify-start">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(dateRange.startDate, 'MMM d, yyyy')}
+                    {formatter.dateTime(dateRange.startDate, {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
+                    locale={calendarLocale}
                     mode="single"
                     selected={dateRange.startDate}
                     onSelect={(date) =>
@@ -131,16 +141,21 @@ export function ReportFilters({
                   />
                 </PopoverContent>
               </Popover>
-              <span className="text-muted-foreground">to</span>
+              <span className="text-muted-foreground">{t('filters.to')}</span>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-[140px] justify-start">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(dateRange.endDate, 'MMM d, yyyy')}
+                    {formatter.dateTime(dateRange.endDate, {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
+                    locale={calendarLocale}
                     mode="single"
                     selected={dateRange.endDate}
                     onSelect={(date) => date && onDateRangeChange({ ...dateRange, endDate: date })}
@@ -155,16 +170,17 @@ export function ReportFilters({
 
       {showAsOfDate && asOfDate && onAsOfDateChange && (
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">As of:</span>
+          <span className="text-sm text-muted-foreground">{t('filters.asOf')}</span>
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" className="w-[160px] justify-start">
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {format(asOfDate, 'MMM d, yyyy')}
+                {formatter.dateTime(asOfDate, { month: 'short', day: 'numeric', year: 'numeric' })}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar
+                locale={calendarLocale}
                 mode="single"
                 selected={asOfDate}
                 onSelect={(date) => date && onAsOfDateChange(date)}
@@ -178,7 +194,7 @@ export function ReportFilters({
       {onExport && (
         <Button variant="outline" onClick={onExport} disabled={isExporting}>
           <Download className="mr-2 h-4 w-4" />
-          {isExporting ? 'Exporting...' : 'Export'}
+          {isExporting ? t('filters.exporting') : t('actions.export')}
         </Button>
       )}
     </div>

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import { ArrowLeft, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
+import { ReportLoadError } from '@/components/reports/report-load-error';
 import {
   useTrialBalanceReport,
   formatCurrency,
@@ -28,9 +29,17 @@ import {
 
 export default function TrialBalanceReportPage() {
   const t = useTranslations('reports');
+  const formatter = useFormatter();
   const [asOfDate, setAsOfDate] = useState(new Date());
 
-  const { data: report, isLoading } = useTrialBalanceReport(format(asOfDate, 'yyyy-MM-dd'));
+  const {
+    data: report,
+    isLoading,
+    isError,
+    refetch,
+  } = useTrialBalanceReport(format(asOfDate, 'yyyy-MM-dd'));
+
+  const currencyCode = report?.currencyCode;
 
   if (isLoading) {
     return (
@@ -70,7 +79,15 @@ export default function TrialBalanceReportPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('trialBalance.title')}</h1>
-          <p className="text-muted-foreground">As of {format(asOfDate, 'MMMM d, yyyy')}</p>
+          <p className="text-muted-foreground">
+            {t('asOf', {
+              date: formatter.dateTime(asOfDate, {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+              }),
+            })}
+          </p>
         </div>
       </div>
 
@@ -82,10 +99,12 @@ export default function TrialBalanceReportPage() {
         showAsOfDate
       />
 
-      {!hasData ? (
+      {isError ? (
+        <ReportLoadError onRetry={() => void refetch()} />
+      ) : !hasData ? (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            No trial balance data available. Create some transactions first.
+            {t('trialBalance.empty')}
           </CardContent>
         </Card>
       ) : (
@@ -102,12 +121,17 @@ export default function TrialBalanceReportPage() {
                   )}
                   <div>
                     <p className="font-semibold">
-                      {isBalanced ? 'Trial Balance is Balanced' : 'Trial Balance is Not Balanced'}
+                      {isBalanced ? t('trialBalance.balanced') : t('trialBalance.notBalanced')}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {isBalanced
-                        ? 'Total debits equal total credits'
-                        : `Difference: ${formatCurrency(Math.abs(totalDebits - totalCredits))}`}
+                        ? t('trialBalance.equalTotals')
+                        : t('difference', {
+                            amount: formatCurrency(
+                              Math.abs(totalDebits - totalCredits),
+                              currencyCode,
+                            ),
+                          })}
                     </p>
                   </div>
                 </div>
@@ -117,13 +141,17 @@ export default function TrialBalanceReportPage() {
                       <p className="text-sm text-muted-foreground">
                         {t('trialBalance.totalDebit')}
                       </p>
-                      <p className="text-xl font-bold font-mono">{formatCurrency(totalDebits)}</p>
+                      <p className="text-xl font-bold font-mono">
+                        {formatCurrency(totalDebits, currencyCode)}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">
                         {t('trialBalance.totalCredit')}
                       </p>
-                      <p className="text-xl font-bold font-mono">{formatCurrency(totalCredits)}</p>
+                      <p className="text-xl font-bold font-mono">
+                        {formatCurrency(totalCredits, currencyCode)}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -134,15 +162,15 @@ export default function TrialBalanceReportPage() {
           {/* Trial Balance Table */}
           <Card>
             <CardHeader>
-              <CardTitle>Account Balances</CardTitle>
+              <CardTitle>{t('trialBalance.accountBalances')}</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Code</TableHead>
+                    <TableHead>{t('code')}</TableHead>
                     <TableHead>{t('trialBalance.account')}</TableHead>
-                    <TableHead>Type</TableHead>
+                    <TableHead>{t('type')}</TableHead>
                     <TableHead className="text-right">{t('trialBalance.debit')}</TableHead>
                     <TableHead className="text-right">{t('trialBalance.credit')}</TableHead>
                   </TableRow>
@@ -154,26 +182,26 @@ export default function TrialBalanceReportPage() {
                       <TableCell className="font-medium">{account.name}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className={getAccountTypeColor(account.type)}>
-                          {account.type}
+                          {t(`accountTypes.${account.type}`)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {account.debit > 0 ? formatCurrency(account.debit) : '-'}
+                        {account.debit > 0 ? formatCurrency(account.debit, currencyCode) : '-'}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {account.credit > 0 ? formatCurrency(account.credit) : '-'}
+                        {account.credit > 0 ? formatCurrency(account.credit, currencyCode) : '-'}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
                 <TableFooter>
                   <TableRow className="font-bold">
-                    <TableCell colSpan={3}>Total</TableCell>
+                    <TableCell colSpan={3}>{t('total')}</TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatCurrency(totalDebits)}
+                      {formatCurrency(totalDebits, currencyCode)}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatCurrency(totalCredits)}
+                      {formatCurrency(totalCredits, currencyCode)}
                     </TableCell>
                   </TableRow>
                 </TableFooter>

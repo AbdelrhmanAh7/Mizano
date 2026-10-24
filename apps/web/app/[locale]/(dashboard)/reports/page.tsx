@@ -22,7 +22,7 @@ export default function ReportsPage() {
   const reportCategories = [
     {
       name: t('categories.financial'),
-      description: 'Core financial statements',
+      description: t('categories.financialDescription'),
       reports: [
         {
           name: t('profitLoss.title'),
@@ -45,8 +45,8 @@ export default function ReportsPage() {
       ],
     },
     {
-      name: 'Receivables & Payables',
-      description: 'Track what you owe and are owed',
+      name: t('categories.aging'),
+      description: t('categories.agingDescription'),
       reports: [
         {
           name: t('arAging.title'),
@@ -64,7 +64,7 @@ export default function ReportsPage() {
     },
     {
       name: t('categories.sales'),
-      description: 'Analyze sales and purchasing performance',
+      description: t('categories.salesDescription'),
       reports: [
         {
           name: t('salesByCustomer.title'),
@@ -87,8 +87,8 @@ export default function ReportsPage() {
       ],
     },
     {
-      name: 'Accounting Reports',
-      description: 'Detailed accounting records',
+      name: t('categories.accounting'),
+      description: t('categories.accountingDescription'),
       reports: [
         {
           name: t('generalLedger.title'),

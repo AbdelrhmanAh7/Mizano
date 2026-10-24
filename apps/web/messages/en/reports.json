@@ -7,7 +7,13 @@
     "sales": "Sales Reports",
     "purchases": "Purchase Reports",
     "inventory": "Inventory Reports",
-    "tax": "Tax Reports"
+    "tax": "Tax Reports",
+    "financialDescription": "Core financial statements",
+    "aging": "Receivables & Payables",
+    "agingDescription": "Track what you owe and are owed",
+    "salesDescription": "Analyze sales and purchasing performance",
+    "accounting": "Accounting Reports",
+    "accountingDescription": "Detailed accounting records"
   },
   "profitLoss": {
     "title": "Profit & Loss",
@@ -19,7 +25,8 @@
     "operatingProfit": "Operating Profit",
     "otherIncome": "Other Income",
     "otherExpenses": "Other Expenses",
-    "netProfit": "Net Profit"
+    "netProfit": "Net Profit",
+    "empty": "No profit & loss data available. Create some transactions first."
   },
   "balanceSheet": {
     "title": "Balance Sheet",
@@ -34,7 +41,10 @@
     "totalLiabilities": "Total Liabilities",
     "equity": "Equity",
     "totalEquity": "Total Equity",
-    "totalLiabilitiesAndEquity": "Total Liabilities & Equity"
+    "totalLiabilitiesAndEquity": "Total Liabilities & Equity",
+    "empty": "No balance sheet data available. Create some transactions first.",
+    "balanced": "Balance sheet is balanced",
+    "notBalanced": "Balance sheet is not balanced"
   },
   "cashFlow": {
     "title": "Cash Flow Statement",
@@ -64,11 +74,22 @@
     "debit": "Debit",
     "credit": "Credit",
     "totalDebit": "Total Debit",
-    "totalCredit": "Total Credit"
+    "totalCredit": "Total Credit",
+    "empty": "No trial balance data available. Create some transactions first.",
+    "balanced": "Trial Balance is Balanced",
+    "notBalanced": "Trial Balance is Not Balanced",
+    "equalTotals": "Total debits equal total credits",
+    "accountBalances": "Account Balances"
   },
   "generalLedger": {
     "title": "General Ledger",
-    "description": "Detailed account transactions"
+    "description": "Detailed account transactions",
+    "selectAccount": "Select an account",
+    "selectAccountTitle": "Select an Account",
+    "selectAccountHint": "Choose an account from the dropdown above to view its general ledger entries.",
+    "entries": "Ledger Entries",
+    "empty": "No entries found for this period.",
+    "journalNumber": "Journal #"
   },
   "arAging": {
     "title": "AR Aging",
@@ -79,7 +100,14 @@
     "days31to60": "31-60 Days",
     "days61to90": "61-90 Days",
     "over90": "Over 90 Days",
-    "total": "Total"
+    "total": "Total",
+    "empty": "No accounts receivable aging data available.",
+    "outstandingInvoices": "Outstanding Invoices",
+    "invoiceNumber": "Invoice #",
+    "invoiceDate": "Invoice Date",
+    "invoiceCount": "{count} invoices",
+    "bucketTitle": "{bucket} Invoices",
+    "emptyBucket": "No invoices in this aging bucket"
   },
   "apAging": {
     "title": "AP Aging",
@@ -90,15 +118,30 @@
     "days31to60": "31-60 Days",
     "days61to90": "61-90 Days",
     "over90": "Over 90 Days",
-    "total": "Total"
+    "total": "Total",
+    "totalPayable": "Total Payable",
+    "outstandingBills": "Outstanding Bills",
+    "empty": "No outstanding payables found.",
+    "billNumber": "Bill #",
+    "billDate": "Bill Date",
+    "billCount": "{count} bills",
+    "bucketTitle": "{bucket} Bills",
+    "emptyBucket": "No bills in this aging bucket"
   },
   "salesByCustomer": {
     "title": "Sales by Customer",
-    "description": "Sales breakdown by customer"
+    "description": "Sales breakdown by customer",
+    "totalSales": "Total Sales",
+    "customers": "Customers",
+    "empty": "No sales data found for the selected period."
   },
   "salesByItem": {
     "title": "Sales by Item",
-    "description": "Sales breakdown by item"
+    "description": "Sales breakdown by item",
+    "totalRevenue": "Total Revenue",
+    "totalQuantitySold": "Total Qty Sold",
+    "uniqueItems": "Unique Items",
+    "empty": "No item sales data found for the selected period."
   },
   "purchasesByVendor": {
     "title": "Purchases by Vendor",
@@ -106,7 +149,10 @@
     "unappliedCredits": "Unapplied Credits",
     "netPayable": "Net Payable",
     "totalUnappliedCredits": "Unapplied Vendor Credits",
-    "totalNetPayable": "Net Payable"
+    "totalNetPayable": "Net Payable",
+    "totalPurchases": "Total Purchases",
+    "vendors": "Vendors",
+    "empty": "No purchase data found for the selected period."
   },
   "inventoryValuation": {
     "title": "Inventory Valuation",
@@ -131,12 +177,60 @@
     "lastQuarter": "Last Quarter",
     "thisYear": "This Year",
     "lastYear": "Last Year",
-    "custom": "Custom"
+    "custom": "Custom",
+    "selectPeriod": "Select period",
+    "to": "to",
+    "asOf": "As of:",
+    "exporting": "Exporting..."
   },
   "actions": {
     "generate": "Generate Report",
     "export": "Export",
     "print": "Print",
     "refresh": "Refresh"
+  },
+  "total": "Total",
+  "asOf": "As of {date}",
+  "difference": "Difference: {amount}",
+  "agingSummary": "Aging Summary",
+  "code": "Code",
+  "type": "Type",
+  "date": "Date",
+  "descriptionLabel": "Description",
+  "balance": "Balance",
+  "customer": "Customer",
+  "vendor": "Vendor",
+  "invoices": "Invoices",
+  "bills": "Bills",
+  "item": "Item",
+  "quantitySold": "Qty Sold",
+  "averagePrice": "Avg. Price",
+  "totalAmount": "Total Amount",
+  "paid": "Paid",
+  "balanceDue": "Balance Due",
+  "totalPaid": "Total Paid",
+  "outstanding": "Outstanding",
+  "amount": "Amount",
+  "dueDate": "Due Date",
+  "daysOverdue": "Days Overdue",
+  "errorTitle": "Reports Error",
+  "retry": "Retry",
+  "loadError": "Unable to load this report.",
+  "accountTypes": {
+    "ASSET": "Asset",
+    "LIABILITY": "Liability",
+    "EQUITY": "Equity",
+    "REVENUE": "Revenue",
+    "INCOME": "Income",
+    "EXPENSE": "Expense"
+  },
+  "agingBuckets": {
+    "current": "Current",
+    "1-15": "1-15 Days",
+    "16-30": "16-30 Days",
+    "1-30": "1-30 Days",
+    "31-60": "31-60 Days",
+    "61-90": "61-90 Days",
+    "90+": "Over 90 Days"
   }
 }

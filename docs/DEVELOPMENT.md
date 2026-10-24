@@ -144,6 +144,15 @@ Rules:
 
 ## CI
 
+For the bill currency/report localization follow-up (#68), the focused regression command from `apps/web` is:
+
+```powershell
+node ../../node_modules/jest/bin/jest.js --runInBand --runTestsByPath components/purchases/bill-amount.spec.tsx lib/hooks/use-organization.spec.ts lib/hooks/use-reports.spec.ts "app/[locale]/(dashboard)/purchases/purchases-currency.spec.tsx" "app/[locale]/(dashboard)/reports/report-currency.spec.tsx" "app/[locale]/(dashboard)/reports/report-labels.spec.tsx" "app/[locale]/(dashboard)/reports/report-load-error.spec.tsx"
+```
+
+This invokes the installed Jest directly, avoiding npm's warnings for pnpm settings and Windows `.cmd` argument handling for paths containing parentheses. Run the installed TypeScript/ESLint entrypoints similarly when PowerShell blocks `npx.ps1`. These targeted tests cover lookup loading/failure/retry, document-currency precedence, organization switching, bill/payment page currency states, report currency, en/ar labels and report load errors; they do not establish E2E or release acceptance. A worker restricted to targeted tests leaves the full suites/build and browser acceptance to the coordinator.
+
+`.github/workflows/ci.yml` runs on pushes and PRs to `master`/`develop`: install (pnpm 8, Node 20, `prisma generate`) → lint and type-check → unit tests (with PostgreSQL 16 and Redis 7 services, `db:push`) → build. E2E is not part of CI yet.
 Checks on PRs and pushes to `master`, by source:
 
 - **`.github/workflows/ci.yml` (GitHub-hosted runners):** runs on pushes to `master` and on PRs to `master`/`develop`, on GitHub-hosted runners only (`ubuntu-latest`; free and unlimited because the repository is public; no self-hosted labels, no secrets beyond `GITHUB_TOKEN`). Four independent parallel jobs, each limited to 5 minutes (`timeout-minutes: 5`; split a job rather than raising the limit): **Install Dependencies** (pnpm 8, Node 20, `prisma generate`), **Lint & Type Check**, **Unit Tests** (PostgreSQL 16 and Redis 7 service containers, `db:push`) and **Build**. Their names are the check names the automerge gates wait for, so keep them stable. A newer push to a PR cancels its older run. The workflow uses `pull_request` (never `pull_request_target`); fork PRs run only after approval in the repository settings. E2E is not part of this workflow. `deploy.yml` stays disabled (it needs deployment secrets).
