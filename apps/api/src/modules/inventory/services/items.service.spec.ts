@@ -251,5 +251,31 @@ describe('ItemsService', () => {
       ).rejects.toThrow(BadRequestException);
       expect(mockPrismaService.item.update).not.toHaveBeenCalled();
     });
+
+    it('rejects a non-numeric sellingPrice or costPrice with 400', async () => {
+      mockPrismaService.item.findFirst.mockResolvedValue({ id: 'item-1' });
+
+      await expect(service.update('org-001', 'item-1', { sellingPrice: 'abc' })).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.update('org-001', 'item-1', { costPrice: 'abc' })).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockPrismaService.item.update).not.toHaveBeenCalled();
+    });
+
+    it('stores valid prices as Decimal and leaves absent ones untouched', async () => {
+      mockPrismaService.item.findFirst.mockResolvedValue({ id: 'item-1' });
+      mockPrismaService.item.update.mockResolvedValue({ id: 'item-1' });
+
+      await service.update('org-001', 'item-1', { sellingPrice: '12.50', name: 'N' });
+
+      const { data } = mockPrismaService.item.update.mock.calls[0][0] as {
+        data: Record<string, { toString(): string } | string>;
+      };
+      expect(data.sellingPrice.toString()).toBe('12.5');
+      expect(data.name).toBe('N');
+      expect('costPrice' in data).toBe(false);
+    });
   });
 });

@@ -106,7 +106,12 @@ export class ItemsService {
       if (existing) throw new ConflictException('SKU already exists');
     }
     await this.assertAccountsBelongToOrg(organizationId, dto);
-    return this.prisma.item.update({ where: { id }, data: dto });
+    const data: Prisma.ItemUpdateInput | Prisma.ItemUncheckedUpdateInput = { ...dto };
+    if (dto.sellingPrice !== undefined)
+      data.sellingPrice = DecimalUtils.parseInput(dto.sellingPrice, 'sellingPrice');
+    if (dto.costPrice !== undefined)
+      data.costPrice = DecimalUtils.parseInput(dto.costPrice, 'costPrice');
+    return this.prisma.item.update({ where: { id }, data });
   }
 
   async remove(organizationId: string, id: string) {

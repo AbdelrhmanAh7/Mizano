@@ -215,7 +215,7 @@ export class TimesheetsService {
     const data: Prisma.TimesheetEntryUpdateInput = {};
     if (dto.description !== undefined) data.description = dto.description;
     if (dto.isBillable !== undefined) data.isBillable = dto.isBillable;
-    if (dto.hours) data.hours = DecimalUtils.parseInput(dto.hours, 'hours');
+    if (dto.hours !== undefined) data.hours = DecimalUtils.parseInput(dto.hours, 'hours');
     if (dto.date) data.date = new Date(dto.date);
 
     return this.prisma.timesheetEntry.update({
