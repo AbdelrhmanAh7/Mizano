@@ -43,7 +43,7 @@ Issue #309 addresses non-blocking review findings from #255:
 2. **AC2 (Schedule Consistency Validation Before DB Transaction)**: Before creating journal entries or updating asset balances, the service validates that `scheduleEntry.bookValue` is not less than `asset.salvageValue`, `scheduleEntry.accumulatedTotal` is non-negative, and `scheduleEntry.bookValue` does not exceed `asset.purchasePrice`. **Additionally**, the fundamental accounting identity `bookValue + accumulatedTotal == purchasePrice` is enforced. In `runMonthlyDepreciation`, validation runs before opening `$transaction`, logging errors and skipping corrupted records without unneeded DB transactions.
 3. **AC3 (Reversal Remediation Path Preserved)**: `reverseDepreciation` restores asset book value and accumulated depreciation from executed schedule history without throwing validation errors if past historical records were inconsistent, ensuring bad postings can always be remediated.
 4. **AC4 (Consistent Entry Timestamp)**: In `runDepreciationForAsset`, `executedAt` when claiming the period via `updateMany` uses `today` (captured at method entry), matching `runMonthlyDepreciation`.
-5. **AC5 (Spec Modularity & Readability)**: The 570+ line spec is modularized into focused test files and a shared fixture (`depreciation.service.spec.ts`, `depreciation-validation.service.spec.ts`, `depreciation.test-fixtures.ts`), each under 190 lines, with all 23 unit tests passing, clean TypeScript typechecks (`pnpm --filter api type-check`), and zero ESLint errors or warnings (`pnpm --filter api lint`).
+5. **AC5 (Spec Modularity & Readability)**: The 570+ line spec is modularized into focused test files and a shared fixture (`depreciation.service.spec.ts`, `depreciation-validation.service.spec.ts`, `depreciation.test-fixtures.ts`), each under 190 lines, with all 23 unit tests passing, clean TypeScript typechecks (`pnpm --filter api type-check`), and zero ESLint errors or warnings.
 
 ---
 
@@ -61,7 +61,7 @@ Issue #309 addresses non-blocking review findings from #255:
 | **AC5** | TypeScript type-check across api package                                | `pnpm --filter api type-check`                                                                                                                                                                                                                                             | Pre-existing errors in unrelated files (shared-types module); **no new errors from changes**                                                         | 2\*       | **PASSED** |
 | **AC5** | ESLint across changed files                                             | `pnpm --filter api exec eslint src/modules/assets/services/depreciation.service.ts src/modules/assets/services/depreciation.service.spec.ts src/modules/assets/services/depreciation-validation.service.spec.ts src/modules/assets/services/depreciation.test-fixtures.ts` | PASS: 0 errors, 0 warnings                                                                                                                           | 0         | **PASSED** |
 
-\* Type-check exits with code 2 due to pre-existing missing `@mizano/shared-types` module in unrelated files (logger, reports, filters). Verified no new errors introduced by stashing changes and comparing base vs head.
+* Type-check exits with code 2 due to pre-existing missing `@mizano/shared-types` module in unrelated files (logger, reports, filters). Verified no new errors introduced by stashing changes and comparing base vs head.
 
 ---
 
