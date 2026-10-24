@@ -55,6 +55,23 @@ const lineSchema = z.object({
   taxRate: z.string().trim().regex(OPTIONAL_PERCENT_INPUT, 'taxInvalid').default('0'),
 });
 
+type BillAccount = { id: string; code: string; name: string; type: string; isActive?: boolean };
+
+// A line account must be an active EXPENSE account. A missing `isActive` counts as active
+// (domain default); with no accounts loaded yet the API stays the judge.
+function createBillSchema(accounts: BillAccount[]) {
+  const usable = new Set(
+    accounts.filter((a) => a.type === 'EXPENSE' && a.isActive !== false).map((a) => a.id),
+  );
+  const checkedLine = lineSchema.refine(
+    (line) => !line.accountId || accounts.length === 0 || usable.has(line.accountId),
+    { message: 'accountInvalidType', path: ['accountId'] },
+  );
+  return billSchema.extend({
+    lines: z.array(checkedLine).min(1, 'At least one line item is required'),
+  });
+}
+
 const billSchema = z.object({
   vendorId: z.string().min(1, 'Vendor is required'),
   date: z.string().min(1, 'Date is required'),
@@ -81,12 +98,13 @@ export interface BillFormDefaultValues {
     quantity: string;
     rate: string;
     taxRate?: string;
+    accountId?: string;
   }>;
 }
 
 interface BillFormProps {
   bill?: Bill | null;
-  accounts?: Array<{ id: string; code: string; name: string; type: string }>;
+  accounts?: BillAccount[];
   items?: Array<{ id: string; name: string; sku: string; costPrice: string }>;
   projects?: Array<{ id: string; name: string }>;
   onSubmit: (data: Record<string, unknown>) => void;
@@ -117,11 +135,10 @@ export function BillForm({
   const { data: vendorsData } = useVendors({ limit: 100 });
   const vendors = useMemo(() => vendorsData?.data || [], [vendorsData?.data]);
 
-  // Filter accounts
-  const _expenseAccounts = accounts.filter((a) => a.type === 'EXPENSE' || a.type === 'ASSET');
+  const schema = useMemo(() => createBillSchema(accounts), [accounts]);
 
   const form = useForm<BillFormData>({
-    resolver: zodResolver(billSchema),
+    resolver: zodResolver(schema),
     defaultValues: {
       vendorId: scanDefaults?.vendorId || defaultVendorId || '',
       date: scanDefaults?.date || format(new Date(), 'yyyy-MM-dd'),
@@ -132,6 +149,7 @@ export function BillForm({
       projectId: scanDefaults?.projectId || '',
       lines: scanDefaults?.lines?.length
         ? scanDefaults.lines.map((l) => ({
+            accountId: l.accountId ?? '',
             description: l.description,
             quantity: l.quantity,
             rate: l.rate,

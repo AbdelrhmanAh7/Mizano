@@ -1,12 +1,18 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { BillForm } from './bill-form';
 import enAi from '@/messages/en/ai.json';
 import arAi from '@/messages/ar/ai.json';
+import enPurchases from '@/messages/en/purchases.json';
+import arPurchases from '@/messages/ar/purchases.json';
 
 jest.mock('next-intl', () => ({
-  useTranslations: () => (key: string, values?: Record<string, string>) =>
-    values ? `${key}|${Object.values(values).join('|')}` : key,
+  useTranslations: () =>
+    Object.assign(
+      (key: string, values?: Record<string, string>) =>
+        values ? `${key}|${Object.values(values).join('|')}` : key,
+      { has: () => true },
+    ),
 }));
 jest.mock('@/lib/hooks/use-vendors', () => ({
   useVendors: () => ({ data: { data: [] } }),
@@ -78,6 +84,55 @@ describe('BillForm scan review totals', () => {
         expect((intake as Record<string, unknown>)[key]).toEqual(expect.any(String));
       }
       expect(Object.keys(intake.discrepancyField)).toEqual(['subtotal', 'tax', 'total']);
+    }
+  });
+});
+
+describe('BillForm line account validation', () => {
+  const accounts = [
+    { id: 'exp-1', code: '5100', name: 'Office', type: 'EXPENSE', isActive: true },
+    { id: 'exp-off', code: '5900', name: 'Closed', type: 'EXPENSE', isActive: false },
+    { id: 'rev-1', code: '4000', name: 'Sales', type: 'REVENUE', isActive: true },
+  ];
+
+  function submitWithAccount(accountId: string) {
+    const onSubmit = jest.fn();
+    render(
+      <BillForm
+        accounts={accounts}
+        scanDefaults={{
+          ...scanDefaults,
+          vendorId: 'v1',
+          lines: [{ ...scanDefaults.lines[0], accountId }],
+        }}
+        onSubmit={onSubmit}
+        onCancel={jest.fn()}
+      />,
+    );
+    fireEvent.submit(document.querySelector('form')!);
+    return onSubmit;
+  }
+
+  it('accepts an active expense account', async () => {
+    const onSubmit = submitWithAccount('exp-1');
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+  });
+
+  it('rejects submission when a line references an inactive expense account', async () => {
+    const onSubmit = submitWithAccount('exp-off');
+    expect(await screen.findByText('line|1|accountInvalidType')).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('rejects submission when a line references an invalid account type', async () => {
+    const onSubmit = submitWithAccount('rev-1');
+    expect(await screen.findByText('line|1|accountInvalidType')).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('has the accountInvalidType copy in English and Arabic', () => {
+    for (const p of [enPurchases, arPurchases]) {
+      expect(p.bills.validation.accountInvalidType).toEqual(expect.any(String));
     }
   });
 });
