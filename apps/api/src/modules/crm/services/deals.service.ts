@@ -4,22 +4,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
-
-export interface CreateDealDto {
-  dealName: string;
-  leadId?: string;
-  customerId?: string;
-  stage?: DealStage;
-  expectedAmount: number;
-  probability?: number;
-  expectedCloseDate?: string;
-  assignedToId?: string;
-  notes?: string;
-}
-
-export interface UpdateDealDto extends Partial<CreateDealDto> {
-  lostReason?: string;
-}
+import { CreateDealDto, UpdateDealDto } from '../dto/deal.dto';
 
 export interface DealQueryDto {
   stage?: DealStage;
