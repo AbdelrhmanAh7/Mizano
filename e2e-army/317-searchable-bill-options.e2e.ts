@@ -163,7 +163,7 @@ test(
       await expect(listbox).not.toBeVisible();
       await expect(trigger).toHaveText('Manual Entry');
       for (const name of ['Amount', 'Total']) {
-        await expect(screen.getByRole('columnheader', { name, exact: true })).toHaveCSS('text-align', 'end');
+        await expect(screen.getByRole('columnheader', { name, exact: true })).toHaveCSS('text-align', dir === 'rtl' ? 'left' : 'right');
       }
       await agent.assert('the bill form remains open without submitting after selecting Manual Entry');
     }

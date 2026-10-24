@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { BillForm } from './bill-form';
 import enAi from '@/messages/en/ai.json';
 import arAi from '@/messages/ar/ai.json';
@@ -91,6 +91,36 @@ describe('BillForm scan review totals', () => {
 });
 
 describe('BillForm select direction', () => {
+  const scrollIntoView = HTMLElement.prototype.scrollIntoView;
+  beforeAll(() => {
+    HTMLElement.prototype.scrollIntoView = jest.fn();
+  });
+  afterAll(() => {
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+  });
+  it.each([
+    ['ar', 'rtl'],
+    ['en', 'ltr'],
+  ])('opens the line Select and aligns numeric cells in %s (%s)', async (locale, dir) => {
+    mockLocale = locale;
+    renderForm({});
+    const table = screen.getByRole('table');
+    const trigger = within(table).getByRole('combobox');
+    expect(trigger).toHaveAttribute('dir', dir);
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+    const listbox = await screen.findByRole('listbox');
+    expect(listbox).toHaveAttribute('dir', dir);
+    fireEvent.click(within(listbox).getByRole('option', { name: 'Manual Entry' }));
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument());
+    expect(trigger).toHaveTextContent('Manual Entry');
+    for (const name of ['Amount', 'Total']) {
+      expect(within(table).getByRole('columnheader', { name })).toHaveClass('text-end');
+    }
+    const cells = within(table).getAllByRole('cell');
+    expect(cells[4]).toHaveClass('text-end');
+    expect(cells[6]).toHaveClass('text-end');
+  });
+
   afterEach(() => {
     mockLocale = 'en';
   });

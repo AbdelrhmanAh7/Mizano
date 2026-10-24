@@ -403,9 +403,9 @@ export function BillForm({
                 <TableHead>Description</TableHead>
                 <TableHead className="w-[80px]">Qty</TableHead>
                 <TableHead className="w-[110px]">Unit Price</TableHead>
-                <TableHead className="w-[110px] text-right">Amount</TableHead>
+                <TableHead className="w-[110px] text-end">Amount</TableHead>
                 <TableHead className="w-[100px]">Tax %</TableHead>
-                <TableHead className="w-[110px] text-right">Total</TableHead>
+                <TableHead className="w-[110px] text-end">Total</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -457,7 +457,7 @@ export function BillForm({
                         className="h-8"
                       />
                     </TableCell>
-                    <TableCell className="text-right font-mono">{lineTotals.net}</TableCell>
+                    <TableCell className="text-end font-mono">{lineTotals.net}</TableCell>
                     <TableCell>
                       <Input
                         {...form.register(`lines.${index}.taxRate`)}
@@ -468,7 +468,7 @@ export function BillForm({
                         className="h-8 w-24"
                       />
                     </TableCell>
-                    <TableCell className="text-right font-mono font-semibold">
+                    <TableCell className="text-end font-mono font-semibold">
                       {lineTotals.total}
                     </TableCell>
                     <TableCell>
