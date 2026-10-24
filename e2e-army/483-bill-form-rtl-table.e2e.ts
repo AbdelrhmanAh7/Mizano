@@ -67,15 +67,14 @@ test(
     const rowAmountCell = screen.getByTestId('line-0-amount').first();
     const rowTotalCell = screen.getByTestId('line-0-total').first();
 
-    if (await rowAmountCell.isVisible()) {
-      const rowAmountAlign = await rowAmountCell.evaluate((el) => getComputedStyle(el).textAlign);
-      expect(rowAmountAlign, 'Amount cell should use logical text-align: end').toBe('end');
-    }
+    await expect(rowAmountCell).toBeVisible();
+    await expect(rowTotalCell).toBeVisible();
 
-    if (await rowTotalCell.isVisible()) {
-      const rowTotalAlign = await rowTotalCell.evaluate((el) => getComputedStyle(el).textAlign);
-      expect(rowTotalAlign, 'Total cell should use logical text-align: end').toBe('end');
-    }
+    const rowAmountAlign = await rowAmountCell.evaluate((el) => getComputedStyle(el).textAlign);
+    expect(rowAmountAlign, 'Amount cell should use logical text-align: end').toBe('end');
+
+    const rowTotalAlign = await rowTotalCell.evaluate((el) => getComputedStyle(el).textAlign);
+    expect(rowTotalAlign, 'Total cell should use logical text-align: end').toBe('end');
 
     // Capture RTL screenshot for visual verification
     await screen.page().screenshot({ path: 'test-results/483-bill-form-ar-rtl-table.png', fullPage: true });
@@ -133,15 +132,14 @@ test(
     const rowAmountCell = screen.getByTestId('line-0-amount').first();
     const rowTotalCell = screen.getByTestId('line-0-total').first();
 
-    if (await rowAmountCell.isVisible()) {
-      const rowAmountAlign = await rowAmountCell.evaluate((el) => getComputedStyle(el).textAlign);
-      expect(rowAmountAlign, 'Amount cell should use logical text-align: end').toBe('end');
-    }
+    await expect(rowAmountCell).toBeVisible();
+    await expect(rowTotalCell).toBeVisible();
 
-    if (await rowTotalCell.isVisible()) {
-      const rowTotalAlign = await rowTotalCell.evaluate((el) => getComputedStyle(el).textAlign);
-      expect(rowTotalAlign, 'Total cell should use logical text-align: end').toBe('end');
-    }
+    const rowAmountAlign = await rowAmountCell.evaluate((el) => getComputedStyle(el).textAlign);
+    expect(rowAmountAlign, 'Amount cell should use logical text-align: end').toBe('end');
+
+    const rowTotalAlign = await rowTotalCell.evaluate((el) => getComputedStyle(el).textAlign);
+    expect(rowTotalAlign, 'Total cell should use logical text-align: end').toBe('end');
 
     // Capture LTR screenshot for visual comparison
     await screen.page().screenshot({ path: 'test-results/483-bill-form-en-ltr-table.png', fullPage: true });
