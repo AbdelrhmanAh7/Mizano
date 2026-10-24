@@ -1,8 +1,7 @@
 'use client';
 
 import { InsightDataViewer } from '@/components/ai';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { Link, useRouter } from '@/i18n/routing';
 import { format } from 'date-fns';
 import {
   ArrowLeft,
@@ -43,6 +42,15 @@ const insightIcons: Record<InsightType, React.ReactNode> = {
   ALERT: <Bell className="h-6 w-6" />,
   OPPORTUNITY: <Target className="h-6 w-6" />,
 };
+
+function formatDateSafe(
+  dateStr?: string | null,
+  formatStr: string = 'MMMM d, yyyy at HH:mm',
+): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? '' : format(d, formatStr);
+}
 
 export default function InsightDetailPage({ params }: { params: { id: string } }) {
   const t = useTranslations('ai.insights.detail');
@@ -110,9 +118,11 @@ export default function InsightDetailPage({ params }: { params: { id: string } }
                   {getInsightPriorityLabel(insight.priority)}
                 </Badge>
               </div>
-              <p className="text-muted-foreground">
-                Generated {format(new Date(insight.createdAt), 'MMMM d, yyyy at HH:mm')}
-              </p>
+              {formatDateSafe(insight.createdAt) && (
+                <p className="text-muted-foreground">
+                  Generated {formatDateSafe(insight.createdAt)}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -245,12 +255,10 @@ export default function InsightDetailPage({ params }: { params: { id: string } }
                   <p className="font-medium">{insight.module}</p>
                 </div>
               )}
-              {insight.expiresAt && (
+              {insight.expiresAt && formatDateSafe(insight.expiresAt, 'MMM d, yyyy') && (
                 <div>
                   <p className="text-sm text-muted-foreground">{t('expires')}</p>
-                  <p className="font-medium">
-                    {format(new Date(insight.expiresAt), 'MMM d, yyyy')}
-                  </p>
+                  <p className="font-medium">{formatDateSafe(insight.expiresAt, 'MMM d, yyyy')}</p>
                 </div>
               )}
             </CardContent>

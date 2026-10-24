@@ -5,6 +5,11 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { UserStatus } from '@prisma/client';
 
+/** Bound each page of organizations fetched by the scheduled notification checks. */
+export const NOTIFICATION_BATCH_SIZE = 50;
+/** Bound the number of entities inspected per organization per run. */
+export const NOTIFICATION_QUERY_LIMIT = 100;
+
 @Injectable()
 export class NotificationsService {
   constructor(private prisma: PrismaService) {}
@@ -131,32 +136,80 @@ export class NotificationsService {
     return { deleted: result.count };
   }
 
+  /**
+   * Walk a query in id order, one bounded page at a time, until a page comes back
+   * shorter than `pageSize`. Each page is requested with a cursor on the last id of
+   * the previous page, so no row is skipped or repeated and memory stays bounded.
+   */
+  private async *eachPage<T extends { id: string }>(
+    pageSize: number,
+    fetchPage: (page: {
+      take: number;
+      orderBy: { id: 'asc' };
+      cursor?: { id: string };
+      skip?: number;
+    }) => Promise<T[]>,
+  ): AsyncGenerator<T[]> {
+    let cursor: string | undefined;
+    for (;;) {
+      const page = await fetchPage({
+        take: pageSize,
+        orderBy: { id: 'asc' },
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      });
+      if (page.length === 0) return;
+      yield page;
+      if (page.length < pageSize) return;
+      cursor = page[page.length - 1].id;
+    }
+  }
+
+  /** Every organization, in bounded id-ordered pages. */
+  private eachOrganizationBatch(): AsyncGenerator<{ id: string }[]> {
+    return this.eachPage(NOTIFICATION_BATCH_SIZE, (page) =>
+      this.prisma.organization.findMany({ select: { id: true }, ...page }),
+    );
+  }
+
   // Scheduled notification checks
   @Cron(CronExpression.EVERY_HOUR)
   async checkOverdueInvoices() {
-    const overdueInvoices = await this.prisma.invoice.findMany({
-      where: {
-        deletedAt: null,
-        dueDate: { lt: new Date() },
-        balanceDue: { gt: 0 },
-        status: { not: 'OVERDUE' },
-      },
-      include: {
-        organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } },
-      },
-    });
-
-    for (const invoice of overdueInvoices) {
-      const adminUser = invoice.organization.users[0];
-      if (adminUser) {
-        await this.createForUser(
-          adminUser.id,
-          invoice.organizationId,
-          'INVOICE_OVERDUE',
-          'Invoice Overdue',
-          `Invoice ${invoice.invoiceNumber} is now overdue.`,
-          { entityType: 'invoice', entityId: invoice.id },
+    // Orgs and each org's invoices are paged by id cursor: bounded memory on the Pi,
+    // and no tenant or invoice past the first page is ever skipped.
+    for await (const batch of this.eachOrganizationBatch()) {
+      for (const org of batch) {
+        const pages = this.eachPage(NOTIFICATION_QUERY_LIMIT, (page) =>
+          this.prisma.invoice.findMany({
+            where: {
+              organizationId: org.id,
+              deletedAt: null,
+              dueDate: { lt: new Date() },
+              balanceDue: { gt: 0 },
+              status: { not: 'OVERDUE' },
+            },
+            include: {
+              organization: {
+                include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } },
+              },
+            },
+            ...page,
+          }),
         );
+        for await (const overdueInvoices of pages) {
+          for (const invoice of overdueInvoices) {
+            const adminUser = invoice.organization.users[0];
+            if (adminUser) {
+              await this.createForUser(
+                adminUser.id,
+                invoice.organizationId,
+                'INVOICE_OVERDUE',
+                'Invoice Overdue',
+                `Invoice ${invoice.invoiceNumber} is now overdue.`,
+                { entityType: 'invoice', entityId: invoice.id },
+              );
+            }
+          }
+        }
       }
     }
   }
@@ -166,63 +219,86 @@ export class NotificationsService {
     const threeDaysFromNow = new Date();
     threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
 
-    const upcomingBills = await this.prisma.bill.findMany({
-      where: {
-        deletedAt: null,
-        dueDate: { gte: new Date(), lte: threeDaysFromNow },
-        balanceDue: { gt: 0 },
-      },
-      include: {
-        organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } },
-      },
-    });
-
-    for (const bill of upcomingBills) {
-      const adminUser = bill.organization.users[0];
-      if (adminUser) {
-        await this.createForUser(
-          adminUser.id,
-          bill.organizationId,
-          'BILL_DUE',
-          'Bill Payment Due Soon',
-          `Bill ${bill.billNumber} is due in ${Math.ceil((bill.dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))} days.`,
-          { entityType: 'bill', entityId: bill.id },
+    // See checkOverdueInvoices for the paging contract.
+    for await (const batch of this.eachOrganizationBatch()) {
+      for (const org of batch) {
+        const pages = this.eachPage(NOTIFICATION_QUERY_LIMIT, (page) =>
+          this.prisma.bill.findMany({
+            where: {
+              organizationId: org.id,
+              deletedAt: null,
+              dueDate: { gte: new Date(), lte: threeDaysFromNow },
+              balanceDue: { gt: 0 },
+            },
+            include: {
+              organization: {
+                include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } },
+              },
+            },
+            ...page,
+          }),
         );
+        for await (const upcomingBills of pages) {
+          for (const bill of upcomingBills) {
+            const adminUser = bill.organization.users[0];
+            if (adminUser) {
+              await this.createForUser(
+                adminUser.id,
+                bill.organizationId,
+                'BILL_DUE',
+                'Bill Payment Due Soon',
+                `Bill ${bill.billNumber} is due in ${Math.ceil((bill.dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))} days.`,
+                { entityType: 'bill', entityId: bill.id },
+              );
+            }
+          }
+        }
       }
     }
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_8AM)
   async checkLowInventory() {
-    const items = await this.prisma.item.findMany({
-      where: { type: 'GOODS' },
-      include: {
-        organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } },
-      },
-    });
+    // See checkOverdueInvoices for the paging contract.
+    for await (const batch of this.eachOrganizationBatch()) {
+      for (const org of batch) {
+        const pages = this.eachPage(NOTIFICATION_QUERY_LIMIT, (page) =>
+          this.prisma.item.findMany({
+            where: { organizationId: org.id, type: 'GOODS' },
+            include: {
+              organization: {
+                include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } },
+              },
+            },
+            ...page,
+          }),
+        );
+        for await (const items of pages) {
+          for (const item of items) {
+            const movements = await this.prisma.inventoryMovement.findMany({
+              where: { itemId: item.id, organizationId: item.organizationId },
+              select: { quantity: true, movementType: true },
+            });
+            const currentStock = movements.reduce(
+              (sum: number, m) => sum + signedMovementQuantity(m.quantity, m.movementType),
+              0,
+            );
+            const reorderPoint = item.reorderPoint || 10;
 
-    for (const item of items) {
-      const movements = await this.prisma.inventoryMovement.findMany({
-        where: { itemId: item.id, organizationId: item.organizationId },
-        select: { quantity: true, movementType: true },
-      });
-      const currentStock = movements.reduce(
-        (sum: number, m) => sum + signedMovementQuantity(m.quantity, m.movementType),
-        0,
-      );
-      const reorderPoint = item.reorderPoint || 10;
-
-      if (currentStock <= reorderPoint) {
-        const adminUser = item.organization.users[0];
-        if (adminUser) {
-          await this.createForUser(
-            adminUser.id,
-            item.organizationId,
-            'LOW_STOCK',
-            'Low Stock Alert',
-            `${item.name} is running low (${currentStock} remaining).`,
-            { entityType: 'item', entityId: item.id },
-          );
+            if (currentStock <= reorderPoint) {
+              const adminUser = item.organization.users[0];
+              if (adminUser) {
+                await this.createForUser(
+                  adminUser.id,
+                  item.organizationId,
+                  'LOW_STOCK',
+                  'Low Stock Alert',
+                  `${item.name} is running low (${currentStock} remaining).`,
+                  { entityType: 'item', entityId: item.id },
+                );
+              }
+            }
+          }
         }
       }
     }

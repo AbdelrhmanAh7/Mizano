@@ -68,7 +68,17 @@ async function bootstrap() {
     ? corsOriginRaw.split(',').map((o) => o.trim())
     : ['http://localhost:5001'];
   app.enableCors({
-    origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
+    origin: isProduction
+      ? corsOrigins.length === 1
+        ? corsOrigins[0]
+        : corsOrigins
+      : (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+          if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+            callback(null, true);
+          } else {
+            callback(null, corsOrigins.includes(origin));
+          }
+        },
     credentials: true,
   });
 

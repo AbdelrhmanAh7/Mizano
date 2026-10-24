@@ -33,7 +33,6 @@ import { ReorderPointsController } from '../controllers/reorder-points.controlle
 import { PatternDetectionController } from '../controllers/pattern-detection.controller';
 import { AnomalyDetectionController } from '../controllers/anomaly-detection.controller';
 import { ReconciliationAiController } from '../controllers/reconciliation-ai.controller';
-import { OllamaTunnelController } from '../controllers/ollama-tunnel.controller';
 
 @Module({
   imports: [PrismaModule, AiCoreModule, AiNlpModule, HttpModule, ConfigModule],
@@ -43,7 +42,6 @@ import { OllamaTunnelController } from '../controllers/ollama-tunnel.controller'
     PatternDetectionController,
     AnomalyDetectionController,
     ReconciliationAiController,
-    OllamaTunnelController,
   ],
   providers: [
     OllamaService,
@@ -56,6 +54,8 @@ import { OllamaTunnelController } from '../controllers/ollama-tunnel.controller'
     DocumentIntakeService,
     IntakeJobsService,
     IntakeJobOwnerGuard,
+    // Enqueue-only queue client: IntakeProcessorService (the BullMQ worker) is
+    // deliberately excluded from AiOperationsModule and runs only in IntakeWorkerModule (#141).
     IntakeQueueService,
     { provide: IntakeStorage, useClass: LocalFsIntakeStorage },
     { provide: INTAKE_CLOCK, useValue: monotonicClock },

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { EmployeeAttritionService } from '../services/employee-attrition.service';
 import { CompensationBenchmarkService } from '../services/compensation-benchmark.service';
@@ -7,12 +8,14 @@ import { QualityPredictionService } from '../services/quality-prediction.service
 import { PredictiveMaintenanceService } from '../services/predictive-maintenance.service';
 import { ResourceOptimizationService } from '../services/resource-optimization.service';
 import { describeError } from '../../../common/utils/redact';
+import { aiSchedulersEnabled } from './ai-schedulers.enabled';
 
 const BATCH_SIZE = 5;
 
 @Injectable()
 export class AiHrOpsScheduler {
   private readonly logger = new Logger(AiHrOpsScheduler.name);
+  private readonly enabled: boolean;
 
   constructor(
     private prisma: PrismaService,
@@ -21,13 +24,34 @@ export class AiHrOpsScheduler {
     private qualityService: QualityPredictionService,
     private maintenanceService: PredictiveMaintenanceService,
     private resourceService: ResourceOptimizationService,
-  ) {}
+    private config: ConfigService,
+  ) {
+    this.enabled = config?.get('AI_SCHEDULERS_ENABLED') === 'true' || aiSchedulersEnabled();
+    if (!this.enabled) {
+      this.logger.log(
+        'AI_SCHEDULERS_ENABLED is not set to true; AI HR/Ops schedulers are disabled',
+      );
+    }
+  }
+
+  public isEnabled(): boolean {
+    return this.enabled;
+  }
+
+  private guard(): boolean {
+    if (!this.enabled) {
+      this.logger.debug('AI scheduler skipped (AI_SCHEDULERS_ENABLED != true)');
+      return false;
+    }
+    return true;
+  }
 
   /**
    * Monthly attrition prediction - runs on the 1st at 5 AM
    */
-  @Cron('0 5 1 * *')
+  @Cron('0 5 1 * *', { name: 'ai:hr:monthly-attrition-prediction' })
   async runMonthlyAttritionPrediction() {
+    if (!this.guard()) return;
     this.logger.log('Starting monthly attrition prediction...');
 
     try {
@@ -69,8 +93,9 @@ export class AiHrOpsScheduler {
   /**
    * Monthly compensation benchmarking - runs on the 1st at 4 AM
    */
-  @Cron('0 4 1 * *')
+  @Cron('0 4 1 * *', { name: 'ai:hr:monthly-compensation-benchmark' })
   async runMonthlyCompensationBenchmark() {
+    if (!this.guard()) return;
     this.logger.log('Starting monthly compensation benchmark...');
 
     try {
@@ -112,8 +137,9 @@ export class AiHrOpsScheduler {
   /**
    * Weekly quality prediction - runs every Monday at 5 AM
    */
-  @Cron('0 5 * * 1')
+  @Cron('0 5 * * 1', { name: 'ai:hr:weekly-quality-prediction' })
   async runWeeklyQualityPrediction() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly quality prediction...');
 
     try {
@@ -153,8 +179,9 @@ export class AiHrOpsScheduler {
   /**
    * Monthly predictive maintenance - runs on the 1st at 6 AM
    */
-  @Cron('0 6 1 * *')
+  @Cron('0 6 1 * *', { name: 'ai:hr:monthly-predictive-maintenance' })
   async runMonthlyPredictiveMaintenance() {
+    if (!this.guard()) return;
     this.logger.log('Starting monthly predictive maintenance...');
 
     try {
@@ -196,8 +223,9 @@ export class AiHrOpsScheduler {
   /**
    * Monthly resource optimization - runs on the 1st at 7 AM
    */
-  @Cron('0 7 1 * *')
+  @Cron('0 7 1 * *', { name: 'ai:hr:monthly-resource-optimization' })
   async runMonthlyResourceOptimization() {
+    if (!this.guard()) return;
     this.logger.log('Starting monthly resource optimization...');
 
     try {

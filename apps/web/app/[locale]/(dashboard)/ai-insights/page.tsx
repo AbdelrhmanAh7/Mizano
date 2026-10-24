@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import { Link } from '@/i18n/routing';
 import { format } from 'date-fns';
 import {
   Brain,
@@ -49,6 +49,12 @@ const insightIcons: Record<InsightType, React.ReactNode> = {
   ALERT: <Bell className="h-5 w-5" />,
   OPPORTUNITY: <Target className="h-5 w-5" />,
 };
+
+function formatDateSafe(dateStr?: string | null, formatStr: string = 'MMM d, yyyy HH:mm'): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? '' : format(d, formatStr);
+}
 
 export default function AIInsightsPage() {
   const t = useTranslations('ai.insights');
@@ -272,7 +278,9 @@ export default function AIInsightsPage() {
                           <span>
                             {t('confidence')}: {formatConfidence(insight.confidence)}
                           </span>
-                          <span>{format(new Date(insight.createdAt), 'MMM d, yyyy HH:mm')}</span>
+                          {formatDateSafe(insight.createdAt) && (
+                            <span>{formatDateSafe(insight.createdAt)}</span>
+                          )}
                           {insight.module && (
                             <span>
                               {t('module')}: {insight.module}

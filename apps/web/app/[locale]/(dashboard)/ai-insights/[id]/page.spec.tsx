@@ -30,6 +30,13 @@ jest.mock('next/link', () => {
   return Link;
 });
 
+jest.mock('@/i18n/routing', () => ({
+  Link: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
+  useRouter: () => ({ push: jest.fn() }),
+}));
+
 const mockUseAIInsight = jest.fn();
 const mockUseDismissInsight = jest.fn(() => ({ mutateAsync: jest.fn() }));
 const mockUseActionInsight = jest.fn(() => ({ mutateAsync: jest.fn() }));
