@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsEnum, IsInt, IsBoolean, MaxLength } from 'class-validator';
+import { IsDecimalString } from '../../../common/dto/decimal-string';
 import { ApiProperty } from '@nestjs/swagger';
 import { ItemType } from '@prisma/client';
 
@@ -29,6 +30,7 @@ export class UpdateItemDto {
   @ApiProperty({ required: false })
   @IsString()
   @IsOptional()
+  @IsDecimalString()
   sellingPrice?: string;
 
   @ApiProperty({ required: false })
@@ -39,6 +41,7 @@ export class UpdateItemDto {
   @ApiProperty({ required: false })
   @IsString()
   @IsOptional()
+  @IsDecimalString()
   costPrice?: string;
 
   @ApiProperty({ required: false })

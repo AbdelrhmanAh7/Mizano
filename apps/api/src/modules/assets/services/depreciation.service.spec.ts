@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
 import { AssetStatus, DepreciationMethod } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { DepreciationService } from './depreciation.service';
@@ -303,6 +304,24 @@ describe('DepreciationService', () => {
       });
       const sl = assets.find((a) => a.id === 'sl')!;
       expect(sl.status).toBe(AssetStatus.ACTIVE);
+    });
+  });
+
+  describe('missing schedule / asset', () => {
+    it('a period with no schedule row is a 404, not a 500', async () => {
+      await expect(service.runDepreciationForAsset(ORG_A, 'sl', 1, 2099)).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.runDepreciationForAsset(ORG_A, 'sl', 1, 2099)).rejects.toThrow(
+        'No depreciation scheduled for this period',
+      );
+      expect(prisma.journal.create).not.toHaveBeenCalled();
+    });
+
+    it('an unknown asset is a 404, not a 500', async () => {
+      await expect(service.runDepreciationForAsset(ORG_A, 'nope', 3, 2026)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
