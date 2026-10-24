@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ConnectionOptions, Queue, Worker } from 'bullmq';
+import { resolveRedisUrl } from '../../../cache/redis-url';
 import { describeError } from '../../../common/utils/redact';
 import { IntakeQueueUnavailableException } from '../../../common/exceptions';
 
@@ -47,7 +48,7 @@ export class IntakeQueueService implements OnModuleDestroy {
   constructor(private readonly config: ConfigService) {}
 
   private get redisUrl(): string | undefined {
-    return this.config.get<string>('REDIS_URL') || undefined;
+    return resolveRedisUrl(this.config);
   }
 
   get concurrency(): number {

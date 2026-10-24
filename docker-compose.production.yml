@@ -19,7 +19,9 @@ services:
       - NODE_ENV=production
       - API_PORT=6001
       - DATABASE_URL=${DATABASE_URL:-postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}}
-      - REDIS_URL=redis://redis:6379
+      # Compose cannot URL-encode: the API encodes REDIS_PASSWORD into REDIS_URL (set REDIS_URL without credentials).
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}}
       - JWT_SECRET=${JWT_SECRET}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5001}
@@ -98,11 +100,9 @@ services:
     image: postgres:16-alpine
     container_name: mizano-postgres
     restart: unless-stopped
-    ports:
-      - "5432:5432"
     environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       - POSTGRES_USER=${POSTGRES_USER:-mizano}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mizano_secret}
       - POSTGRES_DB=${POSTGRES_DB:-mizano_db}
     command: >
       postgres
@@ -135,9 +135,23 @@ services:
     image: redis:7-alpine
     container_name: mizano-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}}
+      - REDISCLI_AUTH=${REDIS_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}}
+    # Array form: the password stays one argv entry, never split by a shell
+    # (a single quote in it is the only character YAML cannot carry here).
+    command:
+      [
+        'redis-server',
+        '--requirepass',
+        '${REDIS_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}}',
+        '--appendonly',
+        'yes',
+        '--maxmemory',
+        '256mb',
+        '--maxmemory-policy',
+        'allkeys-lru',
+      ]
     deploy:
       resources:
         limits:
@@ -149,7 +163,7 @@ services:
     networks:
       - mizano-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "--no-auth-warning", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
