@@ -141,3 +141,31 @@ test(
     await agent.assert('bill form renders LTR in English locale');
   },
 );
+test(
+  '@issue-411 AC1-AC3: bill line Select opens, selects and aligns in Arabic RTL and English LTR',
+  { tags: ['feat:mz-purchase-bills', 'lvl:ui'] },
+  async ({ app, agent, screen, browser }) => {
+    await app.open('/en/login');
+    await agent.act('sign in as {email} with password {pw}', { params: LOGIN });
+    for (const [locale, dir] of [['ar', 'rtl'], ['en', 'ltr']] as const) {
+      await app.open(`/${locale}/purchases/bills/new`);
+      expect(await browser.evaluate(() => document.documentElement.dir)).toBe(dir);
+      const page = screen.page();
+      const trigger = page.locator('tbody').getByRole('combobox').first();
+      await expect(trigger).toHaveAttribute('dir', dir);
+      await trigger.click();
+      const listbox = screen.getByRole('listbox');
+      await expect(listbox).toBeVisible();
+      await expect(listbox).toHaveAttribute('dir', dir);
+      await expect(listbox).toHaveCSS('direction', dir);
+      await page.screenshot({ path: `test-results/411-bill-line-${locale}-${dir}.png`, fullPage: true });
+      await screen.getByRole('option', { name: 'Manual Entry', exact: true }).click();
+      await expect(listbox).not.toBeVisible();
+      await expect(trigger).toHaveText('Manual Entry');
+      for (const name of ['Amount', 'Total']) {
+        await expect(screen.getByRole('columnheader', { name, exact: true })).toHaveCSS('text-align', 'end');
+      }
+      await agent.assert('the bill form remains open without submitting after selecting Manual Entry');
+    }
+  },
+);
