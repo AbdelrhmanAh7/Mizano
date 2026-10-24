@@ -1,6 +1,7 @@
 FROM python:3.11-slim
 WORKDIR /app
-RUN pip install --no-cache-dir fastapi uvicorn httpx
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 COPY ollama_proxy.py .
 ENV TUNNEL_URL_FILE=/data/ollama_tunnel_url
 # WEBHOOK_SECRET has no default on purpose: the container refuses to start without it.

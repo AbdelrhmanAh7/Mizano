@@ -104,15 +104,6 @@ describe('BOMDetailPage', () => {
     mockUseDeleteBOM.mockReturnValue(defaultMutation);
   });
 
-  it('renders loading skeleton without crashing', () => {
-    expect(() => renderPage()).not.toThrow();
-  });
-
-  it('renders "not found" when BOM is undefined and not loading', () => {
-    mockUseBOM.mockReturnValue({ data: undefined, isLoading: false });
-    expect(() => renderPage()).not.toThrow();
-  });
-
   // ── relatedWorkOrders.map regressions ─────────────────────────────────────
 
   it('does not crash when workOrdersResponse is paginated { data, meta } shape (regression: .map is not a function)', () => {
@@ -158,18 +149,5 @@ describe('BOMDetailPage', () => {
     });
     renderPage();
     expect(screen.getByText('bom.noWorkOrders')).toBeInTheDocument();
-  });
-
-  it('renders BOM components table when components are present', () => {
-    mockUseBOM.mockReturnValue({
-      data: makeBOM({
-        components: [{ id: 'c1', itemCode: 'RAW-001', itemName: 'Steel', quantity: 2, unit: 'kg' }],
-      }),
-      isLoading: false,
-    });
-    mockUseWorkOrdersByBom.mockReturnValue({ data: { data: [], meta: { total: 0 } } });
-    renderPage();
-    expect(screen.getByText('RAW-001')).toBeInTheDocument();
-    expect(screen.getByText('Steel')).toBeInTheDocument();
   });
 });

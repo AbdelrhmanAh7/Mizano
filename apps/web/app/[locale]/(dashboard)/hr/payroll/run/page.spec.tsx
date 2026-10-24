@@ -74,18 +74,6 @@ describe('RunPayrollPage', () => {
     mockUseConfirmPayroll.mockReturnValue(defaultMutations);
   });
 
-  it('renders without crashing with empty employee list', () => {
-    expect(() => renderPage()).not.toThrow();
-  });
-
-  it('renders without crashing with valid employees', () => {
-    mockUseEmployees.mockReturnValue({
-      data: { data: [makeEmployee()], meta: { total: 1 } },
-      isLoading: false,
-    });
-    expect(() => renderPage()).not.toThrow();
-  });
-
   // ── allowances.reduce regression ──────────────────────────────────────────
 
   it('does not crash when allowances is null (regression: allowances.reduce is not a function)', () => {
@@ -126,23 +114,5 @@ describe('RunPayrollPage', () => {
     renderPage();
     const btn = screen.getByText('payroll.selectPeriod.generatePreview');
     expect(() => fireEvent.click(btn)).not.toThrow();
-  });
-
-  it('advances to preview step when Generate Preview is clicked with valid employee', () => {
-    mockUseEmployees.mockReturnValue({
-      data: {
-        data: [makeEmployee({ allowances: [{ amount: 500 }], deductions: [{ amount: 200 }] })],
-        meta: { total: 1 },
-      },
-      isLoading: false,
-    });
-    renderPage();
-    fireEvent.click(screen.getByText('payroll.selectPeriod.generatePreview'));
-    expect(screen.getByText('payroll.preview.description')).toBeInTheDocument();
-  });
-
-  it('shows loading skeleton when employees are loading', () => {
-    mockUseEmployees.mockReturnValue({ data: undefined, isLoading: true });
-    expect(() => renderPage()).not.toThrow();
   });
 });

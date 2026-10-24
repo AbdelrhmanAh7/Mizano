@@ -1,0 +1,4 @@
+# Pinned dependencies of the ollama-proxy service (used by the nightly test job).
+fastapi==0.143.0
+httpx==0.28.1
+uvicorn==0.54.0

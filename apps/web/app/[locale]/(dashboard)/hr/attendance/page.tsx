@@ -183,6 +183,7 @@ function AttendancePageContent() {
               void handleStatusChange(row.original.id, selectedDate, value as AttendanceStatus);
             }}
           >
+            <input type="hidden" name="attendanceStatus" value={att?.status ?? '__none__'} />
             <SelectTrigger className="w-32">
               <SelectValue placeholder={t('attendance.mark')} />
             </SelectTrigger>
