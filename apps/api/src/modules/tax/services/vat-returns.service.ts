@@ -16,6 +16,7 @@ import { LEGACY_OPENING_JOURNAL_NUMBER } from '../../accounting/services/opening
 import { CreateVatReturnDto } from '../dto/create-vat-return.dto';
 import { RecordVatPaymentDto } from '../dto/record-vat-payment.dto';
 import { VatReturnQueryDto } from '../dto/vat-return-query.dto';
+import { computeVatDraft } from '../utils/vat-draft-calculator';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ZERO = new Decimal(0);
@@ -558,6 +559,16 @@ export class VatReturnsService {
       vatPayable: Decimal.max(figures.netPayable, ZERO).toFixed(4),
       vatRefundable: Decimal.max(figures.netPayable.neg(), ZERO).toFixed(4),
     };
+  }
+
+  async computeDraftFromLedger(organizationId: string, periodStart: string, periodEnd: string) {
+    return computeVatDraft({
+      prisma: this.prisma,
+      vatReturnsService: this,
+      orgId: organizationId,
+      periodStart,
+      periodEnd,
+    });
   }
 
   async getDashboardStats(organizationId: string) {

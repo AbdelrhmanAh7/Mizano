@@ -104,6 +104,18 @@ export default function ReportsPage() {
         },
       ],
     },
+    {
+      name: t('categories.tax'),
+      description: 'Tax and compliance reports',
+      reports: [
+        {
+          name: t('vatReport.title'),
+          description: t('vatReport.description'),
+          href: '/tax/returns/generate',
+          icon: Calculator,
+        },
+      ],
+    },
   ];
 
   return (

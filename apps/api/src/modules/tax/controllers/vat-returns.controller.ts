@@ -17,7 +17,7 @@ import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 import { CreateVatReturnDto } from '../dto/create-vat-return.dto';
 import { RecordVatPaymentDto } from '../dto/record-vat-payment.dto';
-import { VatReturnQueryDto } from '../dto/vat-return-query.dto';
+import { VatReturnDraftQueryDto, VatReturnQueryDto } from '../dto/vat-return-query.dto';
 import { VatSummaryQueryDto } from '../dto/vat-summary-query.dto';
 import { VatReturnsService } from '../services/vat-returns.service';
 
@@ -62,6 +62,13 @@ export class VatReturnsController {
   @ApiOperation({ summary: 'Bank/cash accounts a VAT payment can be made from' })
   paymentAccounts(@CurrentOrg() orgId: string) {
     return this.vatReturnsService.paymentAccounts(orgId);
+  }
+
+  @Get('draft')
+  @Permissions('tax.view')
+  @ApiOperation({ summary: 'Compute VAT return draft from the ledger' })
+  draft(@CurrentOrg() orgId: string, @Query() query: VatReturnDraftQueryDto) {
+    return this.vatReturnsService.computeDraftFromLedger(orgId, query.periodStart, query.periodEnd);
   }
 
   @Get(':id')
