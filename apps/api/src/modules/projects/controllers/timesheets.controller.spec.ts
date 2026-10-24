@@ -1,4 +1,10 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ExecutionContext, INestApplication } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import * as request from 'supertest';
+import { AllExceptionsFilter } from '../../../common/filters/http-exception.filter';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { TimesheetsService } from '../services/timesheets.service';
 import { TimesheetsController } from './timesheets.controller';
 
 describe('TimesheetsController.getWeeklySummary', () => {
@@ -47,5 +53,44 @@ describe('TimesheetsController.getWeeklySummary', () => {
         errors: { weekStart: ['weekStart (or weekStartDate) is required'] },
       });
     }
+  });
+});
+
+describe('GET /timesheets/weekly-summary (HTTP, with AllExceptionsFilter)', () => {
+  let app: INestApplication;
+  const service = { getWeeklySummary: jest.fn().mockResolvedValue({}) };
+
+  beforeAll(async () => {
+    const allow = {
+      canActivate: (ctx: ExecutionContext) => {
+        ctx.switchToHttp().getRequest().user = { id: 'u1', organizationId: 'org' };
+        return true;
+      },
+    };
+    const moduleRef = await Test.createTestingModule({
+      controllers: [TimesheetsController],
+      providers: [{ provide: TimesheetsService, useValue: service }],
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue(allow)
+      .overrideGuard(PermissionsGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
+    app = moduleRef.createNestApplication();
+    app.useGlobalFilters(new AllExceptionsFilter());
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('omitting both parameters returns the standard 400 validation response', async () => {
+    const res = await request(app.getHttpServer()).get('/timesheets/weekly-summary').expect(400);
+    expect(res.body.statusCode).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_ERROR');
+    expect(res.body.message).toBe('Validation Failed');
+    expect(res.body.details.weekStart).toEqual(['weekStart (or weekStartDate) is required']);
+    expect(service.getWeeklySummary).not.toHaveBeenCalled();
   });
 });
