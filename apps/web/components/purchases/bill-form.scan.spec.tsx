@@ -1,12 +1,18 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { BillForm } from './bill-form';
 import enAi from '@/messages/en/ai.json';
 import arAi from '@/messages/ar/ai.json';
+import enPurchases from '@/messages/en/purchases.json';
+import arPurchases from '@/messages/ar/purchases.json';
 
 jest.mock('next-intl', () => ({
-  useTranslations: () => (key: string, values?: Record<string, string>) =>
-    values ? `${key}|${Object.values(values).join('|')}` : key,
+  useTranslations: () => {
+    const fn = (key: string, values?: Record<string, string>) =>
+      values ? `${key}|${Object.values(values).join('|')}` : key;
+    fn.has = () => true;
+    return fn;
+  },
 }));
 jest.mock('@/lib/hooks/use-vendors', () => ({
   useVendors: () => ({ data: { data: [] } }),
@@ -79,5 +85,176 @@ describe('BillForm scan review totals', () => {
       }
       expect(Object.keys(intake.discrepancyField)).toEqual(['subtotal', 'tax', 'total']);
     }
+  });
+
+  it('has the accountInvalidType copy in English and Arabic', () => {
+    expect(enPurchases.bills.validation.accountInvalidType).toBe(
+      'Account must be an expense or asset account',
+    );
+    expect(arPurchases.bills.validation.accountInvalidType).toBe(
+      'يجب أن يكون الحساب حساب مصروفات أو أصول',
+    );
+  });
+
+  it('rejects submission when a line references an invalid account type', async () => {
+    const onSubmit = jest.fn();
+    const accounts = [
+      { id: 'acc-exp', code: '5000', name: 'Operating Expense', type: 'EXPENSE' },
+      { id: 'acc-liab', code: '2000', name: 'Accounts Payable', type: 'LIABILITY' },
+    ];
+    const initialBill = {
+      id: 'b1',
+      billNumber: 'B-001',
+      vendorId: 'v1',
+      date: '2026-09-01T00:00:00.000Z',
+      dueDate: '2026-10-01T00:00:00.000Z',
+      reference: 'INV-1',
+      currencyCode: 'USD',
+      notes: '',
+      projectId: '',
+      lines: [
+        {
+          id: 'l1',
+          billId: 'b1',
+          itemId: null,
+          accountId: 'acc-liab',
+          description: 'Office supplies',
+          quantity: 1,
+          rate: 100,
+          taxRate: 0,
+          amount: 100,
+        },
+      ],
+    } as unknown as React.ComponentProps<typeof BillForm>['bill'];
+
+    render(
+      <BillForm
+        defaultVendorId="v1"
+        bill={initialBill}
+        accounts={accounts}
+        onSubmit={onSubmit}
+        onCancel={jest.fn()}
+      />,
+    );
+
+    const submitBtn = screen.getByRole('button', { name: /update bill|create bill/i });
+    const form = submitBtn.closest('form')!;
+    fireEvent.submit(form);
+
+    await waitFor(() => {
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+    expect(screen.getByText(/accountInvalidType/)).toBeInTheDocument();
+  });
+
+  it('rejects submission when a line references an inactive expense account', async () => {
+    const onSubmit = jest.fn();
+    const accounts = [
+      { id: 'acc-exp', code: '5000', name: 'Operating Expense', type: 'EXPENSE', isActive: false },
+    ];
+    const initialBill = {
+      id: 'b1',
+      billNumber: 'B-001',
+      vendorId: 'v1',
+      date: '2026-09-01T00:00:00.000Z',
+      dueDate: '2026-10-01T00:00:00.000Z',
+      reference: 'INV-1',
+      currencyCode: 'USD',
+      notes: '',
+      projectId: '',
+      lines: [
+        {
+          id: 'l1',
+          billId: 'b1',
+          itemId: null,
+          accountId: 'acc-exp',
+          description: 'Office supplies',
+          quantity: 1,
+          rate: 100,
+          taxRate: 0,
+          amount: 100,
+        },
+      ],
+    } as unknown as React.ComponentProps<typeof BillForm>['bill'];
+
+    render(
+      <BillForm
+        defaultVendorId="v1"
+        bill={initialBill}
+        accounts={accounts}
+        onSubmit={onSubmit}
+        onCancel={jest.fn()}
+      />,
+    );
+
+    const submitBtn = screen.getByRole('button', { name: /update bill|create bill/i });
+    const form = submitBtn.closest('form')!;
+    fireEvent.submit(form);
+
+    await waitFor(() => {
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+    expect(screen.getByText(/accountInvalidType/)).toBeInTheDocument();
+  });
+
+  it('allows submission when lines reference a valid expense account', async () => {
+    const onSubmit = jest.fn();
+    const accounts = [
+      { id: 'acc-exp', code: '5000', name: 'Operating Expense', type: 'EXPENSE' },
+      { id: 'acc-liab', code: '2000', name: 'Accounts Payable', type: 'LIABILITY' },
+    ];
+    const initialBill = {
+      id: 'b1',
+      billNumber: 'B-001',
+      vendorId: 'v1',
+      date: '2026-09-01T00:00:00.000Z',
+      dueDate: '2026-10-01T00:00:00.000Z',
+      reference: 'INV-1',
+      currencyCode: 'USD',
+      notes: '',
+      projectId: '',
+      lines: [
+        {
+          id: 'l1',
+          billId: 'b1',
+          itemId: null,
+          accountId: 'acc-exp',
+          description: 'Office supplies',
+          quantity: 1,
+          rate: 100,
+          taxRate: 0,
+          amount: 100,
+        },
+      ],
+    } as unknown as React.ComponentProps<typeof BillForm>['bill'];
+
+    render(
+      <BillForm
+        defaultVendorId="v1"
+        bill={initialBill}
+        accounts={accounts}
+        onSubmit={onSubmit}
+        onCancel={jest.fn()}
+      />,
+    );
+
+    const submitBtn = screen.getByRole('button', { name: /update bill|create bill/i });
+    const form = submitBtn.closest('form')!;
+    fireEvent.submit(form);
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          vendorId: 'v1',
+          lines: [expect.objectContaining({ accountId: 'acc-exp' })],
+        }),
+      );
+    });
   });
 });

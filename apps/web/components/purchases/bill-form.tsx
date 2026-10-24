@@ -86,7 +86,7 @@ export interface BillFormDefaultValues {
 
 interface BillFormProps {
   bill?: Bill | null;
-  accounts?: Array<{ id: string; code: string; name: string; type: string }>;
+  accounts?: Array<{ id: string; code: string; name: string; type: string; isActive?: boolean }>;
   items?: Array<{ id: string; name: string; sku: string; costPrice: string }>;
   projects?: Array<{ id: string; name: string }>;
   onSubmit: (data: Record<string, unknown>) => void;
@@ -117,11 +117,35 @@ export function BillForm({
   const { data: vendorsData } = useVendors({ limit: 100 });
   const vendors = useMemo(() => vendorsData?.data || [], [vendorsData?.data]);
 
-  // Filter accounts
-  const _expenseAccounts = accounts.filter((a) => a.type === 'EXPENSE' || a.type === 'ASSET');
+  // Filter accounts: only active expense or asset accounts are valid for bill lines
+  const expenseAccounts = useMemo(
+    () =>
+      accounts.filter((a) => a.isActive !== false && (a.type === 'EXPENSE' || a.type === 'ASSET')),
+    [accounts],
+  );
+  const expenseAccountIds = useMemo(
+    () => new Set(expenseAccounts.map((a) => a.id)),
+    [expenseAccounts],
+  );
+
+  const formSchema = useMemo(() => {
+    return billSchema.superRefine((data, ctx) => {
+      if (accounts.length > 0) {
+        data.lines.forEach((line, index) => {
+          if (line.accountId && !expenseAccountIds.has(line.accountId)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'accountInvalidType',
+              path: ['lines', index, 'accountId'],
+            });
+          }
+        });
+      }
+    });
+  }, [accounts, expenseAccountIds]);
 
   const form = useForm<BillFormData>({
-    resolver: zodResolver(billSchema),
+    resolver: zodResolver(formSchema),
     defaultValues: {
       vendorId: scanDefaults?.vendorId || defaultVendorId || '',
       date: scanDefaults?.date || format(new Date(), 'yyyy-MM-dd'),
@@ -185,6 +209,15 @@ export function BillForm({
   }, [watchVendorId, watchDate, vendors, form]);
 
   const handleSubmit = (data: BillFormData) => {
+    if (accounts.length > 0) {
+      const hasInvalidAccount = data.lines.some(
+        (line) => line.accountId && !expenseAccountIds.has(line.accountId),
+      );
+      if (hasInvalidAccount) {
+        return;
+      }
+    }
+
     const lines = data.lines.map((line) => ({
       itemId: line.itemId || null,
       accountId: line.accountId || null,
@@ -226,7 +259,10 @@ export function BillForm({
               .map((m) =>
                 tValidation('line', {
                   line: index + 1,
-                  message: tValidation.has(m) ? tValidation(m) : m,
+                  message:
+                    typeof tValidation?.has === 'function' && tValidation.has(m)
+                      ? tValidation(m)
+                      : m,
                 }),
               )
           : [],
