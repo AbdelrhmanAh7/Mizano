@@ -617,20 +617,33 @@ export class FinancialReportsService {
     };
   }
 
+  /**
+   * Asserts the account belongs to the caller's organization. Throws NotFoundException
+   * if the account does not exist or belongs to another tenant (#223).
+   * Return type is Promise<void> conforming to assertion contract.
+   */
+  async assertAccountOwnership(organizationId: string, accountId: string): Promise<void> {
+    const account = await this.prisma.account.findFirst({
+      where: { id: accountId, organizationId },
+      select: { id: true },
+    });
+    if (!account) throw new NotFoundException('Account not found');
+  }
+
   async getGeneralLedger(
     organizationId: string,
     accountId: string,
     startDate?: string,
     endDate?: string,
   ): Promise<GeneralLedgerReport> {
-    const account = await this.prisma.account.findFirst({
-      where: { id: accountId, organizationId },
-      select: { id: true, code: true, name: true, type: true },
-    });
-    if (!account) throw new NotFoundException('Account not found');
+    await this.assertAccountOwnership(organizationId, accountId);
 
     const period = resolvePeriod(startDate, endDate);
-    const [currencyCode, prior, lines] = await Promise.all([
+    const [account, currencyCode, prior, lines] = await Promise.all([
+      this.prisma.account.findFirst({
+        where: { id: accountId, organizationId },
+        select: { id: true, code: true, name: true, type: true },
+      }),
       getBaseCurrency(this.prisma, organizationId),
       sumPostedLinesByAccount(this.prisma, organizationId, { lt: period.start }, [accountId]),
       this.prisma.journalLine.findMany({
@@ -660,6 +673,7 @@ export class FinancialReportsService {
         ],
       }),
     ]);
+    if (!account) throw new NotFoundException('Account not found');
 
     const openingBalance = this.naturalValue(account, prior.get(accountId));
     let running = openingBalance;
