@@ -102,6 +102,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.
+- **Import CommonJS test packages (`supertest`) with callable syntax.** When importing CommonJS packages defined with `export =` in TypeScript (such as `supertest`), namespace imports (`import * as request`) produce TS2349 (`This expression is not callable`) when `esModuleInterop` is active or under strict module resolution because the namespace object has no call signatures. Use `import request = require('supertest')` (or default import `import request from 'supertest'` when `esModuleInterop`/`allowSyntheticDefaultImports` is enabled) so the callable signature is preserved. _(supertest TS2349, #307)_
 
 ## Review process
 

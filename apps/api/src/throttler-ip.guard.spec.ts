@@ -9,7 +9,7 @@ import {
   ThrottlerStorage,
 } from '@nestjs/throttler';
 import { Request } from 'express';
-import * as request from 'supertest';
+import request = require('supertest');
 import { IpThrottlerGuard, applyTrustProxy, parseTrustedProxies } from './throttler-ip.guard';
 
 class TestableGuard extends IpThrottlerGuard {
