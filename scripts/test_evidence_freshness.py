@@ -488,6 +488,23 @@ class EvidenceFreshnessTests(unittest.TestCase):
         status_violations = validate_evidence_table_status(content)
         self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
 
+    def test_issue_361_evidence_contract(self):
+        """docs/evidence/361/EVIDENCE.md must exist and define AC1-AC5 with exit codes and supersedes notice."""
+        evidence_361 = EVIDENCE_DIR / "361" / "EVIDENCE.md"
+        self.assertTrue(evidence_361.exists(), "docs/evidence/361/EVIDENCE.md must exist")
+        content = evidence_361.read_text(encoding="utf-8")
+        self.assertIn("Supersedes part of #341", content)
+        self.assertIn("AC1", content)
+        self.assertIn("AC2", content)
+        self.assertIn("AC3", content)
+        self.assertIn("AC4", content)
+        self.assertIn("AC5", content)
+        self.assertIn("Exit Code", content)
+        head_violations = validate_tested_head_binding(content)
+        self.assertEqual(head_violations, [], f"Tested head binding violations: {head_violations}")
+        status_violations = validate_evidence_table_status(content)
+        self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
+
     def test_issue_370_evidence_contract(self):
         """docs/evidence/370/EVIDENCE.md must exist and define AC1-AC5 with exit codes and supersedes notice."""
         evidence_370 = EVIDENCE_DIR / "370" / "EVIDENCE.md"
