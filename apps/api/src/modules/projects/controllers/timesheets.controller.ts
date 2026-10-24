@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import {
   CreateTimesheetDto,
@@ -90,7 +101,9 @@ export class TimesheetsController {
     @Query('weekStartDate') weekStartDate?: string,
   ) {
     // weekStartDate is accepted as an alias; weekStart wins when both are sent
-    return this.timesheetsService.getWeeklySummary(orgId, user.id, weekStart || weekStartDate || '');
+    const week = weekStart || weekStartDate;
+    if (!week) throw new BadRequestException('weekStart (or weekStartDate) is required');
+    return this.timesheetsService.getWeeklySummary(orgId, user.id, week);
   }
 
   @Get('report')

@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { TimesheetsController } from './timesheets.controller';
 
 describe('TimesheetsController.getWeeklySummary', () => {
@@ -23,5 +24,13 @@ describe('TimesheetsController.getWeeklySummary', () => {
     const { service, controller } = make();
     controller.getWeeklySummary('org', user, '2026-03-02', '2026-03-09');
     expect(service.getWeeklySummary).toHaveBeenCalledWith('org', 'u1', '2026-03-02');
+  });
+
+  it('rejects with 400 when neither name is sent', () => {
+    const { service, controller } = make();
+    expect(() => controller.getWeeklySummary('org', user, undefined, undefined)).toThrow(
+      BadRequestException,
+    );
+    expect(service.getWeeklySummary).not.toHaveBeenCalled();
   });
 });
