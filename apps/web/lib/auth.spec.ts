@@ -400,6 +400,7 @@ describe('authOptions session callback', () => {
     // refreshToken must NOT leak into the session object
     expect(result?.['refreshToken']).toBeUndefined();
     expect(Object.keys(result as object)).not.toContain('refreshToken');
+    expect(Object.prototype.hasOwnProperty.call(result, 'refreshToken')).toBe(false);
     expect(JSON.stringify(result)).not.toContain('secret-refresh-token');
   });
 
@@ -440,5 +441,6 @@ describe('authOptions session callback', () => {
     expect(result?.error).toBe('RefreshAccessTokenError');
     expect(result?.['refreshToken']).toBeUndefined();
     expect(Object.keys(result as object)).not.toContain('refreshToken');
+    expect(Object.prototype.hasOwnProperty.call(result, 'refreshToken')).toBe(false);
   });
 });
