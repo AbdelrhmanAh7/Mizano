@@ -145,20 +145,23 @@ describe('CreditNotesService (posting)', () => {
     };
 
     let existingCredits: Decimal | null;
-    let refundedCredits: Decimal | null;
+    /** Live REFUND notes on the invoice (what assertRefundCovered reads). */
+    let refunds: Array<{ amount: Decimal; date: Date }>;
 
     beforeEach(() => {
       existingCredits = null;
-      refundedCredits = null;
+      refunds = [];
       prisma.invoice.count.mockResolvedValue(1);
       prisma.invoice.findFirst.mockResolvedValue(invoiceRow() as any);
-      prisma.creditNote.aggregate.mockImplementation(((args: any) =>
-        Promise.resolve({
-          _sum: { amount: args.where.type ? refundedCredits : existingCredits },
-        })) as any);
-      prisma.paymentAllocation.findMany.mockResolvedValue([{ amount: dec('1140') }] as any);
+      prisma.creditNote.aggregate.mockImplementation((() =>
+        Promise.resolve({ _sum: { amount: existingCredits } })) as any);
+      prisma.paymentAllocation.findMany.mockResolvedValue([
+        { amount: dec('1140'), payment: { date: new Date('2024-07-15') } },
+      ] as any);
       prisma.account.findFirst.mockResolvedValue({ id: 'bank-1' } as any);
-      prisma.creditNote.findMany.mockResolvedValue([]);
+      // No live notes of any type unless a test says otherwise; REFUND notes feed the refund check.
+      prisma.creditNote.findMany.mockImplementation(((args: any) =>
+        Promise.resolve(args.where.type === 'REFUND' ? refunds : [])) as any);
       prisma.journalLine.aggregate.mockResolvedValue({ _sum: { debit: null } } as any);
       prisma.organization.findUnique.mockResolvedValue(orgAccounts as any);
       prisma.$queryRaw.mockResolvedValue([{ max: 2 }] as any);
@@ -230,11 +233,62 @@ describe('CreditNotesService (posting)', () => {
       }
       expect(vat).toEqual(['4.6667', '4.6666', '4.6667']);
       expect(postedVat.toFixed(4)).toBe('14.0000');
-      // Previous VAT is read from this invoice's live credit-note journals on the VAT account.
+      // Previous VAT is read from this invoice's live credit-note journals matching description endsWith - VAT Payable.
       expect(prisma.journalLine.aggregate.mock.calls[1][0]!.where).toMatchObject({
-        accountId: 'vat',
+        description: { endsWith: '- VAT Payable' },
         journal: { organizationId: ORG_ID, sourceType: 'CREDIT_NOTE', deletedAt: null },
       });
+      expect(
+        (prisma.journalLine.aggregate.mock.calls[1][0] as any).where.accountId,
+      ).toBeUndefined();
+    });
+
+    it('credit VAT across default-account change sums exactly', async () => {
+      // Invoice: 100 net + 14 VAT = 114 grand total.
+      // First credit note for 57 is issued under defaultVatPayableAccountId = 'vat-1'.
+      // Second credit note for 57 is issued under defaultVatPayableAccountId = 'vat-2'.
+      prisma.invoice.findFirst.mockResolvedValue(
+        invoiceRow({
+          subtotal: dec('100'),
+          taxAmount: dec('14'),
+          grandTotal: dec('114'),
+          balanceDue: dec('57'),
+        }) as any,
+      );
+      existingCredits = dec('57');
+      // The first credit note exists
+      prisma.creditNote.findMany.mockResolvedValue([{ id: 'cn-1' }] as any);
+      // Aggregate returns the 7.0000 VAT debited by cn-1 on vat-1
+      prisma.journalLine.aggregate.mockResolvedValue({
+        _sum: { debit: dec('7.0000') },
+      } as any);
+
+      // Change default VAT account to vat-2
+      prisma.organization.findUnique.mockResolvedValue({
+        defaultArAccountId: 'ar',
+        defaultSalesReturnsAccountId: 'returns',
+        defaultVatPayableAccountId: 'vat-2',
+      } as any);
+
+      await service.create(ORG_ID, { ...dto, amount: '57' });
+
+      // The new credit note should debit 14.0000 - 7.0000 = 7.0000 to vat-2
+      const journal = journalCall()[1];
+      const vatLine = journal.lines.find((l) => l.description.endsWith('- VAT Payable'));
+      expect(vatLine).toEqual(
+        expect.objectContaining({
+          accountId: 'vat-2',
+          debit: '7.0000',
+        }),
+      );
+      // And the aggregate searched without restricting to vat-2
+      expect(prisma.journalLine.aggregate.mock.calls[0][0]!.where).toMatchObject({
+        description: { endsWith: '- VAT Payable' },
+        journal: { organizationId: ORG_ID, sourceType: 'CREDIT_NOTE', deletedAt: null },
+      });
+      expect(
+        (prisma.journalLine.aggregate.mock.calls[0][0] as any).where.accountId,
+      ).toBeUndefined();
     });
 
     it('lets the note that exhausts the invoice take exactly the remaining VAT', async () => {
@@ -502,18 +556,61 @@ describe('CreditNotesService (posting)', () => {
       });
 
       it('cannot refund more than the customer paid on the invoice', async () => {
-        prisma.paymentAllocation.findMany.mockResolvedValue([{ amount: dec('500') }] as any);
+        prisma.paymentAllocation.findMany.mockResolvedValue([
+          { amount: dec('500'), payment: { date: new Date('2024-07-15') } },
+        ] as any);
         await expect(service.create(ORG_ID, refundDto)).rejects.toThrow(
           'exceeds the amount received',
         );
 
         // Earlier refunds count against what was received.
-        prisma.paymentAllocation.findMany.mockResolvedValue([{ amount: dec('1140') }] as any);
-        refundedCredits = dec('600');
+        prisma.paymentAllocation.findMany.mockResolvedValue([
+          { amount: dec('1140'), payment: { date: new Date('2024-07-15') } },
+        ] as any);
+        refunds = [{ amount: dec('600'), date: new Date('2024-07-20') }];
         await expect(service.create(ORG_ID, refundDto)).rejects.toThrow(
           'exceeds the amount received',
         );
         expect(prisma.creditNote.create).not.toHaveBeenCalled();
+        // Only this organization's live payments and live refunds on this invoice are read.
+        expect(prisma.paymentAllocation.findMany.mock.calls[0][0]!.where).toEqual({
+          invoiceId: 'inv-1',
+          payment: { organizationId: ORG_ID, deletedAt: null },
+        });
+        expect(prisma.creditNote.findMany.mock.calls[0][0]!.where).toEqual({
+          organizationId: ORG_ID,
+          invoiceId: 'inv-1',
+          type: 'REFUND',
+          deletedAt: null,
+        });
+      });
+
+      it('backdated refund rejected', async () => {
+        // The only payment is dated 2024-08-10; a refund dated 2024-08-01 is not covered yet.
+        prisma.paymentAllocation.findMany.mockResolvedValue([
+          { amount: dec('1140'), payment: { date: new Date('2024-08-10') } },
+        ] as any);
+        await expect(service.create(ORG_ID, { ...refundDto, date: '2024-08-01' })).rejects.toThrow(
+          'Refund exceeds the amount received on this invoice',
+        );
+        expect(prisma.creditNote.create).not.toHaveBeenCalled();
+
+        // Dated on the payment day (or later) the same refund is covered.
+        await service.create(ORG_ID, { ...refundDto, date: '2024-08-10' });
+        expect(prisma.creditNote.create).toHaveBeenCalledTimes(1);
+      });
+
+      it('a backdated refund cannot leave a later refund uncovered', async () => {
+        // Paid 1140 on 07-15; 600 already refunded on 08-20. A 570 refund backdated to 08-01 is
+        // covered on 08-01 (1140 paid, nothing refunded yet) but would make the 08-20 total
+        // 1170 > 1140, so it is rejected.
+        refunds = [{ amount: dec('600'), date: new Date('2024-08-20') }];
+        await expect(service.create(ORG_ID, { ...refundDto, date: '2024-08-01' })).rejects.toThrow(
+          'exceeds the amount received',
+        );
+        // 540 fits at every checkpoint.
+        await service.create(ORG_ID, { ...refundDto, date: '2024-08-01', amount: '540' });
+        expect(prisma.creditNote.create).toHaveBeenCalledTimes(1);
       });
     });
 

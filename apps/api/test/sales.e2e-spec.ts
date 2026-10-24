@@ -329,6 +329,36 @@ describe('Sales AR cycle (e2e)', () => {
       expect(invoice.status).toBe('PARTIALLY_PAID');
     });
 
+    it('covers a refund only by receipts dated on or before the refund date', async () => {
+      const refund = {
+        customerId,
+        invoiceId: inv1Id,
+        amount: '50',
+        type: 'REFUND',
+        refundAccountId: accA.bank,
+        reason: 'Overcharge',
+      };
+      const notesBefore = await prisma.creditNote.count({
+        where: { organizationId: tenantA.organizationId },
+      });
+
+      // The only receipt is dated yesterday: a refund dated the day before is not covered yet.
+      const backdated = await a.post('/credit-notes').send({ ...refund, date: isoDay(-2) });
+      expect(backdated.status).toBe(400);
+      expect(backdated.body.message).toContain('exceeds the amount received');
+      expect(
+        await prisma.creditNote.count({ where: { organizationId: tenantA.organizationId } }),
+      ).toBe(notesBefore);
+
+      // Dated on the receipt day it is covered; void it again so the rest of the cycle is unchanged.
+      const covered = await a.post('/credit-notes').send({ ...refund, date: isoDay(-1) });
+      expect(covered.status).toBe(201);
+      expect(await journalsFor(CREDIT_NOTE, covered.body.id)).toHaveLength(1);
+      expect((await a.delete(`/credit-notes/${covered.body.id}`)).status).toBe(200);
+      expect(await journalsFor(CREDIT_NOTE_VOID, covered.body.id)).toHaveLength(1);
+      expect(decimalEquals((await getInvoice(inv1Id)).balanceDue, '128')).toBe(true);
+    });
+
     it('applies a credit note with the VAT split posted to the right accounts', async () => {
       // 57 is 25% of 228, so its VAT share is exactly 7 and the net 50.
       const res = await a.post('/credit-notes').send({

@@ -16,6 +16,7 @@ import { RecurringProfileQueryDto } from '../dto/recurring-profile-query.dto';
 import { ExecuteRecurringProfileDto } from '../dto/execute-recurring-profile.dto';
 import { UpdateRecurringProfileDto } from '../dto/update-recurring-profile.dto';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
+import { CurrentUser, CurrentUserData } from '../../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 
@@ -77,10 +78,11 @@ export class RecurringProfilesController {
   @ApiOperation({ summary: 'Manually execute a recurring profile' })
   executeProfile(
     @CurrentOrg() orgId: string,
+    @CurrentUser() user: CurrentUserData,
     @Param('id') id: string,
     @Body() dto: ExecuteRecurringProfileDto,
   ) {
-    return this.recurringProfilesService.executeProfile(orgId, id, dto.idempotencyKey);
+    return this.recurringProfilesService.executeProfile(orgId, id, dto.idempotencyKey, user.id);
   }
 
   @Get(':id')

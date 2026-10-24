@@ -24,6 +24,7 @@ import { Bill } from '@/lib/hooks/use-bills';
 import { useVendors, Vendor } from '@/lib/hooks/use-vendors';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { addDays, format } from 'date-fns';
+import Decimal from 'decimal.js';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
@@ -52,7 +53,15 @@ const lineSchema = z.object({
     .regex(DECIMAL_INPUT, 'quantityInvalid')
     .refine((v) => /[1-9]/.test(v), 'quantityPositive'),
   rate: z.string().trim().regex(DECIMAL_INPUT, 'rateInvalid'),
-  taxRate: z.string().trim().regex(OPTIONAL_PERCENT_INPUT, 'taxInvalid').default('0'),
+  taxRate: z
+    .string()
+    .trim()
+    .regex(OPTIONAL_PERCENT_INPUT, 'taxInvalid')
+    .refine(
+      (v) => !v || (OPTIONAL_PERCENT_INPUT.test(v) && new Decimal(v).lte('100')),
+      'taxInvalid',
+    )
+    .default('0'),
 });
 
 const billSchema = z.object({
