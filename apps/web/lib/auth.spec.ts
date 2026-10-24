@@ -352,4 +352,56 @@ describe('createTokenRefresher', () => {
     expect(await refresher.refresh('rt')).toBeNull();
     expect(refresher.size().inFlight).toBe(0);
   });
+
+  describe('session callback never exposes the refresh token', () => {
+    const SECRET = 'secret-refresh-token';
+
+    function leaks(value: unknown, seen = new Set<unknown>()): boolean {
+      if (typeof value === 'string') return value.includes(SECRET);
+      if (value === null || typeof value !== 'object' || seen.has(value)) return false;
+      seen.add(value);
+      return Reflect.ownKeys(value).some(
+        (key) =>
+          key === 'refreshToken' || leaks((value as Record<PropertyKey, unknown>)[key], seen),
+      );
+    }
+
+    async function buildSession(token: JWT): Promise<Record<string, unknown>> {
+      const { authOptions } = await import('./auth');
+      const session = {
+        user: { id: '', firstName: '', lastName: '', organizationId: '', role: '' },
+        expires: '2099-01-01T00:00:00.000Z',
+      };
+      return (await authOptions.callbacks?.session?.({
+        session,
+        token,
+        user: undefined as never,
+        newSession: undefined,
+        trigger: 'update',
+      } as never)) as unknown as Record<string, unknown>;
+    }
+
+    it('omits refreshToken as an own, inherited and nested key or value', async () => {
+      const result = await buildSession(jwtFor('A', SECRET));
+      expect(Object.prototype.hasOwnProperty.call(result, 'refreshToken')).toBe(false);
+      expect('refreshToken' in result).toBe(false);
+      expect(leaks(result)).toBe(false);
+    });
+
+    it('keeps the allowed session fields', async () => {
+      const result = await buildSession(jwtFor('A', SECRET));
+      expect(result).toMatchObject({
+        accessToken: 'old-access-A',
+        user: { id: 'A', firstName: 'A', organizationId: 'org-A', role: 'admin' },
+      });
+    });
+
+    it('handles a token without a refresh token', async () => {
+      const token = jwtFor('A', SECRET) as Partial<JWT>;
+      delete token.refreshToken;
+      const result = await buildSession(token as JWT);
+      expect('refreshToken' in result).toBe(false);
+      expect(result).toMatchObject({ accessToken: 'old-access-A' });
+    });
+  });
 });
