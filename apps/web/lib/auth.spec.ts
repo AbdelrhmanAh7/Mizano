@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 import axios from 'axios';
+import type { Session } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import { refreshAccessToken, tokenRefresher } from './auth';
 import { createTokenRefresher, sessionRefreshKey, type RefreshedTokens } from './auth-refresh';
@@ -351,5 +352,57 @@ describe('createTokenRefresher', () => {
     const refresher = createTokenRefresher({ refresh });
     expect(await refresher.refresh('rt')).toBeNull();
     expect(refresher.size().inFlight).toBe(0);
+  });
+});
+
+describe('session callback (client-visible session)', () => {
+  async function buildSession(token: JWT): Promise<Record<string, unknown>> {
+    const { authOptions } = await import('./auth');
+    const session = await authOptions.callbacks?.session?.({
+      session: {
+        user: { email: 'a@example.com', name: 'A User' },
+        expires: '2026-10-19T00:00:00.000Z',
+      },
+      token,
+    } as never);
+    return session as unknown as Record<string, unknown>;
+  }
+
+  it('never copies the refresh token into the session', async () => {
+    const session = await buildSession(jwtFor('A', 'secret-refresh-token'));
+    expect(Object.keys(session)).not.toContain('refreshToken');
+    expect(JSON.stringify(session)).not.toContain('secret-refresh-token');
+  });
+
+  it('keeps the user fields, access token and expiry', async () => {
+    const session = await buildSession(jwtFor('A', 'rt-A'));
+    expect(session).toEqual({
+      user: {
+        email: 'a@example.com',
+        name: 'A User',
+        id: 'A',
+        firstName: 'A',
+        lastName: '',
+        organizationId: 'org-A',
+        role: 'admin',
+      },
+      accessToken: 'old-access-A',
+      expires: '2026-10-19T00:00:00.000Z',
+    });
+  });
+
+  it('passes a refresh error through without the refresh token', async () => {
+    const session = await buildSession({
+      ...jwtFor('A', 'rt-A'),
+      error: 'RefreshAccessTokenError',
+    });
+    expect(session.error).toBe('RefreshAccessTokenError');
+    expect(session).not.toHaveProperty('refreshToken');
+  });
+
+  it('has no refreshToken member on the Session type (compile-time)', () => {
+    const session = {} as Session;
+    // @ts-expect-error the client-visible Session must not expose refreshToken; type-check fails if it returns
+    expect(session.refreshToken).toBeUndefined();
   });
 });
