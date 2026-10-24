@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
+import { DecimalUtils } from '../../../common/utils/decimal';
 
 export interface CreateTimesheetDto {
   projectId: string;
@@ -38,14 +39,16 @@ export class TimesheetsService {
       if (!task) throw new NotFoundException('Task not found');
     }
 
+    const hours = DecimalUtils.parseInput(dto.hours, 'hours');
+
     return this.prisma.timesheetEntry.create({
       data: {
         userId,
         projectId: dto.projectId,
         taskId: dto.taskId,
         date: new Date(dto.date),
-        duration: new Decimal(dto.hours),
-        hours: new Decimal(dto.hours),
+        duration: hours,
+        hours,
         description: dto.description,
         isBillable: dto.isBillable ?? true,
         isBilled: false,
@@ -212,7 +215,7 @@ export class TimesheetsService {
     const data: Prisma.TimesheetEntryUpdateInput = {};
     if (dto.description !== undefined) data.description = dto.description;
     if (dto.isBillable !== undefined) data.isBillable = dto.isBillable;
-    if (dto.hours) data.hours = new Decimal(dto.hours as string | number);
+    if (dto.hours) data.hours = DecimalUtils.parseInput(dto.hours, 'hours');
     if (dto.date) data.date = new Date(dto.date);
 
     return this.prisma.timesheetEntry.update({

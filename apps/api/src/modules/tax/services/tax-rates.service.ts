@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Prisma, TaxType } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { DecimalUtils } from '../../../common/utils/decimal';
 import { CreateTaxRateDto } from '../dto/create-tax-rate.dto';
 import { UpdateTaxRateDto } from '../dto/update-tax-rate.dto';
 import { TaxRateQueryDto } from '../dto/tax-rate-query.dto';
@@ -21,7 +22,7 @@ export class TaxRatesService {
       data: {
         name: dto.name,
         description: dto.description,
-        rate: new Decimal(dto.rate),
+        rate: DecimalUtils.parseInput(dto.rate, 'rate'),
         type: dto.type || TaxType.BOTH,
         linkedAccountId: dto.linkedAccountId,
         isDefault: dto.isDefault ?? false,
@@ -65,7 +66,7 @@ export class TaxRatesService {
     await this.findOne(organizationId, id);
 
     const data: Record<string, unknown> = { ...dto };
-    if (dto.rate !== undefined) data.rate = new Decimal(dto.rate);
+    if (dto.rate !== undefined) data.rate = DecimalUtils.parseInput(dto.rate, 'rate');
 
     // If setting as default, unset other defaults
     if (dto.isDefault) {

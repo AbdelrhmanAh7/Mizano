@@ -29,6 +29,34 @@ describe('ItemsService', () => {
     jest.clearAllMocks();
   });
 
+  describe('create: non-numeric prices', () => {
+    const dto = (over: Record<string, unknown>) =>
+      ({
+        name: 'W',
+        sku: 'W-1',
+        type: ItemType.GOODS,
+        unit: 'pcs',
+        sellingPrice: '10',
+        ...over,
+      }) as never;
+
+    it.each([
+      ['sellingPrice', { sellingPrice: 'abc' }],
+      ['costPrice', { costPrice: 'x' }],
+    ])('rejects a non-numeric %s with 400 before touching the database', async (_f, over) => {
+      mockPrismaService.item.findFirst.mockResolvedValue(null);
+      await expect(service.create('org-001', dto(over))).rejects.toThrow(BadRequestException);
+      expect(mockPrismaService.item.create).not.toHaveBeenCalled();
+    });
+
+    it('still accepts valid decimal strings', async () => {
+      mockPrismaService.item.findFirst.mockResolvedValue(null);
+      mockPrismaService.item.create.mockResolvedValue({ id: 'i1' });
+      await service.create('org-001', dto({ sellingPrice: '12.50', costPrice: '5' }));
+      expect(mockPrismaService.item.create).toHaveBeenCalled();
+    });
+  });
+
   describe('findAll', () => {
     const orgId = 'org-001';
 

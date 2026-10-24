@@ -336,6 +336,31 @@ describe('CurrencyService', () => {
       }
     });
 
+    it('queries the camelCase columns Prisma creates (P2010: organization_id does not exist)', async () => {
+      prisma.$queryRaw.mockResolvedValue([] as never);
+      await service.getLatestRates(ORG_A);
+
+      const sql = ((prisma.$queryRaw.mock.calls[0] as unknown[])[0] as string[]).join('?');
+      expect(sql).toContain('"organizationId"');
+      expect(sql).toContain('"fromCurrency"');
+      expect(sql).toContain('"toCurrency"');
+      expect(sql).not.toMatch(/organization_id|from_currency|to_currency/);
+    });
+
+    it('maps raw camelCase rows to the response shape', async () => {
+      prisma.$queryRaw.mockResolvedValue([
+        {
+          fromCurrency: 'SAR',
+          toCurrency: 'USD',
+          rate: '0.2666',
+          date: new Date('2026-03-01'),
+          source: 'MANUAL',
+        },
+      ] as never);
+      const [row] = await service.getLatestRates(ORG_A, 'SAR');
+      expect(row).toMatchObject({ fromCurrency: 'SAR', toCurrency: 'USD', rate: 0.2666 });
+    });
+
     it('passes organizationId into the latest-rates raw query', async () => {
       prisma.$queryRaw.mockResolvedValue([] as never);
       await service.getLatestRates(ORG_A);

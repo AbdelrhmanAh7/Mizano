@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ItemType, Prisma } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
+import { DecimalUtils } from '../../../common/utils/decimal';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
@@ -35,9 +35,9 @@ export class ItemsService {
         sku: dto.sku,
         type: dto.type,
         unit: dto.unit,
-        sellingPrice: new Decimal(dto.sellingPrice),
+        sellingPrice: DecimalUtils.parseInput(dto.sellingPrice, 'sellingPrice'),
         salesAccountId: dto.salesAccountId,
-        costPrice: new Decimal(dto.costPrice || '0'),
+        costPrice: DecimalUtils.parseInput(dto.costPrice || '0', 'costPrice'),
         purchaseAccountId: dto.purchaseAccountId,
         inventoryAccountId: dto.inventoryAccountId,
         description: dto.description,

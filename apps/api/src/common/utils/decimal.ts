@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 
 /**
@@ -25,6 +26,20 @@ export class DecimalUtils {
     if (value === null || value === undefined) return DecimalUtils.ZERO;
     if (value instanceof Decimal) return value;
     return new Decimal(value);
+  }
+
+  /**
+   * Parse user-supplied input into a Decimal at the request boundary.
+   * Non-numeric input (e.g. "abc", NaN, Infinity) is a client error, not a 500.
+   */
+  static parseInput(value: Decimal | string | number, field: string): Decimal {
+    try {
+      const parsed = value instanceof Decimal ? value : new Decimal(value);
+      if (parsed.isFinite()) return parsed;
+    } catch {
+      // fall through to the validation error below
+    }
+    throw new BadRequestException(`${field} must be a valid number`);
   }
 
   /** Sum an array of Decimal-like values. */

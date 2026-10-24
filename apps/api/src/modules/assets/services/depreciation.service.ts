@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -207,7 +207,7 @@ export class DepreciationService {
     });
 
     if (!asset) {
-      throw new Error('Asset not found or not active');
+      throw new NotFoundException('Asset not found or not active');
     }
 
     const scheduleEntry = await this.prisma.depreciationSchedule.findFirst({
@@ -215,7 +215,7 @@ export class DepreciationService {
     });
 
     if (!scheduleEntry) {
-      throw new Error('No depreciation scheduled for this period');
+      throw new NotFoundException('No depreciation scheduled for this period');
     }
 
     if (scheduleEntry.executedAt) {
