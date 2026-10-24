@@ -16,6 +16,8 @@ export class AssetsService {
    * Create a new asset with depreciation schedule
    */
   async create(organizationId: string, dto: CreateAssetDto): Promise<unknown> {
+    await this.assertAccountsBelongToOrganization(organizationId, dto);
+
     // Generate asset number
     const assetNumber = await this.generateAssetNumber(organizationId);
 
@@ -72,6 +74,26 @@ export class AssetsService {
     });
 
     return this.formatAssetResponse(asset);
+  }
+
+  /**
+   * The three ledger accounts an asset posts to must belong to the caller's
+   * organization. The foreign keys alone accept another tenant's account id, which
+   * would later post depreciation journals against that tenant's ledger.
+   */
+  private async assertAccountsBelongToOrganization(
+    organizationId: string,
+    dto: Pick<CreateAssetDto, 'assetAccountId' | 'depreciationAccountId' | 'accumulatedDeprAccountId'>,
+  ): Promise<void> {
+    const ids = [
+      ...new Set([dto.assetAccountId, dto.depreciationAccountId, dto.accumulatedDeprAccountId]),
+    ];
+    const owned = await this.prisma.account.count({
+      where: { id: { in: ids }, organizationId },
+    });
+    if (owned !== ids.length) {
+      throw new BadRequestException('One or more accounts were not found in this organization');
+    }
   }
 
   /**

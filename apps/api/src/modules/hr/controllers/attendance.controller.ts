@@ -64,8 +64,8 @@ export class AttendanceController {
   getByEmployee(
     @CurrentOrg() orgId: string,
     @Param('employeeId') employeeId: string,
-    @Query('startDate') startDate: string,
-    @Query('endDate') endDate: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
     return this.attendanceService.getAttendanceByEmployee(orgId, employeeId, startDate, endDate);
   }

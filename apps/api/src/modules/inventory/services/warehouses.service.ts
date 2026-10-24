@@ -10,6 +10,20 @@ import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { CreateWarehouseDto } from '../dto/create-warehouse.dto';
 import { UpdateWarehouseDto } from '../dto/update-warehouse.dto';
 
+/**
+ * The API contract (and the web form) calls the street line `address`; the
+ * Warehouse model stores it as `street`. Passing the DTO straight to Prisma
+ * made every create/update with an address fail with a 400.
+ */
+function toWarehouseData<T extends { address?: string }>(dto: T) {
+  const { address, ...rest } = dto;
+  return address === undefined ? rest : { ...rest, street: address };
+}
+
+function withAddress<T extends { street?: string | null }>(warehouse: T) {
+  return { ...warehouse, address: warehouse.street ?? null };
+}
+
 @Injectable()
 export class WarehousesService {
   constructor(private prisma: PrismaService) {}
@@ -27,9 +41,10 @@ export class WarehousesService {
       });
     }
 
-    return this.prisma.warehouse.create({
-      data: { ...dto, organizationId },
+    const created = await this.prisma.warehouse.create({
+      data: { ...toWarehouseData(dto), organizationId },
     });
+    return withAddress(created);
   }
 
   async findAll(organizationId: string, query: PaginationDto) {
@@ -62,7 +77,7 @@ export class WarehousesService {
       where: { id, organizationId, deletedAt: null },
     });
     if (!warehouse) throw new NotFoundException('Warehouse not found');
-    return warehouse;
+    return withAddress(warehouse);
   }
 
   async getStock(organizationId: string, id: string) {
@@ -83,7 +98,11 @@ export class WarehousesService {
         data: { isDefault: false },
       });
     }
-    return this.prisma.warehouse.update({ where: { id }, data: dto });
+    const updated = await this.prisma.warehouse.update({
+      where: { id },
+      data: toWarehouseData(dto),
+    });
+    return withAddress(updated);
   }
 
   async remove(organizationId: string, id: string) {
