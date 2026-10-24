@@ -61,13 +61,32 @@ export class SendPayslipsDto {
 }
 
 export class StatementQueryDto {
-  @ApiProperty({ description: 'Start date for the statement' })
+  @ApiPropertyOptional({
+    description: 'Start date for the statement (default: January 1st of the end date year)',
+  })
+  @IsOptional()
   @IsDateString()
-  dateFrom: string;
+  dateFrom?: string;
 
-  @ApiProperty({ description: 'End date for the statement' })
+  @ApiPropertyOptional({ description: 'End date for the statement (default: today)' })
+  @IsOptional()
   @IsDateString()
-  dateTo: string;
+  dateTo?: string;
+}
+
+/**
+ * Statement period: an omitted end date is today and an omitted start date is January 1st of
+ * the end date's year (year to date; the opening balance still carries everything before it).
+ */
+export function resolveStatementPeriod(
+  query: StatementQueryDto,
+  now: Date = new Date(),
+): { dateFrom: Date; dateTo: Date } {
+  const dateTo = query.dateTo ? new Date(query.dateTo) : now;
+  const dateFrom = query.dateFrom
+    ? new Date(query.dateFrom)
+    : new Date(Date.UTC(dateTo.getUTCFullYear(), 0, 1));
+  return { dateFrom, dateTo };
 }
 
 // ============ Response DTOs ============
