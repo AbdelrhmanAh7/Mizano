@@ -1,0 +1,179 @@
+{
+  "report": {
+    "strategy": "rules",
+    "synthetic": true,
+    "documents": 8,
+    "fields": {
+      "invoiceNumber": {
+        "precision": 1,
+        "recall": 1,
+        "exactMatch": 1
+      },
+      "date": {
+        "precision": 1,
+        "recall": 1,
+        "exactMatch": 1
+      },
+      "dueDate": {
+        "precision": 1,
+        "recall": 1,
+        "exactMatch": 1
+      },
+      "vendorTaxId": {
+        "precision": 1,
+        "recall": 1,
+        "exactMatch": 1
+      },
+      "currency": {
+        "precision": 1,
+        "recall": 0.8571428571428571,
+        "exactMatch": 0.875
+      },
+      "subtotal": {
+        "precision": 1,
+        "recall": 1,
+        "exactMatch": 1
+      },
+      "tax": {
+        "precision": 1,
+        "recall": 0.8571428571428571,
+        "exactMatch": 0.875
+      },
+      "total": {
+        "precision": 1,
+        "recall": 1,
+        "exactMatch": 1
+      }
+    },
+    "allFieldsExact": 0.875,
+    "needsReviewShare": 0.375,
+    "latencyMs": {
+      "p50": 0.169083,
+      "p95": 30.778875,
+      "max": 30.778875
+    },
+    "peakRssMb": 323.484375
+  },
+  "documents": [
+    {
+      "file": "en-sa-standard.txt",
+      "latencyMs": 2.341959,
+      "needsReview": false,
+      "matches": {
+        "invoiceNumber": true,
+        "date": true,
+        "dueDate": true,
+        "vendorTaxId": true,
+        "currency": true,
+        "subtotal": true,
+        "tax": true,
+        "total": true
+      }
+    },
+    {
+      "file": "en-eg-thousands.txt",
+      "latencyMs": 0.169083,
+      "needsReview": true,
+      "matches": {
+        "invoiceNumber": true,
+        "date": true,
+        "dueDate": true,
+        "vendorTaxId": true,
+        "currency": true,
+        "subtotal": true,
+        "tax": true,
+        "total": true
+      }
+    },
+    {
+      "file": "en-ae-trn.txt",
+      "latencyMs": 0.246667,
+      "needsReview": false,
+      "matches": {
+        "invoiceNumber": true,
+        "date": true,
+        "dueDate": true,
+        "vendorTaxId": true,
+        "currency": true,
+        "subtotal": true,
+        "tax": true,
+        "total": true
+      }
+    },
+    {
+      "file": "ar-sa-labels.txt",
+      "latencyMs": 2.858875,
+      "needsReview": false,
+      "matches": {
+        "invoiceNumber": true,
+        "date": true,
+        "dueDate": true,
+        "vendorTaxId": true,
+        "currency": true,
+        "subtotal": true,
+        "tax": true,
+        "total": true
+      }
+    },
+    {
+      "file": "en-missing-total.txt",
+      "latencyMs": 0.065667,
+      "needsReview": true,
+      "matches": {
+        "invoiceNumber": true,
+        "date": true,
+        "dueDate": true,
+        "vendorTaxId": true,
+        "currency": true,
+        "subtotal": true,
+        "tax": true,
+        "total": true
+      }
+    },
+    {
+      "file": "en-ambiguous-date.txt",
+      "latencyMs": 0.072833,
+      "needsReview": true,
+      "matches": {
+        "invoiceNumber": true,
+        "date": true,
+        "dueDate": true,
+        "vendorTaxId": true,
+        "currency": true,
+        "subtotal": true,
+        "tax": true,
+        "total": true
+      }
+    },
+    {
+      "file": "en-usd-no-tax-id.txt",
+      "latencyMs": 0.061,
+      "needsReview": false,
+      "matches": {
+        "invoiceNumber": true,
+        "date": true,
+        "dueDate": true,
+        "vendorTaxId": true,
+        "currency": false,
+        "subtotal": true,
+        "tax": false,
+        "total": true
+      }
+    },
+    {
+      "file": "en-eg-text-layer.pdf",
+      "latencyMs": 30.778875,
+      "needsReview": false,
+      "matches": {
+        "invoiceNumber": true,
+        "date": true,
+        "dueDate": true,
+        "vendorTaxId": true,
+        "currency": true,
+        "subtotal": true,
+        "tax": true,
+        "total": true
+      }
+    }
+  ]
+}

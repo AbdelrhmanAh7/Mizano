@@ -1,13 +1,15 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { EventEmitterModule } from '@nestjs/event-emitter';
-import { CacheModule } from './cache/cache.module';
-import { PrismaModule } from './prisma/prisma.module';
-import { IntakeModule } from './modules/ai/intake/intake.module';
+import { PrismaService } from './prisma/prisma.service';
+import { IntakeQueueService } from './modules/ai/intake/intake-queue.service';
+import { IntakeProcessorService } from './modules/ai/intake/intake-processor.service';
+import { IntakeExecutorService } from './modules/ai/intake/intake-executor.service';
+import { IntakeMatchingService } from './modules/ai/intake/intake-matching.service';
 
 /**
- * Queue consumer process: no AppModule, no HTTP server. `IntakeModule` is the only place
- * `IntakeProcessorService` is provided, so the API only enqueues and never runs a job.
+ * Deliberately excludes AppModule, HTTP controllers, schedulers and all AI/LLM modules. The
+ * extraction child applies the deterministic rules; `IntakeMatchingService` adds the tenant-scoped
+ * vendor and duplicate checks from the database, with no model.
  */
 @Module({
   imports: [
@@ -21,11 +23,13 @@ import { IntakeModule } from './modules/ai/intake/intake.module';
         '../../.env',
       ],
     }),
-    // The AI core providers publish events; AppModule normally supplies the emitter.
-    EventEmitterModule.forRoot(),
-    PrismaModule,
-    CacheModule,
-    IntakeModule,
+  ],
+  providers: [
+    PrismaService,
+    IntakeQueueService,
+    IntakeExecutorService,
+    IntakeMatchingService,
+    IntakeProcessorService,
   ],
 })
 export class IntakeWorkerModule {}

@@ -1,0 +1,86 @@
+{
+  "synthetic": true,
+  "note": "Hand-written synthetic fixtures for exercising the benchmark harness. Not real invoices; results are not an accuracy measurement.",
+  "documents": {
+    "en-sa-standard.txt": {
+      "invoiceNumber": "NJ-2024-0310",
+      "date": "2024-05-21",
+      "dueDate": "2024-06-20",
+      "vendorTaxId": "310987654300003",
+      "currency": "SAR",
+      "subtotal": "1800.00",
+      "tax": "270.00",
+      "total": "2070.00"
+    },
+    "en-eg-thousands.txt": {
+      "invoiceNumber": "DN-88123",
+      "date": "2024-09-02",
+      "dueDate": null,
+      "vendorTaxId": "512334901",
+      "currency": "EGP",
+      "subtotal": "12500.00",
+      "tax": "1750.00",
+      "total": "14250.00"
+    },
+    "en-ae-trn.txt": {
+      "invoiceNumber": "MC-5521",
+      "date": "2024-08-07",
+      "dueDate": null,
+      "vendorTaxId": "100765432100003",
+      "currency": "AED",
+      "subtotal": "3400.00",
+      "tax": "170.00",
+      "total": "3570.00"
+    },
+    "ar-sa-labels.txt": {
+      "invoiceNumber": "WS-2024-17",
+      "date": "2024-07-15",
+      "dueDate": null,
+      "vendorTaxId": "300555666700003",
+      "currency": "SAR",
+      "subtotal": "4000.00",
+      "tax": "600.00",
+      "total": "4600.00"
+    },
+    "en-missing-total.txt": {
+      "invoiceNumber": "NP-404",
+      "date": "2024-10-11",
+      "dueDate": null,
+      "vendorTaxId": null,
+      "currency": null,
+      "subtotal": null,
+      "tax": null,
+      "total": null
+    },
+    "en-ambiguous-date.txt": {
+      "invoiceNumber": "GOF-0099",
+      "date": "2024-04-03",
+      "dueDate": null,
+      "vendorTaxId": "300111222300003",
+      "currency": "SAR",
+      "subtotal": "5000.00",
+      "tax": "750.00",
+      "total": "5750.00"
+    },
+    "en-usd-no-tax-id.txt": {
+      "invoiceNumber": "OSH-2024-118",
+      "date": "2024-11-30",
+      "dueDate": "2024-12-30",
+      "vendorTaxId": null,
+      "currency": "USD",
+      "subtotal": "960.00",
+      "tax": "0.00",
+      "total": "960.00"
+    },
+    "en-eg-text-layer.pdf": {
+      "invoiceNumber": "APM-7781",
+      "date": "2024-06-18",
+      "dueDate": "2024-07-18",
+      "vendorTaxId": "204118773",
+      "currency": "EGP",
+      "subtotal": "8000.00",
+      "tax": "1120.00",
+      "total": "9120.00"
+    }
+  }
+}

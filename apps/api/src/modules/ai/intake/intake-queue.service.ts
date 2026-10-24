@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ConnectionOptions, Queue, Worker } from 'bullmq';
 import { describeError } from '../../../common/utils/redact';
+import { intakeConcurrency } from './intake-runtime';
 import { IntakeQueueUnavailableException } from '../../../common/exceptions';
 
 export const INTAKE_QUEUE_NAME = 'intake';
@@ -51,8 +52,7 @@ export class IntakeQueueService implements OnModuleDestroy {
   }
 
   get concurrency(): number {
-    const n = Number(this.config.get<string>('INTAKE_CONCURRENCY') ?? 1);
-    return Number.isInteger(n) && n >= 1 && n <= 4 ? n : 1;
+    return intakeConcurrency(this.config);
   }
 
   /** Called once by the processor; starts consuming. */
@@ -154,13 +154,10 @@ export class IntakeQueueService implements OnModuleDestroy {
   /** True when Redis answers on the consumer (or producer) connection; always true without REDIS_URL. */
   async isHealthy(): Promise<boolean> {
     if (!this.redisUrl) return true;
-    try {
-      const client = await (this.worker ?? this.queue)?.client;
-      if (!client) return false;
-      await client.ping();
-      return true;
-    } catch {
-      return false;
-    }
+    if (this.worker && !this.worker.isRunning()) return false;
+    const client = await (this.worker ?? this.queue)?.client;
+    if (!client) return false;
+    const res = await client.ping();
+    return res === 'PONG';
   }
 }

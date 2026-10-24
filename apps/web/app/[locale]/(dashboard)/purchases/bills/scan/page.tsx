@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
-import Link from 'next/link';
+import { Link, useRouter } from '@/i18n/routing';
 import {
   ArrowLeft,
   Upload,
@@ -14,8 +13,6 @@ import {
   Sparkles,
   X,
   UserPlus,
-  Zap,
-  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -75,9 +72,9 @@ export default function ScanBillPage() {
   const [localResult, setLocalResult] = useState<DocumentIntakeResult | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [scanDefaults, setScanDefaults] = useState<BillFormDefaultValues | null>(null);
-  const [scanMode, setScanMode] = useState<'fast' | 'slow'>('fast');
   const [unresolvedTaxLines, setUnresolvedTaxLines] = useState<UnresolvedTaxLine[]>([]);
   const [taxReviewed, setTaxReviewed] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // SSE-based document intake
   const intake = useDocumentIntakeStream();
@@ -207,7 +204,11 @@ export default function ScanBillPage() {
   );
 
   const handleProcess = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile) {
+      setLocalError(ts('dropHint'));
+      fileInputRef.current?.click();
+      return;
+    }
 
     setStep('processing');
     setLocalError(null);
@@ -215,7 +216,6 @@ export default function ScanBillPage() {
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('forceType', 'BILL');
-    formData.append('strategy', scanMode);
 
     await intake.processDocument(formData);
   };
@@ -285,6 +285,9 @@ export default function ScanBillPage() {
     setLocalResult(null);
     setScanDefaults(null);
     setLocalError(null);
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
     setUnresolvedTaxLines([]);
     setTaxReviewed(false);
     intake.reset();
@@ -338,7 +341,7 @@ export default function ScanBillPage() {
         <Separator className="w-8" />
         <StepBadge
           step={2}
-          label={ts('steps.processing')}
+          label={step === 'review' || step === 'confirmed' ? 'Completed' : ts('steps.processing')}
           active={step === 'processing'}
           done={step === 'review' || step === 'confirmed'}
         />
@@ -405,7 +408,7 @@ export default function ScanBillPage() {
           <CardContent className="space-y-4">
             <div
               className={cn(
-                'border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors',
+                'border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors relative',
                 dragOver
                   ? 'border-primary bg-primary/5'
                   : 'border-muted-foreground/25 hover:border-primary/50',
@@ -418,16 +421,27 @@ export default function ScanBillPage() {
               onDrop={converting ? undefined : handleDrop}
               onClick={() => {
                 if (converting) return;
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = '*/*';
-                input.onchange = (e) => {
-                  const file = (e.target as HTMLInputElement).files?.[0];
-                  if (file) handleFileSelect(file);
-                };
-                input.click();
+                fileInputRef.current?.click();
               }}
             >
+              <input
+                ref={fileInputRef}
+                type="file"
+                id="file-upload"
+                name="file"
+                aria-label="Select file"
+                data-testid="file-upload-input"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
+                className={
+                  selectedFile
+                    ? 'sr-only'
+                    : 'absolute inset-0 w-full h-full opacity-0 cursor-pointer'
+                }
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileSelect(file);
+                }}
+              />
               {converting ? (
                 <div className="space-y-3">
                   <Loader2 className="h-12 w-12 mx-auto animate-spin text-primary" />
@@ -457,10 +471,12 @@ export default function ScanBillPage() {
                   <Button
                     variant="ghost"
                     size="sm"
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedFile(null);
                       setPreviewUrl(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
                     }}
                   >
                     <X className="mr-1 h-3 w-3" />
@@ -474,51 +490,35 @@ export default function ScanBillPage() {
                     <p className="font-medium">{ts('dropHint')}</p>
                     <p className="text-sm text-muted-foreground">{ts('supportsHint')}</p>
                   </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    data-testid="select-file-button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fileInputRef.current?.click();
+                    }}
+                  >
+                    Select file
+                  </Button>
                 </div>
               )}
             </div>
 
-            {/* Scan Mode Toggle */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-muted-foreground">{ts('scanMode')}</span>
-                <div className="flex rounded-lg border p-1 gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setScanMode('fast')}
-                    className={cn(
-                      'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                      scanMode === 'fast'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-                    )}
-                  >
-                    <Zap className="h-3.5 w-3.5" />
-                    {ts('fast')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setScanMode('slow')}
-                    className={cn(
-                      'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                      scanMode === 'slow'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-                    )}
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                    {ts('accurate')}
-                  </button>
-                </div>
-              </div>
-              <Button onClick={handleProcess} disabled={!selectedFile || converting} size="lg">
+            <div className="flex items-center justify-end">
+              <Button
+                type="button"
+                onClick={handleProcess}
+                disabled={converting}
+                size="lg"
+                aria-label="Scan"
+                data-testid="scan-button"
+              >
                 <Sparkles className="mr-2 h-4 w-4" />
-                {ts('processWithAi')}
+                Scan
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {scanMode === 'fast' ? ts('fastHint') : ts('accurateHint')}
-            </p>
           </CardContent>
         </Card>
       )}
@@ -588,6 +588,13 @@ export default function ScanBillPage() {
                   {ts('resultsTitle')}
                 </CardTitle>
                 <div className="flex items-center gap-2">
+                  <Badge
+                    variant="default"
+                    className="bg-green-600 text-white"
+                    data-testid="status-completed"
+                  >
+                    Completed
+                  </Badge>
                   {result.extractionMethod && (
                     <Badge variant="outline">{result.extractionMethod}</Badge>
                   )}
@@ -714,29 +721,33 @@ export default function ScanBillPage() {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">{ts('extractedSubtotal')}</span>
                       <span className="font-mono">
-                        {result.extractedFields.subtotal.toFixed(2)}
+                        {Number(result.extractedFields.subtotal).toFixed(2)}
                       </span>
                     </div>
                   )}
                   {result.extractedFields.tax != null && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">{ts('extractedTax')}</span>
-                      <span className="font-mono">{result.extractedFields.tax.toFixed(2)}</span>
+                      <span className="font-mono">
+                        {Number(result.extractedFields.tax).toFixed(2)}
+                      </span>
                     </div>
                   )}
                   {result.extractedFields.discount != null &&
-                    result.extractedFields.discount > 0 && (
+                    Number(result.extractedFields.discount) > 0 && (
                       <div className="flex justify-between text-yellow-600">
                         <span>{ts('extractedDiscount')}</span>
                         <span className="font-mono">
-                          -{result.extractedFields.discount.toFixed(2)}
+                          -{Number(result.extractedFields.discount).toFixed(2)}
                         </span>
                       </div>
                     )}
                   {result.extractedFields.total != null && (
                     <div className="flex justify-between font-medium border-t pt-1 mt-1">
                       <span>{ts('extractedTotal')}</span>
-                      <span className="font-mono">{result.extractedFields.total.toFixed(2)}</span>
+                      <span className="font-mono">
+                        {Number(result.extractedFields.total).toFixed(2)}
+                      </span>
                     </div>
                   )}
                 </div>

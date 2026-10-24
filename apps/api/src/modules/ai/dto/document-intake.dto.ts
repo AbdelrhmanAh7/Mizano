@@ -16,8 +16,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ProcessDocumentDto {
   @ApiPropertyOptional({
-    description: 'OCR language (default: eng+ara)',
+    description:
+      'Deprecated and ignored: the CPU worker always recognizes the pinned Arabic and English assets together',
     example: 'eng+ara',
+    deprecated: true,
   })
   @IsString()
   @IsOptional()
@@ -34,8 +36,9 @@ export class ProcessDocumentDto {
 
   @ApiPropertyOptional({
     description:
-      'Scan mode: "fast" (PaddleOCR + text model), "slow" (qwen3-vl:8b vision). ' +
-      'Or advanced: "ocr", "hybrid", "vlm", "auto".',
+      'Deprecated and ignored: the CPU worker has a single deterministic extraction path. ' +
+      'Still accepted so older clients do not fail.',
+    deprecated: true,
     enum: ['fast', 'slow', 'ocr', 'hybrid', 'vlm', 'auto'],
     example: 'fast',
   })

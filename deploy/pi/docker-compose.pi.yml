@@ -34,7 +34,7 @@ services:
     volumes:
       - ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
       interval: 10s
       timeout: 5s
       retries: 6
@@ -85,6 +85,8 @@ services:
     image: ${MIZANO_API_IMAGE:?set MIZANO_API_IMAGE}
     restart: unless-stopped
     mem_limit: 1024m
+    # Headless Chromium (PDF rendering) needs more than Docker's 64 MB /dev/shm.
+    shm_size: 256m
     environment:
       NODE_ENV: production
       API_PORT: '6001'
@@ -111,8 +113,7 @@ services:
       migrate:
         condition: service_completed_successfully
     healthcheck:
-      test:
-        ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:6001/api/health']
+      test: ['CMD', 'node', '/app/apps/api/dist/health/healthcheck.js']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -140,6 +141,7 @@ services:
       OLLAMA_ENABLED: ${OLLAMA_ENABLED:-false}
       INTAKE_STORAGE_DIR: /data/originals
       INTAKE_CONCURRENCY: ${INTAKE_CONCURRENCY:-1}
+      INTAKE_JOB_DEADLINE_MS: ${INTAKE_JOB_DEADLINE_MS:-120000}
     volumes:
       # The worker only reads originals; the api writes them.
       - ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/originals:/data/originals:ro

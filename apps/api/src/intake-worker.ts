@@ -6,6 +6,7 @@ import { WORKER_HEARTBEAT_FILE } from './intake-worker-healthcheck';
 import { createIntakeWorker, registerGracefulShutdown } from './modules/ai/intake/intake.worker';
 import { PrismaService } from './prisma/prisma.service';
 import { IntakeQueueService } from './modules/ai/intake/intake-queue.service';
+import { IntakeExecutorService } from './modules/ai/intake/intake-executor.service';
 
 const HEARTBEAT_INTERVAL_MS = 5000;
 
@@ -33,9 +34,16 @@ async function bootstrap(): Promise<void> {
   registerGracefulShutdown(
     async () => {
       clearInterval(timer);
-      // Stop fetching and let the active job finish; Prisma stays connected until it does,
-      // because the result or failure write still needs the database.
-      await queue.onModuleDestroy();
+      // Stop fetching first, so no new job is claimed once the executor refuses work, then kill
+      // the active child so the drain finishes inside the container's stop grace period.
+      // Prisma stays connected until the drain ends: the failure write still needs the database.
+      const draining = queue.onModuleDestroy();
+      try {
+        app.get(IntakeExecutorService, { strict: false })?.onModuleDestroy();
+      } catch {
+        /* optional if executor not registered */
+      }
+      await draining;
       await app.close();
       await unlink(WORKER_HEARTBEAT_FILE).catch(() => undefined);
     },

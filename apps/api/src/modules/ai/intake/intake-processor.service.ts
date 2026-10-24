@@ -4,24 +4,41 @@ import { ConfigService } from '@nestjs/config';
 import { IntakeJob, IntakeJobStatus, Prisma } from '@prisma/client';
 import { describeError } from '../../../common/utils/redact';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { DocumentIntakeResult, DocumentIntakeService } from '../services/document-intake.service';
+import type { DocumentIntakeResult } from '../services/document-intake.service';
 import { intakeLeaseMs, queueJobId } from './intake-jobs.service';
 import { IntakeQueuePayload, IntakeQueueService } from './intake-queue.service';
+import { IntakeExecutorService } from './intake-executor.service';
+import { IntakeMatchingService } from './intake-matching.service';
+import { IntakeRuntimeError } from './intake-runtime';
 import { IntakeStorage } from './intake-storage';
 import { Clock, INTAKE_CLOCK, monotonicClock, StageTimer } from './stage-timer';
 
 const LOW_CONFIDENCE = 0.6;
 const DEFAULT_RETRY_BASE_MS = 5000;
 
+/** The parts of an intake result that decide review routing. */
+export type ReviewInput = Pick<
+  DocumentIntakeResult,
+  'ocrConfidence' | 'documentType' | 'classificationConfidence'
+> & {
+  extractedFields: Pick<DocumentIntakeResult['extractedFields'], 'total' | 'date'>;
+  duplicateWarning?: DocumentIntakeResult['duplicateWarning'];
+  matchedVendor?: DocumentIntakeResult['matchedVendor'];
+};
+
 /** Decide whether an accountant must look before approval. */
-export function needsReview(result: DocumentIntakeResult): boolean {
+export function needsReview(result: ReviewInput): boolean {
   const fields = result.extractedFields;
   return (
     result.ocrConfidence < LOW_CONFIDENCE ||
+    result.classificationConfidence < LOW_CONFIDENCE ||
     fields.total === null ||
     fields.date === null ||
     result.documentType === 'OTHER' ||
-    result.duplicateWarning?.isDuplicate === true
+    result.documentType === 'RECEIPT' ||
+    result.duplicateWarning?.isDuplicate === true ||
+    // No resolved supplier (none found, or two strong candidates tied); undefined means matching has not run: a draft needs one.
+    result.matchedVendor === null
   );
 }
 
@@ -35,22 +52,70 @@ class LeaseLostError extends Error {
 @Injectable()
 export class IntakeProcessorService implements OnModuleInit {
   private readonly logger = new Logger(IntakeProcessorService.name);
+  private storage?: IntakeStorage;
+  private documentIntake?: {
+    processDocument(
+      organizationId: string,
+      buffer: Buffer,
+      mimeType: string,
+      originalFileName: string,
+      language: string,
+      onProgress: (stage: string, progress: number) => void,
+      strategy?: string,
+    ): Promise<DocumentIntakeResult>;
+  };
+  private intake?: IntakeExecutorService;
+  private queue!: IntakeQueueService;
+  private config!: ConfigService;
+  private matching?: IntakeMatchingService;
+  private clock!: Clock;
 
   constructor(
+    prisma: PrismaService,
+    storage: IntakeStorage,
+    documentIntake: unknown,
+    queue: IntakeQueueService,
+    config: ConfigService,
+    clock?: Clock,
+  );
+  constructor(
+    prisma: PrismaService,
+    intake?: IntakeExecutorService,
+    queue?: IntakeQueueService,
+    config?: ConfigService,
+    matching?: IntakeMatchingService,
+    clock?: Clock,
+  );
+  constructor(
     private readonly prisma: PrismaService,
-    private readonly storage: IntakeStorage,
-    private readonly intake: DocumentIntakeService,
-    private readonly queue: IntakeQueueService,
-    private readonly config: ConfigService,
-    @Optional() @Inject(INTAKE_CLOCK) private readonly clock: Clock = monotonicClock,
-  ) {}
+    @Optional() intake?: unknown,
+    @Optional() queue?: unknown,
+    @Optional() config?: unknown,
+    @Optional() matching?: unknown,
+    @Optional() @Inject(INTAKE_CLOCK) clock: Clock = monotonicClock,
+  ) {
+    if (intake && typeof (intake as unknown as Record<string, unknown>).get === 'function') {
+      // Called as: (prisma, storage, documentIntake, queue, config, clock?)
+      this.storage = intake as unknown as IntakeStorage;
+      this.documentIntake = queue as unknown as typeof this.documentIntake;
+      this.queue = config as unknown as IntakeQueueService;
+      this.config = matching as unknown as ConfigService;
+      this.clock = (clock as unknown as Clock) ?? monotonicClock;
+    } else {
+      this.intake = intake as IntakeExecutorService | undefined;
+      this.queue = queue as IntakeQueueService;
+      this.config = config as ConfigService;
+      this.matching = matching as IntakeMatchingService | undefined;
+      this.clock = clock ?? monotonicClock;
+    }
+  }
 
   onModuleInit(): void {
-    this.queue.registerHandler((payload) => this.handle(payload));
+    this.queue?.registerHandler((payload) => this.handle(payload));
   }
 
   private numberConfig(key: string, fallback: number): number {
-    const n = Number(this.config.get<string>(key));
+    const n = Number(this.config?.get<string>(key));
     return Number.isFinite(n) && n > 0 ? n : fallback;
   }
 
@@ -98,11 +163,8 @@ export class IntakeProcessorService implements OnModuleInit {
     });
     if (!job) return;
 
-    let lost: (error: Error) => void = () => undefined;
-    const lostLease = new Promise<never>((_, reject) => {
-      lost = reject;
-    });
-    lostLease.catch(() => undefined);
+    const cancellation = new AbortController();
+    let leaseLost = false;
     const heartbeat = setInterval(
       () => {
         this.prisma.intakeJob
@@ -111,7 +173,10 @@ export class IntakeProcessorService implements OnModuleInit {
             data: { leaseExpiresAt: new Date(Date.now() + leaseMs) },
           })
           .then((res) => {
-            if (res.count === 0) lost(new LeaseLostError());
+            if (res.count === 0) {
+              leaseLost = true;
+              cancellation.abort();
+            }
           })
           .catch(() => undefined);
       },
@@ -123,35 +188,57 @@ export class IntakeProcessorService implements OnModuleInit {
     // validate (party matching, duplicate check, review decision).
     const timer = new StageTimer(this.clock);
     try {
-      timer.start('load');
-      const buffer = await this.storage.get(job.storageKey, job.sha256);
-      timer.start('extract');
-      const result = await Promise.race([
-        this.intake.processDocument(
-          organizationId,
-          buffer,
-          job.mimeType,
-          job.originalFileName,
-          job.language ?? 'eng+ara',
-          (stage, progress) => {
-            if (stage === 'classifying') timer.start('parse');
-            if (stage === 'matching') timer.start('validate');
-            void this.prisma.intakeJob
-              .updateMany({
-                where: {
-                  id: jobId,
-                  organizationId,
-                  status: IntakeJobStatus.PROCESSING,
-                  leaseToken,
-                },
-                data: { progress },
-              })
-              .catch(() => undefined);
-          },
-          job.strategy ?? undefined,
-        ),
-        lostLease,
-      ]);
+      let result: DocumentIntakeResult;
+      if (this.intake) {
+        timer.start('load');
+        timer.start('extract');
+        const extracted = await this.intake.run(job, cancellation.signal);
+        if (leaseLost) throw new LeaseLostError();
+        timer.start('validate');
+        // The child holds no database access: vendor candidates and the duplicate check are
+        // tenant-scoped reads, made here after it has closed.
+        result = this.matching
+          ? await this.matching.enrich(job.organizationId, extracted)
+          : extracted;
+        if (leaseLost) throw new LeaseLostError();
+      } else if (this.documentIntake && this.storage) {
+        timer.start('load');
+        const buffer = await this.storage.get(job.storageKey, job.sha256);
+        timer.start('extract');
+        const lostLease = new Promise<never>((_, reject) => {
+          cancellation.signal.addEventListener('abort', () => reject(new LeaseLostError()), {
+            once: true,
+          });
+        });
+        result = await Promise.race([
+          this.documentIntake.processDocument(
+            organizationId,
+            buffer,
+            job.mimeType,
+            job.originalFileName,
+            job.language ?? 'eng+ara',
+            (stage, progress) => {
+              if (stage === 'classifying') timer.start('parse');
+              if (stage === 'matching') timer.start('validate');
+              void this.prisma.intakeJob
+                .updateMany({
+                  where: {
+                    id: jobId,
+                    organizationId,
+                    status: IntakeJobStatus.PROCESSING,
+                    leaseToken,
+                  },
+                  data: { progress },
+                })
+                .catch(() => undefined);
+            },
+            job.strategy ?? undefined,
+          ),
+          lostLease,
+        ]);
+      } else {
+        throw new Error('No intake engine configured');
+      }
       const status = needsReview(result) ? IntakeJobStatus.NEEDS_REVIEW : IntakeJobStatus.EXTRACTED;
       timer.stop();
       const written = await this.prisma.intakeJob.updateMany({
@@ -169,7 +256,7 @@ export class IntakeProcessorService implements OnModuleInit {
       if (written.count === 0) throw new LeaseLostError();
       this.logger.log(`Intake job ${jobId} finished: status=${status} attempts=${job.attempts}`);
     } catch (error) {
-      if (error instanceof LeaseLostError) {
+      if (leaseLost || error instanceof LeaseLostError) {
         this.logger.warn(`Intake job ${jobId} lost its lease; abandoning this run`);
         return;
       }
@@ -201,7 +288,10 @@ export class IntakeProcessorService implements OnModuleInit {
     stageTimingsMs: Record<string, number>,
   ): Promise<void> {
     // Extractor errors may quote document text: keep the error type/code only.
-    const lastError = describeError(error, { includeMessage: false }).slice(0, 200);
+    const lastError =
+      error instanceof IntakeRuntimeError
+        ? error.code
+        : describeError(error, { includeMessage: false }).slice(0, 200);
     // `job` was read after the claim, so job.attempts already counts this run.
     const attempts = job.attempts;
     const dead = attempts >= job.maxAttempts;

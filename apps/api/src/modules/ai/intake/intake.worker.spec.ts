@@ -12,6 +12,7 @@ import { IntakeQueueService } from './intake-queue.service';
 import { IntakeStorage } from './intake-storage';
 import { IntakeModule } from './intake.module';
 import { createIntakeWorker, registerGracefulShutdown } from './intake.worker';
+import { IntakeExecutorService } from './intake-executor.service';
 
 // No database or Redis in unit tests: PrismaService and ReadReplicaService never connect and the queue runs in-process.
 process.env.REDIS_URL = '';
@@ -19,6 +20,7 @@ const prismaSpies = (): jest.SpyInstance[] => [
   jest.spyOn(PrismaClient.prototype, '$connect').mockResolvedValue(undefined),
   jest.spyOn(PrismaClient.prototype, '$disconnect').mockResolvedValue(undefined),
   jest.spyOn(IntakeJobsService.prototype, 'recoverJobs').mockResolvedValue(0), // startup sweep
+  jest.spyOn(IntakeExecutorService.prototype, 'onModuleInit').mockResolvedValue(undefined),
 ];
 const listeningServers = (): number =>
   process.getActiveResourcesInfo().filter((name) => name === 'TCPServerWrap').length;
