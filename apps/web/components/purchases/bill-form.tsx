@@ -114,6 +114,7 @@ export function BillForm({
   const isEditing = !!bill;
   const tValidation = useTranslations('purchases.bills.validation');
   const tIntake = useTranslations('ai.intake');
+  const tLineItems = useTranslations('purchases.lineItems');
   const { data: vendorsData } = useVendors({ limit: 100 });
   const vendors = useMemo(() => vendorsData?.data || [], [vendorsData?.data]);
 
@@ -369,19 +370,25 @@ export function BillForm({
       {/* Line Items */}
       <Card>
         <CardHeader>
-          <CardTitle>Line Items</CardTitle>
+          <CardTitle>{tLineItems('title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[200px]">Item/Account</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="w-[80px]">Qty</TableHead>
-                <TableHead className="w-[110px]">Unit Price</TableHead>
-                <TableHead className="w-[110px] text-right">Amount</TableHead>
-                <TableHead className="w-[100px]">Tax %</TableHead>
-                <TableHead className="w-[110px] text-right">Total</TableHead>
+                <TableHead className="w-[200px]">
+                  {tLineItems('item')}/{tLineItems('account')}
+                </TableHead>
+                <TableHead>{tLineItems('description')}</TableHead>
+                <TableHead className="w-[80px]">{tLineItems('quantity')}</TableHead>
+                <TableHead className="w-[110px]">{tLineItems('rate')}</TableHead>
+                <TableHead className="w-[110px] text-end" scope="col">
+                  {tLineItems('amount')}
+                </TableHead>
+                <TableHead className="w-[100px]">{tLineItems('tax')}</TableHead>
+                <TableHead className="w-[110px] text-end" scope="col">
+                  {tLineItems('total')}
+                </TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -432,7 +439,9 @@ export function BillForm({
                         className="h-8"
                       />
                     </TableCell>
-                    <TableCell className="text-right font-mono">{lineTotals.net}</TableCell>
+                    <TableCell className="text-end font-mono" data-testid={`line-${index}-amount`}>
+                      {lineTotals.net}
+                    </TableCell>
                     <TableCell>
                       <Input
                         {...form.register(`lines.${index}.taxRate`)}
@@ -443,7 +452,10 @@ export function BillForm({
                         className="h-8 w-24"
                       />
                     </TableCell>
-                    <TableCell className="text-right font-mono font-semibold">
+                    <TableCell
+                      className="text-end font-mono font-semibold"
+                      data-testid={`line-${index}-total`}
+                    >
                       {lineTotals.total}
                     </TableCell>
                     <TableCell>
@@ -482,7 +494,7 @@ export function BillForm({
             onClick={() => append({ description: '', quantity: '1', rate: '', taxRate: '0' })}
           >
             <Plus className="mr-2 h-4 w-4" />
-            Add Line
+            {tLineItems('addItem')}
           </Button>
 
           {/* Totals */}
