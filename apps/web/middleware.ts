@@ -20,12 +20,41 @@ function getLocale(pathname: string): string {
   return match ? match[1] : 'en';
 }
 
+function withCors(response: NextResponse, origin: string | null): NextResponse {
+  if (origin) {
+    response.headers.set('Access-Control-Allow-Origin', origin);
+    response.headers.set('Access-Control-Allow-Credentials', 'true');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    response.headers.set(
+      'Access-Control-Allow-Headers',
+      'X-Requested-With, Content-Type, Authorization',
+    );
+  }
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  if (request.method === 'OPTIONS') {
+    const headers: Record<string, string> = {
+      'Access-Control-Allow-Origin': origin || '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+      'Access-Control-Allow-Headers': 'X-Requested-With, Content-Type, Authorization',
+    };
+    if (origin) {
+      headers['Access-Control-Allow-Credentials'] = 'true';
+    }
+    return new NextResponse(null, {
+      status: 204,
+      headers,
+    });
+  }
+
   const { pathname } = request.nextUrl;
 
   // Skip middleware for API routes, static files, etc.
   if (pathname.startsWith('/api/') || pathname.startsWith('/_next') || pathname.includes('.')) {
-    return NextResponse.next();
+    return withCors(NextResponse.next(), origin);
   }
 
   const locale = getLocale(pathname);
@@ -39,23 +68,23 @@ export async function middleware(request: NextRequest) {
       request.cookies.get('next-auth.session-token') ||
       request.cookies.get('__Secure-next-auth.session-token');
     if (!sessionCookie) {
-      return intlMiddleware(request);
+      return withCors(intlMiddleware(request), origin);
     }
     // Has a cookie — verify token to redirect authenticated users to dashboard
     const token = await getToken({ req: request });
     if (token && !pathname.includes('/dashboard')) {
-      return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url));
+      return withCors(NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url)), origin);
     }
-    return intlMiddleware(request);
+    return withCors(intlMiddleware(request), origin);
   }
 
   // Root path: redirect based on auth state
   if (pathWithoutLocale === '/') {
     const token = await getToken({ req: request });
     if (token) {
-      return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url));
+      return withCors(NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url)), origin);
     } else {
-      return NextResponse.redirect(new URL(`/${locale}/onboarding`, request.url));
+      return withCors(NextResponse.redirect(new URL(`/${locale}/onboarding`, request.url)), origin);
     }
   }
 
@@ -65,12 +94,12 @@ export async function middleware(request: NextRequest) {
     if (!pathname.includes('/login')) {
       const loginUrl = new URL(`/${locale}/login`, request.url);
       loginUrl.searchParams.set('callbackUrl', pathname);
-      return NextResponse.redirect(loginUrl);
+      return withCors(NextResponse.redirect(loginUrl), origin);
     }
   }
 
   // Handle i18n routing
-  return intlMiddleware(request);
+  return withCors(intlMiddleware(request), origin);
 }
 
 export const config = {

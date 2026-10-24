@@ -43,7 +43,8 @@ const OPTIONAL_PERCENT_INPUT = /^(\d{1,3}(\.\d{1,2})?)?$/;
 
 const lineSchema = z.object({
   itemId: z.string().optional(),
-  accountId: z.string().optional(),
+  // The API refuses to approve a bill with any line lacking an account (key under validation).
+  accountId: z.string().min(1, 'accountRequired'),
   description: z.string().min(1, 'Description is required'),
   // Money/quantities must be valid non-negative decimals: never coerce bad input to 0.
   quantity: z
@@ -87,7 +88,13 @@ export interface BillFormDefaultValues {
 interface BillFormProps {
   bill?: Bill | null;
   accounts?: Array<{ id: string; code: string; name: string; type: string }>;
-  items?: Array<{ id: string; name: string; sku: string; costPrice: string }>;
+  items?: Array<{
+    id: string;
+    name: string;
+    sku: string;
+    costPrice: string;
+    purchaseAccountId?: string | null;
+  }>;
   projects?: Array<{ id: string; name: string }>;
   onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
@@ -113,12 +120,13 @@ export function BillForm({
 }: BillFormProps) {
   const isEditing = !!bill;
   const tValidation = useTranslations('purchases.bills.validation');
+  const tForm = useTranslations('purchases.bills.form');
   const tIntake = useTranslations('ai.intake');
   const { data: vendorsData } = useVendors({ limit: 100 });
   const vendors = useMemo(() => vendorsData?.data || [], [vendorsData?.data]);
 
   // Filter accounts
-  const _expenseAccounts = accounts.filter((a) => a.type === 'EXPENSE' || a.type === 'ASSET');
+  const expenseAccounts = accounts.filter((a) => a.type === 'EXPENSE' || a.type === 'ASSET');
 
   const form = useForm<BillFormData>({
     resolver: zodResolver(billSchema),
@@ -132,13 +140,14 @@ export function BillForm({
       projectId: scanDefaults?.projectId || '',
       lines: scanDefaults?.lines?.length
         ? scanDefaults.lines.map((l) => ({
+            accountId: '',
             description: l.description,
             quantity: l.quantity,
             rate: l.rate,
             // Scan review leaves an unresolved tax rate empty; do not default it to 0.
             taxRate: l.taxRate ?? '0',
           }))
-        : [{ description: '', quantity: '1', rate: '', taxRate: '0' }],
+        : [{ accountId: '', description: '', quantity: '1', rate: '', taxRate: '0' }],
     },
   });
 
@@ -159,12 +168,12 @@ export function BillForm({
         projectId: bill.projectId || '',
         lines: bill.lines?.map((line) => ({
           itemId: line.itemId || '',
-          accountId: line.accountId || '',
+          accountId: line.accountId ?? '',
           description: line.description,
           quantity: String(line.quantity),
           rate: String(line.rate),
           taxRate: String(line.taxRate || 0),
-        })) || [{ description: '', quantity: '1', rate: '', taxRate: '0' }],
+        })) || [{ accountId: '', description: '', quantity: '1', rate: '', taxRate: '0' }],
       });
     }
   }, [bill, form]);
@@ -244,7 +253,15 @@ export function BillForm({
 
   const handleItemSelect = (index: number, itemId: string) => {
     if (itemId === 'none') {
+      // Drop an account that came from the previous item; keep one the user picked by hand.
+      const previousItem = items.find((i) => i.id === form.getValues(`lines.${index}.itemId`));
+      const accountId = form.getValues(`lines.${index}.accountId`);
       form.setValue(`lines.${index}.itemId`, '');
+      if (previousItem?.purchaseAccountId && accountId === previousItem.purchaseAccountId) {
+        form.setValue(`lines.${index}.accountId`, '', {
+          shouldValidate: form.formState.isSubmitted,
+        });
+      }
       return;
     }
     const item = items.find((i) => i.id === itemId);
@@ -252,6 +269,15 @@ export function BillForm({
       form.setValue(`lines.${index}.itemId`, item.id);
       form.setValue(`lines.${index}.description`, item.name);
       form.setValue(`lines.${index}.rate`, item.costPrice);
+      if (item.purchaseAccountId && expenseAccounts.some((a) => a.id === item.purchaseAccountId)) {
+        form.setValue(`lines.${index}.accountId`, item.purchaseAccountId, {
+          shouldValidate: form.formState.isSubmitted,
+        });
+      } else {
+        form.setValue(`lines.${index}.accountId`, '', {
+          shouldValidate: form.formState.isSubmitted,
+        });
+      }
     }
   };
 
@@ -375,13 +401,14 @@ export function BillForm({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[200px]">Item/Account</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="w-[80px]">Qty</TableHead>
-                <TableHead className="w-[110px]">Unit Price</TableHead>
-                <TableHead className="w-[110px] text-right">Amount</TableHead>
-                <TableHead className="w-[100px]">Tax %</TableHead>
-                <TableHead className="w-[110px] text-right">Total</TableHead>
+                <TableHead className="w-[200px]">{tForm('item')}</TableHead>
+                <TableHead className="w-[200px]">{tForm('expenseAccount')}</TableHead>
+                <TableHead>{tForm('description')}</TableHead>
+                <TableHead className="w-[80px]">{tForm('qty')}</TableHead>
+                <TableHead className="w-[110px]">{tForm('unitPrice')}</TableHead>
+                <TableHead className="w-[110px] text-right">{tForm('amount')}</TableHead>
+                <TableHead className="w-[100px]">{tForm('taxPercent')}</TableHead>
+                <TableHead className="w-[110px] text-right">{tForm('total')}</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -391,12 +418,12 @@ export function BillForm({
 
                 return (
                   <TableRow key={field.id}>
-                    <TableCell>
+                    <TableCell data-testid={`line-${index}-item`}>
                       <Select
                         value={form.watch(`lines.${index}.itemId`) || 'none'}
                         onValueChange={(value) => handleItemSelect(index, value)}
                       >
-                        <SelectTrigger className="h-8">
+                        <SelectTrigger className="h-8" aria-label={tForm('item')}>
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
@@ -409,37 +436,66 @@ export function BillForm({
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-testid={`line-${index}-account`}>
+                      <Select
+                        value={form.watch(`lines.${index}.accountId`) || ''}
+                        onValueChange={(value) =>
+                          form.setValue(`lines.${index}.accountId`, value, {
+                            shouldValidate: form.formState.isSubmitted,
+                          })
+                        }
+                      >
+                        <SelectTrigger
+                          className="h-8"
+                          aria-label={tForm('expenseAccount')}
+                          aria-invalid={!!form.formState.errors.lines?.[index]?.accountId}
+                        >
+                          <SelectValue placeholder={tForm('expenseAccountPlaceholder')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {expenseAccounts.map((account) => (
+                            <SelectItem key={account.id} value={account.id}>
+                              {account.code} · {account.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell data-testid={`line-${index}-description`}>
                       <Input
                         {...form.register(`lines.${index}.description`)}
-                        placeholder="Description"
+                        placeholder={tForm('descriptionPlaceholder')}
+                        aria-label={tForm('description')}
                         className="h-8"
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-testid={`line-${index}-quantity`}>
                       <Input
                         {...form.register(`lines.${index}.quantity`)}
                         type="number"
                         step="0.0001"
+                        aria-label={tForm('qty')}
                         className="h-8"
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-testid={`line-${index}-rate`}>
                       <Input
                         {...form.register(`lines.${index}.rate`)}
                         type="number"
                         step="0.0001"
+                        aria-label={tForm('unitPrice')}
                         className="h-8"
                       />
                     </TableCell>
                     <TableCell className="text-right font-mono">{lineTotals.net}</TableCell>
-                    <TableCell>
+                    <TableCell data-testid={`line-${index}-taxRate`}>
                       <Input
                         {...form.register(`lines.${index}.taxRate`)}
                         type="number"
                         min={0}
                         step={0.01}
                         placeholder="0.00"
+                        aria-label={tForm('taxPercent')}
                         className="h-8 w-24"
                       />
                     </TableCell>
@@ -454,7 +510,7 @@ export function BillForm({
                           size="icon"
                           className="h-8 w-8"
                           onClick={() => remove(index)}
-                          aria-label="Delete line item"
+                          aria-label={tForm('deleteLine')}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -479,25 +535,28 @@ export function BillForm({
             variant="outline"
             size="sm"
             className="mt-4"
-            onClick={() => append({ description: '', quantity: '1', rate: '', taxRate: '0' })}
+            aria-label={tForm('addLine')}
+            onClick={() =>
+              append({ accountId: '', description: '', quantity: '1', rate: '', taxRate: '0' })
+            }
           >
             <Plus className="mr-2 h-4 w-4" />
-            Add Line
+            {tForm('addLine')}
           </Button>
 
           {/* Totals */}
           <div className="mt-6 flex justify-end">
             <div className="w-64 space-y-2">
               <div className="flex justify-between text-sm">
-                <span>Subtotal</span>
+                <span>{tForm('subtotal')}</span>
                 <span className="font-mono">{totals.subtotal}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span>Tax</span>
+                <span>{tForm('tax')}</span>
                 <span className="font-mono">{totals.taxAmount}</span>
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2">
-                <span>Total</span>
+                <span>{tForm('total')}</span>
                 <span className="font-mono">{totals.grandTotal}</span>
               </div>
             </div>

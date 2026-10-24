@@ -66,7 +66,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import Link from 'next/link';
+import { Link } from '@/i18n/routing';
 import { Suspense, useState } from 'react';
 import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
 
