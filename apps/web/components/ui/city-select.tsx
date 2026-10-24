@@ -18,6 +18,7 @@ interface CitySelectProps {
   placeholder?: string;
   disabled?: boolean;
   id?: string;
+  'aria-label'?: string;
 }
 
 export function CitySelect({
@@ -27,6 +28,7 @@ export function CitySelect({
   placeholder = 'Select city',
   disabled,
   id,
+  'aria-label': ariaLabel,
 }: CitySelectProps) {
   const cities = useMemo(() => {
     if (!country) return [];
@@ -41,6 +43,7 @@ export function CitySelect({
     return (
       <Input
         id={id}
+        aria-label={ariaLabel}
         value={value || ''}
         onChange={(e) => onValueChange?.(e.target.value)}
         placeholder={country ? 'Enter city name' : 'Select a country first'}
@@ -51,7 +54,7 @@ export function CitySelect({
 
   return (
     <Select value={value || ''} onValueChange={onValueChange} disabled={disabled}>
-      <SelectTrigger id={id}>
+      <SelectTrigger id={id} aria-label={ariaLabel}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent className="max-h-[300px]">

@@ -94,6 +94,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Keep error, loading and empty distinct.** Never collapse a failed query into `[]` ("no accounts"). Show an error with Retry, and block submit while a required lookup is loading or failed.
 - **Show the currency of the document**, falling back to the org base currency, never the counterparty's default. The API must actually return the fields the UI relies on (for example `baseCurrency`).
 - **Payment-wide effects get payment-wide warnings.** Voiding a payment affects every allocated bill.
+- **Use proper Modern Standard Arabic (MSA) translations for accessible labels and form inputs.** Machine translation or nonsensical fragments (such as "مشاركة" for sharing instead of billing/shipping terms) break screen readers. Always provide clean, single-locale MSA labels (e.g., "شارع الفوترة", "شارع الشحن") and never stack multilingual keywords or slashes in aria-labels. _(#372)_
 
 ## 12. Caches, tests and scope
 
