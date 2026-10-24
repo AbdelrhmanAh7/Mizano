@@ -23,7 +23,7 @@ import { ResourceOptimizationController } from '../controllers/resource-optimiza
 import { RouteOptimizationController } from '../controllers/route-optimization.controller';
 
 // Scheduler
-import { AiHrOpsScheduler } from '../schedulers/ai-hr-ops.scheduler';
+import { aiHrOpsSchedulerProvider } from '../schedulers/ai-hr-ops.scheduler';
 
 @Module({
   imports: [PrismaModule, AiCoreModule],
@@ -46,7 +46,7 @@ import { AiHrOpsScheduler } from '../schedulers/ai-hr-ops.scheduler';
     PredictiveMaintenanceService,
     ResourceOptimizationService,
     RouteOptimizationService,
-    AiHrOpsScheduler,
+    aiHrOpsSchedulerProvider,
   ],
   exports: [
     EmployeeAttritionService,
