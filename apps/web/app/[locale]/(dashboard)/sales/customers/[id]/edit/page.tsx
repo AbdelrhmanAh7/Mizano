@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { CustomerForm } from '@/components/sales/customer-form';
 import { useCustomer, useUpdateCustomer } from '@/lib/hooks/use-customers';
-import Link from 'next/link';
+import { Link } from '@/i18n/routing';
 
 export default function EditCustomerPage() {
   const params = useParams();

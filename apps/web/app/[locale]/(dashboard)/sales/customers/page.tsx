@@ -41,7 +41,7 @@ import { cn } from '@/lib/utils';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Edit, Eye, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import Link from 'next/link';
+import { Link } from '@/i18n/routing';
 import { Suspense, useState } from 'react';
 
 function CustomersPageContent() {
