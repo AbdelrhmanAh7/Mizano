@@ -79,6 +79,16 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
       expectNoWrites(prisma);
     });
 
+    it('rejects a non-DRAFT challan before writing', async () => {
+      prisma.deliveryChallan.findFirst.mockResolvedValue(
+        challan(ChallanStatus.ISSUED, { itemId: 'item-b', warehouseId: null }) as never,
+      );
+      await expect(service.update(ORG, 'dc-1', { notes: 'x' })).rejects.toThrow(
+        BadRequestException,
+      );
+      expectNoWrites(prisma);
+    });
+
     it('looks every reference up within the org', async () => {
       prisma.customer.findFirst.mockResolvedValue({ id: 'cust-b' } as never);
       prisma.invoice.findFirst.mockResolvedValue({ id: 'inv-b' } as never);
