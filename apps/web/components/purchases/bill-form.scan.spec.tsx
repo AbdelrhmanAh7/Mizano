@@ -1,12 +1,20 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { BillForm } from './bill-form';
 import enAi from '@/messages/en/ai.json';
 import arAi from '@/messages/ar/ai.json';
+import enPurchases from '@/messages/en/purchases.json';
+import arPurchases from '@/messages/ar/purchases.json';
 
+let mockLocale = 'en';
 jest.mock('next-intl', () => ({
-  useTranslations: () => (key: string, values?: Record<string, string>) =>
-    values ? `${key}|${Object.values(values).join('|')}` : key,
+  useLocale: () => mockLocale,
+  useTranslations: () =>
+    Object.assign(
+      (key: string, values?: Record<string, string>) =>
+        values ? `${key}|${Object.values(values).join('|')}` : key,
+      { has: () => true },
+    ),
 }));
 jest.mock('@/lib/hooks/use-vendors', () => ({
   useVendors: () => ({ data: { data: [] } }),
@@ -78,6 +86,102 @@ describe('BillForm scan review totals', () => {
         expect((intake as Record<string, unknown>)[key]).toEqual(expect.any(String));
       }
       expect(Object.keys(intake.discrepancyField)).toEqual(['subtotal', 'tax', 'total']);
+    }
+  });
+});
+
+describe('BillForm select direction', () => {
+  const scrollIntoView = HTMLElement.prototype.scrollIntoView;
+  beforeAll(() => {
+    HTMLElement.prototype.scrollIntoView = jest.fn();
+  });
+  afterAll(() => {
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+  });
+  it.each([
+    ['ar', 'rtl'],
+    ['en', 'ltr'],
+  ])('opens the line Select and aligns numeric cells in %s (%s)', async (locale, dir) => {
+    mockLocale = locale;
+    renderForm({});
+    const table = screen.getByRole('table');
+    const trigger = within(table).getByRole('combobox');
+    expect(trigger).toHaveAttribute('dir', dir);
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+    const listbox = await screen.findByRole('listbox');
+    expect(listbox).toHaveAttribute('dir', dir);
+    fireEvent.click(within(listbox).getByRole('option', { name: 'Manual Entry' }));
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument());
+    expect(trigger).toHaveTextContent('Manual Entry');
+    for (const name of ['Amount', 'Total']) {
+      expect(within(table).getByRole('columnheader', { name })).toHaveClass('text-end');
+    }
+    const cells = within(table).getAllByRole('cell');
+    expect(cells[4]).toHaveClass('text-end');
+    expect(cells[6]).toHaveClass('text-end');
+  });
+
+  afterEach(() => {
+    mockLocale = 'en';
+  });
+
+  it.each([
+    ['ar', 'rtl'],
+    ['en', 'ltr'],
+  ])('gives every select the %s locale direction (%s)', (locale, dir) => {
+    mockLocale = locale;
+    render(<BillForm onSubmit={jest.fn()} onCancel={jest.fn()} />);
+    const triggers = screen.getAllByRole('combobox');
+    expect(triggers.length).toBeGreaterThan(0);
+    for (const trigger of triggers) expect(trigger).toHaveAttribute('dir', dir);
+  });
+});
+
+describe('BillForm line account validation', () => {
+  const accounts = [
+    { id: 'exp-1', code: '5100', name: 'Office', type: 'EXPENSE', isActive: true },
+    { id: 'exp-off', code: '5900', name: 'Closed', type: 'EXPENSE', isActive: false },
+    { id: 'rev-1', code: '4000', name: 'Sales', type: 'REVENUE', isActive: true },
+  ];
+
+  function submitWithAccount(accountId: string) {
+    const onSubmit = jest.fn();
+    render(
+      <BillForm
+        accounts={accounts}
+        scanDefaults={{
+          ...scanDefaults,
+          vendorId: 'v1',
+          lines: [{ ...scanDefaults.lines[0], accountId }],
+        }}
+        onSubmit={onSubmit}
+        onCancel={jest.fn()}
+      />,
+    );
+    fireEvent.submit(document.querySelector('form')!);
+    return onSubmit;
+  }
+
+  it('accepts an active expense account', async () => {
+    const onSubmit = submitWithAccount('exp-1');
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+  });
+
+  it('rejects submission when a line references an inactive expense account', async () => {
+    const onSubmit = submitWithAccount('exp-off');
+    expect(await screen.findByText('line|1|accountInvalidType')).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('rejects submission when a line references an invalid account type', async () => {
+    const onSubmit = submitWithAccount('rev-1');
+    expect(await screen.findByText('line|1|accountInvalidType')).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('has the accountInvalidType copy in English and Arabic', () => {
+    for (const p of [enPurchases, arPurchases]) {
+      expect(p.bills.validation.accountInvalidType).toEqual(expect.any(String));
     }
   });
 });

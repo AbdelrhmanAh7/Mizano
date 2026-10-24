@@ -27,7 +27,8 @@ import { addDays, format } from 'date-fns';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { localeDirections, type Locale } from '@/i18n/config';
 import { z } from 'zod';
 import {
   computeTotals,
@@ -55,6 +56,23 @@ const lineSchema = z.object({
   taxRate: z.string().trim().regex(OPTIONAL_PERCENT_INPUT, 'taxInvalid').default('0'),
 });
 
+type BillAccount = { id: string; code: string; name: string; type: string; isActive?: boolean };
+
+// A line account must be an active EXPENSE account. A missing `isActive` counts as active
+// (domain default); with no accounts loaded yet the API stays the judge.
+function createBillSchema(accounts: BillAccount[]) {
+  const usable = new Set(
+    accounts.filter((a) => a.type === 'EXPENSE' && a.isActive !== false).map((a) => a.id),
+  );
+  const checkedLine = lineSchema.refine(
+    (line) => !line.accountId || accounts.length === 0 || usable.has(line.accountId),
+    { message: 'accountInvalidType', path: ['accountId'] },
+  );
+  return billSchema.extend({
+    lines: z.array(checkedLine).min(1, 'At least one line item is required'),
+  });
+}
+
 const billSchema = z.object({
   vendorId: z.string().min(1, 'Vendor is required'),
   date: z.string().min(1, 'Date is required'),
@@ -81,12 +99,13 @@ export interface BillFormDefaultValues {
     quantity: string;
     rate: string;
     taxRate?: string;
+    accountId?: string;
   }>;
 }
 
 interface BillFormProps {
   bill?: Bill | null;
-  accounts?: Array<{ id: string; code: string; name: string; type: string }>;
+  accounts?: BillAccount[];
   items?: Array<{ id: string; name: string; sku: string; costPrice: string }>;
   projects?: Array<{ id: string; name: string }>;
   onSubmit: (data: Record<string, unknown>) => void;
@@ -114,14 +133,15 @@ export function BillForm({
   const isEditing = !!bill;
   const tValidation = useTranslations('purchases.bills.validation');
   const tIntake = useTranslations('ai.intake');
+  // Radix Select defaults to ltr (keyboard navigation, popper alignment) unless told otherwise.
+  const dir = localeDirections[useLocale() as Locale] ?? 'ltr';
   const { data: vendorsData } = useVendors({ limit: 100 });
   const vendors = useMemo(() => vendorsData?.data || [], [vendorsData?.data]);
 
-  // Filter accounts
-  const _expenseAccounts = accounts.filter((a) => a.type === 'EXPENSE' || a.type === 'ASSET');
+  const schema = useMemo(() => createBillSchema(accounts), [accounts]);
 
   const form = useForm<BillFormData>({
-    resolver: zodResolver(billSchema),
+    resolver: zodResolver(schema),
     defaultValues: {
       vendorId: scanDefaults?.vendorId || defaultVendorId || '',
       date: scanDefaults?.date || format(new Date(), 'yyyy-MM-dd'),
@@ -132,6 +152,7 @@ export function BillForm({
       projectId: scanDefaults?.projectId || '',
       lines: scanDefaults?.lines?.length
         ? scanDefaults.lines.map((l) => ({
+            accountId: l.accountId ?? '',
             description: l.description,
             quantity: l.quantity,
             rate: l.rate,
@@ -268,6 +289,7 @@ export function BillForm({
             <div className="space-y-2">
               <Label htmlFor="vendorId">Vendor *</Label>
               <Select
+                dir={dir}
                 value={form.watch('vendorId')}
                 onValueChange={(value) => form.setValue('vendorId', value)}
               >
@@ -318,6 +340,7 @@ export function BillForm({
             <div className="space-y-2">
               <Label htmlFor="currencyCode">Currency</Label>
               <Select
+                dir={dir}
                 value={form.watch('currencyCode') || ''}
                 onValueChange={(value) =>
                   form.setValue('currencyCode', value === 'default' ? '' : value)
@@ -343,6 +366,7 @@ export function BillForm({
               <div className="space-y-2">
                 <Label htmlFor="projectId">Project (Optional)</Label>
                 <Select
+                  dir={dir}
                   value={form.watch('projectId') || ''}
                   onValueChange={(value) =>
                     form.setValue('projectId', value === 'none' ? '' : value)
@@ -379,9 +403,9 @@ export function BillForm({
                 <TableHead>Description</TableHead>
                 <TableHead className="w-[80px]">Qty</TableHead>
                 <TableHead className="w-[110px]">Unit Price</TableHead>
-                <TableHead className="w-[110px] text-right">Amount</TableHead>
+                <TableHead className="w-[110px] text-end">Amount</TableHead>
                 <TableHead className="w-[100px]">Tax %</TableHead>
-                <TableHead className="w-[110px] text-right">Total</TableHead>
+                <TableHead className="w-[110px] text-end">Total</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -393,6 +417,7 @@ export function BillForm({
                   <TableRow key={field.id}>
                     <TableCell>
                       <Select
+                        dir={dir}
                         value={form.watch(`lines.${index}.itemId`) || 'none'}
                         onValueChange={(value) => handleItemSelect(index, value)}
                       >
@@ -432,7 +457,7 @@ export function BillForm({
                         className="h-8"
                       />
                     </TableCell>
-                    <TableCell className="text-right font-mono">{lineTotals.net}</TableCell>
+                    <TableCell className="text-end font-mono">{lineTotals.net}</TableCell>
                     <TableCell>
                       <Input
                         {...form.register(`lines.${index}.taxRate`)}
@@ -443,7 +468,7 @@ export function BillForm({
                         className="h-8 w-24"
                       />
                     </TableCell>
-                    <TableCell className="text-right font-mono font-semibold">
+                    <TableCell className="text-end font-mono font-semibold">
                       {lineTotals.total}
                     </TableCell>
                     <TableCell>

@@ -90,6 +90,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 11. Web UI
 
+- **Test open portalled Select content in both directions, not only its trigger.** Use logical table alignment (`text-end`) and verify computed left/right alignment with the existing RTL plugin. _(#411)_
+
 - **Every new string needs en and ar,** including dialog titles, confirm and cancel buttons, placeholders, selector labels and report row names. Shared components accept localized label props.
 - **Keep error, loading and empty distinct.** Never collapse a failed query into `[]` ("no accounts"). Show an error with Retry, and block submit while a required lookup is loading or failed.
 - **Show the currency of the document**, falling back to the org base currency, never the counterparty's default. The API must actually return the fields the UI relies on (for example `baseCurrency`).
