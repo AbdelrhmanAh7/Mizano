@@ -146,10 +146,55 @@ Rules:
 
 Checks on PRs and pushes to `master`, by source:
 
-- **`.github/workflows/ci.yml` (GitHub-hosted runners):** runs on pushes to `master` and on PRs to `master`/`develop`, on GitHub-hosted runners only (`ubuntu-latest`; free and unlimited because the repository is public; no self-hosted labels, no secrets beyond `GITHUB_TOKEN`). Four independent parallel jobs, each limited to 5 minutes (`timeout-minutes: 5`; split a job rather than raising the limit): **Install Dependencies** (pnpm 8, Node 20, `prisma generate`), **Lint & Type Check**, **Unit Tests** (PostgreSQL 16 and Redis 7 service containers, `db:push`) and **Build**. Their names are the check names the automerge gates wait for, so keep them stable. A newer push to a PR cancels its older run. The workflow uses `pull_request` (never `pull_request_target`); fork PRs run only after approval in the repository settings. E2E is not part of this workflow. `deploy.yml` stays disabled (it needs deployment secrets).
+- **`.github/workflows/ci.yml` (GitHub-hosted runners):** runs on pushes to `master`/`develop` and on PRs to `master`/`develop`, on GitHub-hosted runners only (free and unlimited because the repository is public; no self-hosted labels, no secrets beyond `GITHUB_TOKEN`).
+  - **Owner rule:** every standard job stays under 5 minutes (`timeout-minutes: 5`; split a job rather than raising the limit). The four core jobs are **Install Dependencies** (pnpm 8, Node 20, `prisma generate`), **Lint & Type Check**, **Unit Tests** (mock-only: no database services) and **Build**.
+  - **Stable check names:** their names are the exact check names the hub gates and automerge wait for, so they must stay stable.
+  - **Fork PRs:** this workflow uses `pull_request` (read-only token, no secrets), never `pull_request_target`; first-time fork contributors need an approval in repository settings before it runs.
+  - **E2E:** `ci.yml` runs no E2E (see `e2e-army` below).
+  - **Deployment note:** `deploy.yml` publishes production images on pushes to `master` (not PRs).
 - **Hub `localci` job (Mac mini):** runs the full CI (`pnpm ci:full`: lint, type-check, test, build) locally and posts GitHub commit statuses under the same job names, so the gates see the same check names whichever runner produced them.
 - **`e2e-army` status (hub verify suite):** feature-level E2E for the features a PR touches, run by the hub against a throwaway environment; it is a separate commit status, not a job in `ci.yml`.
 - **Local pre-push hook:** only fast checks (`turbo run type-check test --filter=...[<base>]`, see Git workflow below); full CI, build and E2E are left to the sources above.
+
+### Pipeline optimizations (`ci.yml`)
+
+The GitHub Actions workflow includes gating, draft skips, and Turbo caching:
+
+#### Trigger rules
+
+- **Push to `master` or `develop`**: full CI runs (install → lint/type-check → test → build).
+- **Pull requests**: CI runs on `opened`, `synchronize`, `reopened`, `ready_for_review` and `labeled`.
+- **Draft PRs**: CI is **skipped** unless the PR has the `ci` label. Adding `ci` to an existing draft starts CI without a new commit. When marked `ready_for_review`, a real CI run is triggered before any merge.
+- **Labels**: the `ci` label allows running CI on draft PRs without a new commit. Adding a label re-runs CI on the same commit: a run whose jobs were all skipped would report under the same check names as the real run and hide a failing one, so adding a label never produces a skipped run (except on a draft without `ci`, which has no real run to hide). The `ci` label must exist in the repository before it can be applied. Removing a label does not trigger a run (`labeled` event only).
+- **Concurrency**: one run per PR (keyed by PR number) or per pushed commit (keyed by SHA). A newer PR run (a push or adding a label) cancels the older one as a whole. Pushes to `master`/`develop` never cancel or replace each other (each commit gets its own SHA group and runs independently), so every commit on those branches keeps a complete CI result (the deploy workflow starts from the CI result of `master`).
+
+#### Job flow
+
+1. **gate** (`CI Gate`, timeout 5m) — sets `should_run`. Event data reaches the script as environment variables, never through `${{ }}` inside the script, so a label name cannot inject shell code.
+2. **install** (`Install Dependencies`, timeout 5m) — shared dependency install (pnpm store cache) and `prisma generate`.
+3. **lint**, **test**, **build** (each timeout 5m) — run in parallel after install. Each lists `gate` and `install` in `needs`. The lint job also runs `scripts/test_turbo_config.py` and `scripts/test_ci_config.py` guards (see Turbo task inputs and CI rules below). The build job restores the Next.js build cache.
+
+#### Caching
+
+- **pnpm store**: `setup-node` with `cache: 'pnpm'`.
+- **turbo**: `.turbo/cache` is restored before the Turbo tasks of the lint, test and build jobs and saved after the job steps succeed unless there was an exact cache hit (`actions/cache`), with one key prefix per job (`turbo-lint-`, `turbo-test-`, `turbo-build-`) because the tasks differ. Keys include `pnpm-lock.yaml`, `turbo.json` and the SHA; `restore-keys` give partial hits. The pipeline relies solely on `actions/cache` without external secrets or third-party remote cache tokens, adhering to the "no secrets beyond `GITHUB_TOKEN`" security policy.
+- **Next.js cache**: `apps/web/.next/cache` is restored during `build` to speed up compilation.
+
+#### Docker build validation decoupling
+
+Multi-arch native Docker builds (`docker-build` matrix job) were decoupled from `ci.yml` and moved to a dedicated follow-up issue (`docs/follow-up-docker-validation.md`) because measured cold builds take 8–12 minutes, exceeding the mandatory 5-minute job timeout limit (`timeout-minutes: 5`). For change-detection paths in follow-up implementations, `base` is set for pushes only, whereas PRs use the GitHub API to list changed files (a push whose `before` commit is all zeros or missing from shallow clones treats Docker files as changed).
+
+#### Turbo task inputs
+
+`turbo.json` declares no `inputs` for `build`, `lint`, `type-check` and `test`, so Turborepo hashes every file of a package that git tracks (or that is untracked and not ignored) and runs the task again when any of them changes. The old `src/**` globs matched nothing in `apps/web` (its code lives in `app/`, `components/`, `lib/`, `messages/` and `public/`), so web tasks hashed only `package.json`, `tsconfig.json` and the lint/jest config and replayed a cached result for any web change. Locally the replay crossed branches, because Turborepo shares `.turbo/cache` between git worktrees: the first result recorded on any branch replayed on every other branch, and `pnpm ci:full` never really checked web code. CI would have done the same as soon as the Turbo cache is restored there. The same globs also skipped `apps/api/test/` (lint and type-check), `apps/api/prisma/` (lint, type-check and test) and the Nest/SWC configs.
+
+`.prettierrc` and `.prettierignore` are `globalDependencies` because the API lint runs Prettier through ESLint. `scripts/test_turbo_config.py` (standard library only, run by the CI lint job) fails when a task declares `inputs` without `$TURBO_DEFAULT$`. If you add `inputs` to a task again, start from `$TURBO_DEFAULT$` and subtract, then check the result:
+
+```bash
+# change a web file, then:
+pnpm turbo run type-check --filter=@mizano/web --dry=json
+# the changed file must appear under tasks[].inputs and cache.status must be "MISS"
+```
 
 `.github/workflows/demo-planning.yml` validates and syncs `docs/planning/` metadata with `scripts/sync-demo-planning.py`; see the [planning guide](planning/README.md).
 

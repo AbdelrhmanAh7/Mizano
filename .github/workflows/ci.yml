@@ -1,6 +1,6 @@
 # Mizano ERP - Continuous Integration Pipeline
 # =============================================
-# Runs on all PRs and on pushes to the default branch (master), on GitHub-hosted runners only (ubuntu-latest, free and
+# Runs on all PRs and pushes to master/develop branches on GitHub-hosted runners only (free and
 # unlimited for this public repository). No self-hosted labels and no secrets beyond the automatic GITHUB_TOKEN.
 #
 # Owner rule: every job stays under 5 minutes (timeout-minutes: 5), so the pipeline is split into parallel jobs.
@@ -10,21 +10,31 @@
 #
 # Fork PRs: this workflow uses `pull_request` (read-only token, no secrets), never `pull_request_target`; first-time
 # fork contributors need an approval in the repository settings before it runs. Leave that setting on.
+#
+# Optimized: shared pnpm cache, parallel jobs, turbo cache via actions/cache, no redundant installs.
 
 name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, develop]
   pull_request:
     branches: [master, develop]
+    # "labeled" lets an operator start CI on a draft ("ci" label) without a new commit.
+    # Any label change re-runs the real jobs: a run whose jobs the gate skipped would report
+    # under the same check names and hide a failing run of the same commit.
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
 
 permissions:
   contents: read
 
-# A newer push to the same PR cancels the older run; pushes to master are never cancelled, so every master head gets a result.
+# One run per PR. A newer PR run replaces the older one as a whole.
+# Branch pushes get one group per commit SHA: GitHub keeps only one pending run
+# per group, so a shared group would drop the middle of two quick pushes. Per-SHA groups never
+# cancel or replace each other, so every master commit keeps a complete result (deploy.yml
+# starts from the CI result of master).
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -33,15 +43,45 @@ env:
 
 jobs:
   # ==========================================
-  # Install: the lockfile installs and the Prisma client generates
+  # Gate: decide whether CI runs for this event
+  # ==========================================
+  gate:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+    steps:
+      - name: Decide whether CI should run
+        id: check
+        # Event data reaches the script through env vars only, never through ${{ }} in the
+        # script body, so a label name cannot inject shell code.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
+          HAS_CI_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'ci') }}
+        run: |
+          should_run=true
+          if [ "$EVENT_NAME" = "pull_request" ] && [ "$IS_DRAFT" = "true" ] && [ "$HAS_CI_LABEL" != "true" ]; then
+            echo "Draft PR without the 'ci' label - skipping CI"
+            should_run=false
+          fi
+          echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
+
+  # ==========================================
+  # Install & Cache Dependencies (shared)
   # ==========================================
   install:
     name: Install Dependencies
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    needs: gate
+    if: needs.gate.outputs.should_run == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -67,9 +107,13 @@ jobs:
     name: Lint & Type Check
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    needs: [gate, install]
+    if: needs.gate.outputs.should_run == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -87,6 +131,21 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm db:generate
+
+      # Restores here and saves only when all earlier steps passed and the key was not an
+      # exact hit, so the cache holds what the Turbo tasks below produced. Each job has its own key prefix.
+      - name: Cache turbo build cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-lint-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-lint-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
+
+      # Check turbo task inputs and CI configuration constraints (5-minute timeouts,
+      # no cold docker-build jobs, least-privilege permissions, stable check names).
+      - name: Check turbo task inputs and CI configuration
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
 
       - name: Run ESLint
         run: pnpm lint
@@ -104,9 +163,13 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    needs: [gate, install]
+    if: needs.gate.outputs.should_run == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -124,6 +187,14 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm db:generate
+
+      - name: Cache turbo build cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-test-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-test-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
 
       - name: Run unit tests
         run: pnpm test
@@ -142,9 +213,13 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    needs: [gate, install]
+    if: needs.gate.outputs.should_run == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -173,6 +248,14 @@ jobs:
           key: next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/app/**', 'apps/web/components/**', 'apps/web/lib/**', 'apps/web/messages/**', 'packages/*/src/**') }}
           restore-keys: |
             next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      - name: Cache turbo build cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-build-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-build-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
 
       - name: Build all packages
         run: pnpm build
