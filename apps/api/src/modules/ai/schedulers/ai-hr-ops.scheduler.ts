@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Provider } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { EmployeeAttritionService } from '../services/employee-attrition.service';
@@ -236,3 +237,26 @@ export class AiHrOpsScheduler {
     }
   }
 }
+
+/**
+ * Registers AiHrOpsScheduler only when AI_SCHEDULERS_ENABLED=true. Otherwise an
+ * inert object is provided under the same token: DI keeps resolving, but it has
+ * no @Cron metadata, so nothing is scheduled.
+ */
+export const aiHrOpsSchedulerProvider: Provider = {
+  provide: AiHrOpsScheduler,
+  inject: [
+    ConfigService,
+    PrismaService,
+    EmployeeAttritionService,
+    CompensationBenchmarkService,
+    QualityPredictionService,
+    PredictiveMaintenanceService,
+    ResourceOptimizationService,
+  ],
+  useFactory: (
+    config: ConfigService,
+    ...deps: ConstructorParameters<typeof AiHrOpsScheduler>
+  ): AiHrOpsScheduler | object =>
+    config.get<string>('AI_SCHEDULERS_ENABLED') === 'true' ? new AiHrOpsScheduler(...deps) : {},
+};
