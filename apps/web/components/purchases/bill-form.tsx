@@ -27,7 +27,8 @@ import { addDays, format } from 'date-fns';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { localeDirections, type Locale } from '@/i18n/config';
 import { z } from 'zod';
 import {
   computeTotals,
@@ -132,6 +133,8 @@ export function BillForm({
   const isEditing = !!bill;
   const tValidation = useTranslations('purchases.bills.validation');
   const tIntake = useTranslations('ai.intake');
+  // Radix Select defaults to ltr (keyboard navigation, popper alignment) unless told otherwise.
+  const dir = localeDirections[useLocale() as Locale] ?? 'ltr';
   const { data: vendorsData } = useVendors({ limit: 100 });
   const vendors = useMemo(() => vendorsData?.data || [], [vendorsData?.data]);
 
@@ -286,6 +289,7 @@ export function BillForm({
             <div className="space-y-2">
               <Label htmlFor="vendorId">Vendor *</Label>
               <Select
+                dir={dir}
                 value={form.watch('vendorId')}
                 onValueChange={(value) => form.setValue('vendorId', value)}
               >
@@ -336,6 +340,7 @@ export function BillForm({
             <div className="space-y-2">
               <Label htmlFor="currencyCode">Currency</Label>
               <Select
+                dir={dir}
                 value={form.watch('currencyCode') || ''}
                 onValueChange={(value) =>
                   form.setValue('currencyCode', value === 'default' ? '' : value)
@@ -361,6 +366,7 @@ export function BillForm({
               <div className="space-y-2">
                 <Label htmlFor="projectId">Project (Optional)</Label>
                 <Select
+                  dir={dir}
                   value={form.watch('projectId') || ''}
                   onValueChange={(value) =>
                     form.setValue('projectId', value === 'none' ? '' : value)
@@ -411,6 +417,7 @@ export function BillForm({
                   <TableRow key={field.id}>
                     <TableCell>
                       <Select
+                        dir={dir}
                         value={form.watch(`lines.${index}.itemId`) || 'none'}
                         onValueChange={(value) => handleItemSelect(index, value)}
                       >

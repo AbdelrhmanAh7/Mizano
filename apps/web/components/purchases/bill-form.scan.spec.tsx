@@ -6,7 +6,9 @@ import arAi from '@/messages/ar/ai.json';
 import enPurchases from '@/messages/en/purchases.json';
 import arPurchases from '@/messages/ar/purchases.json';
 
+let mockLocale = 'en';
 jest.mock('next-intl', () => ({
+  useLocale: () => mockLocale,
   useTranslations: () =>
     Object.assign(
       (key: string, values?: Record<string, string>) =>
@@ -85,6 +87,23 @@ describe('BillForm scan review totals', () => {
       }
       expect(Object.keys(intake.discrepancyField)).toEqual(['subtotal', 'tax', 'total']);
     }
+  });
+});
+
+describe('BillForm select direction', () => {
+  afterEach(() => {
+    mockLocale = 'en';
+  });
+
+  it.each([
+    ['ar', 'rtl'],
+    ['en', 'ltr'],
+  ])('gives every select the %s locale direction (%s)', (locale, dir) => {
+    mockLocale = locale;
+    render(<BillForm onSubmit={jest.fn()} onCancel={jest.fn()} />);
+    const triggers = screen.getAllByRole('combobox');
+    expect(triggers.length).toBeGreaterThan(0);
+    for (const trigger of triggers) expect(trigger).toHaveAttribute('dir', dir);
   });
 });
 
