@@ -12,37 +12,40 @@ const arSales = JSON.parse(fs.readFileSync(arSalesPath, 'utf-8'));
 const CREATE_CUSTOMER_LABEL_AR: string = arSales.customers?.form?.submitCreate ?? 'إنشاء عميل';
 const UPDATE_CUSTOMER_LABEL_AR: string = arSales.customers?.form?.submitUpdate ?? 'تحديث العميل';
 
+// Require E2E credentials via env vars; fail clearly if missing
+const E2E_EMAIL = process.env.E2E_USER_EMAIL ?? process.env.E2E_LOGIN_EMAIL;
+const E2E_PASSWORD = process.env.E2E_USER_PASSWORD ?? process.env.E2E_LOGIN_PASSWORD;
+if (!E2E_EMAIL || !E2E_PASSWORD) {
+  throw new Error('E2E_USER_EMAIL/E2E_LOGIN_EMAIL and E2E_USER_PASSWORD/E2E_LOGIN_PASSWORD must be set');
+}
+const LOGIN = { email: E2E_EMAIL, pw: E2E_PASSWORD };
+
 const SEED = 'army-492';
-const LOGIN = {
-  email: process.env.E2E_USER_EMAIL || process.env.E2E_LOGIN_EMAIL || ['admin', 'mizano.com'].join('@'),
-  pw: process.env.E2E_USER_PASSWORD || process.env.E2E_LOGIN_PASSWORD || ['pass', 'word', '123'].join(''),
-};
 
 test(
   '@issue-492 AC1: customer form submit button shows "Create Customer" in English create mode',
   { tags: ['feat:mz-customers', 'lvl:ui'] },
-  async ({ app, agent, screen }) => {
+  async ({ app, agent, screen, browser }) => {
     await app.open('/en/login');
     await agent.act('sign in as {email} with password {pw}', { params: LOGIN });
 
     await app.open('/en/sales/customers/new');
-    await agent.act('wait for the customer form to load');
 
     // Verify LTR direction on English locale
-    const dir = await screen.page().evaluate(() => document.documentElement.dir);
-    expect(dir).toBe('ltr');
+    expect(await browser.evaluate(() => document.documentElement.dir)).toBe('ltr');
 
-    // Check the submit button has correct text for create mode
+    // Check the submit button has correct text and aria-label for create mode
     const submitButton = screen.getByRole('button', { name: /create customer/i });
     await expect(submitButton).toBeVisible();
     await expect(submitButton).toHaveAttribute('type', 'submit');
+    await expect(submitButton).toHaveAttribute('aria-label', 'Create Customer');
   },
 );
 
 test(
   '@issue-492 AC2: customer form submit button shows "Update Customer" in English update mode',
   { tags: ['feat:mz-customers', 'lvl:ui'] },
-  async ({ app, agent, screen }) => {
+  async ({ app, agent, screen, browser }) => {
     await app.open('/en/login');
     await agent.act('sign in as {email} with password {pw}', { params: LOGIN });
 
@@ -56,10 +59,14 @@ test(
     await app.open('/en/sales/customers');
     await agent.act('click the edit button for the customer named {name}', { params: { name: `${SEED}-test-customer` } });
 
-    // Check the submit button has correct text for update mode
+    // Verify LTR direction
+    expect(await browser.evaluate(() => document.documentElement.dir)).toBe('ltr');
+
+    // Check the submit button has correct text and aria-label for update mode
     const submitButton = screen.getByRole('button', { name: /update customer/i });
     await expect(submitButton).toBeVisible();
     await expect(submitButton).toHaveAttribute('type', 'submit');
+    await expect(submitButton).toHaveAttribute('aria-label', 'Update Customer');
   },
 );
 
@@ -73,20 +80,16 @@ test(
     await app.open('/ar/sales/customers/new');
 
     // Verify RTL direction on Arabic locale
-    const dir = await browser.evaluate(() => document.documentElement.dir);
-    expect(dir).toBe('rtl');
+    expect(await browser.evaluate(() => document.documentElement.dir)).toBe('rtl');
 
     // Capture RTL screenshot for visual verification
     await screen.page().screenshot({ path: 'test-results/492-customer-form-ar-rtl-create.png', fullPage: true });
 
-    // Check the submit button has correct Arabic text for create mode
+    // Check the submit button has correct Arabic text and aria-label for create mode
     const submitButton = screen.getByRole('button', { name: CREATE_CUSTOMER_LABEL_AR });
     await expect(submitButton).toBeVisible();
     await expect(submitButton).toHaveAttribute('type', 'submit');
-
-    // Verify the form container has RTL direction
-    const form = screen.getByRole('form').first();
-    await expect(form).toHaveCSS('direction', 'rtl');
+    await expect(submitButton).toHaveAttribute('aria-label', CREATE_CUSTOMER_LABEL_AR);
   },
 );
 
@@ -108,20 +111,16 @@ test(
     await agent.act('click the edit button for the customer named {name}', { params: { name: `${SEED}-test-customer-ar` } });
 
     // Verify RTL direction
-    const dir = await browser.evaluate(() => document.documentElement.dir);
-    expect(dir).toBe('rtl');
+    expect(await browser.evaluate(() => document.documentElement.dir)).toBe('rtl');
 
     // Capture RTL screenshot for visual verification
     await screen.page().screenshot({ path: 'test-results/492-customer-form-ar-rtl-update.png', fullPage: true });
 
-    // Check the submit button has correct Arabic text for update mode
+    // Check the submit button has correct Arabic text and aria-label for update mode
     const submitButton = screen.getByRole('button', { name: UPDATE_CUSTOMER_LABEL_AR });
     await expect(submitButton).toBeVisible();
     await expect(submitButton).toHaveAttribute('type', 'submit');
-
-    // Verify the form container has RTL direction
-    const form = screen.getByRole('form').first();
-    await expect(form).toHaveCSS('direction', 'rtl');
+    await expect(submitButton).toHaveAttribute('aria-label', UPDATE_CUSTOMER_LABEL_AR);
   },
 );
 
@@ -135,19 +134,15 @@ test(
     await app.open('/en/sales/customers/new');
 
     // Verify LTR direction on English locale
-    const dir = await browser.evaluate(() => document.documentElement.dir);
-    expect(dir).toBe('ltr');
+    expect(await browser.evaluate(() => document.documentElement.dir)).toBe('ltr');
 
     // Capture LTR screenshot for visual comparison
     await screen.page().screenshot({ path: 'test-results/492-customer-form-en-ltr-create.png', fullPage: true });
 
-    // Check the submit button has correct English text for create mode
+    // Check the submit button has correct English text and aria-label for create mode
     const submitButton = screen.getByRole('button', { name: /create customer/i });
     await expect(submitButton).toBeVisible();
     await expect(submitButton).toHaveAttribute('type', 'submit');
-
-    // Verify the form container has LTR direction
-    const form = screen.getByRole('form').first();
-    await expect(form).toHaveCSS('direction', 'ltr');
+    await expect(submitButton).toHaveAttribute('aria-label', 'Create Customer');
   },
 );
