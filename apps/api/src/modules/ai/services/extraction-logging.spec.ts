@@ -107,7 +107,15 @@ function buildPrisma(): PrismaService {
     findMany: jest.fn().mockResolvedValue([]),
     findFirst: jest.fn().mockResolvedValue(null),
   };
-  return new Proxy({}, { get: () => model }) as unknown as PrismaService;
+  const organization = {
+    findFirst: jest.fn(({ where }: { where: { id: string } }) =>
+      Promise.resolve(where.id === 'org-1' ? { baseCurrency: 'EGP' } : null),
+    ),
+  };
+  return new Proxy(
+    {},
+    { get: (_target, key) => (key === 'organization' ? organization : model) },
+  ) as unknown as PrismaService;
 }
 
 describe('extraction and intake logging never contains document content', () => {

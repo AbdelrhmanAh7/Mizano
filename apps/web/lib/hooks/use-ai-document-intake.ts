@@ -49,6 +49,22 @@ export interface IntakeLineItem {
   total: number;
 }
 
+export type FieldValidationStatus = 'valid' | 'warning' | 'invalid' | 'missing';
+
+export interface FieldValidation {
+  value: string | null;
+  status: FieldValidationStatus;
+  /** Stable machine codes, localized under ai.intake.validation.reasons. */
+  reasons: string[];
+  evidence?: { text: string; lineIndex: number };
+}
+
+export interface ExtractionValidation {
+  fields: Record<string, FieldValidation>;
+  blockingFields: string[];
+  requiresReview: boolean;
+}
+
 export interface DocumentIntakeResult {
   documentType: IntakeDocumentType;
   classificationConfidence: number;
@@ -68,6 +84,7 @@ export interface DocumentIntakeResult {
     lineItems: IntakeLineItem[];
   };
   fieldConfidence: Record<string, number>;
+  validation?: ExtractionValidation;
   ocrConfidence: number;
   matchedVendor: VendorCandidate | null;
   vendorCandidates: VendorCandidate[];

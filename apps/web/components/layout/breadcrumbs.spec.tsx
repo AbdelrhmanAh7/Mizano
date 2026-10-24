@@ -1,10 +1,16 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { Breadcrumbs } from './breadcrumbs';
+import enNavigation from '@/messages/en/navigation.json';
+import arNavigation from '@/messages/ar/navigation.json';
 
 // Track the mock return values so tests can change them
 let mockPathname = '/en/sales/invoices';
 let mockLocale = 'en';
+const mockTranslate = (key: string) =>
+  key === 'purchases.inbox'
+    ? (mockLocale === 'ar' ? arNavigation : enNavigation).purchases.inbox
+    : key;
 
 // Mock next/navigation
 jest.mock('next/navigation', () => ({
@@ -16,7 +22,7 @@ jest.mock('next/navigation', () => ({
 
 // Mock next-intl
 jest.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
+  useTranslations: () => mockTranslate,
   useLocale: () => mockLocale,
 }));
 
@@ -147,5 +153,28 @@ describe('Breadcrumbs', () => {
     expect(screen.getByText('Purchases')).toBeInTheDocument();
     expect(screen.getByText('Bills')).toBeInTheDocument();
     expect(screen.getByText('Scan Document')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['en', 'Invoice inbox'],
+    ['ar', 'صندوق الفواتير'],
+  ])('localizes the inbox breadcrumb in %s', (locale, label) => {
+    mockLocale = locale;
+    mockPathname = `/${locale}/purchases/inbox`;
+    render(<Breadcrumbs />);
+    expect(screen.getByText(label)).toBeInTheDocument();
+    expect(screen.getByText(label).tagName).toBe('SPAN');
+    expect(screen.getByTestId('link-/purchases')).toHaveAttribute('href', '/purchases');
+  });
+
+  it('refreshes the inbox label after a locale change', () => {
+    // Keep pathname and translator identity stable so they cannot mask a stale memo.
+    mockPathname = '/purchases/inbox';
+    const { rerender } = render(<Breadcrumbs />);
+    expect(screen.getByText('Invoice inbox')).toBeInTheDocument();
+    mockLocale = 'ar';
+    rerender(<Breadcrumbs />);
+    expect(screen.getByText('صندوق الفواتير')).toBeInTheDocument();
+    expect(screen.queryByText('Invoice inbox')).not.toBeInTheDocument();
   });
 });

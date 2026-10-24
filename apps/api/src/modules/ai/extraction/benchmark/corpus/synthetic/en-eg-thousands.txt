@@ -1,0 +1,10 @@
+SYNTHETIC FIXTURE - NOT A REAL INVOICE
+Delta Networks S.A.E.
+Tax Invoice
+Invoice No: DN-88123
+Invoice Date: 02/09/2024
+Tax Registration No: 512-334-901
+Router RB4011     5    2,500.00   12,500.00
+Sub Total: EGP 12,500.00
+VAT 14%: EGP 1,750.00
+Total: EGP 14,250.00
