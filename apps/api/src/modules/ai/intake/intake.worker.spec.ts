@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { EventEmitter } from 'events';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -127,5 +129,39 @@ describe('registerGracefulShutdown', () => {
     signals.emit('SIGINT');
     await settle();
     expect(exit).toHaveBeenCalledWith(1);
+  });
+});
+
+describe('docker-compose.production.yml intake-worker @issue-257 @issue-142', () => {
+  it('defines the intake-worker service with dist/intake-worker.js', () => {
+    const compose = readFileSync(
+      resolve(__dirname, '../../../../../../docker-compose.production.yml'),
+      'utf8',
+    );
+    const block = /^ {2}intake-worker:\r?\n((?: {4}.*\r?\n|\s*\r?\n)+)/m.exec(compose)?.[1] ?? '';
+    expect(block).not.toBe('');
+    expect(block).toContain('dist/intake-worker.js');
+    expect(block).toMatch(/healthcheck:[\s\S]*dist\/intake-worker-healthcheck\.js/);
+    expect(block).toContain('intake_storage:/data/intake');
+  });
+
+  it('API require.cache has no tesseract.js or pdf-parse', () => {
+    const tesseractKeys = Object.keys(require.cache).filter((k) => k.includes('tesseract.js'));
+    expect(tesseractKeys).toHaveLength(0);
+    const pdfParseKeys = Object.keys(require.cache).filter((k) => k.includes('pdf-parse'));
+    expect(pdfParseKeys).toHaveLength(0);
+  });
+
+  it('worker extraction loads pdf-parse into require.cache during document processing', async () => {
+    const { extractTextFromPdf } = await import('../utils/pdf-extractor.util');
+    const pdfBytes = Buffer.from(
+      '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n' +
+        '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n' +
+        '4 0 obj<</Length 35>>stream\nBT /F1 12 Tf 20 100 Td (Invoice Test) Tj ET\nendstream endobj\n' +
+        '5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n',
+    );
+    await extractTextFromPdf(pdfBytes);
+    const pdfParseKeys = Object.keys(require.cache).filter((k) => k.includes('pdf-parse'));
+    expect(pdfParseKeys.length).toBeGreaterThan(0);
   });
 });

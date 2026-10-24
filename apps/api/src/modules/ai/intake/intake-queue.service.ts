@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ConnectionOptions, Queue, Worker } from 'bullmq';
+import Redis from 'ioredis';
 import { describeError } from '../../../common/utils/redact';
 import { IntakeQueueUnavailableException } from '../../../common/exceptions';
 
@@ -155,12 +156,50 @@ export class IntakeQueueService implements OnModuleDestroy {
   async isHealthy(): Promise<boolean> {
     if (!this.redisUrl) return true;
     try {
-      const client = await (this.worker ?? this.queue)?.client;
+      const client = (this.worker ?? this.queue)?.client;
       if (!client) return false;
-      await client.ping();
+      const redis = (await client) as unknown as Redis;
+      await redis.ping();
       return true;
     } catch {
       return false;
+    }
+  }
+
+  /** Get the underlying Redis client for diagnostics. */
+  private async getRedisClient(): Promise<Redis | null> {
+    if (!this.redisUrl) return null;
+    try {
+      if (this.worker) {
+        return (await this.worker.client) as unknown as Redis;
+      }
+      const queue = this.getQueue(this.redisUrl);
+      return (await queue.client) as unknown as Redis;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Store the worker's require.cache state for diagnostics. */
+  async storeWorkerModuleCache(modules: string[]): Promise<void> {
+    const client = await this.getRedisClient();
+    if (!client) return;
+    try {
+      await client.set('mizano:worker:module-cache', JSON.stringify(modules), 'EX', 3600);
+    } catch {
+      /* Diagnostics best-effort; never fail the job. */
+    }
+  }
+
+  /** Retrieve the worker's require.cache state for diagnostics. */
+  async getWorkerModuleCache(): Promise<string[] | null> {
+    const client = await this.getRedisClient();
+    if (!client) return null;
+    try {
+      const data = await client.get('mizano:worker:module-cache');
+      return data ? JSON.parse(data) : null;
+    } catch {
+      return null;
     }
   }
 }
