@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { CreatePriceListDto, UpdatePriceListDto } from '../dto/price-list.dto';
 import { PriceListsService } from '../services/price-lists.service';
@@ -21,8 +21,8 @@ export class PriceListsController {
 
   @Get()
   @Permissions('inventory.view')
-  findAll(@CurrentOrg() orgId: string) {
-    return this.priceListsService.findAll(orgId);
+  findAll(@CurrentOrg() orgId: string, @Query('active') active?: string) {
+    return this.priceListsService.findAll(orgId, active === 'true');
   }
 
   @Get(':id')

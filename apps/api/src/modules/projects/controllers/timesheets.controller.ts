@@ -86,9 +86,11 @@ export class TimesheetsController {
   getWeeklySummary(
     @CurrentOrg() orgId: string,
     @CurrentUser() user: CurrentUserData,
-    @Query('weekStart') weekStart: string,
+    @Query('weekStart') weekStart?: string,
+    @Query('weekStartDate') weekStartDate?: string,
   ) {
-    return this.timesheetsService.getWeeklySummary(orgId, user.id, weekStart);
+    // weekStartDate is accepted as an alias; weekStart wins when both are sent
+    return this.timesheetsService.getWeeklySummary(orgId, user.id, weekStart || weekStartDate || '');
   }
 
   @Get('report')

@@ -52,6 +52,13 @@ describe('CacheService pattern invalidation (memory store, no Redis)', () => {
     expect(await service.clearOrganization('o')).toBe(2);
     expect(cache.store.size).toBe(0);
   });
+
+  it('getStats exposes type as an alias of storeType', async () => {
+    const service = new CacheService(memoryCache(), { get: () => undefined } as unknown as ConfigService);
+    const stats = await service.getStats();
+    expect(stats.storeType).toBe('memory');
+    expect(stats.type).toBe('memory');
+  });
 });
 
 describe('CacheService.onModuleDestroy', () => {
