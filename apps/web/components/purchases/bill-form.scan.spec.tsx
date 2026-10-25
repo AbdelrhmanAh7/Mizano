@@ -5,6 +5,7 @@ import enAi from '@/messages/en/ai.json';
 import arAi from '@/messages/ar/ai.json';
 
 jest.mock('next-intl', () => ({
+  useLocale: () => 'en',
   useTranslations: () => (key: string, values?: Record<string, string>) =>
     values ? `${key}|${Object.values(values).join('|')}` : key,
 }));

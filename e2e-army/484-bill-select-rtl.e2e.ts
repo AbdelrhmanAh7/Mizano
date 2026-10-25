@@ -20,11 +20,11 @@ test(
         await expect(trigger).toHaveAttribute('dir', dir);
       }
       for (const width of [375, 1280]) {
-        await page.setViewportSize({ width, height: 900 });
+        await page.setViewportSize({ width, height: 1600 });
         await agent.act('open the Item/Account dropdown in the first bill line');
         await expect(screen.getByRole('listbox')).toHaveAttribute('dir', dir);
         await expect(screen.getByRole('option', { name: 'Manual Entry', exact: true })).toBeVisible();
-        await page.screenshot({ path: `test-results/484-bill-${locale}-${width}.png`, fullPage: true });
+        await page.screenshot({ path: `test-results/484-bill-${locale}-${width}.png`, fullPage: true, animations: 'disabled' });
         await page.keyboard.press('Escape');
         await expect(screen.getByRole('listbox')).not.toBeVisible();
         await expect(item).toBeFocused();
