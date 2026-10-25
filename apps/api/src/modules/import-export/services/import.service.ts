@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/com
 import { CreditNoteType, PaymentMode, Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
 import { Decimal } from '@prisma/client/runtime/library';
-import * as csv from 'csv-parser';
+import * as csvParserModule from 'csv-parser';
 import { Readable } from 'stream';
 import * as XLSX from 'xlsx';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -25,6 +25,14 @@ import {
   ValidationResultDto,
 } from '../dto/import-export.dto';
 // ofx-js loaded dynamically below (no ESM export)
+
+/**
+ * csv-parser is `export =` (a callable CJS function). Under the swc build (no tsc interop) a
+ * namespace import is a non-callable wrapper whose `default` is the function; under ts-jest the
+ * module itself is the function. Resolve whichever shape we got.
+ */
+const csv: typeof csvParserModule =
+  (csvParserModule as unknown as { default?: typeof csvParserModule }).default ?? csvParserModule;
 
 /** Loosely-typed row coming from CSV/Excel/OFX parsing. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
