@@ -1,56 +1,22 @@
 import { test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 
+// Credential-free by design (CTO decision on #535): the customer form sits behind login, so this
+// request-level check only proves both locale routes stay guarded. The localized create/update
+// action names are covered by customer-form-actions.spec.tsx and docs/evidence/491/verify-browser.cjs.
 test(
-  '@issue-491 AC1 AC2 AC3: customer create and update actions have distinct localized names',
-  { tags: ['feat:mz-customers', 'lvl:ui'] },
-  async ({ app, agent, screen, browser }) => {
-    const email = process.env.E2E_LOGIN_EMAIL || process.env.E2E_USER_EMAIL;
-    const password = process.env.E2E_LOGIN_PASSWORD || process.env.E2E_USER_PASSWORD;
-    if (!email || !password)
-      throw new Error('Set throwaway E2E_LOGIN_EMAIL and E2E_LOGIN_PASSWORD');
-
-    await app.open('/en/login');
-    await screen.getByLabel('Email').fill(email);
-    await screen.getByLabel('Password').fill(password);
-    await screen.getByRole('button', 'Sign In', { exact: true }).tap();
-    await expect(browser).toHaveURL(/\/en\/dashboard(?:[/?#]|$)/);
-
-    for (const [locale, direction, create] of [
-      ['en', 'ltr', 'Create Customer'],
-      ['ar', 'rtl', 'إنشاء عميل'],
-    ]) {
-      await app.open(`/${locale}/sales/customers/new`);
-      expect(await browser.evaluate(() => document.documentElement.dir)).toBe(direction);
-      await expect(screen.getByRole('button', create, { exact: true })).toBeVisible();
-      await screen.getByRole('button', create, { exact: true }).tap();
-      await expect(screen.getByText('Customer name is required', { exact: true })).toBeVisible();
-      await expect(browser).toHaveURL(new RegExp(`/${locale}/sales/customers/new$`));
-      await app.screenshot(`491-create-${locale}-${direction}`);
-    }
-
-    await app.open('/en/sales/customers/new');
-    await agent.act('enter army-customer-actions-491 as the customer name');
-    await screen.getByRole('button', 'Create Customer', { exact: true }).tap();
-    await expect(browser).toHaveURL(/\/sales\/customers$/);
-    await screen.getByRole('link', 'army-customer-actions-491', { exact: true }).tap();
-    await expect(browser).toHaveURL(/\/sales\/customers\/[^/]+$/);
-    const customerPath = await browser.evaluate(() => window.location.pathname);
-    const customerId = customerPath.split('/').pop();
-    if (!customerId || customerId === 'customers') throw new Error('Customer detail did not open');
-
-    for (const [locale, direction, update, create] of [
-      ['en', 'ltr', 'Update Customer', 'Create Customer'],
-      ['ar', 'rtl', 'تحديث العميل', 'إنشاء عميل'],
-    ]) {
-      await app.open(`/${locale}/sales/customers/${customerId}/edit`);
-      expect(await browser.evaluate(() => document.documentElement.dir)).toBe(direction);
-      await expect(screen.getByRole('button', update, { exact: true })).toBeVisible();
-      await expect(screen.getByRole('button', create, { exact: true })).toHaveCount(0);
-      await agent.assert(
-        'the submit action clearly updates the existing customer in the page language',
-      );
-      await app.screenshot(`491-update-${locale}-${direction}`);
+  '@issue-491 AC1: the customer form routes stay behind login in English and Arabic',
+  { tags: ['feat:mz-customers', 'lvl:api'] },
+  async ({ app }) => {
+    for (const locale of ['en', 'ar']) {
+      for (const path of ['sales/customers/new', 'sales/customers/army-491/edit']) {
+        const res = await fetch(new URL(`/${locale}/${path}`, app.baseUrl), { redirect: 'manual' });
+        expect(res.status).toBeGreaterThanOrEqual(300);
+        expect(res.status).toBeLessThan(400);
+        expect(res.headers.get('location') ?? '').toMatch(
+          new RegExp(`/${locale}/(login|onboarding)`),
+        );
+      }
     }
   },
 );
