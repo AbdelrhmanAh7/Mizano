@@ -117,37 +117,22 @@ test(
 
 test(
   '@issue-424 AC2: session endpoint does not expose refreshToken',
-  { tags: ['feat:mz-auth', 'lvl:api'], timeout: TEST_TIMEOUT_MS },
-  async ({ app }) => {
-    const api = apiBase(String(app.baseUrl));
+  { tags: ['feat:mz-auth', 'lvl:ui'], timeout: TEST_TIMEOUT_MS },
+  async ({ app, screen, browser }) => {
+    // Sign in via UI (same as hub-live signIn)
+    await app.open('/en/login');
+    await expect(screen.getByRole('button', 'Sign In')).toBeVisible();
+    await screen.getByRole('textbox', 'Email').fill('admin@mizano.com');
+    await screen.getByRole('textbox', 'Password').fill('password123');
+    await screen.getByRole('button', 'Sign In').tap();
+    await expect(browser).toHaveURL(/\/en\/(dashboard|onboarding|accounting|sales)/, { timeout: 40_000 });
 
-    // Sign in as demo admin using direct fetch to capture cookies
-    const loginRes = await fetch(`${api}/auth/login`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ email: 'admin@mizano.com', password: 'password123' }),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    // Fetch session from within browser context (cookies automatically included)
+    const session = await browser.evaluate(async () => {
+      const res = await fetch('/api/auth/session', { credentials: 'include' });
+      return res.json();
     });
-    expect(loginRes.status).toBe(200);
-    const login = await loginRes.json();
-    expect(login).toHaveProperty('user');
-
-    // Extract session cookie from login response
-    const cookieHeader = loginRes.headers.get('set-cookie');
-    const sessionCookie = cookieHeader
-      ?.split(',')
-      .map((c) => c.split(';')[0].trim())
-      .filter((c) => c.startsWith('next-auth.session-token') || c.startsWith('__Secure-next-auth.session-token'))
-      .join('; ');
-
-    // Fetch session using the session cookie
-    const sessionRes = await fetch(`${api}/auth/session`, {
-      headers: { accept: 'application/json', cookie: sessionCookie || '' },
-      credentials: 'include',
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-    expect(sessionRes.status).toBe(200);
-    const session = await sessionRes.json();
+    expect(session).toBeTruthy();
 
     // Verify session has expected fields but no refreshToken
     expect(session).toHaveProperty('user');
