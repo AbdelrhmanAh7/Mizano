@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,20 +30,23 @@ const addressSchema = z.object({
   country: z.string().optional(),
 });
 
-const customerSchema = z.object({
-  name: z.string().min(1, 'Customer name is required'),
-  displayName: z.string().optional(),
-  email: z.string().email('Invalid email').optional().or(z.literal('')),
-  phone: z.string().optional(),
-  currency: z.string().default('USD'),
-  taxId: z.string().optional(),
-  paymentTerms: z.number().optional(),
-  notes: z.string().optional(),
-  billingAddress: addressSchema.optional(),
-  shippingAddress: addressSchema.optional(),
-});
+type Translate = (key: 'nameRequired' | 'invalidEmail') => string;
 
-type CustomerFormData = z.infer<typeof customerSchema>;
+const buildCustomerSchema = (t: Translate) =>
+  z.object({
+    name: z.string().min(1, t('nameRequired')),
+    displayName: z.string().optional(),
+    email: z.string().email(t('invalidEmail')).optional().or(z.literal('')),
+    phone: z.string().optional(),
+    currency: z.string().default('USD'),
+    taxId: z.string().optional(),
+    paymentTerms: z.number().optional(),
+    notes: z.string().optional(),
+    billingAddress: addressSchema.optional(),
+    shippingAddress: addressSchema.optional(),
+  });
+
+type CustomerFormData = z.infer<ReturnType<typeof buildCustomerSchema>>;
 
 interface CustomerFormProps {
   customer?: Customer | null;
@@ -88,25 +92,14 @@ export function buildCustomerPayload(data: CustomerFormData): Record<string, unk
   };
 }
 
-const currencies = [
-  { value: 'USD', label: 'USD - US Dollar' },
-  { value: 'EUR', label: 'EUR - Euro' },
-  { value: 'GBP', label: 'GBP - British Pound' },
-  { value: 'EGP', label: 'EGP - Egyptian Pound' },
-  { value: 'AED', label: 'AED - UAE Dirham' },
-  { value: 'SAR', label: 'SAR - Saudi Riyal' },
-];
+const currencyCodes = ['USD', 'EUR', 'GBP', 'EGP', 'AED', 'SAR'];
 
-const paymentTermsOptions = [
-  { value: 0, label: 'Due on Receipt' },
-  { value: 15, label: 'Net 15' },
-  { value: 30, label: 'Net 30' },
-  { value: 45, label: 'Net 45' },
-  { value: 60, label: 'Net 60' },
-];
+const paymentTermsDays = [0, 15, 30, 45, 60];
 
 export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: CustomerFormProps) {
   const isEditing = !!customer;
+  const t = useTranslations('sales.customers.form');
+  const customerSchema = useMemo(() => buildCustomerSchema(t), [t]);
 
   const form = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
@@ -180,23 +173,23 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
       {/* Basic Information */}
       <Card>
         <CardHeader>
-          <CardTitle>Basic Information</CardTitle>
+          <CardTitle>{t('basicInformation')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Customer Name *</Label>
-              <Input id="name" placeholder="Enter customer name" {...form.register('name')} />
+              <Label htmlFor="name">{t('name')} *</Label>
+              <Input id="name" placeholder={t('namePlaceholder')} {...form.register('name')} />
               {form.formState.errors.name && (
                 <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="displayName">Display Name</Label>
+              <Label htmlFor="displayName">{t('displayName')}</Label>
               <Input
                 id="displayName"
-                placeholder="How to display on documents"
+                placeholder={t('displayNameHint')}
                 {...form.register('displayName')}
               />
             </div>
@@ -204,7 +197,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('email')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -217,7 +210,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
+              <Label htmlFor="phone">{t('phone')}</Label>
               <PhoneInput
                 id="phone"
                 value={form.watch('phone') || ''}
@@ -228,18 +221,18 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="currency">Currency</Label>
+              <Label htmlFor="currency">{t('currency')}</Label>
               <Select
                 value={form.watch('currency')}
                 onValueChange={(value) => form.setValue('currency', value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select currency" />
+                  <SelectValue placeholder={t('selectCurrency')} />
                 </SelectTrigger>
                 <SelectContent>
-                  {currencies.map((currency) => (
-                    <SelectItem key={currency.value} value={currency.value}>
-                      {currency.label}
+                  {currencyCodes.map((code) => (
+                    <SelectItem key={code} value={code}>
+                      {t(`currencies.${code}`)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -247,18 +240,18 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="paymentTerms">Payment Terms</Label>
+              <Label htmlFor="paymentTerms">{t('paymentTerms')}</Label>
               <Select
                 value={String(form.watch('paymentTerms') || 30)}
                 onValueChange={(value) => form.setValue('paymentTerms', parseInt(value))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select payment terms" />
+                  <SelectValue placeholder={t('selectPaymentTerms')} />
                 </SelectTrigger>
                 <SelectContent>
-                  {paymentTermsOptions.map((term) => (
-                    <SelectItem key={term.value} value={String(term.value)}>
-                      {term.label}
+                  {paymentTermsDays.map((days) => (
+                    <SelectItem key={days} value={String(days)}>
+                      {days === 0 ? t('dueOnReceipt') : t('netDays', { days })}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -266,16 +259,16 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="taxId">Tax ID</Label>
-              <Input id="taxId" placeholder="Tax ID / VAT Number" {...form.register('taxId')} />
+              <Label htmlFor="taxId">{t('taxId')}</Label>
+              <Input id="taxId" placeholder={t('taxIdPlaceholder')} {...form.register('taxId')} />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
+            <Label htmlFor="notes">{t('notes')}</Label>
             <Textarea
               id="notes"
-              placeholder="Internal notes about this customer"
+              placeholder={t('notesPlaceholder')}
               {...form.register('notes')}
               rows={3}
             />
@@ -286,14 +279,14 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
       {/* Billing Address */}
       <Card>
         <CardHeader>
-          <CardTitle>Billing Address</CardTitle>
+          <CardTitle>{t('billingAddress')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="billingStreet">Street Address</Label>
+            <Label htmlFor="billingStreet">{t('streetAddress')}</Label>
             <Textarea
               id="billingStreet"
-              placeholder="Street address"
+              placeholder={t('streetPlaceholder')}
               {...form.register('billingAddress.street')}
               rows={2}
             />
@@ -301,7 +294,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="billingCountry">Country</Label>
+              <Label htmlFor="billingCountry">{t('country')}</Label>
               <CountrySelect
                 id="billingCountry"
                 value={form.watch('billingAddress.country') || ''}
@@ -313,7 +306,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="billingCity">City</Label>
+              <Label htmlFor="billingCity">{t('city')}</Label>
               <CitySelect
                 id="billingCity"
                 value={form.watch('billingAddress.city') || ''}
@@ -325,19 +318,19 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="billingState">State/Province</Label>
+              <Label htmlFor="billingState">{t('state')}</Label>
               <Input
                 id="billingState"
-                placeholder="State"
+                placeholder={t('statePlaceholder')}
                 {...form.register('billingAddress.state')}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="billingPostalCode">Zip/Postal Code</Label>
+              <Label htmlFor="billingPostalCode">{t('postalCode')}</Label>
               <Input
                 id="billingPostalCode"
-                placeholder="Postal code"
+                placeholder={t('postalCodePlaceholder')}
                 {...form.register('billingAddress.postalCode')}
               />
             </div>
@@ -349,18 +342,18 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Shipping Address</CardTitle>
+            <CardTitle>{t('shippingAddress')}</CardTitle>
             <Button type="button" variant="outline" size="sm" onClick={copyBillingToShipping}>
-              Copy from Billing
+              {t('copyFromBilling')}
             </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="shippingStreet">Street Address</Label>
+            <Label htmlFor="shippingStreet">{t('streetAddress')}</Label>
             <Textarea
               id="shippingStreet"
-              placeholder="Street address"
+              placeholder={t('streetPlaceholder')}
               {...form.register('shippingAddress.street')}
               rows={2}
             />
@@ -368,7 +361,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="shippingCountry">Country</Label>
+              <Label htmlFor="shippingCountry">{t('country')}</Label>
               <CountrySelect
                 id="shippingCountry"
                 value={form.watch('shippingAddress.country') || ''}
@@ -380,7 +373,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="shippingCity">City</Label>
+              <Label htmlFor="shippingCity">{t('city')}</Label>
               <CitySelect
                 id="shippingCity"
                 value={form.watch('shippingAddress.city') || ''}
@@ -392,19 +385,19 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="shippingState">State/Province</Label>
+              <Label htmlFor="shippingState">{t('state')}</Label>
               <Input
                 id="shippingState"
-                placeholder="State"
+                placeholder={t('statePlaceholder')}
                 {...form.register('shippingAddress.state')}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="shippingPostalCode">Zip/Postal Code</Label>
+              <Label htmlFor="shippingPostalCode">{t('postalCode')}</Label>
               <Input
                 id="shippingPostalCode"
-                placeholder="Postal code"
+                placeholder={t('postalCodePlaceholder')}
                 {...form.register('shippingAddress.postalCode')}
               />
             </div>
@@ -415,10 +408,10 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {t('cancel')}
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : isEditing ? 'Update Customer' : 'Create Customer'}
+          {isSubmitting ? t('saving') : isEditing ? t('update') : t('create')}
         </Button>
       </div>
     </form>
