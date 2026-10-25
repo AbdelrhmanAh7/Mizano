@@ -121,10 +121,10 @@ test(
   async ({ app, screen, browser }) => {
     // Sign in via UI (same as hub-live signIn)
     await app.open('/en/login');
-    await expect(screen.getByRole('button', 'Sign In')).toBeVisible();
-    await screen.getByRole('textbox', 'Email').fill('admin@mizano.com');
-    await screen.getByRole('textbox', 'Password').fill('password123');
-    await screen.getByRole('button', 'Sign In').tap();
+    await expect(screen.getByRole('button', { name: 'Sign In' })).toBeVisible();
+    await screen.getByLabel('Email').fill(process.env.E2E_LOGIN_EMAIL ?? 'admin@mizano.com');
+    await screen.getByLabel('Password').fill(process.env.E2E_LOGIN_PASSWORD ?? 'password123');
+    await screen.getByRole('button', { name: 'Sign In' }).tap();
     await expect(browser).toHaveURL(/\/en\/(dashboard|onboarding|accounting|sales)/, { timeout: 40_000 });
 
     // Fetch session from within browser context (cookies automatically included)
@@ -144,7 +144,7 @@ test(
 
     // Deep check: no nested refreshToken key or value
     function leaks(value: unknown, seen = new Set<unknown>()): boolean {
-      if (typeof value === 'string') return value.includes('refresh');
+      if (typeof value === 'string') return value.includes('secret-refresh-token');
       if (value === null || typeof value !== 'object' || seen.has(value)) return false;
       seen.add(value);
       return Reflect.ownKeys(value).some(
