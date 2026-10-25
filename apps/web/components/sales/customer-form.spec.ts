@@ -1,6 +1,14 @@
 import { buildCustomerPayload } from './customer-form';
 import { createCustomerSchema } from '@mizano/validators';
 
+// customer-form.tsx imports next-intl (ESM-only); only the pure payload builder is exercised here.
+jest.mock('next-intl', () => ({
+  useTranslations:
+    () =>
+    (key: string): string =>
+      key,
+}));
+
 const baseFormData = {
   name: 'Test Customer',
   displayName: 'Test Display',
