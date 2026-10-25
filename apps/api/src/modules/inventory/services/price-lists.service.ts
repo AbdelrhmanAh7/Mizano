@@ -29,9 +29,10 @@ export class PriceListsService {
     });
   }
 
-  async findAll(organizationId: string) {
+  /** Admin list: every list of the tenant with its isActive flag; activeOnly restores the old filter. */
+  async findAll(organizationId: string, activeOnly = false) {
     return this.prisma.priceList.findMany({
-      where: { organizationId, isActive: true },
+      where: { organizationId, ...(activeOnly ? { isActive: true } : {}) },
       orderBy: { name: 'asc' },
     });
   }
