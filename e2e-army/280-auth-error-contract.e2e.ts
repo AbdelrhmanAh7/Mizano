@@ -114,3 +114,58 @@ test(
     expect(invalidCreds.body.error).toBe('Unauthorized');
   },
 );
+
+test(
+  '@issue-424 AC2: session endpoint does not expose refreshToken',
+  { tags: ['feat:mz-auth', 'lvl:api'], timeout: TEST_TIMEOUT_MS },
+  async ({ app }) => {
+    const api = apiBase(String(app.baseUrl));
+
+    // Sign in as demo admin using direct fetch to capture cookies
+    const loginRes = await fetch(`${api}/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ email: 'admin@mizano.com', password: 'password123' }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    expect(loginRes.status).toBe(200);
+    const login = await loginRes.json();
+    expect(login).toHaveProperty('user');
+
+    // Extract session cookie from login response
+    const cookieHeader = loginRes.headers.get('set-cookie');
+    const sessionCookie = cookieHeader
+      ?.split(',')
+      .map((c) => c.split(';')[0].trim())
+      .filter((c) => c.startsWith('next-auth.session-token') || c.startsWith('__Secure-next-auth.session-token'))
+      .join('; ');
+
+    // Fetch session using the session cookie
+    const sessionRes = await fetch(`${api}/auth/session`, {
+      headers: { accept: 'application/json', cookie: sessionCookie || '' },
+      credentials: 'include',
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    expect(sessionRes.status).toBe(200);
+    const session = await sessionRes.json();
+
+    // Verify session has expected fields but no refreshToken
+    expect(session).toHaveProperty('user');
+    expect(session.user).toHaveProperty('id');
+    expect(session).toHaveProperty('accessToken');
+    expect(session).not.toHaveProperty('refreshToken');
+    expect(Object.prototype.hasOwnProperty.call(session, 'refreshToken')).toBe(false);
+    expect('refreshToken' in session).toBe(false);
+
+    // Deep check: no nested refreshToken key or value
+    function leaks(value: unknown, seen = new Set<unknown>()): boolean {
+      if (typeof value === 'string') return value.includes('refresh');
+      if (value === null || typeof value !== 'object' || seen.has(value)) return false;
+      seen.add(value);
+      return Reflect.ownKeys(value).some(
+        (key) => key === 'refreshToken' || leaks((value as Record<PropertyKey, unknown>)[key], seen),
+      );
+    }
+    expect(leaks(session)).toBe(false);
+  },
+);
