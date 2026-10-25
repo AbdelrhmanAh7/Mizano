@@ -5,9 +5,10 @@ test(
   '@issue-491 AC1 AC2 AC3: customer create and update actions have distinct localized names',
   { tags: ['feat:mz-customers', 'lvl:ui'] },
   async ({ app, agent, screen, browser }) => {
-    const email = process.env.E2E_LOGIN_EMAIL;
-    const password = process.env.E2E_LOGIN_PASSWORD;
-    if (!email || !password) throw new Error('Set throwaway E2E_LOGIN_EMAIL and E2E_LOGIN_PASSWORD');
+    const email = process.env.E2E_LOGIN_EMAIL || process.env.E2E_USER_EMAIL;
+    const password = process.env.E2E_LOGIN_PASSWORD || process.env.E2E_USER_PASSWORD;
+    if (!email || !password)
+      throw new Error('Set throwaway E2E_LOGIN_EMAIL and E2E_LOGIN_PASSWORD');
 
     await app.open('/en/login');
     await screen.getByLabel('Email').fill(email);
@@ -33,6 +34,7 @@ test(
     await screen.getByRole('button', 'Create Customer', { exact: true }).tap();
     await expect(browser).toHaveURL(/\/sales\/customers$/);
     await screen.getByRole('link', 'army-customer-actions-491', { exact: true }).tap();
+    await expect(browser).toHaveURL(/\/sales\/customers\/[^/]+$/);
     const customerPath = await browser.evaluate(() => window.location.pathname);
     const customerId = customerPath.split('/').pop();
     if (!customerId || customerId === 'customers') throw new Error('Customer detail did not open');
@@ -45,7 +47,9 @@ test(
       expect(await browser.evaluate(() => document.documentElement.dir)).toBe(direction);
       await expect(screen.getByRole('button', update, { exact: true })).toBeVisible();
       await expect(screen.getByRole('button', create, { exact: true })).toHaveCount(0);
-      await agent.assert('the submit action clearly updates the existing customer in the page language');
+      await agent.assert(
+        'the submit action clearly updates the existing customer in the page language',
+      );
       await app.screenshot(`491-update-${locale}-${direction}`);
     }
   },

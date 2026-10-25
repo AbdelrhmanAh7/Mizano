@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -106,6 +107,7 @@ const paymentTermsOptions = [
 ];
 
 export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: CustomerFormProps) {
+  const t = useTranslations('sales.customers.form');
   const isEditing = !!customer;
 
   const form = useForm<CustomerFormData>({
@@ -418,7 +420,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : isEditing ? 'Update Customer' : 'Create Customer'}
+          {isSubmitting ? t('saving') : isEditing ? t('updateCustomer') : t('createCustomer')}
         </Button>
       </div>
     </form>

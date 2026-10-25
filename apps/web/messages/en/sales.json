@@ -20,6 +20,9 @@
     "customerName": "Customer Name",
     "noCustomerAssigned": "No customer assigned",
     "form": {
+      "createCustomer": "Create Customer",
+      "updateCustomer": "Update Customer",
+      "saving": "Saving...",
       "name": "Customer Name",
       "namePlaceholder": "Enter customer name",
       "displayName": "Display Name",
