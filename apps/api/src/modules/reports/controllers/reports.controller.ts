@@ -1,5 +1,5 @@
 import { Controller, Get, Param, Query, Res, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { CacheResponse, CacheTTL, CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -535,6 +535,11 @@ export class ReportsController {
   @CacheResponse('reports:customer-statement')
   @CacheTTL(600)
   @ApiOperation({ summary: 'Get Customer Statement' })
+  @ApiResponse({ status: 200, description: 'Customer statement retrieved successfully.' })
+  @ApiResponse({ status: 400, description: 'Invalid statement date range or query parameters.' })
+  @ApiResponse({ status: 401, description: 'Authentication is required or the token is invalid.' })
+  @ApiResponse({ status: 403, description: 'The user lacks permission to view reports.' })
+  @ApiResponse({ status: 404, description: 'Customer not found in the current organization.' })
   getCustomerStatement(
     @CurrentOrg() orgId: string,
     @Param('customerId') customerId: string,
