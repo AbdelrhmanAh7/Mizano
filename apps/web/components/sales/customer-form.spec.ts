@@ -1,6 +1,10 @@
 import { buildCustomerPayload } from './customer-form';
 import { createCustomerSchema } from '@mizano/validators';
 
+jest.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => key,
+}));
+
 const baseFormData = {
   name: 'Test Customer',
   displayName: 'Test Display',
