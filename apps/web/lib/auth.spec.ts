@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 import axios from 'axios';
+import type { Session } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import { refreshAccessToken, tokenRefresher } from './auth';
 import { createTokenRefresher, sessionRefreshKey, type RefreshedTokens } from './auth-refresh';
@@ -403,5 +404,93 @@ describe('createTokenRefresher', () => {
       expect('refreshToken' in result).toBe(false);
       expect(result).toMatchObject({ accessToken: 'old-access-A' });
     });
+  });
+});
+
+describe('authOptions session callback', () => {
+  it('omits refreshToken from the session while populating user and accessToken', async () => {
+    const { authOptions } = await import('./auth');
+    const session = {
+      user: {
+        id: '',
+        email: 'admin@mizano.com',
+        name: 'Admin User',
+        firstName: '',
+        lastName: '',
+        organizationId: '',
+        role: '',
+      },
+      accessToken: '',
+      expires: '2026-10-21T12:00:00.000Z',
+    };
+    const token: JWT = {
+      id: 'user-1',
+      firstName: 'Admin',
+      lastName: 'User',
+      organizationId: 'org-1',
+      role: 'admin',
+      accessToken: 'access-token-1',
+      refreshToken: 'secret-refresh-token',
+    };
+
+    const result = (await authOptions.callbacks?.session?.({
+      session,
+      token,
+      user: undefined as never,
+      newSession: undefined as never,
+      trigger: 'update',
+    })) as (Session & Record<string, unknown>) | undefined;
+
+    expect(result).toBeDefined();
+    expect(result?.user?.id).toBe('user-1');
+    expect(result?.user?.firstName).toBe('Admin');
+    expect(result?.user?.lastName).toBe('User');
+    expect(result?.user?.organizationId).toBe('org-1');
+    expect(result?.user?.role).toBe('admin');
+    expect(result?.accessToken).toBe('access-token-1');
+
+    // refreshToken must NOT leak into the session object
+    expect(result?.['refreshToken']).toBeUndefined();
+    expect(Object.keys(result as object)).not.toContain('refreshToken');
+    expect(JSON.stringify(result)).not.toContain('secret-refresh-token');
+  });
+
+  it('sets session.error when token.error is present and still omits refreshToken', async () => {
+    const { authOptions } = await import('./auth');
+    const session = {
+      user: {
+        id: '',
+        email: 'admin@mizano.com',
+        name: 'Admin User',
+        firstName: '',
+        lastName: '',
+        organizationId: '',
+        role: '',
+      },
+      accessToken: '',
+      expires: '2026-10-21T12:00:00.000Z',
+    };
+    const token: JWT = {
+      id: 'user-1',
+      firstName: 'Admin',
+      lastName: 'User',
+      organizationId: 'org-1',
+      role: 'admin',
+      accessToken: 'access-token-1',
+      refreshToken: 'secret-refresh-token',
+      error: 'RefreshAccessTokenError',
+    };
+
+    const result = (await authOptions.callbacks?.session?.({
+      session,
+      token,
+      user: undefined as never,
+      newSession: undefined as never,
+      trigger: 'update',
+    })) as (Session & Record<string, unknown>) | undefined;
+
+    expect(result?.error).toBe('RefreshAccessTokenError');
+    expect(result?.['refreshToken']).toBeUndefined();
+    expect(Object.keys(result as object)).not.toContain('refreshToken');
   });
 });
