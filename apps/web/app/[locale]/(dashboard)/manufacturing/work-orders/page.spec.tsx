@@ -126,8 +126,13 @@ describe('WorkOrdersPage', () => {
     renderPage();
     // The WO number should render and the null date cells should display '-'
     expect(screen.getByText('WO-001')).toBeInTheDocument();
-    const dashes = screen.getAllByText('-');
-    expect(dashes.length).toBeGreaterThanOrEqual(1);
+    // Scope to the WO-001 row and its "plannedStart" column cell.
+    const headerCell = screen.getByText('workOrders.table.plannedStart').closest('th');
+    const row = screen.getByText('WO-001').closest('tr');
+    expect(headerCell).not.toBeNull();
+    expect(row).not.toBeNull();
+    const columnIndex = Array.from(headerCell!.parentElement!.children).indexOf(headerCell!);
+    expect(row!.children[columnIndex].textContent).toBe('-');
   });
 
   it('renders without crashing when both plannedStartDate and dueDate are undefined', () => {

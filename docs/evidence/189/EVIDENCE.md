@@ -3,8 +3,8 @@
 ## Overview
 
 - **PR**: #189 (`test: slim-down 2/3 — prune mock-only UI tests, run API e2e specs nightly`)
-- **Branch**: `chore/slim-mz-tests` (base: `master`)
-- **Tested Head**: `chore/slim-mz-tests`
+- **Branch**: `chore/slim-mz-tests` (base: `master` at `2cc9361f1d954bde5b4d8ff842b7702ebbb213c4`)
+- **Tested Head**: `0aa4a5e652b7f441560d1e91242d3373acdfd8b0`
 - **Originating Sentry Issue**: None. This is test suite refactoring, mock pruning, and CI workflow maintenance; no user-facing production incident in Sentry.
 - **E2E Waiver**: `E2E: not needed — test pruning, regression assertion tightening, and nightly CI workflow addition with zero changed user-facing runtime flow.`
 
@@ -35,9 +35,11 @@
   - `apps/web/components/layout/breadcrumbs.spec.tsx`
   - `apps/web/components/layout/sidebar.spec.tsx`
 - **Verification command**:
+
   ```bash
   git diff --name-only --diff-filter=D origin/master..HEAD
   ```
+
 - **Exit code**: 0
 
 ---
@@ -48,10 +50,13 @@
 
 - **Fix**: Positive assertion for formatted date fallback when `dateOfJoining` is null (defaults to today via `format(new Date(), 'PPP')`) instead of weakly asserting absent placeholder text.
 - **Command**:
+
   ```bash
   pnpm --filter web exec jest --maxWorkers=2 components/hr/employee-form.spec.tsx
   ```
+
 - **Output**:
+
   ```text
   PASS components/hr/employee-form.spec.tsx
     EmployeeForm
@@ -64,18 +69,22 @@
   Test Suites: 1 passed, 1 total
   Tests:       6 passed, 6 total
   ```
+
 - **Exit code**: 0
 
 #### 2. Attendance Page (`apps/web/app/[locale]/(dashboard)/hr/attendance/page.spec.tsx`)
 
 - **Fixes**:
   - Clarified and documented `'??'` fallback: `(employee.name || '??').slice(0, 2)` when employee name is null.
-  - Added hidden input check: `expect(hiddenInputs.length).toBeGreaterThan(0)` and asserted that `input.value !== ''` and `input.value === '__none__'`.
+  - Asserted the status Select's controlled value (`data-value === '__none__'`) and option values (no `''`, sentinel present) through a focused `@/components/ui/select` mock.
 - **Command**:
+
   ```bash
   pnpm --filter web exec jest --maxWorkers=2 "app/[locale]/(dashboard)/hr/attendance/page.spec.tsx"
   ```
+
 - **Output**:
+
   ```text
   PASS app/[locale]/(dashboard)/hr/attendance/page.spec.tsx
     AttendancePage
@@ -88,16 +97,20 @@
   Test Suites: 1 passed, 1 total
   Tests:       6 passed, 6 total
   ```
+
 - **Exit code**: 0
 
 #### 3. Manufacturing Work Orders (`apps/web/app/[locale]/(dashboard)/manufacturing/work-orders/page.spec.tsx`)
 
-- **Fix**: Verified positive rendering of `'-'` for null `plannedStartDate` using `getAllByText('-')`.
+- **Fix**: Verified positive rendering of `'-'` for null `plannedStartDate` by locating the `plannedStart` column cell inside the WO-001 row.
 - **Command**:
+
   ```bash
   pnpm --filter web exec jest --maxWorkers=2 "app/[locale]/(dashboard)/manufacturing/work-orders/page.spec.tsx"
   ```
+
 - **Output**:
+
   ```text
   PASS app/[locale]/(dashboard)/manufacturing/work-orders/page.spec.tsx
     WorkOrdersPage
@@ -107,16 +120,20 @@
   Test Suites: 1 passed, 1 total
   Tests:       3 passed, 3 total
   ```
+
 - **Exit code**: 0
 
 #### 4. Employees Page (`apps/web/app/[locale]/(dashboard)/hr/employees/page.spec.tsx`)
 
 - **Fix**: Removed duplicate test `renders without crashing for null joiningDate (additional null guard check)`.
 - **Command**:
+
   ```bash
   pnpm --filter web exec jest --maxWorkers=2 "app/[locale]/(dashboard)/hr/employees/page.spec.tsx"
   ```
+
 - **Output**:
+
   ```text
   PASS app/[locale]/(dashboard)/hr/employees/page.spec.tsx
     EmployeesPage
@@ -125,6 +142,7 @@
   Test Suites: 1 passed, 1 total
   Tests:       2 passed, 2 total
   ```
+
 - **Exit code**: 0
 
 ---
@@ -164,9 +182,11 @@
 ### AC6 — Tracking Cleanliness
 
 - **Command**:
+
   ```bash
   git ls-files AI_QUESTIONS.md
   ```
+
 - **Output**: (empty)
 - **Exit code**: 0
 
@@ -178,5 +198,5 @@
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Weak assertion on `EmployeeForm` null date fallback        | Assertion only checked `queryByText('Pick a date').not.toBeInTheDocument()`, passing even if rendered output was blank or invalid     | Asserted `expect(screen.getByText(format(new Date(), 'PPP'))).toBeInTheDocument()`                                                                                                 |
 | Hidden input assertion in `AttendancePage` running 0 times | `container.querySelectorAll('input[type="hidden"]')` returned empty list because Select had no hidden input, so `forEach` was a no-op | Added `<input type="hidden" name="attendanceStatus" value={att?.status ?? '__none__'} />` and asserted `expect(hiddenInputs.length).toBeGreaterThan(0)` and `value === '__none__'` |
-| Weak assertion in `WorkOrdersPage` null date cell          | Did not assert date cell text `'-'`; only asserted `WO-001` was in document                                                           | Asserted `expect(screen.getAllByText('-').length).toBeGreaterThanOrEqual(1)`                                                                                                       |
+| Weak assertion in `WorkOrdersPage` null date cell          | Did not assert date cell text `'-'`; only asserted `WO-001` was in document                                                           | Asserted the WO-001 row's `plannedStart` cell text is `'-'`                                                                                                       |
 | Duplicate test in `EmployeesPage`                          | `renders without crashing for null joiningDate (additional null guard check)` duplicated the preceding null check                     | Removed duplicate test block                                                                                                                                                       |

@@ -52,6 +52,29 @@ jest.mock('@/lib/hooks/use-hr', () => ({
   getAttendanceStatusColor: () => '',
 }));
 
+// Capture the props the page passes to the Radix Select wrappers so the tests can
+// assert the controlled value and option values directly (not an auxiliary input).
+jest.mock('@/components/ui/select', () => {
+  const Select = ({ value, children }: { value?: string; children: React.ReactNode }) => (
+    <div data-testid="status-select" data-value={value}>
+      {children}
+    </div>
+  );
+  const SelectItem = ({ value, children }: { value: string; children: React.ReactNode }) => (
+    <div data-testid="status-option" data-value={value}>
+      {children}
+    </div>
+  );
+  const Passthrough = ({ children }: { children?: React.ReactNode }) => <div>{children}</div>;
+  return {
+    Select,
+    SelectItem,
+    SelectTrigger: Passthrough,
+    SelectContent: Passthrough,
+    SelectValue: () => null,
+  };
+});
+
 // ── Import after mocks ────────────────────────────────────────────────────────
 
 import AttendancePage from './page';
@@ -141,15 +164,21 @@ describe('AttendancePage', () => {
     // No attendance record for this employee — att will be undefined
     mockUseAttendance.mockReturnValue({ data: { data: [], meta: { total: 0 } }, isLoading: false });
 
-    const { container } = renderPage();
+    renderPage();
 
-    // The status Select must never use "" — should be "__none__" sentinel instead.
-    const hiddenInputs = container.querySelectorAll('input[type="hidden"]');
-    expect(hiddenInputs.length).toBeGreaterThan(0);
-    hiddenInputs.forEach((input) => {
-      expect((input as HTMLInputElement).value).not.toBe('');
-      expect((input as HTMLInputElement).value).toBe('__none__');
+    // The status Select's controlled value must be the "__none__" sentinel, never "".
+    const selects = screen.getAllByTestId('status-select');
+    expect(selects.length).toBeGreaterThan(0);
+    selects.forEach((select) => {
+      expect(select.getAttribute('data-value')).toBe('__none__');
     });
+
+    // No option may use "" as its value, and the sentinel option must exist.
+    const optionValues = screen
+      .getAllByTestId('status-option')
+      .map((option) => option.getAttribute('data-value'));
+    expect(optionValues).not.toContain('');
+    expect(optionValues).toContain('__none__');
   });
 
   it('renders the "Mark" sentinel option in the status Select', () => {
