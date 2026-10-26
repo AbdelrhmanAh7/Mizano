@@ -1,9 +1,12 @@
-# Evidence for Issue #513: Isolate husky fixture subprocesses from inherited Git environment
+# Evidence for Issue #513: Isolate Husky Fixture Subprocesses from Inherited Git Environment
 
 **Tested Code Head**: `22286d4ae8596f00199d13eba5c9b31ac3a0c40c`
 **Base commit**: `738be74e70a3c4c386b8c5d81109b13385b2174d` (master)
 **Branch**: `ai/513`
 **Implementer**: agy/Gemini (initial commits b2929be4, 22286d4a) · Reviewer: Claude Sonnet 4.6 (Thinking) · different family ✓
+**Originating Sentry Issue**: None (pure test-infrastructure fix, no production error path).
+**Host Environment**: Darwin arm64 (macOS), Python 3.14.8, Git 2.50.1, Node.js v20.18.0, pnpm 8.14.0.
+**E2E**: Not needed — developer tooling test fixture in `scripts/test_husky_hooks.py`; no user-facing flows modified.
 
 ## Numbered Acceptance Criteria
 
@@ -49,6 +52,78 @@ _git_env({"GIT_AUTHOR_NAME": "fixture-author"})
 → {"GIT_AUTHOR_NAME": "fixture-author", "PATH": "/usr/bin", …}  # fixed
 ```
 
+### Base Failure Demonstration (`4770ea7905fa2d21bc51d82da4683f82ad701bba`)
+
+On base commit `4770ea7905fa2d21bc51d82da4683f82ad701bba`:
+
+1. **Missing `sanitized_git_env` function & Overly Broad Allowlist on Base**:
+
+```bash
+$ python3 -c "
+import scripts.test_husky_hooks as mod
+try:
+    from scripts.test_husky_hooks import sanitized_git_env
+    print('sanitized_git_env imported')
+except ImportError as e:
+    print('FAILED on base:', e)
+
+assert mod._GIT_ENV_ALLOWLIST == frozenset({'GIT_EXEC_PATH'}), f'Allowlist too broad: {mod._GIT_ENV_ALLOWLIST}'
+"
+FAILED on base: cannot import name 'sanitized_git_env' from 'scripts.test_husky_hooks' (/Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-513/scripts/test_husky_hooks.py)
+Traceback (most recent call last):
+  File "<string>", line 9, in <module>
+    assert mod._GIT_ENV_ALLOWLIST == frozenset({'GIT_EXEC_PATH'}), f'Allowlist too broad: {mod._GIT_ENV_ALLOWLIST}'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Allowlist too broad: frozenset({'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_EMAIL', 'GIT_TERMINAL_PROMPT', 'GIT_SSH', 'GIT_COMMITTER_NAME', 'GIT_HTTP_PROXY_AUTHMETHOD', 'GIT_EXEC_PATH', 'GIT_AUTHOR_DATE', 'GIT_SSL_NO_VERIFY', 'GIT_COMMITTER_DATE', 'GIT_SSH_COMMAND', 'GIT_SSL_CAINFO', 'GIT_ALLOW_PROTOCOL', 'GIT_ASKPASS', 'GIT_AUTHOR_NAME'})
+# Exit code: 1
+```
+
+2. **Base `_git_env()` rejects caller `base` mapping**:
+
+```bash
+$ python3 -c "
+import scripts.test_husky_hooks as mod
+mod._git_env(base={'PATH': '/bin'})
+"
+Traceback (most recent call last):
+  File "<string>", line 3, in <module>
+TypeError: _git_env() got an unexpected keyword argument 'base'
+# Exit code: 1
+```
+
+### Head Verification Run (`22286d4ae8596f00199d13eba5c9b31ac3a0c40c`)
+
+1. **Sanitizer contract, tightened allowlist, and immutability pass on Head**:
+
+```bash
+$ python3 -c "
+from scripts.test_husky_hooks import sanitized_git_env, _GIT_ENV_ALLOWLIST, _git_env
+assert _GIT_ENV_ALLOWLIST == frozenset({'GIT_EXEC_PATH'}), 'Allowlist must contain only GIT_EXEC_PATH'
+
+base = {
+    'PATH': '/usr/bin',
+    'GIT_DIR': '/decoy/.git',
+    'GIT_EXEC_PATH': '/opt/git/exec',
+    'GIT_AUTHOR_NAME': 'inherited',
+    'MIZANO_SENTINEL': 'preserved',
+}
+base_orig = dict(base)
+cleaned = sanitized_git_env(base=base, overrides={'GIT_AUTHOR_NAME': 'override'})
+assert base == base_orig, 'base must not be mutated'
+assert 'GIT_DIR' not in cleaned, 'GIT_DIR must be stripped'
+assert cleaned.get('GIT_EXEC_PATH') == '/opt/git/exec', 'GIT_EXEC_PATH must be kept'
+assert cleaned.get('GIT_AUTHOR_NAME') == 'override', 'Override must win'
+assert cleaned.get('MIZANO_SENTINEL') == 'preserved', 'Sentinel must survive'
+
+wrapped = _git_env({'GIT_AUTHOR_NAME': 'wrapper-author'})
+assert wrapped.get('GIT_AUTHOR_NAME') == 'wrapper-author', '_git_env positional must forward to overrides'
+
+print('Head verification: pure sanitizer strips repo vars, tightens allowlist, applies overrides, preserves sentinels')
+"
+Head verification: pure sanitizer strips repo vars, tightens allowlist, applies overrides, preserves sentinels
+# Exit code: 0
+```
+
 ## Full Test Run Output
 
 ```
@@ -58,6 +133,49 @@ $ python3 -m pytest scripts/test_husky_hooks.py -x -q --tb=short
 ```
 
 Command run at: 2026-10-27T02:31:46+03:00 · exit code: 0 · 25 tests, 0 failures, 0 errors
+
+Full verbose output:
+
+```
+$ python3 -m unittest -v scripts.test_husky_hooks
+test_git_and_push_helpers_do_not_touch_decoy_repo (scripts.test_husky_hooks.GitEnvironmentIsolationTests.test_git_and_push_helpers_do_not_touch_decoy_repo) ... ok
+test_git_env_clean_module_attribute_is_dynamic (scripts.test_husky_hooks.GitEnvironmentIsolationTests.test_git_env_clean_module_attribute_is_dynamic) ... ok
+test_git_env_helper_scrubs_local_vars_and_preserves_allowlist (scripts.test_husky_hooks.GitEnvironmentIsolationTests.test_git_env_helper_scrubs_local_vars_and_preserves_allowlist) ... ok
+test_git_env_removes_keys_with_none_override (scripts.test_husky_hooks.GitEnvironmentIsolationTests.test_git_env_removes_keys_with_none_override) ... ok
+test_git_env_wrapper_forwards_positional_as_overrides (scripts.test_husky_hooks.GitEnvironmentIsolationTests.test_git_env_wrapper_forwards_positional_as_overrides)
+_git_env(dict) must treat its argument as overrides, not base. ... ok
+test_run_hook_isolates_from_inherited_git_env (scripts.test_husky_hooks.GitEnvironmentIsolationTests.test_run_hook_isolates_from_inherited_git_env) ... ok
+test_sanitized_git_env_contract_and_immutability (scripts.test_husky_hooks.GitEnvironmentIsolationTests.test_sanitized_git_env_contract_and_immutability)
+sanitized_git_env purges all GIT_* except allowlist, preserves sentinels, and never mutates base. ... ok
+test_failing_lint_blocks_the_commit (scripts.test_husky_hooks.PreCommitHookTests.test_failing_lint_blocks_the_commit) ... ok
+test_lints_only_the_staged_files (scripts.test_husky_hooks.PreCommitHookTests.test_lints_only_the_staged_files) ... ok
+test_missing_node_modules_skips_with_a_note (scripts.test_husky_hooks.PreCommitHookTests.test_missing_node_modules_skips_with_a_note) ... ok
+test_preserves_unstaged_hunks_in_partially_staged_files (scripts.test_husky_hooks.PreCommitHookTests.test_preserves_unstaged_hunks_in_partially_staged_files) ... ok
+test_run_hook_isolates_from_inherited_git_env_with_decoy (scripts.test_husky_hooks.PreCommitHookTests.test_run_hook_isolates_from_inherited_git_env_with_decoy) ... ok
+test_watchdog_stops_a_hung_lint_run (scripts.test_husky_hooks.PreCommitHookTests.test_watchdog_stops_a_hung_lint_run) ... ok
+test_deleting_a_ref_checks_nothing (scripts.test_husky_hooks.PrePushHookTests.test_deleting_a_ref_checks_nothing) ... ok
+test_failing_check_blocks_the_push (scripts.test_husky_hooks.PrePushHookTests.test_failing_check_blocks_the_push) ... ok
+test_multi_ref_push_filters_every_pushed_ref (scripts.test_husky_hooks.PrePushHookTests.test_multi_ref_push_filters_every_pushed_ref) ... ok
+test_new_branch_uses_merge_base_with_origin_master (scripts.test_husky_hooks.PrePushHookTests.test_new_branch_uses_merge_base_with_origin_master) ... ok
+test_push_isolates_from_inherited_git_env_with_decoy (scripts.test_husky_hooks.PrePushHookTests.test_push_isolates_from_inherited_git_env_with_decoy)
+push() strips inherited GIT_* and keeps decoy repo unchanged. ... ok
+test_pushed_branch_is_filtered_against_remote_old_sha (scripts.test_husky_hooks.PrePushHookTests.test_pushed_branch_is_filtered_against_remote_old_sha) ... ok
+test_pushed_sha_other_than_checked_out_head_checks_every_package (scripts.test_husky_hooks.PrePushHookTests.test_pushed_sha_other_than_checked_out_head_checks_every_package) ... ok
+test_root_config_change_checks_every_package (scripts.test_husky_hooks.PrePushHookTests.test_root_config_change_checks_every_package) ... ok
+test_schema_change_regenerates_the_prisma_client_first (scripts.test_husky_hooks.PrePushHookTests.test_schema_change_regenerates_the_prisma_client_first) ... ok
+test_skip_flag_and_missing_node_modules_do_not_run_checks (scripts.test_husky_hooks.PrePushHookTests.test_skip_flag_and_missing_node_modules_do_not_run_checks) ... ok
+test_watchdog_kills_the_whole_process_group_when_the_budget_is_exceeded (scripts.test_husky_hooks.PrePushHookTests.test_watchdog_kills_the_whole_process_group_when_the_budget_is_exceeded) ... ok
+test_watchdog_survivor_assertion_fails_for_running_child (scripts.test_husky_hooks.PrePushHookTests.test_watchdog_survivor_assertion_fails_for_running_child)
+A genuinely surviving child process must cause assert_child_terminated to fail. ... ok
+
+----------------------------------------------------------------------
+Ran 25 tests in 21.947s
+
+OK
+# Exit code: 0
+```
+
+All 25 tests pass with 0 failures.
 
 ## Sentry / Originating Issue
 
@@ -79,6 +197,21 @@ Pure test-infrastructure fix (no user-facing flow, no production error path). No
 - **Fix** (line 279): Added `test_push_isolates_from_inherited_git_env_with_decoy` inside `PrePushHookTests`
 - **Regression**: a push() path regression that dropped sanitization would now be caught
 - **Status**: RESOLVED ✅
+
+## Changed Covering Tests
+
+1. `scripts/test_husky_hooks.py`:
+   - `GitEnvironmentIsolationTests.test_sanitized_git_env_contract_and_immutability`: New unit test verifying sanitizer contract, tightened allowlist `{GIT_EXEC_PATH}`, override precedence, sentinel survival, and caller input immutability.
+   - `GitEnvironmentIsolationTests.test_git_env_helper_scrubs_local_vars_and_preserves_allowlist`: Enhanced to verify removal of `GIT_CONFIG_PARAMETERS`, `GIT_CONFIG_COUNT`, and config keys.
+   - `GitEnvironmentIsolationTests.test_git_and_push_helpers_do_not_touch_decoy_repo`: Enhanced with `GIT_OBJECT_DIRECTORY`, config injections, decoy config file hash comparison, and verifying target repo config is not polluted.
+   - `GitEnvironmentIsolationTests.test_run_hook_isolates_from_inherited_git_env`: Enhanced with probe hook checking resolved git dir against target repo, zero repo-locating variables, and decoy integrity.
+   - `GitEnvironmentIsolationTests.test_git_env_clean_module_attribute_is_dynamic`: Verifies dynamic backward compatibility of `GIT_ENV_CLEAN`.
+   - `GitEnvironmentIsolationTests.test_git_env_removes_keys_with_none_override`: Verifies clean deletion when override value is `None`.
+   - `GitEnvironmentIsolationTests.test_git_env_wrapper_forwards_positional_as_overrides`: (CR-1) Verifies positional argument to `_git_env` forwards as `overrides`.
+   - `PreCommitHookTests.test_run_hook_isolates_from_inherited_git_env_with_decoy`: Verifies `PreCommitHookTests.run_hook()` executes real hook script without leaking outer `GIT_DIR` or mutating decoy state.
+   - `PrePushHookTests.test_push_isolates_from_inherited_git_env_with_decoy`: (CR-2) Verifies `PrePushHookTests.push()` strips inherited Git variables and leaves decoy repository unchanged.
+2. `docs/agents/review-lessons.md`:
+   - Added root cause review lesson on isolating git subprocesses in test fixtures from inherited Git environment variables under Section 12.
 
 ## Changed Files
 
