@@ -9,12 +9,22 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tests.support.process_state import (
+    ProcessState,
+    assert_child_terminated,
+    classify_process_state,
+)
+
 PRE_PUSH = ROOT / ".husky" / "pre-push"
 PRE_COMMIT = ROOT / ".husky" / "pre-commit"
 ZERO = "0" * 40
@@ -80,24 +90,12 @@ def git(cwd, *args, env=None):
 
 
 def pid_alive(pid):
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
+    """Check whether a pid is still alive, recognizing terminated and zombie states."""
+    result = classify_process_state(pid)
+    if result.state == ProcessState.TERMINATED:
         return False
-    except PermissionError:
-        return True
-    try:
-        res = subprocess.run(
-            ["ps", "-o", "state=", "-p", str(pid)],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        state = res.stdout.strip()
-        if not state or state.startswith("Z"):
-            return False
-    except Exception:
-        pass
+    if sys.platform.startswith("linux") and result.state == ProcessState.ZOMBIE:
+        return False
     return True
 
 
@@ -252,11 +250,32 @@ class PrePushHookTests(unittest.TestCase):
         self.assertLess(elapsed, 10.0, f"Watchdog exceeded wall-clock budget ({elapsed:.2f}s)")
         self.assertIn("exceeded the 2s limit", result.stderr)
         for pid in map(int, pids.read_text().split()):
+            last_result = None
             for _ in range(30):
-                if not pid_alive(pid):
+                last_result = classify_process_state(pid)
+                if last_result.state == ProcessState.TERMINATED or (
+                    sys.platform.startswith("linux") and last_result.state == ProcessState.ZOMBIE
+                ):
                     break
                 time.sleep(0.1)
-            self.assertFalse(pid_alive(pid), f"pid {pid} survived the watchdog")
+            assert_child_terminated(last_result if last_result is not None else pid)
+
+    def test_watchdog_survivor_assertion_fails_for_running_child(self):
+        """A genuinely surviving child process must cause assert_child_terminated to fail."""
+        sleeper = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+
+        def _cleanup():
+            try:
+                sleeper.kill()
+                sleeper.wait(timeout=2)
+            except Exception:
+                pass
+
+        self.addCleanup(_cleanup)
+        with self.assertRaises(AssertionError) as ctx:
+            assert_child_terminated(sleeper.pid)
+        self.assertIn(str(sleeper.pid), str(ctx.exception))
+        self.assertIn("RUNNING", str(ctx.exception))
 
 
 class PreCommitHookTests(unittest.TestCase):
