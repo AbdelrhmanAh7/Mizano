@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ItemType, Prisma } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
+import { DecimalUtils } from '../../../common/utils/decimal';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
@@ -35,9 +35,9 @@ export class ItemsService {
         sku: dto.sku,
         type: dto.type,
         unit: dto.unit,
-        sellingPrice: new Decimal(dto.sellingPrice),
+        sellingPrice: DecimalUtils.parseInput(dto.sellingPrice, 'sellingPrice'),
         salesAccountId: dto.salesAccountId,
-        costPrice: new Decimal(dto.costPrice || '0'),
+        costPrice: DecimalUtils.parseInput(dto.costPrice || '0', 'costPrice'),
         purchaseAccountId: dto.purchaseAccountId,
         inventoryAccountId: dto.inventoryAccountId,
         description: dto.description,
@@ -106,7 +106,12 @@ export class ItemsService {
       if (existing) throw new ConflictException('SKU already exists');
     }
     await this.assertAccountsBelongToOrg(organizationId, dto);
-    return this.prisma.item.update({ where: { id }, data: dto });
+    const data: Prisma.ItemUpdateInput | Prisma.ItemUncheckedUpdateInput = { ...dto };
+    if (dto.sellingPrice !== undefined)
+      data.sellingPrice = DecimalUtils.parseInput(dto.sellingPrice, 'sellingPrice');
+    if (dto.costPrice !== undefined)
+      data.costPrice = DecimalUtils.parseInput(dto.costPrice, 'costPrice');
+    return this.prisma.item.update({ where: { id }, data });
   }
 
   async remove(organizationId: string, id: string) {

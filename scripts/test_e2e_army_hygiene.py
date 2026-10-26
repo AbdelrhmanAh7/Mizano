@@ -25,6 +25,49 @@ BARE_E2E_IMPORT_PATTERN = re.compile(
     re.MULTILINE,
 )
 
+# Pattern matching hardcoded credentials / plaintext password123 in e2e test files
+HARDCODED_PASSWORD_PATTERN = re.compile(
+    r"""(?:\b(?:pw|password)\s*:\s*['"]password123['"]|['"]password123['"])""",
+    re.IGNORECASE,
+)
+
+
+def find_hardcoded_credential_violations(content: str) -> list[tuple[int, str]]:
+    """Scan content for hard-coded credentials or plaintext passwords.
+
+    Returns a list of (line_number, line_text) for each detected violation.
+    Skips single-line (//) and multi-line (/* ... */) comments.
+    """
+    violations = []
+    in_block_comment = False
+
+    for idx, line in enumerate(content.splitlines(), start=1):
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        if in_block_comment:
+            if "*/" in stripped:
+                in_block_comment = False
+            continue
+
+        if stripped.startswith("/*"):
+            if "*/" not in stripped:
+                in_block_comment = True
+            continue
+
+        if stripped.startswith("//"):
+            continue
+
+        code_part = stripped.split("//")[0].strip()
+        if not code_part:
+            continue
+
+        if HARDCODED_PASSWORD_PATTERN.search(code_part):
+            violations.append((idx, line))
+
+    return violations
+
 
 def find_e2e_import_violations(content: str) -> list[tuple[int, str]]:
     """Scan content for import/export of other .e2e test files.
@@ -152,6 +195,23 @@ import './277-work-order-complete.e2e';
         self.assertIn("import './277-work-order-complete.e2e'", violations[0][1])
         self.assertFalse(file_defines_test(planted_shim))
 
+    def test_hardcoded_credentials_in_465_snippet_detected(self):
+        """Snippet from PR #476 finding e4192c41a52e is detected as a violation."""
+        code = "const ADMIN = { email: 'admin@mizano.com', password: 'password123' };"
+        violations = find_hardcoded_credential_violations(code)
+        self.assertEqual(len(violations), 1)
+        self.assertEqual(violations[0][0], 1)
+        self.assertIn("password123", violations[0][1])
+
+    def test_sanitized_credentials_accepted(self):
+        """Dynamic credentials from environment are accepted without violations."""
+        code = """
+const email = process.env.E2E_USER_EMAIL || process.env.E2E_LOGIN_EMAIL;
+const password = process.env.E2E_USER_PASSWORD || process.env.E2E_LOGIN_PASSWORD;
+"""
+        violations = find_hardcoded_credential_violations(code)
+        self.assertEqual(violations, [])
+
 
 class E2EArmyRepositoryHygieneTests(unittest.TestCase):
     """Integration checks across actual files in e2e-army directory."""
@@ -201,6 +261,39 @@ class E2EArmyRepositoryHygieneTests(unittest.TestCase):
                 file_defines_test(content),
                 f"File {file_path.name} does not define any active test cases",
             )
+
+    def test_465_e2e_no_hardcoded_credentials(self):
+        """e2e-army/465-delivery-challan-update-guard.e2e.ts must not contain hard-coded credentials/passwords."""
+        test_file = E2E_ARMY_DIR / "465-delivery-challan-update-guard.e2e.ts"
+        if not test_file.exists():
+            return
+        content = test_file.read_text(encoding="utf-8")
+        violations = find_hardcoded_credential_violations(content)
+        self.assertEqual(
+            violations,
+            [],
+            f"465 spec contains hardcoded credentials: {violations}",
+        )
+        self.assertNotIn("password123", content, "465 spec contains hardcoded plaintext password123")
+        self.assertNotIn("admin@mizano.com", content, "465 spec contains hardcoded plaintext admin@mizano.com")
+        self.assertIn("process.env", content, "465 spec should source credentials dynamically from env")
+
+    def test_416_e2e_no_hardcoded_credentials(self):
+        """e2e-army/416-bill-rtl-content.e2e.ts must not contain hard-coded credentials/passwords."""
+        test_file = E2E_ARMY_DIR / "416-bill-rtl-content.e2e.ts"
+        if not test_file.exists():
+            return
+        content = test_file.read_text(encoding="utf-8")
+        violations = find_hardcoded_credential_violations(content)
+        self.assertEqual(
+            violations,
+            [],
+            f"416 spec contains hardcoded credentials: {violations}",
+        )
+        self.assertNotIn("password123", content, "416 spec contains hardcoded plaintext password123")
+        self.assertNotIn("admin@mizano.com", content, "416 spec contains hardcoded plaintext admin@mizano.com")
+        self.assertIn("process.env", content, "416 spec should source credentials dynamically from env")
+
 
 
 if __name__ == "__main__":

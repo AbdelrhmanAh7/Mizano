@@ -86,6 +86,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Never log or audit values:** no document text, amounts, tax ids, LLM output, query parameters or raw error objects. Log metadata instead (ids, counts, lengths, durations, field names, status), and use `describeError(error, { includeMessage: false })` wherever an error message could contain document or user data. `redactText` only masks credential-shaped strings, so it does not make document text safe to log.
 - **Clients can't claim trusted provenance.** HTTP log captures are forced to `FRONTEND`.
 - **Compare secrets in constant time, with no default secrets.** Re-apply file permissions on files that already exist.
+- **Never commit hard-coded sensitive credentials or plaintext passwords in e2e tests or test fixtures.** Source credentials dynamically from environment variables (`process.env.E2E_LOGIN_EMAIL`, `process.env.E2E_LOGIN_PASSWORD`) or generate throwaway credentials dynamically. Hard-coded credentials (`admin@mizano.com` / `password123`) fail repository security hygiene and automated review checks. _(#465)_
 
 ## 11. Web UI
 
@@ -103,6 +104,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.
 
 ## Review process
+
+- **A CommonJS callable must retain a callable import type.** Casting a Supertest runtime wrapper back to its namespace type still fails with `esModuleInterop`. Use a callable import and compile the real HTTP spec under interop mode as a regression check. _(#462, PR #417)_
 
 - Run `/code-review` on every PR (inline comments). CodeRabbit (configured in `.coderabbit.yaml`, which points it at this file) does full reviews once a seat is assigned; if one doesn't start automatically then, comment `@coderabbitai review`.
 - Fix every valid finding at its root, reply on the thread with the commit, and resolve it. When a finding is wrong, reply once with the reason and resolve it.

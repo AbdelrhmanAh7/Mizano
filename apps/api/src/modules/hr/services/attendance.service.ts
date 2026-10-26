@@ -2,6 +2,13 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AttendanceStatus, Prisma } from '@prisma/client';
 
+export interface AttendanceSummaryRange {
+  month?: number;
+  year?: number;
+  startDate?: string;
+  endDate?: string;
+}
+
 @Injectable()
 export class AttendanceService {
   constructor(private prisma: PrismaService) {}
@@ -160,14 +167,19 @@ export class AttendanceService {
   async getAttendanceByEmployee(
     organizationId: string,
     employeeId: string,
-    startDate: string,
-    endDate: string,
+    startDate?: string,
+    endDate?: string,
   ) {
+    // Both bounds are optional: `new Date(undefined)` is an Invalid Date, which
+    // Prisma rejects (HTTP 400) when a caller lists an employee without a range.
+    const date: Prisma.DateTimeFilter = {};
+    if (startDate) date.gte = new Date(startDate);
+    if (endDate) date.lte = new Date(endDate);
     return this.prisma.attendance.findMany({
       where: {
         employeeId,
         organizationId,
-        date: { gte: new Date(startDate), lte: new Date(endDate) },
+        ...(Object.keys(date).length > 0 ? { date } : {}),
       },
       orderBy: { date: 'desc' },
     });
@@ -190,20 +202,22 @@ export class AttendanceService {
     });
   }
 
+  /**
+   * Summary over a month (`month` + `year`) or an explicit `startDate`/`endDate` range. An explicit
+   * range wins over month/year; with neither, every record of the employee is summarised.
+   */
   async getAttendanceSummary(
     organizationId: string,
     employeeId: string,
-    month: number,
-    year: number,
+    range: AttendanceSummaryRange = {},
   ) {
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0);
+    const date = this.resolveSummaryRange(range);
 
     const records = await this.prisma.attendance.findMany({
       where: {
         employeeId,
         organizationId,
-        date: { gte: startDate, lte: endDate },
+        ...(date ? { date } : {}),
       },
     });
 
@@ -223,6 +237,39 @@ export class AttendanceService {
     };
 
     return summary;
+  }
+
+  private resolveSummaryRange(range: AttendanceSummaryRange): Prisma.DateTimeFilter | undefined {
+    const { month, year, startDate, endDate } = range;
+    if (startDate || endDate) {
+      const date: Prisma.DateTimeFilter = {};
+      if (startDate) date.gte = this.parseDate('startDate', startDate);
+      if (endDate) date.lte = this.parseDate('endDate', endDate);
+      if (date.gte && date.lte && date.gte > date.lte) {
+        throw new BadRequestException('startDate must not be after endDate');
+      }
+      return date;
+    }
+    if (month === undefined && year === undefined) return undefined;
+    if (
+      month === undefined ||
+      year === undefined ||
+      !Number.isInteger(month) ||
+      !Number.isInteger(year) ||
+      month < 1 ||
+      month > 12
+    ) {
+      throw new BadRequestException('Provide month (1-12) and year together, or startDate/endDate');
+    }
+    return { gte: new Date(year, month - 1, 1), lte: new Date(year, month, 0) };
+  }
+
+  private parseDate(field: string, value: string): Date {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException(`${field} must be a valid date`);
+    }
+    return parsed;
   }
 
   async update(organizationId: string, id: string, dto: Record<string, unknown>) {

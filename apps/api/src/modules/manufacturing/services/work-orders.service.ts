@@ -232,28 +232,37 @@ export class WorkOrdersService {
 
     const quantityProduced = dto.quantityProduced;
 
-    // Consume materials proportionally
-    await this.consumeMaterials(organizationId, workOrder, quantityProduced);
+    // Stock, COGM journal and status change together or not at all, so a retry never double-posts stock
+    return this.prisma.$transaction(async (tx) => {
+      // Consume materials proportionally
+      await this.consumeMaterials(tx, organizationId, workOrder, quantityProduced);
 
-    // Add finished goods to inventory
-    await this.addFinishedGoods(organizationId, workOrder, quantityProduced);
+      // Add finished goods to inventory
+      await this.addFinishedGoods(tx, organizationId, workOrder, quantityProduced);
 
-    // Create COGM journal entry
-    const journalId = await this.createCOGMJournal(organizationId, workOrder, quantityProduced);
+      // Create COGM journal entry
+      const journalId = await this.createCOGMJournal(
+        tx,
+        organizationId,
+        workOrder,
+        quantityProduced,
+      );
 
-    // Update work order as completed
-    return this.prisma.workOrder.update({
-      where: { id },
-      data: {
-        status: WorkOrderStatus.COMPLETED,
-        completedDate: new Date(),
-        notes: dto.notes || workOrder.notes,
-        journalId,
-      },
+      // Update work order as completed
+      return tx.workOrder.update({
+        where: { id },
+        data: {
+          status: WorkOrderStatus.COMPLETED,
+          completedDate: new Date(),
+          notes: dto.notes || workOrder.notes,
+          journalId,
+        },
+      });
     });
   }
 
   private async createCOGMJournal(
+    tx: Prisma.TransactionClient,
     organizationId: string,
     workOrder: WorkOrderWithBom,
     quantityProduced: number,
@@ -286,16 +295,16 @@ export class WorkOrdersService {
 
     // Find inventory accounts
     // Finished goods account (from output item or default ASSET inventory account)
-    const outputItem = await this.prisma.item.findFirst({
+    const outputItem = await tx.item.findFirst({
       where: { id: bom.outputItemId, organizationId },
       select: { inventoryAccountId: true },
     });
 
     const finishedGoodsAccount = outputItem?.inventoryAccountId
-      ? await this.prisma.account.findFirst({
+      ? await tx.account.findFirst({
           where: { id: outputItem.inventoryAccountId, organizationId },
         })
-      : await this.prisma.account.findFirst({
+      : await tx.account.findFirst({
           where: {
             organizationId,
             type: 'ASSET',
@@ -305,7 +314,7 @@ export class WorkOrdersService {
         });
 
     // Raw materials account (find a second inventory/asset account or use same)
-    const rawMaterialsAccount = await this.prisma.account.findFirst({
+    const rawMaterialsAccount = await tx.account.findFirst({
       where: {
         organizationId,
         type: 'ASSET',
@@ -322,7 +331,7 @@ export class WorkOrdersService {
       return null;
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    {
       const journalNumber = await this.generateJournalNumberTx(tx, organizationId);
 
       const journalLines: Array<{
@@ -390,7 +399,7 @@ export class WorkOrdersService {
       });
 
       return journal.id;
-    });
+    }
   }
 
   private async generateJournalNumberTx(
@@ -412,6 +421,7 @@ export class WorkOrdersService {
   }
 
   private async consumeMaterials(
+    tx: Prisma.TransactionClient,
     organizationId: string,
     workOrder: WorkOrderWithBom,
     quantityProduced: number,
@@ -421,7 +431,7 @@ export class WorkOrdersService {
     const multiplier = quantityProduced / outputQty;
 
     // Get default warehouse
-    const defaultWarehouse = await this.prisma.warehouse.findFirst({
+    const defaultWarehouse = await tx.warehouse.findFirst({
       where: { organizationId, isDefault: true },
     });
     const warehouseId = defaultWarehouse?.id;
@@ -435,7 +445,7 @@ export class WorkOrdersService {
       const consumeQty = Math.round(baseQty * multiplier);
 
       // Create OUT inventory movement (positive quantity, movementType carries direction)
-      await this.prisma.inventoryMovement.create({
+      await tx.inventoryMovement.create({
         data: {
           itemId: bomItem.itemId,
           warehouseId,
@@ -447,16 +457,41 @@ export class WorkOrdersService {
           organizationId,
         },
       });
+      await this.applyStockChange(tx, organizationId, bomItem.itemId, warehouseId, -consumeQty);
     }
   }
 
+  /**
+   * Keep the stock read models in step with a movement. Inventory levels and
+   * Item.currentStock are what the stock screens and /inventory-levels report; a
+   * movement row alone left them unchanged after a work order completed.
+   */
+  private async applyStockChange(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    itemId: string,
+    warehouseId: string,
+    delta: number,
+  ) {
+    await tx.item.update({
+      where: { id: itemId },
+      data: { currentStock: { increment: delta } },
+    });
+    await tx.inventoryLevel.upsert({
+      where: { itemId_warehouseId: { itemId, warehouseId } },
+      update: { quantity: { increment: delta } },
+      create: { itemId, warehouseId, quantity: new Decimal(delta), organizationId },
+    });
+  }
+
   private async addFinishedGoods(
+    tx: Prisma.TransactionClient,
     organizationId: string,
     workOrder: WorkOrderWithBom,
     quantityProduced: number,
   ) {
     // Get default warehouse
-    const defaultWarehouse = await this.prisma.warehouse.findFirst({
+    const defaultWarehouse = await tx.warehouse.findFirst({
       where: { organizationId, isDefault: true },
     });
     const warehouseId = defaultWarehouse?.id;
@@ -465,7 +500,7 @@ export class WorkOrdersService {
       throw new BadRequestException('No default warehouse found');
     }
 
-    await this.prisma.inventoryMovement.create({
+    await tx.inventoryMovement.create({
       data: {
         itemId: workOrder.bom.outputItemId,
         warehouseId,
@@ -477,6 +512,13 @@ export class WorkOrdersService {
         organizationId,
       },
     });
+    await this.applyStockChange(
+      tx,
+      organizationId,
+      workOrder.bom.outputItemId,
+      warehouseId,
+      quantityProduced,
+    );
   }
 
   async cancelWorkOrder(organizationId: string, id: string, reason: string) {
@@ -512,26 +554,28 @@ export class WorkOrdersService {
 
     const quantityProduced = dto.quantityProduced;
 
-    // Create ProductionEntry record
-    const entry = await this.prisma.productionEntry.create({
-      data: {
-        workOrderId: id,
-        date: dto.date ? new Date(dto.date) : new Date(),
-        quantityProduced: Math.round(quantityProduced),
-        quantityRejected: dto.quantityRejected ? Math.round(dto.quantityRejected) : 0,
-        wastageQuantity: dto.wastageQuantity ? Math.round(dto.wastageQuantity) : 0,
-        notes: dto.notes,
-        organizationId,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      // Create ProductionEntry record
+      const entry = await tx.productionEntry.create({
+        data: {
+          workOrderId: id,
+          date: dto.date ? new Date(dto.date) : new Date(),
+          quantityProduced: Math.round(quantityProduced),
+          quantityRejected: dto.quantityRejected ? Math.round(dto.quantityRejected) : 0,
+          wastageQuantity: dto.wastageQuantity ? Math.round(dto.wastageQuantity) : 0,
+          notes: dto.notes,
+          organizationId,
+        },
+      });
+
+      // Consume materials proportionally
+      await this.consumeMaterials(tx, organizationId, workOrder, quantityProduced);
+
+      // Add finished goods to inventory
+      await this.addFinishedGoods(tx, organizationId, workOrder, quantityProduced);
+
+      return entry;
     });
-
-    // Consume materials proportionally
-    await this.consumeMaterials(organizationId, workOrder, quantityProduced);
-
-    // Add finished goods to inventory
-    await this.addFinishedGoods(organizationId, workOrder, quantityProduced);
-
-    return entry;
   }
 
   async getProductionHistory(organizationId: string, id: string) {

@@ -1,9 +1,10 @@
-import { IsBoolean, IsInt, IsOptional } from 'class-validator';
+import { IsInt, IsOptional } from 'class-validator';
+import { IsStrictBoolean } from '../../../common/dto/strict-boolean';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateTourProgressDto {
   @ApiProperty({ example: true, description: 'Whether the tour was completed' })
-  @IsBoolean()
+  @IsStrictBoolean()
   completed: boolean;
 
   @ApiProperty({

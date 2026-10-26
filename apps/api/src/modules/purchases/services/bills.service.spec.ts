@@ -144,6 +144,24 @@ describe('BillsService', () => {
       expect(prisma.bill.create).not.toHaveBeenCalled();
     });
 
+    it('should only accept active accounts on create (#410)', async () => {
+      prisma.vendor.findFirst.mockResolvedValue(createMockVendor() as any);
+      // The DB count only matches active accounts: an inactive one yields 0.
+      prisma.account.count.mockImplementation((async (args: any) =>
+        args?.where?.isActive === true ? 0 : 1) as any);
+
+      await expect(
+        service.create(ORG_ID, {
+          ...validDto,
+          lines: [{ accountId: 'inactive-acc', quantity: '1', rate: '1' }],
+        }),
+      ).rejects.toThrow('Account not found');
+      expect(prisma.account.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({ organizationId: ORG_ID, isActive: true }),
+      });
+      expect(prisma.bill.create).not.toHaveBeenCalled();
+    });
+
     it('should auto-number the bill when no bill number is given', async () => {
       prisma.vendor.findFirst.mockResolvedValue(createMockVendor() as any);
       prisma.organization.update.mockResolvedValue({
@@ -297,6 +315,23 @@ describe('BillsService', () => {
       expectDecimalEqual(data.subtotal, '200');
       expectDecimalEqual(data.taxAmount, '28');
       expectDecimalEqual(data.grandTotal, '228');
+    });
+
+    it('should only accept active accounts for replaced lines (#410)', async () => {
+      prisma.bill.findFirst.mockResolvedValue(createMockBill({ status: 'DRAFT' }) as any);
+      // The DB count only matches active accounts: an inactive one yields 0.
+      prisma.account.count.mockImplementation((async (args: any) =>
+        args?.where?.isActive === true ? 0 : 1) as any);
+
+      await expect(
+        service.update(ORG_ID, 'bill-1', {
+          lines: [{ accountId: 'inactive-acc', quantity: '1', rate: '1' }],
+        }),
+      ).rejects.toThrow('Account not found');
+      expect(prisma.account.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({ organizationId: ORG_ID, isActive: true }),
+      });
+      expect(prisma.bill.update).not.toHaveBeenCalled();
     });
 
     it('should reject a project from another organization', async () => {

@@ -4,6 +4,9 @@ export class CacheStatsResponseDto {
   @ApiProperty({ enum: ['redis', 'memory'], description: 'Cache backend type' })
   storeType!: 'redis' | 'memory';
 
+  @ApiProperty({ enum: ['redis', 'memory'], description: 'Alias of storeType' })
+  type!: 'redis' | 'memory';
+
   @ApiProperty({ description: 'Whether the cache backend is connected' })
   connected!: boolean;
 
