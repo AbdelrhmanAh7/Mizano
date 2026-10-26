@@ -630,6 +630,10 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
     ];
     let vatCustomer = '';
 
+    beforeAll(async () => {
+      vatCustomer = (await a.post('/customers').send({ name: 'VAT Customer' })).body.id;
+    });
+
     async function postedInvoice(
       day: number,
       rate: string,
@@ -646,7 +650,6 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
     }
 
     it('@issue-348 AC1: sums posted documents in the period, excludes void and draft, flags foreign currency', async () => {
-      vatCustomer = (await a.post('/customers').send({ name: 'VAT Customer' })).body.id;
       const vatVendor = (await a.post('/vendors').send({ name: 'VAT Vendor' })).body.id;
       await postedInvoice(205, '1000', '14');
       const bill = await a.post('/bills').send({
