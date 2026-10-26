@@ -192,6 +192,44 @@ describe('DepreciationService', () => {
     }));
   }
 
+  describe('rounding residue (#512)', () => {
+    beforeEach(() => {
+      assets = [asset('sl')];
+      schedules = [schedule('sl', '37.5000', '1012.5000', '1487.5001')];
+      expect(
+        schedules[0].bookValue
+          .add(schedules[0].accumulatedTotal)
+          .minus(assets[0].purchasePrice)
+          .toFixed(4),
+      ).toBe('0.0001');
+    });
+
+    it('AC1: monthly run posts a balanced journal despite a 0.0001 sum residue', async () => {
+      const result = await service.runMonthlyDepreciation(ORG_A);
+
+      expect(result).toEqual({ processed: 1, journalsCreated: 1, totalDepreciation: 37.5 });
+      expect(lines(journalFor('sl'))).toEqual([
+        { accountId: 'exp-sl', debit: '37.5000', credit: '0.0000' },
+        { accountId: 'accdep-sl', debit: '0.0000', credit: '37.5000' },
+      ]);
+      expect(schedules[0]).toMatchObject({ journalId: 'jrn-42', executedAt: FIXED_NOW });
+      expect(assets[0].currentBookValue.toFixed(4)).toBe('1487.5001');
+    });
+
+    it('AC2: manual run returns a balanced journal despite a 0.0001 sum residue', async () => {
+      await expect(service.runDepreciationForAsset(ORG_A, 'sl', 3, 2026)).resolves.toEqual({
+        journalId: 'jrn-42',
+        amount: 37.5,
+      });
+      expect(lines(journalFor('sl'))).toEqual([
+        { accountId: 'exp-sl', debit: '37.5000', credit: '0.0000' },
+        { accountId: 'accdep-sl', debit: '0.0000', credit: '37.5000' },
+      ]);
+      expect(schedules[0]).toMatchObject({ journalId: 'jrn-42', executedAt: FIXED_NOW });
+      expect(assets[0].currentBookValue.toFixed(4)).toBe('1487.5001');
+    });
+  });
+
   describe('runMonthlyDepreciation: journal lines', () => {
     it('posts straight-line 37.5000: Dr expense, Cr accumulated depreciation', async () => {
       const result = await service.runMonthlyDepreciation(ORG_A);
