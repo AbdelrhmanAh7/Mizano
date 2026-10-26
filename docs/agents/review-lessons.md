@@ -102,6 +102,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.
+- **Isolate test fixture subprocesses from inherited Git environment variables.** Subprocess helpers in test fixtures (invoking git, git hooks, or push) inherit outer environment variables when tests run inside git hooks or automated runners (e.g. `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_CONFIG_PARAMETERS`). Use a dynamic environment sanitizer (`sanitized_git_env`) that strips all `GIT_*` repository-locating and config-injection variables while preserving the minimal execution allowlist (`GIT_EXEC_PATH`) and caller overrides, ensuring fixture operations stay strictly confined to temporary test repositories. _(#308, #513)_
 
 ## Review process
 
