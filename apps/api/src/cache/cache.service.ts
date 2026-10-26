@@ -11,6 +11,8 @@ export interface CacheOptions {
 
 export interface CacheStats {
   storeType: 'redis' | 'memory';
+  /** Alias of storeType (additive; kept for API consumers that read `type`). */
+  type: 'redis' | 'memory';
   connected: boolean;
   keyCount: number;
   memoryUsage: string;
@@ -244,6 +246,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 
         return {
           storeType: 'redis',
+          type: 'redis',
           connected: true,
           keyCount,
           memoryUsage: memoryMatch ? memoryMatch[1].trim() : 'unknown',
@@ -253,6 +256,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       } catch {
         return {
           storeType: 'redis',
+          type: 'redis',
           connected: false,
           keyCount: 0,
           memoryUsage: '0B',
@@ -264,6 +268,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 
     return {
       storeType: 'memory',
+      type: 'memory',
       connected: true,
       keyCount: 0, // in-memory store doesn't expose key count easily
       memoryUsage: 'N/A',
