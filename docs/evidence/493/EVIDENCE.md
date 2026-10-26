@@ -11,23 +11,26 @@ Not a user-facing change: no e2e-army test added.
 
 ## VERIFICATION REPORT (2026-10-26)
 
-Tested SHA: `e7a4d7954449aae1e59980dd3c1a8fe28d32a8f2` (branch head before this docs-only commit;
-the evidence commit changes no code).
+Tested SHA: `4120461c688a7722f40fea5eec8fc9d4990d42ca` (rerun 2026-10-26 on this head, after the
+`e7a4d795` run; later commits change docs only, no code).
 
 ## Commands and observed output
 
-`nice -n 10 pnpm --filter @mizano/web exec jest components/ui/city-select.spec.tsx --runInBand` — observed exit 0; Jest reported 3 passed (nice also printed `setpriority: Operation not permitted`):
+`nice -n 10 pnpm --filter @mizano/web exec jest components/ui/city-select.spec.tsx --runInBand` — Jest reported 3 passed (nice also printed `setpriority: Operation not permitted`):
 
 ```
 PASS components/ui/city-select.spec.tsx
   CitySelect fallback input
-    ✓ is disabled with "Select a country first" when no country is chosen (20 ms)
-    ✓ is enabled with "Enter city name" for a country without city data (2 ms)
+    ✓ is disabled with "Select a country first" when no country is chosen (24 ms)
+    ✓ is enabled with "Enter city name" for a country without city data (1 ms)
     ✓ stays disabled when the disabled prop is set (1 ms)
 
 Test Suites: 1 passed, 1 total
 Tests:       3 passed, 3 total
 ```
+
+Output above is from the rerun on `4120461c`. The command was piped through `tail`, so the shell
+exit code was not captured for this rerun; the Jest summary shows no failures.
 
 | AC  | Test                                                                  |
 | --- | --------------------------------------------------------------------- |
