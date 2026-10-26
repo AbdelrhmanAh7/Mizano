@@ -65,7 +65,9 @@ def sanitized_git_env(base=None, overrides=None):
     return clean
 
 
-_git_env = sanitized_git_env
+def _git_env(overrides=None):
+    """Backward-compatible wrapper: forwards its argument as overrides, not base."""
+    return sanitized_git_env(overrides=overrides)
 
 
 def __getattr__(name):
@@ -272,6 +274,37 @@ class PrePushHookTests(unittest.TestCase):
             assert_child_terminated(sleeper.pid)
         self.assertIn(str(sleeper.pid), str(ctx.exception))
         self.assertIn("RUNNING", str(ctx.exception))
+
+
+    def test_push_isolates_from_inherited_git_env_with_decoy(self):
+        """push() strips inherited GIT_* and keeps decoy repo unchanged."""
+        decoy = self.tmp / "decoy_push"
+        decoy.mkdir()
+        git(decoy, "init", "-q", "-b", "master")
+        git(decoy, "config", "user.email", "d@example.com")
+        git(decoy, "config", "user.name", "d")
+        git(decoy, "config", "commit.gpgsign", "false")
+        (decoy / "decoy.txt").write_text("decoy content")
+        git(decoy, "add", "decoy.txt")
+        git(decoy, "commit", "-q", "-m", "decoy commit")
+        decoy_head = git(decoy, "rev-parse", "HEAD")
+        decoy_index = (decoy / ".git" / "index").read_bytes()
+
+        head = self.commit("apps/web/b.txt", "push-decoy")
+        decoy_env = {
+            "GIT_DIR": str(decoy / ".git"),
+            "GIT_WORK_TREE": str(decoy),
+            "GIT_INDEX_FILE": str(decoy / ".git" / "index"),
+            "GIT_COMMON_DIR": str(decoy / ".git"),
+            "MIZANO_TEST_SENTINEL": "push-sentinel",
+        }
+        with mock.patch.dict(os.environ, decoy_env):
+            result, calls = self.push([self.line(head, self.base)])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(len(calls) > 0, "push() should have triggered turbo")
+        # Decoy repository must be completely untouched
+        self.assertEqual(git(decoy, "rev-parse", "HEAD"), decoy_head)
+        self.assertEqual((decoy / ".git" / "index").read_bytes(), decoy_index)
 
 
 class PreCommitHookTests(unittest.TestCase):
@@ -672,6 +705,15 @@ class GitEnvironmentIsolationTests(unittest.TestCase):
             self.assertIn("KEEP_ME", scrubbed)
             self.assertEqual(scrubbed.get("ADDED"), "new")
             self.assertNotIn("REMOVE_ME", scrubbed)
+
+    def test_git_env_wrapper_forwards_positional_as_overrides(self):
+        """_git_env(dict) must treat its argument as overrides, not base."""
+        with mock.patch.dict(os.environ, {"GIT_DIR": "/decoy", "PATH": "/usr/bin"}):
+            result = _git_env({"GIT_AUTHOR_NAME": "fixture-author"})
+        self.assertNotIn("GIT_DIR", result, "GIT_DIR must be stripped")
+        self.assertIn("PATH", result, "PATH from os.environ must survive")
+        self.assertEqual(result.get("GIT_AUTHOR_NAME"), "fixture-author",
+                         "_git_env positional arg must apply as overrides")
 
 
 if __name__ == "__main__":
