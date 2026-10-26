@@ -66,6 +66,8 @@ const DECLINING: Row = {
   purchasePrice: new Decimal('10000.0000'),
   salvageValue: new Decimal('1000.0000'),
   depreciationMethod: DepreciationMethod.DECLINING_BALANCE,
+  accumulatedDepreciation: new Decimal('0.0000'),
+  currentBookValue: new Decimal('10000.0000'),
 };
 
 describe('DepreciationService', () => {
@@ -93,7 +95,11 @@ describe('DepreciationService', () => {
     assets = [
       asset('sl'),
       asset('db', DECLINING),
-      asset('last', DECLINING),
+      asset('last', {
+        ...DECLINING,
+        accumulatedDepreciation: new Decimal('8987.6544'),
+        currentBookValue: new Decimal('1012.3456'),
+      }),
       asset('other', { organizationId: ORG_B }),
     ];
     schedules = [
