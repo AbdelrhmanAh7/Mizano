@@ -57,8 +57,12 @@ try {
       .map((f) => f.trim())
       .filter(Boolean),
   );
-} catch (_e) {
-  /* non-fatal */
+} catch (e) {
+  // Fail closed: treating a failed diff as "no unstaged changes" would re-stage
+  // partially staged files and silently commit their unstaged hunks.
+  const detail = (e.stderr && String(e.stderr).trim()) || e.message;
+  console.error('Failed to get unstaged files:', detail);
+  process.exit(1);
 }
 
 const apiTsFiles = stagedFiles

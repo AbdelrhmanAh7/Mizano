@@ -29,6 +29,34 @@ describe('ItemsService', () => {
     jest.clearAllMocks();
   });
 
+  describe('create: non-numeric prices', () => {
+    const dto = (over: Record<string, unknown>) =>
+      ({
+        name: 'W',
+        sku: 'W-1',
+        type: ItemType.GOODS,
+        unit: 'pcs',
+        sellingPrice: '10',
+        ...over,
+      }) as never;
+
+    it.each([
+      ['sellingPrice', { sellingPrice: 'abc' }],
+      ['costPrice', { costPrice: 'x' }],
+    ])('rejects a non-numeric %s with 400 before touching the database', async (_f, over) => {
+      mockPrismaService.item.findFirst.mockResolvedValue(null);
+      await expect(service.create('org-001', dto(over))).rejects.toThrow(BadRequestException);
+      expect(mockPrismaService.item.create).not.toHaveBeenCalled();
+    });
+
+    it('still accepts valid decimal strings', async () => {
+      mockPrismaService.item.findFirst.mockResolvedValue(null);
+      mockPrismaService.item.create.mockResolvedValue({ id: 'i1' });
+      await service.create('org-001', dto({ sellingPrice: '12.50', costPrice: '5' }));
+      expect(mockPrismaService.item.create).toHaveBeenCalled();
+    });
+  });
+
   describe('findAll', () => {
     const orgId = 'org-001';
 
@@ -222,6 +250,32 @@ describe('ItemsService', () => {
         service.update('org-001', 'item-1', { inventoryAccountId: 'acc-foreign' }),
       ).rejects.toThrow(BadRequestException);
       expect(mockPrismaService.item.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-numeric sellingPrice or costPrice with 400', async () => {
+      mockPrismaService.item.findFirst.mockResolvedValue({ id: 'item-1' });
+
+      await expect(service.update('org-001', 'item-1', { sellingPrice: 'abc' })).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.update('org-001', 'item-1', { costPrice: 'abc' })).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockPrismaService.item.update).not.toHaveBeenCalled();
+    });
+
+    it('stores valid prices as Decimal and leaves absent ones untouched', async () => {
+      mockPrismaService.item.findFirst.mockResolvedValue({ id: 'item-1' });
+      mockPrismaService.item.update.mockResolvedValue({ id: 'item-1' });
+
+      await service.update('org-001', 'item-1', { sellingPrice: '12.50', name: 'N' });
+
+      const { data } = mockPrismaService.item.update.mock.calls[0][0] as {
+        data: Record<string, { toString(): string } | string>;
+      };
+      expect(data.sellingPrice.toString()).toBe('12.5');
+      expect(data.name).toBe('N');
+      expect('costPrice' in data).toBe(false);
     });
   });
 });

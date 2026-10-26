@@ -105,6 +105,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## Review process
 
+- **A CommonJS callable must retain a callable import type.** Casting a Supertest runtime wrapper back to its namespace type still fails with `esModuleInterop`. Use a callable import and compile the real HTTP spec under interop mode as a regression check. _(#462, PR #417)_
+
 - Run `/code-review` on every PR (inline comments). CodeRabbit (configured in `.coderabbit.yaml`, which points it at this file) does full reviews once a seat is assigned; if one doesn't start automatically then, comment `@coderabbitai review`.
 - Fix every valid finding at its root, reply on the thread with the commit, and resolve it. When a finding is wrong, reply once with the reason and resolve it.
 - Add any new root cause to this file in the same PR.

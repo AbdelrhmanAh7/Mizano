@@ -562,6 +562,11 @@ export class BillsService {
     const lines = dto.lines ?? [];
     const accountIds = [...new Set(lines.map((l) => l.accountId).filter(Boolean))] as string[];
     if (accountIds.length) {
+      // Active-only existence check (#410): inactive accounts count as not found.
+      const found = await db.account.count({
+        where: { id: { in: accountIds }, organizationId, deletedAt: null, isActive: true },
+      });
+      if (found !== accountIds.length) throw new BadRequestException('Account not found');
       const accounts = await db.account.findMany({
         where: { id: { in: accountIds }, organizationId, deletedAt: null },
         select: { id: true, type: true, isActive: true },

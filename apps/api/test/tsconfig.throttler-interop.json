@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "noEmit": true,
+    "incremental": false
+  },
+  "include": ["../src/throttler-ip.guard.spec.ts"]
+}
