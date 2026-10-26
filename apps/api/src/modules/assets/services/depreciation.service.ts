@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -97,6 +97,7 @@ export class DepreciationService {
       }
 
       try {
+        this.assertScheduleEntryConsistent(asset, scheduleEntry);
         const posted = await this.prisma.$transaction(async (tx) => {
           // Claim the period first: only one concurrent run flips executedAt from null
           const claimed = await tx.depreciationSchedule.updateMany({
@@ -181,6 +182,23 @@ export class DepreciationService {
   }
 
   /**
+   * A stored row must move both asset balances by exactly its amount. Checked before the
+   * period is claimed so a corrupt row can never produce a journal.
+   */
+  private assertScheduleEntryConsistent(
+    asset: { accumulatedDepreciation: Decimal; currentBookValue: Decimal },
+    entry: { amount: Decimal; accumulatedTotal: Decimal; bookValue: Decimal },
+  ): void {
+    const accumulatedDelta = entry.accumulatedTotal.minus(asset.accumulatedDepreciation);
+    const bookDelta = asset.currentBookValue.minus(entry.bookValue);
+    if (!entry.amount.equals(accumulatedDelta) || !entry.amount.equals(bookDelta)) {
+      throw new BadRequestException(
+        'Depreciation schedule row is inconsistent with the asset balances',
+      );
+    }
+  }
+
+  /**
    * Run depreciation for a specific asset (manual trigger)
    */
   async runDepreciationForAsset(
@@ -221,6 +239,8 @@ export class DepreciationService {
     if (scheduleEntry.executedAt) {
       throw new Error('Depreciation already executed for this period');
     }
+
+    this.assertScheduleEntryConsistent(asset, scheduleEntry);
 
     const result = await this.prisma.$transaction(async (tx) => {
       // Claim the period first: only one concurrent run flips executedAt from null

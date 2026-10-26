@@ -114,7 +114,7 @@ describe('depreciation schedule generation', () => {
     const rows = createdRows();
     expect(rows).toHaveLength(9);
     expect(d(rows[0].amount).toFixed(4)).toBe('77.7778');
-    expect(d(rows[8].amount).toFixed(4)).toBe('77.7774');
+    expect(d(rows[8].amount).toFixed(4)).toBe('77.7776');
     let prevAcc = new Decimal('300.0000');
     let prevBook = new Decimal('700.0000');
     for (const r of rows) {

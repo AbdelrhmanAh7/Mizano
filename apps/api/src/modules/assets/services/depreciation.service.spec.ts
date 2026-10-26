@@ -92,8 +92,16 @@ describe('DepreciationService', () => {
     // Final period: residual 12.3456 lands the book value exactly on salvage 1000.
     assets = [
       asset('sl'),
-      asset('db', DECLINING),
-      asset('last', DECLINING),
+      asset('db', {
+        ...DECLINING,
+        accumulatedDepreciation: new Decimal('0.0000'),
+        currentBookValue: new Decimal('10000.0000'),
+      }),
+      asset('last', {
+        ...DECLINING,
+        accumulatedDepreciation: new Decimal('8987.6544'),
+        currentBookValue: new Decimal('1012.3456'),
+      }),
       asset('other', { organizationId: ORG_B }),
     ];
     schedules = [

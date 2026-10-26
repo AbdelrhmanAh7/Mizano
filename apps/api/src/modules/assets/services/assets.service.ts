@@ -6,6 +6,9 @@ import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AssetQueryDto, CreateAssetDto, DisposeAssetDto, UpdateAssetDto } from '../dto/assets.dto';
 
+// One rounding policy for every stored schedule amount: Decimal(19,4), ROUND_HALF_UP
+const roundAmount = (value: Decimal): Decimal => value.toDecimalPlaces(4, Decimal.ROUND_HALF_UP);
+
 @Injectable()
 export class AssetsService {
   private readonly logger = new Logger(AssetsService.name);
@@ -436,40 +439,41 @@ export class AssetsService {
     usefulLifeYears: number,
     method: DepreciationMethod,
   ): Promise<void> {
-    const depreciableAmount = purchasePrice - salvageValue;
+    const price = new Decimal(purchasePrice);
+    const salvage = new Decimal(salvageValue);
     const totalMonths = usefulLifeYears * 12;
     const schedules: Prisma.DepreciationScheduleCreateManyInput[] = [];
 
     let currentMonth = purchaseDate.getMonth() + 1;
     let currentYear = purchaseDate.getFullYear();
-    let accumulatedTotal = 0;
-    let bookValue = purchasePrice;
+    let accumulatedTotal = new Decimal(0);
+    let bookValue = price;
     for (let period = 1; period <= totalMonths; period++) {
-      let monthlyAmount: number;
+      let monthlyAmount: Decimal;
 
-      if (method === DepreciationMethod.STRAIGHT_LINE) {
-        monthlyAmount = depreciableAmount / totalMonths;
+      if (period === totalMonths) {
+        // The final period absorbs rounding residue so book value lands exactly on salvage
+        monthlyAmount = bookValue.minus(salvage);
+      } else if (method === DepreciationMethod.STRAIGHT_LINE) {
+        monthlyAmount = roundAmount(price.minus(salvage).div(totalMonths));
       } else {
-        // Declining balance (double declining)
-        const annualRate = 2 / usefulLifeYears;
-        monthlyAmount = Math.max(0, (bookValue * annualRate) / 12);
-
-        // Don't depreciate below salvage value
-        if (bookValue - monthlyAmount < salvageValue) {
-          monthlyAmount = Math.max(0, bookValue - salvageValue);
-        }
+        // Declining balance (double declining), never below salvage value
+        monthlyAmount = Decimal.min(
+          roundAmount(bookValue.mul(2).div(usefulLifeYears).div(12)),
+          bookValue.minus(salvage),
+        ).clamp(0, Infinity);
       }
 
-      accumulatedTotal += monthlyAmount;
-      bookValue -= monthlyAmount;
+      accumulatedTotal = accumulatedTotal.plus(monthlyAmount);
+      bookValue = bookValue.minus(monthlyAmount);
 
       schedules.push({
         assetId,
         month: currentMonth,
         year: currentYear,
-        amount: new Decimal(monthlyAmount),
-        accumulatedTotal: new Decimal(accumulatedTotal),
-        bookValue: new Decimal(Math.max(bookValue, salvageValue)),
+        amount: monthlyAmount,
+        accumulatedTotal,
+        bookValue,
         organizationId,
       });
 
@@ -502,10 +506,11 @@ export class AssetsService {
       orderBy: [{ year: 'desc' }, { month: 'desc' }],
     });
 
+    const salvage = asset.salvageValue;
     let startMonth: number;
     let startYear: number;
-    let currentBookValue: number;
-    let accumulatedTotal: number;
+    let bookValue: Decimal;
+    let accumulatedTotal: Decimal;
 
     if (lastExecuted) {
       startMonth = lastExecuted.month + 1;
@@ -514,14 +519,14 @@ export class AssetsService {
         startMonth = 1;
         startYear++;
       }
-      currentBookValue = lastExecuted.bookValue.toNumber();
-      accumulatedTotal = lastExecuted.accumulatedTotal.toNumber();
+      bookValue = lastExecuted.bookValue;
+      accumulatedTotal = lastExecuted.accumulatedTotal;
     } else {
       const purchaseDate = new Date(asset.purchaseDate);
       startMonth = purchaseDate.getMonth() + 1;
       startYear = purchaseDate.getFullYear();
-      currentBookValue = asset.purchasePrice.toNumber();
-      accumulatedTotal = 0;
+      bookValue = asset.purchasePrice;
+      accumulatedTotal = new Decimal(0);
     }
 
     // Calculate remaining periods
@@ -529,30 +534,30 @@ export class AssetsService {
     const endMonth = purchaseDate.getMonth() + 1;
     const endYear = purchaseDate.getFullYear() + asset.usefulLifeYears;
 
-    const depreciableAmount = currentBookValue - asset.salvageValue.toNumber();
+    const depreciableAmount = bookValue.minus(salvage);
     const remainingMonths = this.monthsBetween(startMonth, startYear, endMonth, endYear);
 
-    if (remainingMonths <= 0 || depreciableAmount <= 0) return;
+    if (remainingMonths <= 0 || depreciableAmount.lessThanOrEqualTo(0)) return;
 
-    const monthlyAmount = depreciableAmount / remainingMonths;
+    const monthlyAmount = roundAmount(depreciableAmount.div(remainingMonths));
     const schedules: Prisma.DepreciationScheduleCreateManyInput[] = [];
 
     let month = startMonth;
     let year = startYear;
-    let bookValue = currentBookValue;
 
     for (let i = 0; i < remainingMonths; i++) {
-      const amount = Math.min(monthlyAmount, bookValue - asset.salvageValue.toNumber());
-      accumulatedTotal += amount;
-      bookValue -= amount;
+      // The final period allocates the residual exactly to salvage
+      const amount = i === remainingMonths - 1 ? bookValue.minus(salvage) : monthlyAmount;
+      accumulatedTotal = accumulatedTotal.plus(amount);
+      bookValue = bookValue.minus(amount);
 
       schedules.push({
         assetId: asset.id,
         month,
         year,
-        amount: new Decimal(amount),
-        accumulatedTotal: new Decimal(accumulatedTotal),
-        bookValue: new Decimal(Math.max(bookValue, asset.salvageValue.toNumber())),
+        amount,
+        accumulatedTotal,
+        bookValue,
         organizationId,
       });
 
