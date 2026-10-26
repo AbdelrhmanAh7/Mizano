@@ -12,8 +12,8 @@ Sentry: no originating Sentry issue supplied in the live issue or its comments.
 ## Verification report
 
 Base: `4770ea7905fa2d21bc51d82da4683f82ad701bba` (fetched `origin/master`).
-Round-1 tested working tree based on `2627a1ec095dd5a246caf0269f4c10463024610f`.
-Spec SHA-256: `b36ab38c82590be30be324cb44a004c906c316a467eeb7cd64ebc014609fc8ba`. These round-1 edits are not yet committed.
+Tested at commit `210481f8dbd6094011b167fabb32500ae927bd80` (clean tree, re-run in the round-2 session: `pnpm --filter api exec jest --maxWorkers=2 src/modules/assets/services/depreciation.service.spec.ts`, 22 passed, exit 0; hashes below re-verified).
+Spec SHA-256: `b36ab38c82590be30be324cb44a004c906c316a467eeb7cd64ebc014609fc8ba`.
 
 Changed covering tests: `apps/api/src/modules/assets/services/depreciation.service.spec.ts`, describe `rounding residue (#512)`, tests prefixed `AC1:` and `AC2:`.
 Fixtures reuse existing Jest/Prisma mocks and Decimal helpers: cost `2500.0000`, accumulated `1012.5000`, book `1487.5001` / `1487.4999`, charge `37.5000`. The fixture asserts each exact signed residue; `lines` verifies Decimal debit/credit equality.
