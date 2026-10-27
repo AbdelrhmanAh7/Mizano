@@ -165,7 +165,7 @@ def validate_evidence_table_status(text: str) -> list[str]:
     return violations
 
 
-LEGACY_EVIDENCE_EXEMPTIONS = {"352"}
+LEGACY_EVIDENCE_EXEMPTIONS = {"352", "414"}
 
 
 def extract_ac5_content(text: str) -> str:
@@ -286,6 +286,100 @@ def validate_evidence_ac5(text: str) -> list[str]:
                     violations.append(
                         f"AC5 verification row failed or is pending: {stripped}"
                     )
+
+    return violations
+
+
+def check_e2e_command_and_output_recorded(
+    text: str, command_indicator: str = "416-bill-rtl-content"
+) -> bool:
+    """Check whether text records the executed E2E command and its output in code blocks."""
+    code_blocks = re.findall(r"```(?:[a-zA-Z0-9_-]+)?\n(.*?)```", text, re.DOTALL)
+    for block in code_blocks:
+        if command_indicator in block:
+            has_exit_or_output = bool(
+                re.search(
+                    r"(?i:exit\s*code\s*[:=]?\s*0|passed|\b0\s+fail(?:ed)?\b|all\s+\d+\s+tests?\s+pass)",
+                    block,
+                )
+            )
+            if has_exit_or_output:
+                return True
+    return False
+
+
+def validate_e2e_evidence_contract(
+    text: str,
+    e2e_criteria: tuple[str, ...] = ("AC1", "AC2", "AC3", "AC4"),
+    command_indicator: str = "416-bill-rtl-content",
+) -> list[str]:
+    """Validate that E2E-dependent criteria are only marked PASSED if the exact E2E command and output are recorded.
+
+    If the evidence document does not record the executed E2E command and output,
+    all criteria in e2e_criteria must remain marked PENDING.
+    """
+    violations = []
+    e2e_recorded = check_e2e_command_and_output_recorded(text, command_indicator)
+
+    lines = text.splitlines()
+    in_table = False
+    headers = []
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            in_table = False
+            headers = []
+            continue
+
+        parts = [p.strip().replace(r"\|", "|") for p in re.split(r"(?<!\\)\|", stripped)[1:-1]]
+        if not parts:
+            continue
+
+        if all(re.match(r"^:?-+:?$", p) for p in parts):
+            continue
+
+        if not in_table:
+            if any(re.search(r"(?i:criterion|ac id|ac\b|status|exit code)", p) for p in parts):
+                headers = [p.lower() for p in parts]
+                in_table = True
+            continue
+
+        if in_table and headers and len(parts) == len(headers):
+            row_dict = dict(zip(headers, parts))
+            ac_val = ""
+            status_val = ""
+            exit_code_val = ""
+
+            for k, v in row_dict.items():
+                if "ac" in k or "criterion" in k or "id" in k:
+                    ac_val = v
+                elif "status" in k:
+                    status_val = v
+                elif "exit code" in k:
+                    exit_code_val = v
+
+            for ac in e2e_criteria:
+                if re.search(rf"(?i:\b{ac}\b)", ac_val):
+                    claims_passed = bool(re.search(r"\bPASSED\b", status_val, re.IGNORECASE))
+                    is_pending = bool(re.search(r"\bPENDING\b", status_val, re.IGNORECASE))
+                    exit_pending = bool(re.search(r"(?i:pending|unrun|awaiting)", exit_code_val))
+
+                    if not e2e_recorded:
+                        if claims_passed:
+                            violations.append(
+                                f"{ac} marked PASSED, but exact E2E command and execution output are not recorded; "
+                                f"must remain PENDING until E2E is executed: {stripped}"
+                            )
+                        elif not is_pending or not exit_pending:
+                            violations.append(
+                                f"{ac} must remain marked PENDING with pending exit code until exact E2E command and output are recorded: {stripped}"
+                            )
+                    else:
+                        if claims_passed and exit_code_val.strip() not in ("0", "`0`"):
+                            violations.append(
+                                f"{ac} claims PASSED but exit code is not 0: {stripped}"
+                            )
 
     return violations
 
@@ -644,8 +738,69 @@ class EvidenceFreshnessTests(unittest.TestCase):
         self.assertIn("AC4", content)
         self.assertIn("AC5", content)
         self.assertIn("Exit Code", content)
-        head_violations = validate_tested_head_binding(content, expected_head_sha="20b6eee")
+        head_violations = validate_tested_head_binding(content, expected_head_sha="3949b50d")
         self.assertEqual(head_violations, [], f"Tested head binding violations: {head_violations}")
+        status_violations = validate_evidence_table_status(content)
+        self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
+        ac5_violations = validate_evidence_ac5(content)
+        self.assertEqual(ac5_violations, [], f"AC5 violations: {ac5_violations}")
+        e2e_violations = validate_e2e_evidence_contract(content)
+        self.assertEqual(e2e_violations, [], f"E2E evidence contract violations: {e2e_violations}")
+
+    def test_validate_e2e_evidence_contract_flags_unrecorded_passed_claims(self):
+        """validate_e2e_evidence_contract flags criteria claiming PASSED when E2E command and output are not recorded."""
+        unrecorded_passed = (
+            "| AC ID | Requirement | Command | Observed Result | Exit Code | Status |\n"
+            "| :--- | :--- | :--- | :--- | :--- | :--- |\n"
+            "| **AC1** | E2E layout check | `e2e-army/416-bill-rtl-content.e2e.ts` | all good | 0 | **PASSED** |\n"
+            "| **AC5** | Quality check | `pnpm lint` | clean | 0 | **PASSED** |\n"
+        )
+        violations = validate_e2e_evidence_contract(unrecorded_passed)
+        self.assertTrue(len(violations) >= 1)
+        self.assertTrue(
+            any("exact E2E command and execution output are not recorded" in v for v in violations)
+        )
+
+    def test_validate_e2e_evidence_contract_passes_when_pending(self):
+        """validate_e2e_evidence_contract passes when E2E criteria are marked PENDING with pending exit code."""
+        pending_table = (
+            "| AC ID | Requirement | Command | Observed Result | Exit Code | Status |\n"
+            "| :--- | :--- | :--- | :--- | :--- | :--- |\n"
+            "| **AC1** | E2E layout check | `e2e-army/416-bill-rtl-content.e2e.ts` | awaiting PR verify gate | Pending | **PENDING** |\n"
+            "| **AC2** | E2E catalog check | `e2e-army/416-bill-rtl-content.e2e.ts` | awaiting PR verify gate | Pending | **PENDING** |\n"
+            "| **AC3** | E2E listbox check | `e2e-army/416-bill-rtl-content.e2e.ts` | awaiting PR verify gate | Pending | **PENDING** |\n"
+            "| **AC4** | E2E LTR check | `e2e-army/416-bill-rtl-content.e2e.ts` | awaiting PR verify gate | Pending | **PENDING** |\n"
+        )
+        violations = validate_e2e_evidence_contract(pending_table)
+        self.assertEqual(violations, [])
+
+    def test_validate_e2e_evidence_contract_passes_when_command_and_output_recorded(self):
+        """validate_e2e_evidence_contract allows PASSED when E2E command and output are recorded."""
+        recorded_evidence = (
+            "## Verification Commands Executed\n\n"
+            "```bash\n"
+            "npx e2e e2e-army/416-bill-rtl-content.e2e.ts\n"
+            "# Exit code: 0 | 4 passed, 0 failed\n"
+            "```\n\n"
+            "| AC ID | Requirement | Command | Observed Result | Exit Code | Status |\n"
+            "| :--- | :--- | :--- | :--- | :--- | :--- |\n"
+            "| **AC1** | E2E layout check | `e2e-army/416-bill-rtl-content.e2e.ts` | 4 passed | 0 | **PASSED** |\n"
+        )
+        violations = validate_e2e_evidence_contract(recorded_evidence)
+        self.assertEqual(violations, [])
+
+    def test_issue_541_evidence_contract(self):
+        """docs/evidence/541/EVIDENCE.md must exist and define AC1-AC5 with exit codes and supersedes notice."""
+        evidence_541 = EVIDENCE_DIR / "541" / "EVIDENCE.md"
+        self.assertTrue(evidence_541.exists(), "docs/evidence/541/EVIDENCE.md must exist")
+        content = evidence_541.read_text(encoding="utf-8")
+        self.assertIn("Supersedes part of #502", content)
+        self.assertIn("AC1", content)
+        self.assertIn("AC2", content)
+        self.assertIn("AC3", content)
+        self.assertIn("AC4", content)
+        self.assertIn("AC5", content)
+        self.assertIn("Exit Code", content)
         status_violations = validate_evidence_table_status(content)
         self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
         ac5_violations = validate_evidence_ac5(content)
@@ -691,7 +846,10 @@ def main() -> int:
         head_violations = validate_tested_head_binding(text)
         table_violations = validate_evidence_table_status(text)
         ac5_violations = validate_evidence_ac5(text)
-        all_violations = head_violations + table_violations + ac5_violations
+        e2e_violations = []
+        if p.parent.name == "416":
+            e2e_violations = validate_e2e_evidence_contract(text)
+        all_violations = head_violations + table_violations + ac5_violations + e2e_violations
 
         if all_violations:
             total_violations += len(all_violations)
