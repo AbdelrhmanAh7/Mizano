@@ -651,6 +651,48 @@ class EvidenceFreshnessTests(unittest.TestCase):
         ac5_violations = validate_evidence_ac5(content)
         self.assertEqual(ac5_violations, [], f"AC5 violations: {ac5_violations}")
 
+    def test_issue_531_evidence_contract(self):
+        """docs/evidence/531/EVIDENCE.md must exist with AC1-AC4, exit codes, a supersedes notice,
+        a valid tested head SHA that matches the current branch HEAD (dynamically, never hard-coded),
+        and all table rows free of contradictory or premature-PASSED status.
+
+        The tested head is read from git at runtime so the contract remains valid across commits
+        without requiring a manual SHA update (root cause of the PR-#497 blocker: #531).
+        """
+        import subprocess
+
+        evidence_531 = EVIDENCE_DIR / "531" / "EVIDENCE.md"
+        self.assertTrue(evidence_531.exists(), "docs/evidence/531/EVIDENCE.md must exist")
+        content = evidence_531.read_text(encoding="utf-8")
+
+        # Structural requirements
+        self.assertIn("Supersedes part of #497", content)
+        self.assertIn("AC1", content)
+        self.assertIn("AC2", content)
+        self.assertIn("AC3", content)
+        self.assertIn("AC4", content)
+        self.assertIn("Exit Code", content)
+
+        # Tested head must match the *current* branch HEAD — never a hard-coded SHA.
+        # Reading HEAD dynamically means this test stays correct through every future commit.
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=str(ROOT),
+        )
+        self.assertEqual(result.returncode, 0, "git rev-parse HEAD must succeed")
+        current_head = result.stdout.strip()
+        head_violations = validate_tested_head_binding(content, expected_head_sha=current_head)
+        self.assertEqual(
+            head_violations,
+            [],
+            f"Tested head binding violations (current HEAD={current_head}): {head_violations}",
+        )
+
+        status_violations = validate_evidence_table_status(content)
+        self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
+
     def test_cli_validation_mode_succeeds_on_compliant_file(self):
         """CLI mode validates compliant evidence file and outputs PASS with exit code 0."""
         import subprocess
