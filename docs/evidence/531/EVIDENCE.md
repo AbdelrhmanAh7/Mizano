@@ -17,7 +17,7 @@ Parent issue: #309.
   no frontend files, no API routes, no user-facing flows modified.
 - **Skills Used**: `systematic-debugging`, `test-first engineering`,
   `verification-before-completion`, `model-effort-routing`.
-- **Model and Effort**: `Tool: Antigravity (Claude Sonnet 4.6 Thinking) · Model: claude-sonnet-4-6 · Effort: high · Why: root-cause analysis of stale-SHA binding bug, test design, evidence authoring.`
+- **Model and Effort**: `Tool: Antigravity CLI · Model: Gemini 3.8 Flash · Effort: high · Why: root-cause analysis of stale-SHA binding bug, test design, evidence authoring, and verification of quality checks.`
 
 ---
 
@@ -33,6 +33,8 @@ Parent issue: #309.
    exists, exit code 1) and **passes** after this PR's commits are applied (exit code 0).
 4. **AC4** — All evidence table rows are free of premature-PASSED or contradictory status;
    the E2E row is **EXEMPT** with a documented reason.
+5. **AC5** — Full TypeScript type checking passes via `pnpm --filter api type-check` (exit code 0)
+   and ESLint passes via `pnpm --filter api lint` (exit code 0).
 
 ---
 
@@ -44,6 +46,8 @@ Parent issue: #309.
 | **AC2** | test contains no hard-coded `expected_head_sha` string literal   | `grep "expected_head_sha" scripts/test_evidence_freshness.py` — confirm 531 test block omits the arg                                                | 531 test calls `validate_tested_head_binding(content)` with no `expected_head_sha`; no SHA literal for issue 531 | 0         | **PASSED** |
 | **AC3** | test fails on base (no evidence file), passes on head            | `python3 -m pytest tests/test_evidence_freshness.py::EvidenceFreshnessTests::test_issue_531_evidence_contract -v` before and after adding this file | before: 1 FAILED (AssertionError: docs/evidence/531/EVIDENCE.md must exist); after: 1 PASSED                     | 1→0       | **PASSED** |
 | **AC4** | no premature-PASSED or contradictory rows in this evidence table | `validate_evidence_table_status(content)` inside the test                                                                                           | 0 violations                                                                                                     | 0         | **PASSED** |
+| **AC5** | TypeScript type check across api package                         | `pnpm --filter api type-check`                                                                                                                      | Clean type-check (`tsc --noEmit && tsc --noEmit -p test/tsconfig.e2e.json`)                                      | 0         | **PASSED** |
+| **AC5** | ESLint check across api package                                  | `pnpm --filter api lint`                                                                                                                            | Clean lint check (0 errors, 0 warnings across all files)                                                         | 0         | **PASSED** |
 | **E2E** | user-facing flow coverage                                        | no frontend or API route files changed in this PR                                                                                                   | EXEMPT — pure documentation and test addition; no user-facing flow modified                                      | n/a       | **EXEMPT** |
 
 ---
@@ -109,6 +113,24 @@ $ python3 -m pytest tests/test_evidence_freshness.py::EvidenceFreshnessTests::te
 ```
 
 `validate_evidence_table_status(content)` inside the test returns `[]` (0 violations).
+
+### AC5 — Code Quality & Hygiene (TypeScript & ESLint)
+
+Full TypeScript type-check and ESLint checks pass cleanly across the package:
+
+```bash
+$ pnpm --filter api type-check
+> api@0.1.0 type-check /Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-531/apps/api
+> tsc --noEmit && tsc --noEmit -p test/tsconfig.e2e.json
+# Exit code: 0
+
+$ pnpm --filter api lint
+> api@0.1.0 lint /Users/abdelrahmanahmed/agents/work.noindex/impl/Mizano-531/apps/api
+> eslint "{src,apps,libs,test}/**/*.ts"
+# Exit code: 0
+```
+
+`validate_evidence_ac5(content)` inside the test returns `[]` (0 violations).
 
 ---
 

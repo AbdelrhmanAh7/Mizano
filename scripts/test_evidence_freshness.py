@@ -652,7 +652,7 @@ class EvidenceFreshnessTests(unittest.TestCase):
         self.assertEqual(ac5_violations, [], f"AC5 violations: {ac5_violations}")
 
     def test_issue_531_evidence_contract(self):
-        """docs/evidence/531/EVIDENCE.md must exist with AC1-AC4, exit codes, a supersedes notice,
+        """docs/evidence/531/EVIDENCE.md must exist with AC1-AC5, exit codes, a supersedes notice,
         and a valid tested head SHA (format-checked; no hard-coded SHA expected in this test).
 
         This PR is a documentation-and-test fix (no production code changed), so the tested head
@@ -670,6 +670,7 @@ class EvidenceFreshnessTests(unittest.TestCase):
         self.assertIn("AC2", content)
         self.assertIn("AC3", content)
         self.assertIn("AC4", content)
+        self.assertIn("AC5", content)
         self.assertIn("Exit Code", content)
 
         # Validate tested head SHA is present and correctly formatted (no hard-coded comparison).
@@ -681,6 +682,9 @@ class EvidenceFreshnessTests(unittest.TestCase):
 
         status_violations = validate_evidence_table_status(content)
         self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
+
+        ac5_violations = validate_evidence_ac5(content)
+        self.assertEqual(ac5_violations, [], f"AC5 violations: {ac5_violations}")
 
     def test_cli_validation_mode_succeeds_on_compliant_file(self):
         """CLI mode validates compliant evidence file and outputs PASS with exit code 0."""
