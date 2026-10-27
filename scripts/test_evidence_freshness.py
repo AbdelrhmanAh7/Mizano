@@ -801,6 +801,8 @@ class EvidenceFreshnessTests(unittest.TestCase):
         self.assertIn("AC4", content)
         self.assertIn("AC5", content)
         self.assertIn("Exit Code", content)
+        head_violations = validate_tested_head_binding(content, expected_head_sha="3808cd97")
+        self.assertEqual(head_violations, [], f"Tested head binding violations: {head_violations}")
         status_violations = validate_evidence_table_status(content)
         self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
         ac5_violations = validate_evidence_ac5(content)
