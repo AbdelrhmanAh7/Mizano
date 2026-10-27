@@ -673,6 +673,25 @@ class EvidenceFreshnessTests(unittest.TestCase):
                 f"{path.relative_to(ROOT)} must use Unix LF line endings, not Windows CRLF",
             )
 
+    def test_issue_540_evidence_contract(self):
+        """docs/evidence/540/EVIDENCE.md must exist and define AC1-AC5 with exit codes and supersedes notice."""
+        evidence_540 = EVIDENCE_DIR / "540" / "EVIDENCE.md"
+        self.assertTrue(evidence_540.exists(), "docs/evidence/540/EVIDENCE.md must exist")
+        content = evidence_540.read_text(encoding="utf-8")
+        self.assertIn("Supersedes part of #502", content)
+        self.assertIn("AC1", content)
+        self.assertIn("AC2", content)
+        self.assertIn("AC3", content)
+        self.assertIn("AC4", content)
+        self.assertIn("AC5", content)
+        self.assertIn("Exit Code", content)
+        head_violations = validate_tested_head_binding(content, expected_head_sha="0681efa")
+        self.assertEqual(head_violations, [], f"Tested head binding violations: {head_violations}")
+        status_violations = validate_evidence_table_status(content)
+        self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
+        ac5_violations = validate_evidence_ac5(content)
+        self.assertEqual(ac5_violations, [], f"AC5 violations: {ac5_violations}")
+
     def test_cli_validation_mode_succeeds_on_compliant_file(self):
         """CLI mode validates compliant evidence file and outputs PASS with exit code 0."""
         import subprocess
