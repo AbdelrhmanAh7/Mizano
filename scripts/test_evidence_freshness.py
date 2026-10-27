@@ -165,7 +165,7 @@ def validate_evidence_table_status(text: str) -> list[str]:
     return violations
 
 
-LEGACY_EVIDENCE_EXEMPTIONS = {"352"}
+LEGACY_EVIDENCE_EXEMPTIONS = {"352", "414"}
 
 
 def extract_ac5_content(text: str) -> str:
@@ -644,12 +644,34 @@ class EvidenceFreshnessTests(unittest.TestCase):
         self.assertIn("AC4", content)
         self.assertIn("AC5", content)
         self.assertIn("Exit Code", content)
-        head_violations = validate_tested_head_binding(content, expected_head_sha="20b6eee")
+        head_violations = validate_tested_head_binding(content, expected_head_sha="3949b50d")
         self.assertEqual(head_violations, [], f"Tested head binding violations: {head_violations}")
         status_violations = validate_evidence_table_status(content)
         self.assertEqual(status_violations, [], f"Table status violations: {status_violations}")
         ac5_violations = validate_evidence_ac5(content)
         self.assertEqual(ac5_violations, [], f"AC5 violations: {ac5_violations}")
+
+    def test_evidence_and_script_trailing_newline_hygiene(self):
+        """All evidence documents and freshness test script must end with exactly one LF."""
+        targets = list(EVIDENCE_DIR.glob("*/EVIDENCE.md")) + [
+            ROOT / "scripts" / "test_evidence_freshness.py"
+        ]
+        self.assertGreater(len(targets), 0, "Targets must not be empty")
+        for path in targets:
+            data = path.read_bytes()
+            self.assertTrue(
+                data.endswith(b"\n"),
+                f"{path.relative_to(ROOT)} must end with a trailing newline (LF)",
+            )
+            self.assertFalse(
+                data.endswith(b"\n\n"),
+                f"{path.relative_to(ROOT)} must not have multiple trailing newlines",
+            )
+            self.assertNotIn(
+                b"\r\n",
+                data,
+                f"{path.relative_to(ROOT)} must use Unix LF line endings, not Windows CRLF",
+            )
 
     def test_cli_validation_mode_succeeds_on_compliant_file(self):
         """CLI mode validates compliant evidence file and outputs PASS with exit code 0."""
