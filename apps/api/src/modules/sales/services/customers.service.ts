@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
@@ -7,6 +7,7 @@ import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { runBulk } from '../../../common/utils/run-bulk';
 import { AgingReportsService } from '../../reports/services/aging-reports.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { WebhookOutboxService } from '../../integrations/services/webhook-outbox.service';
 import { CreateCustomerDto } from '../dto/create-customer.dto';
 import { UpdateCustomerDto } from '../dto/update-customer.dto';
 
@@ -15,27 +16,31 @@ export class CustomersService {
   constructor(
     private prisma: PrismaService,
     private agingReports: AgingReportsService,
+    @Optional() private outbox?: WebhookOutboxService,
   ) {}
 
   async create(organizationId: string, createCustomerDto: CreateCustomerDto) {
-    const customer = await this.prisma.customer.create({
-      data: {
-        ...createCustomerDto,
-        billingStreet: createCustomerDto.billingAddress?.street,
-        billingCity: createCustomerDto.billingAddress?.city,
-        billingState: createCustomerDto.billingAddress?.state,
-        billingPostalCode: createCustomerDto.billingAddress?.postalCode,
-        billingCountry: createCustomerDto.billingAddress?.country,
-        shippingStreet: createCustomerDto.shippingAddress?.street,
-        shippingCity: createCustomerDto.shippingAddress?.city,
-        shippingState: createCustomerDto.shippingAddress?.state,
-        shippingPostalCode: createCustomerDto.shippingAddress?.postalCode,
-        shippingCountry: createCustomerDto.shippingAddress?.country,
-        organizationId,
-      },
+    // One transaction so the customer.created outbox event commits with the customer.
+    return this.prisma.$transaction(async (tx) => {
+      const customer = await tx.customer.create({
+        data: {
+          ...createCustomerDto,
+          billingStreet: createCustomerDto.billingAddress?.street,
+          billingCity: createCustomerDto.billingAddress?.city,
+          billingState: createCustomerDto.billingAddress?.state,
+          billingPostalCode: createCustomerDto.billingAddress?.postalCode,
+          billingCountry: createCustomerDto.billingAddress?.country,
+          shippingStreet: createCustomerDto.shippingAddress?.street,
+          shippingCity: createCustomerDto.shippingAddress?.city,
+          shippingState: createCustomerDto.shippingAddress?.state,
+          shippingPostalCode: createCustomerDto.shippingAddress?.postalCode,
+          shippingCountry: createCustomerDto.shippingAddress?.country,
+          organizationId,
+        },
+      });
+      await this.outbox?.customerCreated(tx, organizationId, customer);
+      return customer;
     });
-
-    return customer;
   }
 
   async findAll(organizationId: string, query: PaginationDto) {

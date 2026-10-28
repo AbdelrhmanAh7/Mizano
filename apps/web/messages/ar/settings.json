@@ -54,6 +54,10 @@
     "auditLogs": {
       "title": "سجل التدقيق",
       "description": "تتبع جميع إجراءات المستخدمين والتغييرات عبر النظام"
+    },
+    "flowline": {
+      "title": "الربط مع FlowLine",
+      "description": "مفاتيح API وويب هوكات موقّعة وسجل التسليم لأتمتة FlowLine"
     }
   },
   "organization": {
@@ -568,5 +572,92 @@
       "system": "النظام"
     },
     "language": "اللغة"
+  },
+  "flowline": {
+    "title": "الربط مع FlowLine",
+    "description": "اسمح لأتمتة FlowLine بالاستجابة لأحداث ميزانو وتنفيذ إجراءات فيه بمفتاح محدود الصلاحيات.",
+    "back": "العودة إلى الإعدادات",
+    "copy": "نسخ",
+    "copied": "تم النسخ",
+    "done": "تم",
+    "cancel": "إلغاء",
+    "retry": "إعادة المحاولة",
+    "error": "حدث خطأ ما",
+    "loadFailed": "تعذر تحميل هذا القسم.",
+    "name": "الاسم",
+    "status": "الحالة",
+    "encryptionMissing": "لا يمكن حفظ مفاتيح توقيع الويب هوك حتى يضبط مسؤول الخادم المتغير INTEGRATIONS_ENCRYPTION_KEY في الواجهة الخلفية.",
+    "step1": {
+      "title": "١. من FlowLine إلى ميزانو (مفتاح API)",
+      "description": "أنشئ مفتاحًا والصقه مع عنوان الواجهة في اتصال ميزانو داخل FlowLine.",
+      "baseUrl": "عنوان واجهة ميزانو لـ FlowLine",
+      "newKey": "مفتاح API الجديد",
+      "newKeyWarning": "انسخه الآن: لن يظهر مرة أخرى. أي شخص يملك هذا المفتاح يمكنه التصرف ضمن صلاحياته.",
+      "scopes": "الإجراءات المسموح بها",
+      "create": "إنشاء مفتاح API",
+      "empty": "لا توجد مفاتيح بعد.",
+      "prefix": "المفتاح",
+      "lastUsed": "آخر استخدام",
+      "active": "نشط",
+      "revoked": "ملغى",
+      "revoke": "إلغاء المفتاح",
+      "revokeTitle": "إلغاء هذا المفتاح؟",
+      "revokeDescription": "ستتوقف تدفقات FlowLine التي تستخدمه فورًا. لا يمكن التراجع عن ذلك.",
+      "howToUse": "يرسله FlowLine في الترويسة \"Authorization: Bearer <المفتاح>\". تعمل المفاتيح بصلاحيات دورك."
+    },
+    "step2": {
+      "title": "٢. من ميزانو إلى FlowLine (الأحداث)",
+      "description": "في FlowLine أضف مشغّل ميزانو إلى تدفق، ثم الصق رابط الويب هوك ومفتاح التوقيع هنا.",
+      "url": "رابط ويب هوك FlowLine",
+      "secret": "مفتاح التوقيع (whsec_…)",
+      "events": "الأحداث المرسلة",
+      "add": "إضافة ويب هوك",
+      "saved": "تم حفظ الويب هوك",
+      "empty": "لا توجد ويب هوكات بعد.",
+      "secretHint": "المفتاح",
+      "enabled": "مفعّل",
+      "test": "إرسال تجربة",
+      "testOk": "قبل FlowLine حدث التجربة (HTTP {code})",
+      "testFailed": "لم يُقبل حدث التجربة",
+      "delete": "حذف",
+      "deleteTitle": "حذف هذا الويب هوك؟",
+      "deleteDescription": "سيتوقف ميزانو عن إرسال الأحداث إليه وستفشل عمليات التسليم المنتظرة."
+    },
+    "log": {
+      "title": "سجل التسليم",
+      "description": "كل حدث أُرسل إلى FlowLine مع إعادة المحاولات. يمكن إعادة إرسال ما فشل؛ يتجاهل FlowLine التكرار.",
+      "empty": "لم يُرسل شيء بعد.",
+      "event": "الحدث",
+      "endpoint": "الويب هوك",
+      "attempts": "المحاولات",
+      "result": "آخر نتيجة",
+      "time": "الوقت",
+      "testEvent": "حدث تجريبي",
+      "redeliver": "إعادة الإرسال",
+      "nextAttempt": "المحاولة التالية {time}",
+      "status": {
+        "PENDING": "في الانتظار",
+        "DELIVERING": "جارٍ الإرسال",
+        "SUCCEEDED": "تم التسليم",
+        "FAILED": "فشل",
+        "RETRYING": "إعادة المحاولة"
+      }
+    },
+    "scopes": {
+      "customers_read": "قراءة العملاء",
+      "customers_write": "إنشاء عملاء",
+      "invoices_read": "قراءة الفواتير",
+      "invoices_write": "إنشاء مسودات فواتير",
+      "balances_read": "قراءة الأرصدة",
+      "notes_write": "إضافة ملاحظات"
+    },
+    "events": {
+      "customer_created": "إنشاء عميل",
+      "invoice_created": "إنشاء فاتورة",
+      "invoice_sent": "إرسال فاتورة",
+      "invoice_paid": "سداد فاتورة",
+      "invoice_overdue": "فاتورة متأخرة",
+      "payment_received": "استلام دفعة"
+    }
   }
 }

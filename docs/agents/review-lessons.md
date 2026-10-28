@@ -85,6 +85,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **Never log or audit values:** no document text, amounts, tax ids, LLM output, query parameters or raw error objects. Log metadata instead (ids, counts, lengths, durations, field names, status), and use `describeError(error, { includeMessage: false })` wherever an error message could contain document or user data. `redactText` only masks credential-shaped strings, so it does not make document text safe to log.
 - **Clients can't claim trusted provenance.** HTTP log captures are forced to `FRONTEND`.
+- **Outbound requests to customer-supplied URLs are an SSRF vector.** Require HTTPS, resolve DNS and refuse loopback, link-local, private and CGNAT addresses at save time and again before every attempt, and never follow redirects. With Node's `BlockList`, do not add `::ffff:0:0/96`: it matches every plain IPv4 address; unwrap IPv4-mapped addresses instead. _(FlowLine webhooks)_
 - **Compare secrets in constant time, with no default secrets.** Re-apply file permissions on files that already exist.
 - **Never commit hard-coded sensitive credentials or plaintext passwords in e2e tests or test fixtures.** Source credentials dynamically from environment variables (`process.env.E2E_LOGIN_EMAIL`, `process.env.E2E_LOGIN_PASSWORD`) or generate throwaway credentials dynamically. Hard-coded credentials (`admin@mizano.com` / `password123`) fail repository security hygiene and automated review checks. _(#465)_
 

@@ -474,6 +474,14 @@ model Organization {
   users                 User[]
   intakeJobs            IntakeJob[]
   roles                 Role[]
+
+  // External integrations (FlowLine): API keys, outbound webhooks, delivery log, notes
+  integrationApiKeys         IntegrationApiKey[]
+  webhookEndpoints           WebhookEndpoint[]
+  webhookEvents              WebhookEvent[]
+  webhookDeliveries          WebhookDelivery[]
+  integrationNotes           IntegrationNote[]
+  integrationIdempotencyKeys IntegrationIdempotencyKey[]
   accounts              Account[]
   journals              Journal[]
   recurringProfiles     RecurringProfile[]
@@ -3061,4 +3069,166 @@ model IntakeJob {
   @@index([organizationId, status])
   @@index([organizationId, createdAt])
   @@map("intake_jobs")
+}
+
+// ============================================
+// EXTERNAL INTEGRATIONS (FlowLine connector)
+// ============================================
+
+/// Machine credential for an external system. Only the SHA-256 of the key is stored; the
+/// plaintext is shown once at creation. Requests act as `createdById` (its role still applies)
+/// and are further limited to `scopes`.
+model IntegrationApiKey {
+  id                 String    @id @default(cuid())
+  organizationId     String
+  createdById        String
+  name               String
+  /// First characters of the key ("mzk_AbCdEfGh") so people can tell keys apart.
+  prefix             String
+  /// sha256 hex of the full key.
+  keyHash            String    @unique
+  scopes             String[]
+  rateLimitPerMinute Int       @default(120)
+  lastUsedAt         DateTime?
+  expiresAt          DateTime?
+  revokedAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, revokedAt])
+  @@map("integration_api_keys")
+}
+
+/// A receiver (e.g. a FlowLine webhook trigger) for signed outbound events.
+model WebhookEndpoint {
+  id             String    @id @default(cuid())
+  organizationId String
+  createdById    String
+  name           String
+  url            String
+  /// AES-256-GCM ciphertext of the signing secret (organization + endpoint id bound as AAD).
+  secretCiphertext String
+  /// "whs…ab12": enough to recognise the secret, never enough to use it.
+  secretHint     String
+  eventTypes     String[]
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deliveries   WebhookDelivery[]
+
+  @@index([organizationId, deletedAt, isActive])
+  @@map("webhook_endpoints")
+}
+
+/// Transactional outbox row: written in the same transaction as the business change.
+/// `id` is the stable event id sent as x-flowline-event-id on every attempt.
+model WebhookEvent {
+  id             String   @id
+  organizationId String
+  type           String
+  /// Exact JSON body sent to receivers (stored as text so every attempt sends the same bytes).
+  payload        String
+  /// Optional business dedupe key (e.g. one overdue notice per invoice and due date).
+  dedupeKey      String?
+  createdAt      DateTime @default(now())
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deliveries   WebhookDelivery[]
+
+  @@unique([organizationId, dedupeKey])
+  @@index([organizationId, createdAt])
+  @@map("webhook_events")
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  DELIVERING
+  SUCCEEDED
+  FAILED
+}
+
+/// One event to one endpoint, with retry state. Attempts are logged in WebhookDeliveryAttempt.
+model WebhookDelivery {
+  id             String                @id @default(cuid())
+  organizationId String
+  eventId        String
+  endpointId     String
+  status         WebhookDeliveryStatus @default(PENDING)
+  attempts       Int                   @default(0)
+  maxAttempts    Int                   @default(8)
+  nextAttemptAt  DateTime              @default(now())
+  /// Claim lease while DELIVERING; an expired lease is picked up again (crash recovery).
+  lockedUntil    DateTime?
+  lastStatusCode Int?
+  /// Short, redacted reason (status line / network error class); never the payload.
+  lastError      String?
+  deliveredAt    DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  organization     Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  event            WebhookEvent             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  endpoint         WebhookEndpoint          @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  attemptLog       WebhookDeliveryAttempt[]
+
+  @@unique([eventId, endpointId])
+  @@index([status, nextAttemptAt])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, endpointId, createdAt])
+  @@map("webhook_deliveries")
+}
+
+model WebhookDeliveryAttempt {
+  id          String   @id @default(cuid())
+  deliveryId  String
+  attempt     Int
+  statusCode  Int?
+  error       String?
+  durationMs  Int
+  createdAt   DateTime @default(now())
+
+  delivery WebhookDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@index([deliveryId, attempt])
+  @@map("webhook_delivery_attempts")
+}
+
+/// A note an integration attached to a customer or invoice (e.g. "reminder sent on WhatsApp").
+model IntegrationNote {
+  id             String   @id @default(cuid())
+  organizationId String
+  apiKeyId       String
+  entityType     String
+  entityId       String
+  body           String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, entityType, entityId, createdAt], map: "integration_notes_org_entity_idx")
+  @@map("integration_notes")
+}
+
+/// Replay store for POSTs with an Idempotency-Key header, per API key.
+model IntegrationIdempotencyKey {
+  id             String   @id @default(cuid())
+  organizationId String
+  apiKeyId       String
+  key            String
+  requestHash    String
+  /// null while the first request is still running.
+  responseStatus Int?
+  responseBody   Json?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([apiKeyId, key])
+  @@index([createdAt])
+  @@map("integration_idempotency_keys")
 }

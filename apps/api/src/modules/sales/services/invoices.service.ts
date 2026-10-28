@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InvoiceStatus, Prisma, TaxType } from '@prisma/client';
@@ -14,6 +15,7 @@ import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 import { runBulk } from '../../../common/utils/run-bulk';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
+import { WebhookOutboxService } from '../../integrations/services/webhook-outbox.service';
 import { CreateInvoiceDto, InvoiceLineDto } from '../dto/create-invoice.dto';
 import { InvoiceCursorQueryDto } from '../dto/invoice-cursor-query.dto';
 import { InvoiceQueryDto } from '../dto/invoice-query.dto';
@@ -54,6 +56,8 @@ export class InvoicesService {
   constructor(
     private prisma: PrismaService,
     private journalsService: JournalsService,
+    // Outbound integration events, written in the same transaction (absent in the worker).
+    @Optional() private outbox?: WebhookOutboxService,
   ) {}
 
   /**
@@ -72,7 +76,7 @@ export class InvoicesService {
     const run = async (tx: Prisma.TransactionClient) => {
       await this.assertReferences(tx, organizationId, dto, dto.customerId);
       const invoiceNumber = await allocateInvoiceNumber(tx, organizationId);
-      return tx.invoice.create({
+      const invoice = await tx.invoice.create({
         data: {
           invoiceNumber,
           customerId: dto.customerId,
@@ -92,6 +96,8 @@ export class InvoicesService {
         },
         include: INVOICE_VIEW_INCLUDE,
       });
+      await this.outbox?.invoiceEvent(tx, organizationId, 'invoice.created', invoice.id);
+      return invoice;
     };
 
     try {
@@ -411,6 +417,7 @@ export class InvoicesService {
         },
         { tx, source: { type: JournalSourceType.INVOICE_SEND, id: invoice.id } },
       );
+      await this.outbox?.invoiceEvent(tx, organizationId, 'invoice.sent', invoice.id);
 
       return tx.invoice.findUniqueOrThrow({ where: { id }, include: INVOICE_VIEW_INCLUDE });
     });
@@ -541,6 +548,11 @@ export class InvoicesService {
     else status = InvoiceStatus.SENT;
 
     await tx.invoice.update({ where: { id: invoiceId }, data: { balanceDue: balance, status } });
+    // Every settlement path (payments, bulk pay, credit notes, bank matching) lands here, so
+    // this is the one place that announces the transition to PAID.
+    if (status === InvoiceStatus.PAID && invoice.status !== InvoiceStatus.PAID) {
+      await this.outbox?.invoiceEvent(tx, invoice.organizationId, 'invoice.paid', invoiceId);
+    }
   }
 
   /** Locks one invoice row, but only if it belongs to the organization (404 otherwise). */
@@ -632,7 +644,7 @@ export class InvoicesService {
     try {
       return await this.prisma.$transaction(async (tx) => {
         const invoiceNumber = await allocateInvoiceNumber(tx, organizationId);
-        return tx.invoice.create({
+        const copy = await tx.invoice.create({
           data: {
             invoiceNumber,
             customerId: original.customerId,
@@ -662,6 +674,8 @@ export class InvoicesService {
           },
           include: INVOICE_VIEW_INCLUDE,
         });
+        await this.outbox?.invoiceEvent(tx, organizationId, 'invoice.created', copy.id);
+        return copy;
       });
     } catch (error) {
       throw mapDocumentNumberConflict(error, 'Invoice');

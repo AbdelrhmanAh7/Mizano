@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { CreditNoteType, PaymentMode, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
@@ -7,6 +7,7 @@ import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { runBulk } from '../../../common/utils/run-bulk';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
+import { WebhookOutboxService } from '../../integrations/services/webhook-outbox.service';
 import { CreatePaymentReceivedDto } from '../dto/create-payment-received.dto';
 import { PaymentReceivedQueryDto } from '../dto/payment-received-query.dto';
 import { RecordInvoicePaymentDto } from '../dto/record-invoice-payment.dto';
@@ -35,6 +36,7 @@ export class PaymentsReceivedService {
     private prisma: PrismaService,
     private invoicesService: InvoicesService,
     private journalsService: JournalsService,
+    @Optional() private outbox?: WebhookOutboxService,
   ) {}
 
   /**
@@ -152,6 +154,7 @@ export class PaymentsReceivedService {
         },
         { tx, source: { type: JournalSourceType.PAYMENT_RECEIVED, id: payment.id } },
       );
+      await this.outbox?.paymentReceived(tx, organizationId, payment.id);
 
       return payment;
     };
