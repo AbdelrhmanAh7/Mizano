@@ -66,6 +66,23 @@ dc stop postgres >"$work/source-stop.log" 2>&1
 mv "$DATA_DIR/originals" "$DATA_DIR/source-originals-unavailable"
 printf 'fixture organizations=2 originals=4 journals=2 linked_drafts=4 source_database_stopped=1\n'
 "$here/restore-drill.sh"
+# A preserved but incomplete approval must not become a successful recovery claim.
+dc start postgres >/dev/null 2>&1
+for _ in $(seq 1 60); do
+  if dc exec -T postgres pg_isready -h 127.0.0.1 -U postgres -d source >/dev/null 2>&1; then break; fi
+  sleep 1
+done
+dc exec -T postgres psql -Xq -v ON_ERROR_STOP=1 -U postgres -d source \
+  -c 'UPDATE intake_jobs SET "draftDocumentId"=NULL WHERE id=(SELECT id FROM intake_jobs ORDER BY id LIMIT 1)' >/dev/null
+mv "$DATA_DIR/source-originals-unavailable" "$DATA_DIR/originals"
+"$here/backup.sh" >/dev/null
+dc stop postgres >/dev/null 2>&1
+if "$here/restore-drill.sh" >"$work/negative-check.log" 2>&1; then
+  echo "fixture failed: incomplete approval incorrectly passed" >&2
+  exit 1
+fi
+grep -q 'unbalanced ledger or broken tenant/document/journal links' "$work/negative-check.log"
+printf 'incomplete_approval_negative_check=passed\n'
 cleanup || { echo 'fixture cleanup failed' >&2; exit 1; }
 trap - EXIT
 printf 'restic_check_read_data=passed source_project_cleanup=passed\n'

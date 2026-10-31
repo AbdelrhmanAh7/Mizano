@@ -38,6 +38,7 @@ SELECT jsonb_build_object(
       WHERE j."isPosted" AND j."deletedAt" IS NULL GROUP BY 1 HAVING sum(l.debit)<>sum(l.credit)
     ) bad),
     'foreignJournalAccounts', (SELECT count(*) FROM journal_lines l JOIN journals j ON j.id=l."journalId" JOIN accounts a ON a.id=l."accountId" WHERE a."organizationId"<>j."organizationId"),
+    'unlinkedApprovedJobs', (SELECT count(*) FROM intake_jobs WHERE status='APPROVED' AND "draftDocumentId" IS NULL),
     'brokenDrafts', (SELECT count(*) FROM linked WHERE bill_id IS NULL AND invoice_id IS NULL),
     'brokenPostedLinks', (SELECT count(*) FROM linked k WHERE
       ((bill_id IS NOT NULL AND bill_status IN ('OPEN','PARTIALLY_PAID','PAID','OVERDUE','VOID')) OR (invoice_id IS NOT NULL AND invoice_status<>'DRAFT'))
