@@ -113,6 +113,7 @@ describe('/timesheets over HTTP (app ValidationPipe and AllExceptionsFilter)', (
   it('a malformed weekStart is a 400, not an invalid date in Prisma', async () => {
     const res = await request(app.getHttpServer())
       .get('/timesheets/weekly-summary?weekStart=monday')
+      .set('Accept-Language', 'en')
       .expect(400);
     expect(res.body.code).toBe('VALIDATION_ERROR');
     expect(Object.keys(res.body.details)).toEqual(['weekStart']);
@@ -121,6 +122,7 @@ describe('/timesheets over HTTP (app ValidationPipe and AllExceptionsFilter)', (
   it('a bad entry body is a 400 VALIDATION_ERROR with per-field details (was a 500)', async () => {
     const res = await request(app.getHttpServer())
       .post('/timesheets')
+      .set('Accept-Language', 'en')
       .send({ projectId: 'p1', date: 'yesterday', hours: '-2', userId: 'someone-else' })
       .expect(400);
     expect(res.body.code).toBe('VALIDATION_ERROR');
@@ -134,6 +136,7 @@ describe('/timesheets over HTTP (app ValidationPipe and AllExceptionsFilter)', (
   it('a valid entry reaches the service as the DTO, scoped to the caller', async () => {
     await request(app.getHttpServer())
       .post('/timesheets')
+      .set('Accept-Language', 'en')
       .send({ projectId: 'p1', taskId: 't1', date: '2026-10-31', hours: '1.50' })
       .expect(201);
     expect(service.create).toHaveBeenCalledWith(
@@ -146,6 +149,7 @@ describe('/timesheets over HTTP (app ValidationPipe and AllExceptionsFilter)', (
   it('the timer body is validated too', async () => {
     const res = await request(app.getHttpServer())
       .post('/timesheets/timer/start')
+      .set('Accept-Language', 'en')
       .send({ taskId: 't1' })
       .expect(400);
     expect(Object.keys(res.body.details)).toEqual(['projectId']);

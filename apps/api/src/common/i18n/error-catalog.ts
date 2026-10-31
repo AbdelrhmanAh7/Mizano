@@ -248,6 +248,7 @@ const AUTH_ERRORS: ErrorCatalogEntry[] = [
   },
   { code: 'ORGANIZATION_NOT_FOUND', en: 'Organization not found', ar: 'المنشأة غير موجودة.' },
   { code: 'USER_NOT_FOUND', en: 'User not found', ar: 'المستخدم غير موجود.' },
+  { code: 'ASSIGNEE_NOT_FOUND', en: 'Assigned user not found', ar: 'المستخدم المكلَّف غير موجود.' },
   { code: 'ROLE_NOT_FOUND', en: 'Role not found', ar: 'الدور غير موجود.' },
   { code: 'ROLE_INVALID', en: 'Invalid role', ar: 'الدور غير صالح.' },
   {
@@ -1550,6 +1551,11 @@ const BANKING_ERRORS: ErrorCatalogEntry[] = [
 /** Items, warehouses, stock moves, price lists, BOMs and work orders. */
 const INVENTORY_ERRORS: ErrorCatalogEntry[] = [
   { code: 'ITEM_NOT_FOUND', en: 'Item not found', ar: 'الصنف غير موجود.' },
+  {
+    code: 'COMPOSITE_COMPONENT_DUPLICATE',
+    en: 'Each item can appear only once in a composite item',
+    ar: 'لا يمكن تكرار الصنف نفسه داخل الصنف المركّب.',
+  },
   { code: 'ITEM_ID_NOT_FOUND', en: 'Item {id} not found', ar: 'الصنف {id} غير موجود.' },
   {
     code: 'ITEM_NOT_FOUND_BY_SKU',
