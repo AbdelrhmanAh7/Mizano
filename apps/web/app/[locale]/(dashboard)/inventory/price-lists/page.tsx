@@ -26,12 +26,17 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePriceLists, useDeletePriceList } from '@/lib/hooks/use-price-lists';
+import {
+  usePriceLists,
+  useDeletePriceList,
+  usePriceListTypeLabel,
+} from '@/lib/hooks/use-price-lists';
 
 export default function PriceListsPage() {
   const t = useTranslations('inventory');
   const { data, isLoading } = usePriceLists();
   const deletePriceList = useDeletePriceList();
+  const typeLabel = usePriceListTypeLabel();
 
   const priceLists = data?.data || data || [];
 
@@ -95,9 +100,7 @@ export default function PriceListsPage() {
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">
-                          {pl.type === 'SALES' ? 'Sales' : 'Purchase'}
-                        </Badge>
+                        <Badge variant="outline">{typeLabel(pl.type)}</Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant={pl.isActive ? 'default' : 'secondary'}>

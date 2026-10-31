@@ -27,13 +27,13 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import {
   useItem,
   useDeleteItem,
-  getItemTypeLabel,
+  useItemTypeLabel,
   getItemTypeColor,
   getStockStatus,
-  formatCurrency,
 } from '@/lib/hooks/use-items';
 
 interface ItemDetailPageProps {
@@ -46,6 +46,8 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const router = useRouter();
   const { data: item, isLoading } = useItem(id);
   const deleteItem = useDeleteItem();
+  const formatMoney = useMoneyFormatter();
+  const typeLabel = useItemTypeLabel();
 
   const handleDelete = async () => {
     await deleteItem.mutateAsync(id);
@@ -102,7 +104,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   getItemTypeColor(item.type),
                 )}
               >
-                {getItemTypeLabel(item.type)}
+                {typeLabel(item.type)}
               </span>
             </div>
             {item.sku && <p className="text-muted-foreground font-mono">SKU: {item.sku}</p>}
@@ -149,9 +151,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('items.table.sellingPrice')}</p>
-                <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(item.salesPrice || item.sellingPrice)}
-                </p>
+                <p className="text-2xl font-bold font-mono">{formatMoney(item.sellingPrice)}</p>
               </div>
             </div>
           </CardContent>
@@ -165,7 +165,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('items.table.costPrice')}</p>
-                <p className="text-2xl font-bold font-mono">{formatCurrency(item.purchasePrice)}</p>
+                <p className="text-2xl font-bold font-mono">{formatMoney(item.costPrice)}</p>
               </div>
             </div>
           </CardContent>
@@ -241,7 +241,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   getItemTypeColor(item.type),
                 )}
               >
-                {getItemTypeLabel(item.type)}
+                {typeLabel(item.type)}
               </span>
             </div>
             <div className="flex justify-between">

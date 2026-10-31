@@ -319,7 +319,7 @@ export const vendorCreditsApi = {
 // ===========================================================================
 
 export const itemsApi = {
-  ...crud('/items', { updateMethod: 'put' }),
+  ...crud('/items'),
 };
 
 export const warehousesApi = {
@@ -549,7 +549,7 @@ export const payrollApi = {
 // ===========================================================================
 
 export const workOrdersApi = {
-  ...crud('/work-orders', { updateMethod: 'put', hasCursor: false }),
+  ...crud('/work-orders', { hasCursor: false }),
   start: (id: string) => api.post(`/work-orders/${id}/start`),
   complete: (id: string, data: Record<string, unknown>) =>
     api.post(`/work-orders/${id}/complete`, data),

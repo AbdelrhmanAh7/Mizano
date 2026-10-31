@@ -25,7 +25,51 @@
       "reorderPoint": "نقطة إعادة الطلب",
       "openingStock": "الرصيد الافتتاحي",
       "isActive": "نشط",
-      "openingStockHint": "أضف الرصيد الافتتاحي من خلال تسوية المخزون"
+      "openingStockHint": "أضف الرصيد الافتتاحي من خلال تسوية المخزون",
+      "basicInfo": "المعلومات الأساسية",
+      "pricing": "التسعير",
+      "inventory": "المخزون",
+      "accounting": "المحاسبة",
+      "selectAccount": "اختر الحساب",
+      "noAccount": "بدون",
+      "salesAccountHint": "يُستخدم عند بيع هذا الصنف",
+      "purchaseAccountHint": "يُستخدم عند شراء هذا الصنف",
+      "inventoryAccountHint": "يُستخدم لتقييم المخزون",
+      "reorderPointHint": "تنبيه عندما ينخفض المخزون عن هذا المستوى",
+      "create": "إنشاء الصنف",
+      "update": "تحديث الصنف",
+      "saving": "جارٍ الحفظ...",
+      "typeDescriptions": {
+        "GOODS": "منتجات مادية مع تتبع المخزون",
+        "SERVICE": "خدمات بدون مخزون",
+        "DIGITAL": "منتجات رقمية"
+      },
+      "units": {
+        "pcs": "قطعة",
+        "kg": "كيلوجرام",
+        "g": "جرام",
+        "lb": "رطل",
+        "oz": "أونصة",
+        "l": "لتر",
+        "ml": "ملليلتر",
+        "m": "متر",
+        "cm": "سنتيمتر",
+        "ft": "قدم",
+        "in": "بوصة",
+        "box": "صندوق",
+        "pack": "عبوة",
+        "hr": "ساعة",
+        "day": "يوم"
+      },
+      "errors": {
+        "nameRequired": "اسم الصنف مطلوب",
+        "nameTooLong": "يجب ألا يزيد اسم الصنف عن 200 حرف",
+        "skuRequired": "رمز الصنف مطلوب",
+        "skuTooLong": "يجب ألا يزيد رمز الصنف عن 50 حرفًا",
+        "descriptionTooLong": "يجب ألا يزيد الوصف عن 500 حرف",
+        "priceInvalid": "أدخل مبلغًا غير سالب بحد أقصى 4 منازل عشرية",
+        "reorderPointInvalid": "أدخل عددًا صحيحًا"
+      }
     },
     "types": {
       "goods": "سلع",
@@ -44,6 +88,18 @@
     "empty": {
       "title": "لا توجد أصناف بعد",
       "description": "أضف أول صنف لبدء إدارة المخزون"
+    },
+    "toast": {
+      "created": "تم إنشاء الصنف",
+      "createdDescription": "تم إنشاء الصنف بنجاح.",
+      "createError": "تعذر إنشاء الصنف",
+      "updated": "تم تحديث الصنف",
+      "updatedDescription": "تم تحديث الصنف بنجاح.",
+      "updateError": "تعذر تحديث الصنف",
+      "deleted": "تم حذف الصنف",
+      "deletedDescription": "تم حذف الصنف بنجاح.",
+      "deleteError": "تعذر حذف الصنف",
+      "genericError": "حدث خطأ"
     }
   },
   "warehouses": {
@@ -133,7 +189,14 @@
       "namePlaceholder": "أدخل اسم قائمة الأسعار",
       "description": "الوصف",
       "type": "النوع",
-      "adjustment": "التعديل"
+      "adjustment": "التعديل",
+      "adjustmentHint": "نسبة مئوية: زيادة مثل 10 أو تخفيض مثل -10. ثابت: مبلغ يُضاف إلى كل سعر.",
+      "creating": "جارٍ الإنشاء...",
+      "errors": {
+        "nameRequired": "اسم قائمة الأسعار مطلوب",
+        "adjustmentInvalid": "أدخل رقمًا بحد أقصى 4 منازل عشرية، مثل 10 أو -5.5",
+        "nameTooLong": "يجب ألا يزيد اسم قائمة الأسعار عن 200 حرف"
+      }
     },
     "types": {
       "percentage": "نسبة مئوية",
@@ -148,6 +211,22 @@
     "empty": {
       "title": "لا توجد قوائم أسعار بعد",
       "description": "أنشئ قوائم أسعار لمجموعات العملاء المختلفة"
+    },
+    "toast": {
+      "created": "تم إنشاء قائمة الأسعار",
+      "createdDescription": "تم إنشاء قائمة الأسعار.",
+      "createError": "تعذر إنشاء قائمة الأسعار",
+      "deleted": "تم حذف قائمة الأسعار",
+      "deletedDescription": "تم حذف قائمة الأسعار.",
+      "deleteError": "تعذر حذف قائمة الأسعار",
+      "genericError": "حدث خطأ"
+    },
+    "detail": {
+      "noItems": "لا توجد أصناف في قائمة الأسعار هذه بعد.",
+      "item": "الصنف",
+      "sku": "الرمز",
+      "price": "السعر المخصص",
+      "adjustment": "التعديل: {value}"
     }
   },
   "transfers": {

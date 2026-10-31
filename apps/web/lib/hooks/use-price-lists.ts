@@ -1,5 +1,11 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
+import { useTranslations } from 'next-intl';
+import { useQuery, UseMutationResult } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { useToastMutation } from '@/lib/hooks/use-toast-mutation';
+
+export const PRICE_LIST_TYPES = ['PERCENTAGE', 'FIXED'] as const;
+export type PriceListType = (typeof PRICE_LIST_TYPES)[number];
 
 const priceListsApi = {
   list: async () => {
@@ -39,22 +45,39 @@ export function usePriceList(id: string) {
   });
 }
 
-export function useCreatePriceList() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: priceListsApi.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['price-lists'] });
-    },
+/** The price-lists API body (CreatePriceListDto): the adjustment travels as a decimal string. */
+export interface CreatePriceListData {
+  name: string;
+  description?: string;
+  type: PriceListType;
+  adjustment: string;
+}
+
+export function useCreatePriceList(): UseMutationResult<unknown, unknown, CreatePriceListData> {
+  return useToastMutation({
+    namespace: 'inventory.priceLists.toast',
+    mutationFn: (data: CreatePriceListData) => priceListsApi.create({ ...data }),
+    invalidate: () => [['price-lists']],
+    success: 'created',
+    error: 'createError',
   });
 }
 
-export function useDeletePriceList() {
-  const queryClient = useQueryClient();
-  return useMutation({
+export function useDeletePriceList(): UseMutationResult<unknown, unknown, string> {
+  return useToastMutation({
+    namespace: 'inventory.priceLists.toast',
     mutationFn: priceListsApi.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['price-lists'] });
-    },
+    invalidate: () => [['price-lists']],
+    success: 'deleted',
+    error: 'deleteError',
   });
+}
+
+/** Translated price list type (PERCENTAGE / FIXED). */
+export function usePriceListTypeLabel(): (type: string) => string {
+  const t = useTranslations('inventory.priceLists.types');
+  return useCallback(
+    (type: string) => (t.has(type.toLowerCase()) ? t(type.toLowerCase()) : type),
+    [t],
+  );
 }

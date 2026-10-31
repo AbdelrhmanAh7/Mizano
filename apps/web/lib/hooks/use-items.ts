@@ -1,12 +1,11 @@
 'use client';
 
-import { useToast } from '@/components/ui/use-toast';
+import { useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { itemsApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-
-// Types
-type ApiError = { response?: { data?: { message?: string } } };
+import { useToastMutation } from '@/lib/hooks/use-toast-mutation';
+import { useQuery, UseMutationResult } from '@tanstack/react-query';
 
 export type ItemType = 'GOODS' | 'SERVICE' | 'DIGITAL';
 
@@ -62,24 +61,42 @@ export interface ItemParams {
   sortOrder?: 'asc' | 'desc';
 }
 
+export const ITEM_TYPES = ['GOODS', 'SERVICE', 'DIGITAL'] as const;
+
+export const UNIT_CODES = [
+  'pcs',
+  'kg',
+  'g',
+  'lb',
+  'oz',
+  'l',
+  'ml',
+  'm',
+  'cm',
+  'ft',
+  'in',
+  'box',
+  'pack',
+  'hr',
+  'day',
+] as const;
+
+/** The items API body (CreateItemDto): decimal-string prices, null clears an optional field. */
 export interface CreateItemData {
-  sku?: string;
   name: string;
-  description?: string;
+  sku: string;
   type: ItemType;
   unit?: string;
-  salesPrice?: number;
-  purchasePrice?: number;
-  taxRateId?: string;
-  trackInventory?: boolean;
-  reorderPoint?: number;
-  reorderQuantity?: number;
-  incomeAccountId?: string;
-  expenseAccountId?: string;
-  inventoryAccountId?: string;
+  description?: string | null;
+  sellingPrice: string;
+  costPrice?: string;
+  reorderPoint?: number | null;
+  salesAccountId?: string | null;
+  purchaseAccountId?: string | null;
+  inventoryAccountId?: string | null;
 }
 
-export interface UpdateItemData extends Partial<CreateItemData> {}
+export type UpdateItemData = Partial<CreateItemData>;
 
 /**
  * Hook to fetch all items with pagination
@@ -126,101 +143,54 @@ export function useItem(id: string | undefined) {
 /**
  * Hook to create a new item
  */
-export function useCreateItem() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (data: CreateItemData) => {
-      const response = await itemsApi.create(data);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['items'] });
-      toast({
-        title: 'Item created',
-        description: 'The item has been created successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error creating item',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+export function useCreateItem(): UseMutationResult<Item, unknown, CreateItemData> {
+  return useToastMutation({
+    namespace: 'inventory.items.toast',
+    mutationFn: async (data: CreateItemData) => (await itemsApi.create(data)).data as Item,
+    invalidate: () => [['items']],
+    success: 'created',
+    error: 'createError',
   });
 }
 
 /**
  * Hook to update an existing item
  */
-export function useUpdateItem() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateItemData }) => {
-      const response = await itemsApi.update(id, data);
-      return response.data;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['items'] });
-      queryClient.invalidateQueries({ queryKey: ['items', variables.id] });
-      toast({
-        title: 'Item updated',
-        description: 'The item has been updated successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error updating item',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+export function useUpdateItem(): UseMutationResult<
+  Item,
+  unknown,
+  { id: string; data: UpdateItemData }
+> {
+  return useToastMutation({
+    namespace: 'inventory.items.toast',
+    mutationFn: async ({ id, data }: { id: string; data: UpdateItemData }) =>
+      (await itemsApi.update(id, data)).data as Item,
+    invalidate: ({ id }) => [['items'], ['items', id]],
+    success: 'updated',
+    error: 'updateError',
   });
 }
 
 /**
  * Hook to delete an item
  */
-export function useDeleteItem() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await itemsApi.delete(id);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['items'] });
-      toast({
-        title: 'Item deleted',
-        description: 'The item has been deleted successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error deleting item',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+export function useDeleteItem(): UseMutationResult<unknown, unknown, string> {
+  return useToastMutation({
+    namespace: 'inventory.items.toast',
+    mutationFn: async (id: string) => (await itemsApi.delete(id)).data,
+    invalidate: () => [['items']],
+    success: 'deleted',
+    error: 'deleteError',
   });
 }
 
-/**
- * Get item type label
- */
-export function getItemTypeLabel(type: ItemType): string {
-  const labelMap: Record<ItemType, string> = {
-    GOODS: 'Goods',
-    SERVICE: 'Service',
-    DIGITAL: 'Digital',
-  };
-  return labelMap[type] || type;
+/** Translated item type label. */
+export function useItemTypeLabel(): (type: ItemType) => string {
+  const t = useTranslations('inventory.items.types');
+  return useCallback(
+    (type: ItemType) => (t.has(type.toLowerCase()) ? t(type.toLowerCase()) : type),
+    [t],
+  );
 }
 
 /**
@@ -254,46 +224,3 @@ export function getStockStatus(item: Item): {
   }
   return { status: 'ok', label: 'In Stock', color: 'text-green-600' };
 }
-
-/**
- * Format currency amount
- */
-export function formatCurrency(amount: string | number | null, currency: string = 'USD'): string {
-  if (amount === null || amount === undefined) return '-';
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (isNaN(num)) return '-';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(num);
-}
-
-/**
- * Item type options for dropdowns
- */
-export const itemTypeOptions = [
-  { value: 'GOODS', label: 'Goods', description: 'Physical products with inventory tracking' },
-  { value: 'SERVICE', label: 'Service', description: 'Services without inventory' },
-  { value: 'DIGITAL', label: 'Digital', description: 'Digital products' },
-];
-
-/**
- * Common unit options
- */
-export const unitOptions = [
-  { value: 'pcs', label: 'Pieces' },
-  { value: 'kg', label: 'Kilograms' },
-  { value: 'g', label: 'Grams' },
-  { value: 'lb', label: 'Pounds' },
-  { value: 'oz', label: 'Ounces' },
-  { value: 'l', label: 'Liters' },
-  { value: 'ml', label: 'Milliliters' },
-  { value: 'm', label: 'Meters' },
-  { value: 'cm', label: 'Centimeters' },
-  { value: 'ft', label: 'Feet' },
-  { value: 'in', label: 'Inches' },
-  { value: 'box', label: 'Boxes' },
-  { value: 'pack', label: 'Packs' },
-  { value: 'hr', label: 'Hours' },
-  { value: 'day', label: 'Days' },
-];
