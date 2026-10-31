@@ -2,13 +2,17 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { BillingMethod, Prisma, ProjectStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { InvoicesService } from '../../sales/services/invoices.service';
 import { CreateProjectDto } from '../dto/create-project.dto';
 import { UpdateProjectDto } from '../dto/update-project.dto';
 import { ProjectQueryDto } from '../dto/project-query.dto';
 
 @Injectable()
 export class ProjectsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private invoices: InvoicesService,
+  ) {}
 
   async create(organizationId: string, dto: CreateProjectDto) {
     const projectNumber = await this.generateProjectNumber(organizationId);
@@ -293,59 +297,47 @@ export class ProjectsService {
       throw new BadRequestException('No unbilled entries found for this period');
     }
 
+    // Decimal hours and rate: the invoice command computes the line and totals exactly.
     const totalHours = entries.reduce(
-      (sum, e) => sum + parseFloat((e.hours ?? e.duration).toString()),
-      0,
+      (sum, e) => sum.add(new Decimal((e.hours ?? e.duration).toString())),
+      new Decimal(0),
     );
-    const hourlyRate = project.hourlyRate ? parseFloat(project.hourlyRate.toString()) : 0;
+    const hourlyRate = project.hourlyRate ? new Decimal(project.hourlyRate.toString()) : null;
+    const today = new Date();
+    const dueDate = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000); // Net 30
+    const day = (d: Date) => d.toISOString().slice(0, 10);
 
-    // Generate invoice number
-    const lastInvoice = await this.prisma.invoice.findFirst({
-      where: { organizationId },
-      orderBy: { createdAt: 'desc' },
-      select: { invoiceNumber: true },
-    });
-    const invoiceNum = lastInvoice ? parseInt(lastInvoice.invoiceNumber.split('-')[1], 10) + 1 : 1;
-    const invoiceNumber = `INV-${String(invoiceNum).padStart(3, '0')}`;
-
-    // Create invoice
-    const invoice = await this.prisma.invoice.create({
-      data: {
-        invoiceNumber,
-        customerId: project.customerId,
-        projectId,
-        date: new Date(),
-        issueDate: new Date(),
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Net 30
-        subtotal: new Decimal(totalHours * hourlyRate),
-        taxAmount: new Decimal(0),
-        grandTotal: new Decimal(totalHours * hourlyRate),
-        total: new Decimal(totalHours * hourlyRate),
-        balanceDue: new Decimal(totalHours * hourlyRate),
-        notes: `Time billed for ${project.name}: ${dto.startDate} to ${dto.endDate}`,
+    // The one invoice command (org numbering, Decimal totals, tenant checks, invoice.created
+    // event), with the entries marked billed in the same transaction (audit F3).
+    return this.prisma.$transaction(async (tx) => {
+      const invoice = await this.invoices.create(
         organizationId,
-        lines: {
-          create: [
+        {
+          customerId: project.customerId as string,
+          projectId,
+          date: day(today),
+          dueDate: day(dueDate),
+          notes: `Time billed for ${project.name}: ${dto.startDate} to ${dto.endDate}`,
+          lines: [
             {
               description: `Consulting services - ${project.name}`,
-              quantity: new Decimal(totalHours),
-              rate: new Decimal(hourlyRate),
-              unitPrice: new Decimal(hourlyRate),
-              amount: new Decimal(totalHours * hourlyRate),
-              sortOrder: 0,
+              quantity: totalHours.toFixed(4),
+              rate: (hourlyRate ?? new Decimal(0)).toFixed(4),
             },
           ],
         },
-      },
+        { tx },
+      );
+      const { count } = await tx.timesheetEntry.updateMany({
+        where: { id: { in: entries.map((e) => e.id) }, organizationId, isBilled: false },
+        data: { isBilled: true, invoiceId: invoice.id },
+      });
+      // A concurrent billing run took some of these entries: bill nothing twice.
+      if (count !== entries.length) {
+        throw new BadRequestException('Some time entries were billed meanwhile; try again');
+      }
+      return invoice;
     });
-
-    // Mark entries as billed
-    await this.prisma.timesheetEntry.updateMany({
-      where: { id: { in: entries.map((e) => e.id) } },
-      data: { isBilled: true },
-    });
-
-    return invoice;
   }
 
   private async generateProjectNumber(organizationId: string): Promise<string> {

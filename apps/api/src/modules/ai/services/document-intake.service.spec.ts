@@ -24,6 +24,7 @@ interface PrismaMock {
   bill: { findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock };
   invoice: { findFirst: jest.Mock; create: jest.Mock };
   organization: { findUnique: jest.Mock };
+  $transaction: jest.Mock;
 }
 
 /**
@@ -54,7 +55,7 @@ function buildPrisma(): PrismaMock {
         where.id.in.filter((id) => table[id] === where.organizationId).map((id) => ({ id })),
       );
 
-  return {
+  const mock = {
     vendor: { findFirst: jest.fn(findOwned(owned.vendor)), findMany: jest.fn() },
     customer: { findFirst: jest.fn(findOwned(owned.customer)) },
     project: { findFirst: jest.fn(findOwned(owned.project)) },
@@ -80,6 +81,10 @@ function buildPrisma(): PrismaMock {
     },
     organization: { findUnique: jest.fn().mockResolvedValue({ baseCurrency: 'EGP' }) },
   };
+  // Interactive transactions run against the same tenant-aware mock.
+  return Object.assign(mock, {
+    $transaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) => fn(mock)),
+  });
 }
 
 function baseBill(overrides: Partial<ConfirmIntakeInput> = {}): ConfirmIntakeInput {
