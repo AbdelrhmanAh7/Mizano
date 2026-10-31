@@ -10,6 +10,8 @@ import {
   escapeHtml,
   formatCurrency,
   formatDate,
+  partyAddress,
+  renderAddressHtml,
   renderLogoHtml,
   safeColor,
 } from '../templates/base.template';
@@ -75,9 +77,7 @@ export class PdfService implements OnModuleDestroy {
         name: invoice.customer.name,
         email: invoice.customer.email || undefined,
         phone: invoice.customer.phone || undefined,
-        address: invoice.customer.address || undefined,
-        city: invoice.customer.city || undefined,
-        country: invoice.customer.country || undefined,
+        ...partyAddress(invoice.customer),
         taxId: invoice.customer.taxId || undefined,
       },
       lines: invoice.lines.map((line) => ({
@@ -131,9 +131,7 @@ export class PdfService implements OnModuleDestroy {
         name: bill.vendor.name,
         email: bill.vendor.email || undefined,
         phone: bill.vendor.phone || undefined,
-        address: bill.vendor.address || undefined,
-        city: bill.vendor.city || undefined,
-        country: bill.vendor.country || undefined,
+        ...partyAddress(bill.vendor),
         taxId: bill.vendor.taxId || undefined,
       },
       lines: bill.lines.map((line) => ({
@@ -185,9 +183,7 @@ export class PdfService implements OnModuleDestroy {
         name: quote.customer.name,
         email: quote.customer.email || undefined,
         phone: quote.customer.phone || undefined,
-        address: quote.customer.address || undefined,
-        city: quote.customer.city || undefined,
-        country: quote.customer.country || undefined,
+        ...partyAddress(quote.customer),
       },
       lines: quote.lines.map((line) => ({
         description: line.description || line.item?.name || '',
@@ -462,9 +458,7 @@ export class PdfService implements OnModuleDestroy {
       customer: {
         name: customer.name,
         email: customer.email || undefined,
-        address: customer.address || undefined,
-        city: customer.city || undefined,
-        country: customer.country || undefined,
+        ...partyAddress(customer),
       },
       dateFrom,
       dateTo,
@@ -824,8 +818,7 @@ export class PdfService implements OnModuleDestroy {
           <div style="margin-bottom: 30px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px;">CUSTOMER</h4>
             <p style="font-weight: bold;">${escapeHtml(data.customer.name)}</p>
-            ${data.customer.address ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(data.customer.address)}</p>` : ''}
-            ${data.customer.city && data.customer.country ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(data.customer.city)}, ${escapeHtml(data.customer.country)}</p>` : ''}
+            ${renderAddressHtml(data.customer, 'color: #6B7280; font-size: 12px;')}
           </div>
 
           <!-- Opening Balance -->

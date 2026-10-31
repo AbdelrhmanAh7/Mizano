@@ -9,6 +9,7 @@ import {
   generateTotalsHtml,
   defaultTemplateConfig,
   escapeHtml,
+  renderAddressHtml,
   safeColor,
 } from './base.template';
 
@@ -85,8 +86,7 @@ export function generateQuoteHtml(org: OrganizationInfo, quote: QuoteData): stri
           <div style="flex: 1;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">Prepared For</h4>
             <p style="font-weight: bold; margin-bottom: 5px;">${escapeHtml(quote.customer.name)}</p>
-            ${quote.customer.address ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(quote.customer.address)}</p>` : ''}
-            ${quote.customer.city && quote.customer.country ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(quote.customer.city)}, ${escapeHtml(quote.customer.country)}</p>` : ''}
+            ${renderAddressHtml(quote.customer, 'color: #6B7280; font-size: 12px;')}
             ${quote.customer.email ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(quote.customer.email)}</p>` : ''}
             ${quote.customer.phone ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(quote.customer.phone)}</p>` : ''}
           </div>

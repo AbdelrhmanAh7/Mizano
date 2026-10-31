@@ -177,6 +177,45 @@ export function renderLogoHtml(org: OrganizationInfo, style: string): string {
     : '';
 }
 
+/** A street line, a city and a country, as a document prints a party or the organization. */
+export interface PostalAddress {
+  address?: string;
+  city?: string;
+  country?: string;
+}
+
+/** The address columns of a customer or vendor row. */
+interface PartyAddressColumns {
+  address?: string | null;
+  city?: string | null;
+  country?: string | null;
+  billingStreet?: string | null;
+  billingCity?: string | null;
+  billingCountry?: string | null;
+}
+
+/**
+ * The address a document prints for a customer or vendor: the billing address the web forms and
+ * the FlowLine API write, else the simple columns import/export writes. One source per address,
+ * so a document never mixes the street of one with the city of the other.
+ */
+export function partyAddress(party: PartyAddressColumns): PostalAddress {
+  const billing = [party.billingStreet, party.billingCity, party.billingCountry];
+  const [address, city, country] = billing.some((v) => v?.trim())
+    ? billing
+    : [party.address, party.city, party.country];
+  return { address: address || undefined, city: city || undefined, country: country || undefined };
+}
+
+/** Escaped street and "city, country" paragraphs; a city or a country alone still prints. */
+export function renderAddressHtml(address: PostalAddress, style: string): string {
+  const place = [address.city, address.country].filter(Boolean).map(escapeHtml).join(', ');
+  return (
+    (address.address ? `<p style="${style}">${escapeHtml(address.address)}</p>` : '') +
+    (place ? `<p style="${style}">${place}</p>` : '')
+  );
+}
+
 // Common formatting utilities
 export function formatCurrency(
   amount: number | string,
@@ -215,8 +254,7 @@ export function generateHeaderHtml(
       <div>
         ${renderLogoHtml(org, 'max-height: 60px; max-width: 200px;')}
         <h1 style="color: ${color}; margin: 10px 0 5px 0; font-size: 24px;">${escapeHtml(org.name)}</h1>
-        ${org.address ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${escapeHtml(org.address)}</p>` : ''}
-        ${org.city && org.country ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${escapeHtml(org.city)}, ${escapeHtml(org.country)}</p>` : ''}
+        ${renderAddressHtml(org, 'margin: 2px 0; color: #6B7280; font-size: 12px;')}
         ${org.phone ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${l.tel}: <span dir="ltr">${escapeHtml(org.phone)}</span></p>` : ''}
         ${org.email ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${l.email}: ${escapeHtml(org.email)}</p>` : ''}
         ${org.taxId ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${l.taxId}: ${escapeHtml(org.taxId)}</p>` : ''}

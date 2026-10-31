@@ -9,6 +9,7 @@ import {
   generateTotalsHtml,
   defaultTemplateConfig,
   escapeHtml,
+  renderAddressHtml,
   safeColor,
 } from './base.template';
 
@@ -84,8 +85,7 @@ export function generateBillHtml(org: OrganizationInfo, bill: BillData): string 
           <div style="flex: 1;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">From (Vendor)</h4>
             <p style="font-weight: bold; margin-bottom: 5px;">${escapeHtml(bill.vendor.name)}</p>
-            ${bill.vendor.address ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(bill.vendor.address)}</p>` : ''}
-            ${bill.vendor.city && bill.vendor.country ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(bill.vendor.city)}, ${escapeHtml(bill.vendor.country)}</p>` : ''}
+            ${renderAddressHtml(bill.vendor, 'color: #6B7280; font-size: 12px;')}
             ${bill.vendor.email ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(bill.vendor.email)}</p>` : ''}
             ${bill.vendor.phone ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(bill.vendor.phone)}</p>` : ''}
             ${bill.vendor.taxId ? `<p style="color: #6B7280; font-size: 12px;">Tax ID: ${escapeHtml(bill.vendor.taxId)}</p>` : ''}

@@ -273,6 +273,68 @@ describe('PdfService HTML safety', () => {
     expect(lastHtml()).toContain('<html lang="en" dir="ltr">');
     expect(lastHtml()).toContain('Balance Due:');
   });
+  it('prints the billing address of web-created parties, else the import columns', async () => {
+    const doc = {
+      date: new Date('2026-10-31'),
+      dueDate: new Date('2026-11-30'),
+      expiryDate: new Date('2026-11-30'),
+      status: 'DRAFT',
+      currencyCode: null,
+      lines: [{ description: 'x', quantity: '1', rate: '100', taxRate: null, amount: '100' }],
+      subtotal: '100',
+      taxAmount: '0',
+      grandTotal: '100',
+      balanceDue: '100',
+      notes: null,
+      terms: null,
+    };
+    // Created in the web UI: only the billing columns, and a city without a country.
+    const webCustomer = {
+      name: 'Nile Co',
+      address: null,
+      city: null,
+      country: null,
+      billingStreet: '1 Tahrir St',
+      billingCity: 'Cairo',
+      billingCountry: null,
+    };
+    prisma.invoice.findFirst = jest
+      .fn()
+      .mockResolvedValue({ ...doc, invoiceNumber: 'INV-1', customer: webCustomer });
+    await service.generateInvoicePdf('org-1', 'inv-1');
+    expect(lastHtml()).toContain('1 Tahrir St</p>');
+    expect(lastHtml()).toContain('>Cairo</p>');
+
+    prisma.quote = {
+      findFirst: jest.fn().mockResolvedValue({ ...doc, quoteNumber: 'Q-1', customer: webCustomer }),
+    };
+    await service.generateQuotePdf('org-1', 'quote-1');
+    expect(lastHtml()).toContain('1 Tahrir St</p>');
+
+    // Imported vendor: the simple columns only.
+    prisma.bill = {
+      ...prisma.bill,
+      findFirst: jest.fn().mockResolvedValue({
+        ...doc,
+        billNumber: 'B-1',
+        vendor: { name: 'Delta', address: '9 Corniche', city: 'Giza', country: 'EG' },
+      }),
+    };
+    await service.generateBillPdf('org-1', 'bill-1');
+    expect(lastHtml()).toContain('9 Corniche</p>');
+    expect(lastHtml()).toContain('>Giza, EG</p>');
+
+    prisma.customer.findFirst.mockResolvedValue({ id: 'c1', ...webCustomer });
+    await service.generateStatementPdf(
+      'org-1',
+      'c1',
+      new Date('2026-09-01'),
+      new Date('2026-09-30'),
+    );
+    expect(lastHtml()).toContain('1 Tahrir St</p>');
+    expect(lastHtml()).toContain('>Cairo</p>');
+  });
+
   it('prices bills, quotes and statements in the document or base currency, never USD (PR #560)', async () => {
     prisma.organization.findUnique.mockResolvedValue({
       ...ORG_ROW,

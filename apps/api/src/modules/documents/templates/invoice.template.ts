@@ -9,6 +9,7 @@ import {
   generateTotalsHtml,
   defaultTemplateConfig,
   escapeHtml,
+  renderAddressHtml,
   safeColor,
   type DocumentLocale,
   documentDirection,
@@ -150,8 +151,7 @@ export function generateInvoiceHtml(
           <div style="flex: 1;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">${l.billTo}</h4>
             <p style="font-weight: bold; margin-bottom: 5px;"><bdi>${escapeHtml(invoice.customer.name)}</bdi></p>
-            ${invoice.customer.address ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(invoice.customer.address)}</p>` : ''}
-            ${invoice.customer.city && invoice.customer.country ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(invoice.customer.city)}, ${escapeHtml(invoice.customer.country)}</p>` : ''}
+            ${renderAddressHtml(invoice.customer, 'color: #6B7280; font-size: 12px;')}
             ${invoice.customer.email ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(invoice.customer.email)}</p>` : ''}
             ${invoice.customer.phone ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(invoice.customer.phone)}</p>` : ''}
             ${invoice.customer.taxId ? `<p style="color: #6B7280; font-size: 12px;">${l.taxId}: ${escapeHtml(invoice.customer.taxId)}</p>` : ''}
