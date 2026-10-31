@@ -8,6 +8,7 @@ import {
   Delete,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { RecurringProfilesService } from '../services/recurring-profiles.service';
@@ -15,14 +16,16 @@ import { CreateRecurringProfileDto } from '../dto/create-recurring-profile.dto';
 import { RecurringProfileQueryDto } from '../dto/recurring-profile-query.dto';
 import { ExecuteRecurringProfileDto } from '../dto/execute-recurring-profile.dto';
 import { UpdateRecurringProfileDto } from '../dto/update-recurring-profile.dto';
-import { CurrentOrg, Permissions } from '../../../common/decorators';
+import { CurrentOrg, InvalidatesLedger, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 
 @ApiTags('Recurring Profiles')
 @ApiBearerAuth()
 @Controller('recurring-profiles')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseInterceptors(CacheInvalidationInterceptor)
 export class RecurringProfilesController {
   constructor(private readonly recurringProfilesService: RecurringProfilesService) {}
 
@@ -74,6 +77,8 @@ export class RecurringProfilesController {
 
   @Post(':id/execute')
   @Permissions('accounting.edit')
+  // Executing posts the generated invoice, bill or journal to the ledger.
+  @InvalidatesLedger('recurring-profiles:*', 'invoices:*', 'bills:*')
   @ApiOperation({ summary: 'Manually execute a recurring profile' })
   executeProfile(
     @CurrentOrg() orgId: string,
