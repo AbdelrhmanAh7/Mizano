@@ -8,10 +8,12 @@ import { WebhookOutboxService } from './webhook-outbox.service';
 const BATCH = 200;
 
 /**
- * Emits `invoice.overdue` once per invoice and due date for every issued invoice with an open
- * balance whose due date has passed. The dedupe key makes the scan idempotent, so it can run
- * hourly, after restarts, and concurrently with the midnight status job. Moving the due date
- * (not possible today on a sent invoice, but cheap to support) yields a fresh notice.
+ * Emits `invoice.overdue` once per endpoint, invoice and due date for every issued invoice with
+ * an open balance whose due date has passed. An endpoint hears only about invoices that fall due
+ * after it started listening (`overdueNoticesFrom`, else its createdAt), so connecting FlowLine
+ * never floods it with every old debt; the settings "send backlog" action opts in to those
+ * (audit F2). The dedupe key makes the scan idempotent, so it can run hourly, after restarts,
+ * and concurrently with the midnight status job. Moving the due date yields a fresh notice.
  */
 @Injectable()
 export class OverdueScannerService {
@@ -34,14 +36,17 @@ export class OverdueScannerService {
     this.running = true;
     let emitted = 0;
     try {
-      const startOfToday = new Date(now);
-      startOfToday.setUTCHours(0, 0, 0, 0);
-      const orgs = await this.prisma.webhookEndpoint.findMany({
+      const startOfToday = startOfUtcDay(now);
+      const endpoints = await this.prisma.webhookEndpoint.findMany({
         where: { isActive: true, deletedAt: null, eventTypes: { has: 'invoice.overdue' } },
-        select: { organizationId: true },
-        distinct: ['organizationId'],
+        select: { id: true, organizationId: true, overdueNoticesFrom: true, createdAt: true },
+        orderBy: { id: 'asc' },
       });
-      for (const { organizationId } of orgs) {
+      for (const endpoint of endpoints) {
+        const { organizationId } = endpoint;
+        // Overdue from the day after the due date, so an invoice due on the day the endpoint
+        // subscribed (or later) falls due after it: due date >= that day (UTC).
+        const dueFrom = startOfUtcDay(endpoint.overdueNoticesFrom ?? endpoint.createdAt);
         let cursor: string | undefined;
         for (;;) {
           const invoices = await this.prisma.invoice.findMany({
@@ -51,7 +56,7 @@ export class OverdueScannerService {
               status: {
                 in: [InvoiceStatus.SENT, InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.OVERDUE],
               },
-              dueDate: { lt: startOfToday },
+              dueDate: { gte: dueFrom, lt: startOfToday },
               balanceDue: { gt: 0 },
             },
             select: { id: true, dueDate: true },
@@ -61,7 +66,9 @@ export class OverdueScannerService {
           });
           if (invoices.length === 0) break;
           for (const inv of invoices) {
-            if (await this.emitOnce(organizationId, inv.id, inv.dueDate)) emitted += 1;
+            if (await this.emitOnce(organizationId, endpoint.id, inv.id, inv.dueDate)) {
+              emitted += 1;
+            }
           }
           cursor = invoices[invoices.length - 1].id;
           if (invoices.length < BATCH) break;
@@ -77,10 +84,12 @@ export class OverdueScannerService {
 
   private async emitOnce(
     organizationId: string,
+    endpointId: string,
     invoiceId: string,
     dueDate: Date,
   ): Promise<boolean> {
-    const dedupeKey = `invoice.overdue:${invoiceId}:${dueDate.toISOString().slice(0, 10)}`;
+    const due = dueDate.toISOString().slice(0, 10);
+    const dedupeKey = `invoice.overdue:${invoiceId}:${due}:${endpointId}`;
     const exists = await this.prisma.webhookEvent.findUnique({
       where: { organizationId_dedupeKey: { organizationId, dedupeKey } },
       select: { id: true },
@@ -92,10 +101,7 @@ export class OverdueScannerService {
         organizationId,
         'invoice.overdue',
         invoiceId,
-        {
-          dedupeKey,
-          source: { type: 'system' },
-        },
+        { dedupeKey, endpointIds: [endpointId], source: { type: 'system' } },
       ));
     } catch (error) {
       // A concurrent scan won the unique (organizationId, dedupeKey) race: already emitted.
@@ -104,4 +110,10 @@ export class OverdueScannerService {
       throw error;
     }
   }
+}
+
+function startOfUtcDay(date: Date): Date {
+  const day = new Date(date);
+  day.setUTCHours(0, 0, 0, 0);
+  return day;
 }

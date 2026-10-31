@@ -39,6 +39,7 @@ import {
   useRedeliverWebhook,
   useRevokeIntegrationKey,
   useTestWebhookEndpoint,
+  useSendOverdueBacklog,
   useUpdateWebhookEndpoint,
   useWebhookDeliveries,
   useWebhookEndpoints,
@@ -188,6 +189,7 @@ export function FlowlineConnect() {
   const updateWebhook = useUpdateWebhookEndpoint();
   const deleteWebhook = useDeleteWebhookEndpoint();
   const testWebhook = useTestWebhookEndpoint();
+  const overdueBacklog = useSendOverdueBacklog();
   const redeliver = useRedeliverWebhook();
 
   const [origin, setOrigin] = useState('');
@@ -536,6 +538,40 @@ export function FlowlineConnect() {
                       <Send className="h-4 w-4 me-1" />
                       {t('step2.test')}
                     </Button>
+                    {w.eventTypes.includes('invoice.overdue') && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={!w.isActive || overdueBacklog.isPending}
+                          >
+                            {t('step2.backlog')}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>{t('step2.backlogTitle')}</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {t('step2.backlogDescription')}
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() =>
+                                overdueBacklog.mutate(w.id, {
+                                  onSuccess: () => toast({ title: t('step2.backlogQueued') }),
+                                  onError: fail,
+                                })
+                              }
+                            >
+                              {t('step2.backlog')}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="ghost" size="icon" aria-label={t('step2.delete')}>

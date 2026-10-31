@@ -443,7 +443,7 @@ describe('FlowLine integration (e2e)', () => {
       expect(inv.body.data.status).toBe('PAID');
     });
 
-    it('emits invoice.overdue once per invoice and due date', async () => {
+    it('emits invoice.overdue once per invoice and due date, old debts only on request', async () => {
       const draft = await a.post('/invoices').send({
         customerId,
         date: isoDay(-40),
@@ -453,6 +453,11 @@ describe('FlowLine integration (e2e)', () => {
       expect(draft.status).toBe(201);
       expect((await a.patch(`/invoices/${draft.body.id}/send`)).status).toBe(200);
 
+      // Overdue before the endpoint subscribed: no flood on the first scan (audit F2) ...
+      expect(await scanner.scan()).toBe(0);
+      // ... until the owner explicitly asks for the backlog.
+      const backlog = await a.post(`/integration-settings/webhooks/${endpointId}/overdue-backlog`);
+      expect(backlog.status).toBe(201);
       expect(await scanner.scan()).toBeGreaterThanOrEqual(1);
       expect(await scanner.scan()).toBe(0);
       await deliver();

@@ -98,6 +98,13 @@ export class IntegrationSettingsController {
     return this.settings.sendTest(orgId, id);
   }
 
+  @Post('webhooks/:id/overdue-backlog')
+  @Permissions('settings.edit')
+  @ApiOperation({ summary: 'Announce invoices that are already overdue on the next scan' })
+  sendOverdueBacklog(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.settings.sendOverdueBacklog(orgId, id);
+  }
+
   @Get('deliveries')
   @Permissions('settings.view')
   listDeliveries(@CurrentOrg() orgId: string, @Query() query: DeliveryQueryDto) {

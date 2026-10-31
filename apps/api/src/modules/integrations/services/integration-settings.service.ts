@@ -51,9 +51,27 @@ const ENDPOINT_SELECT = {
   secretHint: true,
   eventTypes: true,
   isActive: true,
+  overdueNoticesFrom: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.WebhookEndpointSelect;
+
+const OVERDUE_EVENT = 'invoice.overdue';
+
+/**
+ * The new overdue cutoff when an endpoint starts listening to invoice.overdue (subscribes, or is
+ * re-enabled while subscribed): now, so invoices that were already overdue are not announced.
+ * Undefined leaves the stored cutoff as it is.
+ */
+export function overdueCutoffUpdate(
+  before: { eventTypes: string[]; isActive: boolean } | null,
+  after: { eventTypes: string[]; isActive: boolean },
+  now: Date = new Date(),
+): Date | undefined {
+  const listening = (e: { eventTypes: string[]; isActive: boolean } | null) =>
+    !!e && e.isActive && e.eventTypes.includes(OVERDUE_EVENT);
+  return listening(after) && !listening(before) ? now : undefined;
+}
 
 /** Settings-screen operations (JWT + settings permissions). Never returns stored secrets. */
 @Injectable()
@@ -170,17 +188,26 @@ export class IntegrationSettingsService {
         secretCiphertext: sealSecret(dto.secret, `${organizationId}:${id}`),
         secretHint: secretHint(dto.secret),
         eventTypes: dto.eventTypes,
+        overdueNoticesFrom: overdueCutoffUpdate(null, {
+          eventTypes: dto.eventTypes,
+          isActive: true,
+        }),
       },
       select: ENDPOINT_SELECT,
     });
   }
 
   async updateEndpoint(organizationId: string, id: string, dto: UpdateWebhookEndpointDto) {
-    await this.ownedEndpoint(organizationId, id);
+    const before = await this.ownedEndpoint(organizationId, id);
     if (dto.url !== undefined) await assertPublicWebhookUrl(dto.url);
+    const overdueNoticesFrom = overdueCutoffUpdate(before, {
+      eventTypes: dto.eventTypes ?? before.eventTypes,
+      isActive: dto.isActive ?? before.isActive,
+    });
     return this.prisma.webhookEndpoint.update({
       where: { id },
       data: {
+        ...(overdueNoticesFrom ? { overdueNoticesFrom } : {}),
         ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
         ...(dto.url !== undefined ? { url: dto.url.trim() } : {}),
         ...(dto.eventTypes !== undefined ? { eventTypes: dto.eventTypes } : {}),
@@ -204,6 +231,22 @@ export class IntegrationSettingsService {
       data: { deletedAt: new Date(), isActive: false },
     });
     return { message: 'Webhook endpoint deleted' };
+  }
+
+  /**
+   * Explicit opt-in to the overdue backlog: the next hourly scan announces every invoice that is
+   * overdue now, not only those that fall due from now on (audit F2).
+   */
+  async sendOverdueBacklog(organizationId: string, id: string) {
+    const endpoint = await this.ownedEndpoint(organizationId, id);
+    if (!endpoint.eventTypes.includes(OVERDUE_EVENT)) {
+      throw new BadRequestException('The endpoint does not subscribe to invoice.overdue');
+    }
+    return this.prisma.webhookEndpoint.update({
+      where: { id },
+      data: { overdueNoticesFrom: new Date(0) },
+      select: ENDPOINT_SELECT,
+    });
   }
 
   /** Sends a signed `mizano.test` event now and reports the outcome of the first attempt. */

@@ -85,7 +85,7 @@ export class WebhookOutboxService {
     organizationId: string,
     type: Extract<WebhookEventType, `invoice.${string}`>,
     invoiceId: string,
-    options: { dedupeKey?: string; source?: EventSource } = {},
+    options: { dedupeKey?: string; endpointIds?: string[]; source?: EventSource } = {},
   ): Promise<string | null> {
     if (!(await this.hasSubscribers(db, organizationId, type))) return null;
     const [invoice, baseCurrency] = await Promise.all([

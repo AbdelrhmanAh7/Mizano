@@ -3114,6 +3114,10 @@ model WebhookEndpoint {
   secretHint     String
   eventTypes     String[]
   isActive       Boolean   @default(true)
+  /// invoice.overdue goes only to invoices due on or after this day (UTC): set when the endpoint
+  /// starts listening to it, so the first scan never floods it with old debts. Null means the
+  /// endpoint's createdAt; the "send backlog" action sets the epoch.
+  overdueNoticesFrom DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?

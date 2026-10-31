@@ -17,11 +17,13 @@ jest.mock('@/lib/hooks/use-permissions', () => ({
 
 const createKey = jest.fn();
 const createWebhook = jest.fn();
+const sendBacklog = jest.fn();
 const mutation = (mutate = jest.fn()) => ({ mutate, isPending: false });
 const ok = <T,>(data: T) => ({ data, isLoading: false, isError: false, refetch: jest.fn() });
 
 let deliveries = ok<unknown[]>([]);
 let keys = ok<unknown[]>([]);
+let endpoints = ok<unknown[]>([]);
 
 jest.mock('@/lib/hooks/use-integrations', () => ({
   useIntegrationCatalog: () =>
@@ -32,7 +34,7 @@ jest.mock('@/lib/hooks/use-integrations', () => ({
       encryptionConfigured: false,
     }),
   useIntegrationKeys: () => keys,
-  useWebhookEndpoints: () => ok([]),
+  useWebhookEndpoints: () => endpoints,
   useWebhookDeliveries: () => deliveries,
   useCreateIntegrationKey: () => mutation(createKey),
   useRevokeIntegrationKey: () => mutation(),
@@ -40,6 +42,7 @@ jest.mock('@/lib/hooks/use-integrations', () => ({
   useUpdateWebhookEndpoint: () => mutation(),
   useDeleteWebhookEndpoint: () => mutation(),
   useTestWebhookEndpoint: () => mutation(),
+  useSendOverdueBacklog: () => mutation(sendBacklog),
   useRedeliverWebhook: () => mutation(),
 }));
 
@@ -59,6 +62,29 @@ describe('FlowlineConnect', () => {
     createWebhook.mockReset();
     deliveries = ok([]);
     keys = ok([]);
+    endpoints = ok([]);
+    sendBacklog.mockReset();
+  });
+
+  it('sends the overdue backlog only after an explicit confirmation (audit F2)', () => {
+    endpoints = ok([
+      {
+        id: 'w1',
+        name: 'FlowLine',
+        url: 'https://flow.example/api/public/webhooks/x',
+        secretHint: 'whs…ab12',
+        eventTypes: ['invoice.overdue'],
+        isActive: true,
+        createdAt: '2026-10-31T00:00:00.000Z',
+        updatedAt: '2026-10-31T00:00:00.000Z',
+      },
+    ]);
+    render(<FlowlineConnect />);
+    fireEvent.click(screen.getByRole('button', { name: 'step2.backlog' }));
+    expect(sendBacklog).not.toHaveBeenCalled();
+    expect(screen.getByText('step2.backlogDescription')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'step2.backlog' }));
+    expect(sendBacklog).toHaveBeenCalledWith('w1', expect.any(Object));
   });
 
   it('has every string in English and Arabic', () => {

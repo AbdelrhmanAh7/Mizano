@@ -104,6 +104,9 @@ export const integrationsApi = {
   deleteWebhook: async (id: string): Promise<void> => {
     await api.delete(`${base}/webhooks/${id}`);
   },
+  /** Announce invoices that were already overdue when the webhook subscribed (next scan). */
+  sendOverdueBacklog: async (id: string): Promise<WebhookEndpoint> =>
+    unwrap<WebhookEndpoint>((await api.post(`${base}/webhooks/${id}/overdue-backlog`)).data),
   testWebhook: async (id: string): Promise<TestDeliveryResult> =>
     unwrap<TestDeliveryResult>((await api.post(`${base}/webhooks/${id}/test`)).data),
   listDeliveries: async (params?: {
