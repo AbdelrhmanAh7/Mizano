@@ -10,6 +10,24 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateCustomerDto } from '../dto/create-customer.dto';
 import { UpdateCustomerDto } from '../dto/update-customer.dto';
 
+type CustomerAddress = CreateCustomerDto['billingAddress'];
+
+/** The flat billing and shipping columns of the two address objects (undefined leaves a column). */
+function flatAddresses(billing: CustomerAddress, shipping: CustomerAddress) {
+  return {
+    billingStreet: billing?.street,
+    billingCity: billing?.city,
+    billingState: billing?.state,
+    billingPostalCode: billing?.postalCode,
+    billingCountry: billing?.country,
+    shippingStreet: shipping?.street,
+    shippingCity: shipping?.city,
+    shippingState: shipping?.state,
+    shippingPostalCode: shipping?.postalCode,
+    shippingCountry: shipping?.country,
+  };
+}
+
 @Injectable()
 export class CustomersService {
   constructor(
@@ -18,24 +36,29 @@ export class CustomersService {
   ) {}
 
   async create(organizationId: string, createCustomerDto: CreateCustomerDto) {
+    // The address objects map to flat columns; Prisma rejects them as fields of their own.
+    const { billingAddress, shippingAddress, ...fields } = createCustomerDto;
     const customer = await this.prisma.customer.create({
       data: {
-        ...createCustomerDto,
-        billingStreet: createCustomerDto.billingAddress?.street,
-        billingCity: createCustomerDto.billingAddress?.city,
-        billingState: createCustomerDto.billingAddress?.state,
-        billingPostalCode: createCustomerDto.billingAddress?.postalCode,
-        billingCountry: createCustomerDto.billingAddress?.country,
-        shippingStreet: createCustomerDto.shippingAddress?.street,
-        shippingCity: createCustomerDto.shippingAddress?.city,
-        shippingState: createCustomerDto.shippingAddress?.state,
-        shippingPostalCode: createCustomerDto.shippingAddress?.postalCode,
-        shippingCountry: createCustomerDto.shippingAddress?.country,
+        ...fields,
+        // A customer without an explicit currency uses the org base currency, never the
+        // column's USD default (audit B5/F4).
+        currency: fields.currency ?? (await this.baseCurrency(organizationId)),
+        ...flatAddresses(billingAddress, shippingAddress),
         organizationId,
       },
     });
 
     return customer;
+  }
+
+  private async baseCurrency(organizationId: string): Promise<string> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { baseCurrency: true },
+    });
+    if (!org) throw new NotFoundException('Organization not found');
+    return org.baseCurrency;
   }
 
   async findAll(organizationId: string, query: PaginationDto) {
@@ -161,21 +184,10 @@ export class CustomersService {
       throw new NotFoundException('Customer not found');
     }
 
+    const { billingAddress, shippingAddress, ...fields } = updateCustomerDto;
     const updatedCustomer = await this.prisma.customer.update({
       where: { id },
-      data: {
-        ...updateCustomerDto,
-        billingStreet: updateCustomerDto.billingAddress?.street,
-        billingCity: updateCustomerDto.billingAddress?.city,
-        billingState: updateCustomerDto.billingAddress?.state,
-        billingPostalCode: updateCustomerDto.billingAddress?.postalCode,
-        billingCountry: updateCustomerDto.billingAddress?.country,
-        shippingStreet: updateCustomerDto.shippingAddress?.street,
-        shippingCity: updateCustomerDto.shippingAddress?.city,
-        shippingState: updateCustomerDto.shippingAddress?.state,
-        shippingPostalCode: updateCustomerDto.shippingAddress?.postalCode,
-        shippingCountry: updateCustomerDto.shippingAddress?.country,
-      },
+      data: { ...fields, ...flatAddresses(billingAddress, shippingAddress) },
     });
 
     return updatedCustomer;
