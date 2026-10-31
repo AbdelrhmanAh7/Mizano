@@ -14,7 +14,7 @@ import {
   InvoicesService,
   RECEIVABLE_INVOICE_STATUSES,
 } from '../../sales/services/invoices.service';
-import { startOfTodayUtc } from '../../sales/utils/sales-helpers';
+import { startOfTodayUtc } from '../../../common/utils/sales-helpers';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CreateCustomerDto } from '../../sales/dto/create-customer.dto';
 import { CreateInvoiceDto } from '../../sales/dto/create-invoice.dto';
