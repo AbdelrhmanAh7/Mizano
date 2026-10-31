@@ -27,6 +27,7 @@ type InvoiceLabel =
   | 'invoiceDate'
   | 'dueDate'
   | 'reference'
+  | 'etaUuid'
   | 'balanceDue'
   | 'notes'
   | 'terms';
@@ -40,6 +41,7 @@ const INVOICE_LABELS: Record<DocumentLocale, DocumentCopy<InvoiceLabel>> = {
     invoiceDate: 'Invoice Date:',
     dueDate: 'Due Date:',
     reference: 'Reference:',
+    etaUuid: 'ETA UUID:',
     balanceDue: 'Balance Due:',
     notes: 'Notes',
     terms: 'Terms & Conditions',
@@ -60,6 +62,7 @@ const INVOICE_LABELS: Record<DocumentLocale, DocumentCopy<InvoiceLabel>> = {
     invoiceDate: 'تاريخ الفاتورة:',
     dueDate: 'تاريخ الاستحقاق:',
     reference: 'المرجع:',
+    etaUuid: 'معرّف الفاتورة الإلكترونية لدى مصلحة الضرائب:',
     balanceDue: 'الرصيد المستحق:',
     notes: 'ملاحظات',
     terms: 'الشروط والأحكام',
@@ -98,6 +101,7 @@ export interface InvoiceData {
   notes?: string;
   terms?: string;
   reference?: string;
+  externalEInvoiceNumber?: string;
 }
 
 /**
@@ -184,6 +188,14 @@ export function generateInvoiceHtml(
                   ? `<tr>
                 <td style="padding-block: 5px; padding-inline-end: 20px; color: #6B7280; font-size: 12px;">${l.reference}</td>
                 <td style="padding: 5px 0; font-size: 12px; font-weight: bold;"><bdi>${escapeHtml(invoice.reference)}</bdi></td>
+              </tr>`
+                  : ''
+              }
+              ${
+                invoice.externalEInvoiceNumber
+                  ? `<tr>
+                <td style="padding-block: 5px; padding-inline-end: 20px; color: #6B7280; font-size: 12px;">${l.etaUuid}</td>
+                <td style="padding: 5px 0; font-size: 12px; overflow-wrap: anywhere;"><bdi>${escapeHtml(invoice.externalEInvoiceNumber)}</bdi></td>
               </tr>`
                   : ''
               }

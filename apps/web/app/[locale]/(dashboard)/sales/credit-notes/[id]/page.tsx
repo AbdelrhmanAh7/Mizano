@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, User, Calendar, FileText, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ExternalEInvoiceReference } from '@/components/sales/external-einvoice-reference';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -13,11 +14,13 @@ import {
   getCreditNoteTypeColor,
   getCreditNoteTypeLabel,
 } from '@/lib/hooks/use-credit-notes';
+import { usePermissions } from '@/lib/hooks/use-permissions';
 import { format } from 'date-fns';
 import { useDateFnsLocale } from '@/lib/date-locale';
 
 export default function CreditNoteDetailPage() {
   const dateLocale = useDateFnsLocale();
+  const { hasPermission } = usePermissions();
   const params = useParams();
   const t = useTranslations('sales');
   const creditNoteId = params.id as string;
@@ -106,6 +109,13 @@ export default function CreditNoteDetailPage() {
           </div>
         </div>
       </div>
+
+      <ExternalEInvoiceReference
+        id={creditNote.id}
+        kind="credit-notes"
+        reference={creditNote.externalEInvoiceNumber}
+        canEdit={hasPermission('sales.edit') && !creditNote.deletedAt}
+      />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

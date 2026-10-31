@@ -14,7 +14,6 @@ import {
   CacheResponse,
   CacheTTL,
   CurrentOrg,
-  InvalidateCache,
   InvalidatesLedger,
   Permissions,
 } from '../../../common/decorators';
@@ -102,7 +101,7 @@ export class VendorCreditsController {
 
   @Post(':id/apply-to-bill')
   @Permissions('purchases.edit')
-  @InvalidateCache('vendor-credits:*', 'bills:*', 'vendors:*')
+  @InvalidatesLedger('vendor-credits:*', 'bills:*', 'vendors:*')
   @ApiOperation({ summary: 'Apply vendor credit to a bill balance (no journal)' })
   applyToBill(
     @CurrentOrg() orgId: string,

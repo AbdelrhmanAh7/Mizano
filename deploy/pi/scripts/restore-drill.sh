@@ -1,52 +1,53 @@
 #!/usr/bin/env bash
-# Restore the latest backup into a throwaway Postgres container and sanity-check it.
-# Needs the age PRIVATE identity: AGE_IDENTITY_FILE=/path/key.txt restore-drill.sh
+# Always restores to a new, network-isolated scratch Postgres and a temporary originals folder.
 set -euo pipefail
+here="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=deploy/pi/scripts/lib.sh
-. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-
-: "${AGE_IDENTITY_FILE:?set AGE_IDENTITY_FILE to the age private key file}"
-dir="$DATA_DIR/backups"
-latest="$(find "$dir" -maxdepth 1 -name 'db-*.dump.age' | sort | tail -n 1)"
-[ -n "$latest" ] || { echo "no backup found" >&2; exit 1; }
-
-name="mizano-restore-drill-$$"
+. "$here/lib.sh"
+umask 077
+require_restic
+backup_host="${BACKUP_HOST:-$(hostname)}"
+set_name="${BACKUP_SET:-default}"
+[[ "$set_name" =~ ^[a-zA-Z0-9_-]+$ ]] || { echo "invalid backup set" >&2; exit 2; }
 work="$(mktemp -d)"
+name="mizano-restore-drill-$(python3 -c 'import secrets; print(secrets.token_hex(12))')"
+container_id=""
+started=$SECONDS
 cleanup() {
-  docker rm -f "$name" >/dev/null 2>&1 || true
+  if [ -n "$container_id" ]; then
+    docker rm -fv "$container_id" >/dev/null 2>&1 || return 1
+    container_id=""
+  fi
   rm -rf "$work"
 }
 trap cleanup EXIT
-
-log "decrypting $(basename "$latest")"
-age -d -i "$AGE_IDENTITY_FILE" -o "$work/db.dump" "$latest"
-chmod 644 "$work/db.dump"
-chmod 755 "$work"
-
-drill_pw="$(head -c 18 /dev/urandom | base64 | tr -d '/+=')"
-docker run -d --name "$name" -e POSTGRES_PASSWORD="$drill_pw" -e POSTGRES_DB=drill \
-  -v "$work:/restore:ro" postgres:16 >/dev/null
-# Probe over TCP: the temporary init server only listens on the unix socket.
+# Pin latest to one complete snapshot before reading it; never restore a caller-supplied DB URL.
+restic snapshots --json --host "$backup_host" --tag "mizano,$set_name" --latest 1 >"$work/snapshots.json" 2>/dev/null \
+  || { echo "DRILL FAILED: cannot list snapshots (password file, repository or lock)" >&2; exit 1; }
+snapshot="$(python3 -c 'import json,sys; rows=json.load(open(sys.argv[1])); print(max(rows,key=lambda r:r["time"])["id"] if rows else "")' "$work/snapshots.json" 2>/dev/null)" \
+  || { echo "DRILL FAILED: unreadable snapshot list" >&2; exit 1; }
+[[ "$snapshot" =~ ^[0-9a-f]{8,64}$ ]] || { echo "no valid backup snapshot" >&2; exit 1; }
+restic dump "$snapshot" /mizano.tar >"$work/backup.tar" 2>/dev/null \
+  || { echo "DRILL FAILED: cannot read the snapshot archive" >&2; exit 1; }
+log "restore stage=verify-files"
+python3 "$here/backup-manifest.py" unpack "$work/backup.tar" "$work"
+# Credentials are generated for this one scratch container and removed with it.
+drill_pw="$(python3 -c 'import secrets; print(secrets.token_hex(24))')"
+container_id="$(docker run -d --name "$name" --network none --memory 384m \
+  -e POSTGRES_PASSWORD="$drill_pw" -e POSTGRES_DB=drill \
+  "${RESTORE_POSTGRES_IMAGE:-postgres:16}" -c shared_buffers=64MB -c max_connections=10 2>/dev/null)" \
+  || { echo "DRILL FAILED: cannot start the scratch database (image pull or Docker)" >&2; exit 1; }
 ready=0
 for _ in $(seq 1 60); do
-  if docker exec "$name" pg_isready -h 127.0.0.1 -U postgres -d drill >/dev/null 2>&1; then
-    ready=1
-    break
-  fi
-  sleep 2
+  if docker exec "$name" pg_isready -h 127.0.0.1 -U postgres -d drill >/dev/null 2>&1; then ready=1; break; fi
+  sleep 1
 done
-[ "$ready" -eq 1 ] || { echo "DRILL FAILED: postgres not ready" >&2; exit 1; }
-
-docker exec "$name" pg_restore -U postgres -d drill --no-owner --exit-on-error /restore/db.dump
-psql_q() { docker exec "$name" psql -U postgres -d drill -tA -c "$1"; }
-
-tables="$(psql_q "select count(*) from information_schema.tables where table_schema='public'")"
-[ "$tables" -gt 0 ] || { echo "DRILL FAILED: no tables" >&2; exit 1; }
-
-# Journal lines must balance. Table/column names follow the Prisma schema.
-exists="$(psql_q "select to_regclass('public.journal_lines') is not null and to_regclass('public.journals') is not null")"
-[ "$exists" = "t" ] || { echo "DRILL FAILED: journals/journal_lines tables missing" >&2; exit 1; }
-# Every posted, non-deleted journal must balance on its own (debits = credits).
-unbalanced="$(psql_q 'select count(*) > 0 from (select j.id from journals j join journal_lines l on l."journalId" = j.id where j."isPosted" and j."deletedAt" is null group by j.id having sum(l.debit) <> sum(l.credit)) u')"
-[ "$unbalanced" = "f" ] || { echo "DRILL FAILED: debits do not equal credits" >&2; exit 1; }
-log "restore drill OK: $tables tables, journals balanced"
+[ "$ready" -eq 1 ] || { echo "DRILL FAILED: scratch database not ready" >&2; exit 1; }
+log "restore stage=database"
+docker exec -i "$name" pg_restore -U postgres -d drill --no-owner --no-privileges --exit-on-error \
+  <"$work/db.dump" >/dev/null 2>&1
+log "restore stage=verify-ledger-links"
+python3 "$here/backup-manifest.py" verify-db "$name" "$work"
+cleanup || { echo "DRILL FAILED: scratch cleanup" >&2; exit 1; }
+trap - EXIT
+log "restore drill OK snapshot=$snapshot elapsed_seconds=$((SECONDS-started))"

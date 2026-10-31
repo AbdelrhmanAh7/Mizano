@@ -4,7 +4,7 @@ Applies repository-wide. Read this first, then the provider entrypoint, [current
 
 ## Goal
 
-Run a tiny live deployment on a **Raspberry Pi 5 (8GB, arm64)** with the full accountant flow: core ledger (AP/AR, reports, Arabic/English) + invoice intake (web upload, CPU-only extraction, validated drafts, batch approval) + Telegram ingestion. Tracking epic: GitHub issue #45. Milestones: P1 Pi platform, P2 Ledger correctness, P3 Intake & Telegram, P4 Pi go-live. Project board: `Mizano — Pi Live`.
+Run a tiny live deployment on a **Raspberry Pi 5 (8GB, arm64)** with the full accountant flow: core ledger (AP/AR, reports, Arabic/English) + invoice intake (web upload, CPU-only extraction, validated drafts, batch approval) + Telegram ingestion. Tracking epic: issue #45 (closed; work is now tracked in the "First client ready" milestone). Milestones: "First client ready" and "First month" (the older P1–P4 milestones are closed). Project board: "Mizano — First client" once the owner grants the GitHub `project` scope.
 
 ## Non-negotiable domain rules
 
@@ -23,11 +23,15 @@ Run a tiny live deployment on a **Raspberry Pi 5 (8GB, arm64)** with the full ac
 - Start from current GitHub `master` and record its SHA. Read the current issue state before taking work; do not treat this document's initial dates as proof of progress.
 - Exactly one coordinator; it owns shared contracts/schema and the integration branch. Each implementer has one issue, branch and worktree. Use a lease/claim with owner, scope, expiry and heartbeat; no concurrent editing of shared paths.
 - Four logical lanes may run together, but local CPU/RAM and build concurrency determine execution limits. At most one expensive build/test at a time on a small host; no four competing OCR workers.
-- Owner decision (31 Oct 2026): no pull requests are required. Work happens on a branch, passes the full local gates (lint, type-check, unit tests, knip, jscpd), is reviewed by an independent CLI reviewer from a different provider than the author (Codex CLI or Antigravity CLI, read-only, on the exact tested head; record the reviewer and the SHA in the merge commit), and is merged straight into `master` once the blockers are fixed. Author self-review is not independent approval. Never bypass identity or permission controls.
+- Owner decision (31 Oct 2026): no pull request *reviews* are wanted. `master`'s ruleset still requires a pull request with its 4 checks (Install Dependencies, Lint & Type Check, Unit Tests, Build), so a PR is only the merge vehicle (see [github-work](.claude/skills/github-work/SKILL.md)). Work happens on a branch, passes the local gates (lint, type-check, unit tests of what you touched, knip, jscpd), is reviewed by an independent CLI reviewer from a different provider than the author (read-only, on the exact tested head; record the reviewer and the SHA in the PR), and is merged once the blockers are fixed. Author self-review is not independent approval. Never bypass identity or permission controls.
 - Before writing code, a worker brief or a review, read [review lessons](docs/agents/review-lessons.md): every rule there is a past review finding. Add new root causes to it in the change that fixes them. Bot reviews on GitHub (CodeRabbit, `/code-review`) are optional extras, never a merge gate.
 - Read only needed paths and diff. Return evidence, not full transcripts. One bounded retry on quota/transient failure, then checkpoint/route to an available provider. Do not spawn endless workers or guess CLI flags.
 - Keep Next.js/NestJS/PostgreSQL/Redis and current shared packages. No framework rewrite or new HR/CRM/manufacturing scope during this sprint. Follow existing TypeScript/module/i18n conventions.
 - Explicitly handle loading/empty/error/reconnect states; preserve Arabic/English and RTL. Use real APIs and reconciled report data, not demo-only fake success responses.
+
+## Tracked work and the owner's Notion page
+
+Pick, branch, label and ship work by [github-work](.claude/skills/github-work/SKILL.md): milestone "First client ready", `Closes #`, the Project card, and the PR-as-merge-vehicle rule with the 4 checks. After anything ships, refresh the owner's Notion page by [notion-sync](.claude/skills/notion-sync/SKILL.md). Claude loads both as skills; Codex and Antigravity read the same files and follow them step by step.
 
 ## Validation and release
 

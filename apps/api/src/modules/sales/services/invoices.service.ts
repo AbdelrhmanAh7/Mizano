@@ -136,6 +136,7 @@ export class InvoicesService {
       where.OR = [
         { invoiceNumber: { contains: search, mode: 'insensitive' } },
         { reference: { contains: search, mode: 'insensitive' } },
+        { externalEInvoiceNumber: { contains: search, mode: 'insensitive' } },
         { customer: { name: { contains: search, mode: 'insensitive' } } },
       ];
     }
@@ -198,6 +199,7 @@ export class InvoicesService {
       where.OR = [
         { invoiceNumber: { contains: search, mode: 'insensitive' } },
         { reference: { contains: search, mode: 'insensitive' } },
+        { externalEInvoiceNumber: { contains: search, mode: 'insensitive' } },
         { customer: { name: { contains: search, mode: 'insensitive' } } },
       ];
     }
@@ -528,7 +530,7 @@ export class InvoicesService {
   async remove(organizationId: string, id: string) {
     const { count } = await this.prisma.invoice.updateMany({
       where: { id, organizationId, deletedAt: null, status: InvoiceStatus.DRAFT },
-      data: { deletedAt: new Date() },
+      data: { deletedAt: new Date(), externalEInvoiceNumber: null },
     });
     if (count === 0) {
       const exists = await this.prisma.invoice.findFirst({

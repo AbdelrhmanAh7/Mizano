@@ -12,10 +12,16 @@ describe('payables reports net unapplied vendor credits', () => {
     date: new Date('2029-12-01'),
     billDate: null,
     dueDate: new Date('2030-01-01'),
+    grandTotal: new Decimal(balance),
     balanceDue: new Decimal(balance),
+    billAllocations: [],
+    appliedCredits: [],
     vendor: { id: vendorId, name: `Vendor ${vendorId}` },
   });
   const credit = (vendorId: string, amount: string) => ({
+    id: `vc-${vendorId}-${amount}`,
+    date: new Date('2029-12-02'),
+    deletedAt: null,
     vendorId,
     amount: new Decimal(amount),
     vendor: { id: vendorId, name: `Vendor ${vendorId}` },
@@ -29,17 +35,16 @@ describe('payables reports net unapplied vendor credits', () => {
       vendorCredit: {
         findMany: jest.fn().mockResolvedValue([credit('v1', '150.5'), credit('v1', '49.5')]),
       },
+      billAllocation: { findMany: jest.fn().mockResolvedValue([]) },
     };
     const service = new AgingReportsService(prisma as unknown as ReadReplicaService);
 
-    const report = await service.getPayablesAging(ORG);
+    const report = await service.getPayablesAging(ORG, '2029-12-31');
 
-    expect(prisma.vendorCredit.findMany.mock.calls[0][0].where).toMatchObject({
-      organizationId: ORG,
-      deletedAt: null,
-      appliedToBillId: null,
-      refundedAt: null,
-    });
+    const creditWhere = prisma.vendorCredit.findMany.mock.calls[0][0].where;
+    expect(creditWhere).toMatchObject({ organizationId: ORG });
+    expect(creditWhere.AND[0].OR[0]).toEqual({ appliedToBillId: null });
+    expect(creditWhere.AND[1].OR[0]).toEqual({ refundedAt: null });
     // Money is exact and travels as 4-dp strings, like the receivables aging (review-lessons §6).
     expect(report.summary.total).toBe('256.0000');
     expect(report.summary.current).toBe('256.0000');

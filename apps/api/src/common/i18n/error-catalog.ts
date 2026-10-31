@@ -175,6 +175,16 @@ const AUTH_ERRORS: ErrorCatalogEntry[] = [
     ar: 'رابط إعادة تعيين كلمة المرور غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا.',
   },
   {
+    code: 'PASSWORD_RESET_LINK_ADMIN_ONLY',
+    en: 'Only an organization admin can create a password reset link',
+    ar: 'إنشاء رابط إعادة تعيين كلمة المرور متاح لمدير المنشأة فقط.',
+  },
+  {
+    code: 'PASSWORD_RESET_MEMBER_INACTIVE',
+    en: 'Only an active member can get a password reset link',
+    ar: 'لا يمكن إنشاء رابط لإعادة تعيين كلمة المرور إلا لعضو نشط.',
+  },
+  {
     code: 'PASSWORD_RESET_SENT',
     en: 'If an account exists for this email, we sent a link to reset the password.',
     ar: 'إذا كان هناك حساب بهذا البريد الإلكتروني، فقد أرسلنا إليه رابطًا لإعادة تعيين كلمة المرور.',
@@ -832,6 +842,11 @@ const ACCOUNTING_ERRORS: ErrorCatalogEntry[] = [
 
 /** Customers, quotes, invoices, credit notes, payments, delivery challans. */
 const SALES_ERRORS: ErrorCatalogEntry[] = [
+  {
+    code: 'EXTERNAL_EINVOICE_REFERENCE_EXISTS',
+    en: 'This ETA reference is already used in this organization',
+    ar: 'مرجع الفاتورة الإلكترونية مستخدم بالفعل في هذه المنشأة.',
+  },
   { code: 'CUSTOMER_NOT_FOUND', en: 'Customer not found', ar: 'العميل غير موجود.' },
   {
     code: 'CUSTOMER_EMAIL_EXISTS',

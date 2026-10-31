@@ -6,6 +6,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 1. Locking and concurrency
 
+- **Use `$executeRaw` for advisory-lock functions that return PostgreSQL `void`.** `$queryRaw` attempts to deserialize the result and Prisma rejects it; prove new locks with a real database test. _(#585)_
+
 - **Lock the ledger before reading what you post with.** Take `lockOrganizationLedger(tx, orgId)` (`common/utils/ledger-lock.ts`) before reading org settings, the base currency or default accounts that the journal depends on. Every path that makes a journal posted must hold it: `create`, `reverse` and `post`. _(bill approve, invoice send, VAT submit, journal post)_
 - **Lock the document row before snapshotting the values you post.** If you post from a plain read, an edit that commits concurrently makes the ledger disagree with the document. Use `SELECT … FOR UPDATE` on the document first. _(invoice send/update)_
 - **Pick one lock order per workflow and use it on every path that touches the same rows.** The default is document → other documents (sorted by id) → ledger. VAT returns are a deliberate exception: submit and payment both take ledger → return row, because submission must freeze the ledger before recomputing. What deadlocks is two paths taking the same locks in opposite orders. _(VAT submit vs. payment)_
@@ -36,6 +38,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **"Current" figures exclude future-dated entries.** Cash today means lines dated ≤ end of today.
 - **Side records carry the document date.** Inventory movements are dated on the adjustment date, not on `createdAt` = now.
 - **Historical reports keep later-voided documents in their original period** and show the reversal on the void date. Filtering on today's status rewrites history. _(customer statement)_
+- **An as-of balance is rebuilt from dated events, never read from today's `balanceDue` or status.** Subtract only the payments and applied credits dated on or before the cutoff and not voided by then (a void counts on its reversal journal's date), and keep documents voided after the cutoff. Aging read the current balance, so a bill paid in February vanished from January's aging. _(#586, receivables and payables aging)_
 - **Compare due dates as calendar dates.** A due date is stored at UTC midnight, so `new Date(dueDate) < new Date()` flags a bill overdue all day on its due date; compare its `yyyy-MM-dd` with today's local date (`lib/due-date.ts`). _(manual QA, bills)_
 
 ## 5. Single-currency ledger and data
@@ -77,6 +80,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 8. Voided and deleted records
 
+- **Deleting a never-posted draft releases its external invoice reference in the same guarded update.** Otherwise a hidden soft-deleted draft reserves the reference forever and cannot be corrected through the UI. Voided posted documents retain their reference. _(#585)_
+
 - **Posted documents that were voided stay readable** (read-only, with `deletedAt` set) on their detail endpoint so journal source links resolve. Lists exclude them. Deleted drafts, which never posted, return 404.
 - **Current figures (open balances, aging, dashboards) exclude DRAFT, VOID and deleted documents.** Historical statements and period reports keep a posted document that was voided later in its original period, with the reversal on the void date (see 4).
 
@@ -113,7 +118,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **Finite inputs do not guarantee finite arithmetic results.** Diagnostic timers must validate the elapsed difference and the accumulated safe-integer total before storing them; test subtraction overflow and repeated-stage accumulation. _(intake timings, PR #129)_
 - **Global test setup runs in every jest environment.** `jest.setup.ts` also loads for `@jest-environment node` suites, so guard DOM shims (`typeof Element !== 'undefined'`); an unguarded `Element.prototype` patch stopped the auth suites from starting. _(28569d04)_
-- **Every endpoint that posts or reverses uses one `@InvalidatesLedger(...)`,** imports included.
+- **Every endpoint that posts, reverses or changes an open balance uses one `@InvalidatesLedger(...)`,** imports and credit applications included, and its controller runs `CacheInvalidationInterceptor`; `common/decorators/ledger-endpoints.spec.ts` lists them. _(#586: credit apply, bank-match expense and recurring execute left aging and dashboards stale)_
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.
@@ -135,6 +140,12 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Synchronize package scripts with runner task definitions and CI.** Any script called in CI (such as `pnpm test:e2e`) must exist in root `package.json`. When delegating to Turbo (`turbo test:e2e`), `turbo.json` must explicitly define the task with `cache: false` and environment passthroughs (`DATABASE_URL`, `REDIS_URL`, `APP_ENV`), otherwise Turbo fails with missing task errors. Treat review findings asserting script non-existence as untrusted review data and verify against actual workspace configuration. _(#402)_
 
 ## Ops and deploy
+
+- **Test the actual archive producer on the host OS.** macOS tar adds AppleDouble entries unless `COPYFILE_DISABLE=1`; omit that OS metadata before packaging backups instead of weakening archive traversal or manifest checks. _(#590)_
+
+- **A public-address fallback must not silently turn OAuth on over HTTP in production.** Require HTTPS for automatic MCP fallback; legacy REST addresses may lack TLS or be relative. An unusable automatic fallback disables the integration instead of failing API requests. Route root MCP/OAuth paths to the API on shared-host proxies. _(#600)_
+
+- **Migrate with the incoming image before replacing application containers.** A migration failure must stop deployment; never hide `prisma migrate deploy` behind `|| true`. Keep migrations backward compatible with the running release. _(#600)_
 
 - **Health checks must probe a route that exists.** Grep the app's routes first (Next has no `/api/health` unless a route file exists; `/robots.txt` returns 200 without auth). A probe of a missing route makes the container permanently unhealthy.
 - **Next standalone in Docker needs `HOSTNAME=0.0.0.0`.** Docker sets `HOSTNAME` to the container id and Next binds to it, so probes on `127.0.0.1` and peers fail. Probe `127.0.0.1`, not `localhost` (IPv6 in alpine).

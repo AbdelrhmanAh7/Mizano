@@ -50,3 +50,10 @@ export class ResetPasswordDto {
   @StrongPassword()
   password: string;
 }
+
+export class MemberResetLinkDto {
+  @ApiPropertyOptional({ enum: RESET_LOCALES, description: 'Language of the reset page' })
+  @IsOptional()
+  @IsIn(RESET_LOCALES)
+  locale?: ResetLocale;
+}

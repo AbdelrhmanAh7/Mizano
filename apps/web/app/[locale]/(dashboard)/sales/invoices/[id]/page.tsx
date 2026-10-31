@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ExternalEInvoiceReference } from '@/components/sales/external-einvoice-reference';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -508,6 +509,13 @@ export default function InvoiceDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          <ExternalEInvoiceReference
+            id={invoice.id}
+            kind="invoices"
+            reference={invoice.externalEInvoiceNumber}
+            canEdit={canEdit && invoice.status !== 'VOID'}
+          />
 
           {(invoice.notes || invoice.terms) && (
             <Card>

@@ -184,7 +184,7 @@ if (!totalDebits.equals(totalCredits)) throw new BadRequestException('Journal en
 - When adding new features, add corresponding unit tests
 - API tests: `node apps/api/_run_tests.js [--testPathPattern="<pattern>"]` (required for Windows/WSL compatibility)
 - Web tests: `cd apps/web && npx jest [--testPathPattern="<pattern>"]`
-- Always run the full suite (`node apps/api/_run_tests.js` + `cd apps/web && npx jest`) before finalizing changes
+- Run the full suite (`node apps/api/_run_tests.js` + `cd apps/web && npx jest`) through the shared heavy-command queue before finalizing changes; for a PR the 4 required GitHub checks (which run the full suites and the build) count as that run, so do not repeat the full suites locally
 
 ## Git Hooks
 
@@ -244,6 +244,6 @@ Owner decision (31 Oct 2026); design and feature inventory: [docs/plans/ai-own-a
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)                         | System design, modules, domain rules, folder structure, adding code |
 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)                           | Setup, 4-env system, database, testing, CI, hooks, deployment       |
 | [`docs/DESIGN-SYSTEM.md`](docs/DESIGN-SYSTEM.md)                       | Tokens, components, UI patterns, RTL, money display                 |
-| [`docs/roadmap.md`](docs/roadmap.md)                                   | Raspberry Pi live plan (milestones P1–P4)                           |
+| [`docs/roadmap.md`](docs/roadmap.md)                                   | Raspberry Pi live plan (older milestones P1–P4, closed; now "First client ready" and "First month")                           |
 | [`docs/strategy/demo-acceptance.md`](docs/strategy/demo-acceptance.md) | Demo go/no-go contract                                              |
 | [`docs/strategy/`](docs/strategy/)                                     | Vision, repository review, extraction and regional research         |

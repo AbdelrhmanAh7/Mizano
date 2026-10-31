@@ -33,6 +33,6 @@ import { AccountingModule } from '../accounting/accounting.module';
     JwtStrategy,
     JwtRefreshStrategy,
   ],
-  exports: [AuthService, JwtModule],
+  exports: [AuthService, PasswordResetService, JwtModule],
 })
 export class AuthModule {}
