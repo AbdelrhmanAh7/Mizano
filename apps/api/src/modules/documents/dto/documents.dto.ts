@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEmail, IsArray, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsEmail, IsArray, IsDateString, IsIn } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 // ============ Enums ============
@@ -15,6 +15,14 @@ export enum DocumentType {
 }
 
 // ============ Send Document DTOs ============
+
+/** Language of a generated document (`?locale=ar` renders Arabic, right-to-left). */
+export class DocumentLocaleQueryDto {
+  @ApiPropertyOptional({ enum: ['en', 'ar'], default: 'en' })
+  @IsOptional()
+  @IsIn(['en', 'ar'])
+  locale?: 'en' | 'ar';
+}
 
 export class SendDocumentDto {
   @ApiProperty({ description: 'Recipient email address' })

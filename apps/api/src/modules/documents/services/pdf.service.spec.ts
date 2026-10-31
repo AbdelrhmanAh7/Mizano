@@ -220,4 +220,57 @@ describe('PdfService HTML safety', () => {
     expect(lastHtml()).toContain('Head of Security');
     expect(lastHtml()).not.toContain('Field Agent');
   });
+
+  it('renders the invoice in Arabic, right-to-left, in the base currency (audit B3)', async () => {
+    prisma.organization.findUnique.mockResolvedValue({
+      ...ORG_ROW,
+      currency: 'USD', // schema default, not the ledger currency
+      baseCurrency: 'EGP',
+    });
+    prisma.invoice.findFirst = jest.fn().mockResolvedValue({
+      invoiceNumber: 'INV-0001',
+      date: new Date('2026-10-31'),
+      dueDate: new Date('2026-11-30'),
+      status: 'SENT',
+      currencyCode: null,
+      customer: { name: 'شركة النيل للتجارة', email: null, phone: null, address: null },
+      lines: [
+        {
+          description: 'استشارات',
+          quantity: '1',
+          rate: '1000',
+          discount: null,
+          taxRate: '14',
+          amount: '1000',
+          item: null,
+        },
+      ],
+      subtotal: '1000',
+      taxAmount: '140',
+      shippingAmount: null,
+      grandTotal: '1140',
+      balanceDue: '1140',
+      notes: null,
+      terms: null,
+    });
+
+    await service.generateInvoicePdf('org-1', 'inv-1', 'ar');
+    const ar = lastHtml();
+    expect(prisma.invoice.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'inv-1', organizationId: 'org-1', deletedAt: null } }),
+    );
+    expect(ar).toContain('<html lang="ar" dir="rtl">');
+    expect(ar).toContain('الإجمالي');
+    expect(ar).toContain('شركة النيل للتجارة');
+    expect(ar).toContain("'Noto Sans Arabic'");
+    expect(ar).toContain('1,140.00'); // Western digits
+    expect(ar).toContain(
+      new Intl.NumberFormat('ar-u-nu-latn', { style: 'currency', currency: 'EGP' }).format(1140),
+    );
+    expect(ar).not.toMatch(/US\$|\$\s?1,140/);
+
+    await service.generateInvoicePdf('org-1', 'inv-1');
+    expect(lastHtml()).toContain('<html lang="en" dir="ltr">');
+    expect(lastHtml()).toContain('Balance Due:');
+  });
 });

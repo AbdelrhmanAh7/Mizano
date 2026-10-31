@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleDestroy } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { generateInvoiceHtml, InvoiceData } from '../templates/invoice.template';
 import { generateQuoteHtml, QuoteData } from '../templates/quote.template';
 import { generatePayslipHtml, PayslipData } from '../templates/payslip.template';
 import { generateBillHtml, BillData } from '../templates/bill.template';
 import {
+  DocumentLocale,
   OrganizationInfo,
   escapeHtml,
   formatCurrency,
@@ -12,15 +13,28 @@ import {
   renderLogoHtml,
   safeColor,
 } from '../templates/base.template';
-import { renderHtmlToPdf } from './pdf-renderer';
+import { closePdfBrowser, renderHtmlToPdf } from './pdf-renderer';
 
 @Injectable()
-export class PdfService {
+export class PdfService implements OnModuleDestroy {
   constructor(private prisma: PrismaService) {}
+
+  /** The renderer shares one Chromium process; stop it with the application. */
+  async onModuleDestroy(): Promise<void> {
+    await closePdfBrowser();
+  }
 
   // ============ Invoice PDF ============
 
-  async generateInvoicePdf(organizationId: string, invoiceId: string): Promise<Buffer> {
+  /**
+   * `locale` is the document language (`ar` renders right-to-left). The organization has no
+   * document-language setting, so callers pass the requesting user's UI locale.
+   */
+  async generateInvoicePdf(
+    organizationId: string,
+    invoiceId: string,
+    locale: DocumentLocale = 'en',
+  ): Promise<Buffer> {
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: invoiceId, organizationId, deletedAt: null },
       include: {
@@ -68,12 +82,14 @@ export class PdfService {
         : undefined,
       grandTotal: parseFloat(invoice.grandTotal.toString()),
       balanceDue: parseFloat(invoice.balanceDue.toString()),
-      currency: org.currency || 'SAR',
+      // The document's currency, else the ledger's base currency (never the USD schema default
+      // of Organization.currency).
+      currency: invoice.currencyCode?.trim().toUpperCase() || org.baseCurrency || 'SAR',
       notes: invoice.notes || undefined,
       terms: invoice.terms || undefined,
     };
 
-    const html = generateInvoiceHtml(org, invoiceData);
+    const html = generateInvoiceHtml(org, invoiceData, locale);
     return this.htmlToPdf(html);
   }
 
@@ -714,6 +730,7 @@ export class PdfService {
       footerText: org.footerText || undefined,
       primaryColor: org.primaryColor || undefined,
       currency: org.currency || 'SAR',
+      baseCurrency: org.baseCurrency,
     };
   }
 

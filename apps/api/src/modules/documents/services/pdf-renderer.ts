@@ -9,11 +9,23 @@ import * as puppeteer from 'puppeteer';
  *  - request interception aborts everything except `data:` and `about:` URLs, so injected
  *    `<img>`, `<link>`, `<iframe>`, CSS `url()`, redirects and `file://` can neither reach the
  *    internal network (SSRF) nor read local files;
- *  - every step has a timeout, and the browser is always closed.
+ *  - every render gets its own browser context (no shared cookies, cache or storage between
+ *    renders or tenants), which is always closed;
+ *  - every step has a timeout.
+ *
+ * One Chromium process is shared by all renders and relaunched if it dies: the Raspberry Pi
+ * has too little RAM to start a browser per PDF. At most MAX_CONCURRENT_RENDERS pages render
+ * at once; later requests wait their turn.
+ *
+ * In the API image Chromium comes from Alpine (`apk add chromium`, see apps/api/Dockerfile) and
+ * is found through PUPPETEER_EXECUTABLE_PATH; Puppeteer's own Chrome download is skipped.
  */
 
-/** Hard limit for loading the content and for printing, each. */
+/** Hard limit for launching, loading the content and printing, each. */
 export const PDF_RENDER_TIMEOUT_MS = 30_000;
+
+/** Pages rendered at the same time by the shared browser. */
+export const MAX_CONCURRENT_RENDERS = 2;
 
 /** Only inline content may be loaded by the page. */
 export function isAllowedPdfRequestUrl(url: string): boolean {
@@ -21,19 +33,82 @@ export function isAllowedPdfRequestUrl(url: string): boolean {
   return scheme === 'data' || scheme === 'about';
 }
 
+let sharedBrowser: Promise<puppeteer.Browser> | null = null;
+
+function launchBrowser(timeoutMs: number): Promise<puppeteer.Browser> {
+  const launching = puppeteer
+    .launch({
+      headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        // Docker's /dev/shm is 64 MB; Chromium crashes on larger pages without this.
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+      ],
+      timeout: timeoutMs,
+    })
+    .then((browser) => {
+      browser.once('disconnected', () => {
+        if (sharedBrowser === launching) sharedBrowser = null;
+      });
+      return browser;
+    });
+  // A failed launch is retried by the next render instead of being cached.
+  launching.catch(() => {
+    if (sharedBrowser === launching) sharedBrowser = null;
+  });
+  return launching;
+}
+
+async function getBrowser(timeoutMs: number): Promise<puppeteer.Browser> {
+  if (sharedBrowser) {
+    const browser = await sharedBrowser.catch(() => null);
+    if (browser?.connected) return browser;
+    sharedBrowser = null;
+  }
+  sharedBrowser = launchBrowser(timeoutMs);
+  return sharedBrowser;
+}
+
+let activeRenders = 0;
+const waiting: Array<() => void> = [];
+
+async function acquireRenderSlot(): Promise<void> {
+  if (activeRenders < MAX_CONCURRENT_RENDERS) {
+    activeRenders += 1;
+    return;
+  }
+  // The slot is handed over by releaseRenderSlot, so activeRenders stays the same.
+  await new Promise<void>((resolve) => waiting.push(resolve));
+}
+
+function releaseRenderSlot(): void {
+  const next = waiting.shift();
+  if (next) next();
+  else activeRenders -= 1;
+}
+
+/** Closes the shared browser (application shutdown). The next render launches a new one. */
+export async function closePdfBrowser(): Promise<void> {
+  const current = sharedBrowser;
+  sharedBrowser = null;
+  const browser = await current?.catch(() => null);
+  if (browser) await browser.close().catch(() => undefined);
+}
+
 /** Render `html` to an A4 PDF in a locked-down headless browser. */
 export async function renderHtmlToPdf(
   html: string,
   timeoutMs: number = PDF_RENDER_TIMEOUT_MS,
 ): Promise<Buffer> {
-  let browser: puppeteer.Browser | undefined;
+  await acquireRenderSlot();
+  let context: puppeteer.BrowserContext | undefined;
   try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      timeout: timeoutMs,
-    });
-    const page = await browser.newPage();
+    const browser = await getBrowser(timeoutMs);
+    context = await browser.createBrowserContext();
+    const page = await context.newPage();
 
     // Lock the page down BEFORE any content is set.
     await page.setJavaScriptEnabled(false);
@@ -62,8 +137,7 @@ export async function renderHtmlToPdf(
     });
     return Buffer.from(pdf);
   } finally {
-    if (browser) {
-      await browser.close();
-    }
+    if (context) await context.close().catch(() => undefined);
+    releaseRenderSlot();
   }
 }

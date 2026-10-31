@@ -57,7 +57,67 @@ export interface OrganizationInfo {
   footerText?: string;
   primaryColor?: string;
   currency?: string;
+  /** Ledger currency; documents fall back to it, not to `currency` (a USD schema default). */
+  baseCurrency?: string;
 }
+
+/** Language of a generated document. Arabic renders right-to-left with Western digits. */
+export type DocumentLocale = 'en' | 'ar';
+
+export function documentDirection(locale: DocumentLocale): 'ltr' | 'rtl' {
+  return locale === 'ar' ? 'rtl' : 'ltr';
+}
+
+/** Intl locale for numbers and dates: Arabic with Western (latn) digits, or English. */
+export function intlLocaleFor(locale: DocumentLocale): string {
+  return locale === 'ar' ? 'ar-u-nu-latn' : 'en-SA';
+}
+
+/**
+ * System fonts installed in the API image (apk font-noto-arabic, font-dejavu). The renderer has
+ * no network, so web fonts cannot load; Chromium falls back glyph by glyph along this list, so
+ * Arabic names on an English invoice render too.
+ */
+export function documentFontStack(locale: DocumentLocale): string {
+  return locale === 'ar'
+    ? "'Noto Sans Arabic', 'Noto Naskh Arabic', 'DejaVu Sans', Arial, sans-serif"
+    : "'Helvetica Neue', Helvetica, Arial, 'DejaVu Sans', 'Noto Sans Arabic', sans-serif";
+}
+
+const BASE_LABELS: Record<DocumentLocale, Record<string, string>> = {
+  en: {
+    description: 'Description',
+    qty: 'Qty',
+    rate: 'Rate',
+    taxPercent: 'Tax %',
+    amount: 'Amount',
+    subtotal: 'Subtotal',
+    discount: 'Discount',
+    shipping: 'Shipping',
+    tax: 'Tax (VAT)',
+    total: 'Total',
+    tel: 'Tel',
+    email: 'Email',
+    taxId: 'Tax ID',
+    bankDetails: 'Bank Details',
+  },
+  ar: {
+    description: 'الوصف',
+    qty: 'الكمية',
+    rate: 'السعر',
+    taxPercent: 'الضريبة %',
+    amount: 'المبلغ',
+    subtotal: 'المجموع الفرعي',
+    discount: 'الخصم',
+    shipping: 'الشحن',
+    tax: 'ضريبة القيمة المضافة',
+    total: 'الإجمالي',
+    tel: 'هاتف',
+    email: 'البريد الإلكتروني',
+    taxId: 'الرقم الضريبي',
+    bankDetails: 'البيانات البنكية',
+  },
+};
 
 export interface DocumentLineItem {
   description: string;
@@ -118,9 +178,13 @@ export function renderLogoHtml(org: OrganizationInfo, style: string): string {
 }
 
 // Common formatting utilities
-export function formatCurrency(amount: number | string, currency: string = 'SAR'): string {
+export function formatCurrency(
+  amount: number | string,
+  currency: string = 'SAR',
+  locale: DocumentLocale = 'en',
+): string {
   const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-SA', {
+  return new Intl.NumberFormat(intlLocaleFor(locale), {
     style: 'currency',
     currency: currency,
     minimumFractionDigits: 2,
@@ -147,8 +211,13 @@ export function formatShortDate(date: Date | string, locale: string = 'en-SA'): 
 }
 
 // Generate header section for documents
-export function generateHeaderHtml(org: OrganizationInfo, primaryColor?: string): string {
+export function generateHeaderHtml(
+  org: OrganizationInfo,
+  primaryColor?: string,
+  locale: DocumentLocale = 'en',
+): string {
   const color = safeColor(primaryColor || org.primaryColor, defaultTemplateConfig.colors.primary);
+  const l = BASE_LABELS[locale];
 
   return `
     <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
@@ -157,17 +226,22 @@ export function generateHeaderHtml(org: OrganizationInfo, primaryColor?: string)
         <h1 style="color: ${color}; margin: 10px 0 5px 0; font-size: 24px;">${escapeHtml(org.name)}</h1>
         ${org.address ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${escapeHtml(org.address)}</p>` : ''}
         ${org.city && org.country ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${escapeHtml(org.city)}, ${escapeHtml(org.country)}</p>` : ''}
-        ${org.phone ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">Tel: ${escapeHtml(org.phone)}</p>` : ''}
-        ${org.email ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">Email: ${escapeHtml(org.email)}</p>` : ''}
-        ${org.taxId ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">Tax ID: ${escapeHtml(org.taxId)}</p>` : ''}
+        ${org.phone ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${l.tel}: <span dir="ltr">${escapeHtml(org.phone)}</span></p>` : ''}
+        ${org.email ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${l.email}: ${escapeHtml(org.email)}</p>` : ''}
+        ${org.taxId ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${l.taxId}: ${escapeHtml(org.taxId)}</p>` : ''}
       </div>
     </div>
   `;
 }
 
 // Generate footer section for documents
-export function generateFooterHtml(org: OrganizationInfo, primaryColor?: string): string {
+export function generateFooterHtml(
+  org: OrganizationInfo,
+  primaryColor?: string,
+  locale: DocumentLocale = 'en',
+): string {
   const color = safeColor(primaryColor || org.primaryColor, defaultTemplateConfig.colors.primary);
+  const l = BASE_LABELS[locale];
 
   return `
     <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid ${defaultTemplateConfig.colors.border};">
@@ -175,7 +249,7 @@ export function generateFooterHtml(org: OrganizationInfo, primaryColor?: string)
         org.bankDetails
           ? `
         <div style="margin-bottom: 15px;">
-          <h4 style="color: ${color}; margin-bottom: 5px; font-size: 12px;">Bank Details</h4>
+          <h4 style="color: ${color}; margin-bottom: 5px; font-size: 12px;">${l.bankDetails}</h4>
           <p style="white-space: pre-line; color: #6B7280; font-size: 11px;">${escapeHtml(org.bankDetails)}</p>
         </div>
       `
@@ -198,15 +272,17 @@ export function generateItemsTableHtml(
   currency: string = 'SAR',
   showTax: boolean = true,
   primaryColor?: string,
+  locale: DocumentLocale = 'en',
 ): string {
   const color = safeColor(primaryColor, defaultTemplateConfig.colors.primary);
+  const l = BASE_LABELS[locale];
 
-  const headers = ['Description', 'Qty', 'Rate', ...(showTax ? ['Tax %'] : []), 'Amount'];
+  const headers = [l.description, l.qty, l.rate, ...(showTax ? [l.taxPercent] : []), l.amount];
 
   const headerCells = headers
     .map(
       (h, i) =>
-        `<th style="padding: 10px; text-align: ${i === 0 ? 'left' : 'right'}; background: ${color}; color: white; font-size: 12px;">${h}</th>`,
+        `<th style="padding: 10px; text-align: ${i === 0 ? 'start' : 'end'}; background: ${color}; color: white; font-size: 12px;">${h}</th>`,
     )
     .join('');
 
@@ -214,11 +290,11 @@ export function generateItemsTableHtml(
     .map(
       (item) => `
       <tr style="border-bottom: 1px solid ${defaultTemplateConfig.colors.border};">
-        <td style="padding: 10px; font-size: 12px;">${escapeHtml(item.description)}</td>
-        <td style="padding: 10px; text-align: right; font-size: 12px;">${escapeHtml(item.quantity)}</td>
-        <td style="padding: 10px; text-align: right; font-size: 12px;">${formatCurrency(item.rate, currency)}</td>
-        ${showTax ? `<td style="padding: 10px; text-align: right; font-size: 12px;">${escapeHtml(item.taxRate || 0)}%</td>` : ''}
-        <td style="padding: 10px; text-align: right; font-size: 12px; font-weight: bold;">${formatCurrency(item.amount, currency)}</td>
+        <td style="padding: 10px; text-align: start; font-size: 12px;"><bdi>${escapeHtml(item.description)}</bdi></td>
+        <td style="padding: 10px; text-align: end; font-size: 12px;">${escapeHtml(item.quantity)}</td>
+        <td style="padding: 10px; text-align: end; font-size: 12px;">${formatCurrency(item.rate, currency, locale)}</td>
+        ${showTax ? `<td style="padding: 10px; text-align: end; font-size: 12px;">${escapeHtml(item.taxRate || 0)}%</td>` : ''}
+        <td style="padding: 10px; text-align: end; font-size: 12px; font-weight: bold;">${formatCurrency(item.amount, currency, locale)}</td>
       </tr>
     `,
     )
@@ -244,24 +320,27 @@ export function generateTotalsHtml(
   currency: string = 'SAR',
   shippingAmount?: number,
   discountAmount?: number,
+  locale: DocumentLocale = 'en',
 ): string {
+  const l = BASE_LABELS[locale];
+  const money = (value: number) => formatCurrency(value, currency, locale);
   const rows: Array<{ label: string; value: string; bold?: boolean }> = [
-    { label: 'Subtotal', value: formatCurrency(subtotal, currency) },
+    { label: l.subtotal, value: money(subtotal) },
   ];
 
   if (discountAmount && discountAmount > 0) {
-    rows.push({ label: 'Discount', value: `-${formatCurrency(discountAmount, currency)}` });
+    rows.push({ label: l.discount, value: `-${money(discountAmount)}` });
   }
 
   if (shippingAmount && shippingAmount > 0) {
-    rows.push({ label: 'Shipping', value: formatCurrency(shippingAmount, currency) });
+    rows.push({ label: l.shipping, value: money(shippingAmount) });
   }
 
   if (taxAmount > 0) {
-    rows.push({ label: 'Tax (VAT)', value: formatCurrency(taxAmount, currency) });
+    rows.push({ label: l.tax, value: money(taxAmount) });
   }
 
-  rows.push({ label: 'Total', value: formatCurrency(grandTotal, currency), bold: true });
+  rows.push({ label: l.total, value: money(grandTotal), bold: true });
 
   return `
     <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
@@ -270,8 +349,8 @@ export function generateTotalsHtml(
           .map(
             (row) => `
           <tr>
-            <td style="padding: 8px; text-align: left; font-size: 12px; ${row.bold ? 'font-weight: bold; font-size: 14px;' : ''}">${escapeHtml(row.label)}</td>
-            <td style="padding: 8px; text-align: right; font-size: 12px; ${row.bold ? 'font-weight: bold; font-size: 14px; color: #111827;' : ''}">${escapeHtml(row.value)}</td>
+            <td style="padding: 8px; text-align: start; font-size: 12px; ${row.bold ? 'font-weight: bold; font-size: 14px;' : ''}">${escapeHtml(row.label)}</td>
+            <td style="padding: 8px; text-align: end; font-size: 12px; ${row.bold ? 'font-weight: bold; font-size: 14px; color: #111827;' : ''}">${escapeHtml(row.value)}</td>
           </tr>
         `,
           )
