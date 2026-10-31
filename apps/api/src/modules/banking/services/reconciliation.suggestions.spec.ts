@@ -118,6 +118,9 @@ describe('ReconciliationService.getSuggestions (#586 matching precision)', () =>
     expect(wheres[1]).toMatchObject({ organizationId: ORG, customer: party });
     expect(wheres[1].balanceDue.toString()).toBe('1000.0001');
     expect(wheres[2].customer).toEqual(party);
+    expect(wheres[2].balanceDue.lte.toString()).toBe('1050.000105');
+    expect(wheres[3].customer).toEqual(party);
+    expect(wheres[3].balanceDue.gte.toString()).toBe('1000.0001');
     expect(row.matches).toEqual([
       expect.objectContaining({
         entity: expect.objectContaining({ id: 'INV-PAYEE' }),

@@ -46,19 +46,24 @@ function referenceTokens(
 
 /**
  * Pools of documents whose party name contains the bank line's payee (the same case-insensitive
- * rule the score uses): with the exact amount first, then any amount. None without a payee.
+ * rule the score uses): exact amount, near amount (invoices only), then any amount. Together
+ * with the named, exact, near and newest pools every score level has its own bounded pool.
+ * None without a payee.
  */
 function payeePools(
   payee: string | null,
   amount: Decimal,
+  nearCeiling?: Decimal,
 ): Array<{
-  amount: { balanceDue?: Decimal };
+  amount: { balanceDue?: Decimal | { gt: Decimal; lte: Decimal } };
   party: { name: { contains: string; mode: 'insensitive' } };
 }> {
   if (!payee) return [];
   const party = { name: { contains: payee, mode: 'insensitive' as const } };
   return [
     { amount: { balanceDue: amount }, party },
+    // Invoices also score near amounts, so they get a near-amount payee pool.
+    ...(nearCeiling ? [{ amount: { balanceDue: { gt: amount, lte: nearCeiling } }, party }] : []),
     { amount: {}, party },
   ];
 }
@@ -151,7 +156,7 @@ export class ReconciliationService {
               ...query,
               where: { ...where, invoiceNumber: { in: tokens } },
             }),
-            ...payeePools(transaction.payee, amount).map((extra) =>
+            ...payeePools(transaction.payee, amount, nearCeiling).map((extra) =>
               this.prisma.invoice.findMany({
                 ...query,
                 where: { ...where, ...extra.amount, customer: extra.party },
