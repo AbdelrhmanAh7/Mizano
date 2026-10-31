@@ -226,7 +226,7 @@ function VendorsPageContent() {
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
-            Import
+            {tCommon('buttons.import')}
           </Button>
           {canCreate && (
             <Button asChild>

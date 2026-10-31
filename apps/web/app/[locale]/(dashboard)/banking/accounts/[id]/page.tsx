@@ -61,12 +61,14 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 interface BankAccountDetailPageProps {
   params: { id: string };
 }
 
 export default function BankAccountDetailPage({ params }: BankAccountDetailPageProps) {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('banking');
   const { id } = params;
   const router = useRouter();
@@ -232,7 +234,7 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
             <p className="text-sm text-muted-foreground">Last Reconciled</p>
             <p className="text-lg font-semibold">
               {account.lastReconciled
-                ? format(new Date(account.lastReconciled), 'MMM d, yyyy')
+                ? format(new Date(account.lastReconciled), 'PP', { locale: dateLocale })
                 : 'Never'}
             </p>
           </CardContent>
@@ -263,7 +265,9 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
                 />
                 <Tooltip
                   formatter={(value: number) => [formatCurrency(value), 'Balance']}
-                  labelFormatter={(label: string) => format(new Date(label), 'MMM d, yyyy')}
+                  labelFormatter={(label: string) =>
+                    format(new Date(label), 'PP', { locale: dateLocale })
+                  }
                 />
                 <Line
                   type="monotone"
@@ -355,7 +359,9 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
                       amount: string | number;
                     }) => (
                       <TableRow key={tx.id}>
-                        <TableCell>{format(new Date(tx.date), 'MMM d, yyyy')}</TableCell>
+                        <TableCell>
+                          {format(new Date(tx.date), 'PP', { locale: dateLocale })}
+                        </TableCell>
                         <TableCell>
                           <div>
                             <p className="font-medium">{tx.description}</p>

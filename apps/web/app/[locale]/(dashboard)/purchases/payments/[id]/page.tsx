@@ -35,12 +35,14 @@ import {
   formatCurrency,
 } from '@/lib/hooks/use-payments-made';
 import { useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 interface PaymentDetailPageProps {
   params: { id: string };
 }
 
 export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
+  const dateLocale = useDateFnsLocale();
   const { id } = params;
   const t = useTranslations('purchases');
   const baseCurrency = useBaseCurrency();
@@ -166,7 +168,7 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
               <div>
                 <p className="text-sm text-muted-foreground">{t('payments.paymentDate')}</p>
                 <p className="text-2xl font-bold">
-                  {format(new Date(payment.date), 'MMM d, yyyy')}
+                  {format(new Date(payment.date), 'PP', { locale: dateLocale })}
                 </p>
               </div>
             </div>
@@ -249,7 +251,7 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
                       </TableCell>
                       <TableCell>
                         {allocation.bill?.date
-                          ? format(new Date(allocation.bill.date), 'MMM d, yyyy')
+                          ? format(new Date(allocation.bill.date), 'PP', { locale: dateLocale })
                           : '-'}
                       </TableCell>
                       <TableCell className="text-right font-mono">

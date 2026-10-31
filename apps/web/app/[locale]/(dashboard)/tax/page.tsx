@@ -25,8 +25,10 @@ import {
   getVATReturnStatusLabel,
   type VATReturnStatus,
 } from '@/lib/hooks/use-tax';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 export default function TaxPage() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('tax');
   const { data: stats, isLoading } = useTaxDashboardStats();
 
@@ -256,7 +258,7 @@ export default function TaxPage() {
                           </Link>
                           <p className="text-xs text-muted-foreground">
                             {format(new Date(ret.startDate), 'MMM d')} -{' '}
-                            {format(new Date(ret.endDate), 'MMM d, yyyy')}
+                            {format(new Date(ret.endDate), 'PP', { locale: dateLocale })}
                           </p>
                         </div>
                         <div className="text-right">
@@ -326,7 +328,7 @@ export default function TaxPage() {
                           </Link>
                           <p className="text-xs text-muted-foreground">
                             {format(new Date(dl.startDate), 'MMM d')} -{' '}
-                            {format(new Date(dl.endDate), 'MMM d, yyyy')}
+                            {format(new Date(dl.endDate), 'PP', { locale: dateLocale })}
                           </p>
                         </div>
                         <div className="text-right">
@@ -341,7 +343,7 @@ export default function TaxPage() {
                           )}
                           {dl.dueDate && (
                             <p className="text-xs text-muted-foreground mt-1">
-                              {format(new Date(dl.dueDate), 'MMM d, yyyy')}
+                              {format(new Date(dl.dueDate), 'PP', { locale: dateLocale })}
                             </p>
                           )}
                         </div>

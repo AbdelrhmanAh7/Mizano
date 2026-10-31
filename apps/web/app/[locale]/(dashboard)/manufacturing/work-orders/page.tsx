@@ -38,8 +38,10 @@ import { CheckCircle, Eye, Filter, Play, Plus, RefreshCw, Trash2, XCircle } from
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function WorkOrdersPageContent() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('manufacturing');
   const tCommon = useTranslations('common');
   const { toast } = useToast();
@@ -222,14 +224,16 @@ function WorkOrdersPageContent() {
       ),
       cell: ({ row }) =>
         row.original.plannedStartDate
-          ? format(new Date(row.original.plannedStartDate), 'MMM d, yyyy')
+          ? format(new Date(row.original.plannedStartDate), 'PP', { locale: dateLocale })
           : '-',
     },
     {
       accessorKey: 'dueDate',
       header: tCommon('date'),
       cell: ({ row }) =>
-        row.original.dueDate ? format(new Date(row.original.dueDate), 'MMM d, yyyy') : '-',
+        row.original.dueDate
+          ? format(new Date(row.original.dueDate), 'PP', { locale: dateLocale })
+          : '-',
     },
     {
       accessorKey: 'status',

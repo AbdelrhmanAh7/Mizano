@@ -43,8 +43,10 @@ import { Ban, Eye, Plus, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function PaymentsMadePageContent() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('purchases');
   const baseCurrency = useBaseCurrency();
   const tCommon = useTranslations('common');
@@ -150,7 +152,7 @@ function PaymentsMadePageContent() {
           onSort={tableParams.setSort}
         />
       ),
-      cell: ({ row }) => format(new Date(row.original.date), 'MMM d, yyyy'),
+      cell: ({ row }) => format(new Date(row.original.date), 'PP', { locale: dateLocale }),
     },
     {
       accessorKey: 'paymentMode',
@@ -224,7 +226,7 @@ function PaymentsMadePageContent() {
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
-            Import
+            {tCommon('buttons.import')}
           </Button>
           <Button asChild>
             <Link href="/purchases/payments/new">

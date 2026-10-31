@@ -35,8 +35,10 @@ import {
 import { PaymentModeBadge } from '@/components/sales/status-badge';
 import { format } from 'date-fns';
 import { usePermissions } from '@/lib/hooks/use-permissions';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 export default function PaymentReceivedDetailPage() {
+  const dateLocale = useDateFnsLocale();
   const params = useParams();
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
@@ -181,7 +183,7 @@ export default function PaymentReceivedDetailPage() {
               {t('payments.date')}
             </div>
             <div className="text-2xl font-bold">
-              {format(new Date(payment.date), 'MMM d, yyyy')}
+              {format(new Date(payment.date), 'PP', { locale: dateLocale })}
             </div>
           </CardContent>
         </Card>

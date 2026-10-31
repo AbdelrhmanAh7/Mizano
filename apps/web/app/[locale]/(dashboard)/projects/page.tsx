@@ -53,8 +53,10 @@ import {
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function ProjectsPageContent() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('projects');
   const tableParams = useTableParams({ defaultSortBy: 'createdAt' });
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -270,7 +272,9 @@ function ProjectsPageContent() {
         />
       ),
       cell: ({ row }) =>
-        row.original.startDate ? format(new Date(row.original.startDate), 'MMM d, yyyy') : '-',
+        row.original.startDate
+          ? format(new Date(row.original.startDate), 'PP', { locale: dateLocale })
+          : '-',
     },
     {
       id: 'actions',

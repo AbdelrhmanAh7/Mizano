@@ -26,8 +26,10 @@ import { ReportPageHeader, ReportPageSkeleton } from '@/components/reports/repor
 import { useGeneralLedgerReport } from '@/lib/hooks/use-reports';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { useAccounts } from '@/lib/hooks/use-accounts';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 export default function GeneralLedgerPage() {
+  const dateLocale = useDateFnsLocale();
   // Report figures are ledger amounts, in the organization base currency (audit B5).
   const formatCurrency = useMoneyFormatter();
   const t = useTranslations('reports');
@@ -148,7 +150,9 @@ export default function GeneralLedgerPage() {
                         i: number,
                       ) => (
                         <TableRow key={i}>
-                          <TableCell>{format(new Date(entry.date), 'MMM d, yyyy')}</TableCell>
+                          <TableCell>
+                            {format(new Date(entry.date), 'PP', { locale: dateLocale })}
+                          </TableCell>
                           <TableCell>
                             {entry.journalNumber ? (
                               <Link

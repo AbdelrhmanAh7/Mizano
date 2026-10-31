@@ -70,6 +70,7 @@ import {
 } from '@/lib/hooks/use-tax';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { cn } from '@/lib/utils';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 const STATUS_STEPS: { key: VATReturnStatus; icon: typeof Circle }[] = [
   { key: 'DRAFT', icon: Circle },
@@ -87,6 +88,7 @@ function toDecimalString(value: number | string): string {
 }
 
 export default function VATReturnDetailPage() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('tax');
   const tCommon = useTranslations('common');
   const params = useParams();
@@ -437,7 +439,7 @@ export default function VATReturnDetailPage() {
                 </div>
                 <div className="text-lg font-bold">
                   {vatReturn.filedAt
-                    ? format(new Date(vatReturn.filedAt), 'MMM d, yyyy')
+                    ? format(new Date(vatReturn.filedAt), 'PP', { locale: dateLocale })
                     : t('returns.notFiled')}
                 </div>
               </CardContent>
@@ -460,8 +462,8 @@ export default function VATReturnDetailPage() {
                 <div>
                   <dt className="text-sm text-muted-foreground">{t('returns.detail.period')}</dt>
                   <dd className="font-medium">
-                    {format(new Date(vatReturn.startDate), 'MMM d, yyyy')} -{' '}
-                    {format(new Date(vatReturn.endDate), 'MMM d, yyyy')}
+                    {format(new Date(vatReturn.startDate), 'PP', { locale: dateLocale })} -{' '}
+                    {format(new Date(vatReturn.endDate), 'PP', { locale: dateLocale })}
                   </dd>
                 </div>
                 <div>
@@ -477,7 +479,7 @@ export default function VATReturnDetailPage() {
                     {t('returns.detail.createdDate')}
                   </dt>
                   <dd className="font-medium">
-                    {format(new Date(vatReturn.createdAt), 'MMM d, yyyy')}
+                    {format(new Date(vatReturn.createdAt), 'PP', { locale: dateLocale })}
                   </dd>
                 </div>
                 {vatReturn.submittedAt && (
@@ -486,7 +488,7 @@ export default function VATReturnDetailPage() {
                       {t('returns.detail.submittedDate')}
                     </dt>
                     <dd className="font-medium">
-                      {format(new Date(vatReturn.submittedAt), 'MMM d, yyyy')}
+                      {format(new Date(vatReturn.submittedAt), 'PP', { locale: dateLocale })}
                     </dd>
                   </div>
                 )}
@@ -494,7 +496,7 @@ export default function VATReturnDetailPage() {
                   <div>
                     <dt className="text-sm text-muted-foreground">{t('returns.detail.dueDate')}</dt>
                     <dd className="font-medium">
-                      {format(new Date(vatReturn.dueDate), 'MMM d, yyyy')}
+                      {format(new Date(vatReturn.dueDate), 'PP', { locale: dateLocale })}
                     </dd>
                   </div>
                 )}
@@ -635,7 +637,8 @@ export default function VATReturnDetailPage() {
                             vatReturn.payment.paymentDate ||
                             vatReturn.payment.createdAt,
                         ),
-                        'MMM d, yyyy',
+                        'PP',
+                        { locale: dateLocale },
                       )}
                     </dd>
                   </div>

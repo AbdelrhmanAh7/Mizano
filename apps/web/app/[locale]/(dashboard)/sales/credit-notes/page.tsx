@@ -31,8 +31,10 @@ import { Eye, Filter, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function CreditNotesPageContent() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
 
@@ -155,7 +157,7 @@ function CreditNotesPageContent() {
           onSort={tableParams.setSort}
         />
       ),
-      cell: ({ row }) => format(new Date(row.original.date), 'MMM d, yyyy'),
+      cell: ({ row }) => format(new Date(row.original.date), 'PP', { locale: dateLocale }),
     },
     {
       accessorKey: 'type',
@@ -208,7 +210,7 @@ function CreditNotesPageContent() {
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
-            Import
+            {tCommon('buttons.import')}
           </Button>
           {canCreate && (
             <Button asChild>

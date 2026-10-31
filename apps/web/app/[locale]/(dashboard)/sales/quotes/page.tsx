@@ -56,8 +56,10 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function QuotesPageContent() {
+  const dateLocale = useDateFnsLocale();
   // Quote totals in the quote's own currency, else the org base currency (audit B5).
   const formatCurrency = useMoneyFormatter();
   const t = useTranslations('sales');
@@ -294,7 +296,7 @@ function QuotesPageContent() {
           onSort={tableParams.setSort}
         />
       ),
-      cell: ({ row }) => format(new Date(row.original.date), 'MMM d, yyyy'),
+      cell: ({ row }) => format(new Date(row.original.date), 'PP', { locale: dateLocale }),
     },
     {
       accessorKey: 'expiryDate',
@@ -307,7 +309,7 @@ function QuotesPageContent() {
           onSort={tableParams.setSort}
         />
       ),
-      cell: ({ row }) => format(new Date(row.original.expiryDate), 'MMM d, yyyy'),
+      cell: ({ row }) => format(new Date(row.original.expiryDate), 'PP', { locale: dateLocale }),
     },
     {
       accessorKey: 'status',
@@ -422,7 +424,7 @@ function QuotesPageContent() {
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
-            Import
+            {tCommon('buttons.import')}
           </Button>
           {canCreate && (
             <Button asChild>

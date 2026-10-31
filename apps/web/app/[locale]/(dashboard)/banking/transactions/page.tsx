@@ -34,8 +34,10 @@ import {
 } from '@/lib/hooks/use-bank-transactions';
 import { useTranslations } from 'next-intl';
 import { StatementImportZone } from '@/components/banking/statement-import-zone';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 export default function BankTransactionsPage() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('banking');
   const tCommon = useTranslations('common');
   const [statusFilter, setStatusFilter] = useState<TransactionStatus | 'all'>('all');
@@ -216,7 +218,9 @@ export default function BankTransactionsPage() {
                     return (
                       <TableRow key={txn.id}>
                         <TableCell className="text-sm">
-                          {txn.date ? format(new Date(txn.date), 'MMM d, yyyy') : '-'}
+                          {txn.date
+                            ? format(new Date(txn.date), 'PP', { locale: dateLocale })
+                            : '-'}
                         </TableCell>
                         <TableCell className="max-w-[300px] truncate">
                           {txn.description || '-'}

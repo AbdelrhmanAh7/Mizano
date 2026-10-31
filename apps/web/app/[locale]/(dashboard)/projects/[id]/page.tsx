@@ -65,12 +65,14 @@ import {
 import { KanbanBoard } from '@/components/projects/kanban-board';
 import { BudgetProgressCard } from '@/components/projects/budget-progress-card';
 import { useTranslations } from 'next-intl';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 interface ProjectDetailPageProps {
   params: { id: string };
 }
 
 export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
+  const dateLocale = useDateFnsLocale();
   const { id } = params;
   const t = useTranslations('projects');
   const router = useRouter();
@@ -397,7 +399,9 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                   <TableBody>
                     {timeEntries.map((entry) => (
                       <TableRow key={entry.id}>
-                        <TableCell>{format(new Date(entry.date), 'MMM d, yyyy')}</TableCell>
+                        <TableCell>
+                          {format(new Date(entry.date), 'PP', { locale: dateLocale })}
+                        </TableCell>
                         <TableCell>{entry.task?.name || '-'}</TableCell>
                         <TableCell className="max-w-[200px] truncate">
                           {entry.description || '-'}
@@ -448,13 +452,15 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{t('projects.form.startDate')}</span>
                   <span>
-                    {project.startDate ? format(new Date(project.startDate), 'MMM d, yyyy') : '-'}
+                    {project.startDate
+                      ? format(new Date(project.startDate), 'PP', { locale: dateLocale })
+                      : '-'}
                   </span>
                 </div>
                 {project.endDate && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">{t('projects.form.endDate')}</span>
-                    <span>{format(new Date(project.endDate), 'MMM d, yyyy')}</span>
+                    <span>{format(new Date(project.endDate), 'PP', { locale: dateLocale })}</span>
                   </div>
                 )}
               </CardContent>

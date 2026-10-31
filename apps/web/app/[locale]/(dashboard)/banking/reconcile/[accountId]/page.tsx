@@ -32,12 +32,14 @@ import {
   getConfidenceLabel,
 } from '@/lib/hooks/use-bank-transactions';
 import { useTranslations } from 'next-intl';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 interface ReconcileAccountPageProps {
   params: { accountId: string };
 }
 
 export default function ReconcileAccountPage({ params }: ReconcileAccountPageProps) {
+  const dateLocale = useDateFnsLocale();
   const { accountId } = params;
   const t = useTranslations('banking');
   const [selectedTransaction, setSelectedTransaction] = useState<string | null>(null);
@@ -190,7 +192,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                             <span className="font-medium">{tx.description}</span>
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">
-                            {format(new Date(tx.date), 'MMM d, yyyy')}
+                            {format(new Date(tx.date), 'PP', { locale: dateLocale })}
                             {tx.payee && ` • ${tx.payee}`}
                           </p>
                         </div>
@@ -243,7 +245,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                       <div className="p-4 bg-muted rounded-lg">
                         <p className="font-medium">{selectedTx.description}</p>
                         <p className="text-sm text-muted-foreground">
-                          {format(new Date(selectedTx.date), 'MMM d, yyyy')} •{' '}
+                          {format(new Date(selectedTx.date), 'PP', { locale: dateLocale })} •{' '}
                           <span
                             className={cn(
                               'font-mono',
@@ -283,7 +285,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                                 </div>
                                 <p className="text-sm text-muted-foreground mt-1">
                                   {match.counterpartyName} •{' '}
-                                  {format(new Date(match.date), 'MMM d, yyyy')}
+                                  {format(new Date(match.date), 'PP', { locale: dateLocale })}
                                 </p>
                                 <p className="text-sm font-mono mt-1">
                                   {t('reconciliation.balanceDue', {

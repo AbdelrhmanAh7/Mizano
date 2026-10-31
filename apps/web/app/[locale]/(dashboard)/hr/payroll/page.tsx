@@ -22,8 +22,10 @@ import { CheckCircle2, DollarSign, Eye, FileText, Play, Trash2, Users } from 'lu
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function PayrollPageContent() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('hr');
   const tableParams = useTableParams({ defaultSortBy: 'createdAt' });
   const { hasPermission } = usePermissions();
@@ -181,7 +183,7 @@ function PayrollPageContent() {
       header: 'Created',
       cell: ({ row }) => (
         <span className="text-muted-foreground">
-          {format(new Date(row.original.createdAt), 'MMM d, yyyy')}
+          {format(new Date(row.original.createdAt), 'PP', { locale: dateLocale })}
         </span>
       ),
     },

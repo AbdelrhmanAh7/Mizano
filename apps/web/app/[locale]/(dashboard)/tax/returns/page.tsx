@@ -60,8 +60,10 @@ import {
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Suspense, useMemo, useState } from 'react';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function VATReturnsPageContent() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('tax');
   const tCommon = useTranslations('common');
   const { toast } = useToast();
@@ -250,7 +252,7 @@ function VATReturnsPageContent() {
       cell: ({ row }) => (
         <span className="text-sm">
           {format(new Date(row.original.startDate), 'MMM d')} -{' '}
-          {format(new Date(row.original.endDate), 'MMM d, yyyy')}
+          {format(new Date(row.original.endDate), 'PP', { locale: dateLocale })}
         </span>
       ),
     },

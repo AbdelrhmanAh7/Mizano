@@ -49,6 +49,7 @@ import { invalidateLedgerQueries } from '@/lib/hooks/use-journals';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { cn } from '@/lib/utils';
 import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 const PAYABLE_STATUSES = ['OPEN', 'OVERDUE', 'PARTIALLY_PAID'];
 
@@ -66,6 +67,7 @@ interface BillDetailPageProps {
 }
 
 export default function BillDetailPage({ params }: BillDetailPageProps) {
+  const dateLocale = useDateFnsLocale();
   const { id } = params;
   const t = useTranslations('purchases');
   const baseCurrency = useBaseCurrency();
@@ -250,7 +252,9 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{format(new Date(bill.date), 'MMM d, yyyy')}</div>
+            <div className="text-2xl font-bold">
+              {format(new Date(bill.date), 'PP', { locale: dateLocale })}
+            </div>
           </CardContent>
         </Card>
 
@@ -262,7 +266,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
           </CardHeader>
           <CardContent>
             <div className={cn('text-2xl font-bold', isOverdue && 'text-destructive')}>
-              {format(new Date(bill.dueDate), 'MMM d, yyyy')}
+              {format(new Date(bill.dueDate), 'PP', { locale: dateLocale })}
             </div>
             {isOverdue && <p className="text-sm text-destructive">{t('bills.status.overdue')}</p>}
           </CardContent>
@@ -394,7 +398,9 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
                           {row.paymentNumber}
                         </Link>
                       </TableCell>
-                      <TableCell>{format(new Date(row.date), 'MMM d, yyyy')}</TableCell>
+                      <TableCell>
+                        {format(new Date(row.date), 'PP', { locale: dateLocale })}
+                      </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatCurrency(row.amount, currency)}
                       </TableCell>

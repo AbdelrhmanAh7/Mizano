@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { useUnpaidBills, paymentModeOptions, formatCurrency } from '@/lib/hooks/use-payments-made';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 const paymentMadeSchema = z.object({
   vendorId: z.string().min(1, 'Vendor is required'),
@@ -74,6 +75,7 @@ export function PaymentMadeForm({
   preselectedVendorId,
   preselectedBillId,
 }: PaymentMadeFormProps) {
+  const dateLocale = useDateFnsLocale();
   const [allocations, setAllocations] = useState<BillAllocation[]>([]);
 
   const form = useForm<PaymentMadeFormData>({
@@ -440,8 +442,12 @@ export function PaymentMadeForm({
                           />
                         </TableCell>
                         <TableCell className="font-mono">{allocation.billNumber}</TableCell>
-                        <TableCell>{format(new Date(allocation.date), 'MMM d, yyyy')}</TableCell>
-                        <TableCell>{format(new Date(allocation.dueDate), 'MMM d, yyyy')}</TableCell>
+                        <TableCell>
+                          {format(new Date(allocation.date), 'PP', { locale: dateLocale })}
+                        </TableCell>
+                        <TableCell>
+                          {format(new Date(allocation.dueDate), 'PP', { locale: dateLocale })}
+                        </TableCell>
                         <TableCell className="text-right font-mono">
                           {formatCurrency(allocation.grandTotal, currency)}
                         </TableCell>

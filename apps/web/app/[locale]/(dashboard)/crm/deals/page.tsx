@@ -23,8 +23,10 @@ import { Clock, DollarSign, LayoutGrid, List, Plus, Target, TrendingUp } from 'l
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function DealsPageContent() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('crm');
   const tCommon = useTranslations('common');
   const { hasPermission } = usePermissions();
@@ -101,7 +103,7 @@ function DealsPageContent() {
       header: t('deals.table.expectedClose'),
       cell: ({ row }) =>
         row.original.expectedCloseDate
-          ? format(new Date(row.original.expectedCloseDate), 'MMM d, yyyy')
+          ? format(new Date(row.original.expectedCloseDate), 'PP', { locale: dateLocale })
           : '-',
     },
     {

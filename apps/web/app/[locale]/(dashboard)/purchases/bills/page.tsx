@@ -61,8 +61,10 @@ import {
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function BillsPageContent() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('purchases');
   const baseCurrency = useBaseCurrency();
   const tCommon = useTranslations('common');
@@ -237,7 +239,7 @@ function BillsPageContent() {
           onSort={tableParams.setSort}
         />
       ),
-      cell: ({ row }) => format(new Date(row.original.date), 'MMM d, yyyy'),
+      cell: ({ row }) => format(new Date(row.original.date), 'PP', { locale: dateLocale }),
     },
     {
       accessorKey: 'dueDate',
@@ -257,7 +259,7 @@ function BillsPageContent() {
           (bill.status === 'OPEN' && new Date(bill.dueDate) < new Date());
         return (
           <span className={cn(isOverdue && 'text-destructive')}>
-            {format(new Date(bill.dueDate), 'MMM d, yyyy')}
+            {format(new Date(bill.dueDate), 'PP', { locale: dateLocale })}
           </span>
         );
       },
@@ -365,7 +367,7 @@ function BillsPageContent() {
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
-            Import
+            {tCommon('buttons.import')}
           </Button>
           {canCreate && (
             <>

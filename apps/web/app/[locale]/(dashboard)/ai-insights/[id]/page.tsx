@@ -34,6 +34,7 @@ import {
   InsightType,
   type AIInsight,
 } from '@/lib/hooks/use-ai';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 const insightIcons: Record<InsightType, React.ReactNode> = {
   ANOMALY: <AlertTriangle className="h-6 w-6" />,
@@ -45,6 +46,7 @@ const insightIcons: Record<InsightType, React.ReactNode> = {
 };
 
 export default function InsightDetailPage({ params }: { params: { id: string } }) {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('ai.insights.detail');
   const tInsights = useTranslations('ai.insights');
   const { id } = params;
@@ -249,7 +251,7 @@ export default function InsightDetailPage({ params }: { params: { id: string } }
                 <div>
                   <p className="text-sm text-muted-foreground">{t('expires')}</p>
                   <p className="font-medium">
-                    {format(new Date(insight.expiresAt), 'MMM d, yyyy')}
+                    {format(new Date(insight.expiresAt), 'PP', { locale: dateLocale })}
                   </p>
                 </div>
               )}

@@ -363,7 +363,7 @@ export default function InvoiceDetailPage() {
               {tDetail('dueDate')}
             </div>
             <div className={cn('text-2xl font-bold', isOverdue && 'text-red-600')}>
-              {format(new Date(invoice.dueDate), 'MMM d, yyyy', { locale: dateLocale })}
+              {format(new Date(invoice.dueDate), 'PP', { locale: dateLocale })}
             </div>
           </CardContent>
         </Card>
@@ -616,7 +616,7 @@ export default function InvoiceDetailPage() {
                     </TableCell>
                     <TableCell>
                       {allocation.payment?.date
-                        ? format(new Date(allocation.payment.date), 'MMM d, yyyy', {
+                        ? format(new Date(allocation.payment.date), 'PP', {
                             locale: dateLocale,
                           })
                         : '-'}
@@ -663,7 +663,7 @@ export default function InvoiceDetailPage() {
                     </TableCell>
                     <TableCell>
                       {creditNote.date
-                        ? format(new Date(creditNote.date), 'MMM d, yyyy', { locale: dateLocale })
+                        ? format(new Date(creditNote.date), 'PP', { locale: dateLocale })
                         : '-'}
                     </TableCell>
                     <TableCell className="text-end font-mono text-orange-600">

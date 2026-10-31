@@ -24,6 +24,7 @@ import {
   VATReturn,
   VATPayment,
 } from '@/lib/hooks/use-tax';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 interface PaymentRow {
   payment: VATPayment;
@@ -31,6 +32,7 @@ interface PaymentRow {
 }
 
 export default function VATPaymentsPage() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('tax');
 
   const { data: returnsData, isLoading } = useVATReturns();
@@ -127,7 +129,7 @@ export default function VATPaymentsPage() {
               <Skeleton className="h-8 w-24" />
             ) : (
               <div className="text-lg font-bold">
-                {latestPaymentDate ? format(latestPaymentDate, 'MMM d, yyyy') : '-'}
+                {latestPaymentDate ? format(latestPaymentDate, 'PP', { locale: dateLocale }) : '-'}
               </div>
             )}
           </CardContent>
@@ -182,13 +184,15 @@ export default function VATPaymentsPage() {
                     </TableCell>
                     <TableCell className="text-sm">
                       {format(new Date(pr.vatReturn.startDate), 'MMM d')} -{' '}
-                      {format(new Date(pr.vatReturn.endDate), 'MMM d, yyyy')}
+                      {format(new Date(pr.vatReturn.endDate), 'PP', { locale: dateLocale })}
                     </TableCell>
                     <TableCell className="text-right font-mono font-semibold">
                       {formatCurrency(pr.payment.amount)}
                     </TableCell>
                     <TableCell>
-                      {format(new Date(pr.payment.date || pr.payment.createdAt), 'MMM d, yyyy')}
+                      {format(new Date(pr.payment.date || pr.payment.createdAt), 'PP', {
+                        locale: dateLocale,
+                      })}
                     </TableCell>
                     <TableCell>
                       {pr.payment.reference ? (

@@ -25,8 +25,10 @@ import {
   TimesheetEntry,
 } from '@/lib/hooks/use-projects';
 import { useTranslations } from 'next-intl';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function TimesheetsPageContent() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('projects');
   const tableParams = useTableParams({ defaultSortBy: 'date' });
 
@@ -75,7 +77,7 @@ function TimesheetsPageContent() {
           onSort={tableParams.setSort}
         />
       ),
-      cell: ({ row }) => format(new Date(row.original.date), 'MMM d, yyyy'),
+      cell: ({ row }) => format(new Date(row.original.date), 'PP', { locale: dateLocale }),
     },
     {
       accessorKey: 'task.project.name',

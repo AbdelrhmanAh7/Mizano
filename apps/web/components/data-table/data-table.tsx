@@ -29,6 +29,7 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Download, Loader2, SlidersHorizontal } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DataTablePagination } from './data-table-pagination';
 
@@ -165,6 +166,7 @@ export function DataTable<TData, TValue>({
   onExportAll,
 }: DataTableProps<TData, TValue>) {
   const resolvedTableId = tableId || exportFilename;
+  const t = useTranslations('common.table');
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() =>
@@ -191,14 +193,14 @@ export function DataTable<TData, TValue>({
             (table.getIsSomePageRowsSelected() && 'indeterminate')
           }
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
+          aria-label={t('selectAll')}
         />
       ),
       cell: ({ row }) => (
         <Checkbox
           checked={row.getIsSelected()}
           onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
+          aria-label={t('selectRow')}
           onClick={(e) => e.stopPropagation()}
         />
       ),
@@ -210,7 +212,7 @@ export function DataTable<TData, TValue>({
       maxSize: 40,
     };
     return [selectColumn as ColumnDef<TData, TValue>, ...columns];
-  }, [columns, enableSelection]);
+  }, [columns, enableSelection, t]);
 
   const table = useReactTable({
     data,
@@ -337,7 +339,7 @@ export function DataTable<TData, TValue>({
         {enableExport && !enableVirtualization && (
           <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="h-4 w-4 me-1" />
-            Export CSV
+            {t('exportCsv')}
           </Button>
         )}
 
@@ -347,15 +349,15 @@ export function DataTable<TData, TValue>({
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
                 <Download className="h-4 w-4 me-1" />
-                Export All
+                {t('exportAll')}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuCheckboxItem checked={false} onCheckedChange={() => onExportAll('csv')}>
-                Export as CSV
+                {t('exportAsCsv')}
               </DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem checked={false} onCheckedChange={() => onExportAll('xlsx')}>
-                Export as XLSX
+                {t('exportAsXlsx')}
               </DropdownMenuCheckboxItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -366,7 +368,7 @@ export function DataTable<TData, TValue>({
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
                 <SlidersHorizontal className="h-4 w-4 me-1" />
-                Columns
+                {t('columns')}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
@@ -390,7 +392,7 @@ export function DataTable<TData, TValue>({
                     onCheckedChange={handleResetColumns}
                     className="text-muted-foreground"
                   >
-                    Reset column widths
+                    {t('resetColumnWidths')}
                   </DropdownMenuCheckboxItem>
                 </>
               )}
@@ -525,7 +527,7 @@ export function DataTable<TData, TValue>({
                     <td colSpan={table.getVisibleLeafColumns().length} className="text-center py-4">
                       <div className="flex items-center justify-center gap-2 text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm">Loading more...</span>
+                        <span className="text-sm">{t('loadingMore')}</span>
                       </div>
                     </td>
                   </tr>
@@ -539,10 +541,12 @@ export function DataTable<TData, TValue>({
         <div className="flex items-center justify-between px-2">
           <div className="text-sm text-muted-foreground">
             {total > 0
-              ? `Showing ${data.length} of ${total} results`
-              : `${data.length} results loaded`}
+              ? t('showingLoaded', { count: data.length, total })
+              : t('resultsLoaded', { count: data.length })}
           </div>
-          {hasNextPage && <span className="text-sm text-muted-foreground">Scroll for more</span>}
+          {hasNextPage && (
+            <span className="text-sm text-muted-foreground">{t('scrollForMore')}</span>
+          )}
         </div>
       </div>
     );

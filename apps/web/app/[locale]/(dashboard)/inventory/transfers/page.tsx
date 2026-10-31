@@ -30,8 +30,10 @@ import { Eye, MoreHorizontal, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function TransfersPageContent() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('inventory');
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -80,7 +82,7 @@ function TransfersPageContent() {
           onSort={tableParams.setSort}
         />
       ),
-      cell: ({ row }) => format(new Date(row.original.date), 'MMM d, yyyy'),
+      cell: ({ row }) => format(new Date(row.original.date), 'PP', { locale: dateLocale }),
     },
     {
       id: 'from',

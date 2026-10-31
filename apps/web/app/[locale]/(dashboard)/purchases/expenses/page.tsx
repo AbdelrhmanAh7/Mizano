@@ -40,8 +40,10 @@ import { useTranslations } from 'next-intl';
 import { CheckCircle, Eye, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function ExpensesPageContent() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('purchases');
   const tCommon = useTranslations('common');
   const { toast } = useToast();
@@ -159,7 +161,7 @@ function ExpensesPageContent() {
           onSort={tableParams.setSort}
         />
       ),
-      cell: ({ row }) => format(new Date(row.original.date), 'MMM d, yyyy'),
+      cell: ({ row }) => format(new Date(row.original.date), 'PP', { locale: dateLocale }),
     },
     {
       accessorKey: 'account.name',
@@ -256,7 +258,7 @@ function ExpensesPageContent() {
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
-            Import
+            {tCommon('buttons.import')}
           </Button>
           {canCreate && (
             <Button asChild>

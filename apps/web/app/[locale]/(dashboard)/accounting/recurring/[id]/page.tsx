@@ -30,8 +30,10 @@ import { formatJournalAmount } from '@/lib/hooks/use-journals';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { format } from 'date-fns';
 import { useTranslations } from 'next-intl';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 export default function RecurringProfileDetailPage() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('accounting');
   const params = useParams();
   const router = useRouter();
@@ -251,11 +253,15 @@ export default function RecurringProfileDetailPage() {
             </div>
             <div>
               <dt className="text-sm font-medium text-muted-foreground">Created</dt>
-              <dd className="mt-1">{format(new Date(profile.createdAt), 'MMM d, yyyy')}</dd>
+              <dd className="mt-1">
+                {format(new Date(profile.createdAt), 'PP', { locale: dateLocale })}
+              </dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-muted-foreground">Last Modified</dt>
-              <dd className="mt-1">{format(new Date(profile.updatedAt), 'MMM d, yyyy')}</dd>
+              <dd className="mt-1">
+                {format(new Date(profile.updatedAt), 'PP', { locale: dateLocale })}
+              </dd>
             </div>
           </dl>
         </CardContent>
