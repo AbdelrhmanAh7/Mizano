@@ -46,7 +46,19 @@ describe('ReconciliationService.getSuggestions (#586 matching precision)', () =>
 
     await service.getSuggestions(ORG, 'ba1');
 
-    const where = prisma.invoice.findMany.mock.calls[0][0].where;
+    // Pools: named number, exact, near, newest. Every pool keeps the status and balance rules.
+    const queries = prisma.invoice.findMany.mock.calls.map(
+      (c: Array<{ where: any; take: number }>) => c[0],
+    );
+    for (const q of queries) {
+      expect(q.where).toMatchObject({ organizationId: ORG, deletedAt: null });
+      expect(q.where.status).toEqual({ in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] });
+      expect(q.where.balanceDue).toBeDefined();
+      expect(q.take).toBe(200);
+    }
+    // A named document is offered whatever its age; the other pools stay in the date window.
+    expect(queries[0].where.date).toBeUndefined();
+    const where = queries[3].where;
     expect(where).toMatchObject({
       organizationId: ORG,
       deletedAt: null,

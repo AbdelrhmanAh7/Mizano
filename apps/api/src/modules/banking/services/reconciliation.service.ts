@@ -41,7 +41,7 @@ function referenceTokens(
   const text = `${transaction.reference ?? ''} ${transaction.description ?? ''}`;
   // Any character outside a document number (letters, digits, - / _) separates words.
   const words = text.split(/[^\p{L}\p{N}\-/_]+/u).filter((w) => w.length >= 2);
-  return [...new Set(words)].slice(0, 20);
+  return [...new Set(words)].slice(0, 100);
 }
 
 /**
@@ -72,7 +72,10 @@ function uniqueById<T extends { id: string }>(rows: T[]): T[] {
   return [...new Map(rows.map((r) => [r.id, r])).values()];
 }
 
-/** An empty account currency means the base currency (the schema default). */
+/**
+ * Same currency, ignoring case. A missing currency on either side is not treated as a mismatch
+ * (the rule confirm has always used); note new bank accounts default to USD, not the base currency.
+ */
 function sameCurrency(accountCurrency: string | null, baseCurrency: string | null): boolean {
   if (!accountCurrency || !baseCurrency) return true;
   return accountCurrency.trim().toUpperCase() === baseCurrency.trim().toUpperCase();
@@ -154,7 +157,8 @@ export class ReconciliationService {
           await Promise.all([
             this.prisma.invoice.findMany({
               ...query,
-              where: { ...where, invoiceNumber: { in: tokens } },
+              // A document named on the bank line is offered whatever its age.
+              where: { ...where, date: undefined, invoiceNumber: { in: tokens } },
             }),
             ...payeePools(transaction.payee, amount, nearCeiling).map((extra) =>
               this.prisma.invoice.findMany({
@@ -208,7 +212,8 @@ export class ReconciliationService {
             // Bills score no near amounts: a named number, the payee, the exact amount, the newest.
             this.prisma.bill.findMany({
               ...query,
-              where: { ...where, billNumber: { in: tokens } },
+              // A document named on the bank line is offered whatever its age.
+              where: { ...where, date: undefined, billNumber: { in: tokens } },
             }),
             ...payeePools(transaction.payee, amount).map((extra) =>
               this.prisma.bill.findMany({
