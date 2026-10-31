@@ -296,6 +296,8 @@ export const billsApi = {
   open: (id: string) => api.patch(`/bills/${id}/open`),
   /** Approves a draft bill and posts its journal (Dr expense/VAT, Cr AP) on the bill date. */
   approve: (id: string) => api.post(`/bills/${id}/approve`),
+  /** Accounts a bill line may use (purchases.create) and the vendor's last-used one. */
+  accountOptions: (params?: { vendorId?: string }) => api.get('/bills/account-options', { params }),
   clone: (id: string) => api.post(`/bills/${id}/clone`),
   bulkDelete: (ids: string[]) => api.post('/bills/bulk-delete', { ids }),
   bulkOpen: (ids: string[]) => api.post('/bills/bulk-open', { ids }),

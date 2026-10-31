@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { BillForm } from '@/components/purchases/bill-form';
 import { useBill, useUpdateBill } from '@/lib/hooks/use-bills';
 import { useQuery } from '@tanstack/react-query';
-import { accountsApi, itemsApi } from '@/lib/api';
+import { itemsApi } from '@/lib/api';
 
 interface EditBillPageProps {
   params: { id: string };
@@ -23,15 +23,6 @@ export default function EditBillPage({ params }: EditBillPageProps) {
   const { data: bill, isLoading: billLoading } = useBill(id);
   const updateBill = useUpdateBill();
 
-  // Fetch accounts for dropdowns
-  const { data: accountsData, isLoading: accountsLoading } = useQuery({
-    queryKey: ['accounts'],
-    queryFn: async () => {
-      const response = await accountsApi.getAll();
-      return response.data;
-    },
-  });
-
   // Fetch items for dropdowns
   const { data: itemsData, isLoading: itemsLoading } = useQuery({
     queryKey: ['items'],
@@ -41,7 +32,6 @@ export default function EditBillPage({ params }: EditBillPageProps) {
     },
   });
 
-  const accounts = accountsData?.data || [];
   const items = itemsData?.data || [];
 
   const handleSubmit = async (data: Record<string, unknown>) => {
@@ -53,7 +43,7 @@ export default function EditBillPage({ params }: EditBillPageProps) {
     }
   };
 
-  if (billLoading || accountsLoading || itemsLoading) {
+  if (billLoading || itemsLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-12 w-64" />
@@ -76,7 +66,7 @@ export default function EditBillPage({ params }: EditBillPageProps) {
   if (bill.status !== 'DRAFT') {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Only draft bills can be edited</p>
+        <p className="text-muted-foreground">{t('bills.onlyDraftsEditable')}</p>
         <Button asChild className="mt-4">
           <Link href={`/purchases/bills/${id}`}>{t('bills.billDetails')}</Link>
         </Button>
@@ -102,7 +92,6 @@ export default function EditBillPage({ params }: EditBillPageProps) {
       {/* Form */}
       <BillForm
         bill={bill}
-        accounts={accounts}
         items={items}
         onSubmit={handleSubmit}
         onCancel={() => router.push(`/purchases/bills/${id}`)}

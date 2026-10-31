@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { paymentsMadeApi } from '@/lib/api';
-import { getApiErrorMessage } from '@/lib/api-error';
+import { getApiErrorMessage, getLocalizedApiErrorMessage } from '@/lib/api-error';
 import {
   compareDecimals,
   isPositiveDecimal,
@@ -70,6 +70,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
   const t = useTranslations('purchases');
   const baseCurrency = useBaseCurrency();
   const tCommon = useTranslations('common');
+  const tValidation = useTranslations('purchases.bills.validation');
   const { hasPermission } = usePermissions();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -88,7 +89,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
     } catch (error) {
       toast({
         title: t('bills.approveFailed'),
-        description: getApiErrorMessage(error, t('bills.approveFailed')),
+        description: getLocalizedApiErrorMessage(error, t('bills.approveFailed'), tValidation),
         variant: 'destructive',
       });
     }

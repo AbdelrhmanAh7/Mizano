@@ -2,12 +2,12 @@
 
 import { useToast } from '@/components/ui/use-toast';
 import { billsApi } from '@/lib/api';
+import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 import { decimalToDisplayNumber } from '@/lib/decimal';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { invalidateLedgerQueries } from '@/lib/hooks/use-journals';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-
-type ApiError = { response?: { data?: { message?: string } } };
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
 
 // Types — mirror the API's BillStatus enum exactly.
 export type BillStatus =
@@ -185,12 +185,47 @@ export function useBill(id: string | undefined) {
   });
 }
 
+export interface BillAccountOption {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+}
+
+export interface BillAccountOptions {
+  /** Active EXPENSE/ASSET accounts that are not control accounts: what the API accepts. */
+  data: BillAccountOption[];
+  /** Account of the vendor's most recent eligible bill line, if any. */
+  vendorDefaultAccountId: string | null;
+}
+
+/**
+ * Accounts the bill form offers on each line (GET /bills/account-options, purchases.create). The
+ * previous vendor's list stays shown while another vendor's default loads.
+ */
+export function useBillAccountOptions(vendorId?: string) {
+  return useQuery({
+    queryKey: ['bills', 'account-options', vendorId || null],
+    queryFn: async (): Promise<BillAccountOptions> => {
+      const response = await billsApi.accountOptions(vendorId ? { vendorId } : undefined);
+      const body = response.data as Partial<BillAccountOptions> | undefined;
+      return {
+        data: Array.isArray(body?.data) ? body.data : [],
+        vendorDefaultAccountId: body?.vendorDefaultAccountId ?? null,
+      };
+    },
+    placeholderData: keepPreviousData,
+  });
+}
+
 /**
  * Hook to create a new bill
  */
 export function useCreateBill() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('purchases.bills.toasts');
+  const tValidation = useTranslations('purchases.bills.validation');
 
   return useMutation({
     mutationFn: async (data: CreateBillData): Promise<Bill> => {
@@ -200,15 +235,15 @@ export function useCreateBill() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bills'] });
       toast({
-        title: 'Bill created',
-        description: 'The bill has been saved as a draft.',
+        title: t('created'),
+        description: t('createdDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error creating bill',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('createFailed'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tValidation),
       });
     },
   });
@@ -220,6 +255,8 @@ export function useCreateBill() {
 export function useUpdateBill() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('purchases.bills.toasts');
+  const tValidation = useTranslations('purchases.bills.validation');
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateBillData }) => {
@@ -230,15 +267,15 @@ export function useUpdateBill() {
       queryClient.invalidateQueries({ queryKey: ['bills'] });
       queryClient.invalidateQueries({ queryKey: ['bills', variables.id] });
       toast({
-        title: 'Bill updated',
-        description: 'The bill has been updated successfully.',
+        title: t('updated'),
+        description: t('updatedDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error updating bill',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('updateFailed'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tValidation),
       });
     },
   });
@@ -291,6 +328,8 @@ export function useDeleteBill() {
 export function useCloneBill() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('purchases.bills.toasts');
+  const tValidation = useTranslations('purchases.bills.validation');
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -300,15 +339,15 @@ export function useCloneBill() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bills'] });
       toast({
-        title: 'Bill duplicated',
-        description: 'A new draft copy has been created.',
+        title: t('duplicated'),
+        description: t('duplicatedDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error duplicating bill',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('duplicateFailed'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tValidation),
       });
     },
   });
