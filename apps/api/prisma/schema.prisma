@@ -480,6 +480,11 @@ model Organization {
   aiUsage       AiUsage[]
   aiOAuthStates AiOAuthState[]
 
+  // AI apps connected through MCP (the owner's Claude, ChatGPT, Codex or Gemini)
+  mcpGrants    McpGrant[]
+  mcpTokens    McpToken[]
+  mcpToolCalls McpToolCall[]
+
   // External integrations (FlowLine): API keys, outbound webhooks, delivery log, notes
   integrationApiKeys         IntegrationApiKey[]
   webhookEndpoints           WebhookEndpoint[]
@@ -3372,4 +3377,144 @@ model AiOAuthState {
 
   @@index([organizationId, userId])
   @@map("ai_oauth_states")
+}
+
+// ============================================
+// MCP: AI apps connect through OAuth 2.1 (authorization code + PKCE)
+// ============================================
+
+/// An AI app that registered itself (RFC 7591). Registration happens before anyone signs in,
+/// so a client belongs to no organization: what it may touch is decided by the grant.
+model McpClient {
+  id                      String    @id @default(cuid())
+  /// The public client_id handed to the app.
+  clientId                String    @unique
+  clientName              String
+  /// Compared exactly at /authorize (loopback addresses may change only the port, RFC 8252).
+  redirectUris            String[]
+  /// none | client_secret_post | client_secret_basic
+  tokenEndpointAuthMethod String    @default("none")
+  /// sha256 hex of the client secret (confidential clients only).
+  clientSecretHash        String?
+  clientUri               String?
+  softwareId              String?
+  softwareVersion         String?
+  createdAt               DateTime  @default(now())
+  lastUsedAt              DateTime?
+
+  authRequests McpAuthRequest[]
+  grants       McpGrant[]
+
+  @@map("mcp_clients")
+}
+
+/// A pending /authorize request waiting for the person's answer on the consent screen.
+model McpAuthRequest {
+  id            String    @id @default(cuid())
+  /// sha256 hex of the handle in the consent page address.
+  requestHash   String    @unique
+  clientId      String
+  redirectUri   String
+  state         String?
+  /// S256 challenge (base64url sha256 of the verifier).
+  codeChallenge String
+  scopes        String[]
+  resource      String
+  /// Language of the consent screen and the default language of tool answers.
+  locale        String    @default("ar")
+  expiresAt     DateTime
+  consumedAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  client McpClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("mcp_auth_requests")
+}
+
+/// What a person allowed one AI app to do in one organization. Revoking it ends every token.
+model McpGrant {
+  id             String    @id @default(cuid())
+  organizationId String
+  /// The person who allowed it; every tool call acts as this user and passes their role.
+  userId         String
+  clientId       String
+  /// mizano:read | mizano:drafts
+  scopes         String[]
+  locale         String    @default("ar")
+  createdAt      DateTime  @default(now())
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  revokedById    String?
+  /// USER | REFRESH_REUSE | CODE_REUSE | USER_INACTIVE
+  revokeReason   String?
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       McpClient     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  codes        McpAuthCode[]
+  tokens       McpToken[]
+
+  @@index([organizationId, revokedAt])
+  @@index([organizationId, userId])
+  @@map("mcp_grants")
+}
+
+/// Single-use authorization code (60 s). A second use revokes the grant.
+model McpAuthCode {
+  id            String    @id @default(cuid())
+  codeHash      String    @unique
+  grantId       String
+  redirectUri   String
+  codeChallenge String
+  resource      String
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  grant McpGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@map("mcp_auth_codes")
+}
+
+/// Opaque access and refresh tokens, stored as sha256 only. Refresh tokens rotate on every use;
+/// presenting a used one revokes the whole grant (reuse detection).
+model McpToken {
+  id             String    @id @default(cuid())
+  tokenHash      String    @unique
+  grantId        String
+  organizationId String
+  /// ACCESS | REFRESH
+  kind           String
+  /// The MCP server this token is for (RFC 8707 audience).
+  resource       String
+  expiresAt      DateTime
+  /// Refresh tokens: set when exchanged for a new pair.
+  usedAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  grant        McpGrant     @relation(fields: [grantId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([grantId])
+  @@index([expiresAt])
+  @@map("mcp_tokens")
+}
+
+/// One MCP tool call: who, which tool, how long. Never arguments, amounts or results.
+model McpToolCall {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  grantId        String
+  tool           String
+  success        Boolean
+  errorCode      String?
+  durationMs     Int
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([grantId, createdAt])
+  @@map("mcp_tool_calls")
 }

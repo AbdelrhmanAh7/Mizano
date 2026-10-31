@@ -1,5 +1,6 @@
 'use client';
 
+import { AiAppConnect } from '@/components/settings/ai-app-connect';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -190,7 +191,10 @@ export function AiConnect() {
         </div>
       )}
 
-      {/* Connection */}
+      {/* The person's own AI app (Claude, ChatGPT, Codex, Gemini) through Mizano's tools */}
+      <AiAppConnect />
+
+      {/* Connection: an API key for the features that run inside Mizano */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
