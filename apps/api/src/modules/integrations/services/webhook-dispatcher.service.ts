@@ -7,7 +7,7 @@ import { signedFlowlineHeaders } from '../utils/flowline-signature';
 import { openSecret } from '../utils/secret-box';
 import { request as httpRequest } from 'http';
 import { request as httpsRequest } from 'https';
-import { assertPublicWebhookUrl, publicOnlyLookup } from '../utils/url-safety';
+import { parseWebhookUrl, publicOnlyLookup } from '../utils/url-safety';
 
 /** Delay before attempt n+1 after attempt n failed (seconds); the last value repeats. */
 export const RETRY_SCHEDULE_SECONDS = [30, 120, 600, 1800, 3600, 10800, 21600];
@@ -28,46 +28,50 @@ export type WebhookTransport = (
  * Plain POST through node:http(s) with `publicOnlyLookup`, so the connection goes to the address
  * that was checked (no DNS rebinding). Redirects are never followed (a 3xx is a failed attempt).
  */
-export const fetchTransport: WebhookTransport = (url, { headers, body, timeoutMs }) =>
-  new Promise<TransportResult>((resolve, reject) => {
-    const target = new URL(url);
-    const send = target.protocol === 'https:' ? httpsRequest : httpRequest;
-    // One absolute deadline for the whole attempt (connect, upload, response headers): a receiver
-    // that trickles bytes can't hold the dispatcher longer than timeoutMs.
-    const ctrl = new AbortController();
-    const deadline = setTimeout(
-      () =>
-        ctrl.abort(Object.assign(new Error('Webhook delivery timed out'), { code: 'ETIMEDOUT' })),
-      timeoutMs,
-    );
-    const req = send(
-      target,
-      {
-        method: 'POST',
-        headers: {
-          ...headers,
-          'user-agent': 'Mizano-Webhooks/1.0',
-          'content-length': Buffer.byteLength(body).toString(),
+export const createFetchTransport =
+  (lookup: ReturnType<typeof publicOnlyLookup> = publicOnlyLookup()): WebhookTransport =>
+  (url, { headers, body, timeoutMs }) =>
+    new Promise<TransportResult>((resolve, reject) => {
+      const target = new URL(url);
+      const send = target.protocol === 'https:' ? httpsRequest : httpRequest;
+      // One absolute deadline for the whole attempt (connect, upload, response headers): a receiver
+      // that trickles bytes can't hold the dispatcher longer than timeoutMs.
+      const ctrl = new AbortController();
+      const deadline = setTimeout(
+        () =>
+          ctrl.abort(Object.assign(new Error('Webhook delivery timed out'), { code: 'ETIMEDOUT' })),
+        timeoutMs,
+      );
+      const req = send(
+        target,
+        {
+          method: 'POST',
+          headers: {
+            ...headers,
+            'user-agent': 'Mizano-Webhooks/1.0',
+            'content-length': Buffer.byteLength(body).toString(),
+          },
+          lookup,
+          signal: ctrl.signal,
         },
-        lookup: publicOnlyLookup(),
-        signal: ctrl.signal,
-      },
-      (res) => {
+        (res) => {
+          clearTimeout(deadline);
+          const status = res.statusCode ?? 0;
+          // Only the status matters: drop the body and the socket now instead of reading it.
+          res.destroy();
+          resolve({ status });
+        },
+      );
+      req.on('error', (e) => {
         clearTimeout(deadline);
-        const status = res.statusCode ?? 0;
-        // Only the status matters: drop the body and the socket now instead of reading it.
-        res.destroy();
-        resolve({ status });
-      },
-    );
-    req.on('error', (e) => {
-      clearTimeout(deadline);
-      const cause =
-        ctrl.signal.aborted && ctrl.signal.reason instanceof Error ? ctrl.signal.reason : e;
-      reject(Object.assign(new TypeError('fetch failed'), { cause }));
+        const cause =
+          ctrl.signal.aborted && ctrl.signal.reason instanceof Error ? ctrl.signal.reason : e;
+        reject(Object.assign(new TypeError('fetch failed'), { cause }));
+      });
+      req.end(body);
     });
-    req.end(body);
-  });
+
+export const fetchTransport: WebhookTransport = createFetchTransport();
 
 /**
  * Retry 5xx, timeouts/network errors, 408, 425, 429 and 409 (FlowLine answers 409 while the
@@ -200,7 +204,9 @@ export class WebhookDispatcherService implements OnModuleDestroy {
     let statusCode: number | null = null;
     let error: string | null = null;
     try {
-      await assertPublicWebhookUrl(endpoint.url);
+      // Syntax, scheme and private IP literals only: the public-address check on the resolved name
+      // runs inside the transport (publicOnlyLookup), under the same deadline as the request.
+      parseWebhookUrl(endpoint.url);
       const secret = openSecret(
         endpoint.secretCiphertext,
         `${endpoint.organizationId}:${endpoint.id}`,

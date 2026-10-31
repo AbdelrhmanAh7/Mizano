@@ -1,6 +1,10 @@
 import { createServer, type Server } from 'http';
 import type { AddressInfo } from 'net';
-import { fetchTransport, networkErrorSummary } from './webhook-dispatcher.service';
+import {
+  createFetchTransport,
+  fetchTransport,
+  networkErrorSummary,
+} from './webhook-dispatcher.service';
 
 /** The real transport against a local server: status only, and one absolute deadline (CLI review). */
 describe('fetchTransport', () => {
@@ -38,6 +42,18 @@ describe('fetchTransport', () => {
     mode = 'stall';
     const started = Date.now();
     const error = await fetchTransport(`${base}/hook`, {
+      headers: {},
+      body: '{}',
+      timeoutMs: 200,
+    }).catch((e: unknown) => e);
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(networkErrorSummary(error)).toContain('(ETIMEDOUT)');
+  });
+
+  it('keeps the deadline when the name never resolves (DNS runs inside the attempt)', async () => {
+    const stalled = createFetchTransport(() => undefined);
+    const started = Date.now();
+    const error = await stalled('http://stall.example/hook', {
       headers: {},
       body: '{}',
       timeoutMs: 200,
