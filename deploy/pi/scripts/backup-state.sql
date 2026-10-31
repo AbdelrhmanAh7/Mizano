@@ -41,9 +41,14 @@ SELECT jsonb_build_object(
     'unlinkedApprovedJobs', (SELECT count(*) FROM intake_jobs WHERE status='APPROVED' AND "draftDocumentId" IS NULL),
     'brokenDrafts', (SELECT count(*) FROM linked WHERE bill_id IS NULL AND invoice_id IS NULL),
     'brokenPostedLinks', (SELECT count(*) FROM linked k WHERE
-      ((bill_id IS NOT NULL AND bill_status IN ('OPEN','PARTIALLY_PAID','PAID','OVERDUE','VOID')) OR (invoice_id IS NOT NULL AND invoice_status<>'DRAFT'))
+      ((bill_id IS NOT NULL AND bill_status IN ('OPEN','PARTIALLY_PAID','PAID','OVERDUE','VOID'))
+        OR (invoice_id IS NOT NULL AND invoice_status IN ('SENT','PARTIALLY_PAID','PAID','OVERDUE')))
       AND NOT EXISTS (SELECT 1 FROM journals j WHERE j."organizationId"=k."organizationId" AND j."sourceId"=k."draftDocumentId" AND j."isPosted"
-        AND j."sourceType"=CASE WHEN k.bill_id IS NOT NULL THEN 'BILL_APPROVAL' ELSE 'INVOICE_SEND' END))
+        AND j."sourceType"=CASE WHEN k.bill_id IS NOT NULL THEN 'BILL_APPROVAL' ELSE 'INVOICE_SEND' END)),
+    -- A voided draft never had a journal; a voided sent invoice has its send journal and a reversal.
+    'brokenVoidedInvoices', (SELECT count(*) FROM linked k WHERE k.invoice_status='VOID'
+      AND EXISTS (SELECT 1 FROM journals j WHERE j."organizationId"=k."organizationId" AND j."sourceId"=k."draftDocumentId" AND j."isPosted" AND j."sourceType"='INVOICE_SEND')
+        <> EXISTS (SELECT 1 FROM journals j WHERE j."organizationId"=k."organizationId" AND j."sourceId"=k."draftDocumentId" AND j."isPosted" AND j."sourceType"='INVOICE_VOID'))
   ),
   'linkedDrafts', (SELECT count(*) FROM linked)
 );

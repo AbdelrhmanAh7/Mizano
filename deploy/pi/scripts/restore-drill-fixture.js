@@ -94,7 +94,8 @@ async function main() {
           customerId: customer.id,
           date: day,
           dueDate: day,
-          status: 'DRAFT',
+          // Organization B's invoice was voided as a draft: it has no journal, and that must restore.
+          status: label === 'B' ? 'VOID' : 'DRAFT',
           organizationId: org.id,
           subtotal: '100.0000',
           grandTotal: '100.0000',

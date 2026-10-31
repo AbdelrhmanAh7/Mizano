@@ -73,6 +73,15 @@ def read_line(process):
     return line.strip()
 
 
+def copy_container_originals(container_path, target, state, errors):
+    copied = subprocess.run(compose() + ['cp', 'api:' + container_path.rstrip('/') + '/.', str(target)],
+                            stdout=errors, stderr=errors, check=False, timeout=3600)
+    # A fresh server has no intake folder until the first upload. That is only an empty
+    # backup when the database lists no originals; otherwise the copy really failed.
+    if copied.returncode != 0 and state.get('originals'):
+        raise CheckFailed('originals copy failed')
+
+
 def create(work):
     work.mkdir(parents=True, exist_ok=True)
     user = os.environ.get('POSTGRES_USER', 'mizano')
@@ -112,8 +121,7 @@ def create(work):
         target.mkdir(mode=0o700)
         container_path = os.environ.get('BACKUP_ORIGINALS_CONTAINER_PATH')
         if container_path:
-            subprocess.run(compose() + ['cp', 'api:' + container_path.rstrip('/') + '/.', str(target)],
-                           stdout=errors, stderr=errors, check=True, timeout=3600)
+            copy_container_originals(container_path, target, state, errors)
         else:
             source = Path(os.environ.get('BACKUP_ORIGINALS_DIR', os.environ['DATA_DIR'] + '/originals'))
             if not source.is_dir():

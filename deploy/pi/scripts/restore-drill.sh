@@ -22,17 +22,21 @@ cleanup() {
 }
 trap cleanup EXIT
 # Pin latest to one complete snapshot before reading it; never restore a caller-supplied DB URL.
-restic snapshots --json --host "$backup_host" --tag "mizano,$set_name" --latest 1 >"$work/snapshots.json" 2>/dev/null
-snapshot="$(python3 -c 'import json,sys; rows=json.load(open(sys.argv[1])); assert rows; print(max(rows,key=lambda r:r["time"])["id"])' "$work/snapshots.json")"
+restic snapshots --json --host "$backup_host" --tag "mizano,$set_name" --latest 1 >"$work/snapshots.json" 2>/dev/null \
+  || { echo "DRILL FAILED: cannot list snapshots (password file, repository or lock)" >&2; exit 1; }
+snapshot="$(python3 -c 'import json,sys; rows=json.load(open(sys.argv[1])); print(max(rows,key=lambda r:r["time"])["id"] if rows else "")' "$work/snapshots.json" 2>/dev/null)" \
+  || { echo "DRILL FAILED: unreadable snapshot list" >&2; exit 1; }
 [[ "$snapshot" =~ ^[0-9a-f]{8,64}$ ]] || { echo "no valid backup snapshot" >&2; exit 1; }
-restic dump "$snapshot" /mizano.tar >"$work/backup.tar" 2>/dev/null
+restic dump "$snapshot" /mizano.tar >"$work/backup.tar" 2>/dev/null \
+  || { echo "DRILL FAILED: cannot read the snapshot archive" >&2; exit 1; }
 log "restore stage=verify-files"
 python3 "$here/backup-manifest.py" unpack "$work/backup.tar" "$work"
 # Credentials are generated for this one scratch container and removed with it.
 drill_pw="$(python3 -c 'import secrets; print(secrets.token_hex(24))')"
 container_id="$(docker run -d --name "$name" --network none --memory 384m \
   -e POSTGRES_PASSWORD="$drill_pw" -e POSTGRES_DB=drill \
-  "${RESTORE_POSTGRES_IMAGE:-postgres:16}" -c shared_buffers=64MB -c max_connections=10 2>/dev/null)"
+  "${RESTORE_POSTGRES_IMAGE:-postgres:16}" -c shared_buffers=64MB -c max_connections=10 2>/dev/null)" \
+  || { echo "DRILL FAILED: cannot start the scratch database (image pull or Docker)" >&2; exit 1; }
 ready=0
 for _ in $(seq 1 60); do
   if docker exec "$name" pg_isready -h 127.0.0.1 -U postgres -d drill >/dev/null 2>&1; then ready=1; break; fi

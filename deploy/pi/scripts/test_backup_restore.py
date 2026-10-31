@@ -47,6 +47,15 @@ class ManifestTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 MANIFEST.verify_files(root, data)
 
+    def test_fresh_server_without_intake_folder_backs_up_as_empty(self):
+        missing = subprocess.CompletedProcess([], 1)
+        with tempfile.TemporaryDirectory() as tmp, patch.object(MANIFEST.subprocess, 'run', return_value=missing), \
+                patch.object(MANIFEST, 'compose', return_value=['docker']):
+            MANIFEST.copy_container_originals('/app/storage/intake', Path(tmp), {'originals': []}, None)
+            with self.assertRaises(ValueError):
+                MANIFEST.copy_container_originals('/app/storage/intake', Path(tmp),
+                                                  {'originals': [{'key': 'org-a/document'}]}, None)
+
     def test_foreign_original_key_is_refused(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
