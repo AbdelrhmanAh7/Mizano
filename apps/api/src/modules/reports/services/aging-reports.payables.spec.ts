@@ -35,6 +35,7 @@ describe('payables reports net unapplied vendor credits', () => {
       vendorCredit: {
         findMany: jest.fn().mockResolvedValue([credit('v1', '150.5'), credit('v1', '49.5')]),
       },
+      billAllocation: { findMany: jest.fn().mockResolvedValue([]) },
     };
     const service = new AgingReportsService(prisma as unknown as ReadReplicaService);
 

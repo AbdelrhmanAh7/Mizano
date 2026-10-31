@@ -24,12 +24,17 @@ const applied = (e: Event) => ({
   deletedAt: e.deletedAt ? d(e.deletedAt) : null,
 });
 
-function journalMock(voids: Array<{ sourceId: string; date: string }>) {
+interface VoidJournal {
+  sourceType: string;
+  sourceId: string;
+  date: string;
+}
+function journalMock(voids: VoidJournal[]) {
   return {
     findMany: jest.fn(async (args: { where: { sourceId: { in: string[] } } }) =>
       voids
         .filter((v) => args.where.sourceId.in.includes(v.sourceId))
-        .map((v) => ({ sourceId: v.sourceId, date: d(v.date) })),
+        .map((v) => ({ ...v, date: d(v.date) })),
     ),
   };
 }
@@ -53,11 +58,13 @@ describe('payables aging as of a cutoff', () => {
   function build(
     bills: unknown[],
     credits: unknown[] = [],
-    voids: Array<{ sourceId: string; date: string }> = [],
+    voids: VoidJournal[] = [],
+    laterBillPayments: unknown[] = [],
   ) {
     const prisma = {
       bill: { findMany: jest.fn().mockResolvedValue(bills) },
       vendorCredit: { findMany: jest.fn().mockResolvedValue(credits) },
+      billAllocation: { findMany: jest.fn().mockResolvedValue(laterBillPayments) },
       journal: journalMock(voids),
     };
     return { prisma, service: new AgingReportsService(prisma as unknown as ReadReplicaService) };
@@ -102,7 +109,7 @@ describe('payables aging as of a cutoff', () => {
         }),
       ],
       [],
-      [{ sourceId: 'p1', date: '2026-02-03' }],
+      [{ sourceType: 'PAYMENT_MADE_VOID', sourceId: 'p1', date: '2026-02-03' }],
     );
 
     const report = await service.getPayablesAging(ORG, CUTOFF);
@@ -110,7 +117,7 @@ describe('payables aging as of a cutoff', () => {
     expect(report.summary.total).toBe('600.0000');
     expect(prisma.journal.findMany.mock.calls[0][0].where).toMatchObject({
       organizationId: ORG,
-      sourceType: 'PAYMENT_MADE_VOID',
+      sourceType: { in: ['PAYMENT_MADE_VOID'] },
       isPosted: true,
       deletedAt: null,
     });
@@ -125,7 +132,7 @@ describe('payables aging as of a cutoff', () => {
         }),
       ],
       [],
-      [{ sourceId: 'p1', date: '2026-01-20' }],
+      [{ sourceType: 'PAYMENT_MADE_VOID', sourceId: 'p1', date: '2026-01-20' }],
     );
 
     const report = await service.getPayablesAging(ORG, CUTOFF);
@@ -146,13 +153,60 @@ describe('payables aging as of a cutoff', () => {
           vendor: { id: 'v1', name: 'Vendor' },
         },
       ],
-      [{ sourceId: 'c9', date: '2026-02-02' }],
+      [{ sourceType: 'VENDOR_CREDIT_VOID', sourceId: 'c9', date: '2026-02-02' }],
     );
 
     const report = await service.getPayablesAging(ORG, CUTOFF);
 
     expect(report.summary.unappliedCredits).toBe('150.0000');
     expect(report.summary.netTotal).toBe('850.0000');
+  });
+
+  it('nets a payment dated by the cutoff for a bill dated after it as a vendor credit', async () => {
+    const { prisma, service } = build(
+      [bill({ balanceDue: '1000' })],
+      [],
+      [],
+      [
+        {
+          amount: new Decimal('80'),
+          payment: { id: 'p7', date: d('2026-01-30'), deletedAt: null },
+          bill: { vendor: { id: 'v1', name: 'Vendor' } },
+        },
+      ],
+    );
+
+    const report = await service.getPayablesAging(ORG, CUTOFF);
+
+    expect(report.summary.unappliedCredits).toBe('80.0000');
+    expect(report.summary.netTotal).toBe('920.0000');
+    expect(prisma.billAllocation.findMany.mock.calls[0][0].where).toMatchObject({
+      bill: { organizationId: ORG, deletedAt: null },
+      payment: { organizationId: ORG },
+    });
+  });
+
+  it('keeps an over-settlement on the cutoff as a vendor credit instead of clamping it', async () => {
+    // Paid on Jan 15, that payment voided on Feb 3 and replaced by one back-dated to Jan 20:
+    // on Jan 31 both were live, so the vendor held a 1000 credit.
+    const { service } = build(
+      [
+        bill({
+          payments: [
+            { id: 'p1', amount: '1000', date: '2026-01-15', deletedAt: '2026-02-03' },
+            { id: 'p2', amount: '1000', date: '2026-01-20' },
+          ],
+        }),
+      ],
+      [],
+      [{ sourceType: 'PAYMENT_MADE_VOID', sourceId: 'p1', date: '2026-02-03' }],
+    );
+
+    const report = await service.getPayablesAging(ORG, CUTOFF);
+
+    expect(report.billCount).toBe(0);
+    expect(report.summary.unappliedCredits).toBe('1000.0000');
+    expect(report.summary.netTotal).toBe('-1000.0000');
   });
 
   it('drops a bill fully settled by the cutoff', async () => {
@@ -183,10 +237,11 @@ describe('receivables aging as of a cutoff', () => {
     customer: { id: 'c1', name: 'Customer' },
   });
 
-  function build(invoices: unknown[], voids: Array<{ sourceId: string; date: string }> = []) {
+  function build(invoices: unknown[], voids: VoidJournal[] = []) {
     const prisma = {
       invoice: { findMany: jest.fn().mockResolvedValue(invoices) },
       creditNote: { findMany: jest.fn().mockResolvedValue([]) },
+      paymentAllocation: { findMany: jest.fn().mockResolvedValue([]) },
       journal: journalMock(voids),
     };
     return new AgingReportsService(prisma as unknown as ReadReplicaService);
@@ -209,7 +264,10 @@ describe('receivables aging as of a cutoff', () => {
   it('keeps an invoice voided after the cutoff and drops a voided draft', async () => {
     const posted = invoice({ status: 'VOID' });
     const draft = { ...invoice({ status: 'VOID' }), id: 'i2', invoiceNumber: 'INV-0002' };
-    const service = build([posted, draft], [{ sourceId: 'i1', date: '2026-02-10' }]);
+    const service = build(
+      [posted, draft],
+      [{ sourceType: 'INVOICE_VOID', sourceId: 'i1', date: '2026-02-10' }],
+    );
 
     const report = await service.getReceivablesAging(ORG, CUTOFF);
 
@@ -218,7 +276,10 @@ describe('receivables aging as of a cutoff', () => {
   });
 
   it('drops an invoice voided on or before the cutoff', async () => {
-    const service = build([invoice({ status: 'VOID' })], [{ sourceId: 'i1', date: '2026-01-31' }]);
+    const service = build(
+      [invoice({ status: 'VOID' })],
+      [{ sourceType: 'INVOICE_VOID', sourceId: 'i1', date: '2026-01-31' }],
+    );
 
     const report = await service.getReceivablesAging(ORG, CUTOFF);
 
@@ -232,7 +293,7 @@ describe('receivables aging as of a cutoff', () => {
           credits: [{ id: 'cn1', amount: '120', date: '2026-01-25', deletedAt: '2026-02-04' }],
         }),
       ],
-      [{ sourceId: 'cn1', date: '2026-02-04' }],
+      [{ sourceType: 'CREDIT_NOTE_VOID', sourceId: 'cn1', date: '2026-02-04' }],
     );
 
     const report = await service.getReceivablesAging(ORG, CUTOFF);

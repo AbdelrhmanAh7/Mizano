@@ -34,6 +34,7 @@ describe('receivables aging', () => {
     const prisma = {
       invoice: { findMany: jest.fn().mockResolvedValue(invoices) },
       creditNote: { findMany: jest.fn().mockResolvedValue(credits) },
+      paymentAllocation: { findMany: jest.fn().mockResolvedValue([]) },
     };
     return { prisma, service: new AgingReportsService(prisma as unknown as ReadReplicaService) };
   }

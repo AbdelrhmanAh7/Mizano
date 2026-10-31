@@ -140,4 +140,49 @@ describe('Aging as of a cutoff (e2e)', () => {
     });
     expect(D(past.summary.netTotal).equals(await controlAsOf(acc.ar, cutoff, 'debit'))).toBe(true);
   });
+
+  it('nets an over-settlement and a payment for a later bill on the cutoff (equals AP control)', async () => {
+    const vendor = await a.post('/vendors').send({ name: 'Aging Vendor Two' });
+    expect(vendor.status).toBe(201);
+    const bill = async (date: string, rate: string): Promise<string> => {
+      const res = await a.post('/bills').send({
+        vendorId: vendor.body.id,
+        date,
+        dueDate: isoDay(5),
+        lines: [{ description: 'Rent', accountId: acc.rent, quantity: '1', rate, taxRate: '0' }],
+      });
+      expect(res.status).toBe(201);
+      expect((await a.post(`/bills/${res.body.id}/approve`)).status).toBe(201);
+      return res.body.id;
+    };
+    const pay = async (billId: string, date: string, amount: string): Promise<string> => {
+      const res = await a.post('/payments-made').send({
+        vendorId: vendor.body.id,
+        date,
+        amount,
+        paymentMode: 'BANK_TRANSFER',
+        paidFromAccountId: acc.bank,
+        allocations: [{ billId, amount }],
+      });
+      expect(res.status).toBe(201);
+      return res.body.id;
+    };
+    // Paid before the cutoff, that payment voided today and replaced by one back-dated before
+    // the cutoff: on the cutoff both were live, so the vendor held a 400 credit then.
+    const settled = await bill(isoDay(-30), '400');
+    const first = await pay(settled, isoDay(-20), '400');
+    expect((await a.delete(`/payments-made/${first}`)).status).toBe(200);
+    await pay(settled, isoDay(-18), '400');
+    // A bill dated after the cutoff, paid with a payment dated before it: a credit on the cutoff.
+    const later = await bill(isoDay(-5), '90');
+    await pay(later, isoDay(-12), '90');
+
+    const before = await controlAsOf(acc.ap, cutoff, 'credit');
+    const past = (await a.get('/reports/payables-aging').query({ asOfDate: cutoff })).body;
+    const vendorCredit = past.unappliedCredits.vendors.find(
+      (v: { vendorId: string }) => v.vendorId === vendor.body.id,
+    );
+    expect(vendorCredit.amount).toBe('490.0000');
+    expect(D(past.summary.netTotal).equals(before)).toBe(true);
+  });
 });
