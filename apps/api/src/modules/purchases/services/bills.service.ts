@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { BillStatus, Prisma } from '@prisma/client';
+import { AccountType, BillStatus, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
@@ -19,6 +19,11 @@ import { BillCursorQueryDto } from '../dto/bill-cursor-query.dto';
 import { BillQueryDto } from '../dto/bill-query.dto';
 import { BillLineDto, CreateBillDto } from '../dto/create-bill.dto';
 import { UpdateBillDto } from '../dto/update-bill.dto';
+import {
+  ACCOUNT_REQUIRED,
+  assertBillLineAccounts,
+  billLineAccountWhere,
+} from '../utils/bill-line-accounts';
 
 /** Bill statuses that carry an open AP balance and can receive payments. */
 export const PAYABLE_BILL_STATUSES: BillStatus[] = [
@@ -307,6 +312,39 @@ export class BillsService {
     return { isDuplicate: false, existingBillId: null, similarity: 0, matchType: 'none' };
   }
 
+  /**
+   * Accounts the bill form may offer on a line (exactly what create/update/approve accept), plus
+   * the account of this vendor's most recent bill line that is still eligible, used as the
+   * default for a new line. Needs only purchases.create, not accounting.view.
+   */
+  async accountOptions(
+    organizationId: string,
+    vendorId?: string,
+  ): Promise<{
+    data: { id: string; code: string; name: string; type: AccountType }[];
+    vendorDefaultAccountId: string | null;
+  }> {
+    const where = await billLineAccountWhere(this.prisma, organizationId);
+    const data = await this.prisma.account.findMany({
+      where,
+      select: { id: true, code: true, name: true, type: true },
+      orderBy: { code: 'asc' },
+    });
+    let vendorDefaultAccountId: string | null = null;
+    if (vendorId && data.length > 0) {
+      const last = await this.prisma.billLine.findFirst({
+        where: {
+          accountId: { in: data.map((a) => a.id) },
+          bill: { organizationId, vendorId, deletedAt: null },
+        },
+        orderBy: [{ bill: { date: 'desc' } }, { bill: { createdAt: 'desc' } }],
+        select: { accountId: true },
+      });
+      vendorDefaultAccountId = last?.accountId ?? null;
+    }
+    return { data, vendorDefaultAccountId };
+  }
+
   /** "Open" is the same accounting event as approval: it must post to the ledger. */
   async open(organizationId: string, id: string) {
     return { data: await this.approve(organizationId, id) };
@@ -331,10 +369,20 @@ export class BillsService {
       }
       if (bill.lines.length === 0) throw new BadRequestException('Bill has no lines');
       if (bill.lines.some((l) => !l.accountId)) {
-        throw new BadRequestException(
-          'All bill lines must have an expense account assigned before approval',
-        );
+        throw new BadRequestException({
+          statusCode: 400,
+          code: ACCOUNT_REQUIRED,
+          message: 'All bill lines must have an expense account assigned before approval',
+          error: 'Bad Request',
+        });
       }
+      // Re-check under the ledger lock: an account may have been deactivated, retyped or made a
+      // control account after the draft was saved (#550).
+      await assertBillLineAccounts(
+        tx,
+        organizationId,
+        bill.lines.map((l) => l.accountId as string),
+      );
 
       const org = await tx.organization.findUnique({
         where: { id: organizationId },
@@ -542,13 +590,12 @@ export class BillsService {
       if (!project) throw new BadRequestException('Project not found');
     }
     const lines = dto.lines ?? [];
-    const accountIds = [...new Set(lines.map((l) => l.accountId).filter(Boolean))] as string[];
-    if (accountIds.length) {
-      const found = await db.account.count({
-        where: { id: { in: accountIds }, organizationId, deletedAt: null, isActive: true },
-      });
-      if (found !== accountIds.length) throw new BadRequestException('Account not found');
-    }
+    // Drafts may leave a line without an account (scan review, import); approve() requires one.
+    await assertBillLineAccounts(
+      db,
+      organizationId,
+      lines.map((l) => l.accountId).filter((id): id is string => !!id),
+    );
     const itemIds = [...new Set(lines.map((l) => l.itemId).filter(Boolean))] as string[];
     if (itemIds.length) {
       const found = await db.item.count({ where: { id: { in: itemIds }, organizationId } });

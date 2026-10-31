@@ -16,6 +16,7 @@ import { extractTextFromPdf } from '../utils/pdf-extractor.util';
 import { levenshteinSimilarity, normalizeText } from '../utils/text-similarity.util';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
 import { assertTotalsFit } from '../../sales/utils/sales-helpers';
+import { assertBillLineAccounts } from '../../purchases/utils/bill-line-accounts';
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -535,6 +536,10 @@ export class DocumentIntakeService {
         throw new BadRequestException(
           'accountId does not reference an active account in this organization',
         );
+      }
+      if (dto.type === 'BILL') {
+        // Same rule as BillsService (expense/asset, no control accounts); approve() re-checks.
+        await assertBillLineAccounts(this.prisma, organizationId, accountIds);
       }
     }
 

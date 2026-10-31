@@ -23,6 +23,7 @@ import {
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
+import { BillAccountOptionsQueryDto } from '../dto/bill-account-options-query.dto';
 import { BillCursorQueryDto } from '../dto/bill-cursor-query.dto';
 import { BillQueryDto } from '../dto/bill-query.dto';
 import { CheckDuplicateBillDto } from '../dto/check-duplicate-bill.dto';
@@ -43,6 +44,15 @@ export class BillsController {
     private readonly billsService: BillsService,
     private readonly paymentsMadeService: PaymentsMadeService,
   ) {}
+
+  @Get('account-options')
+  @Permissions('purchases.create')
+  @ApiOperation({
+    summary: 'Accounts a bill line may use (active expense/asset, no control accounts)',
+  })
+  accountOptions(@CurrentOrg() orgId: string, @Query() query: BillAccountOptionsQueryDto) {
+    return this.billsService.accountOptions(orgId, query.vendorId);
+  }
 
   @Post('check-duplicate')
   @Permissions('purchases.create')
