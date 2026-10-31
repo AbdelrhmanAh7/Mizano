@@ -273,4 +273,56 @@ describe('PdfService HTML safety', () => {
     expect(lastHtml()).toContain('<html lang="en" dir="ltr">');
     expect(lastHtml()).toContain('Balance Due:');
   });
+  it('prices bills, quotes and statements in the document or base currency, never USD (PR #560)', async () => {
+    prisma.organization.findUnique.mockResolvedValue({
+      ...ORG_ROW,
+      currency: 'USD', // schema default, not the ledger currency
+      baseCurrency: 'EGP',
+    });
+    const doc = {
+      date: new Date('2026-10-31'),
+      dueDate: new Date('2026-11-30'),
+      expiryDate: new Date('2026-11-30'),
+      status: 'DRAFT',
+      lines: [{ description: 'x', quantity: '1', rate: '100', taxRate: null, amount: '100' }],
+      subtotal: '100',
+      taxAmount: '0',
+      grandTotal: '100',
+      balanceDue: '100',
+      notes: null,
+      terms: null,
+    };
+    const party = { name: 'P', email: null, phone: null, address: null };
+    const egp = new Intl.NumberFormat('en-SA', { style: 'currency', currency: 'EGP' }).format(100);
+
+    prisma.bill = {
+      ...prisma.bill,
+      findFirst: jest
+        .fn()
+        .mockResolvedValue({ ...doc, billNumber: 'B-1', currencyCode: null, vendor: party }),
+    };
+    await service.generateBillPdf('org-1', 'bill-1');
+    expect(lastHtml()).toContain(egp);
+
+    prisma.quote = {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue({ ...doc, quoteNumber: 'Q-1', currencyCode: 'sar', customer: party }),
+    };
+    await service.generateQuotePdf('org-1', 'quote-1');
+    expect(lastHtml()).toContain(
+      new Intl.NumberFormat('en-SA', { style: 'currency', currency: 'SAR' }).format(100),
+    );
+
+    await service.generateStatementPdf(
+      'org-1',
+      'c1',
+      new Date('2026-09-01'),
+      new Date('2026-09-30'),
+    );
+    expect(lastHtml()).toMatch(/EGP/);
+    for (const html of renderer.mock.calls.slice(-3).map((c) => String(c[0]))) {
+      expect(html).not.toMatch(/US\$|USD/);
+    }
+  });
 });

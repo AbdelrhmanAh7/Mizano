@@ -15,6 +15,19 @@ import {
 } from '../templates/base.template';
 import { closePdfBrowser, renderHtmlToPdf } from './pdf-renderer';
 
+/**
+ * Ledger figures (statements, reports, payslips) are in the organization base currency, never in
+ * Organization.currency, a USD schema default.
+ */
+function ledgerCurrency(org: OrganizationInfo): string {
+  return org.baseCurrency || 'SAR';
+}
+
+/** A document's own currency, else the base currency it is posted in. */
+function documentCurrency(currencyCode: string | null | undefined, org: OrganizationInfo): string {
+  return currencyCode?.trim().toUpperCase() || ledgerCurrency(org);
+}
+
 @Injectable()
 export class PdfService implements OnModuleDestroy {
   constructor(private prisma: PrismaService) {}
@@ -82,9 +95,7 @@ export class PdfService implements OnModuleDestroy {
         : undefined,
       grandTotal: parseFloat(invoice.grandTotal.toString()),
       balanceDue: parseFloat(invoice.balanceDue.toString()),
-      // The document's currency, else the ledger's base currency (never the USD schema default
-      // of Organization.currency).
-      currency: invoice.currencyCode?.trim().toUpperCase() || org.baseCurrency || 'SAR',
+      currency: documentCurrency(invoice.currencyCode, org),
       notes: invoice.notes || undefined,
       terms: invoice.terms || undefined,
     };
@@ -135,7 +146,7 @@ export class PdfService implements OnModuleDestroy {
       taxAmount: parseFloat(bill.taxAmount.toString()),
       grandTotal: parseFloat(bill.grandTotal.toString()),
       balanceDue: parseFloat(bill.balanceDue.toString()),
-      currency: org.currency || 'SAR',
+      currency: documentCurrency(bill.currencyCode, org),
       notes: bill.notes || undefined,
     };
 
@@ -188,7 +199,7 @@ export class PdfService implements OnModuleDestroy {
       subtotal: parseFloat(quote.subtotal.toString()),
       taxAmount: parseFloat(quote.taxAmount.toString()),
       grandTotal: parseFloat(quote.grandTotal.toString()),
-      currency: org.currency || 'SAR',
+      currency: documentCurrency(quote.currencyCode, org),
       notes: quote.notes || undefined,
       terms: quote.terms || undefined,
     };
@@ -321,7 +332,7 @@ export class PdfService implements OnModuleDestroy {
       grossPay: parseFloat((payslip.grossPay || payslip.grossSalary).toString()),
       totalDeductions: parseFloat((payslip.totalDeductions || 0).toString()),
       netPay: parseFloat((payslip.netPay || payslip.netSalary).toString()),
-      currency: 'SAR',
+      currency: ledgerCurrency(org),
     };
 
     const html = generatePayslipHtml(org, payslipData);
@@ -459,7 +470,7 @@ export class PdfService implements OnModuleDestroy {
       openingBalance,
       transactions,
       closingBalance,
-      currency: 'SAR',
+      currency: ledgerCurrency(org),
     });
 
     return this.htmlToPdf(html);
@@ -474,7 +485,7 @@ export class PdfService implements OnModuleDestroy {
   ): Promise<Buffer> {
     const org = await this.getOrganizationInfo(organizationId);
     const primaryColor = safeColor(org.primaryColor, '#3B82F6');
-    const currency = org.currency || 'SAR';
+    const currency = ledgerCurrency(org);
     const journalLines = await this.prisma.journalLine.findMany({
       where: {
         journal: {
@@ -537,7 +548,7 @@ export class PdfService implements OnModuleDestroy {
   async generateBalanceSheetPdf(organizationId: string, asOfDate: string): Promise<Buffer> {
     const org = await this.getOrganizationInfo(organizationId);
     const pc = safeColor(org.primaryColor, '#3B82F6');
-    const cur = org.currency || 'SAR';
+    const cur = ledgerCurrency(org);
     const lines = await this.prisma.journalLine.findMany({
       where: {
         journal: {
@@ -608,7 +619,7 @@ export class PdfService implements OnModuleDestroy {
   ): Promise<Buffer> {
     const org = await this.getOrganizationInfo(organizationId);
     const pc = safeColor(org.primaryColor, '#3B82F6'),
-      cur = org.currency || 'SAR';
+      cur = ledgerCurrency(org);
     const ref = asOfDate ? new Date(asOfDate) : new Date();
     const cat = (due: Date, amt: number) => {
       const d = Math.floor((ref.getTime() - due.getTime()) / 86400000);
