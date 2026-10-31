@@ -32,6 +32,14 @@ export const fetchTransport: WebhookTransport = (url, { headers, body, timeoutMs
   new Promise<TransportResult>((resolve, reject) => {
     const target = new URL(url);
     const send = target.protocol === 'https:' ? httpsRequest : httpRequest;
+    // One absolute deadline for the whole attempt (connect, upload, response headers): a receiver
+    // that trickles bytes can't hold the dispatcher longer than timeoutMs.
+    const ctrl = new AbortController();
+    const deadline = setTimeout(
+      () =>
+        ctrl.abort(Object.assign(new Error('Webhook delivery timed out'), { code: 'ETIMEDOUT' })),
+      timeoutMs,
+    );
     const req = send(
       target,
       {
@@ -42,17 +50,22 @@ export const fetchTransport: WebhookTransport = (url, { headers, body, timeoutMs
           'content-length': Buffer.byteLength(body).toString(),
         },
         lookup: publicOnlyLookup(),
-        timeout: timeoutMs,
+        signal: ctrl.signal,
       },
       (res) => {
-        res.resume();
-        resolve({ status: res.statusCode ?? 0 });
+        clearTimeout(deadline);
+        const status = res.statusCode ?? 0;
+        // Only the status matters: drop the body and the socket now instead of reading it.
+        res.destroy();
+        resolve({ status });
       },
     );
-    req.on('timeout', () =>
-      req.destroy(Object.assign(new Error('Webhook delivery timed out'), { code: 'ETIMEDOUT' })),
-    );
-    req.on('error', (e) => reject(Object.assign(new TypeError('fetch failed'), { cause: e })));
+    req.on('error', (e) => {
+      clearTimeout(deadline);
+      const cause =
+        ctrl.signal.aborted && ctrl.signal.reason instanceof Error ? ctrl.signal.reason : e;
+      reject(Object.assign(new TypeError('fetch failed'), { cause }));
+    });
     req.end(body);
   });
 
