@@ -78,26 +78,29 @@ describe('ReconciliationService.getSuggestions (#586 matching precision)', () =>
     prisma.bankTransaction.findMany.mockResolvedValue([
       { ...deposit, reference: 'TRF INV-0007', description: 'Payment (INV-0009)' },
     ]);
-    // Each pool is queried on its own: the exact pool holds the old exact match even when the
-    // near pool and the newest pool are saturated with other documents.
+    // Each pool is queried on its own, so saturated weaker pools never hide a stronger match:
+    // a named invoice behind 200 newer exact amounts, an exact one behind 200 near amounts.
+    const exact = Array.from({ length: 200 }, (_, i) => invoice(`INV-E${i}`, '1000.0001'));
     const near = Array.from({ length: 200 }, (_, i) => invoice(`INV-N${i}`, '1000.5'));
     prisma.invoice.findMany
-      .mockResolvedValueOnce([invoice('INV-OLD', '1000.0001')])
+      .mockResolvedValueOnce([invoice('INV-0007', '5000')])
+      .mockResolvedValueOnce(exact)
       .mockResolvedValueOnce(near)
       .mockResolvedValueOnce([invoice('INV-NEW', '9000')]);
 
     const [row] = await service.getSuggestions(ORG, 'ba1');
 
-    const [exactWhere, nearWhere] = prisma.invoice.findMany.mock.calls.map(
+    const [namedWhere, exactWhere, nearWhere] = prisma.invoice.findMany.mock.calls.map(
       (c: Array<{ where: any }>) => c[0].where,
     );
-    expect(exactWhere.OR[0].balanceDue.toString()).toBe('1000.0001');
-    expect(exactWhere.OR[1]).toEqual({
-      invoiceNumber: { in: ['TRF', 'INV-0007', 'Payment', 'INV-0009'] },
+    expect(namedWhere.invoiceNumber).toEqual({
+      in: ['TRF', 'INV-0007', 'Payment', 'INV-0009'],
     });
+    expect(exactWhere.balanceDue.toString()).toBe('1000.0001');
     expect(nearWhere.balanceDue.gt.toString()).toBe('1000.0001');
     expect(nearWhere.balanceDue.lte.toString()).toBe('1050.000105');
-    expect(row.matches[0]).toMatchObject({ entity: { id: 'INV-OLD' }, confidence: 90 });
+    expect(row.matches[0]).toMatchObject({ entity: { id: 'INV-0007' }, confidence: 100 });
+    expect(row.matches[1]).toMatchObject({ confidence: 90 });
     expect(row.matches).toHaveLength(5);
   });
 

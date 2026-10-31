@@ -40,17 +40,6 @@ function referenceTokens(
   return [...new Set(words)].slice(0, 20);
 }
 
-/** Candidates with exactly the amount, or whose number appears on the bank line. */
-function exactOrNamed<F extends string>(
-  numberField: F,
-  amount: Decimal,
-  tokens: string[],
-): Array<{ balanceDue: Decimal } | Record<F, { in: string[] }>> {
-  const exact = { balanceDue: amount };
-  if (tokens.length === 0) return [exact];
-  return [exact, { [numberField]: { in: tokens } } as Record<F, { in: string[] }>];
-}
-
 function uniqueById<T extends { id: string }>(rows: T[]): T[] {
   return [...new Map(rows.map((r) => [r.id, r])).values()];
 }
@@ -130,15 +119,16 @@ export class ReconciliationService {
         take: MATCH_CANDIDATE_LIMIT,
       };
       // Separate pools in priority order, each bounded, so weaker candidates never crowd out
-      // stronger ones: exact amount or a named number, then near amounts, then the newest open
+      // stronger ones: a named number, then exact amount, then near amounts, then the newest open
       // ones for name-only matches.
       const invoices = uniqueById(
         (
           await Promise.all([
             this.prisma.invoice.findMany({
               ...query,
-              where: { ...where, OR: exactOrNamed('invoiceNumber', amount, tokens) },
+              where: { ...where, invoiceNumber: { in: tokens } },
             }),
+            this.prisma.invoice.findMany({ ...query, where: { ...where, balanceDue: amount } }),
             this.prisma.invoice.findMany({
               ...query,
               where: { ...where, balanceDue: { gt: amount, lte: nearCeiling } },
@@ -183,11 +173,12 @@ export class ReconciliationService {
       const bills = uniqueById(
         (
           await Promise.all([
-            // Bills score no near amounts: exact amount or a named number, then the newest.
+            // Bills score no near amounts: a named number, then exact amount, then the newest.
             this.prisma.bill.findMany({
               ...query,
-              where: { ...where, OR: exactOrNamed('billNumber', amount, tokens) },
+              where: { ...where, billNumber: { in: tokens } },
             }),
+            this.prisma.bill.findMany({ ...query, where: { ...where, balanceDue: amount } }),
             this.prisma.bill.findMany({ ...query, where }),
           ])
         ).flat(),
