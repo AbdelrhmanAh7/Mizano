@@ -12,6 +12,7 @@ import {
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { DOCUMENT_DIGITS, type DocumentDigits } from '../../../common/utils/document-digits';
 
 // ============================================
 // GENERAL SETTINGS
@@ -262,6 +263,14 @@ export class LocalizationSettingsDto {
   @IsOptional()
   @IsString()
   timezone?: string;
+
+  @ApiPropertyOptional({
+    description: 'Digits of Arabic PDFs: latn (0123) or arab (Arabic-Indic)',
+    enum: DOCUMENT_DIGITS,
+  })
+  @IsOptional()
+  @IsIn(DOCUMENT_DIGITS)
+  documentDigits?: DocumentDigits;
 }
 
 // ============================================
@@ -337,6 +346,7 @@ export interface AllSettingsResponse {
     dateFormat: string;
     numberFormat: string;
     timezone: string;
+    documentDigits: DocumentDigits;
   };
   branding: {
     logoUrl: string | null;

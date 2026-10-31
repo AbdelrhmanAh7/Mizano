@@ -28,11 +28,18 @@ export function documentLocaleFor(appLocale: string): DocumentLocale {
   return appLocale === 'ar' ? 'ar' : 'en';
 }
 
+/** Documents with a PDF in the user's language (GET /documents/:kind/:id/pdf?locale=). */
+export type PdfDocumentKind = 'invoice' | 'quote' | 'bill';
+
 const documentsApi = {
-  // Invoice PDFs
-  getInvoicePdf: async (invoiceId: string, locale?: DocumentLocale): Promise<Blob> => {
-    const response = await api.get(`/documents/invoice/${invoiceId}/pdf`, {
-      params: locale ? { locale } : undefined,
+  // Invoice, quote and bill PDFs
+  getDocumentPdf: async (
+    kind: PdfDocumentKind,
+    documentId: string,
+    locale: DocumentLocale,
+  ): Promise<Blob> => {
+    const response = await api.get(`/documents/${kind}/${documentId}/pdf`, {
+      params: { locale },
       responseType: 'blob',
     });
     return response.data;
@@ -42,13 +49,6 @@ const documentsApi = {
     return response.data;
   },
 
-  // Quote PDFs
-  getQuotePdf: async (quoteId: string) => {
-    const response = await api.get(`/documents/quote/${quoteId}/pdf`, {
-      responseType: 'blob',
-    });
-    return response.data;
-  },
   sendQuote: async (quoteId: string, data: SendDocumentDto) => {
     const response = await api.post(`/documents/quote/${quoteId}/send`, data);
     return response.data;
@@ -63,14 +63,6 @@ const documentsApi = {
   },
   sendCreditNote: async (creditNoteId: string, data: SendDocumentDto) => {
     const response = await api.post(`/documents/credit-note/${creditNoteId}/send`, data);
-    return response.data;
-  },
-
-  // Bill PDFs
-  getBillPdf: async (billId: string) => {
-    const response = await api.get(`/documents/bill/${billId}/pdf`, {
-      responseType: 'blob',
-    });
     return response.data;
   },
 
@@ -136,24 +128,28 @@ const documentsApi = {
   },
 };
 
-// ============ Invoice PDF actions ============
+// ============ Invoice, quote and bill PDF actions ============
 
 function pdfBlob(data: Blob): Blob {
   return data.type === 'application/pdf' ? data : new Blob([data], { type: 'application/pdf' });
 }
 
-/** Downloads the invoice PDF (GET /documents/invoice/:id/pdf, `sales.view`) as `<number>.pdf`. */
-export async function downloadInvoicePdf(
-  invoiceId: string,
-  invoiceNumber: string,
+/**
+ * Downloads a document PDF as `<number>.pdf`. Same permission as the page's API route:
+ * `sales.view` for invoices and quotes, `purchases.view` for bills.
+ */
+export async function downloadDocumentPdf(
+  kind: PdfDocumentKind,
+  documentId: string,
+  documentNumber: string,
   locale: DocumentLocale,
 ): Promise<void> {
-  const blob = pdfBlob(await documentsApi.getInvoicePdf(invoiceId, locale));
+  const blob = pdfBlob(await documentsApi.getDocumentPdf(kind, documentId, locale));
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
   // Keep the number readable (Arabic too); drop only characters file systems refuse.
-  link.download = `${invoiceNumber.replace(/[\\/:*?"<>|\s]+/g, '_') || 'invoice'}.pdf`;
+  link.download = `${documentNumber.replace(/[\\/:*?"<>|\s]+/g, '_') || kind}.pdf`;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -161,17 +157,18 @@ export async function downloadInvoicePdf(
 }
 
 /**
- * Opens the invoice PDF in a new tab for printing. The tab must be opened synchronously in the
+ * Opens a document PDF in a new tab for printing. The tab must be opened synchronously in the
  * click handler (popup blockers allow nothing later), so call this directly from onClick; it
  * closes the tab again if the PDF cannot be generated.
  */
-export async function openInvoicePdfForPrint(
-  invoiceId: string,
+export async function openDocumentPdfForPrint(
+  kind: PdfDocumentKind,
+  documentId: string,
   locale: DocumentLocale,
 ): Promise<void> {
   const tab = window.open('', '_blank');
   try {
-    const blob = pdfBlob(await documentsApi.getInvoicePdf(invoiceId, locale));
+    const blob = pdfBlob(await documentsApi.getDocumentPdf(kind, documentId, locale));
     const url = window.URL.createObjectURL(blob);
     if (tab) tab.location.href = url;
     else window.location.assign(url);

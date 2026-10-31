@@ -52,6 +52,7 @@ const mockOrg = {
   dateFormat: 'DD/MM/YYYY',
   numberFormat: '1,000.00',
   timezone: 'UTC',
+  documentDigits: 'latn',
   primaryColor: null,
   footerText: null,
   defaultArAccountId: null,
@@ -174,6 +175,15 @@ describe('OrganizationsService', () => {
       expect(result.localization.dateFormat).toBe('DD/MM/YYYY');
       expect(result.localization.numberFormat).toBe('1,000.00');
       expect(result.localization.timezone).toBe('UTC');
+      expect(result.localization.documentDigits).toBe('latn');
+    });
+
+    it('returns the digits of Arabic PDFs as the API enum (item 3)', async () => {
+      mockPrisma.organization.findUnique.mockResolvedValue({ ...mockOrg, documentDigits: 'arab' });
+      expect((await service.getAllSettings(ORG_ID)).localization.documentDigits).toBe('arab');
+
+      mockPrisma.organization.findUnique.mockResolvedValue({ ...mockOrg, documentDigits: 'x' });
+      expect((await service.getAllSettings(ORG_ID)).localization.documentDigits).toBe('latn');
     });
 
     it('throws NotFoundException for missing org', async () => {
@@ -363,6 +373,21 @@ describe('OrganizationsService', () => {
           },
         }),
       );
+    });
+
+    it('saves the digits of Arabic PDFs, and a null keeps the stored choice (item 3)', async () => {
+      mockPrisma.organization.update.mockResolvedValue({ id: ORG_ID, updatedAt: new Date() });
+
+      await service.updateLocalizationSettings(ORG_ID, { documentDigits: 'arab' });
+      expect(mockPrisma.organization.update.mock.calls[0][0]).toMatchObject({
+        where: { id: ORG_ID },
+        data: { documentDigits: 'arab' },
+      });
+
+      await service.updateLocalizationSettings(ORG_ID, {
+        documentDigits: null as unknown as undefined,
+      });
+      expect(mockPrisma.organization.update.mock.calls[1][0].data.documentDigits).toBeUndefined();
     });
   });
 

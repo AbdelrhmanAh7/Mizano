@@ -47,6 +47,7 @@ import {
 } from '@/lib/hooks/use-bills';
 import { invalidateLedgerQueries } from '@/lib/hooks/use-journals';
 import { usePermissions } from '@/lib/hooks/use-permissions';
+import { DocumentPdfActions } from '@/components/shared/document-pdf-actions';
 import { cn } from '@/lib/utils';
 import { isPastDue } from '@/lib/due-date';
 import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
@@ -85,6 +86,8 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
 
   const canEdit = hasPermission('purchases.edit');
   const canVoid = hasPermission('purchases.delete');
+  // Same permission as GET /documents/bill/:id/pdf.
+  const canExportPdf = hasPermission('purchases.view');
 
   const handleApprove = async () => {
     try {
@@ -191,7 +194,10 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {canExportPdf && (
+            <DocumentPdfActions kind="bill" documentId={bill.id} documentNumber={bill.billNumber} />
+          )}
           {canEdit && bill.status === 'DRAFT' && (
             <>
               <Button variant="outline" asChild>

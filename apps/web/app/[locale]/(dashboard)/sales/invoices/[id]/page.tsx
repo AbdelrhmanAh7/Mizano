@@ -10,11 +10,8 @@ import {
   Ban,
   Trash2,
   CreditCard,
-  Download,
   FileText,
-  Loader2,
   Mail,
-  Printer,
   User,
   Calendar,
   DollarSign,
@@ -42,7 +39,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
-import { useToast } from '@/components/ui/use-toast';
 import {
   useInvoice,
   useDeleteInvoice,
@@ -51,13 +47,9 @@ import {
 } from '@/lib/hooks/use-invoices';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
-import {
-  documentLocaleFor,
-  downloadInvoicePdf,
-  openInvoicePdfForPrint,
-} from '@/lib/hooks/use-documents';
+import { DocumentPdfActions } from '@/components/shared/document-pdf-actions';
 import { InvoiceStatusBadge } from '@/components/sales/status-badge';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
 import { useDateFnsLocale } from '@/lib/date-locale';
 import { cn } from '@/lib/utils';
@@ -68,18 +60,15 @@ export default function InvoiceDetailPage() {
   const t = useTranslations('sales');
   const tDetail = useTranslations('sales.invoices.detail');
   const tCommon = useTranslations('common');
-  const locale = useLocale();
   const dateLocale = useDateFnsLocale();
   const params = useParams();
   const router = useRouter();
-  const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const invoiceId = params.id as string;
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [voidDialogOpen, setVoidDialogOpen] = useState(false);
-  const [pdfBusy, setPdfBusy] = useState<'download' | 'print' | null>(null);
 
   const { data: invoice, isLoading } = useInvoice(invoiceId);
   const deleteInvoice = useDeleteInvoice();
@@ -123,38 +112,6 @@ export default function InvoiceDetailPage() {
       // handled by useVoidInvoice
     }
     setVoidDialogOpen(false);
-  };
-
-  const pdfLocale = documentLocaleFor(locale);
-  const showPdfError = () =>
-    toast({
-      title: tDetail('pdfError'),
-      description: tDetail('pdfErrorDescription'),
-      variant: 'destructive',
-    });
-
-  const handleExportPdf = async () => {
-    if (!invoice) return;
-    setPdfBusy('download');
-    try {
-      await downloadInvoicePdf(invoiceId, invoice.invoiceNumber, pdfLocale);
-    } catch {
-      showPdfError();
-    } finally {
-      setPdfBusy(null);
-    }
-  };
-
-  // Must stay synchronous up to window.open (inside openInvoicePdfForPrint) for popup blockers.
-  const handlePrint = async () => {
-    setPdfBusy('print');
-    try {
-      await openInvoicePdfForPrint(invoiceId, pdfLocale);
-    } catch {
-      showPdfError();
-    } finally {
-      setPdfBusy(null);
-    }
   };
 
   if (isLoading) {
@@ -280,22 +237,11 @@ export default function InvoiceDetailPage() {
           )}
           {canExportPdf && !isDraft && (
             <>
-              <Button variant="outline" onClick={handleExportPdf} disabled={pdfBusy !== null}>
-                {pdfBusy === 'download' ? (
-                  <Loader2 className="me-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="me-2 h-4 w-4" />
-                )}
-                {tDetail('exportPdf')}
-              </Button>
-              <Button variant="outline" onClick={handlePrint} disabled={pdfBusy !== null}>
-                {pdfBusy === 'print' ? (
-                  <Loader2 className="me-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Printer className="me-2 h-4 w-4" />
-                )}
-                {tDetail('print')}
-              </Button>
+              <DocumentPdfActions
+                kind="invoice"
+                documentId={invoiceId}
+                documentNumber={invoice.invoiceNumber}
+              />
               {/* Sending needs a configured mail provider. */}
               <Button variant="outline" disabled title={tDetail('comingSoon')}>
                 <Mail className="me-2 h-4 w-4" />
