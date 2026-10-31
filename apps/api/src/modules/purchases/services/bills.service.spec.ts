@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BillsService } from './bills.service';
+import { UpdateBillDto } from '../dto/update-bill.dto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalsService } from '../../accounting/services/journals.service';
 import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
@@ -332,6 +333,34 @@ describe('BillsService', () => {
         where: expect.objectContaining({ organizationId: ORG_ID, isActive: true }),
       });
       expect(prisma.bill.update).not.toHaveBeenCalled();
+    });
+
+    it('disconnects the project when the web form sends projectId: null (audit B2)', async () => {
+      prisma.bill.findFirst.mockResolvedValue(createMockBill({ status: 'DRAFT' }) as any);
+      prisma.bill.updateMany.mockResolvedValue({ count: 1 });
+      prisma.bill.update.mockResolvedValue({} as any);
+
+      // The exact shape BillForm submits for a bill without a project.
+      await service.update(ORG_ID, 'bill-1', { projectId: null } as unknown as UpdateBillDto);
+
+      const data = prisma.bill.update.mock.calls[0]![0]!.data as any;
+      expect(data.project).toEqual({ disconnect: true });
+      expect(prisma.project.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('connects the project when one is chosen and leaves it alone when omitted', async () => {
+      prisma.bill.findFirst.mockResolvedValue(createMockBill({ status: 'DRAFT' }) as any);
+      prisma.project.findFirst.mockResolvedValue({ id: 'proj-1' } as any);
+      prisma.bill.updateMany.mockResolvedValue({ count: 1 });
+      prisma.bill.update.mockResolvedValue({} as any);
+
+      await service.update(ORG_ID, 'bill-1', { projectId: 'proj-1' });
+      await service.update(ORG_ID, 'bill-1', { notes: 'x' });
+
+      expect((prisma.bill.update.mock.calls[0]![0]!.data as any).project).toEqual({
+        connect: { id: 'proj-1' },
+      });
+      expect((prisma.bill.update.mock.calls[1]![0]!.data as any).project).toBeUndefined();
     });
 
     it('should reject a project from another organization', async () => {

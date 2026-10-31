@@ -168,7 +168,10 @@ export class BillsService {
     if (dto.currencyCode !== undefined) data.currencyCode = dto.currencyCode;
     if (dto.notes !== undefined) data.notes = dto.notes;
     if (dto.vendorId !== undefined) data.vendor = { connect: { id: dto.vendorId } };
-    if (dto.projectId !== undefined) data.project = { connect: { id: dto.projectId } };
+    // The web form sends `projectId: null` for "no project"; Prisma rejects `connect: { id: null }`.
+    if (dto.projectId !== undefined) {
+      data.project = dto.projectId ? { connect: { id: dto.projectId } } : { disconnect: true };
+    }
 
     try {
       return await this.prisma.$transaction(async (tx) => {
