@@ -58,17 +58,6 @@ export interface PaymentCollectionPoint {
   amount: number;
 }
 
-export interface ChurnRiskItem {
-  segment: string;
-  count: number;
-}
-
-export interface CLVSegmentItem {
-  segment: string;
-  count: number;
-  avgValue: number;
-}
-
 // Purchases
 export interface BillStatusItem {
   status: string;
@@ -125,12 +114,6 @@ export interface SalaryDistributionItem {
   count: number;
 }
 
-export interface AttritionRiskItem {
-  level: string;
-  count: number;
-  percentage: number;
-}
-
 // Inventory
 export interface StockLevelItem {
   itemName: string;
@@ -142,13 +125,6 @@ export interface InventoryMovementPoint {
   month: string;
   inQty: number;
   outQty: number;
-}
-
-export interface ReorderAlertItem {
-  itemName: string;
-  currentStock: number;
-  reorderPoint: number;
-  status: string;
 }
 
 export interface WorkOrderStatusItem {
@@ -215,15 +191,6 @@ export interface DealWinRatePoint {
 }
 
 // AI
-export interface AnomalyTimelineItem {
-  date: string;
-  type: string;
-  severity: string;
-  value: number;
-  expectedValue: number;
-  description: string;
-}
-
 /**
  * Money arrives from the API as fixed-scale decimal strings. Convert the listed fields once, at
  * the hook boundary, for display and chart plotting only.
@@ -343,32 +310,6 @@ export function usePaymentCollection(enabled = true) {
     queryFn: async (): Promise<PaymentCollectionPoint[]> => {
       const res = await api.get('/reports/dashboard/payment-collection?months=6');
       return withMoney<PaymentCollectionPoint>(res.data?.data ?? res.data, ['amount']);
-    },
-    enabled,
-    refetchInterval: REFETCH_INTERVAL,
-    refetchIntervalInBackground: false,
-  });
-}
-
-export function useChurnRisk(enabled = true) {
-  return useQuery({
-    queryKey: ['dashboard', 'churn-risk'],
-    queryFn: async (): Promise<ChurnRiskItem[]> => {
-      const res = await api.get('/reports/dashboard/churn-risk');
-      return res.data?.data ?? res.data ?? [];
-    },
-    enabled,
-    refetchInterval: REFETCH_INTERVAL,
-    refetchIntervalInBackground: false,
-  });
-}
-
-export function useCLVSegments(enabled = true) {
-  return useQuery({
-    queryKey: ['dashboard', 'clv-segments'],
-    queryFn: async (): Promise<CLVSegmentItem[]> => {
-      const res = await api.get('/reports/dashboard/clv-segments');
-      return res.data?.data ?? res.data ?? [];
     },
     enabled,
     refetchInterval: REFETCH_INTERVAL,
@@ -502,19 +443,6 @@ export function useSalaryDistribution(enabled = true) {
   });
 }
 
-export function useAttritionRisk(enabled = true) {
-  return useQuery({
-    queryKey: ['dashboard', 'attrition-risk'],
-    queryFn: async (): Promise<AttritionRiskItem[]> => {
-      const res = await api.get('/reports/dashboard/attrition-risk');
-      return res.data?.data ?? res.data ?? [];
-    },
-    enabled,
-    refetchInterval: REFETCH_INTERVAL,
-    refetchIntervalInBackground: false,
-  });
-}
-
 // Inventory hooks
 export function useStockLevels(enabled = true) {
   return useQuery({
@@ -534,19 +462,6 @@ export function useInventoryMovements(enabled = true) {
     queryKey: ['dashboard', 'inventory-movements'],
     queryFn: async (): Promise<InventoryMovementPoint[]> => {
       const res = await api.get('/reports/dashboard/inventory-movements?months=6');
-      return res.data?.data ?? res.data ?? [];
-    },
-    enabled,
-    refetchInterval: REFETCH_INTERVAL,
-    refetchIntervalInBackground: false,
-  });
-}
-
-export function useReorderAlerts(enabled = true) {
-  return useQuery({
-    queryKey: ['dashboard', 'reorder-alerts'],
-    queryFn: async (): Promise<ReorderAlertItem[]> => {
-      const res = await api.get('/reports/dashboard/reorder-alerts');
       return res.data?.data ?? res.data ?? [];
     },
     enabled,
@@ -688,15 +603,3 @@ export function useDealWinRate(enabled = true) {
 }
 
 // AI hooks
-export function useAnomalyTimeline(enabled = true) {
-  return useQuery({
-    queryKey: ['dashboard', 'anomaly-timeline'],
-    queryFn: async (): Promise<AnomalyTimelineItem[]> => {
-      const res = await api.get('/reports/dashboard/anomaly-timeline?days=90');
-      return res.data?.data ?? res.data ?? [];
-    },
-    enabled,
-    refetchInterval: REFETCH_INTERVAL,
-    refetchIntervalInBackground: false,
-  });
-}

@@ -1,16 +1,10 @@
 'use client';
 
-import { InventoryAIPanel } from '@/components/ai';
+import { RowActionsMenu } from '@/components/shared/row-actions-menu';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import { AutoTourTrigger } from '@/components/tour/auto-tour-trigger';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   Select,
   SelectContent,
@@ -32,7 +26,7 @@ import {
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { cn } from '@/lib/utils';
 import { type ColumnDef } from '@tanstack/react-table';
-import { AlertTriangle, Eye, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
@@ -153,31 +147,12 @@ function ItemsPageContent() {
       cell: ({ row }) => {
         const item = row.original;
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link href={`/inventory/items/${item.id}`}>
-                  <Eye className="mr-2 h-4 w-4" />
-                  {t('common.view')}
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href={`/inventory/items/${item.id}/edit`}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  {t('common.edit')}
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(item.id)}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                {t('common.delete')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <RowActionsMenu
+            viewHref={`/inventory/items/${item.id}`}
+            editHref={`/inventory/items/${item.id}/edit`}
+            onDelete={() => setDeleteId(item.id)}
+            labels={{ view: t('common.view'), edit: t('common.edit'), delete: t('common.delete') }}
+          />
         );
       },
     },
@@ -228,9 +203,6 @@ function ItemsPageContent() {
           </SelectContent>
         </Select>
       </div>
-
-      {/* AI Panel */}
-      <InventoryAIPanel />
 
       {/* Table */}
       <div data-tour="item-list">

@@ -20,7 +20,6 @@ const segmentLabels: Record<string, string> = {
   tax: 'Tax',
   reports: 'Reports',
   settings: 'Settings',
-  'ai-insights': 'AI Insights',
   // Sub-pages
   customers: 'Customers',
   invoices: 'Invoices',
@@ -55,7 +54,6 @@ const segmentLabels: Record<string, string> = {
   'audit-logs': 'Audit Logs',
   'price-lists': 'Price Lists',
   assets: 'Fixed Assets',
-  'deep-search': 'Deep Search',
 };
 
 export function Breadcrumbs() {

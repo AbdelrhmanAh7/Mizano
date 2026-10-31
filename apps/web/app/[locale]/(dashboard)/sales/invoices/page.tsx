@@ -1,6 +1,5 @@
 'use client';
 
-import { CollectionPriorityCard } from '@/components/ai';
 import type { DateRangeValue } from '@/components/data-table';
 import {
   DataTable,
@@ -440,9 +439,6 @@ function InvoicesPageContent() {
           )}
         </div>
       </div>
-
-      {/* AI Collection Priority */}
-      <CollectionPriorityCard />
 
       {/* Filters */}
       <Card data-tour="invoice-filters">

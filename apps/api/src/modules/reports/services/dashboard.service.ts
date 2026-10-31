@@ -14,7 +14,6 @@ import {
   LeadStatus,
   ProjectStatus,
   QuoteStatus,
-  ReorderStatus,
   TaskStatus,
   WorkOrderStatus,
 } from '@prisma/client';
@@ -959,68 +958,6 @@ export class DashboardService {
     return buckets.map((b) => ({ month: b.label, amount: money(monthly.get(b.key)) }));
   }
 
-  async getChurnRisk(organizationId: string) {
-    const cacheKey = `dashboard:churn-risk`;
-    return this.cacheService.getOrSet(cacheKey, () => this.computeChurnRisk(organizationId), {
-      ttl: 120,
-      organizationId,
-    });
-  }
-
-  private async computeChurnRisk(organizationId: string) {
-    const profiles = await this.prisma.customerAiProfile.findMany({
-      where: { organizationId },
-      select: { churnRisk: true },
-    });
-
-    let low = 0;
-    let medium = 0;
-    let high = 0;
-
-    for (const p of profiles) {
-      const risk = parseFloat(p.churnRisk.toString());
-      if (risk < 0.3) low++;
-      else if (risk <= 0.6) medium++;
-      else high++;
-    }
-
-    return [
-      { segment: 'Low', count: low },
-      { segment: 'Medium', count: medium },
-      { segment: 'High', count: high },
-    ];
-  }
-
-  async getCLVSegments(organizationId: string) {
-    const cacheKey = `dashboard:clv-segments`;
-    return this.cacheService.getOrSet(cacheKey, () => this.computeCLVSegments(organizationId), {
-      ttl: 120,
-      organizationId,
-    });
-  }
-
-  private async computeCLVSegments(organizationId: string) {
-    const profiles = await this.prisma.customerAiProfile.findMany({
-      where: { organizationId },
-      select: { clvSegment: true, lifetimeValue: true },
-    });
-
-    const segments: Record<string, { count: number; totalValue: number }> = {};
-    for (const p of profiles) {
-      const segment = p.clvSegment || 'Unclassified';
-      if (!segments[segment]) segments[segment] = { count: 0, totalValue: 0 };
-      segments[segment].count++;
-      segments[segment].totalValue += parseFloat(p.lifetimeValue.toString());
-    }
-
-    return Object.entries(segments).map(([segment, data]) => ({
-      segment,
-      count: data.count,
-      totalValue: data.totalValue,
-      avgValue: data.count > 0 ? Math.round((data.totalValue / data.count) * 100) / 100 : 0,
-    }));
-  }
-
   // ============ Purchases (Tab 4) ============
 
   async getBillStatus(organizationId: string) {
@@ -1382,43 +1319,6 @@ export class DashboardService {
     return distribution;
   }
 
-  async getAttritionRisk(organizationId: string) {
-    const cacheKey = `dashboard:attrition-risk`;
-    return this.cacheService.getOrSet(cacheKey, () => this.computeAttritionRisk(organizationId), {
-      ttl: 120,
-      organizationId,
-    });
-  }
-
-  private async computeAttritionRisk(organizationId: string) {
-    const profiles = await this.prisma.employeeAiProfile.findMany({
-      where: { organizationId },
-      select: { attritionRisk: true },
-    });
-
-    let low = 0;
-    let medium = 0;
-    let high = 0;
-
-    for (const p of profiles) {
-      const risk = parseFloat(p.attritionRisk.toString());
-      if (risk < 0.3) low++;
-      else if (risk <= 0.6) medium++;
-      else high++;
-    }
-
-    const total = low + medium + high;
-    return [
-      { level: 'Low', count: low, percentage: total > 0 ? Math.round((low / total) * 100) : 0 },
-      {
-        level: 'Medium',
-        count: medium,
-        percentage: total > 0 ? Math.round((medium / total) * 100) : 0,
-      },
-      { level: 'High', count: high, percentage: total > 0 ? Math.round((high / total) * 100) : 0 },
-    ];
-  }
-
   // ============ Inventory (Tab 6) ============
 
   async getStockLevels(organizationId: string, limit: number = 15) {
@@ -1502,48 +1402,6 @@ export class DashboardService {
     }
 
     return data;
-  }
-
-  async getReorderAlerts(organizationId: string) {
-    const cacheKey = `dashboard:reorder-alerts`;
-    return this.cacheService.getOrSet(cacheKey, () => this.computeReorderAlerts(organizationId), {
-      ttl: 120,
-      organizationId,
-    });
-  }
-
-  private async computeReorderAlerts(organizationId: string) {
-    const alerts = await this.prisma.itemReorderAnalysis.findMany({
-      where: {
-        organizationId,
-        status: { in: [ReorderStatus.LOW_STOCK, ReorderStatus.CRITICAL] },
-      },
-      include: {
-        item: {
-          select: {
-            name: true,
-            inventoryLevels: {
-              where: { organizationId },
-              select: { quantity: true },
-            },
-          },
-        },
-      },
-      orderBy: { calculatedAt: 'desc' },
-    });
-
-    return alerts.map((a) => {
-      const currentStock = a.item.inventoryLevels.reduce(
-        (sum: number, il: { quantity: Decimal }) => sum + parseFloat((il.quantity ?? 0).toString()),
-        0,
-      );
-      return {
-        itemName: a.item.name,
-        currentStock,
-        reorderPoint: a.reorderPoint,
-        status: a.status,
-      };
-    });
   }
 
   async getWorkOrderStatus(organizationId: string) {
@@ -1954,47 +1812,4 @@ export class DashboardService {
   }
 
   // ============ AI (Tab 9) ============
-
-  async getAnomalyTimeline(organizationId: string, days: number = 90) {
-    const cacheKey = `dashboard:anomaly-timeline:${days}`;
-    return this.cacheService.getOrSet(
-      cacheKey,
-      () => this.computeAnomalyTimeline(organizationId, days),
-      { ttl: 120, organizationId },
-    );
-  }
-
-  private async computeAnomalyTimeline(organizationId: string, days: number) {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    startDate.setHours(0, 0, 0, 0);
-
-    const anomalies = await this.prisma.aiAnomaly.findMany({
-      where: { organizationId, createdAt: { gte: startDate } },
-      select: {
-        id: true,
-        type: true,
-        severity: true,
-        entityType: true,
-        value: true,
-        expectedValue: true,
-        description: true,
-        isResolved: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return anomalies.map((a) => ({
-      id: a.id,
-      date: a.createdAt,
-      type: a.type,
-      severity: a.severity,
-      entityType: a.entityType,
-      value: parseFloat(a.value.toString()),
-      expectedValue: parseFloat(a.expectedValue.toString()),
-      description: a.description,
-      isResolved: a.isResolved,
-    }));
-  }
 }

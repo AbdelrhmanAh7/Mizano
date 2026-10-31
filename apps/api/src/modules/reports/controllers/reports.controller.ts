@@ -188,24 +188,6 @@ export class ReportsController {
     return this.dashboardService.getPaymentCollection(orgId, clampInt(months, 6, 1, MAX_MONTHS));
   }
 
-  @Get('dashboard/churn-risk')
-  @Permissions('reports.view')
-  @CacheResponse('dashboard:churn-risk')
-  @CacheTTL(300)
-  @ApiOperation({ summary: 'Get customer churn risk distribution' })
-  getChurnRisk(@CurrentOrg() orgId: string) {
-    return this.dashboardService.getChurnRisk(orgId);
-  }
-
-  @Get('dashboard/clv-segments')
-  @Permissions('reports.view')
-  @CacheResponse('dashboard:clv-segments')
-  @CacheTTL(300)
-  @ApiOperation({ summary: 'Get customer lifetime value segments' })
-  getCLVSegments(@CurrentOrg() orgId: string) {
-    return this.dashboardService.getCLVSegments(orgId);
-  }
-
   // ============ Purchases (Tab 4) ============
 
   @Get('dashboard/bill-status')
@@ -291,15 +273,6 @@ export class ReportsController {
     return this.dashboardService.getSalaryDistribution(orgId);
   }
 
-  @Get('dashboard/attrition-risk')
-  @Permissions('reports.view')
-  @CacheResponse('dashboard:attrition-risk')
-  @CacheTTL(300)
-  @ApiOperation({ summary: 'Get employee attrition risk distribution' })
-  getAttritionRisk(@CurrentOrg() orgId: string) {
-    return this.dashboardService.getAttritionRisk(orgId);
-  }
-
   // ============ Inventory (Tab 6) ============
 
   @Get('dashboard/stock-levels')
@@ -318,15 +291,6 @@ export class ReportsController {
   @ApiOperation({ summary: 'Get monthly inventory movements' })
   getInventoryMovements(@CurrentOrg() orgId: string, @Query('months') months?: string) {
     return this.dashboardService.getInventoryMovements(orgId, clampInt(months, 6, 1, MAX_MONTHS));
-  }
-
-  @Get('dashboard/reorder-alerts')
-  @Permissions('reports.view')
-  @CacheResponse('dashboard:reorder-alerts')
-  @CacheTTL(300)
-  @ApiOperation({ summary: 'Get items needing reorder' })
-  getReorderAlerts(@CurrentOrg() orgId: string) {
-    return this.dashboardService.getReorderAlerts(orgId);
   }
 
   @Get('dashboard/work-order-status')
@@ -424,15 +388,6 @@ export class ReportsController {
   }
 
   // ============ AI (Tab 9) ============
-
-  @Get('dashboard/anomaly-timeline')
-  @Permissions('reports.view')
-  @CacheResponse('dashboard:anomaly-timeline')
-  @CacheTTL(300)
-  @ApiOperation({ summary: 'Get AI anomaly timeline' })
-  getAnomalyTimeline(@CurrentOrg() orgId: string, @Query('days') days?: string) {
-    return this.dashboardService.getAnomalyTimeline(orgId, clampInt(days, 90, 1, MAX_DAYS));
-  }
 
   // Financial Reports
   @Get('profit-and-loss')

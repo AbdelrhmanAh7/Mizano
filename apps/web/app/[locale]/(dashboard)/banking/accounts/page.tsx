@@ -1,8 +1,9 @@
 'use client';
 
+import { RowActionsMenu } from '@/components/shared/row-actions-menu';
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { Plus, MoreHorizontal, Eye, Pencil, Trash2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,12 +14,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -146,31 +141,12 @@ function BankAccountsPageContent() {
       cell: ({ row }) => {
         const account = row.original;
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link href={`/banking/accounts/${account.id}`}>
-                  <Eye className="mr-2 h-4 w-4" />
-                  View
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href={`/banking/accounts/${account.id}/edit`}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(account.id)}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <RowActionsMenu
+            viewHref={`/banking/accounts/${account.id}`}
+            editHref={`/banking/accounts/${account.id}/edit`}
+            onDelete={() => setDeleteId(account.id)}
+            labels={{ view: 'View', edit: 'Edit', delete: 'Delete' }}
+          />
         );
       },
     },

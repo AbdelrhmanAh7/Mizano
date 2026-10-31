@@ -1,6 +1,5 @@
 'use client';
 
-import { FlightRiskCard } from '@/components/ai';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { Badge } from '@/components/ui/badge';
@@ -222,9 +221,6 @@ function EmployeesPageContent() {
           </CardContent>
         </Card>
       </div>
-
-      {/* AI Flight Risk */}
-      <FlightRiskCard />
 
       {/* Filters */}
       <Card>

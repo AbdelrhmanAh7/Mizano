@@ -185,10 +185,10 @@ describe('Sidebar', () => {
     expect(accountingItems.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('renders AI-related navigation items', () => {
+  it('has no retired AI screens in the navigation (AI lives in Settings → AI)', () => {
     render(<Sidebar />);
-    const aiInsights = screen.getAllByText('aiInsights');
-    expect(aiInsights.length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('aiInsights')).toBeNull();
+    expect(screen.queryByText('deepSearch')).toBeNull();
   });
 
   it('highlights the active route with primary styling', () => {

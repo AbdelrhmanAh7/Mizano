@@ -32,8 +32,8 @@
       "description": "Prefixes, numbering, default notes, and terms"
     },
     "ai": {
-      "title": "AI Features",
-      "description": "Toggle AI categorization, OCR, forecasting, and anomaly detection"
+      "title": "AI",
+      "description": "Optional AI through your own AI account: read bills, suggest accounts, monthly summary"
     },
     "notifications": {
       "title": "Notifications",
@@ -183,28 +183,100 @@
     "autoSendDescription": "Automatically email invoices when they are marked as sent"
   },
   "ai": {
-    "title": "AI Features",
-    "description": "Toggle AI-powered features and configure model parameters",
-    "featureToggles": "AI Feature Toggles",
-    "featureTogglesDescription": "Enable or disable individual AI capabilities",
-    "features": {
-      "categorization": "Auto-Categorization",
-      "categorizationDescription": "Automatically categorize expenses and transactions using ML",
-      "reconciliation": "Smart Reconciliation",
-      "reconciliationDescription": "AI-powered matching of bank transactions to invoices/bills",
-      "ocr": "OCR Document Scanning",
-      "ocrDescription": "Extract data from receipts and invoices using computer vision",
-      "forecasting": "Cash Flow Forecasting",
-      "forecastingDescription": "Predict future cash flows using historical data patterns",
-      "anomaly": "Anomaly Detection",
-      "anomalyDescription": "Flag unusual transactions or patterns for review",
-      "leadScoring": "Lead Scoring",
-      "leadScoringDescription": "Score CRM leads based on engagement and conversion likelihood"
+    "title": "AI",
+    "description": "Optional AI through your own AI account. Mizano works fully without it.",
+    "back": "Back to settings",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "save": "Save",
+    "loadFailed": "Could not load the AI settings.",
+    "genericError": "Something went wrong. Please try again.",
+    "status": {
+      "off": "Off",
+      "connected": "Connected, no feature on",
+      "on": "On"
     },
-    "modelParameters": "Model Parameters",
-    "modelParametersDescription": "Configure how AI models learn and detect anomalies",
-    "anomalySensitivity": "Anomaly Detection Sensitivity",
-    "anomalySensitivityHint": "Z-score threshold (2–4). Lower values flag more transactions, higher values only flag the most unusual ones."
+    "providers": {
+      "anthropic": "Claude (Anthropic)",
+      "openai": "OpenAI",
+      "gemini": "Google Gemini",
+      "openrouter": "OpenRouter",
+      "ollama": "Ollama (this server)",
+      "none": "None"
+    },
+    "connection": {
+      "title": "Connect your AI account",
+      "connectedTitle": "Your AI account",
+      "description": "Mizano uses AI only through your own account. Your key is checked with the provider before it is saved, stored encrypted and never shown again.",
+      "provider": "Provider",
+      "apiKey": "API key",
+      "apiKeyPlaceholder": "Paste the API key",
+      "connect": "Check and connect",
+      "verifying": "Checking…",
+      "getKey": "Get an API key from {provider}",
+      "subscriptionNote": "A personal Claude or ChatGPT subscription cannot be used by other apps under Anthropic's and OpenAI's terms. Create an API key in the provider's developer console (it bills you directly).",
+      "openRouterHint": "Have an OpenRouter account? Connect it without copying a key.",
+      "openRouterConnect": "Connect your OpenRouter account",
+      "viaOpenRouter": "Connected through OpenRouter",
+      "ollamaHint": "Uses the Ollama server the operator of this Mizano installation configured. No key needed.",
+      "model": "Model",
+      "test": "Test",
+      "testing": "Testing…",
+      "testOk": "The provider answered in {ms} ms.",
+      "revoke": "Disconnect",
+      "revokeTitle": "Disconnect the AI account?",
+      "revokeBody": "The stored key is deleted and every AI feature turns off. Accounting keeps working without AI.",
+      "encryptionMissing": "The server has no encryption key (INTEGRATIONS_ENCRYPTION_KEY), so an API key cannot be stored yet."
+    },
+    "consent": {
+      "title": "Permission to send data",
+      "body": "When an AI feature is on, Mizano sends the data that feature needs to {provider} under your account: uploaded bills and receipts (files or their text), your chart of accounts names for account suggestions, and monthly profit and loss totals for summaries. Nothing is sent before you agree, and AI never posts anything: you review every draft.",
+      "checkbox": "I agree to send this data to {provider}",
+      "accept": "Agree",
+      "given": "Agreed on {date}."
+    },
+    "features": {
+      "title": "AI features",
+      "description": "Each feature is off until you turn it on.",
+      "needsConsent": "Agree to send data first.",
+      "documents": "Read bills and receipts",
+      "documentsDescription": "Fills the draft from an uploaded file. Without it, Mizano reads documents on this server.",
+      "categorization": "Suggest accounts",
+      "categorizationDescription": "Suggests an expense account for each line of a read bill. You can change it before saving.",
+      "summary": "Monthly summary",
+      "summaryDescription": "A short plain-language explanation of the month's profit and loss on the report."
+    },
+    "spend": {
+      "title": "Model and monthly limit",
+      "description": "Calls stop when the estimated cost would pass the limit (USD, per calendar month).",
+      "limit": "Monthly limit (USD)",
+      "used": "Used this month: ${spent} of ${limit}",
+      "calls": "{count, plural, one {# call} other {# calls}}",
+      "loadingModels": "Loading models…",
+      "modelsFailed": "Could not load the provider's models.",
+      "usageFailed": "Could not load this month's usage."
+    },
+    "usageFeature": {
+      "documents": "Reading",
+      "categorization": "Account suggestions",
+      "summary": "Summaries",
+      "test": "Tests"
+    }
+  },
+  "aiErrors": {
+    "AI_NOT_ENABLED": "AI is off for this organization. An admin can turn it on in Settings → AI.",
+    "AI_NOT_CONFIGURED": "This provider is not available on this server.",
+    "AI_CONSENT_REQUIRED": "An admin must agree to send data to the provider first.",
+    "AI_LIMIT_REACHED": "This month's AI limit is reached. Raise it in Settings → AI or wait for next month.",
+    "AI_KEY_INVALID": "The provider refused this key. Check it and try again.",
+    "AI_KEY_NO_CREDIT": "The provider account has no credit left.",
+    "AI_RATE_LIMITED": "The provider is busy or rate limiting this key. Try again in a minute.",
+    "AI_MODEL_UNAVAILABLE": "This model is not available for your key.",
+    "AI_PROVIDER_ERROR": "The provider could not be reached. Try again later.",
+    "AI_TIMEOUT": "The provider did not answer in time.",
+    "AI_INVALID_OUTPUT": "The AI answer could not be used. Nothing was changed.",
+    "AI_INPUT_UNSUPPORTED": "The connected provider cannot read this kind of file.",
+    "AI_OAUTH_STATE_INVALID": "The OpenRouter sign-in expired or was already used. Start again."
   },
   "notifications": {
     "title": "Notifications",

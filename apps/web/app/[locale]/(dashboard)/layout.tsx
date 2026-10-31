@@ -16,10 +16,6 @@ const KeyboardShortcuts = dynamic(
   () => import('@/components/keyboard-shortcuts').then((m) => ({ default: m.KeyboardShortcuts })),
   { ssr: false },
 );
-const ChatWidget = dynamic(
-  () => import('@/components/ai/chatbot/chat-widget').then((m) => ({ default: m.ChatWidget })),
-  { ssr: false },
-);
 const LoggerDashboard = dynamic(
   () =>
     import('@/components/logger/logger-dashboard').then((m) => ({ default: m.LoggerDashboard })),
@@ -69,7 +65,6 @@ export default async function DashboardLayout({
           <div className="contents print:hidden">
             <CommandPalette />
             <KeyboardShortcuts />
-            <ChatWidget />
             <LoggerDashboard />
           </div>
         </div>
