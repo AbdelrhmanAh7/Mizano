@@ -49,22 +49,3 @@ export function getLocalizedApiErrorMessage(
   if (code && t.has(code)) return t(code);
   return getApiErrorMessage(error, fallback);
 }
-
-/** HTTP status of an API (axios) error, if any. */
-export function getApiErrorStatus(error: unknown): number | undefined {
-  if (error && typeof error === 'object') {
-    const status = (error as { response?: { status?: unknown } }).response?.status;
-    if (typeof status === 'number') return status;
-  }
-  return undefined;
-}
-
-/** True when the API says the organization is missing a default ledger account. */
-export function isMissingDefaultAccountError(error: unknown): boolean {
-  return /configure (a )?default .*account/i.test(getApiErrorMessage(error, ''));
-}
-
-/** Converts any thrown value into an Error carrying the server message (for ErrorState). */
-export function toDisplayError(error: unknown, fallback: string): Error {
-  return new Error(getApiErrorMessage(error, fallback));
-}

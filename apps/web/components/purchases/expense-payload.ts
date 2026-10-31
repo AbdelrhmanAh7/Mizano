@@ -35,8 +35,6 @@ export interface CreateExpensePayload {
 
 /** Up to 15 integer digits and 4 decimals: what Decimal(19, 4) can store. */
 export const MONEY_PATTERN = /^\d{1,15}(\.\d{1,4})?$/;
-/** A percentage with up to 2 decimals. */
-export const PERCENT_PATTERN = /^\d{1,3}(\.\d{1,2})?$/;
 
 export function buildExpensePayload(values: ExpenseFormValues): CreateExpensePayload {
   const optional = (v?: string): string | undefined =>

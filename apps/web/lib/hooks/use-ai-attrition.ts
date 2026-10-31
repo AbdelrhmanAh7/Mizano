@@ -1,47 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-
-// ============ Types ============
-
-export interface AttritionPrediction {
-  employeeId: string;
-  employeeName: string;
-  department: string;
-  attritionRisk: number; // 0-1
-  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-  factors: string[];
-  tenure: number; // months
-  lastReviewScore?: number;
-  salaryBand: string;
-  recommendations: string[];
-  confidence: number;
-  predictionMethod?: 'ML' | 'RULE_BASED' | 'HYBRID';
-}
-
-export interface FlightRiskEmployee {
-  id: string;
-  name: string;
-  department: string;
-  attritionRisk: number;
-  riskLevel: string;
-  tenure: number;
-  recommendations: string[];
-}
-
-export interface AttritionBatchResult {
-  total: number;
-  highRisk: number;
-  mediumRisk: number;
-  lowRisk: number;
-  processed: number;
-}
-
-export interface AttritionTrainingResult {
-  success: boolean;
-  samplesUsed: number;
-  accuracy?: number;
-  message: string;
-}
 
 // ============ API Functions ============
 
@@ -66,40 +24,10 @@ const attritionApi = {
   },
 };
 
-// ============ Hooks ============
-
-export function useAttritionPrediction(employeeId: string) {
-  return useQuery({
-    queryKey: ['ai-attrition', employeeId],
-    queryFn: () => attritionApi.predictAttrition(employeeId),
-    enabled: !!employeeId,
-  });
-}
-
 export function useFlightRisk(limit?: number) {
   return useQuery({
     queryKey: ['ai-attrition-flight-risk', limit],
     queryFn: () => attritionApi.getFlightRisk(limit),
-  });
-}
-
-export function usePredictAllAttrition() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: attritionApi.predictAll,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-attrition'] });
-    },
-  });
-}
-
-export function useTrainAttritionModel() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: attritionApi.trainModel,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-attrition'] });
-    },
   });
 }
 
@@ -113,16 +41,6 @@ export function getRiskLevelColor(riskLevel: string): string {
     CRITICAL: 'bg-red-100 text-red-800 border-red-200',
   };
   return colors[riskLevel] || colors.MEDIUM;
-}
-
-export function getRiskLevelLabel(riskLevel: string): string {
-  const labels: Record<string, string> = {
-    LOW: 'Low Risk',
-    MEDIUM: 'Medium Risk',
-    HIGH: 'High Risk',
-    CRITICAL: 'Critical Risk',
-  };
-  return labels[riskLevel] || riskLevel;
 }
 
 export function formatAttritionRisk(risk: number): string {

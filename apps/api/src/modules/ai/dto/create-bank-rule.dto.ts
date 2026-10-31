@@ -109,38 +109,3 @@ export class CreateBankRuleDto {
   @Type(() => RuleActionDto)
   action: RuleActionDto;
 }
-
-export class UpdateBankRuleDto {
-  @ApiPropertyOptional({
-    description: 'Name of the rule',
-  })
-  @IsString()
-  @IsOptional()
-  name?: string;
-
-  @ApiPropertyOptional({
-    description: 'Conditions that must all be met',
-    type: [RuleConditionDto],
-  })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => RuleConditionDto)
-  @IsOptional()
-  conditions?: RuleConditionDto[];
-
-  @ApiPropertyOptional({
-    description: 'Action to take when conditions match',
-    type: RuleActionDto,
-  })
-  @IsObject()
-  @ValidateNested()
-  @Type(() => RuleActionDto)
-  @IsOptional()
-  action?: RuleActionDto;
-
-  @ApiPropertyOptional({
-    description: 'Whether the rule is active',
-  })
-  @IsOptional()
-  isActive?: boolean;
-}

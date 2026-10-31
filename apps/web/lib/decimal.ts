@@ -85,16 +85,6 @@ export function isPositiveDecimal(value: DecimalLike): boolean {
   return parsed !== null && parsed > ZERO;
 }
 
-/** True when the value is (or parses to) exactly zero; empty/invalid input counts as zero. */
-export function isZeroDecimal(value: DecimalLike): boolean {
-  return toScaled(value) === ZERO;
-}
-
-/** The smaller of two decimal values. */
-export function minDecimal(a: DecimalLike, b: DecimalLike): string {
-  return compareDecimals(a, b) <= 0 ? normalizeDecimal(a) : normalizeDecimal(b);
-}
-
 /** Absolute value. */
 export function absDecimal(value: DecimalLike): string {
   const scaled = toScaled(value);

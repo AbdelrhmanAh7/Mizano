@@ -1,41 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-
-// ============ Types ============
-
-export interface CustomerCLV {
-  customerId: string;
-  customerName: string;
-  clv: number;
-  segment: 'PLATINUM' | 'GOLD' | 'SILVER' | 'BRONZE';
-  totalRevenue: number;
-  averageOrderValue: number;
-  purchaseFrequency: number;
-  customerLifetime: number; // days
-  projectedValue: number;
-  confidence: number;
-}
-
-export interface CLVSegment {
-  segment: string;
-  count: number;
-  totalCLV: number;
-  averageCLV: number;
-  percentage: number;
-}
-
-export interface CLVDistribution {
-  segments: CLVSegment[];
-  totalCustomers: number;
-  totalCLV: number;
-}
-
-export interface CLVCalculationResult {
-  total: number;
-  calculated: number;
-  failed: number;
-  message: string;
-}
 
 // ============ API Functions ============
 
@@ -58,37 +22,10 @@ const clvApi = {
   },
 };
 
-// ============ Hooks ============
-
-export function useCustomerCLV(customerId: string) {
-  return useQuery({
-    queryKey: ['ai-clv', customerId],
-    queryFn: () => clvApi.getCustomerCLV(customerId),
-    enabled: !!customerId,
-  });
-}
-
 export function useCLVSegments() {
   return useQuery({
     queryKey: ['ai-clv-segments'],
     queryFn: clvApi.getCLVSegments,
-  });
-}
-
-export function useCLVDistribution() {
-  return useQuery({
-    queryKey: ['ai-clv-distribution'],
-    queryFn: clvApi.getCLVDistribution,
-  });
-}
-
-export function useCalculateAllCLV() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: clvApi.calculateAll,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-clv'] });
-    },
   });
 }
 
@@ -102,16 +39,6 @@ export function getSegmentColor(segment: string): string {
     BRONZE: 'bg-orange-100 text-orange-800 border-orange-200',
   };
   return colors[segment] || colors.SILVER;
-}
-
-export function getSegmentLabel(segment: string): string {
-  const labels: Record<string, string> = {
-    PLATINUM: 'Platinum',
-    GOLD: 'Gold',
-    SILVER: 'Silver',
-    BRONZE: 'Bronze',
-  };
-  return labels[segment] || segment;
 }
 
 export function formatCLV(clv: number): string {

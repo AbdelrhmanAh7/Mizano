@@ -19,23 +19,6 @@ export type BillStatus =
   | 'OVERDUE'
   | 'VOID';
 
-export const BILL_STATUSES: BillStatus[] = [
-  'DRAFT',
-  'PENDING',
-  'OPEN',
-  'PARTIALLY_PAID',
-  'OVERDUE',
-  'PAID',
-  'VOID',
-];
-
-/** Statuses the API accepts payments against (POST /payments-made). */
-export const PAYABLE_BILL_STATUSES: BillStatus[] = ['OPEN', 'PARTIALLY_PAID', 'OVERDUE'];
-
-export function isBillPayable(bill: Pick<Bill, 'status'>): boolean {
-  return PAYABLE_BILL_STATUSES.includes(bill.status);
-}
-
 /** Approval posts the bill to the ledger; anything past DRAFT/PENDING has a posted journal. */
 export function isBillPosted(bill: Pick<Bill, 'status'>): boolean {
   return bill.status !== 'DRAFT' && bill.status !== 'PENDING' && bill.status !== 'VOID';
@@ -296,13 +279,6 @@ export function useApproveBill() {
     },
     onSuccess: () => invalidateLedgerQueries(queryClient),
   });
-}
-
-/**
- * @deprecated "Open" is the same accounting event as approval; use useApproveBill.
- */
-export function useOpenBill() {
-  return useApproveBill();
 }
 
 /**

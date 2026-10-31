@@ -326,44 +326,6 @@ export class BrandingSettingsDto {
 }
 
 // ============================================
-// COMBINED SETTINGS UPDATE DTO
-// ============================================
-
-export class UpdateAllSettingsDto {
-  @ApiPropertyOptional()
-  @IsOptional()
-  general?: GeneralSettingsDto;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  financial?: FinancialSettingsDto;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  invoice?: InvoiceSettingsDto;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  inventory?: InventorySettingsDto;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  ai?: AiSettingsDto;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  email?: EmailSettingsDto;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  localization?: LocalizationSettingsDto;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  branding?: BrandingSettingsDto;
-}
-
-// ============================================
 // RESPONSE TYPES
 // ============================================
 

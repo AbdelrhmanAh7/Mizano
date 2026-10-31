@@ -1,7 +1,6 @@
 'use client';
 
 import { bankTransactionsApi } from '@/lib/api';
-import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -64,17 +63,6 @@ export function useBankTransactions(params?: TransactionFilters) {
   });
 }
 
-export function useInfiniteBankTransactions(params?: Record<string, unknown>) {
-  return useInfiniteTableData<BankTransaction, Record<string, unknown>>({
-    queryKey: ['bank-transactions'],
-    fetchFn: async (p) => {
-      const response = await bankTransactionsApi.getAllCursor(p);
-      return response.data;
-    },
-    params: params || {},
-  });
-}
-
 export function useBankTransaction(id: string) {
   return useQuery({
     queryKey: ['bank-transactions', id],
@@ -132,22 +120,6 @@ export function useMatchTransaction() {
   });
 }
 
-export function useUnmatchTransaction() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: bankTransactionsApi.unmatch,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
-      toast.success('Transaction unmatched successfully');
-    },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to unmatch transaction');
-    },
-  });
-}
-
 export function useExcludeTransaction() {
   const queryClient = useQueryClient();
 
@@ -159,23 +131,6 @@ export function useExcludeTransaction() {
     },
     onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to exclude transaction');
-    },
-  });
-}
-
-export function useCreateExpenseFromTransaction() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
-      bankTransactionsApi.createExpense(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      toast.success('Expense created and matched');
-    },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to create expense');
     },
   });
 }

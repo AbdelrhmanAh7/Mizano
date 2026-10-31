@@ -2,18 +2,6 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bankAccountsApi } from '@/lib/api';
-
-export interface BankingDashboardStats {
-  totalAccounts: number;
-  totalSystemBalance: number;
-  pendingTransactionCount: number;
-  monthlyTransactionCount: number;
-}
-
-export interface BalanceHistoryPoint {
-  date: string;
-  runningBalance: number;
-}
 import { toast } from 'sonner';
 
 type ApiError = { response?: { data?: { message?: string } } };

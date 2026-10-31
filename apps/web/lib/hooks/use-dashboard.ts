@@ -519,41 +519,6 @@ export function useDashboardProjects() {
 }
 
 /**
- * Legacy combined hook — kept for backward compatibility.
- * Uses all individual hooks internally.
- */
-export function useDashboard() {
-  const statsQuery = useDashboardStats();
-  const revenueQuery = useDashboardRevenue();
-  const cashFlowQuery = useDashboardCashFlow();
-  const expensesQuery = useDashboardExpenses();
-  const customersQuery = useDashboardCustomers();
-  const bankingQuery = useDashboardBanking();
-  const inventoryQuery = useDashboardInventory();
-
-  const isLoading = statsQuery.isLoading;
-  const isRefetching =
-    statsQuery.isRefetching || revenueQuery.isRefetching || cashFlowQuery.isRefetching;
-
-  const data = statsQuery.data
-    ? {
-        stats: statsQuery.data.stats,
-        receivablesVsPayables: statsQuery.data.receivablesVsPayables,
-        cashFlowTrend: cashFlowQuery.data || [],
-        topExpenses: expensesQuery.data || [],
-        revenueTrend: revenueQuery.data || [],
-        topCustomers: customersQuery.data || [],
-        bankBalanceTrend: bankingQuery.data || [],
-        inventoryValueTrend: inventoryQuery.data || [],
-        alerts: statsQuery.data.alerts,
-        recentTransactions: statsQuery.data.recentTransactions,
-      }
-    : undefined;
-
-  return { data, isLoading, isRefetching };
-}
-
-/**
  * Aggregate daily cash flow data into monthly buckets.
  * Sums and the net are exact decimal strings; they become numbers only for plotting.
  */
@@ -579,21 +544,4 @@ export function aggregateCashFlowByMonth(
     outflow: decimalToDisplayNumber(data.outflow),
     net: decimalToDisplayNumber(subtractDecimals(data.inflow, data.outflow)),
   }));
-}
-
-// Money is formatted with useMoneyFormatter / useCompactMoneyFormatter (org base currency).
-
-/**
- * Get alert icon and color based on severity
- */
-export function getAlertStyles(severity: AIAlert['severity']) {
-  switch (severity) {
-    case 'error':
-      return { color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' };
-    case 'warning':
-      return { color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200' };
-    case 'info':
-    default:
-      return { color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' };
-  }
 }

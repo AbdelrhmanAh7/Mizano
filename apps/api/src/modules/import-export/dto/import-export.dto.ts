@@ -1,12 +1,4 @@
-import {
-  IsString,
-  IsOptional,
-  IsArray,
-  IsEnum,
-  IsDateString,
-  IsBoolean,
-  ValidateNested,
-} from 'class-validator';
+import { IsString, IsOptional, IsArray, IsEnum, IsBoolean, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -160,35 +152,6 @@ export class ImportResultDto {
 
   @ApiProperty({ type: [Object] })
   errors: Array<{ row: number; error: string }>;
-}
-
-// ============ Export DTOs ============
-
-export class ExportQueryDto {
-  @ApiProperty({ enum: ExportFormat, default: ExportFormat.CSV })
-  @IsEnum(ExportFormat)
-  format: ExportFormat = ExportFormat.CSV;
-
-  @ApiPropertyOptional({ description: 'Start date for filtering' })
-  @IsOptional()
-  @IsDateString()
-  dateFrom?: string;
-
-  @ApiPropertyOptional({ description: 'End date for filtering' })
-  @IsOptional()
-  @IsDateString()
-  dateTo?: string;
-
-  @ApiPropertyOptional({ description: 'Specific fields to export' })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  fields?: string[];
-
-  @ApiPropertyOptional({ description: 'Include deleted records' })
-  @IsOptional()
-  @IsBoolean()
-  includeDeleted?: boolean = false;
 }
 
 // ============ Entity Field Definitions ============

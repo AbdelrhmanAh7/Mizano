@@ -1,6 +1,6 @@
 'use client';
 
-import api, { attendanceApi, departmentsApi, employeesApi, payrollApi } from '@/lib/api';
+import api, { attendanceApi, employeesApi, payrollApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -199,22 +199,7 @@ export function useAttendance(startDateOrParams?: string | AttendanceParams, end
   });
 }
 
-export function useMarkAttendance() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: attendanceApi.mark,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['attendance'] });
-      toast.success('Attendance marked');
-    },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to mark attendance');
-    },
-  });
-}
-
-export function useMarkBulkAttendance() {
+export function useBulkMarkAttendance() {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -228,9 +213,6 @@ export function useMarkBulkAttendance() {
     },
   });
 }
-
-// Alias for backward compatibility
-export const useBulkMarkAttendance = useMarkBulkAttendance;
 
 export interface PayrollRunParams {
   page?: number;
@@ -296,21 +278,6 @@ export function useConfirmPayroll() {
   });
 }
 
-export function useMarkPayrollPaid() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: payrollApi.markPaid,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['payroll'] });
-      toast.success('Payroll marked as paid');
-    },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to mark payroll as paid');
-    },
-  });
-}
-
 export function useEmployeePayslips(employeeId: string) {
   return useQuery({
     queryKey: ['payslips', 'employee', employeeId],
@@ -345,34 +312,12 @@ export function usePayslip(payslipIdOrPayrollId: string, payslipId?: string) {
   });
 }
 
-// Employee Summary Hooks
-export function useEmployeeCount() {
-  return useQuery({
-    queryKey: ['employees', 'count'],
-    queryFn: async () => {
-      const response = await api.get('/employees/count');
-      return response.data?.data || response.data;
-    },
-  });
-}
-
 export function useDepartmentSummary() {
   return useQuery({
     queryKey: ['employees', 'department-summary'],
     queryFn: async () => {
       const response = await api.get('/employees/summary');
       return response.data?.data || response.data;
-    },
-  });
-}
-
-// Department Hook
-export function useDepartments() {
-  return useQuery({
-    queryKey: ['departments'],
-    queryFn: async () => {
-      const response = await departmentsApi.getAll();
-      return response.data;
     },
   });
 }

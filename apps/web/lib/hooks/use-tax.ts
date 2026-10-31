@@ -77,33 +77,6 @@ export interface VATPayment {
   createdAt: string;
 }
 
-export interface TaxDashboardStats {
-  activeRates: number;
-  totalRates: number;
-  pendingReturns: number;
-  totalReturns: number;
-  outstandingVAT: number;
-  totalPaid: number;
-  upcomingDeadlines: Array<{
-    id: string;
-    returnNumber?: string;
-    dueDate?: string;
-    status: VATReturnStatus;
-    startDate: string;
-    endDate: string;
-  }>;
-  recentReturns: Array<{
-    id: string;
-    returnNumber?: string;
-    status: VATReturnStatus;
-    outputVAT: number | string;
-    inputVAT: number | string;
-    netPayable: number | string;
-    startDate: string;
-    endDate: string;
-  }>;
-}
-
 // ============ API Functions ============
 
 const taxRatesApi = {
@@ -212,14 +185,6 @@ export function useTaxRateOptions(): TaxRateOptionsState {
     [data],
   );
   return { options, isLoading, isError };
-}
-
-export function useTaxRate(id: string) {
-  return useQuery({
-    queryKey: ['tax-rates', id],
-    queryFn: () => taxRatesApi.get(id),
-    enabled: !!id,
-  });
 }
 
 export function useCreateTaxRate() {

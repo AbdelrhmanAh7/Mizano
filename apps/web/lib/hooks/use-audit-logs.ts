@@ -32,42 +32,6 @@ export function useAuditLogs(params?: AuditLogParams) {
 }
 
 /**
- * Hook to fetch a single audit log by ID
- */
-export function useAuditLog(id: string | undefined) {
-  return useQuery({
-    queryKey: ['audit-logs', id],
-    queryFn: async () => {
-      if (!id) throw new Error('Audit log ID is required');
-      const response = await auditLogsApi.getOne(id);
-      return response.data;
-    },
-    enabled: !!id,
-  });
-}
-
-/**
- * Hook to fetch audit logs for a specific entity
- */
-export function useEntityAuditLogs(
-  entityType: string | undefined,
-  entityId: string | undefined,
-  params?: Pick<AuditLogParams, 'page' | 'limit' | 'sortOrder'>,
-) {
-  return useQuery({
-    queryKey: ['audit-logs', 'entity', entityType, entityId, params],
-    queryFn: async () => {
-      if (!entityType || !entityId) {
-        throw new Error('Entity type and ID are required');
-      }
-      const response = await auditLogsApi.getByEntity(entityType, entityId, params);
-      return response.data;
-    },
-    enabled: !!entityType && !!entityId,
-  });
-}
-
-/**
  * Hook to fetch audit log statistics
  */
 export function useAuditStats(days: number = 30) {

@@ -402,13 +402,6 @@ export function normalizeCurrencyParam(
 // ── Aging ──────────────────────────────────────────────────────────────────────
 
 export type AgingBucketKey = 'current' | 'days1_30' | 'days31_60' | 'days61_90' | 'over90';
-export const AGING_BUCKET_KEYS: AgingBucketKey[] = [
-  'current',
-  'days1_30',
-  'days31_60',
-  'days61_90',
-  'over90',
-];
 
 /** Whole UTC calendar days between the due date and the as-of date (negative = not yet due). */
 export function daysPastDue(dueDate: Date, asOf: Date): number {

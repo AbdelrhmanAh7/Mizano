@@ -27,14 +27,6 @@ export const quoteStatusColors: Record<QuoteStatus, string> = {
   EXPIRED: 'bg-orange-100 text-orange-800 border-orange-200',
 };
 
-// Credit note types
-export type CreditNoteType = 'REFUND' | 'APPLY_TO_INVOICE';
-
-export const creditNoteTypeColors: Record<CreditNoteType, string> = {
-  REFUND: 'bg-green-100 text-green-800 border-green-200',
-  APPLY_TO_INVOICE: 'bg-blue-100 text-blue-800 border-blue-200',
-};
-
 // Payment mode types
 export type PaymentMode =
   | 'CASH'
@@ -72,11 +64,6 @@ const quoteStatusKeys: Record<QuoteStatus, string> = {
   INVOICED: 'invoiced',
   DECLINED: 'declined',
   EXPIRED: 'expired',
-};
-
-const creditNoteTypeKeys: Record<CreditNoteType, string> = {
-  REFUND: 'refund',
-  APPLY_TO_INVOICE: 'applyToInvoice',
 };
 
 const paymentModeKeys: Record<PaymentMode, string> = {
@@ -160,23 +147,6 @@ export function QuoteStatusBadge({ status, className }: QuoteStatusBadgeProps) {
       status={status}
       colorMap={quoteStatusColors}
       labelMap={{ [status]: label }}
-      className={className}
-    />
-  );
-}
-
-interface CreditNoteTypeBadgeProps {
-  type: CreditNoteType;
-  className?: string;
-}
-
-export function CreditNoteTypeBadge({ type, className }: CreditNoteTypeBadgeProps) {
-  const label = useEnumLabel('sales.creditNotes.types', creditNoteTypeKeys, type);
-  return (
-    <StatusBadge
-      status={type}
-      colorMap={creditNoteTypeColors}
-      labelMap={{ [type]: label }}
       className={className}
     />
   );

@@ -44,69 +44,6 @@ export function createMockAiFeedback() {
   };
 }
 
-/** Creates a mock OllamaService */
-export function createMockOllamaService() {
-  return {
-    extractFromImageVision: jest.fn().mockResolvedValue(null),
-    extractFromText: jest.fn().mockResolvedValue(null),
-    buildEmptyResult: jest.fn().mockReturnValue({
-      vendorName: null,
-      vendorAddress: null,
-      vendorPhone: null,
-      vendorEmail: null,
-      vendorTaxId: null,
-      invoiceNumber: null,
-      date: null,
-      dueDate: null,
-      total: null,
-      subtotal: null,
-      tax: null,
-      discount: null,
-      currency: null,
-      paymentTerms: null,
-      notes: null,
-      lineItems: [],
-      rawText: '',
-      ocrConfidence: 0,
-      fieldConfidence: {},
-      accountingEntry: null,
-      processingTimeMs: 0,
-    }),
-  };
-}
-
-/** Creates a mock DocumentClassificationService */
-export function createMockDocumentClassification() {
-  return {
-    classifyText: jest.fn().mockResolvedValue({
-      category: 'INVOICE',
-      confidence: 0.85,
-      scores: [],
-    }),
-    classifyDocument: jest.fn().mockResolvedValue({
-      category: 'INVOICE',
-      confidence: 0.85,
-      scores: [],
-    }),
-    trainModel: jest.fn().mockResolvedValue(undefined),
-    getModelStatus: jest.fn().mockResolvedValue({
-      hasActiveModel: false,
-    }),
-  };
-}
-
-/** Creates a mock EntityExtractionService */
-export function createMockEntityExtraction() {
-  return {
-    extractEntities: jest.fn().mockResolvedValue([]),
-    extractAndMatch: jest.fn().mockResolvedValue({
-      entities: [],
-      matchedVendors: [],
-      matchedCustomers: [],
-    }),
-  };
-}
-
 /** Standard test org ID */
 export const TEST_ORG_ID = 'org-test-001';
 

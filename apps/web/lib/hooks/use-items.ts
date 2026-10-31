@@ -124,19 +124,6 @@ export function useItem(id: string | undefined) {
 }
 
 /**
- * Hook to fetch active items for dropdowns (simplified query)
- */
-export function useActiveItems() {
-  return useQuery({
-    queryKey: ['items', 'active'],
-    queryFn: async () => {
-      const response = await itemsApi.getAll({ limit: 100 });
-      return (response.data.data || response.data) as Item[];
-    },
-  });
-}
-
-/**
  * Hook to create a new item
  */
 export function useCreateItem() {
@@ -246,22 +233,6 @@ export function getItemTypeColor(type: ItemType): string {
     DIGITAL: 'bg-purple-100 text-purple-800',
   };
   return colorMap[type] || 'bg-gray-100 text-gray-800';
-}
-
-/**
- * Get item type badge variant
- */
-export function getTypeVariant(type: ItemType): 'default' | 'secondary' | 'outline' {
-  switch (type) {
-    case 'GOODS':
-      return 'default';
-    case 'SERVICE':
-      return 'secondary';
-    case 'DIGITAL':
-      return 'outline';
-    default:
-      return 'default';
-  }
 }
 
 /**

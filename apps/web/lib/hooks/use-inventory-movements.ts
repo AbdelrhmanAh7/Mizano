@@ -2,7 +2,6 @@
 
 import { inventoryMovementsApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
-import { useQuery } from '@tanstack/react-query';
 
 export type MovementType = 'IN' | 'OUT';
 export type MovementSource =
@@ -36,30 +35,6 @@ export interface InventoryMovement {
     name: string;
     code: string;
   };
-}
-
-export interface InventoryMovementParams {
-  page?: number;
-  limit?: number;
-  search?: string;
-  itemId?: string;
-  warehouseId?: string;
-  type?: MovementType;
-  source?: MovementSource;
-  dateFrom?: string;
-  dateTo?: string;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-}
-
-export function useInventoryMovements(params?: InventoryMovementParams) {
-  return useQuery({
-    queryKey: ['inventory-movements', params],
-    queryFn: async () => {
-      const response = await inventoryMovementsApi.getAll(params as Record<string, unknown>);
-      return response.data;
-    },
-  });
 }
 
 export function useInfiniteInventoryMovements(params?: Record<string, unknown>) {

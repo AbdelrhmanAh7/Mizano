@@ -121,18 +121,6 @@ export function useUpdateSuggestion() {
   });
 }
 
-export function useSuggestionPrompt(suggestionId: string | null) {
-  return useQuery({
-    queryKey: ['deep-search-prompt', suggestionId],
-    queryFn: async () => {
-      const res = await deepSearchApi.getSuggestionPrompt(suggestionId!);
-      return res.data as { prompt: string; title: string; category: string };
-    },
-    enabled: !!suggestionId,
-    staleTime: Infinity,
-  });
-}
-
 // ============ Helpers ============
 
 export function getCategoryColor(category: DeepSearchSuggestion['category']) {

@@ -131,21 +131,6 @@ export interface CreateActivityDto {
   date?: string;
 }
 
-export interface PipelineMetrics {
-  totalDeals: number;
-  totalValue: number;
-  weightedValue: number;
-  avgDealSize: number;
-  conversionRate: number;
-  avgDaysToClose: number;
-  byStage: Record<DealStage, { count: number; value: number }>;
-}
-
-export interface ConvertLeadResult {
-  customerId: string;
-  dealId?: string;
-}
-
 // ============ API Functions ============
 
 const leadsApi = {
@@ -346,28 +331,6 @@ export function useConvertLead() {
   });
 }
 
-export function useBulkUpdateLeadStatus() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ ids, status }: { ids: string[]; status: LeadStatus }) =>
-      leadsApi.bulkUpdateStatus(ids, status),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leads'] });
-    },
-  });
-}
-
-export function useBulkAssignLeads() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ ids, assignedToId }: { ids: string[]; assignedToId: string }) =>
-      leadsApi.bulkAssign(ids, assignedToId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leads'] });
-    },
-  });
-}
-
 // ============ Deals Hooks ============
 
 export function useDeals(params?: {
@@ -403,31 +366,12 @@ export function useDeal(id: string) {
   });
 }
 
-export function useDealsByStage() {
-  return useQuery({
-    queryKey: ['deals', 'by-stage'],
-    queryFn: () => dealsApi.getByStage(),
-  });
-}
-
 export function useCreateDeal() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: dealsApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['deals'] });
-      queryClient.invalidateQueries({ queryKey: ['pipeline-metrics'] });
-    },
-  });
-}
-
-export function useUpdateDeal() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateDealDto }) => dealsApi.update(id, data),
-    onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ['deals'] });
-      queryClient.invalidateQueries({ queryKey: ['deals', id] });
       queryClient.invalidateQueries({ queryKey: ['pipeline-metrics'] });
     },
   });
@@ -523,17 +467,6 @@ export function useCreateActivity() {
   });
 }
 
-export function useDeleteActivity() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: activitiesApi.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead-activities'] });
-      queryClient.invalidateQueries({ queryKey: ['deal-activities'] });
-    },
-  });
-}
-
 // ============ Helper Functions ============
 
 export function getLeadSourceLabel(source: LeadSource): string {
@@ -547,19 +480,6 @@ export function getLeadSourceLabel(source: LeadSource): string {
     OTHER: 'Other',
   };
   return labels[source] || source;
-}
-
-export function getLeadSourceIcon(source: LeadSource): string {
-  const icons: Record<LeadSource, string> = {
-    FACEBOOK_ADS: '📘',
-    GOOGLE_ADS: '🔍',
-    WEBSITE: '🌐',
-    REFERRAL: '🤝',
-    COLD_CALL: '📞',
-    TRADE_SHOW: '🎪',
-    OTHER: '📋',
-  };
-  return icons[source] || '📋';
 }
 
 export function getLeadStatusColor(status: LeadStatus): string {
@@ -606,17 +526,6 @@ export function getDealStageLabel(stage: DealStage): string {
     LOST: 'Lost',
   };
   return labels[stage] || stage;
-}
-
-export function getActivityTypeIcon(type: ActivityType): string {
-  const icons: Record<ActivityType, string> = {
-    CALL: '📞',
-    EMAIL: '📧',
-    MEETING: '👥',
-    NOTE: '📝',
-    TASK: '✅',
-  };
-  return icons[type] || '📋';
 }
 
 export function getActivityTypeLabel(type: ActivityType): string {

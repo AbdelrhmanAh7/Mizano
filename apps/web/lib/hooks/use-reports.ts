@@ -40,26 +40,6 @@ export interface BalanceSheetReport {
   asOfDate: string;
 }
 
-export interface CashFlowReport {
-  operations: {
-    netIncome: number;
-    adjustments: Array<{ key?: string; name: string; amount: number }>;
-    total: number;
-  };
-  investing: {
-    items: Array<{ key?: string; name: string; amount: number }>;
-    total: number;
-  };
-  financing: {
-    items: Array<{ key?: string; name: string; amount: number }>;
-    total: number;
-  };
-  netChange: number;
-  openingBalance: number;
-  closingBalance: number;
-  period: DateRange;
-}
-
 export interface AgingBucket {
   range: string;
   amount: number;

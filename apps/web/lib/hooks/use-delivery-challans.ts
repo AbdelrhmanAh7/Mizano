@@ -164,18 +164,6 @@ export function useCreateDeliveryChallan() {
   });
 }
 
-export function useUpdateDeliveryChallan() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateDeliveryChallanDto }) =>
-      challansApi.update(id, data),
-    onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ['delivery-challans'] });
-      queryClient.invalidateQueries({ queryKey: ['delivery-challans', id] });
-    },
-  });
-}
-
 export function useDeleteDeliveryChallan() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -212,17 +200,6 @@ export function useMarkChallanReturned() {
   });
 }
 
-export function useCreateChallanFromInvoice() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: challansApi.createFromInvoice,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['delivery-challans'] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-    },
-  });
-}
-
 // ============ Helper Functions ============
 
 export function getChallanTypeLabel(type: ChallanType): string {
@@ -232,24 +209,6 @@ export function getChallanTypeLabel(type: ChallanType): string {
     SAMPLE: 'Sample',
   };
   return labels[type] || type;
-}
-
-export function getChallanTypeDescription(type: ChallanType): string {
-  const descriptions: Record<ChallanType, string> = {
-    SUPPLY: 'Regular supply of goods to customer',
-    JOB_WORK: 'Goods sent for job work processing',
-    SAMPLE: 'Sample goods sent for evaluation',
-  };
-  return descriptions[type] || '';
-}
-
-export function getChallanTypeIcon(type: ChallanType): string {
-  const icons: Record<ChallanType, string> = {
-    SUPPLY: '📦',
-    JOB_WORK: '🔧',
-    SAMPLE: '🧪',
-  };
-  return icons[type] || '📋';
 }
 
 export function getChallanStatusColor(status: ChallanStatus): string {
@@ -270,25 +229,12 @@ export function getChallanStatusLabel(status: ChallanStatus): string {
   return labels[status] || status;
 }
 
-export function getChallanStatusDescription(status: ChallanStatus): string {
-  const descriptions: Record<ChallanStatus, string> = {
-    DRAFT: 'Challan created but not yet issued',
-    ISSUED: 'Goods have been dispatched',
-    RETURNED: 'Goods have been returned',
-  };
-  return descriptions[status] || '';
-}
-
 export function canIssueChallan(challan: DeliveryChallan): boolean {
   return challan.status === 'DRAFT' && challan.lines.length > 0;
 }
 
 export function canMarkReturned(challan: DeliveryChallan): boolean {
   return challan.status === 'ISSUED';
-}
-
-export function canEditChallan(challan: DeliveryChallan): boolean {
-  return challan.status === 'DRAFT';
 }
 
 export function canDeleteChallan(challan: DeliveryChallan): boolean {

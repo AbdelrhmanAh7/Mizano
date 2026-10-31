@@ -47,15 +47,6 @@ export interface Transfer {
   lines?: TransferLine[];
 }
 
-export interface TransferParams {
-  page?: number;
-  limit?: number;
-  search?: string;
-  status?: TransferStatus;
-  fromWarehouseId?: string;
-  toWarehouseId?: string;
-}
-
 export interface CreateTransferData {
   fromWarehouseId: string;
   toWarehouseId: string;
@@ -65,19 +56,6 @@ export interface CreateTransferData {
     itemId: string;
     quantity: number;
   }>;
-}
-
-/**
- * Hook to fetch all transfers
- */
-export function useTransfers(params?: TransferParams) {
-  return useQuery({
-    queryKey: ['transfers', params],
-    queryFn: async () => {
-      const response = await transfersApi.getAll(params);
-      return response.data;
-    },
-  });
 }
 
 /**
@@ -201,29 +179,9 @@ export function useCancelTransfer() {
 }
 
 /**
- * Get status badge variant
- */
-export function getStatusVariant(
-  status: TransferStatus,
-): 'default' | 'secondary' | 'outline' | 'destructive' {
-  switch (status) {
-    case 'PENDING':
-      return 'secondary';
-    case 'IN_TRANSIT':
-      return 'default';
-    case 'COMPLETED':
-      return 'outline';
-    case 'CANCELLED':
-      return 'destructive';
-    default:
-      return 'default';
-  }
-}
-
-/**
  * Get status display text
  */
-export function getStatusText(status: TransferStatus): string {
+export function getTransferStatusLabel(status: TransferStatus): string {
   switch (status) {
     case 'PENDING':
       return 'Pending';
@@ -238,8 +196,6 @@ export function getStatusText(status: TransferStatus): string {
   }
 }
 
-// Alias functions for backward compatibility
-export const getTransferStatusLabel = getStatusText;
 export function getTransferStatusColor(status: TransferStatus): string {
   switch (status) {
     case 'PENDING':

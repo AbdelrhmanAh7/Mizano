@@ -107,30 +107,6 @@ export function useDeleteBankRule() {
   });
 }
 
-export function useTestBankRule() {
-  return useMutation({
-    mutationFn: bankRulesApi.test,
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to test bank rule');
-    },
-  });
-}
-
-export function useReorderBankRules() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: bankRulesApi.reorder,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bank-rules'] });
-      toast.success('Rules reordered successfully');
-    },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to reorder rules');
-    },
-  });
-}
-
 // Helper functions
 export const conditionFieldOptions = [
   { value: 'description', label: 'Description' },

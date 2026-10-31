@@ -46,24 +46,6 @@ export class TimeTrendQueryDto {
   interval?: number = 5;
 }
 
-// Response DTOs
-export class QueryMetricEntryDto {
-  @ApiProperty()
-  model!: string;
-
-  @ApiProperty()
-  action!: string;
-
-  @ApiProperty({ description: 'Duration in milliseconds' })
-  duration!: number;
-
-  @ApiProperty()
-  timestamp!: Date;
-
-  @ApiProperty()
-  isSlow!: boolean;
-}
-
 export class QueryStatsResponseDto {
   @ApiProperty()
   totalQueries!: number;

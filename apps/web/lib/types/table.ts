@@ -19,16 +19,6 @@ export interface UseTableParamsOptions {
   mode?: 'paginated' | 'virtual';
 }
 
-export interface PaginatedResponse<T> {
-  data: T[];
-  meta: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
-
 export interface CursorPaginatedResponse<T> {
   data: T[];
   meta: {
@@ -36,13 +26,4 @@ export interface CursorPaginatedResponse<T> {
     nextCursor: string | null;
     hasMore: boolean;
   };
-}
-
-export interface CursorQueryParams {
-  cursor?: string;
-  take?: number;
-  search?: string;
-  sortBy?: string;
-  sortOrder?: SortOrder;
-  [key: string]: string | number | undefined;
 }

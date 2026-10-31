@@ -207,21 +207,6 @@ export function nGramSimilarity(str1: string, str2: string, n: number = 2): numb
 }
 
 /**
- * Check if a string starts with any of the given prefixes
- */
-export function startsWithAny(
-  text: string,
-  prefixes: string[],
-  caseInsensitive: boolean = true,
-): boolean {
-  const normalizedText = caseInsensitive ? text.toLowerCase() : text;
-  return prefixes.some((prefix) => {
-    const normalizedPrefix = caseInsensitive ? prefix.toLowerCase() : prefix;
-    return normalizedText.startsWith(normalizedPrefix);
-  });
-}
-
-/**
  * Calculate word overlap ratio between two strings
  */
 export function wordOverlapRatio(str1: string, str2: string): number {

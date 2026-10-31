@@ -179,42 +179,6 @@ export function getTierFromScore(score: number): LeadTier {
 }
 
 /**
- * Get tier color for UI
- */
-export function getTierColor(tier: LeadTier): string {
-  switch (tier) {
-    case 'HOT':
-      return '#ef4444'; // Red
-    case 'WARM':
-      return '#f97316'; // Orange
-    case 'COOL':
-      return '#3b82f6'; // Blue
-    case 'COLD':
-      return '#6b7280'; // Gray
-    default:
-      return '#6b7280';
-  }
-}
-
-/**
- * Get tier label
- */
-export function getTierLabel(tier: LeadTier): string {
-  switch (tier) {
-    case 'HOT':
-      return 'Hot Lead';
-    case 'WARM':
-      return 'Warm Lead';
-    case 'COOL':
-      return 'Cool Lead';
-    case 'COLD':
-      return 'Cold Lead';
-    default:
-      return 'Unknown';
-  }
-}
-
-/**
  * Calculate decay multiplier based on weeks of inactivity
  */
 export function getDecayMultiplier(

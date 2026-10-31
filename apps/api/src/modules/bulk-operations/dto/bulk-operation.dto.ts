@@ -1,5 +1,4 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsEnum, IsString } from 'class-validator';
 
 export enum BulkEntityType {
   INVOICES = 'invoices',
@@ -32,23 +31,6 @@ export enum BulkActionType {
 }
 
 export type BulkJobStatus = 'pending' | 'running' | 'completed' | 'failed';
-
-export class StartBulkOperationDto {
-  @ApiProperty({ type: [String], minItems: 1, maxItems: 100 })
-  @IsArray()
-  @IsString({ each: true })
-  @ArrayMinSize(1)
-  @ArrayMaxSize(100)
-  ids: string[];
-
-  @ApiProperty({ enum: BulkEntityType })
-  @IsEnum(BulkEntityType)
-  entityType: BulkEntityType;
-
-  @ApiProperty({ enum: BulkActionType })
-  @IsEnum(BulkActionType)
-  action: BulkActionType;
-}
 
 export interface BulkJobState {
   jobId: string;

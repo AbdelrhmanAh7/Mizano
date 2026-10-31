@@ -195,20 +195,6 @@ export const authApi = {
 };
 
 // ===========================================================================
-// Dashboard API (no CRUD pattern)
-// ===========================================================================
-
-export const dashboardApi = {
-  getOverview: () => api.get('/reports/dashboard'),
-  getRevenueChart: (months?: number) =>
-    api.get(`/reports/dashboard/revenue-chart${months ? `?months=${months}` : ''}`),
-  getCashFlowChart: (days?: number) =>
-    api.get(`/reports/dashboard/cash-flow-chart${days ? `?days=${days}` : ''}`),
-  getTopCustomers: (limit?: number) =>
-    api.get(`/reports/dashboard/top-customers${limit ? `?limit=${limit}` : ''}`),
-};
-
-// ===========================================================================
 // Sales
 // ===========================================================================
 
@@ -258,14 +244,6 @@ export const paymentsReceivedApi = {
   /** Voids a payment: restores invoice balances and posts a linked reversal journal. */
   void: (id: string) => api.post(`/payments-received/${id}/void`),
   bulkDelete: (ids: string[]) => api.post('/payments-received/bulk-delete', { ids }),
-};
-
-export const deliveryChallansApi = {
-  ...crud('/delivery-challans'),
-  issue: (id: string) => api.post(`/delivery-challans/${id}/issue`),
-  markReturned: (id: string) => api.post(`/delivery-challans/${id}/mark-returned`),
-  bulkDelete: (ids: string[]) => api.post('/delivery-challans/bulk-delete', { ids }),
-  bulkIssue: (ids: string[]) => api.post('/delivery-challans/bulk-issue', { ids }),
 };
 
 // ===========================================================================
@@ -364,12 +342,6 @@ export const compositeItemsApi = {
     api.post(`/composite-items/${id}/assemble`, data),
 };
 
-export const inventoryLevelsApi = {
-  getAll: (params?: { itemId?: string; warehouseId?: string }) =>
-    api.get('/inventory-levels', { params }),
-  getByItem: (itemId: string) => api.get(`/inventory-levels/by-item/${itemId}`),
-};
-
 export const inventoryMovementsApi = {
   getAll: (params?: Record<string, unknown>) => api.get('/inventory-movements', { params }),
   getAllCursor: (params?: Record<string, unknown>) =>
@@ -443,47 +415,6 @@ export const projectsApi = {
   bulkComplete: (ids: string[]) => api.post('/projects/bulk-complete', { ids }),
   bulkHold: (ids: string[]) => api.post('/projects/bulk-hold', { ids }),
   bulkCancel: (ids: string[]) => api.post('/projects/bulk-cancel', { ids }),
-};
-
-export const timesheetsApi = {
-  ...crud('/timesheets', { updateMethod: 'put', hasCursor: false }),
-  startTimer: (data: Record<string, unknown>) => api.post('/timesheets/timer/start', data),
-  stopTimer: (id: string) => api.post(`/timesheets/timer/stop/${id}`),
-  getRunningTimer: () => api.get('/timesheets/timer/running'),
-  getWeeklySummary: (weekStart: string) =>
-    api.get(`/timesheets/weekly-summary?weekStart=${weekStart}`),
-};
-
-// ===========================================================================
-// Reports (no CRUD pattern)
-// ===========================================================================
-
-export const reportsApi = {
-  getProfitAndLoss: (startDate: string, endDate: string) =>
-    api.get(`/reports/profit-and-loss?startDate=${startDate}&endDate=${endDate}`),
-  getBalanceSheet: (asOfDate: string) => api.get(`/reports/balance-sheet?asOfDate=${asOfDate}`),
-  getCashFlow: (startDate: string, endDate: string) =>
-    api.get(`/reports/cash-flow?startDate=${startDate}&endDate=${endDate}`),
-  getTrialBalance: (asOfDate: string) => api.get(`/reports/trial-balance?asOfDate=${asOfDate}`),
-  getReceivablesAging: (asOfDate?: string) =>
-    api.get(`/reports/receivables-aging${asOfDate ? `?asOfDate=${asOfDate}` : ''}`),
-  getPayablesAging: (asOfDate?: string) =>
-    api.get(`/reports/payables-aging${asOfDate ? `?asOfDate=${asOfDate}` : ''}`),
-};
-
-// ===========================================================================
-// AI (no CRUD pattern)
-// ===========================================================================
-
-export const aiApi = {
-  getInsights: () => api.get('/ai/insights'),
-  forecastRevenue: (months?: number) =>
-    api.get(`/ai/forecast/revenue${months ? `?months=${months}` : ''}`),
-  forecastCashFlow: (weeks?: number) =>
-    api.get(`/ai/forecast/cash-flow${weeks ? `?weeks=${weeks}` : ''}`),
-  predictChurn: () => api.get('/ai/forecast/customer-churn'),
-  categorize: (data: { description: string; amount: number; type: 'expense' | 'income' }) =>
-    api.post('/ai/categorize', data),
 };
 
 // ===========================================================================
@@ -613,10 +544,6 @@ export const payrollApi = {
   bulkPay: (ids: string[]) => api.post('/payroll/runs/bulk-pay', { ids }),
 };
 
-export const departmentsApi = {
-  getAll: () => api.get('/departments'),
-};
-
 // ===========================================================================
 // Manufacturing
 // ===========================================================================
@@ -717,15 +644,6 @@ export const cacheApi = {
   flush: () => api.delete<FlushCacheResponse>('/cache/flush'),
   deletePattern: (pattern: string) =>
     api.delete<DeletePatternResponse>(`/cache/keys/${encodeURIComponent(pattern)}`),
-};
-
-// ===========================================================================
-// Bulk Export
-// ===========================================================================
-
-export const bulkExportApi = {
-  export: (ids: string[], entityType: string, format: 'csv' | 'xlsx' = 'csv') =>
-    api.post('/export/bulk', { ids, entityType, format }, { responseType: 'blob' }),
 };
 
 // Export main api for direct usage

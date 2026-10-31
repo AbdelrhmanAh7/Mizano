@@ -2,7 +2,6 @@
 
 import { useToast } from '@/components/ui/use-toast';
 import { accountsApi } from '@/lib/api';
-import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 type ApiError = { response?: { data?: { message?: string } } };
@@ -65,20 +64,6 @@ export function useAccounts(params?: AccountParams) {
       const response = await accountsApi.getAll(params);
       return response.data;
     },
-  });
-}
-
-/**
- * Hook to fetch all accounts with cursor-based infinite scrolling
- */
-export function useInfiniteAccounts(params?: Record<string, unknown>) {
-  return useInfiniteTableData<Account, Record<string, unknown>>({
-    queryKey: ['accounts'],
-    fetchFn: async (p) => {
-      const response = await accountsApi.getAllCursor(p);
-      return response.data;
-    },
-    params: params || {},
   });
 }
 
