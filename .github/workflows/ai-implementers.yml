@@ -3,7 +3,8 @@
 # Managed from Notion: NileQuant Labs HQ -> Agent Team -> "Mac mini - Local Agent Stack".
 # Engines (free first, from providers.json): agy (Gemini) -> OpenRouter free via command-code -> claude -> codex.
 # Logic lives in AbdelrhmanAh7/nql-agents/bin (checked out at ~/agents/nql-agents on the Mac mini).
-#  - start   every 2 h, 24/7 (+ manual): oldest ai-ready issue -> branch ai/<n> -> ONE PR "Closes #n"
+#  - start   every 2 h, 24/7 (+ manual): oldest ai-ready issue -> branch ai/<n> -> ONE PR "Closes #n";
+#            skipped while AI_WIP_LIMIT (5) or more ai/* PRs are open, so fixes land before new ones start
 #  - rescue  every 3h: re-run stalled handoffs; after 2 handoffs -> ai-stuck
 #  - automerge hourly: squash only if CodeRabbit APPROVED head + CI green + no risky paths, else needs-owner
 #  - mention: "@claude" comments by the repo OWNER only
@@ -24,6 +25,7 @@ permissions:
 
 env:
   HUB_BIN: /Users/abdelrahmanahmed/agents/nql-agents/bin
+  AI_WIP_LIMIT: 5
 
 jobs:
   start:
@@ -40,8 +42,21 @@ jobs:
           persist-credentials: false
       - name: Ensure labels exist
         run: source "$HUB_BIN/common.sh" && ensure_labels "$GITHUB_REPOSITORY"
+      - id: wip
+        name: Work-in-progress limit (open ai/* PRs)
+        # Fails closed: if the count cannot be read, the step fails and nothing starts (audit C3).
+        run: |
+          open=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 500 --json headRefName \
+            --jq '[.[] | select(.headRefName | startswith("ai/"))] | length')
+          if [ "$open" -ge "$AI_WIP_LIMIT" ]; then
+            echo "full=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$open AI PRs are open (limit $AI_WIP_LIMIT): not starting a new task."
+          else
+            echo "full=false" >> "$GITHUB_OUTPUT"
+          fi
       - id: pick
         name: Pick the oldest ai-ready issue
+        if: steps.wip.outputs.full == 'false'
         run: echo "issue=$("$HUB_BIN/pick.sh" "$GITHUB_REPOSITORY")" >> "$GITHUB_OUTPUT"
       - name: Implement with local Claude (fallback Codex)
         if: steps.pick.outputs.issue != ''
@@ -51,7 +66,7 @@ jobs:
           rc=0; "$HUB_BIN/implement.sh" "$GITHUB_REPOSITORY" "$ISSUE" start || rc=$?
           if [ "$rc" = 2 ]; then echo "::warning::Both engines failed; handed off to the rescue job."; elif [ "$rc" != 0 ]; then exit "$rc"; fi
       - name: Nothing to do
-        if: steps.pick.outputs.issue == ''
+        if: steps.wip.outputs.full == 'false' && steps.pick.outputs.issue == ''
         run: echo "No ai-ready issue to start."
 
   rescue:

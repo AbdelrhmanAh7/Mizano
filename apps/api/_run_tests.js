@@ -3,7 +3,7 @@
  * Directly uses absolute .pnpm store paths.
  */
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 
 const root = path.resolve(__dirname, '..', '..');
@@ -29,13 +29,14 @@ const jestBin = path.join(root, 'node_modules', 'jest', 'bin', 'jest.js');
 // Use the config file that has absolute ts-jest path
 const configFile = path.join(__dirname, '_jest.config.js');
 
-const args = process.argv.slice(2);
-const fullArgs = [`--config="${configFile}"`, ...args].join(' ');
+// Arguments go to jest as an argv array, never through a shell, so a --testPathPattern with a
+// regex alternation (a|b) or other shell metacharacters reaches jest unchanged (audit C9).
+const args = [jestBin, `--config=${configFile}`, ...process.argv.slice(2)];
 
 console.log(`Using jest from: ${jestBin}`);
 
 try {
-  execSync(`node "${jestBin}" ${fullArgs}`, {
+  execFileSync(process.execPath, args, {
     stdio: 'inherit',
     cwd: __dirname,
     env: {

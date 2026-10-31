@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json.schemastore.org/jscpd.json",
+  "minTokens": 70,
+  "format": ["typescript", "tsx"],
+  "path": ["apps/api/src", "apps/web/app", "apps/web/components", "apps/web/lib", "packages"],
+  "ignore": [
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/__tests__/**",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.next/**"
+  ],
+  "reporters": ["console"],
+  "silent": true,
+  "threshold": 3.2,
+  "gitignore": true
+}
