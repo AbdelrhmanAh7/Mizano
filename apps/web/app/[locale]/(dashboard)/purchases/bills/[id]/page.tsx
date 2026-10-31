@@ -43,11 +43,12 @@ import {
   useApproveBill,
   formatCurrency,
   getStatusVariant,
-  getStatusText,
+  useBillStatusLabel,
 } from '@/lib/hooks/use-bills';
 import { invalidateLedgerQueries } from '@/lib/hooks/use-journals';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { cn } from '@/lib/utils';
+import { isPastDue } from '@/lib/due-date';
 import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
 import { useDateFnsLocale } from '@/lib/date-locale';
 
@@ -70,6 +71,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
   const dateLocale = useDateFnsLocale();
   const { id } = params;
   const t = useTranslations('purchases');
+  const statusLabel = useBillStatusLabel();
   const baseCurrency = useBaseCurrency();
   const tCommon = useTranslations('common');
   const tValidation = useTranslations('purchases.bills.validation');
@@ -164,7 +166,8 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
       : [];
   });
   const isOverdue =
-    bill.status === 'OVERDUE' || (bill.status === 'OPEN' && new Date(bill.dueDate) < new Date());
+    bill.status === 'OVERDUE' ||
+    ((bill.status === 'OPEN' || bill.status === 'PARTIALLY_PAID') && isPastDue(bill.dueDate));
   // A bill without its own currency is posted in the base currency, so it is shown in it.
   const currency = documentCurrency(bill.currencyCode, baseCurrency);
 
@@ -181,9 +184,11 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight font-mono">{bill.billNumber}</h1>
-              <Badge variant={getStatusVariant(bill.status)}>{getStatusText(bill.status)}</Badge>
+              <Badge variant={getStatusVariant(bill.status)}>{statusLabel(bill.status)}</Badge>
             </div>
-            <p className="text-muted-foreground">From {bill.vendor?.name}</p>
+            <p className="text-muted-foreground">
+              {t('bills.from', { name: bill.vendor?.name ?? '' })}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -442,12 +447,12 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
       {/* Quick Actions */}
       <Card>
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
+          <CardTitle>{t('bills.quickActions')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3">
             <Button variant="outline" asChild>
-              <Link href={`/purchases/vendors/${bill.vendorId}`}>View Vendor</Link>
+              <Link href={`/purchases/vendors/${bill.vendorId}`}>{t('bills.viewVendor')}</Link>
             </Button>
             {bill.projectId && (
               <Button variant="outline" asChild>

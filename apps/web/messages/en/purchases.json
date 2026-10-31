@@ -237,7 +237,8 @@
       "partiallyPaid": "Partially Paid",
       "paid": "Paid",
       "overdue": "Overdue",
-      "void": "Void"
+      "void": "Void",
+      "pending": "Pending"
     },
     "empty": {
       "title": "No bills yet",
@@ -286,7 +287,10 @@
       "duplicateFailed": "Error duplicating bill",
       "genericError": "An error occurred"
     },
-    "onlyDraftsEditable": "Only draft bills can be edited"
+    "onlyDraftsEditable": "Only draft bills can be edited",
+    "from": "From {name}",
+    "quickActions": "Quick Actions",
+    "viewVendor": "View Vendor"
   },
   "credits": {
     "title": "Vendor Credits",

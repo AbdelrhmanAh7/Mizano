@@ -27,7 +27,7 @@ import {
   Bill,
   BillStatus,
   formatCurrency,
-  getStatusText,
+  useBillStatusLabel,
   getStatusVariant,
   useCloneBill,
   useDeleteBill,
@@ -42,6 +42,7 @@ import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { cn } from '@/lib/utils';
+import { isPastDue } from '@/lib/due-date';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { useTranslations } from 'next-intl';
@@ -66,6 +67,7 @@ import { useDateFnsLocale } from '@/lib/date-locale';
 function BillsPageContent() {
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('purchases');
+  const statusLabel = useBillStatusLabel();
   const baseCurrency = useBaseCurrency();
   const tCommon = useTranslations('common');
   const { toast } = useToast();
@@ -256,7 +258,7 @@ function BillsPageContent() {
         const bill = row.original;
         const isOverdue =
           bill.status === 'OVERDUE' ||
-          (bill.status === 'OPEN' && new Date(bill.dueDate) < new Date());
+          ((bill.status === 'OPEN' || bill.status === 'PARTIALLY_PAID') && isPastDue(bill.dueDate));
         return (
           <span className={cn(isOverdue && 'text-destructive')}>
             {format(new Date(bill.dueDate), 'PP', { locale: dateLocale })}
@@ -269,7 +271,7 @@ function BillsPageContent() {
       header: t('bills.table.status'),
       cell: ({ row }) => (
         <Badge variant={getStatusVariant(row.original.status)}>
-          {getStatusText(row.original.status)}
+          {statusLabel(row.original.status)}
         </Badge>
       ),
     },

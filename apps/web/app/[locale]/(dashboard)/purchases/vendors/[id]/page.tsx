@@ -20,7 +20,7 @@ import { useVendor, formatVendorAddress, getBalanceColor } from '@/lib/hooks/use
 import {
   useBills,
   getStatusVariant as getBillStatusVariant,
-  getStatusText as getBillStatusText,
+  useBillStatusLabel,
   type Bill,
 } from '@/lib/hooks/use-bills';
 import { useExpenses, type Expense } from '@/lib/hooks/use-expenses';
@@ -47,6 +47,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
   // Bills, payments and balances are ledger amounts in the organization base currency, never
   // the vendor's default currency (review-lessons §11).
   const formatMoney = useMoneyFormatter();
+  const billStatusLabel = useBillStatusLabel();
   const tCommon = useTranslations('common');
   const { hasPermission } = usePermissions();
   const { data: vendor, isLoading } = useVendor(id);
@@ -354,7 +355,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
                         <TableCell>{format(new Date(bill.dueDate), 'MMM dd, yyyy')}</TableCell>
                         <TableCell>
                           <Badge variant={getBillStatusVariant(bill.status)}>
-                            {getBillStatusText(bill.status)}
+                            {billStatusLabel(bill.status)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-mono">

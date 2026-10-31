@@ -237,7 +237,8 @@
       "partiallyPaid": "مدفوعة جزئياً",
       "paid": "مدفوعة",
       "overdue": "متأخرة",
-      "void": "ملغاة"
+      "void": "ملغاة",
+      "pending": "معلقة"
     },
     "empty": {
       "title": "لا توجد فواتير بعد",
@@ -286,7 +287,10 @@
       "duplicateFailed": "تعذّر نسخ الفاتورة",
       "genericError": "حدث خطأ"
     },
-    "onlyDraftsEditable": "لا يمكن تعديل إلا الفواتير المسودة"
+    "onlyDraftsEditable": "لا يمكن تعديل إلا الفواتير المسودة",
+    "from": "من {name}",
+    "quickActions": "إجراءات سريعة",
+    "viewVendor": "عرض المورد"
   },
   "credits": {
     "title": "ائتمانات الموردين",
