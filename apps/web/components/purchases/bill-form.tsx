@@ -23,7 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Bill, useBillAccountOptions } from '@/lib/hooks/use-bills';
 import { useVendors, Vendor } from '@/lib/hooks/use-vendors';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { addDays, format } from 'date-fns';
+import { addDays, format, parseISO } from 'date-fns';
 import { AlertTriangle, Plus, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useFieldArray, useForm, type Resolver } from 'react-hook-form';
@@ -131,6 +131,23 @@ interface BillFormProps {
   extractedTotals?: ExtractedTotalsInput & { discount?: string | number | null };
 }
 
+/**
+ * Days from the bill date to its due date for a vendor: its payment terms, where 0 means due on
+ * receipt (`?? 30`, never `|| 30`), or null when the vendor is unknown so nothing is rewritten.
+ */
+export function dueDaysFor(vendor: Pick<Vendor, 'paymentTerms'> | undefined): number | null {
+  if (!vendor) return null;
+  const terms = Number(vendor.paymentTerms ?? 30);
+  return Number.isInteger(terms) && terms >= 0 ? terms : 30;
+}
+
+/** `date` (yyyy-MM-dd, local calendar) plus `days`, or null when either is missing or invalid. */
+function dueDateFor(date: string | undefined, days: number | null): string | null {
+  if (days === null || !date) return null;
+  const billDate = parseISO(date);
+  return Number.isNaN(billDate.getTime()) ? null : format(addDays(billDate, days), 'yyyy-MM-dd');
+}
+
 const emptyLine = (accountId = '') => ({
   accountId,
   description: '',
@@ -194,9 +211,7 @@ export function BillForm({
     name: 'lines',
   });
 
-  // Update due date when vendor changes
   const watchVendorId = form.watch('vendorId');
-  const watchDate = form.watch('date');
 
   // Expense/asset accounts the API accepts on a line, plus this vendor's last-used one.
   const accountOptionsQuery = useBillAccountOptions(watchVendorId || undefined);
@@ -255,16 +270,28 @@ export function BillForm({
     });
   }, [vendorDefaultAccountId, form]);
 
+  // The due date follows the vendor's terms only when the user picks a vendor or changes the
+  // date. Loading the vendors, reset() of a saved bill and scan defaults never rewrite it.
+  const recomputeDueDate = (vendorId: string | undefined, date: string | undefined) => {
+    const vendor = vendorId ? vendors.find((v: Vendor) => v.id === vendorId) : undefined;
+    const dueDate = dueDateFor(date, dueDaysFor(vendor));
+    if (dueDate) form.setValue('dueDate', dueDate, { shouldValidate: form.formState.isSubmitted });
+  };
+  const dateField = form.register('date');
+
+  // A new bill opened for a given vendor (no saved bill, no scanned due date) starts on that
+  // vendor's terms once, as long as the user has not typed a due date yet.
+  const initialTermsApplied = useRef(false);
   useEffect(() => {
-    if (watchVendorId && watchDate) {
-      const vendor = vendors.find((v: Vendor) => v.id === watchVendorId);
-      if (vendor) {
-        const billDate = new Date(watchDate);
-        const dueDate = addDays(billDate, vendor.paymentTerms || 30);
-        form.setValue('dueDate', format(dueDate, 'yyyy-MM-dd'));
-      }
-    }
-  }, [watchVendorId, watchDate, vendors, form]);
+    if (initialTermsApplied.current || bill || scanDefaults?.dueDate) return;
+    const vendorId = form.getValues('vendorId');
+    const vendor = vendorId ? vendors.find((v: Vendor) => v.id === vendorId) : undefined;
+    if (!vendor) return;
+    initialTermsApplied.current = true;
+    if (form.getFieldState('dueDate').isDirty) return;
+    const dueDate = dueDateFor(form.getValues('date'), dueDaysFor(vendor));
+    if (dueDate) form.setValue('dueDate', dueDate);
+  }, [vendors, bill, scanDefaults?.dueDate, form]);
 
   const handleSubmit = (data: BillFormData) => {
     // Never submit while the account options are unknown: the line accounts can't be checked.
@@ -374,7 +401,10 @@ export function BillForm({
               </Label>
               <Select
                 value={form.watch('vendorId')}
-                onValueChange={(value) => form.setValue('vendorId', value)}
+                onValueChange={(value) => {
+                  form.setValue('vendorId', value);
+                  recomputeDueDate(value, form.getValues('date'));
+                }}
               >
                 <SelectTrigger id="vendorId">
                   <SelectValue placeholder={tForm('vendorPlaceholder')} />
@@ -399,7 +429,15 @@ export function BillForm({
               <Label htmlFor="date">
                 {tForm('date')} {required}
               </Label>
-              <Input id="date" type="date" {...form.register('date')} />
+              <Input
+                id="date"
+                type="date"
+                {...dateField}
+                onChange={(event) => {
+                  void dateField.onChange(event);
+                  recomputeDueDate(form.getValues('vendorId'), event.target.value);
+                }}
+              />
               {form.formState.errors.date && (
                 <p className="text-sm text-red-500">
                   {translateError(form.formState.errors.date.message)}

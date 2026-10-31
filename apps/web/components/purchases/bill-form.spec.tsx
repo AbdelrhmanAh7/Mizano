@@ -37,8 +37,13 @@ jest.mock('next-intl', () => {
   };
 });
 
+const defaultVendors = [
+  { id: 'vendor-1', name: 'Acme', paymentTerms: 30 },
+  { id: 'vendor-cod', name: 'Cash Supplier', paymentTerms: 0 },
+];
+let mockVendors = defaultVendors;
 jest.mock('@/lib/hooks/use-vendors', () => ({
-  useVendors: () => ({ data: { data: [{ id: 'vendor-1', name: 'Acme', paymentTerms: 30 }] } }),
+  useVendors: () => ({ data: { data: mockVendors } }),
 }));
 
 const accounts = [
@@ -296,5 +301,59 @@ describe('BillForm expense account per line (audit B1, #550)', () => {
         keys(enPurchases.bills[section]).sort(),
       );
     }
+  });
+});
+
+describe('BillForm due date (audit B8)', () => {
+  beforeEach(() => {
+    mockLocale = 'en';
+    mockOptions = ready();
+    mockVendors = defaultVendors;
+  });
+
+  const dueDateInput = () => document.querySelector<HTMLInputElement>('input[name="dueDate"]')!;
+  const dateInput = () => document.querySelector<HTMLInputElement>('input[name="date"]')!;
+  const savedBill = {
+    id: 'bill-1',
+    vendorId: 'vendor-1',
+    date: '2026-10-01T00:00:00.000Z',
+    // Set by hand: not the bill date plus the vendor's 30 days.
+    dueDate: '2026-10-10T00:00:00.000Z',
+    status: 'DRAFT',
+    lines: [
+      { accountId: 'acc-rent', description: 'Rent', quantity: '1', rate: '100', taxRate: '0' },
+    ],
+  } as unknown as React.ComponentProps<typeof BillForm>['bill'];
+
+  it('keeps a saved bill due date when the form loads and saves', async () => {
+    const onSubmit = renderForm({ bill: savedBill });
+    await waitFor(() => expect(dueDateInput().value).toBe('2026-10-10'));
+    fireEvent.click(screen.getByRole('button', { name: 'Update Bill' }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ date: '2026-10-01', dueDate: '2026-10-10' });
+  });
+
+  it('keeps a scanned due date', () => {
+    renderForm({
+      scanDefaults: { vendorId: 'vendor-1', date: '2026-10-01', dueDate: '2026-10-05' },
+    });
+    expect(dueDateInput().value).toBe('2026-10-05');
+  });
+
+  it('recomputes when the user picks a vendor, with 0-day terms due on receipt', () => {
+    renderForm({ bill: savedBill });
+    fireEvent.click(screen.getByRole('option', { name: 'Cash Supplier' }));
+    expect(dueDateInput().value).toBe('2026-10-01');
+  });
+
+  it('recomputes from the vendor terms when the user changes the bill date', () => {
+    renderForm({ bill: savedBill });
+    fireEvent.change(dateInput(), { target: { value: '2026-11-15' } });
+    expect(dueDateInput().value).toBe('2026-12-15');
+  });
+
+  it('starts a new bill for a vendor on that vendor terms', () => {
+    renderForm({ defaultVendorId: 'vendor-cod' });
+    expect(dueDateInput().value).toBe(dateInput().value);
   });
 });
