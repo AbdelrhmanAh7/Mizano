@@ -11,7 +11,12 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { CompositeItemsService } from '../services/composite-items.service';
-import { CreateCompositeItemDto, UpdateCompositeItemDto } from '../dto/composite-item.dto';
+import {
+  AssembleCompositeItemDto,
+  CompositeAvailabilityQueryDto,
+  CreateCompositeItemDto,
+  UpdateCompositeItemDto,
+} from '../dto/composite-item.dto';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -77,13 +82,9 @@ export class CompositeItemsController {
   checkAvailability(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
-    @Query('quantity') quantity?: string,
+    @Query() query: CompositeAvailabilityQueryDto,
   ) {
-    return this.compositeItemsService.checkAvailability(
-      orgId,
-      id,
-      quantity ? parseInt(quantity, 10) : 1,
-    );
+    return this.compositeItemsService.checkAvailability(orgId, id, query.quantity ?? 1);
   }
 
   @Post(':id/assemble')
@@ -92,7 +93,7 @@ export class CompositeItemsController {
   assemble(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
-    @Body() dto: { quantity: number; warehouseId: string },
+    @Body() dto: AssembleCompositeItemDto,
   ) {
     return this.compositeItemsService.assemble(orgId, id, dto);
   }

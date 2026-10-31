@@ -5,7 +5,12 @@ import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { Decimal } from '@prisma/client/runtime/library';
-import { CreateCompositeItemDto, UpdateCompositeItemDto } from '../dto/composite-item.dto';
+import {
+  AssembleCompositeItemDto,
+  CompositeItemComponentDto,
+  CreateCompositeItemDto,
+  UpdateCompositeItemDto,
+} from '../dto/composite-item.dto';
 
 @Injectable()
 export class CompositeItemsService {
@@ -17,23 +22,17 @@ export class CompositeItemsService {
     });
     if (existing) throw new BadRequestException('SKU already exists for a composite item');
 
-    // Validate all component items exist
-    for (const comp of dto.components || []) {
-      const item = await this.prisma.item.findFirst({
-        where: { id: comp.itemId, organizationId, deletedAt: null },
-      });
-      if (!item) throw new NotFoundException(`Component item ${comp.itemId} not found`);
-    }
+    await this.assertComponentsInOrg(organizationId, dto.components);
 
     return this.prisma.compositeItem.create({
       data: {
         name: dto.name,
-        sku: dto.sku || '',
-        sellingPrice: new Decimal(dto.sellingPrice || '0'),
+        sku: dto.sku,
+        sellingPrice: new Decimal(dto.sellingPrice ?? '0'),
         description: dto.description,
         organizationId,
         components: {
-          create: (dto.components || []).map((comp) => ({
+          create: dto.components.map((comp) => ({
             itemId: comp.itemId,
             quantity: comp.quantity,
           })),
@@ -56,6 +55,28 @@ export class CompositeItemsService {
         },
       },
     });
+  }
+
+  /**
+   * A bundle may only hold the tenant's own live items, each once: another organization's item
+   * id is reported as not found, exactly like an unknown one.
+   */
+  private async assertComponentsInOrg(
+    organizationId: string,
+    components: CompositeItemComponentDto[],
+  ): Promise<void> {
+    const ids = components.map((comp) => comp.itemId);
+    const unique = [...new Set(ids)];
+    if (unique.length !== ids.length) {
+      throw new BadRequestException('Each item can appear only once in a composite item');
+    }
+    const found = await this.prisma.item.findMany({
+      where: { id: { in: unique }, organizationId, deletedAt: null },
+      select: { id: true },
+    });
+    const foundIds = new Set(found.map((item) => item.id));
+    const missing = unique.find((id) => !foundIds.has(id));
+    if (missing) throw new NotFoundException(`Component item ${missing} not found`);
   }
 
   private static readonly ALLOWED_SORT_FIELDS = ['id', 'name', 'sku', 'createdAt', 'updatedAt'];
@@ -150,50 +171,46 @@ export class CompositeItemsService {
       if (existing) throw new BadRequestException('SKU already exists');
     }
 
-    // If components are provided, replace them
-    if (dto.components) {
-      for (const comp of dto.components) {
-        const item = await this.prisma.item.findFirst({
-          where: { id: comp.itemId, organizationId, deletedAt: null },
-        });
-        if (!item) throw new NotFoundException(`Component item ${comp.itemId} not found`);
-      }
+    if (dto.components) await this.assertComponentsInOrg(organizationId, dto.components);
 
-      await this.prisma.compositeItemComponent.deleteMany({ where: { compositeItemId: id } });
+    // Explicit fields only. Required columns ignore `null`; a new component list replaces the
+    // old one in the same transaction, so a failed update never leaves the bundle empty.
+    const data: Prisma.CompositeItemUpdateInput = {};
+    if (dto.name != null) data.name = dto.name;
+    if (dto.sku != null) data.sku = dto.sku;
+    if (dto.sellingPrice != null) data.sellingPrice = new Decimal(dto.sellingPrice);
+    if (dto.description !== undefined) data.description = dto.description;
+    const components = dto.components;
+    if (components) {
+      data.components = {
+        create: components.map((comp) => ({ itemId: comp.itemId, quantity: comp.quantity })),
+      };
     }
 
-    return this.prisma.compositeItem.update({
-      where: { id },
-      data: {
-        ...(dto.name && { name: dto.name }),
-        ...(dto.sku && { sku: dto.sku }),
-        ...(dto.sellingPrice !== undefined && { sellingPrice: new Decimal(dto.sellingPrice) }),
-        ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.components && {
+    return this.prisma.$transaction(async (tx) => {
+      if (components) {
+        await tx.compositeItemComponent.deleteMany({ where: { compositeItemId: id } });
+      }
+      return tx.compositeItem.update({
+        where: { id },
+        data,
+        include: {
           components: {
-            create: dto.components.map((comp) => ({
-              itemId: comp.itemId,
-              quantity: comp.quantity,
-            })),
-          },
-        }),
-      },
-      include: {
-        components: {
-          include: {
-            item: {
-              select: {
-                id: true,
-                name: true,
-                sku: true,
-                unit: true,
-                costPrice: true,
-                currentStock: true,
+            include: {
+              item: {
+                select: {
+                  id: true,
+                  name: true,
+                  sku: true,
+                  unit: true,
+                  costPrice: true,
+                  currentStock: true,
+                },
               },
             },
           },
         },
-      },
+      });
     });
   }
 
@@ -276,17 +293,13 @@ export class CompositeItemsService {
    * Assemble a composite item by consuming component stock.
    * Creates OUT inventory movements for each component.
    */
-  async assemble(
-    organizationId: string,
-    id: string,
-    dto: { quantity: number; warehouseId: string },
-  ) {
+  async assemble(organizationId: string, id: string, dto: AssembleCompositeItemDto) {
     const composite = await this.findOne(organizationId, id);
     const { quantity, warehouseId } = dto;
 
     // Validate warehouse
     const warehouse = await this.prisma.warehouse.findFirst({
-      where: { id: warehouseId, organizationId },
+      where: { id: warehouseId, organizationId, deletedAt: null },
     });
     if (!warehouse) throw new NotFoundException('Warehouse not found');
 

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CompositeItemsService } from './composite-items.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
@@ -99,6 +99,110 @@ describe('CompositeItemsService', () => {
       await expect(service.findOne(ORG_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
   });
+  describe('component items belong to the organization', () => {
+    const body = {
+      name: 'Bundle',
+      sku: 'BNDL-1',
+      sellingPrice: '100.00',
+      components: [
+        { itemId: 'item-1', quantity: 1 },
+        { itemId: 'item-x', quantity: 2 },
+      ],
+    };
+
+    it('create refuses an item of another organization (or a deleted one)', async () => {
+      prisma.compositeItem.findFirst.mockResolvedValue(null);
+      prisma.item.findMany.mockResolvedValue([{ id: 'item-1' }] as never);
+
+      await expect(service.create(ORG_ID, body)).rejects.toThrow('Component item item-x not found');
+      expect(prisma.item.findMany.mock.calls[0]![0]!.where).toEqual({
+        id: { in: ['item-1', 'item-x'] },
+        organizationId: ORG_ID,
+        deletedAt: null,
+      });
+      expect(prisma.compositeItem.create).not.toHaveBeenCalled();
+    });
+
+    it('create refuses the same item twice', async () => {
+      prisma.compositeItem.findFirst.mockResolvedValue(null);
+      await expect(
+        service.create(ORG_ID, {
+          ...body,
+          components: [
+            { itemId: 'item-1', quantity: 1 },
+            { itemId: 'item-1', quantity: 2 },
+          ],
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.compositeItem.create).not.toHaveBeenCalled();
+    });
+
+    it('create stores the sent SKU, decimal price and whole quantities', async () => {
+      prisma.compositeItem.findFirst.mockResolvedValue(null);
+      prisma.item.findMany.mockResolvedValue([{ id: 'item-1' }, { id: 'item-x' }] as never);
+      prisma.compositeItem.create.mockResolvedValue({ id: 'ci-1' } as never);
+
+      await service.create(ORG_ID, body);
+      const { data } = prisma.compositeItem.create.mock.calls[0]![0] as unknown as {
+        data: {
+          sku: string;
+          sellingPrice: { toString(): string };
+          organizationId: string;
+          components: { create: Array<{ itemId: string; quantity: number }> };
+        };
+      };
+      expect(data.sku).toBe('BNDL-1');
+      expect(data.sellingPrice.toString()).toBe('100');
+      expect(data.organizationId).toBe(ORG_ID);
+      expect(data.components.create).toEqual(body.components);
+    });
+
+    it('update refuses a foreign item before deleting the old components', async () => {
+      prisma.compositeItem.findFirst.mockResolvedValueOnce({ id: 'ci-1', components: [] } as never);
+      prisma.item.findMany.mockResolvedValue([{ id: 'item-1' }] as never);
+
+      await expect(service.update(ORG_ID, 'ci-1', { components: body.components })).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.compositeItemComponent.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.compositeItem.update).not.toHaveBeenCalled();
+    });
+
+    it('update replaces the components inside one transaction', async () => {
+      prisma.compositeItem.findFirst.mockResolvedValueOnce({ id: 'ci-1', components: [] } as never);
+      prisma.item.findMany.mockResolvedValue([{ id: 'item-1' }, { id: 'item-x' }] as never);
+      prisma.compositeItem.update.mockResolvedValue({ id: 'ci-1' } as never);
+
+      await service.update(ORG_ID, 'ci-1', {
+        components: body.components,
+        sellingPrice: null,
+      } as never);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.compositeItemComponent.deleteMany).toHaveBeenCalledWith({
+        where: { compositeItemId: 'ci-1' },
+      });
+      const { data } = prisma.compositeItem.update.mock.calls[0]![0] as unknown as {
+        data: Record<string, unknown>;
+      };
+      expect(data).not.toHaveProperty('sellingPrice');
+      expect(data).not.toHaveProperty('organizationId');
+    });
+
+    it('assemble refuses a warehouse of another organization or a deleted one', async () => {
+      jest.spyOn(service, 'findOne').mockResolvedValue({ name: 'Bundle', components: [] } as never);
+      prisma.warehouse.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.assemble(ORG_ID, 'bundle', { quantity: 1, warehouseId: 'wh-x' }),
+      ).rejects.toThrow('Warehouse not found');
+      expect(prisma.warehouse.findFirst.mock.calls[0]![0]!.where).toEqual({
+        id: 'wh-x',
+        organizationId: ORG_ID,
+        deletedAt: null,
+      });
+    });
+  });
+
   it('assembly writes positive OUT quantities and decrements component stock', async () => {
     jest.spyOn(service, 'findOne').mockResolvedValue({
       name: 'Bundle',
