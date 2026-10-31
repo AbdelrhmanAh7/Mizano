@@ -71,6 +71,7 @@ import {
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { cn } from '@/lib/utils';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useDateFormatter } from '@/lib/hooks/use-date-locale';
 
 const STATUS_STEPS: { key: VATReturnStatus; icon: typeof Circle }[] = [
   { key: 'DRAFT', icon: Circle },
@@ -88,6 +89,7 @@ function toDecimalString(value: number | string): string {
 }
 
 export default function VATReturnDetailPage() {
+  const formatLongDate = useDateFormatter('long');
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('tax');
   const tCommon = useTranslations('common');
@@ -278,7 +280,7 @@ export default function VATReturnDetailPage() {
             </div>
             <p className="text-muted-foreground">
               {format(new Date(vatReturn.startDate), 'MMMM d')} -{' '}
-              {format(new Date(vatReturn.endDate), 'MMMM d, yyyy')}
+              {formatLongDate(new Date(vatReturn.endDate))}
             </p>
           </div>
         </div>

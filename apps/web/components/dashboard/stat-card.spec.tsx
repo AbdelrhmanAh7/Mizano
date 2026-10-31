@@ -2,9 +2,11 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { StatCard } from './stat-card';
 
+let mockLocale = 'en';
+
 // Mock next-intl
 jest.mock('next-intl', () => ({
-  useLocale: () => 'en',
+  useLocale: () => mockLocale,
   useTranslations: () => (key: string, params?: Record<string, unknown>) => {
     if (key === 'fromLastMonth' && params?.value !== undefined) {
       return `${params.value}% from last month`;
@@ -139,5 +141,13 @@ describe('StatCard', () => {
     const { container } = render(<StatCard title="Revenue" value={50000} icon={DollarSign} />);
     // Default blue colors should be in the rendered HTML
     expect(container.innerHTML).toContain('blue');
+  });
+
+  // Manual QA: counts used the browser locale, so Arabic systems showed "٠" (it reads as a dot).
+  it('shows counts with Western digits on Arabic pages', () => {
+    mockLocale = 'ar';
+    render(<StatCard title="Active Projects" value={1234} icon={Users} currency="count" />);
+    expect(screen.getByText('1,234')).toBeInTheDocument();
+    mockLocale = 'en';
   });
 });

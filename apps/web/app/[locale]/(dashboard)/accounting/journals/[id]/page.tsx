@@ -42,11 +42,12 @@ import {
 import { getApiErrorMessage } from '@/lib/api-error';
 import { isPositiveDecimal } from '@/lib/decimal';
 import { usePermissions } from '@/lib/hooks/use-permissions';
-import { format } from 'date-fns';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useDateFormatter } from '@/lib/hooks/use-date-locale';
 
 export default function JournalDetailPage() {
+  const formatLongDate = useDateFormatter('long');
   const t = useTranslations('accounting');
   const tCommon = useTranslations('common');
   const params = useParams();
@@ -181,9 +182,7 @@ export default function JournalDetailPage() {
               <h1 className="text-3xl font-bold tracking-tight">{journal.journalNumber}</h1>
               <Badge className={getStatusColor(journal.status)}>{journal.status}</Badge>
             </div>
-            <p className="text-muted-foreground">
-              {format(new Date(journal.entryDate), 'MMMM d, yyyy')}
-            </p>
+            <p className="text-muted-foreground">{formatLongDate(new Date(journal.entryDate))}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -269,7 +268,7 @@ export default function JournalDetailPage() {
               <dt className="text-sm font-medium text-muted-foreground">
                 {t('journals.form.date')}
               </dt>
-              <dd className="text-lg">{format(new Date(journal.entryDate), 'MMMM d, yyyy')}</dd>
+              <dd className="text-lg">{formatLongDate(new Date(journal.entryDate))}</dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-muted-foreground">

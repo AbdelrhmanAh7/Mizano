@@ -61,8 +61,10 @@ import { useLocale, useTranslations } from 'next-intl';
 import { format } from 'date-fns';
 import { useDateFnsLocale } from '@/lib/date-locale';
 import { cn } from '@/lib/utils';
+import { useDateFormatter } from '@/lib/hooks/use-date-locale';
 
 export default function InvoiceDetailPage() {
+  const formatLongDate = useDateFormatter('long');
   const t = useTranslations('sales');
   const tDetail = useTranslations('sales.invoices.detail');
   const tCommon = useTranslations('common');
@@ -537,14 +539,12 @@ export default function InvoiceDetailPage() {
             <CardContent className="space-y-4">
               <div>
                 <div className="text-sm text-muted-foreground">{t('invoices.form.date')}</div>
-                <div className="font-medium">
-                  {format(new Date(invoice.date), 'MMMM d, yyyy', { locale: dateLocale })}
-                </div>
+                <div className="font-medium">{formatLongDate(new Date(invoice.date))}</div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">{t('invoices.form.dueDate')}</div>
                 <div className={cn('font-medium', isOverdue && 'text-red-600')}>
-                  {format(new Date(invoice.dueDate), 'MMMM d, yyyy', { locale: dateLocale })}
+                  {formatLongDate(new Date(invoice.dueDate))}
                   {isOverdue && ` ${tDetail('overdue')}`}
                 </div>
               </div>

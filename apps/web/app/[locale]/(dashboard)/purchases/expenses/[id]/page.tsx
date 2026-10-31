@@ -2,7 +2,6 @@
 
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
-import { format } from 'date-fns';
 import { ArrowLeft, Trash2, Receipt, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -29,12 +28,14 @@ import {
 } from '@/lib/hooks/use-expenses';
 import { sumDecimals } from '@/lib/decimal';
 import { usePermissions } from '@/lib/hooks/use-permissions';
+import { useDateFormatter } from '@/lib/hooks/use-date-locale';
 
 interface ExpenseDetailPageProps {
   params: { id: string };
 }
 
 export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
+  const formatLongDate = useDateFormatter('long');
   const { id } = params;
   const t = useTranslations('purchases');
   const tCommon = useTranslations('common');
@@ -106,9 +107,7 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
               {isVoided && <Badge variant="destructive">{t('expenses.voided')}</Badge>}
               {isPending && <Badge variant="secondary">{t('expenses.pending')}</Badge>}
             </div>
-            <p className="text-muted-foreground">
-              {format(new Date(expense.date), 'MMMM d, yyyy')}
-            </p>
+            <p className="text-muted-foreground">{formatLongDate(new Date(expense.date))}</p>
           </div>
         </div>
         {isPending && canEdit && (
@@ -194,7 +193,7 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <p className="text-sm font-medium text-muted-foreground">{t('expenses.form.date')}</p>
-              <p className="mt-1">{format(new Date(expense.date), 'MMMM d, yyyy')}</p>
+              <p className="mt-1">{formatLongDate(new Date(expense.date))}</p>
             </div>
 
             <div>

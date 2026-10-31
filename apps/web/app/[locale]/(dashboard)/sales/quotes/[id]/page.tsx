@@ -38,10 +38,11 @@ import {
 } from '@/lib/hooks/use-quotes';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { QuoteStatusBadge } from '@/components/sales/status-badge';
-import { format } from 'date-fns';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
+import { useDateFormatter } from '@/lib/hooks/use-date-locale';
 
 export default function QuoteDetailPage() {
+  const formatLongDate = useDateFormatter('long');
   // Quote amounts: see `currency` below.
   const formatCurrency = useMoneyFormatter();
   const params = useParams();
@@ -280,13 +281,13 @@ export default function QuoteDetailPage() {
             </div>
             <div>
               <dt className="text-sm font-medium text-muted-foreground">{t('quotes.quoteDate')}</dt>
-              <dd className="text-lg">{format(new Date(quote.date), 'MMMM d, yyyy')}</dd>
+              <dd className="text-lg">{formatLongDate(new Date(quote.date))}</dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-muted-foreground">
                 {t('quotes.expiryDate')}
               </dt>
-              <dd className="text-lg">{format(new Date(quote.expiryDate), 'MMMM d, yyyy')}</dd>
+              <dd className="text-lg">{formatLongDate(new Date(quote.expiryDate))}</dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-muted-foreground">{t('quotes.customer')}</dt>

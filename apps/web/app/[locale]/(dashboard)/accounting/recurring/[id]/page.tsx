@@ -31,8 +31,10 @@ import { usePermissions } from '@/lib/hooks/use-permissions';
 import { format } from 'date-fns';
 import { useTranslations } from 'next-intl';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useDateFormatter } from '@/lib/hooks/use-date-locale';
 
 export default function RecurringProfileDetailPage() {
+  const formatLongDate = useDateFormatter('long');
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('accounting');
   const params = useParams();
@@ -224,7 +226,7 @@ export default function RecurringProfileDetailPage() {
               </dt>
               <dd className="mt-1 flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
-                {format(new Date(profile.nextRunDate), 'MMMM d, yyyy')}
+                {formatLongDate(new Date(profile.nextRunDate))}
               </dd>
             </div>
             <div>
