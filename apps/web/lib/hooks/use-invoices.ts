@@ -55,6 +55,8 @@ export interface Invoice {
   currencyCode?: string | null;
   notes: string | null;
   terms: string | null;
+  /** The customer's reference, such as their purchase order number. */
+  reference?: string | null;
   lines: InvoiceLine[];
   payments?: Array<{
     id: string;

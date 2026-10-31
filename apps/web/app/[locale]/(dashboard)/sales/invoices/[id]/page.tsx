@@ -547,6 +547,16 @@ export default function InvoiceDetailPage() {
                   {isOverdue && ` ${tDetail('overdue')}`}
                 </div>
               </div>
+              {invoice.reference && (
+                <div>
+                  <div className="text-sm text-muted-foreground">
+                    {t('invoices.form.reference')}
+                  </div>
+                  <div className="font-medium" dir="auto">
+                    {invoice.reference}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

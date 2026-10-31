@@ -98,6 +98,7 @@ export class PdfService implements OnModuleDestroy {
       currency: documentCurrency(invoice.currencyCode, org),
       notes: invoice.notes || undefined,
       terms: invoice.terms || undefined,
+      reference: invoice.reference || undefined,
     };
 
     const html = generateInvoiceHtml(org, invoiceData, locale);

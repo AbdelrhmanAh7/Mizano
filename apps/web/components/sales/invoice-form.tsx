@@ -1,6 +1,6 @@
 'use client';
 
-import { format, parseISO } from 'date-fns';
+import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { useForm, Control, FieldValues, UseFormWatch, UseFormSetValue } from 'react-hook-form';
@@ -75,6 +75,15 @@ const paymentTermsOptions = [
   { value: 'NET_60', labelKey: 'net60', days: 60 },
 ];
 
+/**
+ * The payment-terms option a saved invoice was issued on, derived from its two dates (the terms
+ * are not stored separately), or '' when the due date was set by hand to another number of days.
+ */
+export function paymentTermsFor(date: string, dueDate: string): string {
+  const days = differenceInCalendarDays(parseISO(dueDate), parseISO(date));
+  return paymentTermsOptions.find((term) => term.days === days)?.value ?? '';
+}
+
 export function InvoiceForm({
   invoice,
   customerId,
@@ -130,8 +139,8 @@ export function InvoiceForm({
         customerId: invoice.customerId,
         invoiceDate: invoice.date.split('T')[0],
         dueDate: invoice.dueDate.split('T')[0],
-        reference: '',
-        paymentTerms: 'NET_30',
+        reference: invoice.reference || '',
+        paymentTerms: paymentTermsFor(invoice.date.split('T')[0], invoice.dueDate.split('T')[0]),
         notes: invoice.notes || '',
         terms: invoice.terms || '',
         shippingCharge: invoice.shippingAmount || '0',
@@ -207,6 +216,8 @@ export function InvoiceForm({
       customerId: data.customerId,
       date: data.invoiceDate,
       dueDate: data.dueDate,
+      // Null clears a reference removed while editing; the API trims and stores '' as none.
+      reference: data.reference?.trim() || (isEditing ? null : undefined),
       notes: data.notes || undefined,
       terms: data.terms || undefined,
       shippingAmount: data.shippingCharge?.trim() || '0',
@@ -259,6 +270,7 @@ export function InvoiceForm({
               <Label htmlFor="reference">{t('reference')}</Label>
               <Input
                 id="reference"
+                maxLength={100}
                 placeholder={t('referencePlaceholder')}
                 {...form.register('reference')}
               />

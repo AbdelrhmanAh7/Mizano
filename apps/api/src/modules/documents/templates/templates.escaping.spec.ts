@@ -147,8 +147,16 @@ describe('document templates escape all interpolated data', () => {
       currency: 'SAR',
       notes: `Notes ${XSS}`,
       terms: `Terms ${XSS}`,
+      reference: `PO ${XSS}`,
     };
-    expectNoInjectedMarkup(generateInvoiceHtml(hostileOrg, data));
+    const html = generateInvoiceHtml(hostileOrg, data);
+    expectNoInjectedMarkup(html);
+    // Audit B9: the customer's reference is printed (escaped) under the dates.
+    expect(html).toContain('Reference:');
+    expect(html).toContain('PO &lt;script&gt;');
+    expect(generateInvoiceHtml(hostileOrg, { ...data, reference: 'PO-77' }, 'ar')).toContain(
+      'المرجع:',
+    );
   });
 
   it('bill', () => {

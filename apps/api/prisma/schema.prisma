@@ -954,6 +954,8 @@ model Invoice {
   exchangeRate   Decimal?      @db.Decimal(19, 6)
   notes          String?
   terms          String?
+  /// The customer's own reference for the invoice, such as their purchase order number.
+  reference      String?
   organizationId String
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt

@@ -110,6 +110,15 @@ describe('InvoicesService', () => {
       expect(data.organizationId).toBe(ORG_ID);
     });
 
+    it("keeps the customer's reference, trimmed, and stores a blank one as none (audit B9)", async () => {
+      await service.create(ORG_ID, { ...validDto, reference: '  PO-4411 ' });
+      expect(createdData().reference).toBe('PO-4411');
+
+      prisma.invoice.create.mockClear();
+      await service.create(ORG_ID, { ...validDto, reference: '  ' });
+      expect(createdData().reference).toBeNull();
+    });
+
     it('applies the line discount before tax', async () => {
       await service.create(ORG_ID, {
         ...validDto,
@@ -237,6 +246,17 @@ describe('InvoicesService', () => {
     });
   });
 
+  describe('findAll', () => {
+    it("finds an invoice by the customer's reference, inside the organization (audit B9)", async () => {
+      prisma.invoice.findMany.mockResolvedValue([]);
+      prisma.invoice.count.mockResolvedValue(0);
+      await service.findAll(ORG_ID, { search: 'PO-44' } as any);
+      const where = prisma.invoice.findMany.mock.calls[0][0]!.where as any;
+      expect(where.organizationId).toBe(ORG_ID);
+      expect(where.OR).toContainEqual({ reference: { contains: 'PO-44', mode: 'insensitive' } });
+    });
+  });
+
   describe('update', () => {
     beforeEach(() => {
       prisma.invoice.findFirst.mockResolvedValue(invoiceRow() as any);
@@ -291,6 +311,17 @@ describe('InvoicesService', () => {
       expect(prisma.invoice.updateMany.mock.calls[0][0]).toMatchObject({
         where: { id: 'inv-1', organizationId: ORG_ID, status: 'DRAFT', deletedAt: null },
       });
+    });
+
+    it("updates or clears the customer's reference only when it is sent (audit B9)", async () => {
+      await service.update(ORG_ID, 'inv-1', { reference: 'PO-9' });
+      expect((prisma.invoice.update.mock.calls[0][0].data as any).reference).toBe('PO-9');
+
+      await service.update(ORG_ID, 'inv-1', { reference: null });
+      expect((prisma.invoice.update.mock.calls[1][0].data as any).reference).toBeNull();
+
+      await service.update(ORG_ID, 'inv-1', { notes: 'x' });
+      expect(prisma.invoice.update.mock.calls[2][0].data).not.toHaveProperty('reference');
     });
 
     it('replaces the lines and re-derives all totals as Decimal', async () => {

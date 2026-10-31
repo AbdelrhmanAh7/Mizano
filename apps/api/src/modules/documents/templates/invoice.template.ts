@@ -24,6 +24,7 @@ const INVOICE_LABELS: Record<DocumentLocale, Record<string, string>> = {
     taxId: 'Tax ID',
     invoiceDate: 'Invoice Date:',
     dueDate: 'Due Date:',
+    reference: 'Reference:',
     balanceDue: 'Balance Due:',
     notes: 'Notes',
     terms: 'Terms & Conditions',
@@ -35,6 +36,7 @@ const INVOICE_LABELS: Record<DocumentLocale, Record<string, string>> = {
     taxId: 'الرقم الضريبي',
     invoiceDate: 'تاريخ الفاتورة:',
     dueDate: 'تاريخ الاستحقاق:',
+    reference: 'المرجع:',
     balanceDue: 'الرصيد المستحق:',
     notes: 'ملاحظات',
     terms: 'الشروط والأحكام',
@@ -83,6 +85,7 @@ export interface InvoiceData {
   currency: string;
   notes?: string;
   terms?: string;
+  reference?: string;
 }
 
 /**
@@ -163,6 +166,14 @@ export function generateInvoiceHtml(
                 <td style="padding-block: 5px; padding-inline-end: 20px; color: #6B7280; font-size: 12px;">${l.dueDate}</td>
                 <td style="padding: 5px 0; font-size: 12px; font-weight: bold;">${formatDate(invoice.dueDate, dateLocale)}</td>
               </tr>
+              ${
+                invoice.reference
+                  ? `<tr>
+                <td style="padding-block: 5px; padding-inline-end: 20px; color: #6B7280; font-size: 12px;">${l.reference}</td>
+                <td style="padding: 5px 0; font-size: 12px; font-weight: bold;"><bdi>${escapeHtml(invoice.reference)}</bdi></td>
+              </tr>`
+                  : ''
+              }
               <tr>
                 <td style="padding-block: 5px; padding-inline-end: 20px; color: #6B7280; font-size: 12px;">${l.balanceDue}</td>
                 <td style="padding: 5px 0; font-size: 14px; font-weight: bold; color: ${invoice.balanceDue > 0 ? '#EF4444' : '#10B981'};">

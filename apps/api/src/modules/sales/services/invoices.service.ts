@@ -42,6 +42,11 @@ const INVOICE_VIEW_INCLUDE = {
   },
 } satisfies Prisma.InvoiceInclude;
 
+/** A typed reference is trimmed; an empty one is stored as no reference. */
+function normalizeReference(reference: string | null | undefined): string | null {
+  return reference?.trim() || null;
+}
+
 interface InvoiceReferences {
   customerId?: string;
   quoteId?: string;
@@ -87,6 +92,7 @@ export class InvoicesService {
           balanceDue: totals.grandTotal,
           notes: dto.notes,
           terms: dto.terms,
+          reference: normalizeReference(dto.reference),
           organizationId,
           lines: { create: lineData },
         },
@@ -122,6 +128,7 @@ export class InvoicesService {
     if (search) {
       where.OR = [
         { invoiceNumber: { contains: search, mode: 'insensitive' } },
+        { reference: { contains: search, mode: 'insensitive' } },
         { customer: { name: { contains: search, mode: 'insensitive' } } },
       ];
     }
@@ -178,6 +185,7 @@ export class InvoicesService {
     if (search) {
       where.OR = [
         { invoiceNumber: { contains: search, mode: 'insensitive' } },
+        { reference: { contains: search, mode: 'insensitive' } },
         { customer: { name: { contains: search, mode: 'insensitive' } } },
       ];
     }
@@ -285,6 +293,7 @@ export class InvoicesService {
       if (date) data.date = date;
       if (dueDate) data.dueDate = dueDate;
       if (dto.notes !== undefined) data.notes = dto.notes;
+      if (dto.reference !== undefined) data.reference = normalizeReference(dto.reference);
       if (dto.terms !== undefined) data.terms = dto.terms;
 
       if (dto.lines) {
