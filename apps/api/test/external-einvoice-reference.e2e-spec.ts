@@ -90,6 +90,9 @@ describe('external ETA reference (e2e)', () => {
       .patch(`/invoices/${a.invoiceId}/external-einvoice-reference`)
       .send({ externalEInvoiceNumber: 'ETA', grandTotal: '1', organizationId: b.organizationId });
     expect(invalid.status).toBe(400);
+    expect((await reference(a, clone.body.id, 'ETA-deleted-draft')).status).toBe(200);
+    expect((await a.api.delete(`/invoices/${clone.body.id}`)).status).toBe(200);
+    expect((await reference(a, a.invoiceId, 'ETA-deleted-draft')).status).toBe(200);
   });
 
   it('updates and clears posted metadata with a transactional audit and unchanged journal/amounts', async () => {

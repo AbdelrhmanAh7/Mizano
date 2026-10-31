@@ -530,7 +530,7 @@ export class InvoicesService {
   async remove(organizationId: string, id: string) {
     const { count } = await this.prisma.invoice.updateMany({
       where: { id, organizationId, deletedAt: null, status: InvoiceStatus.DRAFT },
-      data: { deletedAt: new Date() },
+      data: { deletedAt: new Date(), externalEInvoiceNumber: null },
     });
     if (count === 0) {
       const exists = await this.prisma.invoice.findFirst({

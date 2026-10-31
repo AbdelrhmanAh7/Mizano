@@ -80,6 +80,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 8. Voided and deleted records
 
+- **Deleting a never-posted draft releases its external invoice reference in the same guarded update.** Otherwise a hidden soft-deleted draft reserves the reference forever and cannot be corrected through the UI. Voided posted documents retain their reference. _(#585)_
+
 - **Posted documents that were voided stay readable** (read-only, with `deletedAt` set) on their detail endpoint so journal source links resolve. Lists exclude them. Deleted drafts, which never posted, return 404.
 - **Current figures (open balances, aging, dashboards) exclude DRAFT, VOID and deleted documents.** Historical statements and period reports keep a posted document that was voided later in its original period, with the reversal on the void date (see 4).
 

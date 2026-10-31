@@ -729,7 +729,7 @@ describe('InvoicesService', () => {
   });
 
   describe('remove (soft delete)', () => {
-    it('soft-deletes a draft with a guarded update', async () => {
+    it('soft-deletes a draft and releases its external reference with a guarded update', async () => {
       prisma.invoice.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.remove(ORG_ID, 'inv-1');
@@ -737,7 +737,7 @@ describe('InvoicesService', () => {
       expect(result.message).toBe('Invoice deleted successfully');
       expect(prisma.invoice.updateMany).toHaveBeenCalledWith({
         where: { id: 'inv-1', organizationId: ORG_ID, deletedAt: null, status: 'DRAFT' },
-        data: { deletedAt: expect.any(Date) },
+        data: { deletedAt: expect.any(Date), externalEInvoiceNumber: null },
       });
       expect(prisma.invoice.delete).not.toHaveBeenCalled();
       expect(prisma.invoice.deleteMany).not.toHaveBeenCalled();
