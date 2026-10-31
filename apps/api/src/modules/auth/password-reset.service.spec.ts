@@ -161,6 +161,11 @@ describe('PasswordResetService', () => {
       await expect(service.createLinkForMember('org-1', 'b1', 'm1', 'en')).rejects.toBeInstanceOf(
         ForbiddenException,
       );
+      // A suspended Admin cannot either.
+      store.user.rows[0].status = 'SUSPENDED';
+      await expect(service.createLinkForMember('org-1', 'u1', 'm1', 'en')).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
       expect(store.passwordResetToken.rows).toHaveLength(0);
     });
 

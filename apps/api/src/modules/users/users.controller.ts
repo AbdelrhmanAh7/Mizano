@@ -78,7 +78,7 @@ export class UsersController {
     @Body() dto: MemberResetLinkDto,
     @Req() request: Request,
   ) {
-    const locale = dto.locale ?? requestLocale(request);
+    const locale = dto?.locale ?? requestLocale(request);
     return this.passwordReset.createLinkForMember(orgId, actor.id, id, locale);
   }
 

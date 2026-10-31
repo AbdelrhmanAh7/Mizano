@@ -118,7 +118,7 @@ export class PasswordResetService {
     // Only the organization's Admin (owner) may hand links over: a role that merely holds
     // settings.edit must not be able to take over an Admin account this way.
     const actor = await this.prisma.user.findFirst({
-      where: { id: actorId, organizationId },
+      where: { id: actorId, organizationId, status: 'ACTIVE' },
       select: { role: { select: { name: true } } },
     });
     if (actor?.role?.name !== ADMIN_ROLE) throw new ForbiddenException(ADMIN_ONLY);
