@@ -75,13 +75,26 @@ async function getBrowser(timeoutMs: number): Promise<puppeteer.Browser> {
 let activeRenders = 0;
 const waiting: Array<() => void> = [];
 
-async function acquireRenderSlot(): Promise<void> {
+async function acquireRenderSlot(timeoutMs: number): Promise<void> {
   if (activeRenders < MAX_CONCURRENT_RENDERS) {
     activeRenders += 1;
     return;
   }
-  // The slot is handed over by releaseRenderSlot, so activeRenders stays the same.
-  await new Promise<void>((resolve) => waiting.push(resolve));
+  // The slot is handed over by releaseRenderSlot, so activeRenders stays the same. A request that
+  // waits longer than the render timeout gives up and leaves the queue, so a stuck render can't
+  // make every later request wait forever.
+  await new Promise<void>((resolve, reject) => {
+    const grant = (): void => {
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      const index = waiting.indexOf(grant);
+      if (index !== -1) waiting.splice(index, 1);
+      reject(new Error('PDF render queue timed out'));
+    }, timeoutMs);
+    waiting.push(grant);
+  });
 }
 
 function releaseRenderSlot(): void {
@@ -103,7 +116,7 @@ export async function renderHtmlToPdf(
   html: string,
   timeoutMs: number = PDF_RENDER_TIMEOUT_MS,
 ): Promise<Buffer> {
-  await acquireRenderSlot();
+  await acquireRenderSlot(timeoutMs);
   let context: puppeteer.BrowserContext | undefined;
   try {
     const browser = await getBrowser(timeoutMs);

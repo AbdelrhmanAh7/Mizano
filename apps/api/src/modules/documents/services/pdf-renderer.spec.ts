@@ -250,4 +250,20 @@ describe('renderHtmlToPdf (sandboxed PDF renderer)', () => {
     await Promise.all(renders);
     expect(peak).toBe(MAX_CONCURRENT_RENDERS);
   });
+  it('gives up waiting for a render slot after the timeout, without taking a slot', async () => {
+    const releases: Array<() => void> = [];
+    page.setContent.mockImplementation(
+      () => new Promise<void>((resolve) => releases.push(resolve)),
+    );
+    const busy = Array.from({ length: MAX_CONCURRENT_RENDERS }, (_, i) =>
+      renderHtmlToPdf(`<p>${i}</p>`, 1_000),
+    );
+    while (releases.length < MAX_CONCURRENT_RENDERS) await new Promise((r) => setImmediate(r));
+    await expect(renderHtmlToPdf('<p>late</p>', 20)).rejects.toThrow('PDF render queue timed out');
+    releases.forEach((release) => release());
+    await Promise.all(busy);
+    // The slots are free again: a new render starts at once.
+    page.setContent.mockImplementation(async () => undefined);
+    await expect(renderHtmlToPdf('<p>after</p>')).resolves.toBeInstanceOf(Buffer);
+  });
 });
