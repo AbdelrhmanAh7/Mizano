@@ -1,6 +1,6 @@
 ---
 name: Demo task or verified defect
-about: Scoped accountant demo work with evidence and acceptance
+about: Older demo-flow template; prefer Task or Bug. Scoped accountant demo work with evidence and acceptance
 ---
 
 ## User outcome / observed defect

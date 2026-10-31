@@ -38,7 +38,7 @@ Use a local systemd timer or the host's supported scheduler for the verified run
 
 ## Task lifecycle
 
-Ready issue → lease → scoped plan → branch/worktree → implement → affected tests → PR → independent review on exact head → full required gates → merge → demo deployment of exact tested SHA → health/acceptance evidence → close. Recheck dependencies before picking the next issue. `Needs review`, `Blocked` and `Done` mean real evidence states, not elapsed time.
+Ready issue → lease → scoped plan → branch/worktree → implement → affected tests → independent review on exact head → PR (the merge vehicle) → the 4 required checks → merge → demo deployment of exact tested SHA → health/acceptance evidence → close checklist issues by hand with that evidence (plain tasks close on merge via `Closes #`). Recheck dependencies before picking the next issue. `Needs review`, `Blocked` and `Done` mean real evidence states, not elapsed time.
 
 A lease record contains issue key/number, provider, run ID, paths, baseline SHA, worktree, acquired/expiry time and heartbeat. Renew while active. Recover stale leases only after verifying no live worker still owns the process/worktree. Never steal work based only on a missing UI update.
 

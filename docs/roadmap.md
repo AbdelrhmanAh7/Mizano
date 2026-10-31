@@ -1,6 +1,6 @@
 # Mizano: Raspberry Pi live roadmap
 
-Owner: project maintainer. Goal changed 2 October 2026: the target is a tiny live deployment on a Raspberry Pi 5 (8GB, arm64) with the full accountant flow. Tracking epic: issue #45. Project board: `Mizano — Pi Live`. GitHub issues are the source of execution status; this document asserts no completed progress.
+Owner: project maintainer. Goal changed 2 October 2026: the target is a tiny live deployment on a Raspberry Pi 5 (8GB, arm64) with the full accountant flow. Tracking epic: issue #45 (closed; work is now tracked in the "First client ready" milestone). Project board: `Mizano — First client` (once the owner grants the GitHub `project` scope). Milestones: "First client ready" and "First month". GitHub issues are the source of execution status; this document asserts no completed progress.
 
 > Superseded: the ten-day CPU invoice demo plan (deadline 14 September 2026, four-provider operation) is no longer the goal.
 
