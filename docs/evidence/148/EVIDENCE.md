@@ -60,7 +60,7 @@ This document provides verification evidence for GitHub issue #148 (PR #205) in 
 8. **Thread T5 (Enforce advertised wall-clock budget):**
    - _Fix:_ Watchdog tests assert `assertGreaterEqual(elapsed, 1.8)` and `assertLess(elapsed, 10.0)` for a 2s budget, proving the watchdog terminates promptly within the wall-clock limit.
 9. **Consistent CI documentation:**
-   - _Fix:_ `CONTRIBUTING.md` and `docs/DEVELOPMENT.md` explicitly state that `pnpm ci:full` is not run by hooks, `localci` runs the full monorepo suite + build on the Mac mini, `e2e-army` handles feature E2E, and hooks remain fast gates under 60 s / 290 s.
+   - _Fix:_ `CONTRIBUTING.md` and `docs/DEVELOPMENT.md` explicitly state that `pnpm ci:full` is not run by hooks, GitHub Actions runs the full monorepo suite + build, `e2e-army` handles feature E2E, and hooks remain fast gates under 60 s / 290 s.
 
 ## Covering Tests
 

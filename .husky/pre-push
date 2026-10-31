@@ -9,9 +9,8 @@
 # .npmrc, turbo.json, tsconfig* e.g. tsconfig.json, tsconfig.base.json) checks every package. The jest unit suites need no database. No lint (pre-commit
 # lints staged files), no build, no E2E/browser.
 #
-# The full CI (`pnpm ci:full`, build, E2E) runs on the Mac mini via the hub's
-# `localci` job, which posts the GitHub commit statuses under the workflows'
-# job names. Run `pnpm ci:full` by hand when you need it locally.
+# The full CI (lint, type-check, unit tests, build) runs on GitHub Actions
+# (ci.yml). Run `pnpm ci:full` by hand when you need it locally.
 #
 # Escape hatches: HUSKY=0 git push ...  (or SKIP_LOCAL_CI=1 git push ...)
 #
@@ -30,7 +29,7 @@ if [ -z "${MZ_HOOK_LIMITED:-}" ] && command -v perl >/dev/null 2>&1; then
     if (!$p) { setpgrp(0, 0); exec @ARGV; exit 127 }
     my $stop = sub { kill "TERM", -$p; sleep 2; kill "KILL", -$p };
     $SIG{INT} = $SIG{TERM} = sub { $stop->(); exit 130 };
-    $SIG{ALRM} = sub { $stop->(); print STDERR "\n$name exceeded the ${t}s limit: split the check, or push with SKIP_LOCAL_CI=1 - localci runs the full CI\n"; exit 124 };
+    $SIG{ALRM} = sub { $stop->(); print STDERR "\n$name exceeded the ${t}s limit: split the check, or push with SKIP_LOCAL_CI=1 - GitHub Actions runs the full CI\n"; exit 124 };
     alarm $t; waitpid($p, 0); exit($? & 127 ? 128 + ($? & 127) : $? >> 8);
   ' "${MZ_PREPUSH_LIMIT_SECONDS:-290}" pre-push sh "$0" "$@"
 fi
@@ -39,7 +38,7 @@ set -eu
 root=$(git rev-parse --show-toplevel)
 cd "$root"
 if [ ! -x node_modules/.bin/turbo ] || [ ! -x node_modules/.bin/tsc ] || [ ! -x node_modules/.bin/jest ]; then
-  echo "pre-push: node_modules missing in this worktree; skipping type-check + unit tests (localci runs full CI)"
+  echo "pre-push: node_modules missing in this worktree; skipping type-check + unit tests (GitHub Actions runs full CI)"
   exit 0
 fi
 
@@ -111,4 +110,4 @@ elif [ -n "$bases" ]; then
 else
   echo "pre-push: nothing to check (deletions only)"
 fi
-echo "pre-push: type-check + unit tests passed (full CI runs on localci)"
+echo "pre-push: type-check + unit tests passed (full CI runs on GitHub Actions)"
