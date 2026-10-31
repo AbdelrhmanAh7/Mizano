@@ -49,7 +49,37 @@ export interface AiConnection {
   model: string;
   apiKey: string | null;
   price: StoredPrice;
-  monthlyLimitUsd: Decimal;
+  /** Which settings this connection was opened from (see `connectionFingerprint`). */
+  fingerprint: string;
+}
+
+type ConnectionFields = Pick<
+  AiSettings,
+  'provider' | 'model' | 'keyCiphertext' | 'consentProvider' | 'consentAt'
+>;
+
+/**
+ * Identifies the provider, model, key and consent a connection was opened with. A new key has a
+ * new ciphertext (random IV), so rotating, revoking or switching provider changes it.
+ */
+export function connectionFingerprint(s: ConnectionFields): string {
+  return [
+    s.provider,
+    s.model ?? '',
+    s.keyCiphertext ?? '',
+    s.consentProvider ?? '',
+    s.consentAt?.toISOString() ?? '',
+  ].join('|');
+}
+
+/** Whether the current (locked) settings still allow a call opened as `connection`. */
+export function settingsStillAllow(
+  current: AiSettings | null,
+  connection: Pick<AiConnection, 'fingerprint'>,
+  feature: AiFeatureKey | 'test',
+): boolean {
+  if (!current || connectionFingerprint(current) !== connection.fingerprint) return false;
+  return feature === 'test' || activeFeatures(current).includes(feature);
 }
 
 export function keyAad(organizationId: string): string {
@@ -255,7 +285,7 @@ export class AiSettingsService {
         s.priceInPerMtok !== null && s.priceOutPerMtok !== null
           ? [s.priceInPerMtok.toString(), s.priceOutPerMtok.toString()]
           : null,
-      monthlyLimitUsd: new Decimal(s.monthlyLimitUsd.toString()),
+      fingerprint: connectionFingerprint(s),
     };
   }
 

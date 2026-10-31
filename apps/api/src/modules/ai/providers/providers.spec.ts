@@ -232,8 +232,18 @@ describe('AI provider adapters (fake fetch)', () => {
     expect(classifyFailure(400, 'Your credit balance is too low')).toBe('no_credit');
     expect(classifyFailure(429, '')).toBe('rate_limited');
     expect(classifyFailure(503, '')).toBe('provider_down');
-    expect(new AiProviderError('rate_limited', 429).transient).toBe(true);
-    expect(new AiProviderError('invalid_key', 401).transient).toBe(false);
+    expect(new AiProviderError('rate_limited', 429).retryable).toBe(true);
+    expect(new AiProviderError('provider_down', 503).retryable).toBe(true);
+    expect(new AiProviderError('network').retryable).toBe(false);
+    expect(new AiProviderError('invalid_key', 401).retryable).toBe(false);
+    // Unknown outcome may have been charged; an error answer or a pre-send refusal was not.
+    expect(new AiProviderError('network').possiblyBilled).toBe(true);
+    expect(new AiProviderError('network', 200).possiblyBilled).toBe(true);
+    expect(new AiProviderError('timeout').possiblyBilled).toBe(true);
+    expect(new AiProviderError('bad_response', 200).possiblyBilled).toBe(true);
+    expect(new AiProviderError('bad_response', 302).possiblyBilled).toBe(false);
+    expect(new AiProviderError('rate_limited', 429).possiblyBilled).toBe(false);
+    expect(new AiProviderError('model_unavailable').possiblyBilled).toBe(false);
 
     const { fn } = fakeFetch({ status: 302, body: {} });
     await expect(

@@ -82,8 +82,25 @@ export class AiProviderError extends Error {
     this.name = 'AiProviderError';
   }
 
-  /** Worth one more attempt: nothing was answered, so nothing was billed. */
-  get transient(): boolean {
-    return this.kind === 'rate_limited' || this.kind === 'provider_down' || this.kind === 'network';
+  /**
+   * The outcome is unknown, so the provider may have charged: the request may have been sent
+   * (network failure, timeout, a body that could not be read) or a success answer was unusable.
+   * An error answer (4xx/5xx), a redirect or a refusal before sending costs nothing.
+   */
+  get possiblyBilled(): boolean {
+    if (this.kind === 'network' || this.kind === 'timeout') return true;
+    return (
+      this.kind === 'bad_response' &&
+      this.status !== undefined &&
+      this.status >= 200 &&
+      this.status < 300
+    );
+  }
+
+  /** Worth one more attempt: the provider answered 429 or 5xx, so this attempt cost nothing. */
+  get retryable(): boolean {
+    return (
+      (this.kind === 'rate_limited' || this.kind === 'provider_down') && this.status !== undefined
+    );
   }
 }

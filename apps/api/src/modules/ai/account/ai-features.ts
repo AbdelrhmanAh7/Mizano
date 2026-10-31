@@ -22,7 +22,8 @@ export type AiErrorCode =
   | 'AI_TIMEOUT'
   | 'AI_INVALID_OUTPUT'
   | 'AI_INPUT_UNSUPPORTED'
-  | 'AI_OAUTH_STATE_INVALID';
+  | 'AI_OAUTH_STATE_INVALID'
+  | 'AI_SETTINGS_CHANGED';
 
 const STATUS: Record<AiErrorCode, HttpStatus> = {
   AI_NOT_ENABLED: HttpStatus.CONFLICT,
@@ -38,6 +39,7 @@ const STATUS: Record<AiErrorCode, HttpStatus> = {
   AI_INVALID_OUTPUT: HttpStatus.BAD_GATEWAY,
   AI_INPUT_UNSUPPORTED: HttpStatus.BAD_REQUEST,
   AI_OAUTH_STATE_INVALID: HttpStatus.BAD_REQUEST,
+  AI_SETTINGS_CHANGED: HttpStatus.CONFLICT,
 };
 
 /** A typed AI failure; the response carries the code, never provider text or document data. */

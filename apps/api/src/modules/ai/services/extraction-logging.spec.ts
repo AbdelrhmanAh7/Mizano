@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import Decimal from 'decimal.js';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AiGatewayService } from '../account/ai-gateway.service';
-import { AiSettingsService } from '../account/ai-settings.service';
+import { AiSettingsService, connectionFingerprint } from '../account/ai-settings.service';
 import { AiDocumentReader } from '../extraction/ai-document-reader';
 import { ExtractionStrategyResolver } from '../extraction/extraction-strategy-resolver.service';
 import { RulesStrategy } from '../extraction/rules-strategy.service';
@@ -69,11 +69,23 @@ function captureAllLogging(): () => string {
   return () => JSON.stringify(spies.flatMap((spy) => spy.mock.calls));
 }
 
+/** The organization's AI settings row the gateway re-reads under its lock. */
+const SETTINGS_ROW = {
+  organizationId: 'org-1',
+  provider: 'anthropic',
+  model: 'claude-haiku-4-5',
+  keyCiphertext: 'v1.iv.tag.ct',
+  consentProvider: 'anthropic',
+  consentAt: new Date('2026-10-31T10:00:00Z'),
+  features: ['documents', 'categorization'],
+  monthlyLimitUsd: new Decimal(5),
+};
+
 function buildPrisma(): PrismaService {
   const model = {
     findMany: jest.fn().mockResolvedValue([{ id: 'acc-1', code: '5100', name: 'Supplies ZXQ' }]),
     findFirst: jest.fn().mockResolvedValue(null),
-    findUnique: jest.fn().mockResolvedValue(null),
+    findUnique: jest.fn().mockResolvedValue(SETTINGS_ROW),
     aggregate: jest.fn().mockResolvedValue({ _sum: { costUsd: null } }),
     create: jest.fn().mockResolvedValue({ id: 'usage-1' }),
     updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -120,7 +132,7 @@ describe('AI intake logging never contains document content or the key', () => {
         model: 'claude-haiku-4-5',
         apiKey: SENTINELS.apiKey,
         price: null,
-        monthlyLimitUsd: new Decimal(5),
+        fingerprint: connectionFingerprint(SETTINGS_ROW),
       }),
     } as unknown as AiSettingsService;
     const prisma = buildPrisma();

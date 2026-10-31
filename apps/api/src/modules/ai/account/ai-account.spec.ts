@@ -226,21 +226,70 @@ describe('AI gateway: monthly limit reservation', () => {
     expect(usage).toHaveLength(0);
   });
 
-  it('retries once on a transient failure and releases the reservation when the provider refuses', async () => {
-    const complete = jest.fn().mockRejectedValue(new AiProviderError('rate_limited', 429));
-    const { gateway, usage } = await connected(adapter({ complete }));
+  /** Runs `run` with fake timers so the one-second retry delay passes instantly. */
+  async function runWithFakeTimers(gateway: AiGatewayService) {
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
     try {
-      const pending = run(gateway);
-      const settled = expect(pending).rejects.toMatchObject({ code: 'AI_RATE_LIMITED' });
+      const pending = run(gateway).then(
+        (value) => ({ value, error: undefined as unknown }),
+        (error: unknown) => ({ value: undefined, error }),
+      );
       await jest.advanceTimersByTimeAsync(1_000);
-      await settled;
+      return await pending;
     } finally {
       jest.useRealTimers();
     }
+  }
+
+  it('reserves each attempt separately: a refused attempt is released, the retry settles', async () => {
+    const complete = jest
+      .fn()
+      .mockRejectedValueOnce(new AiProviderError('rate_limited', 429))
+      .mockResolvedValueOnce({
+        text: '{"ok":true}',
+        inputTokens: 100,
+        outputTokens: 10,
+        reportedCostUsd: null,
+      });
+    const { gateway, usage } = await connected(adapter({ complete }));
+    const out = await runWithFakeTimers(gateway);
+    expect(out.error).toBeUndefined();
     expect(complete).toHaveBeenCalledTimes(2);
-    expect(usage[0]).toMatchObject({ status: 'RELEASED', success: false });
+    expect(usage).toHaveLength(2);
+    expect(usage[0]).toMatchObject({
+      status: 'RELEASED',
+      success: false,
+      errorCode: 'rate_limited',
+    });
     expect(new Decimal(String(usage[0].costUsd)).eq(0)).toBe(true);
+    expect(usage[1]).toMatchObject({ status: 'SETTLED', success: true });
+  });
+
+  it('retries a refusal for load once, then stops', async () => {
+    const complete = jest.fn().mockRejectedValue(new AiProviderError('rate_limited', 429));
+    const { gateway, usage } = await connected(adapter({ complete }));
+    const out = await runWithFakeTimers(gateway);
+    expect(out.error).toMatchObject({ code: 'AI_RATE_LIMITED' });
+    expect(complete).toHaveBeenCalledTimes(2);
+    expect(usage.map((u) => u.status)).toEqual(['RELEASED', 'RELEASED']);
+  });
+
+  it.each([
+    ['a dropped connection', new AiProviderError('network')],
+    ['an unreadable answer body', new AiProviderError('network', 200)],
+    ['a timeout', new AiProviderError('timeout')],
+    ['an unusable success answer', new AiProviderError('bad_response', 200)],
+  ])('never retries %s and keeps the estimate as spent', async (_case, failure) => {
+    const complete = jest.fn().mockRejectedValue(failure);
+    const { gateway, usage } = await connected(adapter({ complete }));
+    const out = await runWithFakeTimers(gateway);
+    expect(out.error).toBeDefined();
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(usage).toHaveLength(1);
+    expect(usage[0]).toMatchObject({ status: 'SETTLED', success: false });
+    const cost = new Decimal(String(usage[0].costUsd));
+    expect(cost.gt(0)).toBe(true);
+    expect(cost.eq(String(usage[0].estimatedCostUsd))).toBe(true);
   });
 
   it('does nothing for an organization without AI', async () => {
@@ -248,6 +297,84 @@ describe('AI gateway: monthly limit reservation', () => {
     await expect(run(gateway)).rejects.toMatchObject({ code: 'AI_NOT_ENABLED' });
     expect(provider.complete).not.toHaveBeenCalled();
     expect(usage).toHaveLength(0);
+  });
+});
+
+describe('AI gateway: settings that change after the connection was opened', () => {
+  const schema = z.object({ ok: z.literal(true) });
+  const run = (gateway: AiGatewayService) =>
+    gateway.run({
+      organizationId: ORG,
+      feature: 'documents',
+      system: 'x',
+      parts: () => [{ type: 'text', text: 'hello' }],
+      maxOutputTokens: 100,
+      schema,
+    });
+
+  /** A connected organization whose settings `change` right after the gateway opened them. */
+  async function changedAfterOpen(change: (service: AiSettingsService) => Promise<unknown>) {
+    const ctx = build();
+    await ctx.service.connect(ORG, 'u', { provider: 'anthropic', apiKey: KEY });
+    await ctx.service.consent(ORG, 'u', 'anthropic');
+    await ctx.service.update(ORG, { features: ['documents'] });
+    const open = ctx.service.connection.bind(ctx.service);
+    jest.spyOn(ctx.service, 'connection').mockImplementation(async (org, feature) => {
+      const connection = await open(org, feature);
+      await change(ctx.service);
+      return connection;
+    });
+    return ctx;
+  }
+
+  it.each([
+    ['the key is revoked', (s: AiSettingsService) => s.revoke(ORG)],
+    [
+      'the key is replaced',
+      (s: AiSettingsService) =>
+        s.connect(ORG, 'u', { provider: 'anthropic', apiKey: `${KEY}-new` }),
+    ],
+    ['the feature is turned off', (s: AiSettingsService) => s.update(ORG, { features: [] })],
+  ])('sends nothing when %s before the reservation', async (_case, change) => {
+    const { gateway, provider, usage } = await changedAfterOpen(change);
+    await expect(run(gateway)).rejects.toMatchObject({ code: 'AI_SETTINGS_CHANGED' });
+    expect(provider.complete).not.toHaveBeenCalled();
+    expect(usage).toHaveLength(0);
+  });
+
+  it('applies a lower limit read under the lock', async () => {
+    const { gateway, provider, usage } = await changedAfterOpen((s) =>
+      s.update(ORG, { monthlyLimitUsd: '0' }),
+    );
+    await expect(run(gateway)).rejects.toMatchObject({ code: 'AI_LIMIT_REACHED' });
+    expect(provider.complete).not.toHaveBeenCalled();
+    expect(usage).toHaveLength(0);
+  });
+
+  it('revalidates before the retry: a revoke during the first attempt stops it', async () => {
+    const holder: { service?: AiSettingsService } = {};
+    const complete = jest.fn(async () => {
+      await holder.service?.revoke(ORG);
+      throw new AiProviderError('rate_limited', 429);
+    });
+    const ctx = build(adapter({ complete }));
+    holder.service = ctx.service;
+    await ctx.service.connect(ORG, 'u', { provider: 'anthropic', apiKey: KEY });
+    await ctx.service.consent(ORG, 'u', 'anthropic');
+    await ctx.service.update(ORG, { features: ['documents'] });
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+    try {
+      const settled = expect(run(ctx.gateway)).rejects.toMatchObject({
+        code: 'AI_SETTINGS_CHANGED',
+      });
+      await jest.advanceTimersByTimeAsync(1_000);
+      await settled;
+    } finally {
+      jest.useRealTimers();
+    }
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(ctx.usage).toHaveLength(1);
+    expect(ctx.usage[0]).toMatchObject({ status: 'RELEASED' });
   });
 });
 

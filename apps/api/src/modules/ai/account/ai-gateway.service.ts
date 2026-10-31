@@ -2,14 +2,20 @@ import { Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { ZodType, ZodTypeDef } from 'zod';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { AiPart, AiProviderError } from '../providers/ai-provider';
+import { AiCompletion, AiPart, AiProviderError } from '../providers/ai-provider';
 import { AiError, AiFeatureKey } from './ai-features';
 import { costUsd, estimateInputTokens } from './ai-pricing';
-import { AiConnection, AiSettingsService, startOfUtcMonth } from './ai-settings.service';
+import {
+  AiConnection,
+  AiSettingsService,
+  settingsStillAllow,
+  startOfUtcMonth,
+} from './ai-settings.service';
 
 const CALL_TIMEOUT_MS = 60_000;
 const OLLAMA_TIMEOUT_MS = 180_000;
 const RETRY_DELAY_MS = 1_000;
+const MAX_ATTEMPTS = 2;
 
 export interface AiRunInput<T> {
   organizationId: string;
@@ -91,27 +97,53 @@ export class AiGatewayService {
       estimatedInput,
       input.maxOutputTokens,
     );
-    const usageId = await this.reserve(input, connection, estimate);
     const started = Date.now();
     const timeoutMs = connection.provider === 'ollama' ? OLLAMA_TIMEOUT_MS : CALL_TIMEOUT_MS;
 
-    let completion;
-    try {
-      completion = await this.callWithOneRetry(connection, input, parts, timeoutMs);
-    } catch (error) {
-      const failure = error instanceof AiProviderError ? error : new AiProviderError('network');
-      // An error answer is not billed; a timeout or a dropped connection may have been.
-      const billable = failure.kind === 'timeout' || failure.kind === 'network';
-      await this.settle(usageId, {
-        status: billable ? 'SETTLED' : 'RELEASED',
-        success: false,
-        errorCode: failure.kind,
-        cost: billable ? estimate : new Decimal(0),
-      });
-      this.logLine(input, connection, started, `failed:${failure.kind}`);
-      throw toAiError(failure);
+    for (let attempt = 1; ; attempt++) {
+      // Every attempt is reserved on its own, under the settings lock: a revoke, provider or
+      // key change, feature switched off or lower limit stops it before anything is sent.
+      const usageId = await this.reserve(input, connection, estimate);
+      let completion: AiCompletion;
+      try {
+        completion = await connection.adapter.complete(
+          { apiKey: connection.apiKey },
+          connection.model,
+          { system: input.system, parts, maxOutputTokens: input.maxOutputTokens, json: true },
+          AbortSignal.timeout(timeoutMs),
+        );
+      } catch (error) {
+        const failure = error instanceof AiProviderError ? error : new AiProviderError('network');
+        // Unknown outcome (sent, timed out, unreadable answer): the estimate stays spent.
+        const billed = failure.possiblyBilled;
+        await this.settle(usageId, {
+          status: billed ? 'SETTLED' : 'RELEASED',
+          success: false,
+          errorCode: failure.kind,
+          cost: billed ? estimate : new Decimal(0),
+        });
+        // Only a refusal for load (429/5xx) is retried, once; never an ambiguous failure.
+        if (failure.retryable && attempt < MAX_ATTEMPTS) {
+          this.logLine(input, connection, started, `retry:${failure.kind}`);
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+          continue;
+        }
+        this.logLine(input, connection, started, `failed:${failure.kind}`);
+        throw toAiError(failure);
+      }
+      return this.finish(input, connection, usageId, completion, estimatedInput, started);
     }
+  }
 
+  /** Settles the real cost of an answered call and validates the answer locally. */
+  private async finish<T>(
+    input: AiRunInput<T>,
+    connection: AiConnection,
+    usageId: string,
+    completion: AiCompletion,
+    estimatedInput: number,
+    started: number,
+  ): Promise<AiRunResult<T>> {
     const inputTokens = completion.inputTokens ?? estimatedInput;
     const outputTokens = completion.outputTokens ?? input.maxOutputTokens;
     const cost =
@@ -144,8 +176,9 @@ export class AiGatewayService {
   }
 
   /**
-   * Locks the organization's settings row, so concurrent calls see each other's reservations,
-   * and refuses a call whose estimate would cross the monthly limit.
+   * Locks the organization's settings row (concurrent calls and settings changes serialize on
+   * it), re-reads it, refuses when the connection it was opened from changed or the feature is
+   * off, and refuses a call whose estimate would cross the current (locked) monthly limit.
    */
   private async reserve<T>(
     input: AiRunInput<T>,
@@ -154,12 +187,19 @@ export class AiGatewayService {
   ): Promise<string> {
     return this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "ai_settings" WHERE "organizationId" = ${input.organizationId} FOR UPDATE`;
+      const current = await tx.aiSettings.findUnique({
+        where: { organizationId: input.organizationId },
+      });
+      if (!settingsStillAllow(current, connection, input.feature)) {
+        throw new AiError('AI_SETTINGS_CHANGED', 'The AI settings changed; nothing was sent');
+      }
+      const limit = new Decimal(current?.monthlyLimitUsd.toString() ?? '0');
       const sum = await tx.aiUsage.aggregate({
         where: { organizationId: input.organizationId, createdAt: { gte: startOfUtcMonth() } },
         _sum: { costUsd: true },
       });
       const spent = new Decimal(sum._sum.costUsd?.toString() ?? '0');
-      if (spent.plus(estimate).gt(connection.monthlyLimitUsd)) {
+      if (spent.plus(estimate).gt(limit)) {
         throw new AiError('AI_LIMIT_REACHED', 'This call would cross the monthly AI limit');
       }
       const row = await tx.aiUsage.create({
@@ -177,28 +217,6 @@ export class AiGatewayService {
       });
       return row.id;
     });
-  }
-
-  private async callWithOneRetry<T>(
-    connection: AiConnection,
-    input: AiRunInput<T>,
-    parts: AiPart[],
-    timeoutMs: number,
-  ) {
-    const attempt = () =>
-      connection.adapter.complete(
-        { apiKey: connection.apiKey },
-        connection.model,
-        { system: input.system, parts, maxOutputTokens: input.maxOutputTokens, json: true },
-        AbortSignal.timeout(timeoutMs),
-      );
-    try {
-      return await attempt();
-    } catch (error) {
-      if (!(error instanceof AiProviderError) || !error.transient) throw error;
-      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
-      return attempt();
-    }
   }
 
   private async settle(
