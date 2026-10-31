@@ -28,15 +28,15 @@ import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 const creditNoteSchema = z
   .object({
-    customerId: z.string().min(1, 'Customer is required'),
-    invoiceId: z.string().min(1, 'Original invoice is required'),
-    date: z.string().min(1, 'Date is required'),
+    customerId: z.string().min(1, 'customerRequired'),
+    invoiceId: z.string().min(1, 'invoiceRequired'),
+    date: z.string().min(1, 'dateRequired'),
     type: z.enum(['REFUND', 'APPLY_TO_INVOICE']),
     amount: z
       .string()
       .trim()
-      .regex(/^\d{1,15}(\.\d{1,4})?$/, 'Enter a valid amount (up to 15 digits, 4 decimals)'),
-    reason: z.string().trim().min(1, 'Reason is required').max(500),
+      .regex(/^\d{1,15}(\.\d{1,4})?$/, 'amountInvalid'),
+    reason: z.string().trim().min(1, 'reasonRequired').max(500),
     appliedToInvoiceId: z.string().optional(),
     refundAccountId: z.string().optional(),
   })
@@ -44,7 +44,7 @@ const creditNoteSchema = z
     if (v.type === 'REFUND' && !v.refundAccountId) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Refund account is required',
+        message: 'refundAccountRequired',
         path: ['refundAccountId'],
       });
     }
@@ -52,7 +52,7 @@ const creditNoteSchema = z
     if (v.type === 'APPLY_TO_INVOICE' && !v.appliedToInvoiceId) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Choose the invoice to apply this credit to',
+        message: 'applyInvoiceRequired',
         path: ['appliedToInvoiceId'],
       });
     }
@@ -96,6 +96,10 @@ export function CreditNoteForm({
   });
 
   const t = useTranslations('sales');
+  const tForm = useTranslations('sales.creditNotes.form');
+  /** Schema messages are keys of sales.creditNotes.form. */
+  const errorText = (message?: string): string | undefined =>
+    message && tForm.has(message) ? tForm(message) : message;
   // Sales-authorized lookup of bank/cash accounts (the server enforces the same rule on create).
   const { data: refundAccountsData } = useQuery({
     queryKey: ['credit-notes', 'refund-accounts'],
@@ -114,7 +118,9 @@ export function CreditNoteForm({
   });
   const invoices = invoicesData?.data || [];
 
-  // Open invoices to apply the credit to: every one of the customer's, from the server (B11).
+  // Open invoices to apply the credit to: every one of the customer's, from the server (B11),
+  // including the original invoice (the API's default target) listed first. Excluding it made the
+  // usual case, crediting the still-open invoice itself, impossible from the form.
   const { data: openInvoicesData } = useInvoices({
     customerId: selectedCustomerId || undefined,
     open: true,
@@ -122,8 +128,9 @@ export function CreditNoteForm({
     sortOrder: 'asc',
     limit: 500,
   });
-  const openInvoices = (openInvoicesData?.data || []).filter(
-    (inv: Invoice) => inv.id !== selectedInvoiceId,
+  const openInvoices = [...(openInvoicesData?.data || [])].sort(
+    (a: Invoice, b: Invoice) =>
+      Number(b.id === selectedInvoiceId) - Number(a.id === selectedInvoiceId),
   );
 
   // Get selected invoice details
@@ -150,7 +157,7 @@ export function CreditNoteForm({
       {/* Customer & Invoice Selection */}
       <Card>
         <CardHeader>
-          <CardTitle>Credit Note Details</CardTitle>
+          <CardTitle>{tForm('details')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -172,21 +179,25 @@ export function CreditNoteForm({
                 isInvalid={!!form.formState.errors.customerId}
               />
               {form.formState.errors.customerId && (
-                <p className="text-sm text-red-500">{form.formState.errors.customerId.message}</p>
+                <p className="text-sm text-red-500">
+                  {errorText(form.formState.errors.customerId.message)}
+                </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="date">Date *</Label>
+              <Label htmlFor="date">{tForm('date')} *</Label>
               <Input id="date" type="date" {...form.register('date')} />
               {form.formState.errors.date && (
-                <p className="text-sm text-red-500">{form.formState.errors.date.message}</p>
+                <p className="text-sm text-red-500">
+                  {errorText(form.formState.errors.date.message)}
+                </p>
               )}
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="invoiceId">Original Invoice *</Label>
+            <Label htmlFor="invoiceId">{tForm('originalInvoice')} *</Label>
             <Select
               value={form.watch('invoiceId')}
               onValueChange={(value) => form.setValue('invoiceId', value)}
@@ -194,7 +205,9 @@ export function CreditNoteForm({
             >
               <SelectTrigger>
                 <SelectValue
-                  placeholder={selectedCustomerId ? 'Select an invoice' : 'Select a customer first'}
+                  placeholder={
+                    selectedCustomerId ? tForm('selectInvoice') : tForm('selectCustomerFirst')
+                  }
                 />
               </SelectTrigger>
               <SelectContent>
@@ -208,7 +221,9 @@ export function CreditNoteForm({
               </SelectContent>
             </Select>
             {form.formState.errors.invoiceId && (
-              <p className="text-sm text-red-500">{form.formState.errors.invoiceId.message}</p>
+              <p className="text-sm text-red-500">
+                {errorText(form.formState.errors.invoiceId.message)}
+              </p>
             )}
           </div>
 
@@ -216,14 +231,14 @@ export function CreditNoteForm({
             <div className="p-4 bg-muted rounded-lg">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-muted-foreground">Invoice Total:</span>
-                  <span className="ml-2 font-mono font-medium">
+                  <span className="text-muted-foreground">{tForm('invoiceTotal')}</span>
+                  <span className="ms-2 font-mono font-medium">
                     {formatCurrency(selectedInvoice.grandTotal)}
                   </span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Balance Due:</span>
-                  <span className="ml-2 font-mono font-medium">
+                  <span className="text-muted-foreground">{tForm('balanceDue')}</span>
+                  <span className="ms-2 font-mono font-medium">
                     {formatCurrency(selectedInvoice.balanceDue)}
                   </span>
                 </div>
@@ -236,7 +251,7 @@ export function CreditNoteForm({
       {/* Credit Note Type */}
       <Card>
         <CardHeader>
-          <CardTitle>Credit Type</CardTitle>
+          <CardTitle>{tForm('creditType')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <RadioGroup
@@ -244,34 +259,30 @@ export function CreditNoteForm({
             onValueChange={(value) => form.setValue('type', value as CreditNoteType)}
             className="space-y-3"
           >
-            <div className="flex items-start space-x-3 p-4 border rounded-lg">
+            <div className="flex items-start gap-3 p-4 border rounded-lg">
               <RadioGroupItem value="REFUND" id="refund" />
               <div>
                 <Label htmlFor="refund" className="font-medium cursor-pointer">
                   {t('creditNotes.form.refundLabel')}
                 </Label>
-                <p className="text-sm text-muted-foreground">
-                  Issue a refund to the customer. The credit will reduce their account balance.
-                </p>
+                <p className="text-sm text-muted-foreground">{tForm('refundDescription')}</p>
               </div>
             </div>
 
-            <div className="flex items-start space-x-3 p-4 border rounded-lg">
+            <div className="flex items-start gap-3 p-4 border rounded-lg">
               <RadioGroupItem value="APPLY_TO_INVOICE" id="apply" />
               <div>
                 <Label htmlFor="apply" className="font-medium cursor-pointer">
-                  Apply to Invoice
+                  {tForm('applyToInvoice')}
                 </Label>
-                <p className="text-sm text-muted-foreground">
-                  Apply the credit to another open invoice to reduce its balance.
-                </p>
+                <p className="text-sm text-muted-foreground">{tForm('applyDescription')}</p>
               </div>
             </div>
           </RadioGroup>
 
           {selectedType === 'REFUND' && (
             <div className="space-y-2 pt-4">
-              <Label htmlFor="refundAccountId">Refund Paid From *</Label>
+              <Label htmlFor="refundAccountId">{tForm('refundPaidFrom')} *</Label>
               <Select
                 value={form.watch('refundAccountId') || ''}
                 onValueChange={(value) =>
@@ -301,7 +312,7 @@ export function CreditNoteForm({
               )}
               {form.formState.errors.refundAccountId && (
                 <p className="text-sm text-red-500">
-                  {form.formState.errors.refundAccountId.message}
+                  {errorText(form.formState.errors.refundAccountId.message)}
                 </p>
               )}
             </div>
@@ -309,7 +320,7 @@ export function CreditNoteForm({
 
           {selectedType === 'APPLY_TO_INVOICE' && (
             <div className="space-y-2 pt-4">
-              <Label htmlFor="appliedToInvoiceId">Apply to Invoice *</Label>
+              <Label htmlFor="appliedToInvoiceId">{tForm('applyToInvoice')} *</Label>
               <Select
                 value={form.watch('appliedToInvoiceId') || ''}
                 onValueChange={(value) =>
@@ -329,7 +340,10 @@ export function CreditNoteForm({
                 <SelectContent>
                   {openInvoices.map((invoice: Invoice) => (
                     <SelectItem key={invoice.id} value={invoice.id}>
-                      {invoice.invoiceNumber} - Balance: {formatCurrency(invoice.balanceDue)}
+                      {tForm('invoiceBalance', {
+                        number: invoice.invoiceNumber,
+                        amount: formatCurrency(invoice.balanceDue),
+                      })}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -338,9 +352,7 @@ export function CreditNoteForm({
                 <p className="text-sm text-red-500">{t('creditNotes.form.applyInvoiceRequired')}</p>
               )}
               {selectedType === 'APPLY_TO_INVOICE' && openInvoices.length === 0 && (
-                <p className="text-sm text-amber-600">
-                  No other open invoices available for this customer.
-                </p>
+                <p className="text-sm text-amber-600">{tForm('noOpenInvoicesForCustomer')}</p>
               )}
             </div>
           )}
@@ -350,11 +362,11 @@ export function CreditNoteForm({
       {/* Amount & Reason */}
       <Card>
         <CardHeader>
-          <CardTitle>Amount & Reason</CardTitle>
+          <CardTitle>{tForm('amountReason')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="amount">Credit Amount *</Label>
+            <Label htmlFor="amount">{tForm('creditAmount')} *</Label>
             <Input
               id="amount"
               type="text"
@@ -363,25 +375,29 @@ export function CreditNoteForm({
               {...form.register('amount')}
             />
             {form.formState.errors.amount && (
-              <p className="text-sm text-red-500">{form.formState.errors.amount.message}</p>
+              <p className="text-sm text-red-500">
+                {errorText(form.formState.errors.amount.message)}
+              </p>
             )}
             {selectedInvoice && (
               <p className="text-sm text-muted-foreground">
-                Maximum: {formatCurrency(selectedInvoice.grandTotal)}
+                {tForm('maximum', { amount: formatCurrency(selectedInvoice.grandTotal) })}
               </p>
             )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="reason">Reason *</Label>
+            <Label htmlFor="reason">{tForm('reason')} *</Label>
             <Textarea
               id="reason"
-              placeholder="Reason for issuing this credit note..."
+              placeholder={tForm('reasonPlaceholder')}
               rows={4}
               {...form.register('reason')}
             />
             {form.formState.errors.reason && (
-              <p className="text-sm text-red-500">{form.formState.errors.reason.message}</p>
+              <p className="text-sm text-red-500">
+                {errorText(form.formState.errors.reason.message)}
+              </p>
             )}
           </div>
         </CardContent>
@@ -390,10 +406,10 @@ export function CreditNoteForm({
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {tForm('cancel')}
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Creating...' : 'Create Credit Note'}
+          {isSubmitting ? tForm('creating') : tForm('submit')}
         </Button>
       </div>
     </form>
