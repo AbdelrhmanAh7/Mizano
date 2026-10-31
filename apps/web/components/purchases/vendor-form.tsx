@@ -7,10 +7,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { PhoneInput } from '@/components/ui/phone-input';
-import { CountrySelect } from '@/components/ui/country-select';
-import { CitySelect } from '@/components/ui/city-select';
 import {
   Select,
   SelectContent,
@@ -19,15 +16,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AddressCard,
+  AddressLabels,
+  addressFromParty,
+  addressSchema,
+  emptyAddress,
+} from '@/components/shared/address-fields';
 import { Vendor } from '@/lib/hooks/use-vendors';
-
-const addressSchema = z.object({
-  street: z.string().optional(),
-  city: z.string().optional(),
-  state: z.string().optional(),
-  postalCode: z.string().optional(),
-  country: z.string().optional(),
-});
 
 const vendorSchema = z.object({
   name: z.string().min(1, 'Vendor name is required'),
@@ -58,6 +54,17 @@ const currencies = [
   { value: 'SAR', label: 'SAR - Saudi Riyal' },
 ];
 
+const addressLabels: AddressLabels = {
+  street: 'Street Address',
+  streetPlaceholder: 'Street address',
+  country: 'Country',
+  city: 'City',
+  state: 'State/Province',
+  statePlaceholder: 'State',
+  postalCode: 'Zip/Postal Code',
+  postalCodePlaceholder: 'Postal code',
+};
+
 const paymentTermsOptions = [
   { value: 0, label: 'Due on Receipt' },
   { value: 15, label: 'Net 15' },
@@ -79,13 +86,7 @@ export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorF
       currency: 'USD',
       taxId: '',
       paymentTerms: 30,
-      billingAddress: {
-        street: '',
-        city: '',
-        state: '',
-        postalCode: '',
-        country: '',
-      },
+      billingAddress: emptyAddress(),
     },
   });
 
@@ -99,13 +100,7 @@ export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorF
         currency: vendor.currency || 'USD',
         taxId: vendor.taxId || '',
         paymentTerms: vendor.paymentTerms || 30,
-        billingAddress: {
-          street: vendor.billingStreet || '',
-          city: vendor.billingCity || '',
-          state: vendor.billingState || '',
-          postalCode: vendor.billingPostalCode || '',
-          country: vendor.billingCountry || '',
-        },
+        billingAddress: addressFromParty(vendor, 'billing'),
       });
     }
   }, [vendor, form]);
@@ -227,67 +222,12 @@ export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorF
         </CardContent>
       </Card>
 
-      {/* Billing Address */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Billing Address</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="billingStreet">Street Address</Label>
-            <Textarea
-              id="billingStreet"
-              placeholder="Street address"
-              {...form.register('billingAddress.street')}
-              rows={2}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="billingCountry">Country</Label>
-              <CountrySelect
-                id="billingCountry"
-                value={form.watch('billingAddress.country') || ''}
-                onValueChange={(val) => {
-                  form.setValue('billingAddress.country', val);
-                  form.setValue('billingAddress.city', '');
-                }}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="billingCity">City</Label>
-              <CitySelect
-                id="billingCity"
-                value={form.watch('billingAddress.city') || ''}
-                onValueChange={(val) => form.setValue('billingAddress.city', val)}
-                country={form.watch('billingAddress.country') || ''}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="billingState">State/Province</Label>
-              <Input
-                id="billingState"
-                placeholder="State"
-                {...form.register('billingAddress.state')}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="billingPostalCode">Zip/Postal Code</Label>
-              <Input
-                id="billingPostalCode"
-                placeholder="Postal code"
-                {...form.register('billingAddress.postalCode')}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <AddressCard
+        form={form}
+        name="billingAddress"
+        title="Billing Address"
+        labels={addressLabels}
+      />
 
       {/* Actions */}
       <div className="flex justify-end gap-3">

@@ -10,8 +10,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { PhoneInput } from '@/components/ui/phone-input';
-import { CountrySelect } from '@/components/ui/country-select';
-import { CitySelect } from '@/components/ui/city-select';
 import {
   Select,
   SelectContent,
@@ -20,16 +18,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AddressCard,
+  AddressLabels,
+  AddressValues,
+  addressFromParty,
+  addressSchema,
+  emptyAddress,
+} from '@/components/shared/address-fields';
 import { Customer } from '@/lib/hooks/use-customers';
 import { useBaseCurrency } from '@/lib/hooks/use-organization';
-
-const addressSchema = z.object({
-  street: z.string().optional(),
-  city: z.string().optional(),
-  state: z.string().optional(),
-  postalCode: z.string().optional(),
-  country: z.string().optional(),
-});
 
 const customerSchema = z.object({
   name: z.string().min(1, 'nameRequired'),
@@ -66,7 +64,7 @@ export function buildCustomerPayload(data: CustomerFormData): Record<string, unk
   const optionalNumber = (v?: number): number | undefined =>
     v !== undefined && v !== null ? v : undefined;
 
-  const addressOrUndefined = (addr?: z.infer<typeof addressSchema>) => {
+  const addressOrUndefined = (addr?: AddressValues) => {
     if (!addr) return undefined;
     const street = optional(addr.street);
     const city = optional(addr.city);
@@ -130,20 +128,8 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
       taxId: '',
       paymentTerms: 30,
       notes: '',
-      billingAddress: {
-        street: '',
-        city: '',
-        state: '',
-        postalCode: '',
-        country: '',
-      },
-      shippingAddress: {
-        street: '',
-        city: '',
-        state: '',
-        postalCode: '',
-        country: '',
-      },
+      billingAddress: emptyAddress(),
+      shippingAddress: emptyAddress(),
     },
   });
 
@@ -166,20 +152,8 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
         taxId: customer.taxId || '',
         paymentTerms: customer.paymentTerms ?? 30,
         notes: customer.notes || '',
-        billingAddress: {
-          street: customer.billingStreet || '',
-          city: customer.billingCity || '',
-          state: customer.billingState || '',
-          postalCode: customer.billingPostalCode || '',
-          country: customer.billingCountry || '',
-        },
-        shippingAddress: {
-          street: customer.shippingStreet || '',
-          city: customer.shippingCity || '',
-          state: customer.shippingState || '',
-          postalCode: customer.shippingPostalCode || '',
-          country: customer.shippingCountry || '',
-        },
+        billingAddress: addressFromParty(customer, 'billing'),
+        shippingAddress: addressFromParty(customer, 'shipping'),
       });
     }
   }, [customer, form]);
@@ -187,6 +161,17 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
   const handleSubmit = (data: CustomerFormData) => {
     const submitData = buildCustomerPayload(data);
     onSubmit(submitData);
+  };
+
+  const addressLabels: AddressLabels = {
+    street: t('street'),
+    streetPlaceholder: t('streetPlaceholder'),
+    country: t('country'),
+    city: t('city'),
+    state: t('state'),
+    statePlaceholder: t('statePlaceholder'),
+    postalCode: t('postalCode'),
+    postalCodePlaceholder: t('postalCodePlaceholder'),
   };
 
   const copyBillingToShipping = () => {
@@ -308,134 +293,23 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
         </CardContent>
       </Card>
 
-      {/* Billing Address */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('billingAddress')}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="billingStreet">{t('street')}</Label>
-            <Textarea
-              id="billingStreet"
-              placeholder={t('streetPlaceholder')}
-              {...form.register('billingAddress.street')}
-              rows={2}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="billingCountry">{t('country')}</Label>
-              <CountrySelect
-                id="billingCountry"
-                value={form.watch('billingAddress.country') || ''}
-                onValueChange={(val) => {
-                  form.setValue('billingAddress.country', val);
-                  form.setValue('billingAddress.city', '');
-                }}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="billingCity">{t('city')}</Label>
-              <CitySelect
-                id="billingCity"
-                value={form.watch('billingAddress.city') || ''}
-                onValueChange={(val) => form.setValue('billingAddress.city', val)}
-                country={form.watch('billingAddress.country') || ''}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="billingState">{t('state')}</Label>
-              <Input
-                id="billingState"
-                placeholder={t('statePlaceholder')}
-                {...form.register('billingAddress.state')}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="billingPostalCode">{t('postalCode')}</Label>
-              <Input
-                id="billingPostalCode"
-                placeholder={t('postalCodePlaceholder')}
-                {...form.register('billingAddress.postalCode')}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Shipping Address */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>{t('shippingAddress')}</CardTitle>
-            <Button type="button" variant="outline" size="sm" onClick={copyBillingToShipping}>
-              {t('copyFromBilling')}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="shippingStreet">{t('street')}</Label>
-            <Textarea
-              id="shippingStreet"
-              placeholder={t('streetPlaceholder')}
-              {...form.register('shippingAddress.street')}
-              rows={2}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="shippingCountry">{t('country')}</Label>
-              <CountrySelect
-                id="shippingCountry"
-                value={form.watch('shippingAddress.country') || ''}
-                onValueChange={(val) => {
-                  form.setValue('shippingAddress.country', val);
-                  form.setValue('shippingAddress.city', '');
-                }}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="shippingCity">{t('city')}</Label>
-              <CitySelect
-                id="shippingCity"
-                value={form.watch('shippingAddress.city') || ''}
-                onValueChange={(val) => form.setValue('shippingAddress.city', val)}
-                country={form.watch('shippingAddress.country') || ''}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="shippingState">{t('state')}</Label>
-              <Input
-                id="shippingState"
-                placeholder={t('statePlaceholder')}
-                {...form.register('shippingAddress.state')}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="shippingPostalCode">{t('postalCode')}</Label>
-              <Input
-                id="shippingPostalCode"
-                placeholder={t('postalCodePlaceholder')}
-                {...form.register('shippingAddress.postalCode')}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <AddressCard
+        form={form}
+        name="billingAddress"
+        title={t('billingAddress')}
+        labels={addressLabels}
+      />
+      <AddressCard
+        form={form}
+        name="shippingAddress"
+        title={t('shippingAddress')}
+        labels={addressLabels}
+        action={
+          <Button type="button" variant="outline" size="sm" onClick={copyBillingToShipping}>
+            {t('copyFromBilling')}
+          </Button>
+        }
+      />
 
       {/* Actions */}
       <div className="flex justify-end gap-3">
