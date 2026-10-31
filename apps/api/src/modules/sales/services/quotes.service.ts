@@ -23,7 +23,7 @@ import {
   mapDocumentNumberConflict,
   parseDocumentDate,
   startOfTodayUtc,
-} from '../utils/sales-helpers';
+} from '../../../common/utils/sales-helpers';
 
 const QUOTE_VIEW_INCLUDE = {
   customer: { select: { id: true, name: true } },

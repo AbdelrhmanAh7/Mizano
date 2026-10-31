@@ -14,7 +14,7 @@ import { Permissions, Public } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { describeError } from '../../../common/utils/redact';
-import { timingSafeStringEqual } from '../utils/secure-compare.util';
+import { timingSafeStringEqual } from '../../../common/utils/secure-compare.util';
 
 interface TunnelUpdateDto {
   tunnel_url: string;

@@ -25,7 +25,7 @@ import {
   assertTotalsFit,
   parseDocumentDate,
   startOfTodayUtc,
-} from '../utils/sales-helpers';
+} from '../../../common/utils/sales-helpers';
 
 /** Invoice statuses that carry an open AR balance and can receive payments or credits. */
 export const RECEIVABLE_INVOICE_STATUSES: InvoiceStatus[] = [

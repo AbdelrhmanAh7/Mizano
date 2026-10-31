@@ -15,7 +15,12 @@ import {
   TAXABLE_INVOICE_STATUSES,
   VatReturnsService,
 } from '../../tax/services/vat-returns.service';
-import { MAX_DAYS, parseReportDate, startOfUtcDay, toIsoDate } from '../utils/report-utils';
+import {
+  MAX_DAYS,
+  parseReportDate,
+  startOfUtcDay,
+  toIsoDate,
+} from '../../../common/utils/report-utils';
 
 const WideDecimal = Prisma.Decimal.clone({ precision: 40 });
 const DAY_MS = 86_400_000;

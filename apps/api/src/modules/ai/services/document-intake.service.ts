@@ -15,8 +15,8 @@ import {
 import { extractTextFromPdf } from '../utils/pdf-extractor.util';
 import { levenshteinSimilarity, normalizeText } from '../utils/text-similarity.util';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
-import { assertTotalsFit } from '../../sales/utils/sales-helpers';
-import { assertBillLineAccounts } from '../../purchases/utils/bill-line-accounts';
+import { assertTotalsFit } from '../../../common/utils/sales-helpers';
+import { assertBillLineAccounts } from '../../../common/utils/bill-line-accounts';
 
 // ---------------------------------------------------------------------------
 // Interfaces

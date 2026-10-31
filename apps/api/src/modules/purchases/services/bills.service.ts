@@ -12,7 +12,7 @@ import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
 import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 import { runBulk } from '../../../common/utils/run-bulk';
-import { assertTotalsFit, startOfTodayUtc } from '../../sales/utils/sales-helpers';
+import { assertTotalsFit, startOfTodayUtc } from '../../../common/utils/sales-helpers';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
 import { BillCursorQueryDto } from '../dto/bill-cursor-query.dto';
@@ -23,7 +23,7 @@ import {
   ACCOUNT_REQUIRED,
   assertBillLineAccounts,
   billLineAccountWhere,
-} from '../utils/bill-line-accounts';
+} from '../../../common/utils/bill-line-accounts';
 
 /** Bill statuses that carry an open AP balance and can receive payments. */
 export const PAYABLE_BILL_STATUSES: BillStatus[] = [

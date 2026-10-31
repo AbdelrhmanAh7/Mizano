@@ -15,7 +15,7 @@ import {
   nextPaymentReceivedNumber,
   parseDocumentDate,
   parsePositiveDecimal,
-} from '../utils/sales-helpers';
+} from '../../../common/utils/sales-helpers';
 import { InvoicesService, RECEIVABLE_INVOICE_STATUSES } from './invoices.service';
 
 export interface PayInFullOptions {

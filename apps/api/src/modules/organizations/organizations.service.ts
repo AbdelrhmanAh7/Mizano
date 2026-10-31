@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { lockOrganizationLedger } from '../../common/utils/ledger-lock';
 import { PrismaService } from '../../prisma/prisma.service';
-import { timingSafeStringEqual } from '../ai/utils/secure-compare.util';
+import { timingSafeStringEqual } from '../../common/utils/secure-compare.util';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { UpdateAccountSettingsDto } from './dto/update-account-settings.dto';
 import {

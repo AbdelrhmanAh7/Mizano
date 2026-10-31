@@ -9,7 +9,7 @@ import { AgingReportsService } from '../services/aging-reports.service';
 import { DashboardService } from '../services/dashboard.service';
 import { FinancialReportsService } from '../services/financial-reports.service';
 import { FinancialNarrativeService } from '../../ai/services/financial-narrative.service';
-import { MAX_DAYS, MAX_MONTHS, clampInt } from '../utils/report-utils';
+import { MAX_DAYS, MAX_MONTHS, clampInt } from '../../../common/utils/report-utils';
 
 @ApiTags('Reports')
 @ApiBearerAuth()

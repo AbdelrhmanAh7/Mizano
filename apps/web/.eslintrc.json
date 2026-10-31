@@ -12,7 +12,7 @@
       }
     ],
     "no-console": [
-      "warn",
+      "error",
       {
         "allow": ["warn", "error"]
       }
@@ -23,7 +23,18 @@
       "error",
       {
         "selector": "CallExpression[callee.property.name=/^(split|slice|substring|substr)$/][callee.object.callee.property.name='toISOString']",
-        "message": "toISOString() gives the UTC date, which is yesterday in UTC+ zones such as Cairo. Use format(date, 'yyyy-MM-dd') from date-fns for a calendar date (review-lessons §4)."
+        "message": "toISOString() gives the UTC date, which is yesterday in UTC+ zones such as Cairo. Use format(date, 'yyyy-MM-dd') from date-fns for a calendar date (review-lessons \u00a74)."
+      }
+    ],
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["**/apps/api/**", "**/api/src/**", "api/src/**"],
+            "message": "Web code reaches the API over HTTP only; share types and schemas through @mizano/shared-types and @mizano/validators."
+          }
+        ]
       }
     ]
   },

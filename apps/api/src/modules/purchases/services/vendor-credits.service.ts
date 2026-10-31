@@ -19,7 +19,7 @@ import {
   mapDocumentNumberConflict,
   parseDocumentDate,
   parsePositiveDecimal,
-} from '../../sales/utils/sales-helpers';
+} from '../../../common/utils/sales-helpers';
 import { CreateVendorCreditDto } from '../dto/create-vendor-credit.dto';
 import { RefundVendorCreditDto } from '../dto/refund-vendor-credit.dto';
 import { VendorCreditQueryDto } from '../dto/vendor-credit-query.dto';

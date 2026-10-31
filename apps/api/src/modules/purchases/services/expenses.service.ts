@@ -19,7 +19,7 @@ import {
   assertMoneyFits,
   parseDocumentDate,
   parsePositiveDecimal,
-} from '../../sales/utils/sales-helpers';
+} from '../../../common/utils/sales-helpers';
 import { CreateExpenseDto } from '../dto/create-expense.dto';
 import { ExpenseQueryDto } from '../dto/expense-query.dto';
 

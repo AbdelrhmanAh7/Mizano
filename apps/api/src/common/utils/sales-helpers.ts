@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import { DocumentTotals } from '../../../common/utils/document-totals';
+import { DocumentTotals } from './document-totals';
 
 /** Money columns are Decimal(19, 4): more precision than that cannot be stored. */
 const MONEY_SCALE = 4;

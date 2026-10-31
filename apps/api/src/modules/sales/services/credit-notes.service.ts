@@ -21,7 +21,7 @@ import {
   nextCreditNoteNumber,
   parseDocumentDate,
   parsePositiveDecimal,
-} from '../utils/sales-helpers';
+} from '../../../common/utils/sales-helpers';
 import { bankCashAccountWhere } from '../../../common/utils/bank-cash-accounts';
 import { InvoicesService, RECEIVABLE_INVOICE_STATUSES } from './invoices.service';
 
