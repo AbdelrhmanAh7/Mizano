@@ -94,6 +94,17 @@ Runtime environment settings can be configured in `.env.local` or environment-sp
 
 - `MIZANO_NODE_HEAP_MB`: Optional integer between 128 and 4096. Caps Node V8 heap space (`--max-old-space-size=<n>`) via the start launcher. Because the launcher evaluates this setting to configure Node arguments before the application process boots and before `.env.local` is loaded by NestJS, this variable must be exported in the service/process environment (e.g. shell, systemd, or container environment). In containerized setups, this variable will not reach containers until the compose profile (#39) passes it. When unset, Node default heap limits apply. For Raspberry Pi 5 (8GB) deployments, `1024` (1GB) is a suggested starting value to tune (not a measured benchmark).
 
+### Develop in the browser
+
+Mizano opens in [GitHub Codespaces](https://github.com/features/codespaces) with PostgreSQL 16 and Redis 7 already running. No local install or Docker is needed.
+
+1. On the repository page choose **Code → Codespaces → Create codespace on master**. The `.devcontainer/` setup uses the 4-core machine (the web app, API and database need it).
+2. Wait for the first-time setup to finish. It installs packages, generates Prisma, applies the migrations and loads the demo data (a few minutes; it runs once).
+3. In the terminal run `pnpm dev:codespaces`. It sets the web, API and sign-in addresses from the codespace's own forwarded URLs, then starts both servers.
+4. Open the **Mizano web** port (5001) from the Ports tab, or accept the preview. Sign in with the demo account `admin@mizano.com` / `password123` (other demo users in `apps/api/prisma/seed.ts`). The API is on port 6001 (`/api/docs` for Swagger).
+
+Ports stay private to your GitHub account; do not make them public. The codespace holds only demo data and the placeholder development secrets from `.env.local`: never put real customer data or real keys in it. Stop it when you finish (**Codespaces → Stop**, it also stops itself after 30 idle minutes) to save your free hours. At the time of writing a free personal account includes 120 core-hours a month, so a 4-core codespace gives about 30 hours; check **Settings → Billing** for the current figures. To start with a clean database, run `pnpm db:reset`.
+
 ## Repository layout
 
 ```

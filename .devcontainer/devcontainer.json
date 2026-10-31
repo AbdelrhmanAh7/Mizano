@@ -1,0 +1,25 @@
+{
+  "name": "Mizano",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "shutdownAction": "stopCompose",
+  "hostRequirements": { "cpus": 4, "memory": "8gb", "storage": "32gb" },
+  "containerEnv": {
+    "APP_ENV": "local",
+    "DATABASE_URL": "postgresql://mizano:mizano_secret@postgres:5432/mizano_db?schema=public",
+    "REDIS_URL": "redis://redis:6379"
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "forwardPorts": [5001, 6001],
+  "portsAttributes": {
+    "5001": { "label": "Mizano web", "onAutoForward": "openPreview" },
+    "6001": { "label": "Mizano API", "onAutoForward": "notify" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode", "Prisma.prisma"]
+    },
+    "codespaces": { "openFiles": ["README.md"] }
+  }
+}
