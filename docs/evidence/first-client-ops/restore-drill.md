@@ -2,9 +2,9 @@
 
 Issue: [#590](https://github.com/AbdelrhmanAh7/Mizano/issues/590). Date: **1 November 2026**, Africa/Cairo.
 
-Tested Code Head: `e25ddee89dcae4209649f4f9b3ea72f6297a9230`.
-This identifies the exact scripts/fixture commit tested below. This evidence document was added
-after the run; no live deployment or Pi/server restore is claimed. Final PR-head checks and
+Tested Code Head: `d3fe16a9ea99f60a95fc87eea63eedf5c902ea9e`.
+This identifies the exact scripts/fixture commit tested below (the last code commit; later commits,
+if any, change this document only). This evidence document was added after the run; no live deployment or Pi/server restore is claimed. Final PR-head checks and
 independent review are recorded in the PR.
 
 ## Scope and tools
@@ -53,20 +53,25 @@ bash deploy/pi/scripts/test-restore-drill.sh
 - Isolated restore, file hashes and per-organization counts: passed.
 - Posted journal and organization trial balance, account tenancy, draft and source-journal links:
   all check counts **zero**.
-- Measured restore-script elapsed time: **5 seconds** (Bash `SECONDS`, 1-second resolution),
+- Negative check: after the first restore, one approved intake job had its draft link removed and
+  a new backup was taken. The restore drill **failed as required** with the fixed reason
+  "unbalanced ledger or broken tenant/document/journal links", so an incomplete approval is never
+  reported as a recovery.
+- Measured restore-script elapsed time: **4 seconds** (Bash `SECONDS`, 1-second resolution),
   including snapshot selection, archive verification, scratch database startup/restore, checks
   and cleanup. This is one small local fixture; it is not a live RTO measurement.
 
 Metadata-only output from the exact-code run:
 
 ```text
-2026-10-31T22:36:38Z backup OK snapshot=6ed07379c6151dd406ca8d9c1cf108b2b838d43315b1cc20e2eb7216feae845d
+2026-10-31T23:02:27Z backup OK snapshot=c3bcafb236c08525798483ee4103353c0ab1102fb5d271be6dd9a53e38bc491b
 fixture organizations=2 originals=4 journals=2 linked_drafts=4 source_database_stopped=1
-2026-10-31T22:36:41Z restore stage=verify-files
-2026-10-31T22:36:42Z restore stage=database
-2026-10-31T22:36:44Z restore stage=verify-ledger-links
+2026-10-31T23:02:29Z restore stage=verify-files
+2026-10-31T23:02:31Z restore stage=database
+2026-10-31T23:02:31Z restore stage=verify-ledger-links
 organizations=2 originals=4 linked_drafts=4 checks=all-zero
-2026-10-31T22:36:44Z restore drill OK snapshot=6ed07379c6151dd406ca8d9c1cf108b2b838d43315b1cc20e2eb7216feae845d elapsed_seconds=5
+2026-10-31T23:02:32Z restore drill OK snapshot=c3bcafb236c08525798483ee4103353c0ab1102fb5d271be6dd9a53e38bc491b elapsed_seconds=4
+incomplete_approval_negative_check=passed
 restic_check_read_data=passed source_project_cleanup=passed
 ```
 
