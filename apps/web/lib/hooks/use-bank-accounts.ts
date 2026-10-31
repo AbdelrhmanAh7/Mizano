@@ -3,8 +3,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bankAccountsApi } from '@/lib/api';
 import { toast } from 'sonner';
-
-type ApiError = { response?: { data?: { message?: string } } };
+import { useTranslations } from 'next-intl';
+import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 
 export interface BankAccount {
   id: string;
@@ -69,46 +69,52 @@ export function useBankAccountTransactions(id: string, params?: Record<string, u
 
 export function useCreateBankAccount() {
   const queryClient = useQueryClient();
+  const t = useTranslations('banking.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: bankAccountsApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
-      toast.success('Bank account created successfully');
+      toast.success(t('accountCreated'));
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to create bank account');
+    onError: (error: unknown) => {
+      toast.error(getLocalizedApiErrorMessage(error, t('accountCreateError'), tApiErrors));
     },
   });
 }
 
 export function useUpdateBankAccount() {
   const queryClient = useQueryClient();
+  const t = useTranslations('banking.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
       bankAccountsApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
-      toast.success('Bank account updated successfully');
+      toast.success(t('accountUpdated'));
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to update bank account');
+    onError: (error: unknown) => {
+      toast.error(getLocalizedApiErrorMessage(error, t('accountUpdateError'), tApiErrors));
     },
   });
 }
 
 export function useDeleteBankAccount() {
   const queryClient = useQueryClient();
+  const t = useTranslations('banking.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: bankAccountsApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
-      toast.success('Bank account deleted successfully');
+      toast.success(t('accountDeleted'));
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to delete bank account');
+    onError: (error: unknown) => {
+      toast.error(getLocalizedApiErrorMessage(error, t('accountDeleteError'), tApiErrors));
     },
   });
 }
@@ -135,14 +141,17 @@ export function useBankAccountBalanceHistory(id: string) {
 }
 
 // Helper functions
-export const accountTypeOptions = [
-  { value: 'BANK', label: 'Bank Account' },
-  { value: 'CREDIT_CARD', label: 'Credit Card' },
-  { value: 'PETTY_CASH', label: 'Petty Cash' },
+/** Bank account types; `labelKey` is a key under the `banking` messages namespace. */
+export const accountTypeOptions: { value: BankAccountType; labelKey: string }[] = [
+  { value: 'BANK', labelKey: 'accounts.types.bank' },
+  { value: 'CREDIT_CARD', labelKey: 'accounts.types.creditCard' },
+  { value: 'PETTY_CASH', labelKey: 'accounts.types.pettyCash' },
 ];
 
-export function getAccountTypeLabel(type: BankAccountType): string {
-  return accountTypeOptions.find((t) => t.value === type)?.label || type;
+/** The translated label of a bank account type; `t` is `useTranslations('banking')`. */
+export function getAccountTypeLabel(type: BankAccountType, t: (key: string) => string): string {
+  const option = accountTypeOptions.find((o) => o.value === type);
+  return option ? t(option.labelKey) : type;
 }
 
 export function getAccountTypeColor(type: BankAccountType): string {

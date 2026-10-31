@@ -23,6 +23,7 @@ import { render, screen } from '@testing-library/react';
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
 jest.mock('next-intl', () => ({
+  useLocale: () => 'en',
   useTranslations: () => (key: string) => key,
 }));
 

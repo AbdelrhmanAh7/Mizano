@@ -11,7 +11,7 @@ import { useTranslations } from 'next-intl';
 export default function EditEmployeePage({ params }: { params: { id: string } }) {
   const { id } = params;
   const t = useTranslations('hr');
-  const { data: employee, isLoading } = useEmployee(id);
+  const { data: employee, isLoading, isError, refetch } = useEmployee(id);
 
   if (isLoading) {
     return (
@@ -22,12 +22,23 @@ export default function EditEmployeePage({ params }: { params: { id: string } })
     );
   }
 
+  if (isError) {
+    return (
+      <div className="text-center py-12 space-y-4" role="alert">
+        <p className="text-muted-foreground">{t('loadError')}</p>
+        <Button variant="outline" onClick={() => void refetch()}>
+          {t('retry')}
+        </Button>
+      </div>
+    );
+  }
+
   if (!employee) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-xl font-semibold">Employee not found</h2>
+        <h2 className="text-xl font-semibold">{t('employees.notFound')}</h2>
         <Button asChild className="mt-4">
-          <Link href="/hr/employees">Back to Employees</Link>
+          <Link href="/hr/employees">{t('employees.backToEmployees')}</Link>
         </Button>
       </div>
     );
@@ -37,14 +48,16 @@ export default function EditEmployeePage({ params }: { params: { id: string } })
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
           <Link href={`/hr/employees/${id}`}>
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
           </Link>
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('employees.editEmployee')}</h1>
-          <p className="text-muted-foreground">Update employee information for {employee.name}</p>
+          <p className="text-muted-foreground">
+            {t('employees.editDescription', { name: employee.name })}
+          </p>
         </div>
       </div>
 

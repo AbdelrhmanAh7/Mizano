@@ -13,8 +13,9 @@ import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function ReconcilePage() {
   const t = useTranslations('banking');
+  const tCommon = useTranslations('common');
   const formatCurrency = useMoneyFormatter();
-  const { data, isLoading } = useBankAccounts({ isActive: true });
+  const { data, isLoading, isError, refetch } = useBankAccounts({ isActive: true });
   const accounts: BankAccount[] = data?.data || [];
 
   if (isLoading) {
@@ -39,7 +40,14 @@ export default function ReconcilePage() {
       </div>
 
       {/* Account Selection */}
-      {accounts.length === 0 ? (
+      {isError ? (
+        <div className="py-12 text-center space-y-4" role="alert">
+          <p className="text-sm text-muted-foreground">{tCommon('table.error')}</p>
+          <Button variant="outline" onClick={() => void refetch()}>
+            {tCommon('dashboard.tryAgain')}
+          </Button>
+        </div>
+      ) : accounts.length === 0 ? (
         <div className="text-center py-12">
           <Landmark className="mx-auto h-12 w-12 text-muted-foreground" />
           <h3 className="mt-4 text-lg font-semibold">{t('reconciliation.empty.noAccounts')}</h3>
@@ -117,9 +125,9 @@ export default function ReconcilePage() {
 
                   <Button asChild className="w-full">
                     <Link href={`/banking/reconcile/${account.id}`}>
-                      <RefreshCw className="mr-2 h-4 w-4" />
+                      <RefreshCw className="me-2 h-4 w-4" />
                       {t('reconciliation.reconcile')}
-                      <ArrowRight className="ml-2 h-4 w-4" />
+                      <ArrowRight className="ms-2 h-4 w-4 rtl:rotate-180" />
                     </Link>
                   </Button>
                 </CardContent>

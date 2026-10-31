@@ -15,6 +15,8 @@ import {
 import { cn } from '@/lib/utils';
 import { useBankAccounts } from '@/lib/hooks/use-bank-accounts';
 import { useImportTransactions } from '@/lib/hooks/use-bank-transactions';
+import { getLocalizedApiErrorMessage } from '@/lib/api-error';
+import { useTranslations } from 'next-intl';
 
 interface ImportResult {
   imported: number;
@@ -24,13 +26,21 @@ interface ImportResult {
 }
 
 export function StatementImportZone() {
+  const t = useTranslations('banking.import');
+  const tCommon = useTranslations('common');
+  const tApiErrors = useTranslations('common.apiErrors');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: accountsData } = useBankAccounts();
+  const {
+    data: accountsData,
+    isError: accountsFailed,
+    isLoading: accountsLoading,
+    refetch: refetchAccounts,
+  } = useBankAccounts();
   const accounts = accountsData?.data || accountsData || [];
   const importMutation = useImportTransactions();
 
@@ -38,7 +48,7 @@ export function StatementImportZone() {
 
   const handleFile = async (file: File) => {
     if (!selectedAccountId) {
-      setError('Please select a bank account first');
+      setError(t('selectAccountFirst'));
       return;
     }
     setError(null);
@@ -50,8 +60,7 @@ export function StatementImportZone() {
         (res as unknown as { data?: ImportResult })?.data || (res as unknown as ImportResult);
       setResult(data);
     } catch (err: unknown) {
-      const apiErr = err as { response?: { data?: { message?: string } } };
-      setError(apiErr.response?.data?.message || 'Failed to import statement');
+      setError(getLocalizedApiErrorMessage(err, t('failed'), tApiErrors));
     }
   };
 
@@ -71,9 +80,15 @@ export function StatementImportZone() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+        <Select
+          value={selectedAccountId}
+          onValueChange={setSelectedAccountId}
+          disabled={accountsLoading || accountsFailed}
+        >
           <SelectTrigger className="w-[260px]">
-            <SelectValue placeholder="Select bank account..." />
+            <SelectValue
+              placeholder={accountsLoading ? tCommon('loading.default') : t('selectAccount')}
+            />
           </SelectTrigger>
           <SelectContent>
             {(Array.isArray(accounts) ? accounts : []).map(
@@ -85,6 +100,14 @@ export function StatementImportZone() {
             )}
           </SelectContent>
         </Select>
+        {accountsFailed && (
+          <span className="flex items-center gap-2 text-sm text-destructive">
+            {t('accountsFailed')}
+            <Button variant="outline" size="sm" onClick={() => void refetchAccounts()}>
+              {tCommon('combobox.retry')}
+            </Button>
+          </span>
+        )}
       </div>
 
       <div
@@ -111,15 +134,13 @@ export function StatementImportZone() {
           onChange={handleInputChange}
         />
         <Upload className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
-        <p className="text-sm font-medium">
-          {isDragging ? 'Drop file here' : 'Drag & drop or click to upload'}
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">CSV, Excel, OFX, QFX files</p>
+        <p className="text-sm font-medium">{isDragging ? t('dropHere') : t('dragOrClick')}</p>
+        <p className="text-xs text-muted-foreground mt-1">{t('formats')}</p>
       </div>
 
       {isLoading && (
         <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">Importing transactions...</p>
+          <p className="text-sm text-muted-foreground">{t('importing')}</p>
           <Progress className="h-2" value={undefined} />
         </div>
       )}
@@ -138,11 +159,15 @@ export function StatementImportZone() {
             <div className="flex items-center gap-4 text-sm">
               <span className="flex items-center gap-1">
                 <FileText className="h-3 w-3" />
-                {result.total} total
+                {t('total', { count: result.total })}
               </span>
-              <span className="font-medium">{result.imported} imported</span>
-              <span className="text-muted-foreground">{result.duplicates} duplicates skipped</span>
-              <span className="text-blue-700">{result.rulesApplied} rules applied</span>
+              <span className="font-medium">{t('imported', { count: result.imported })}</span>
+              <span className="text-muted-foreground">
+                {t('duplicates', { count: result.duplicates })}
+              </span>
+              <span className="text-blue-700">
+                {t('rulesApplied', { count: result.rulesApplied })}
+              </span>
             </div>
           </AlertDescription>
         </Alert>
@@ -150,7 +175,7 @@ export function StatementImportZone() {
 
       {result && (
         <Button variant="outline" size="sm" onClick={() => setResult(null)}>
-          Import Another File
+          {t('another')}
         </Button>
       )}
     </div>

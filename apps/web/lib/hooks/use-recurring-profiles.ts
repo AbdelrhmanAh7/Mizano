@@ -1,12 +1,15 @@
 'use client';
 
+import { useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { recurringProfilesApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { getLocalizedApiErrorMessage } from '@/lib/api-error';
+import { useToastMutation } from '@/lib/hooks/use-toast-mutation';
 import { idempotencyKeyFor, releaseIdempotencyKey } from '@/lib/utils/idempotency';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
 
 export type RecurringFrequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
 
@@ -102,32 +105,19 @@ export function useRecurringProfile(id: string | undefined) {
   });
 }
 
+const RECURRING_TOAST = 'accounting.recurring.toast';
+
 /**
  * Hook to create a new recurring profile
  */
 export function useCreateRecurringProfile() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (data: CreateRecurringProfileData) => {
-      const response = await recurringProfilesApi.create(data);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recurring-profiles'] });
-      toast({
-        title: 'Profile created',
-        description: 'The recurring profile has been created successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error creating profile',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: RECURRING_TOAST,
+    mutationFn: async (data: CreateRecurringProfileData) =>
+      (await recurringProfilesApi.create(data)).data,
+    invalidate: () => [['recurring-profiles']],
+    success: 'created',
+    error: 'createError',
   });
 }
 
@@ -135,57 +125,41 @@ export function useCreateRecurringProfile() {
  * Hook to update an existing recurring profile
  */
 export function useUpdateRecurringProfile() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateRecurringProfileData }) => {
-      const response = await recurringProfilesApi.update(id, data);
-      return response.data;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['recurring-profiles'] });
-      queryClient.invalidateQueries({ queryKey: ['recurring-profiles', variables.id] });
-      toast({
-        title: 'Profile updated',
-        description: 'The recurring profile has been updated successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error updating profile',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: RECURRING_TOAST,
+    mutationFn: async ({ id, data }: { id: string; data: UpdateRecurringProfileData }) =>
+      (await recurringProfilesApi.update(id, data)).data,
+    invalidate: ({ id }) => [['recurring-profiles'], ['recurring-profiles', id]],
+    success: 'updated',
+    error: 'updateError',
   });
 }
 
 /**
- * Hook to toggle recurring profile active state
+ * Hook to toggle recurring profile active state (the toast names the new state).
  */
 export function useToggleRecurringProfile() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations(RECURRING_TOAST);
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async (id: string) => {
       const response = await recurringProfilesApi.toggle(id);
-      return response.data;
+      return response.data as { isActive?: boolean };
     },
     onSuccess: (data, id) => {
-      queryClient.invalidateQueries({ queryKey: ['recurring-profiles'] });
-      queryClient.invalidateQueries({ queryKey: ['recurring-profiles', id] });
-      toast({
-        title: data.isActive ? 'Profile activated' : 'Profile deactivated',
-        description: `The recurring profile has been ${data.isActive ? 'activated' : 'deactivated'} successfully.`,
-      });
+      void queryClient.invalidateQueries({ queryKey: ['recurring-profiles'] });
+      void queryClient.invalidateQueries({ queryKey: ['recurring-profiles', id] });
+      const state = data?.isActive ? 'activated' : 'paused';
+      toast({ title: t(state), description: t(`${state}Description`) });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error toggling profile',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('toggleError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });
@@ -195,28 +169,12 @@ export function useToggleRecurringProfile() {
  * Hook to delete a recurring profile
  */
 export function useDeleteRecurringProfile() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await recurringProfilesApi.delete(id);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recurring-profiles'] });
-      toast({
-        title: 'Profile deleted',
-        description: 'The recurring profile has been deleted successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error deleting profile',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: RECURRING_TOAST,
+    mutationFn: async (id: string) => (await recurringProfilesApi.delete(id)).data,
+    invalidate: () => [['recurring-profiles']],
+    success: 'deleted',
+    error: 'deleteError',
   });
 }
 
@@ -224,29 +182,17 @@ export function useDeleteRecurringProfile() {
  * Hook to execute a recurring profile immediately
  */
 export function useExecuteRecurringProfile() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  return useMutation({
+  return useToastMutation({
+    namespace: RECURRING_TOAST,
     mutationFn: async (id: string) => {
       const response = await recurringProfilesApi.execute(id, idempotencyKeyFor(`execute:${id}`));
+      // A completed run frees its key; a failed one keeps it so a retry is the same request.
+      releaseIdempotencyKey(`execute:${id}`);
       return response.data;
     },
-    onSuccess: (_, id) => {
-      releaseIdempotencyKey(`execute:${id}`);
-      queryClient.invalidateQueries({ queryKey: ['recurring-profiles'] });
-      queryClient.invalidateQueries({ queryKey: ['recurring-profiles', id] });
-      toast({
-        title: 'Profile executed',
-        description: 'The recurring profile has been executed successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error executing profile',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: (id) => [['recurring-profiles'], ['recurring-profiles', id]],
+    success: 'executed',
+    error: 'executeError',
   });
 }
 
@@ -282,14 +228,15 @@ export function useRecurringProfileExecutions(id: string | undefined, limit?: nu
 }
 
 /**
- * Get frequency display label
+ * Translated frequency label (accounting.recurring.frequencies); unknown values show as sent.
  */
-export function getFrequencyLabel(frequency: RecurringFrequency): string {
-  const labelMap: Record<RecurringFrequency, string> = {
-    DAILY: 'Daily',
-    WEEKLY: 'Weekly',
-    MONTHLY: 'Monthly',
-    YEARLY: 'Yearly',
-  };
-  return labelMap[frequency] || frequency;
+export function useFrequencyLabel(): (frequency: RecurringFrequency | string) => string {
+  const t = useTranslations('accounting.recurring.frequencies');
+  return useCallback(
+    (frequency: RecurringFrequency | string) => {
+      const key = String(frequency).toLowerCase();
+      return t.has(key) ? t(key) : String(frequency);
+    },
+    [t],
+  );
 }

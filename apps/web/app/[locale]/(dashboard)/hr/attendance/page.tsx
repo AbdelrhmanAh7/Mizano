@@ -42,16 +42,29 @@ import {
   AttendanceStatus,
 } from '@/lib/hooks/use-hr';
 import { useTranslations } from 'next-intl';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 const attendanceStatuses: AttendanceStatus[] = ['PRESENT', 'ABSENT', 'LEAVE', 'HALF_DAY'];
 
 function AttendancePageContent() {
   const t = useTranslations('hr');
+  const tCommon = useTranslations('common');
+  const dateLocale = useDateFnsLocale();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  const { data: employeesData, isLoading: employeesLoading } = useEmployees({ status: 'ACTIVE' });
-  const { data: attendanceData, isLoading: attendanceLoading } = useAttendance(
+  const {
+    data: employeesData,
+    isLoading: employeesLoading,
+    isError: employeesError,
+    refetch: refetchEmployees,
+  } = useEmployees({ status: 'ACTIVE' });
+  const {
+    data: attendanceData,
+    isLoading: attendanceLoading,
+    isError: attendanceError,
+    refetch: refetchAttendance,
+  } = useAttendance(
     format(startOfMonth(currentMonth), 'yyyy-MM-dd'),
     format(endOfMonth(currentMonth), 'yyyy-MM-dd'),
   );
@@ -102,6 +115,11 @@ function AttendancePageContent() {
   ).length;
 
   const isLoading = employeesLoading || attendanceLoading;
+  const isError = employeesError || attendanceError;
+  const retry = () => {
+    void refetchEmployees();
+    void refetchAttendance();
+  };
 
   // Columns for the selected date details table
   const detailColumns: ColumnDef<{
@@ -139,7 +157,7 @@ function AttendancePageContent() {
         const att = getAttendanceForDay(row.original.id, selectedDate);
         return att ? (
           <Badge variant="outline" className={getAttendanceStatusColor(att.status)}>
-            {getAttendanceStatusLabel(att.status)}
+            {getAttendanceStatusLabel(att.status, t)}
           </Badge>
         ) : (
           <span className="text-muted-foreground">{t('attendance.notMarked')}</span>
@@ -190,7 +208,7 @@ function AttendancePageContent() {
               <SelectItem value="__none__">{t('attendance.mark')}</SelectItem>
               {attendanceStatuses.map((status) => (
                 <SelectItem key={status} value={status}>
-                  {getAttendanceStatusLabel(status)}
+                  {getAttendanceStatusLabel(status, t)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -210,7 +228,7 @@ function AttendancePageContent() {
         </div>
         <Button asChild>
           <Link href="/hr/attendance/mark">
-            <UserCheck className="mr-2 h-4 w-4" />
+            <UserCheck className="me-2 h-4 w-4" />
             {t('attendance.newAttendance')}
           </Link>
         </Button>
@@ -219,14 +237,24 @@ function AttendancePageContent() {
       {/* Month Navigator */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" onClick={previousMonth}>
-            <ChevronLeft className="h-4 w-4" />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={previousMonth}
+            aria-label={t('attendance.previousMonth')}
+          >
+            <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
           </Button>
           <h2 className="text-xl font-semibold min-w-[200px] text-center">
-            {format(currentMonth, 'MMMM yyyy')}
+            {format(currentMonth, 'MMMM yyyy', { locale: dateLocale })}
           </h2>
-          <Button variant="outline" size="icon" onClick={nextMonth}>
-            <ChevronRight className="h-4 w-4" />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={nextMonth}
+            aria-label={t('attendance.nextMonth')}
+          >
+            <ChevronRight className="h-4 w-4 rtl:rotate-180" />
           </Button>
         </div>
         <Button
@@ -263,7 +291,9 @@ function AttendancePageContent() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {t('attendance.presentOn', { date: format(selectedDate, 'MMM d') })}
+                  {t('attendance.presentOn', {
+                    date: format(selectedDate, 'MMM d', { locale: dateLocale }),
+                  })}
                 </p>
                 <p className="text-2xl font-bold text-green-600">{presentCount}</p>
               </div>
@@ -278,7 +308,9 @@ function AttendancePageContent() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {t('attendance.absentOn', { date: format(selectedDate, 'MMM d') })}
+                  {t('attendance.absentOn', {
+                    date: format(selectedDate, 'MMM d', { locale: dateLocale }),
+                  })}
                 </p>
                 <p className="text-2xl font-bold text-red-600">{absentCount}</p>
               </div>
@@ -293,7 +325,9 @@ function AttendancePageContent() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {t('attendance.onLeaveOn', { date: format(selectedDate, 'MMM d') })}
+                  {t('attendance.onLeaveOn', {
+                    date: format(selectedDate, 'MMM d', { locale: dateLocale }),
+                  })}
                 </p>
                 <p className="text-2xl font-bold text-yellow-600">{leaveCount}</p>
               </div>
@@ -302,139 +336,159 @@ function AttendancePageContent() {
         </Card>
       </div>
 
-      {/* Calendar View - kept as manual Table due to dynamic date columns */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('attendance.calendar')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="sticky left-0 bg-background min-w-[200px]">
-                    {t('attendance.table.employee')}
-                  </TableHead>
-                  {daysInMonth.map((day) => (
-                    <TableHead
-                      key={day.toISOString()}
-                      className={cn(
-                        'text-center min-w-[40px] cursor-pointer hover:bg-muted',
-                        isWeekend(day) && 'bg-muted/50',
-                        isSameDay(day, selectedDate) && 'bg-primary/10',
-                      )}
-                      onClick={() => setSelectedDate(day)}
-                    >
-                      <div className="flex flex-col items-center">
-                        <span className="text-xs text-muted-foreground">{format(day, 'EEE')}</span>
-                        <span
+      {isError ? (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="py-8 text-center space-y-4" role="alert">
+              <p className="text-sm text-muted-foreground">{tCommon('table.error')}</p>
+              <Button variant="outline" onClick={retry}>
+                {t('retry')}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Calendar View - kept as manual Table due to dynamic date columns */}
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('attendance.calendar')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="sticky start-0 bg-background min-w-[200px]">
+                        {t('attendance.table.employee')}
+                      </TableHead>
+                      {daysInMonth.map((day) => (
+                        <TableHead
+                          key={day.toISOString()}
                           className={cn(
-                            'text-sm',
-                            isSameDay(day, new Date()) &&
-                              'bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center',
+                            'text-center min-w-[40px] cursor-pointer hover:bg-muted',
+                            isWeekend(day) && 'bg-muted/50',
+                            isSameDay(day, selectedDate) && 'bg-primary/10',
                           )}
+                          onClick={() => setSelectedDate(day)}
                         >
-                          {format(day, 'd')}
-                        </span>
-                      </div>
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {employees.map((employee: { id: string; name: string }) => {
-                  const nameParts = (employee.name || '').split(' ');
-                  const initials =
-                    nameParts.length >= 2
-                      ? nameParts[0][0] + nameParts[nameParts.length - 1][0]
-                      : (employee.name || '??').slice(0, 2);
-                  return (
-                    <TableRow key={employee.id}>
-                      <TableCell className="sticky left-0 bg-background">
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-                          </Avatar>
-                          <span className="text-sm font-medium">{employee.name}</span>
-                        </div>
-                      </TableCell>
-                      {daysInMonth.map((day) => {
-                        const att = getAttendanceForDay(employee.id, day);
-                        const isSelected = isSameDay(day, selectedDate);
-                        return (
-                          <TableCell
-                            key={day.toISOString()}
-                            className={cn(
-                              'text-center p-1',
-                              isWeekend(day) && 'bg-muted/50',
-                              isSelected && 'bg-primary/10',
-                            )}
-                          >
-                            {att ? (
-                              <Badge
-                                variant="outline"
-                                className={cn('text-xs px-1', getAttendanceStatusColor(att.status))}
-                              >
-                                {att.status === 'PRESENT' && 'P'}
-                                {att.status === 'ABSENT' && 'A'}
-                                {att.status === 'LEAVE' && 'L'}
-                                {att.status === 'HALF_DAY' && 'H'}
-                              </Badge>
-                            ) : isWeekend(day) ? (
-                              <span className="text-xs text-muted-foreground">-</span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                        );
-                      })}
+                          <div className="flex flex-col items-center">
+                            <span className="text-xs text-muted-foreground">
+                              {format(day, 'EEE', { locale: dateLocale })}
+                            </span>
+                            <span
+                              className={cn(
+                                'text-sm',
+                                isSameDay(day, new Date()) &&
+                                  'bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center',
+                              )}
+                            >
+                              {format(day, 'd')}
+                            </span>
+                          </div>
+                        </TableHead>
+                      ))}
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {employees.map((employee: { id: string; name: string }) => {
+                      const nameParts = (employee.name || '').split(' ');
+                      const initials =
+                        nameParts.length >= 2
+                          ? nameParts[0][0] + nameParts[nameParts.length - 1][0]
+                          : (employee.name || '??').slice(0, 2);
+                      return (
+                        <TableRow key={employee.id}>
+                          <TableCell className="sticky start-0 bg-background">
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+                              </Avatar>
+                              <span className="text-sm font-medium">{employee.name}</span>
+                            </div>
+                          </TableCell>
+                          {daysInMonth.map((day) => {
+                            const att = getAttendanceForDay(employee.id, day);
+                            const isSelected = isSameDay(day, selectedDate);
+                            return (
+                              <TableCell
+                                key={day.toISOString()}
+                                className={cn(
+                                  'text-center p-1',
+                                  isWeekend(day) && 'bg-muted/50',
+                                  isSelected && 'bg-primary/10',
+                                )}
+                              >
+                                {att ? (
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      'text-xs px-1',
+                                      getAttendanceStatusColor(att.status),
+                                    )}
+                                  >
+                                    {att.status === 'PRESENT' && t('attendance.short.present')}
+                                    {att.status === 'ABSENT' && t('attendance.short.absent')}
+                                    {att.status === 'LEAVE' && t('attendance.short.leave')}
+                                    {att.status === 'HALF_DAY' && t('attendance.short.halfDay')}
+                                  </Badge>
+                                ) : isWeekend(day) ? (
+                                  <span className="text-xs text-muted-foreground">-</span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Selected Date Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{format(selectedDate, 'EEEE, MMMM d, yyyy')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DataTable
-            columns={detailColumns}
-            data={employees}
-            isLoading={isLoading}
-            emptyMessage={t('employees.empty.title')}
-          />
-        </CardContent>
-      </Card>
+          {/* Selected Date Details */}
+          <Card>
+            <CardHeader>
+              <CardTitle>{format(selectedDate, 'PPPP', { locale: dateLocale })}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DataTable
+                columns={detailColumns}
+                data={employees}
+                isLoading={isLoading}
+                emptyMessage={t('employees.empty.title')}
+              />
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* Legend */}
       <div className="flex items-center gap-6 text-sm">
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="bg-green-100 text-green-800">
-            P
+            {t('attendance.short.present')}
           </Badge>
           <span>{t('attendance.status.present')}</span>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="bg-red-100 text-red-800">
-            A
+            {t('attendance.short.absent')}
           </Badge>
           <span>{t('attendance.status.absent')}</span>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
-            L
+            {t('attendance.short.leave')}
           </Badge>
           <span>{t('attendance.status.leave')}</span>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="bg-orange-100 text-orange-800">
-            H
+            {t('attendance.short.halfDay')}
           </Badge>
           <span>{t('attendance.status.halfDay')}</span>
         </div>

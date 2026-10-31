@@ -24,6 +24,7 @@ import {
   useDeleteBankAccount,
   getAccountTypeLabel,
   getAccountTypeColor,
+  accountTypeOptions,
   BankAccount,
   BankAccountType,
 } from '@/lib/hooks/use-bank-accounts';
@@ -33,12 +34,13 @@ import { sumDecimals } from '@/lib/decimal';
 
 function BankAccountsPageContent() {
   const t = useTranslations('banking');
+  const tCommon = useTranslations('common');
   const formatCurrency = useMoneyFormatter();
   const tableParams = useTableParams({ defaultSortBy: 'name' });
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const { data, isLoading } = useBankAccounts({
+  const { data, isLoading, isError, refetch } = useBankAccounts({
     ...tableParams.queryParams,
     type: typeFilter !== 'all' ? (typeFilter as BankAccountType) : undefined,
   });
@@ -87,7 +89,7 @@ function BankAccountsPageContent() {
       header: t('accounts.table.type'),
       cell: ({ row }) => (
         <Badge variant="outline" className={getAccountTypeColor(row.original.type)}>
-          {getAccountTypeLabel(row.original.type)}
+          {getAccountTypeLabel(row.original.type, t)}
         </Badge>
       ),
     },
@@ -96,7 +98,11 @@ function BankAccountsPageContent() {
       header: t('accounts.table.accountNumber'),
       meta: { cellClassName: 'font-mono text-sm text-muted-foreground' },
       cell: ({ row }) =>
-        row.original.accountNumber ? `.... ${row.original.accountNumber.slice(-4)}` : '-',
+        row.original.accountNumber ? (
+          <bdi>{`.... ${row.original.accountNumber.slice(-4)}`}</bdi>
+        ) : (
+          '-'
+        ),
     },
     {
       accessorKey: 'systemBalance',
@@ -109,7 +115,7 @@ function BankAccountsPageContent() {
           onSort={tableParams.setSort}
         />
       ),
-      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      meta: { headerClassName: 'text-end', cellClassName: 'text-end' },
       cell: ({ row }) => {
         const balance =
           typeof row.original.systemBalance === 'string'
@@ -126,10 +132,10 @@ function BankAccountsPageContent() {
     },
     {
       accessorKey: 'isActive',
-      header: 'Status',
+      header: t('accounts.table.status'),
       cell: ({ row }) => (
         <Badge variant={row.original.isActive ? 'default' : 'secondary'}>
-          {row.original.isActive ? 'Active' : 'Inactive'}
+          {row.original.isActive ? tCommon('status.active') : tCommon('status.inactive')}
         </Badge>
       ),
     },
@@ -144,7 +150,11 @@ function BankAccountsPageContent() {
             viewHref={`/banking/accounts/${account.id}`}
             editHref={`/banking/accounts/${account.id}/edit`}
             onDelete={() => setDeleteId(account.id)}
-            labels={{ view: 'View', edit: 'Edit', delete: 'Delete' }}
+            labels={{
+              view: tCommon('buttons.view'),
+              edit: tCommon('buttons.edit'),
+              delete: tCommon('buttons.delete'),
+            }}
           />
         );
       },
@@ -157,11 +167,11 @@ function BankAccountsPageContent() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('accounts.title')}</h1>
-          <p className="text-muted-foreground">Manage your bank accounts and track balances</p>
+          <p className="text-muted-foreground">{t('accounts.pageDescription')}</p>
         </div>
         <Button asChild>
           <Link href="/banking/accounts/new">
-            <Plus className="mr-2 h-4 w-4" />
+            <Plus className="me-2 h-4 w-4" />
             {t('accounts.newAccount')}
           </Link>
         </Button>
@@ -172,12 +182,16 @@ function BankAccountsPageContent() {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Balance</p>
-              <p className="text-3xl font-bold font-mono">{formatCurrency(totalBalance)}</p>
+              <p className="text-sm text-muted-foreground">{t('accounts.totalBalance')}</p>
+              <p className="text-3xl font-bold font-mono">
+                {isError ? '—' : formatCurrency(totalBalance)}
+              </p>
             </div>
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">Active Accounts</p>
-              <p className="text-2xl font-bold">{accounts.filter((a) => a.isActive).length}</p>
+            <div className="text-end">
+              <p className="text-sm text-muted-foreground">{t('accounts.activeAccounts')}</p>
+              <p className="text-2xl font-bold">
+                {isError ? '—' : accounts.filter((a) => a.isActive).length}
+              </p>
             </div>
           </div>
         </CardContent>
@@ -188,54 +202,60 @@ function BankAccountsPageContent() {
         <DataTableSearch
           value={tableParams.search}
           onChange={tableParams.setSearch}
-          placeholder="Search accounts..."
+          placeholder={t('accounts.searchPlaceholder')}
         />
         <Select value={typeFilter} onValueChange={setTypeFilter}>
           <SelectTrigger className="w-40">
-            <SelectValue placeholder="Type" />
+            <SelectValue placeholder={t('accounts.table.type')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="BANK">Bank Account</SelectItem>
-            <SelectItem value="CREDIT_CARD">Credit Card</SelectItem>
-            <SelectItem value="PETTY_CASH">Petty Cash</SelectItem>
+            <SelectItem value="all">{t('accounts.allTypes')}</SelectItem>
+            {accountTypeOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {t(option.labelKey)}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
 
       {/* Table */}
-      <DataTable
-        columns={columns}
-        data={accounts}
-        page={meta?.page || 1}
-        totalPages={meta?.totalPages || 1}
-        total={meta?.total || 0}
-        limit={tableParams.limit}
-        onPageChange={tableParams.setPage}
-        onLimitChange={tableParams.setLimit}
-        isLoading={isLoading}
-        emptyMessage={t('accounts.empty.title')}
-        emptyAction={
-          <Button asChild>
-            <Link href="/banking/accounts/new">{t('accounts.newAccount')}</Link>
+      {isError ? (
+        <div className="py-8 text-center space-y-4" role="alert">
+          <p className="text-sm text-muted-foreground">{tCommon('table.error')}</p>
+          <Button variant="outline" onClick={() => void refetch()}>
+            {tCommon('dashboard.tryAgain')}
           </Button>
-        }
-      />
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={accounts}
+          page={meta?.page || 1}
+          totalPages={meta?.totalPages || 1}
+          total={meta?.total || 0}
+          limit={tableParams.limit}
+          onPageChange={tableParams.setPage}
+          onLimitChange={tableParams.setLimit}
+          isLoading={isLoading}
+          emptyMessage={t('accounts.empty.title')}
+          emptyAction={
+            <Button asChild>
+              <Link href="/banking/accounts/new">{t('accounts.newAccount')}</Link>
+            </Button>
+          }
+        />
+      )}
 
       {/* Delete Confirmation */}
       <DeleteConfirmDialog
         open={!!deleteId}
         onOpenChange={() => setDeleteId(null)}
         title={t('accounts.deleteAccount')}
-        description={
-          <>
-            Are you sure you want to delete this bank account? This action cannot be undone. All
-            associated transactions will also be deleted.
-          </>
-        }
+        description={t('accounts.deleteConfirm')}
         onConfirm={handleDelete}
-        cancelLabel="Cancel"
-        deleteLabel="Delete"
+        cancelLabel={tCommon('buttons.cancel')}
+        deleteLabel={tCommon('buttons.delete')}
       />
     </div>
   );

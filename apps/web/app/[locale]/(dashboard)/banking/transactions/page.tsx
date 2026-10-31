@@ -35,11 +35,13 @@ import {
 import { useTranslations } from 'next-intl';
 import { StatementImportZone } from '@/components/banking/statement-import-zone';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function BankTransactionsPage() {
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('banking');
   const tCommon = useTranslations('common');
+  const formatCurrency = useMoneyFormatter();
   const [statusFilter, setStatusFilter] = useState<TransactionStatus | 'all'>('all');
   const [bankAccountId] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -51,7 +53,7 @@ export default function BankTransactionsPage() {
 
   const hasActiveFilters = dateFrom || dateTo || amountMin || amountMax;
 
-  const { data, isLoading } = useBankTransactions({
+  const { data, isLoading, isError, refetch } = useBankTransactions({
     status: (statusFilter === 'all' ? undefined : statusFilter) as TransactionStatus | undefined,
     bankAccountId: bankAccountId || undefined,
     dateFrom: dateFrom || undefined,
@@ -88,7 +90,7 @@ export default function BankTransactionsPage() {
       {/* Import Statement */}
       <div>
         <Button variant="outline" onClick={() => setImportOpen((o) => !o)}>
-          <Upload className="mr-2 h-4 w-4" />
+          <Upload className="me-2 h-4 w-4" />
           {t('transactions.importStatement')}
         </Button>
         {importOpen && (
@@ -117,12 +119,12 @@ export default function BankTransactionsPage() {
 
         <div>
           <Button variant="outline" size="sm" onClick={() => setFiltersOpen((o) => !o)}>
-            <Filter className="mr-2 h-4 w-4" />
+            <Filter className="me-2 h-4 w-4" />
             {t('transactions.filters.title')}
             {hasActiveFilters && (
               <Badge
                 variant="secondary"
-                className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+                className="ms-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
               >
                 !
               </Badge>
@@ -174,7 +176,7 @@ export default function BankTransactionsPage() {
                   </div>
                   {hasActiveFilters && (
                     <Button variant="ghost" size="sm" onClick={clearFilters} className="mt-3">
-                      <X className="mr-1 h-3 w-3" />
+                      <X className="me-1 h-3 w-3" />
                       {t('transactions.filters.clearFilters')}
                     </Button>
                   )}
@@ -187,7 +189,14 @@ export default function BankTransactionsPage() {
 
       <Card>
         <CardContent className="p-0">
-          {transactions.length === 0 ? (
+          {isError ? (
+            <div className="py-12 text-center space-y-4" role="alert">
+              <p className="text-sm text-muted-foreground">{tCommon('table.error')}</p>
+              <Button variant="outline" onClick={() => void refetch()}>
+                {tCommon('dashboard.tryAgain')}
+              </Button>
+            </div>
+          ) : transactions.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               {t('transactions.empty.title')}. {t('transactions.empty.description')}
             </div>
@@ -198,9 +207,9 @@ export default function BankTransactionsPage() {
                   <TableHead>{t('transactions.table.date')}</TableHead>
                   <TableHead>{t('transactions.table.description')}</TableHead>
                   <TableHead>{t('transactions.table.payee')}</TableHead>
-                  <TableHead className="text-right">{t('transactions.table.amount')}</TableHead>
+                  <TableHead className="text-end">{t('transactions.table.amount')}</TableHead>
                   <TableHead>{t('transactions.table.status')}</TableHead>
-                  <TableHead className="text-right">{tCommon('table.actions')}</TableHead>
+                  <TableHead className="text-end">{tCommon('table.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -226,7 +235,7 @@ export default function BankTransactionsPage() {
                           {txn.description || '-'}
                         </TableCell>
                         <TableCell>{txn.payee || '-'}</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-end">
                           <span
                             className={cn(
                               'font-mono font-medium flex items-center justify-end gap-1',
@@ -238,7 +247,7 @@ export default function BankTransactionsPage() {
                             ) : (
                               <ArrowUpRight className="h-3 w-3" />
                             )}
-                            ${Math.abs(amount).toFixed(2)}
+                            {formatCurrency(Math.abs(amount))}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -246,12 +255,15 @@ export default function BankTransactionsPage() {
                             variant="outline"
                             className={getStatusColor(txn.status as TransactionStatus)}
                           >
-                            {getStatusLabel(txn.status as TransactionStatus)}
+                            {getStatusLabel(txn.status as TransactionStatus, t)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-end">
                           <Button size="sm" variant="ghost" asChild>
-                            <Link href={`/banking/transactions/${txn.id}`}>
+                            <Link
+                              href={`/banking/transactions/${txn.id}`}
+                              aria-label={tCommon('buttons.view')}
+                            >
                               <Eye className="h-4 w-4" />
                             </Link>
                           </Button>

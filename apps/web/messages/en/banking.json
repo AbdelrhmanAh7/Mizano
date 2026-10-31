@@ -16,7 +16,24 @@
       "type": "Account Type",
       "openingBalance": "Opening Balance",
       "linkedAccount": "Linked GL Account",
-      "linkedAccountPlaceholder": "Select GL account"
+      "linkedAccountPlaceholder": "Select GL account",
+      "sectionInformation": "Account Information",
+      "sectionAccounting": "Accounting",
+      "nameExample": "e.g., Main Operating Account",
+      "nameRequired": "Account name is required",
+      "nameMax": "Account name must be 100 characters or less",
+      "typePlaceholder": "Select type",
+      "accountNumberHint": "Last 4 digits or full number",
+      "currencyPlaceholder": "Select currency",
+      "glAccount": "GL Account",
+      "glAccountPlaceholder": "Link to GL account",
+      "glAccountSelect": "Select a GL account",
+      "glAccountHint": "Link this bank account to a general ledger account for accurate financial reporting",
+      "linkedAccountRequired": "GL Account is required",
+      "isActive": "Active",
+      "isActiveHint": "Inactive accounts won't appear in selections",
+      "create": "Create Account",
+      "update": "Update Account"
     },
     "types": {
       "bank": "Bank Account",
@@ -28,12 +45,30 @@
       "accountNumber": "Account #",
       "type": "Type",
       "balance": "Balance",
-      "currency": "Currency"
+      "currency": "Currency",
+      "status": "Status"
     },
     "empty": {
       "title": "No bank accounts yet",
       "description": "Add your first bank account"
-    }
+    },
+    "pageDescription": "Manage your bank accounts and track balances",
+    "newDescription": "Add a new bank account to track your finances",
+    "totalBalance": "Total Balance",
+    "activeAccounts": "Active Accounts",
+    "searchPlaceholder": "Search accounts...",
+    "allTypes": "All Types",
+    "deleteConfirm": "Are you sure you want to delete this bank account? This action cannot be undone. All associated transactions will also be deleted.",
+    "deleteConfirmShort": "Are you sure you want to delete this bank account? This action cannot be undone.",
+    "backToAccounts": "Back to Accounts",
+    "glAccountsFailed": "Couldn't load the ledger accounts. Try again before adding a bank account.",
+    "systemBalance": "System Balance",
+    "lastReconciled": "Last Reconciled",
+    "neverReconciled": "Never",
+    "balanceHistory": "30-Day Balance History",
+    "recentTransactions": "Recent Transactions",
+    "viewAll": "View All",
+    "noTransactions": "No transactions yet. Import transactions to get started."
   },
   "transactions": {
     "title": "Bank Transactions",
@@ -87,7 +122,11 @@
     "empty": {
       "title": "No transactions yet",
       "description": "Import or add your first transaction"
-    }
+    },
+    "notFound": "Transaction Not Found",
+    "noDescription": "No description",
+    "account": "Account",
+    "matchedTo": "Matched To"
   },
   "rules": {
     "title": "Bank Rules",
@@ -113,7 +152,34 @@
       "bankAccount": "Bank Account",
       "bankAccountPlaceholder": "All accounts",
       "conditions": "Conditions",
-      "action": "Action"
+      "action": "Action",
+      "detailsTitle": "Rule Details",
+      "detailsDescription": "Give your rule a descriptive name to identify it easily",
+      "nameExample": "e.g., Office Supplies from Amazon",
+      "nameRequired": "Rule name is required",
+      "isActive": "Active",
+      "isActiveHint": "Inactive rules won't be applied to transactions",
+      "conditionsDescription": "Define when this rule should be applied (all conditions must match)",
+      "conditionsRequired": "At least one condition is required",
+      "addCondition": "Add Condition",
+      "fieldPlaceholder": "Field",
+      "operatorPlaceholder": "Operator",
+      "valuePlaceholder": "Value",
+      "valueRequired": "Value is required",
+      "removeCondition": "Remove condition",
+      "actionDescription": "What should happen when a transaction matches this rule",
+      "actionType": "Action Type",
+      "actionTypePlaceholder": "Select action",
+      "account": "Account",
+      "accountPlaceholder": "Select account",
+      "vendor": "Vendor",
+      "vendorPlaceholder": "Select vendor",
+      "customer": "Customer",
+      "customerPlaceholder": "Select customer",
+      "autoCreate": "Auto-create transactions",
+      "autoCreateHint": "Automatically create expenses when this rule matches",
+      "create": "Create Rule",
+      "update": "Update Rule"
     },
     "conditions": {
       "field": "Field",
@@ -122,13 +188,16 @@
       "fields": {
         "description": "Description",
         "payee": "Payee",
-        "amount": "Amount"
+        "amount": "Amount",
+        "reference": "Reference"
       },
       "operators": {
         "contains": "Contains",
         "equals": "Equals",
         "startsWith": "Starts with",
-        "endsWith": "Ends with"
+        "endsWith": "Ends with",
+        "greaterThan": "Greater than",
+        "lessThan": "Less than"
       }
     },
     "actions": {
@@ -137,7 +206,11 @@
       "vendor": "Vendor",
       "types": {
         "expense": "Create Expense",
-        "transfer": "Create Transfer"
+        "transfer": "Create Transfer",
+        "categorize": "Categorize to Account",
+        "createExpense": "Create Expense",
+        "matchVendor": "Match to Vendor",
+        "matchCustomer": "Match to Customer"
       }
     },
     "table": {
@@ -149,7 +222,9 @@
     "empty": {
       "title": "No rules yet",
       "description": "Create rules to automate transaction categorization"
-    }
+    },
+    "notFound": "Rule not found",
+    "backToRules": "Back to Rules"
   },
   "reconciliation": {
     "title": "Reconciliation",
@@ -209,6 +284,60 @@
       "noAccounts": "No bank accounts",
       "noAccountsDescription": "Add a bank account first to start reconciliation.",
       "addBankAccount": "Add Bank Account"
+    },
+    "confidenceWithLevel": "{level} confidence",
+    "confidenceLevels": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "none": "Not rated"
     }
+  },
+  "errorTitle": "Banking error",
+  "hub": {
+    "accountsDescription": "View and manage your bank accounts, balances, and transactions.",
+    "reconcileDescription": "Match bank statements with your records for accurate bookkeeping.",
+    "rulesDescription": "Automate transaction categorization with custom bank rules.",
+    "transactionsDescription": "View all imported bank transactions and their matching status.",
+    "totalAccounts": "Total Accounts",
+    "totalBalance": "Total Balance",
+    "pendingTransactions": "Pending Transactions",
+    "thisMonth": "This Month",
+    "statsFailed": "Couldn't load the banking summary."
+  },
+  "toast": {
+    "accountCreated": "Bank account created successfully",
+    "accountCreateError": "Failed to create bank account",
+    "accountUpdated": "Bank account updated successfully",
+    "accountUpdateError": "Failed to update bank account",
+    "accountDeleted": "Bank account deleted successfully",
+    "accountDeleteError": "Failed to delete bank account",
+    "ruleCreated": "Bank rule created successfully",
+    "ruleCreateError": "Failed to create bank rule",
+    "ruleUpdated": "Bank rule updated successfully",
+    "ruleUpdateError": "Failed to update bank rule",
+    "ruleDeleted": "Bank rule deleted successfully",
+    "ruleDeleteError": "Failed to delete bank rule",
+    "transactionMatched": "Transaction matched successfully",
+    "matchError": "Failed to match transaction",
+    "transactionExcluded": "Transaction excluded",
+    "excludeError": "Failed to exclude transaction",
+    "transactionsImported": "Transactions imported successfully",
+    "importError": "Failed to import transactions"
+  },
+  "import": {
+    "selectAccount": "Select bank account...",
+    "selectAccountFirst": "Please select a bank account first",
+    "accountsFailed": "Couldn't load bank accounts.",
+    "failed": "Failed to import statement",
+    "dropHere": "Drop file here",
+    "dragOrClick": "Drag & drop or click to upload",
+    "formats": "CSV, Excel, OFX, QFX files",
+    "importing": "Importing transactions...",
+    "total": "{count} total",
+    "imported": "{count} imported",
+    "duplicates": "{count} duplicates skipped",
+    "rulesApplied": "{count} rules applied",
+    "another": "Import Another File"
   }
 }

@@ -15,13 +15,18 @@ import {
   getStatusColor,
 } from '@/lib/hooks/use-bank-transactions';
 import { useTranslations } from 'next-intl';
+import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function BankTransactionDetailPage() {
   const t = useTranslations('banking');
+  const tCommon = useTranslations('common');
+  const dateLocale = useDateFnsLocale();
+  const formatCurrency = useMoneyFormatter();
   const params = useParams();
   const id = params.id as string;
 
-  const { data: txn, isLoading } = useBankTransaction(id);
+  const { data: txn, isLoading, isError, refetch } = useBankTransaction(id);
 
   if (isLoading) {
     return (
@@ -35,16 +40,27 @@ export default function BankTransactionDetailPage() {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="text-center py-12 space-y-4" role="alert">
+        <p className="text-muted-foreground">{tCommon('errors.generic')}</p>
+        <Button variant="outline" onClick={() => void refetch()}>
+          {tCommon('dashboard.tryAgain')}
+        </Button>
+      </div>
+    );
+  }
+
   if (!txn) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label={tCommon('buttons.back')}>
             <Link href="/banking/transactions">
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
             </Link>
           </Button>
-          <h1 className="text-3xl font-bold">Transaction Not Found</h1>
+          <h1 className="text-3xl font-bold">{t('transactions.notFound')}</h1>
         </div>
       </div>
     );
@@ -57,9 +73,9 @@ export default function BankTransactionDetailPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label={tCommon('buttons.back')}>
             <Link href="/banking/transactions">
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
             </Link>
           </Button>
           <div>
@@ -68,10 +84,12 @@ export default function BankTransactionDetailPage() {
                 {t('transactions.transactionDetails')}
               </h1>
               <Badge variant="outline" className={getStatusColor(txn.status)}>
-                {getStatusLabel(txn.status)}
+                {getStatusLabel(txn.status, t)}
               </Badge>
             </div>
-            <p className="text-muted-foreground">{txn.description || 'No description'}</p>
+            <p className="text-muted-foreground">
+              {txn.description || t('transactions.noDescription')}
+            </p>
           </div>
         </div>
       </div>
@@ -84,7 +102,9 @@ export default function BankTransactionDetailPage() {
           <CardContent className="space-y-4">
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t('transactions.form.date')}</span>
-              <span>{txn.date ? format(new Date(txn.date), 'MMMM d, yyyy') : '-'}</span>
+              <span>
+                {txn.date ? format(new Date(txn.date), 'PPP', { locale: dateLocale }) : '-'}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t('transactions.form.amount')}</span>
@@ -99,7 +119,7 @@ export default function BankTransactionDetailPage() {
                 ) : (
                   <ArrowUpRight className="h-4 w-4" />
                 )}
-                ${Math.abs(amount).toFixed(2)}
+                {formatCurrency(Math.abs(amount))}
               </span>
             </div>
             <div className="flex justify-between">
@@ -121,23 +141,23 @@ export default function BankTransactionDetailPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Bank Account</CardTitle>
+            <CardTitle>{t('transactions.form.bankAccount')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Account</span>
+              <span className="text-muted-foreground">{t('transactions.account')}</span>
               <span>{txn.bankAccount?.name || '-'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Status</span>
+              <span className="text-muted-foreground">{t('transactions.table.status')}</span>
               <Badge variant="outline" className={getStatusColor(txn.status)}>
-                {getStatusLabel(txn.status)}
+                {getStatusLabel(txn.status, t)}
               </Badge>
             </div>
             {txn.matchedTransaction && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Matched To</span>
-                <span>{txn.matchedTransaction.reference || 'Matched'}</span>
+                <span className="text-muted-foreground">{t('transactions.matchedTo')}</span>
+                <span>{txn.matchedTransaction.reference || t('transactions.status.matched')}</span>
               </div>
             )}
           </CardContent>

@@ -18,6 +18,7 @@ import { render, screen } from '@testing-library/react';
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
 jest.mock('next-intl', () => ({
+  useLocale: () => 'en',
   useTranslations: () => (key: string) => key,
 }));
 
@@ -45,6 +46,7 @@ jest.mock('@/lib/hooks/use-hr', () => ({
   useDeleteEmployee: () => mockUseDeleteEmployee(),
   getEmployeeStatusLabel: (s: string) => s,
   getEmployeeStatusColor: () => '',
+  getPayrollStatusLabel: (s: string) => s,
   formatCurrency: (v: number) => `$${v}`,
 }));
 

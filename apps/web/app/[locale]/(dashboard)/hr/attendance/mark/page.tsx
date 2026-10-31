@@ -36,6 +36,7 @@ import {
   AttendanceStatus,
 } from '@/lib/hooks/use-hr';
 import { useTranslations } from 'next-intl';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 const attendanceStatuses: AttendanceStatus[] = ['PRESENT', 'ABSENT', 'LEAVE', 'HALF_DAY'];
 
@@ -49,13 +50,15 @@ interface AttendanceEntry {
 
 export default function MarkAttendancePage() {
   const t = useTranslations('hr');
+  const tCommon = useTranslations('common');
+  const dateLocale = useDateFnsLocale();
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [entries, setEntries] = useState<Map<string, AttendanceEntry>>(new Map());
   const [selectAll, setSelectAll] = useState(false);
   const [defaultStatus, setDefaultStatus] = useState<AttendanceStatus>('PRESENT');
 
-  const { data: employeesData, isLoading } = useEmployees({ isActive: true });
+  const { data: employeesData, isLoading, isError, refetch } = useEmployees({ isActive: true });
   const bulkMark = useBulkMarkAttendance();
 
   const employees = employeesData?.data || [];
@@ -126,26 +129,37 @@ export default function MarkAttendancePage() {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="text-center py-12 space-y-4" role="alert">
+        <p className="text-muted-foreground">{t('loadError')}</p>
+        <Button variant="outline" onClick={() => void refetch()}>
+          {t('retry')}
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
           <Link href="/hr/attendance">
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
           </Link>
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('attendance.newAttendance')}</h1>
-          <p className="text-muted-foreground">Record attendance for multiple employees</p>
+          <p className="text-muted-foreground">{t('attendance.markPage.description')}</p>
         </div>
       </div>
 
       {/* Date Selection */}
       <Card>
         <CardHeader>
-          <CardTitle>Select Date</CardTitle>
-          <CardDescription>Choose the date for which you want to mark attendance</CardDescription>
+          <CardTitle>{t('attendance.markPage.selectDate')}</CardTitle>
+          <CardDescription>{t('attendance.markPage.selectDateDescription')}</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center gap-4">
           <Popover>
@@ -153,12 +167,14 @@ export default function MarkAttendancePage() {
               <Button
                 variant="outline"
                 className={cn(
-                  'w-64 justify-start text-left font-normal',
+                  'w-64 justify-start text-start font-normal',
                   !selectedDate && 'text-muted-foreground',
                 )}
               >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {selectedDate ? format(selectedDate, 'PPP') : 'Pick a date'}
+                <CalendarIcon className="me-2 h-4 w-4" />
+                {selectedDate
+                  ? format(selectedDate, 'PPP', { locale: dateLocale })
+                  : t('attendance.markPage.pickDate')}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -176,17 +192,19 @@ export default function MarkAttendancePage() {
       {/* Bulk Actions */}
       <Card>
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
+          <CardTitle>{t('attendance.markPage.quickActions')}</CardTitle>
         </CardHeader>
         <CardContent className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <Checkbox id="selectAll" checked={selectAll} onCheckedChange={handleSelectAll} />
             <label htmlFor="selectAll" className="text-sm">
-              Select all employees
+              {t('attendance.markPage.selectAll')}
             </label>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Default status:</span>
+            <span className="text-sm text-muted-foreground">
+              {t('attendance.markPage.defaultStatus')}
+            </span>
             <Select value={defaultStatus} onValueChange={handleDefaultStatusChange}>
               <SelectTrigger className="w-32">
                 <SelectValue />
@@ -194,7 +212,7 @@ export default function MarkAttendancePage() {
               <SelectContent>
                 {attendanceStatuses.map((status) => (
                   <SelectItem key={status} value={status}>
-                    {getAttendanceStatusLabel(status)}
+                    {getAttendanceStatusLabel(status, t)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -206,9 +224,12 @@ export default function MarkAttendancePage() {
       {/* Employee List */}
       <Card>
         <CardHeader>
-          <CardTitle>Employees</CardTitle>
+          <CardTitle>{t('attendance.markPage.employees')}</CardTitle>
           <CardDescription>
-            {entries.size} of {employees.length} employees selected
+            {t('attendance.markPage.selectedCount', {
+              selected: entries.size,
+              total: employees.length,
+            })}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -236,6 +257,9 @@ export default function MarkAttendancePage() {
                   <TableRow key={employee.id}>
                     <TableCell>
                       <Checkbox
+                        aria-label={t('attendance.markPage.selectEmployee', {
+                          name: employee.name,
+                        })}
                         checked={isSelected}
                         onCheckedChange={(checked) => {
                           if (checked) {
@@ -261,7 +285,7 @@ export default function MarkAttendancePage() {
                         <div>
                           <p className="font-medium">{employee.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {employee.jobTitle || 'No title'}
+                            {employee.jobTitle || t('noTitle')}
                           </p>
                         </div>
                       </div>
@@ -275,12 +299,12 @@ export default function MarkAttendancePage() {
                         disabled={!isSelected}
                       >
                         <SelectTrigger className="w-32">
-                          <SelectValue placeholder="Select" />
+                          <SelectValue placeholder={t('attendance.markPage.selectStatus')} />
                         </SelectTrigger>
                         <SelectContent>
                           {attendanceStatuses.map((status) => (
                             <SelectItem key={status} value={status}>
-                              {getAttendanceStatusLabel(status)}
+                              {getAttendanceStatusLabel(status, t)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -306,7 +330,7 @@ export default function MarkAttendancePage() {
                     </TableCell>
                     <TableCell>
                       <Input
-                        placeholder="Notes"
+                        placeholder={t('attendance.markPage.notesPlaceholder')}
                         value={entry?.notes || ''}
                         onChange={(e) => updateEntry(employee.id, { notes: e.target.value })}
                         disabled={!isSelected}
@@ -324,11 +348,13 @@ export default function MarkAttendancePage() {
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button variant="outline" onClick={() => router.back()}>
-          Cancel
+          {tCommon('buttons.cancel')}
         </Button>
         <Button onClick={handleSubmit} disabled={entries.size === 0 || bulkMark.isPending}>
-          <UserCheck className="mr-2 h-4 w-4" />
-          {bulkMark.isPending ? 'Saving...' : `Mark Attendance (${entries.size})`}
+          <UserCheck className="me-2 h-4 w-4" />
+          {bulkMark.isPending
+            ? tCommon('loading.saving')
+            : t('attendance.markPage.submit', { count: entries.size })}
         </Button>
       </div>
     </div>

@@ -337,7 +337,8 @@
     "forbidden": "Access denied",
     "validation": "Validation error",
     "network": "Network error. Please check your connection.",
-    "server": "Server error. Please try again later."
+    "server": "Server error. Please try again later.",
+    "tryAgain": "Try again"
   },
   "empty": {
     "title": "No data",

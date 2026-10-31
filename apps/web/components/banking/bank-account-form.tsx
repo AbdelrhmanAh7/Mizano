@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,16 +20,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BankAccount, accountTypeOptions } from '@/lib/hooks/use-bank-accounts';
 
 const bankAccountSchema = z.object({
-  name: z.string().min(1, 'Account name is required').max(100),
+  // Messages are keys of banking.accounts.form.
+  name: z.string().min(1, 'nameRequired').max(100, 'nameMax'),
   accountNumber: z.string().optional(),
   type: z.enum(['BANK', 'CREDIT_CARD', 'PETTY_CASH']),
   currency: z.string().default('USD'),
   openingBalance: z.number().optional(),
-  linkedAccountId: z.string().min(1, 'GL Account is required'),
+  linkedAccountId: z.string().min(1, 'linkedAccountRequired'),
   isActive: z.boolean().default(true),
 });
 
 type BankAccountFormData = z.infer<typeof bankAccountSchema>;
+
+/** Currencies offered for a bank account; names come from Intl in the page language. */
+const CURRENCY_CODES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'EGP'];
 
 interface BankAccountFormProps {
   account?: BankAccount | null;
@@ -46,6 +51,13 @@ export function BankAccountForm({
   isSubmitting,
 }: BankAccountFormProps) {
   const isEditing = !!account;
+  const t = useTranslations('banking');
+  const tForm = useTranslations('banking.accounts.form');
+  const tCommon = useTranslations('common');
+  const locale = useLocale();
+  const currencyNames = new Intl.DisplayNames([locale], { type: 'currency' });
+  const errorText = (message?: string): string | undefined =>
+    message && tForm.has(message) ? tForm(message) : message;
 
   const form = useForm<BankAccountFormData>({
     resolver: zodResolver(bankAccountSchema),
@@ -82,35 +94,33 @@ export function BankAccountForm({
       {/* Basic Information */}
       <Card>
         <CardHeader>
-          <CardTitle>Account Information</CardTitle>
+          <CardTitle>{tForm('sectionInformation')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Account Name *</Label>
-              <Input
-                id="name"
-                placeholder="e.g., Main Operating Account"
-                {...form.register('name')}
-              />
+              <Label htmlFor="name">{tForm('name')} *</Label>
+              <Input id="name" placeholder={tForm('nameExample')} {...form.register('name')} />
               {form.formState.errors.name && (
-                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
+                <p className="text-sm text-red-500">
+                  {errorText(form.formState.errors.name.message)}
+                </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="type">Account Type *</Label>
+              <Label htmlFor="type">{tForm('type')} *</Label>
               <Select
                 value={form.watch('type')}
                 onValueChange={(value: BankAccountFormData['type']) => form.setValue('type', value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
+                  <SelectValue placeholder={tForm('typePlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {accountTypeOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      {option.label}
+                      {t(option.labelKey)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -120,30 +130,30 @@ export function BankAccountForm({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="accountNumber">Account Number</Label>
+              <Label htmlFor="accountNumber">{tForm('accountNumber')}</Label>
               <Input
                 id="accountNumber"
-                placeholder="Last 4 digits or full number"
+                dir="ltr"
+                placeholder={tForm('accountNumberHint')}
                 {...form.register('accountNumber')}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="currency">Currency</Label>
+              <Label htmlFor="currency">{tForm('currency')}</Label>
               <Select
                 value={form.watch('currency')}
                 onValueChange={(value) => form.setValue('currency', value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select currency" />
+                  <SelectValue placeholder={tForm('currencyPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="USD">USD - US Dollar</SelectItem>
-                  <SelectItem value="EUR">EUR - Euro</SelectItem>
-                  <SelectItem value="GBP">GBP - British Pound</SelectItem>
-                  <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
-                  <SelectItem value="AUD">AUD - Australian Dollar</SelectItem>
-                  <SelectItem value="EGP">EGP - Egyptian Pound</SelectItem>
+                  {CURRENCY_CODES.map((code) => (
+                    <SelectItem key={code} value={code}>
+                      {code} - {currencyNames.of(code) ?? code}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -151,7 +161,7 @@ export function BankAccountForm({
 
           {!isEditing && (
             <div className="space-y-2">
-              <Label htmlFor="openingBalance">Opening Balance</Label>
+              <Label htmlFor="openingBalance">{tForm('openingBalance')}</Label>
               <Input
                 id="openingBalance"
                 type="number"
@@ -167,11 +177,11 @@ export function BankAccountForm({
       {/* Accounting */}
       <Card>
         <CardHeader>
-          <CardTitle>Accounting</CardTitle>
+          <CardTitle>{tForm('sectionAccounting')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="linkedAccountId">GL Account *</Label>
+            <Label htmlFor="linkedAccountId">{tForm('glAccount')} *</Label>
             <Select
               value={form.watch('linkedAccountId') || '__none__'}
               onValueChange={(value) =>
@@ -181,11 +191,11 @@ export function BankAccountForm({
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="Link to GL account" />
+                <SelectValue placeholder={tForm('glAccountPlaceholder')} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__" disabled>
-                  Select a GL account
+                  {tForm('glAccountSelect')}
                 </SelectItem>
                 {glAccounts.map((glAccount) => (
                   <SelectItem key={glAccount.id} value={glAccount.id}>
@@ -196,20 +206,16 @@ export function BankAccountForm({
             </Select>
             {form.formState.errors.linkedAccountId && (
               <p className="text-sm text-red-500">
-                {form.formState.errors.linkedAccountId.message}
+                {errorText(form.formState.errors.linkedAccountId.message)}
               </p>
             )}
-            <p className="text-xs text-muted-foreground">
-              Link this bank account to a general ledger account for accurate financial reporting
-            </p>
+            <p className="text-xs text-muted-foreground">{tForm('glAccountHint')}</p>
           </div>
 
           <div className="flex items-center justify-between">
             <div>
-              <Label>Active</Label>
-              <p className="text-sm text-muted-foreground">
-                Inactive accounts won&apos;t appear in selections
-              </p>
+              <Label>{tForm('isActive')}</Label>
+              <p className="text-sm text-muted-foreground">{tForm('isActiveHint')}</p>
             </div>
             <Switch
               checked={form.watch('isActive')}
@@ -222,10 +228,10 @@ export function BankAccountForm({
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {tCommon('buttons.cancel')}
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : isEditing ? 'Update Account' : 'Create Account'}
+          {isSubmitting ? tCommon('loading.saving') : isEditing ? tForm('update') : tForm('create')}
         </Button>
       </div>
     </form>
