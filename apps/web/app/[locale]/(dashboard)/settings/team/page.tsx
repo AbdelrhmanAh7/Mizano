@@ -207,8 +207,9 @@ export default function TeamSettingsPage() {
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteUser();
-  const { hasPermission } = usePermissions();
-  const canEditMembers = hasPermission('settings.edit');
+  // Same rule as the server: only the organization's Admin hands over reset links.
+  const { roleName } = usePermissions();
+  const canHandOverResetLinks = roleName === 'Admin';
 
   // Dialog state
   const [addRoleOpen, setAddRoleOpen] = useState(false);
@@ -535,7 +536,7 @@ export default function TeamSettingsPage() {
                         >
                           <Edit2 className="h-4 w-4" />
                         </Button>
-                        {canEditMembers && user.status === 'ACTIVE' && (
+                        {canHandOverResetLinks && user.status === 'ACTIVE' && (
                           <MemberResetLinkButton userId={user.id} name={user.name} />
                         )}
                         <Button

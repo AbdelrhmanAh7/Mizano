@@ -80,6 +80,8 @@ export interface FakeAuthStore {
   auditLog: Table;
   organization: { findUnique: jest.Mock };
   $transaction: jest.Mock;
+  /** Row locks: answers `SELECT … FROM "users" WHERE id = $1 AND "organizationId" = $2`. */
+  $queryRaw: jest.Mock;
 }
 
 export function createFakeAuthStore(): FakeAuthStore {
@@ -92,6 +94,13 @@ export function createFakeAuthStore(): FakeAuthStore {
     auditLog: new Table(),
     organization: { findUnique: jest.fn(() => Promise.resolve(null)) },
     $transaction: jest.fn((fn: (tx: FakeAuthStore) => Promise<unknown>) => fn(store)),
+    $queryRaw: jest.fn((_sql: TemplateStringsArray, id: unknown, organizationId: unknown) =>
+      Promise.resolve(
+        user.rows
+          .filter((u) => u.id === id && u.organizationId === organizationId)
+          .map((u) => ({ id: u.id, status: u.status })),
+      ),
+    ),
   };
   return store;
 }

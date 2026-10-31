@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcrypt';
@@ -14,6 +20,13 @@ import type { ForgotPasswordDto, ResetLocale } from './dto/password.dto';
 const RESET_TTL_MINUTES = 30;
 /** At most this many links per account per hour, on top of the per-address route throttle. */
 const MAX_LINKS_PER_HOUR = 3;
+
+const ADMIN_ROLE = 'Admin';
+
+const ADMIN_ONLY = {
+  code: 'PASSWORD_RESET_LINK_ADMIN_ONLY',
+  message: 'Only an organization admin can create a password reset link',
+};
 
 const MEMBER_INACTIVE = {
   code: 'PASSWORD_RESET_MEMBER_INACTIVE',
@@ -91,7 +104,7 @@ export class PasswordResetService {
   }
 
   /**
-   * No-mail fallback (#599): an admin of the organization creates a one-time link for a member
+   * No-mail fallback (#599): the organization's Admin creates a one-time link for a member
    * of the same organization and hands it over (WhatsApp, in person). Same rules as the emailed
    * link: only the digest is stored, single use, 30 minutes, and using it ends every session.
    * Earlier unused links of the member stop working, so only the newest handed-over link works.
@@ -102,17 +115,25 @@ export class PasswordResetService {
     memberId: string,
     locale: ResetLocale,
   ): Promise<{ link: string; expiresAt: string }> {
-    const member = await this.prisma.user.findFirst({
-      where: { id: memberId, organizationId },
-      select: { id: true, status: true },
+    // Only the organization's Admin (owner) may hand links over: a role that merely holds
+    // settings.edit must not be able to take over an Admin account this way.
+    const actor = await this.prisma.user.findFirst({
+      where: { id: actorId, organizationId },
+      select: { role: { select: { name: true } } },
     });
-    if (!member) throw new NotFoundException('User not found');
-    if (member.status !== 'ACTIVE') throw new BadRequestException(MEMBER_INACTIVE);
+    if (actor?.role?.name !== ADMIN_ROLE) throw new ForbiddenException(ADMIN_ONLY);
 
     const token = randomBytes(32).toString('base64url');
     const now = new Date();
     const expiresAt = new Date(now.getTime() + RESET_TTL_MINUTES * 60 * 1000);
     await this.prisma.$transaction(async (tx) => {
+      // Lock the member row so two concurrent requests cannot both leave a valid link.
+      const [member] = await tx.$queryRaw<{ id: string; status: string }[]>`
+        SELECT id, status FROM "users"
+        WHERE id = ${memberId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+      if (!member) throw new NotFoundException('User not found');
+      if (member.status !== 'ACTIVE') throw new BadRequestException(MEMBER_INACTIVE);
+
       await tx.passwordResetToken.updateMany({
         where: { userId: member.id, organizationId, usedAt: null },
         data: { usedAt: now },

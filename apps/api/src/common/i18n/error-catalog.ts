@@ -175,6 +175,11 @@ const AUTH_ERRORS: ErrorCatalogEntry[] = [
     ar: 'رابط إعادة تعيين كلمة المرور غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا.',
   },
   {
+    code: 'PASSWORD_RESET_LINK_ADMIN_ONLY',
+    en: 'Only an organization admin can create a password reset link',
+    ar: 'إنشاء رابط إعادة تعيين كلمة المرور متاح لمدير المنشأة فقط.',
+  },
+  {
     code: 'PASSWORD_RESET_MEMBER_INACTIVE',
     en: 'Only an active member can get a password reset link',
     ar: 'لا يمكن إنشاء رابط لإعادة تعيين كلمة المرور إلا لعضو نشط.',

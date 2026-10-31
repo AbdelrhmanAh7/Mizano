@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -120,6 +120,7 @@ describe('PasswordResetService', () => {
   describe('link handed over by an admin (no mail)', () => {
     beforeEach(() => {
       env = { CORS_ORIGIN: 'https://app.mizano.test/' }; // no mail server: the fallback needs none
+      store.user.rows[0].role = { name: 'Admin' };
       store.user.rows.push(
         {
           id: 'm1',
@@ -128,6 +129,7 @@ describe('PasswordResetService', () => {
           status: 'ACTIVE',
           organizationId: 'org-1',
           passwordHash: 'old',
+          role: { name: 'Office manager' },
         },
         {
           id: 'b1',
@@ -136,6 +138,7 @@ describe('PasswordResetService', () => {
           status: 'ACTIVE',
           organizationId: 'org-2',
           passwordHash: 'old',
+          role: { name: 'Admin' },
         },
       );
     });
@@ -148,6 +151,27 @@ describe('PasswordResetService', () => {
       );
       expect(store.passwordResetToken.rows).toHaveLength(0);
       expect(store.auditLog.rows).toHaveLength(0);
+    });
+
+    it('refuses a caller who is not the Admin, even holding settings.edit', async () => {
+      await expect(service.createLinkForMember('org-1', 'm1', 'u1', 'en')).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      // The Admin of another organization is not the Admin here either.
+      await expect(service.createLinkForMember('org-1', 'b1', 'm1', 'en')).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(store.passwordResetToken.rows).toHaveLength(0);
+    });
+
+    it('locks the member row, scoped to the organization, before replacing links', async () => {
+      await service.createLinkForMember('org-1', 'u1', 'm1', 'en');
+      const [sql, id, org] = store.$queryRaw.mock.calls[0] as [string[], string, string];
+      expect(sql.join('?')).toMatch(/FOR UPDATE/);
+      expect([id, org]).toEqual(['m1', 'org-1']);
+      expect(store.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        store.passwordResetToken.create.mock.invocationCallOrder[0],
+      );
     });
 
     it('refuses an inactive member', async () => {
