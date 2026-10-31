@@ -294,7 +294,28 @@
     "passwordPlaceholder": "8 أحرف كحد أدنى، حرف كبير، حرف صغير، رقم",
     "selectRole": "اختر دوراً",
     "save": "حفظ",
-    "saving": "جارِ الحفظ..."
+    "saving": "جارِ الحفظ...",
+    "toast": {
+      "roleCreated": "تم إنشاء الدور",
+      "roleCreatedDescription": "أُنشئ الدور بنجاح.",
+      "roleCreateError": "تعذّر إنشاء الدور",
+      "roleUpdated": "تم تحديث الدور",
+      "roleUpdatedDescription": "حُدّث الدور بنجاح.",
+      "roleUpdateError": "تعذّر تحديث الدور",
+      "roleDeleted": "تم حذف الدور",
+      "roleDeletedDescription": "حُذف الدور بنجاح.",
+      "roleDeleteError": "تعذّر حذف الدور",
+      "userCreated": "تمت إضافة العضو",
+      "userCreatedDescription": "يمكن لعضو الفريق تسجيل الدخول الآن.",
+      "userCreateError": "تعذّرت إضافة العضو",
+      "userUpdated": "تم تحديث العضو",
+      "userUpdatedDescription": "حُدّثت بيانات عضو الفريق.",
+      "userUpdateError": "تعذّر تحديث العضو",
+      "userDeleted": "تمت إزالة العضو",
+      "userDeletedDescription": "أُزيل عضو الفريق.",
+      "userDeleteError": "تعذّرت إزالة العضو",
+      "genericError": "حدث خطأ ما. يرجى المحاولة مرة أخرى."
+    }
   },
   "performance": {
     "title": "أداء قاعدة البيانات",

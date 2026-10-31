@@ -1,10 +1,8 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { usersApi } from '@/lib/api';
-import { useToast } from '@/components/ui/use-toast';
-
-type ApiError = { response?: { data?: { message?: string } } };
+import { useToastMutation } from '@/lib/hooks/use-toast-mutation';
 
 interface UserParams {
   page?: number;
@@ -62,28 +60,12 @@ export function useUser(id: string | undefined) {
  * Hook to create a new user
  */
 export function useCreateUser() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (data: CreateUserData) => {
-      const response = await usersApi.create(data);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast({
-        title: 'User created',
-        description: 'The user has been created successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error creating user',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: 'settings.team.toast',
+    mutationFn: async (data: CreateUserData) => (await usersApi.create(data)).data,
+    invalidate: () => [['users']],
+    success: 'userCreated',
+    error: 'userCreateError',
   });
 }
 
@@ -91,29 +73,13 @@ export function useCreateUser() {
  * Hook to update an existing user
  */
 export function useUpdateUser() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateUserData }) => {
-      const response = await usersApi.update(id, data);
-      return response.data;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      queryClient.invalidateQueries({ queryKey: ['users', variables.id] });
-      toast({
-        title: 'User updated',
-        description: 'The user has been updated successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error updating user',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: 'settings.team.toast',
+    mutationFn: async ({ id, data }: { id: string; data: UpdateUserData }) =>
+      (await usersApi.update(id, data)).data,
+    invalidate: ({ id }) => [['users'], ['users', id]],
+    success: 'userUpdated',
+    error: 'userUpdateError',
   });
 }
 
@@ -121,28 +87,12 @@ export function useUpdateUser() {
  * Hook to delete a user
  */
 export function useDeleteUser() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await usersApi.delete(id);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast({
-        title: 'User deleted',
-        description: 'The user has been deleted successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error deleting user',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: 'settings.team.toast',
+    mutationFn: async (id: string) => (await usersApi.delete(id)).data,
+    invalidate: () => [['users']],
+    success: 'userDeleted',
+    error: 'userDeleteError',
   });
 }
 

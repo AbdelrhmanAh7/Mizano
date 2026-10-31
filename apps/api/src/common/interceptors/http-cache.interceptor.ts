@@ -4,9 +4,16 @@ import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { HTTP_CACHE_KEY, HttpCacheProfile } from '../decorators/http-cache.decorator';
 
-const CACHE_PROFILES: Record<HttpCacheProfile, string> = {
-  static: 'public, max-age=3600, stale-while-revalidate=300',
-  short: 'private, max-age=30, stale-while-revalidate=60',
+/**
+ * Every profile is private (tenant data behind a bearer token must never sit in a shared cache)
+ * and revalidates on each use. A max-age let the browser answer React Query's refetch after a
+ * write from its own cache: a new role, account or tax rate stayed invisible for an hour and a
+ * new invoice was missing from its list for 30 s. Revalidation stays cheap: Express sends an
+ * ETag and unchanged responses come back as 304 without a body.
+ */
+export const CACHE_PROFILES: Record<HttpCacheProfile, string> = {
+  static: 'private, no-cache',
+  short: 'private, no-cache',
   realtime: 'private, no-cache, no-store',
 };
 
@@ -34,9 +41,7 @@ export class HttpCacheInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap(() => {
         response.setHeader('Cache-Control', CACHE_PROFILES[profile]);
-        if (profile === 'static') {
-          response.setHeader('Vary', 'Authorization');
-        }
+        response.setHeader('Vary', 'Authorization');
       }),
     );
   }
