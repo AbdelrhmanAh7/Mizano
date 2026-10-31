@@ -358,6 +358,38 @@
       "comingSoon": "قريبًا",
       "pdfError": "تعذّر إنشاء ملف PDF",
       "pdfErrorDescription": "يُرجى المحاولة مرة أخرى بعد قليل."
+    },
+    "list": {
+      "searchPlaceholder": "ابحث برقم الفاتورة أو اسم العميل...",
+      "dateRange": "الفترة",
+      "refresh": "تحديث الفواتير",
+      "importLabel": "الفواتير",
+      "markAsPaid": "تعليم كمدفوعة",
+      "void": "إلغاء"
+    },
+    "bulkDelete": {
+      "title": "حذف {count} فاتورة؟",
+      "description": "ستُحذف فواتير المسودة فقط، وستُتخطى الفواتير الأخرى.",
+      "confirm": "حذف {count} فاتورة",
+      "success": "تم حذف {count} فاتورة"
+    },
+    "bulkSend": {
+      "title": "إرسال {count} فاتورة؟",
+      "description": "ستُعلَّم فواتير المسودة كمرسلة، وسيُنشأ لها قيد محاسبي.",
+      "confirm": "إرسال {count} فاتورة",
+      "success": "تم إرسال {count} فاتورة"
+    },
+    "bulkVoid": {
+      "title": "إلغاء {count} فاتورة؟",
+      "description": "ستُلغى الفواتير المحددة. لا يمكن التراجع عن هذا الإجراء.",
+      "confirm": "إلغاء {count} فاتورة",
+      "success": "تم إلغاء {count} فاتورة"
+    },
+    "bulkPay": {
+      "title": "تعليم {count} فاتورة كمدفوعة؟",
+      "description": "ستُعلَّم الفواتير المرسلة والمتأخرة المحددة كمدفوعة بالكامل.",
+      "confirm": "تعليم {count} فاتورة كمدفوعة",
+      "success": "تم تعليم {count} فاتورة كمدفوعة"
     }
   },
   "creditNotes": {

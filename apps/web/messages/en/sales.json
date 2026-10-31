@@ -358,6 +358,38 @@
       "comingSoon": "Coming soon",
       "pdfError": "Could not create the PDF",
       "pdfErrorDescription": "Please try again in a moment."
+    },
+    "list": {
+      "searchPlaceholder": "Search by invoice number or customer...",
+      "dateRange": "Date range",
+      "refresh": "Refresh invoices",
+      "importLabel": "Invoices",
+      "markAsPaid": "Mark as Paid",
+      "void": "Void"
+    },
+    "bulkDelete": {
+      "title": "Delete {count} invoices?",
+      "description": "Only draft invoices will be deleted. Non-draft invoices will be skipped.",
+      "confirm": "Delete {count} invoices",
+      "success": "{count} invoices deleted"
+    },
+    "bulkSend": {
+      "title": "Send {count} invoices?",
+      "description": "Draft invoices will be marked as sent. This will create accounting entries.",
+      "confirm": "Send {count} invoices",
+      "success": "{count} invoices sent"
+    },
+    "bulkVoid": {
+      "title": "Void {count} invoices?",
+      "description": "Selected invoices will be voided. This action cannot be undone.",
+      "confirm": "Void {count} invoices",
+      "success": "{count} invoices voided"
+    },
+    "bulkPay": {
+      "title": "Mark {count} invoices as paid?",
+      "description": "Selected sent/overdue invoices will be marked as fully paid.",
+      "confirm": "Mark {count} invoices as paid",
+      "success": "{count} invoices marked as paid"
     }
   },
   "creditNotes": {

@@ -32,7 +32,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-import { useToast } from '@/components/ui/use-toast';
 import { ImportWizard } from '@/components/import/import-wizard';
 import { invoicesApi } from '@/lib/api';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
@@ -42,7 +41,6 @@ import {
   Invoice,
   InvoiceStatus,
   getInvoiceStatusColor,
-  getInvoiceStatusLabel,
   useCloneInvoice,
   useDeleteInvoice,
   useInfiniteInvoices,
@@ -50,6 +48,7 @@ import {
   useVoidInvoice,
 } from '@/lib/hooks/use-invoices';
 import { usePermissions } from '@/lib/hooks/use-permissions';
+import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { cn } from '@/lib/utils';
 import { type ColumnDef } from '@tanstack/react-table';
@@ -66,13 +65,15 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
 function InvoicesPageContent() {
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
+  const locale = useLocale();
+  const baseCurrency = useBaseCurrency();
 
   const STATUS_OPTIONS = [
     { value: 'DRAFT', label: t('invoices.status.draft') },
@@ -82,7 +83,6 @@ function InvoicesPageContent() {
     { value: 'OVERDUE', label: t('invoices.status.overdue') },
     { value: 'VOID', label: t('invoices.status.void') },
   ];
-  const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const { onExportAll } = useExportAll('invoices', 'invoices');
   const tableParams = useTableParams({
@@ -134,32 +134,32 @@ function InvoicesPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => invoicesApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['invoices']],
-    successMessage: '{count} draft invoices deleted',
+    successMessage: t.raw('invoices.bulkDelete.success'),
   });
 
   const bulkSendAction = useBulkAction({
     mutationFn: (ids) => invoicesApi.bulkSend(ids).then((r) => r.data),
     queryKeys: [['invoices']],
-    successMessage: '{count} invoices sent',
+    successMessage: t.raw('invoices.bulkSend.success'),
   });
 
   const bulkVoidAction = useBulkAction({
     mutationFn: (ids) => invoicesApi.bulkVoid(ids).then((r) => r.data),
     queryKeys: [['invoices']],
-    successMessage: '{count} invoices voided',
+    successMessage: t.raw('invoices.bulkVoid.success'),
   });
 
   const bulkPayAction = useBulkAction({
     mutationFn: (ids) => invoicesApi.bulkPay(ids).then((r) => r.data),
     queryKeys: [['invoices']],
-    successMessage: '{count} invoices marked as paid',
+    successMessage: t.raw('invoices.bulkPay.success'),
   });
 
   const bulkActions = [
     ...(canEdit
       ? [
           {
-            label: 'Send',
+            label: tCommon('buttons.send'),
             icon: Send,
             onClick: (rows: Invoice[]) => {
               setBulkSelectedRows(rows);
@@ -171,7 +171,7 @@ function InvoicesPageContent() {
     ...(canEdit
       ? [
           {
-            label: 'Mark as Paid',
+            label: t('invoices.list.markAsPaid'),
             icon: DollarSign,
             onClick: (rows: Invoice[]) => {
               setBulkSelectedRows(rows);
@@ -183,7 +183,7 @@ function InvoicesPageContent() {
     ...(canEdit
       ? [
           {
-            label: 'Void',
+            label: t('invoices.list.void'),
             icon: Ban,
             variant: 'outline' as const,
             onClick: (rows: Invoice[]) => {
@@ -196,7 +196,7 @@ function InvoicesPageContent() {
     ...(canDelete
       ? [
           {
-            label: 'Delete',
+            label: tCommon('buttons.delete'),
             icon: Trash2,
             variant: 'destructive' as const,
             onClick: (rows: Invoice[]) => {
@@ -227,14 +227,8 @@ function InvoicesPageContent() {
     if (selectedInvoice) {
       try {
         await deleteInvoice.mutateAsync(selectedInvoice.id);
-      } catch (error: unknown) {
-        toast({
-          title: 'Error',
-          description:
-            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-            'Failed to delete invoice',
-          variant: 'destructive',
-        });
+      } catch {
+        // useDeleteInvoice shows the translated error toast.
       }
       setDeleteDialogOpen(false);
       setSelectedInvoice(null);
@@ -245,14 +239,8 @@ function InvoicesPageContent() {
     if (selectedInvoice) {
       try {
         await sendInvoice.mutateAsync(selectedInvoice.id);
-      } catch (error: unknown) {
-        toast({
-          title: 'Error',
-          description:
-            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-            'Failed to send invoice',
-          variant: 'destructive',
-        });
+      } catch {
+        // useSendInvoice shows the translated error toast.
       }
       setSendDialogOpen(false);
       setSelectedInvoice(null);
@@ -263,26 +251,26 @@ function InvoicesPageContent() {
     if (selectedInvoice) {
       try {
         await voidInvoice.mutateAsync(selectedInvoice.id);
-      } catch (error: unknown) {
-        toast({
-          title: 'Error',
-          description:
-            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-            'Failed to void invoice',
-          variant: 'destructive',
-        });
+      } catch {
+        // useVoidInvoice shows the translated error toast.
       }
       setVoidDialogOpen(false);
       setSelectedInvoice(null);
     }
   };
 
-  const formatCurrency = (amount: string | number, currency: string = 'USD') => {
+  // The invoice's own currency, else the organization base currency (never a guessed USD).
+  const numberLocale = locale === 'ar' ? 'ar-u-nu-latn' : 'en';
+  const formatCurrency = (amount: string | number, currencyCode?: string | null) => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(num);
+    const value = Number.isFinite(num) ? num : 0;
+    const currency = documentCurrency(currencyCode, baseCurrency);
+    return new Intl.NumberFormat(
+      numberLocale,
+      currency
+        ? { style: 'currency', currency }
+        : { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+    ).format(value);
   };
 
   const columns: ColumnDef<Invoice>[] = [
@@ -346,7 +334,8 @@ function InvoicesPageContent() {
       header: t('invoices.table.status'),
       cell: ({ row }) => (
         <Badge className={getInvoiceStatusColor(row.original.status)}>
-          {getInvoiceStatusLabel(row.original.status)}
+          {STATUS_OPTIONS.find((o) => o.value === row.original.status)?.label ??
+            row.original.status}
         </Badge>
       ),
     },
@@ -361,18 +350,18 @@ function InvoicesPageContent() {
           onSort={tableParams.setSort}
         />
       ),
-      meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
-      cell: ({ row }) => formatCurrency(row.original.grandTotal),
+      meta: { headerClassName: 'text-end', cellClassName: 'text-end font-mono' },
+      cell: ({ row }) => formatCurrency(row.original.grandTotal, row.original.currencyCode),
     },
     {
       accessorKey: 'balanceDue',
       header: t('invoices.table.balance'),
-      meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
+      meta: { headerClassName: 'text-end', cellClassName: 'text-end font-mono' },
       cell: ({ row }) => {
         const balanceDue = parseFloat(row.original.balanceDue || '0');
         return (
           <span className={cn(balanceDue > 0 && 'text-red-600 font-semibold')}>
-            {formatCurrency(row.original.balanceDue)}
+            {formatCurrency(row.original.balanceDue, row.original.currencyCode)}
           </span>
         );
       },
@@ -380,7 +369,7 @@ function InvoicesPageContent() {
     {
       id: 'actions',
       header: '',
-      meta: { cellClassName: 'text-right' },
+      meta: { cellClassName: 'text-end' },
       cell: ({ row }) => {
         const invoice = row.original;
         return (
@@ -474,10 +463,10 @@ function InvoicesPageContent() {
             <DataTableSearch
               value={tableParams.search}
               onChange={tableParams.setSearch}
-              placeholder="Search by invoice number or customer..."
+              placeholder={t('invoices.list.searchPlaceholder')}
             />
             <DataTableFacetedFilter
-              title="Status"
+              title={t('invoices.table.status')}
               options={STATUS_OPTIONS}
               selected={tableParams.filters.status ? [tableParams.filters.status] : []}
               onSelectionChange={(values) =>
@@ -497,13 +486,13 @@ function InvoicesPageContent() {
                   tableParams.setFilters({ dateFrom: undefined, dateTo: undefined });
                 }
               }}
-              placeholder="Date range"
+              placeholder={t('invoices.list.dateRange')}
             />
             <Button
               variant="outline"
               size="icon"
               onClick={() => refetch()}
-              aria-label="Refresh invoices"
+              aria-label={t('invoices.list.refresh')}
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
@@ -612,7 +601,10 @@ function InvoicesPageContent() {
         action="delete"
         count={bulkSelectedRows.length}
         itemType="invoices"
-        description="Only draft invoices will be deleted. Non-draft invoices will be skipped."
+        title={t('invoices.bulkDelete.title', { count: bulkSelectedRows.length })}
+        description={t('invoices.bulkDelete.description')}
+        confirmLabel={t('invoices.bulkDelete.confirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         destructive
         isLoading={bulkDeleteAction.isLoading}
         onConfirm={async () => {
@@ -627,7 +619,10 @@ function InvoicesPageContent() {
         action="send"
         count={bulkSelectedRows.length}
         itemType="invoices"
-        description="Draft invoices will be marked as sent. This will create accounting entries."
+        title={t('invoices.bulkSend.title', { count: bulkSelectedRows.length })}
+        description={t('invoices.bulkSend.description')}
+        confirmLabel={t('invoices.bulkSend.confirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         isLoading={bulkSendAction.isLoading}
         onConfirm={async () => {
           await bulkSendAction.execute(bulkSelectedRows.map((r) => r.id));
@@ -641,7 +636,10 @@ function InvoicesPageContent() {
         action="void"
         count={bulkSelectedRows.length}
         itemType="invoices"
-        description="Selected invoices will be voided. This action cannot be undone."
+        title={t('invoices.bulkVoid.title', { count: bulkSelectedRows.length })}
+        description={t('invoices.bulkVoid.description')}
+        confirmLabel={t('invoices.bulkVoid.confirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         destructive
         isLoading={bulkVoidAction.isLoading}
         onConfirm={async () => {
@@ -656,7 +654,10 @@ function InvoicesPageContent() {
         action="mark as paid"
         count={bulkSelectedRows.length}
         itemType="invoices"
-        description="Selected sent/overdue invoices will be marked as fully paid."
+        title={t('invoices.bulkPay.title', { count: bulkSelectedRows.length })}
+        description={t('invoices.bulkPay.description')}
+        confirmLabel={t('invoices.bulkPay.confirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         isLoading={bulkPayAction.isLoading}
         onConfirm={async () => {
           await bulkPayAction.execute(bulkSelectedRows.map((r) => r.id));
@@ -670,7 +671,7 @@ function InvoicesPageContent() {
         open={importOpen}
         onOpenChange={setImportOpen}
         entityType={'invoices' as ImportEntityType}
-        entityLabel="Invoices"
+        entityLabel={t('invoices.list.importLabel')}
         onComplete={() => refetch()}
       />
     </div>
