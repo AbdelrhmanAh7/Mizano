@@ -38,6 +38,29 @@
     "empty": {
       "title": "No accounts yet",
       "description": "Set up your chart of accounts to start"
+    },
+    "page": {
+      "description": "Manage your organization's account structure",
+      "seed": "Seed Accounts",
+      "seedServices": "Services Industry",
+      "seedRetail": "Retail Industry",
+      "seedConstruction": "Construction Industry",
+      "searchPlaceholder": "Search accounts...",
+      "filterByType": "Filter by type",
+      "allTypes": "All Types",
+      "assets": "Assets",
+      "liabilities": "Liabilities",
+      "equity": "Equity",
+      "income": "Income",
+      "revenue": "Revenue",
+      "expenses": "Expenses",
+      "listTitle": "Accounts",
+      "refresh": "Refresh accounts",
+      "deleteConfirm": "Are you sure you want to delete \"{name}\"? This action cannot be undone. Accounts with transactions or child accounts cannot be deleted.",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "system": "System",
+      "groupTitle": "{type} Accounts"
     }
   },
   "journals": {
@@ -60,7 +83,17 @@
       "description": "Description",
       "addLine": "Add Line",
       "minLines": "Journal must have at least 2 lines",
-      "mustBalance": "Total debits must equal total credits"
+      "mustBalance": "Total debits must equal total credits",
+      "totals": "Totals",
+      "balanced": "Balanced",
+      "unbalanced": "Unbalanced (Difference: {amount})",
+      "removeLine": "Remove journal line",
+      "accountRequired": "Account is required",
+      "dateRequired": "Date is required",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "create": "Create Journal",
+      "update": "Update Journal"
     },
     "table": {
       "journalNumber": "Journal #",
@@ -105,7 +138,8 @@
     "reverseTitle": "Reverse journal entry",
     "reverseConfirm": "This posts a new journal that reverses every line of {number}. The original entry stays unchanged.",
     "reversed": "Reversal posted",
-    "reverseFailed": "Failed to reverse journal"
+    "reverseFailed": "Failed to reverse journal",
+    "newJournalDescription": "Create a new manual journal entry"
   },
   "recurring": {
     "title": "Recurring Profiles",

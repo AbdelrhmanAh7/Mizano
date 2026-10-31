@@ -5,7 +5,7 @@ import {
   signedFlowlineHeaders,
   verifyFlowlineSignature,
 } from './flowline-signature';
-import { openSecret, sealSecret, secretHint } from './secret-box';
+import { openSecret, sealSecret, secretHint } from '../../../common/utils/secret-box';
 import {
   assertPublicWebhookUrl,
   isPrivateAddress,

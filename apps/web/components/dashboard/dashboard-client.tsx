@@ -1,9 +1,7 @@
 'use client';
 
-import { AIBusinessPulse } from '@/components/dashboard/ai-business-pulse';
 import { WidgetErrorBoundary } from '@/components/dashboard/widget-error-boundary';
 import { DateRangePicker } from '@/components/dashboard/date-range-picker';
-import { EnhancedAIInsights } from '@/components/dashboard/enhanced-ai-insights';
 import { RecentTransactions } from '@/components/dashboard/recent-transactions';
 import { StatCard } from '@/components/dashboard/stat-card';
 import { WidgetCustomizer } from '@/components/dashboard/widget-customizer';
@@ -48,8 +46,6 @@ import { ProfitMarginChart } from '@/components/dashboard/profit-margin-chart';
 import { TopCustomersChart } from '@/components/dashboard/top-customers-chart';
 import { BankBalanceChart } from '@/components/dashboard/bank-balance-chart';
 import { InventoryValueChart } from '@/components/dashboard/inventory-value-chart';
-import { CashFlowForecastChart } from '@/components/dashboard/cash-flow-forecast-chart';
-import { RevenueForecastChart } from '@/components/dashboard/revenue-forecast-chart';
 import { UpcomingPayments } from '@/components/dashboard/upcoming-payments';
 import { BankAccountsSummary } from '@/components/dashboard/bank-accounts-summary';
 import { ProjectsOverview } from '@/components/dashboard/projects-overview';
@@ -61,7 +57,6 @@ import { HRSection } from '@/components/dashboard/sections/hr-section';
 import { InventorySection } from '@/components/dashboard/sections/inventory-section';
 import { ProjectsSection } from '@/components/dashboard/sections/projects-section';
 import { CRMSection } from '@/components/dashboard/sections/crm-section';
-import { AISection } from '@/components/dashboard/sections/ai-section';
 
 function ChartSkeleton() {
   return (
@@ -124,7 +119,6 @@ export function DashboardClient() {
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-    queryClient.invalidateQueries({ queryKey: ['ai-'] });
   };
 
   const isRefetching = queryClient.isFetching({ queryKey: ['dashboard'] }) > 0;
@@ -132,9 +126,6 @@ export function DashboardClient() {
 
   const renderWidget = (widgetId: string) => {
     switch (widgetId) {
-      case 'ai-pulse':
-        return <AIBusinessPulse key={widgetId} />;
-
       case 'kpi-row-1':
         return (
           <div
@@ -244,14 +235,6 @@ export function DashboardClient() {
           </div>
         );
 
-      case 'ai-forecast':
-        return (
-          <div key={widgetId} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <CashFlowForecastChart />
-            <RevenueForecastChart />
-          </div>
-        );
-
       case 'cash-flow-revenue':
         return (
           <div
@@ -344,10 +327,7 @@ export function DashboardClient() {
 
       case 'insights-transactions':
         return (
-          <div key={widgetId} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div data-tour="dashboard-ai-alerts">
-              <EnhancedAIInsights />
-            </div>
+          <div key={widgetId} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div data-tour="dashboard-transactions">
               <RecentTransactions transactions={statsData?.recentTransactions || []} />
             </div>
@@ -406,7 +386,6 @@ export function DashboardClient() {
           <TabsTrigger value="inventory">{t('sections.inventory')}</TabsTrigger>
           <TabsTrigger value="projects">{t('sections.projects')}</TabsTrigger>
           <TabsTrigger value="crm">{t('sections.crm')}</TabsTrigger>
-          <TabsTrigger value="ai">{t('sections.ai')}</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab — existing dashboard, unchanged */}
@@ -454,11 +433,6 @@ export function DashboardClient() {
         {/* CRM Tab */}
         <TabsContent value="crm" className="mt-6">
           <CRMSection enabled={activeTab === 'crm'} />
-        </TabsContent>
-
-        {/* AI Analytics Tab */}
-        <TabsContent value="ai" className="mt-6">
-          <AISection enabled={activeTab === 'ai'} />
         </TabsContent>
       </Tabs>
     </div>

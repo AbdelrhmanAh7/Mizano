@@ -14,11 +14,23 @@ jest.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-// Mock next-intl
-jest.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
-  useLocale: () => mockLocale,
-}));
+// Mock next-intl with the real breadcrumb messages of the current locale
+jest.mock('next-intl', () => {
+  const messages: Record<string, Record<string, string>> = {
+    en: jest.requireActual('../../messages/en/navigation.json').breadcrumbs,
+    ar: jest.requireActual('../../messages/ar/navigation.json').breadcrumbs,
+  };
+  return {
+    useTranslations: () => {
+      const dict = messages[mockLocale];
+      const t = (key: string, values?: Record<string, string>) =>
+        (dict[key] ?? key).replace(/\{(\w+)\}/g, (_m: string, k: string) => values?.[k] ?? '');
+      t.has = (key: string) => key in dict;
+      return t;
+    },
+    useLocale: () => mockLocale,
+  };
+});
 
 // Mock the i18n Link component (used by Breadcrumbs instead of next/link)
 jest.mock('@/i18n/routing', () => ({
@@ -147,5 +159,15 @@ describe('Breadcrumbs', () => {
     expect(screen.getByText('Purchases')).toBeInTheDocument();
     expect(screen.getByText('Bills')).toBeInTheDocument();
     expect(screen.getByText('Scan Document')).toBeInTheDocument();
+  });
+  it('translates segments and detail pages in Arabic', () => {
+    mockLocale = 'ar';
+    mockPathname = '/ar/sales/invoices/clz1234567890abcdefgh';
+    render(<Breadcrumbs />);
+    expect(screen.getByText('المبيعات')).toBeInTheDocument();
+    expect(screen.getByText('الفواتير')).toBeInTheDocument();
+    expect(screen.getByText('تفاصيل الفواتير')).toBeInTheDocument();
+    expect(screen.queryByText('Invoices')).toBeNull();
+    mockLocale = 'en';
   });
 });

@@ -1,8 +1,9 @@
 'use client';
 
+import { RowActionsMenu } from '@/components/shared/row-actions-menu';
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { Plus, MoreHorizontal, Eye, Pencil, Trash2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,12 +14,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -29,14 +24,16 @@ import {
   useDeleteBankAccount,
   getAccountTypeLabel,
   getAccountTypeColor,
-  formatCurrency,
   BankAccount,
   BankAccountType,
 } from '@/lib/hooks/use-bank-accounts';
 import { useTranslations } from 'next-intl';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
+import { sumDecimals } from '@/lib/decimal';
 
 function BankAccountsPageContent() {
   const t = useTranslations('banking');
+  const formatCurrency = useMoneyFormatter();
   const tableParams = useTableParams({ defaultSortBy: 'name' });
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -59,11 +56,8 @@ function BankAccountsPageContent() {
   };
 
   // Calculate totals
-  const totalBalance = accounts.reduce((sum, acc) => {
-    const balance =
-      typeof acc.systemBalance === 'string' ? parseFloat(acc.systemBalance) : acc.systemBalance;
-    return sum + (balance || 0);
-  }, 0);
+  // Ledger balances (base currency), summed exactly.
+  const totalBalance = sumDecimals(accounts.map((acc) => String(acc.systemBalance ?? 0)));
 
   const columns: ColumnDef<BankAccount>[] = [
     {
@@ -146,31 +140,12 @@ function BankAccountsPageContent() {
       cell: ({ row }) => {
         const account = row.original;
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link href={`/banking/accounts/${account.id}`}>
-                  <Eye className="mr-2 h-4 w-4" />
-                  View
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href={`/banking/accounts/${account.id}/edit`}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(account.id)}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <RowActionsMenu
+            viewHref={`/banking/accounts/${account.id}`}
+            editHref={`/banking/accounts/${account.id}/edit`}
+            onDelete={() => setDeleteId(account.id)}
+            labels={{ view: 'View', edit: 'Edit', delete: 'Delete' }}
+          />
         );
       },
     },
@@ -179,7 +154,7 @@ function BankAccountsPageContent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('accounts.title')}</h1>
           <p className="text-muted-foreground">Manage your bank accounts and track balances</p>

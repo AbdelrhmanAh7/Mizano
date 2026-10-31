@@ -28,8 +28,7 @@
       "hr": "HR & Payroll",
       "inventory": "Inventory",
       "projects": "Projects",
-      "crm": "CRM",
-      "ai": "AI Analytics"
+      "crm": "CRM"
     },
     "charts": {
       "cashFlowTrend": "Cash Flow Trend",
@@ -291,7 +290,24 @@
     "rowsPerPage": "Rows per page",
     "of": "of",
     "selectAll": "Select all",
-    "deselectAll": "Deselect all"
+    "deselectAll": "Deselect all",
+    "exportCsv": "Export CSV",
+    "exportAll": "Export All",
+    "exportAsCsv": "Export as CSV",
+    "exportAsXlsx": "Export as XLSX",
+    "columns": "Columns",
+    "resetColumnWidths": "Reset column widths",
+    "loadingMore": "Loading more...",
+    "showingLoaded": "Showing {count} of {total} results",
+    "resultsLoaded": "{count} results loaded",
+    "scrollForMore": "Scroll for more",
+    "selectRow": "Select row",
+    "clearSearch": "Clear search",
+    "firstPage": "Go to first page",
+    "previousPage": "Go to previous page",
+    "nextPage": "Go to next page",
+    "lastPage": "Go to last page",
+    "searchPlaceholder": "Search..."
   },
   "pagination": {
     "previous": "Previous",
@@ -444,5 +460,23 @@
     "previous": "Previous",
     "next": "Next",
     "page": "Page {current} of {total}"
+  },
+  "dateRange": {
+    "placeholder": "Date range",
+    "pickRange": "Pick a date range",
+    "quickSelect": "Quick Select",
+    "clear": "Clear date range",
+    "today": "Today",
+    "last7Days": "Last 7 days",
+    "last30Days": "Last 30 days",
+    "thisMonth": "This month",
+    "lastMonth": "Last month",
+    "thisQuarter": "This quarter",
+    "lastQuarter": "Last quarter",
+    "thisYear": "This year",
+    "last12Months": "Last 12 months"
+  },
+  "apiErrors": {
+    "VALIDATION_ERROR": "Some fields are missing or invalid. Check the form and try again."
   }
 }

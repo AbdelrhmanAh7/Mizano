@@ -27,7 +27,12 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePriceList, useDeletePriceList } from '@/lib/hooks/use-price-lists';
+import {
+  usePriceList,
+  useDeletePriceList,
+  usePriceListTypeLabel,
+} from '@/lib/hooks/use-price-lists';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function PriceListDetailPage() {
   const t = useTranslations('inventory');
@@ -36,6 +41,8 @@ export default function PriceListDetailPage() {
   const id = params.id as string;
   const { data: priceList, isLoading } = usePriceList(id);
   const deletePriceList = useDeletePriceList();
+  const typeLabel = usePriceListTypeLabel();
+  const formatMoney = useMoneyFormatter();
 
   if (isLoading) {
     return (
@@ -87,7 +94,8 @@ export default function PriceListDetailPage() {
               </Badge>
             </div>
             <p className="text-muted-foreground">
-              {priceList.type === 'SALES' ? 'Sales' : 'Purchase'} Price List
+              {typeLabel(priceList.type)} ·{' '}
+              {t('priceLists.detail.adjustment', { value: priceList.adjustment })}
             </p>
           </div>
         </div>
@@ -128,16 +136,15 @@ export default function PriceListDetailPage() {
         <CardContent>
           {items.length === 0 ? (
             <p className="text-center py-8 text-muted-foreground">
-              No items in this price list yet.
+              {t('priceLists.detail.noItems')}
             </p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Item</TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                  <TableHead className="text-right">Min Qty</TableHead>
+                  <TableHead>{t('priceLists.detail.item')}</TableHead>
+                  <TableHead>{t('priceLists.detail.sku')}</TableHead>
+                  <TableHead className="text-end">{t('priceLists.detail.price')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -145,16 +152,14 @@ export default function PriceListDetailPage() {
                   (item: {
                     id: string;
                     item?: { name?: string; sku?: string };
-                    price?: string | number;
-                    minQuantity?: number;
+                    customPrice?: string;
                   }) => (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">{item.item?.name || '-'}</TableCell>
                       <TableCell className="font-mono text-sm">{item.item?.sku || '-'}</TableCell>
-                      <TableCell className="text-right font-mono">
-                        ${parseFloat(item.price?.toString() || '0').toFixed(2)}
+                      <TableCell className="text-end font-mono">
+                        {formatMoney(item.customPrice)}
                       </TableCell>
-                      <TableCell className="text-right">{item.minQuantity || 1}</TableCell>
                     </TableRow>
                   ),
                 )}

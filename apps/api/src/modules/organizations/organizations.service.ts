@@ -11,7 +11,6 @@ import {
   FinancialSettingsDto,
   InvoiceSettingsDto,
   InventorySettingsDto,
-  AiSettingsDto,
   EmailSettingsDto,
   LocalizationSettingsDto,
   BrandingSettingsDto,
@@ -215,15 +214,6 @@ export class OrganizationsService {
         enableMultiWarehouse: org.enableMultiWarehouse,
         enableBundles: org.enableBundles,
       },
-      ai: {
-        aiCategorizationEnabled: org.aiCategorizationEnabled,
-        aiReconciliationEnabled: org.aiReconciliationEnabled,
-
-        aiForecastingEnabled: org.aiForecastingEnabled,
-        aiAnomalyEnabled: org.aiAnomalyEnabled,
-        aiLeadScoringEnabled: org.aiLeadScoringEnabled,
-        anomalySensitivity: org.anomalySensitivity,
-      },
       email: {
         smtpHost: org.smtpHost,
         smtpPort: org.smtpPort,
@@ -345,22 +335,6 @@ export class OrganizationsService {
         defaultValuationMethod: dto.defaultValuationMethod,
         enableMultiWarehouse: dto.enableMultiWarehouse,
         enableBundles: dto.enableBundles,
-      },
-      select: { id: true, updatedAt: true },
-    });
-  }
-
-  async updateAiSettings(id: string, dto: AiSettingsDto) {
-    return this.prisma.organization.update({
-      where: { id },
-      data: {
-        aiCategorizationEnabled: dto.aiCategorizationEnabled,
-        aiReconciliationEnabled: dto.aiReconciliationEnabled,
-
-        aiForecastingEnabled: dto.aiForecastingEnabled,
-        aiAnomalyEnabled: dto.aiAnomalyEnabled,
-        aiLeadScoringEnabled: dto.aiLeadScoringEnabled,
-        anomalySensitivity: dto.anomalySensitivity,
       },
       select: { id: true, updatedAt: true },
     });

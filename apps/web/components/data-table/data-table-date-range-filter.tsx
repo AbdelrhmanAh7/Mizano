@@ -17,6 +17,8 @@ import {
 import { CalendarIcon, X } from 'lucide-react';
 import { useState } from 'react';
 import { type DateRange as RDPDateRange } from 'react-day-picker';
+import { useTranslations } from 'next-intl';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 export interface DateRangeValue {
   from: Date;
@@ -34,43 +36,44 @@ interface DataTableDateRangeFilterProps {
 }
 
 interface Preset {
+  /** Key in `common.dateRange`. */
   label: string;
   range: () => DateRangeValue;
 }
 
 const presets: Preset[] = [
   {
-    label: 'Today',
+    label: 'today',
     range: () => {
       const today = new Date();
       return { from: today, to: today };
     },
   },
   {
-    label: 'Last 7 days',
+    label: 'last7Days',
     range: () => ({ from: subDays(new Date(), 6), to: new Date() }),
   },
   {
-    label: 'Last 30 days',
+    label: 'last30Days',
     range: () => ({ from: subDays(new Date(), 29), to: new Date() }),
   },
   {
-    label: 'This month',
+    label: 'thisMonth',
     range: () => ({ from: startOfMonth(new Date()), to: new Date() }),
   },
   {
-    label: 'Last month',
+    label: 'lastMonth',
     range: () => {
       const last = subMonths(new Date(), 1);
       return { from: startOfMonth(last), to: endOfMonth(last) };
     },
   },
   {
-    label: 'This quarter',
+    label: 'thisQuarter',
     range: () => ({ from: startOfQuarter(new Date()), to: new Date() }),
   },
   {
-    label: 'Last quarter',
+    label: 'lastQuarter',
     range: () => {
       const last = subQuarters(new Date(), 1);
       return {
@@ -80,7 +83,7 @@ const presets: Preset[] = [
     },
   },
   {
-    label: 'This year',
+    label: 'thisYear',
     range: () => ({ from: startOfYear(new Date()), to: new Date() }),
   },
 ];
@@ -88,11 +91,13 @@ const presets: Preset[] = [
 export function DataTableDateRangeFilter({
   value,
   onChange,
-  placeholder = 'Date range',
+  placeholder,
   maxDate,
   showPresets = true,
 }: DataTableDateRangeFilterProps) {
   const [open, setOpen] = useState(false);
+  const t = useTranslations('common.dateRange');
+  const locale = useDateFnsLocale();
 
   const handlePreset = (preset: Preset) => {
     onChange(preset.range());
@@ -112,7 +117,7 @@ export function DataTableDateRangeFilter({
             variant="outline"
             size="sm"
             className={cn(
-              'h-9 border-dashed justify-start text-left font-normal',
+              'h-9 border-dashed justify-start text-start font-normal',
               value && 'rounded-e-none border-e-0',
               !value && 'text-muted-foreground',
             )}
@@ -120,10 +125,10 @@ export function DataTableDateRangeFilter({
             <CalendarIcon className="me-2 h-4 w-4" />
             {value ? (
               <span>
-                {format(value.from, 'MMM d, yyyy')} – {format(value.to, 'MMM d, yyyy')}
+                {format(value.from, 'PP', { locale })} – {format(value.to, 'PP', { locale })}
               </span>
             ) : (
-              placeholder
+              (placeholder ?? t('placeholder'))
             )}
           </Button>
         </PopoverTrigger>
@@ -131,7 +136,9 @@ export function DataTableDateRangeFilter({
           <div className="flex">
             {showPresets && (
               <div className="border-e p-3 space-y-1 min-w-[140px]">
-                <p className="text-xs font-medium text-muted-foreground mb-2 px-2">Quick Select</p>
+                <p className="text-xs font-medium text-muted-foreground mb-2 px-2">
+                  {t('quickSelect')}
+                </p>
                 {presets.map((preset) => (
                   <Button
                     key={preset.label}
@@ -140,7 +147,7 @@ export function DataTableDateRangeFilter({
                     className="w-full justify-start text-xs"
                     onClick={() => handlePreset(preset)}
                   >
-                    {preset.label}
+                    {t(preset.label)}
                   </Button>
                 ))}
               </div>
@@ -170,7 +177,7 @@ export function DataTableDateRangeFilter({
           size="sm"
           className="h-9 rounded-s-none border-dashed px-2"
           onClick={handleClear}
-          aria-label="Clear date range"
+          aria-label={t('clear')}
         >
           <X className="h-3 w-3" data-testid="icon-x" />
         </Button>

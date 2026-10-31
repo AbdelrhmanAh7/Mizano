@@ -1,8 +1,7 @@
 /**
- * Shared image preprocessing utilities for OCR and VLM extraction.
- *
- * Extracted from OllamaService to be reused across extraction strategies.
- * Two presets: OCR-optimized (crisp text) vs VLM-optimized (compressed for model).
+ * Image preprocessing for the two readers: OCR-optimized (crisp text) for the CPU rules reader,
+ * and compressed JPEG for the organization's AI provider (smaller upload, within every
+ * provider's image limits).
  */
 
 import { Logger } from '@nestjs/common';
@@ -11,15 +10,14 @@ import { describeError } from '../../../common/utils/redact';
 const logger = new Logger('ImagePreprocessor');
 
 // ---------------------------------------------------------------------------
-// VLM Preset (existing behavior from OllamaService)
+// AI provider preset
 // ---------------------------------------------------------------------------
 
-/** Max file size for VLM-processed images (300KB). */
-const VLM_MAX_IMAGE_BYTES = 300 * 1024;
-/** Starting max dimension for VLM. */
-const VLM_INITIAL_MAX_DIM = 2048;
-/** Starting JPEG quality for VLM. */
-const VLM_INITIAL_JPEG_QUALITY = 90;
+/** Images up to this size in a format every provider reads are sent unchanged. */
+const AI_MAX_IMAGE_BYTES = 1536 * 1024;
+const AI_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const AI_INITIAL_MAX_DIM = 2048;
+const AI_INITIAL_JPEG_QUALITY = 85;
 
 // ---------------------------------------------------------------------------
 // OCR Preset
@@ -65,29 +63,35 @@ export async function convertHeicToJpeg(buffer: Buffer): Promise<Buffer> {
 }
 
 // ---------------------------------------------------------------------------
-// VLM Preprocessing
+// AI provider preprocessing
 // ---------------------------------------------------------------------------
 
 /**
- * Preprocess an image for Ollama Vision model.
- * Preserves colors, resizes + compresses to ≤300KB.
+ * An image an AI provider accepts: JPEG, PNG or WebP within AI_MAX_IMAGE_BYTES as is; anything
+ * else (HEIC, large photos) converted to a compressed JPEG. Null when it cannot be converted.
  */
-export async function preprocessForVlm(buffer: Buffer, mimeType: string): Promise<Buffer> {
-  const isHeic = mimeType === 'image/heic' || mimeType === 'image/heif';
-
-  let jpegBuffer = buffer;
-  if (isHeic) {
-    jpegBuffer = await convertHeicToJpeg(buffer);
+export async function prepareImageForAi(
+  buffer: Buffer,
+  mimeType: string,
+): Promise<{ data: Buffer; mimeType: string } | null> {
+  if (AI_IMAGE_TYPES.has(mimeType) && buffer.length <= AI_MAX_IMAGE_BYTES) {
+    return { data: buffer, mimeType };
   }
-
-  const compressed = await compressToTarget(
-    jpegBuffer,
-    mimeType,
-    VLM_MAX_IMAGE_BYTES,
-    VLM_INITIAL_MAX_DIM,
-    VLM_INITIAL_JPEG_QUALITY,
-  );
-  return compressed ?? jpegBuffer;
+  try {
+    const heic = mimeType === 'image/heic' || mimeType === 'image/heif';
+    const source = heic ? await convertHeicToJpeg(buffer) : buffer;
+    const compressed = await compressToTarget(
+      source,
+      heic ? 'image/jpeg' : mimeType,
+      AI_MAX_IMAGE_BYTES,
+      AI_INITIAL_MAX_DIM,
+      AI_INITIAL_JPEG_QUALITY,
+    );
+    return compressed ? { data: compressed, mimeType: 'image/jpeg' } : null;
+  } catch (err) {
+    logger.warn(`AI image preprocessing failed: ${describeError(err, { includeMessage: false })}`);
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +168,8 @@ async function compressToTarget(
     const origH = meta.height ?? 0;
     const origDim = Math.max(origW, origH);
 
-    if (buffer.length <= maxBytes) {
+    // Small JPEGs pass; any other format is re-encoded so the caller always gets a JPEG.
+    if (buffer.length <= maxBytes && originalMimeType === 'image/jpeg') {
       return buffer;
     }
 

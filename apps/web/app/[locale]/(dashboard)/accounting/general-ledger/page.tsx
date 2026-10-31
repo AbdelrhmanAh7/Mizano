@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/table';
 import { useAccountsTree, flattenAccountsTree } from '@/lib/hooks/use-accounts';
 import { useGeneralLedger } from '@/lib/hooks/use-accounting-reports';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 interface LedgerEntry {
   date: string;
@@ -54,6 +55,7 @@ const formatCurrency = (amount: number | string, currency = 'USD'): string => {
 };
 
 export default function GeneralLedgerPage() {
+  const dateLocale = useDateFnsLocale();
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [dateFrom, setDateFrom] = useState(format(subMonths(new Date(), 3), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -158,8 +160,8 @@ export default function GeneralLedgerPage() {
                 ? `${selectedAccount.code} - ${selectedAccount.name}`
                 : 'General Ledger'}
               <span className="text-sm font-normal text-muted-foreground ml-2">
-                {format(new Date(dateFrom), 'MMM d, yyyy')} -{' '}
-                {format(new Date(dateTo), 'MMM d, yyyy')}
+                {format(new Date(dateFrom), 'PP', { locale: dateLocale })} -{' '}
+                {format(new Date(dateTo), 'PP', { locale: dateLocale })}
               </span>
             </CardTitle>
           </CardHeader>
@@ -200,7 +202,9 @@ export default function GeneralLedgerPage() {
                   ) : (
                     entries.map((entry, index) => (
                       <TableRow key={`${entry.journalId}-${index}`}>
-                        <TableCell>{format(new Date(entry.date), 'MMM d, yyyy')}</TableCell>
+                        <TableCell>
+                          {format(new Date(entry.date), 'PP', { locale: dateLocale })}
+                        </TableCell>
                         <TableCell>
                           <Link
                             href={`/accounting/journals/${entry.journalId}`}

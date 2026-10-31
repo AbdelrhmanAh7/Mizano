@@ -25,6 +25,7 @@ interface HeaderProps {
 export function Header({ sessionUser }: HeaderProps) {
   const locale = useLocale();
   const t = useTranslations('common.header');
+  const tTable = useTranslations('common.table');
   const pathname = usePathname();
   const { startTour } = useTourStore();
   const t_tour = useTranslations('tour.header');
@@ -60,7 +61,7 @@ export function Header({ sessionUser }: HeaderProps) {
             onClick={openCommandPalette}
           >
             <Search className="h-3.5 w-3.5" />
-            <span className="text-xs">Search...</span>
+            <span className="text-xs">{tTable('searchPlaceholder')}</span>
             <kbd className="pointer-events-none h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 hidden sm:inline-flex">
               <span className="text-xs">&#8984;</span>K
             </kbd>

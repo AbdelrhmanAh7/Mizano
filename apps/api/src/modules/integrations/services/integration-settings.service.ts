@@ -23,7 +23,11 @@ import {
   WEBHOOK_EVENT_TYPES,
 } from '../integration-catalog';
 import { generateApiKey } from '../utils/api-key';
-import { integrationsEncryptionConfigured, sealSecret, secretHint } from '../utils/secret-box';
+import {
+  integrationsEncryptionConfigured,
+  sealSecret,
+  secretHint,
+} from '../../../common/utils/secret-box';
 import { assertPublicWebhookUrl } from '../utils/url-safety';
 import { WebhookDispatcherService } from './webhook-dispatcher.service';
 import { WebhookOutboxService } from './webhook-outbox.service';

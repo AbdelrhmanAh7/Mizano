@@ -31,16 +31,18 @@ import { Badge } from '@/components/ui/badge';
 import {
   usePaymentMade,
   useDeletePaymentMade,
-  formatPaymentMode,
   formatCurrency,
 } from '@/lib/hooks/use-payments-made';
+import { PaymentModeText, type PaymentMode } from '@/components/sales/status-badge';
 import { useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 interface PaymentDetailPageProps {
   params: { id: string };
 }
 
 export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
+  const dateLocale = useDateFnsLocale();
   const { id } = params;
   const t = useTranslations('purchases');
   const baseCurrency = useBaseCurrency();
@@ -97,7 +99,9 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
               <h1 className="text-3xl font-bold tracking-tight font-mono">
                 {payment.paymentNumber}
               </h1>
-              <Badge variant="outline">{formatPaymentMode(payment.paymentMode)}</Badge>
+              <Badge variant="outline">
+                <PaymentModeText mode={payment.paymentMode as PaymentMode} />
+              </Badge>
               {payment.deletedAt && (
                 <Badge variant="destructive">{t('payments.voidedBadge')}</Badge>
               )}
@@ -166,7 +170,7 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
               <div>
                 <p className="text-sm text-muted-foreground">{t('payments.paymentDate')}</p>
                 <p className="text-2xl font-bold">
-                  {format(new Date(payment.date), 'MMM d, yyyy')}
+                  {format(new Date(payment.date), 'PP', { locale: dateLocale })}
                 </p>
               </div>
             </div>
@@ -206,7 +210,9 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t('payments.paymentMode')}</span>
-              <span>{formatPaymentMode(payment.paymentMode)}</span>
+              <span>
+                <PaymentModeText mode={payment.paymentMode as PaymentMode} />
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t('payments.reference')}</span>
@@ -249,7 +255,7 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
                       </TableCell>
                       <TableCell>
                         {allocation.bill?.date
-                          ? format(new Date(allocation.bill.date), 'MMM d, yyyy')
+                          ? format(new Date(allocation.bill.date), 'PP', { locale: dateLocale })
                           : '-'}
                       </TableCell>
                       <TableCell className="text-right font-mono">

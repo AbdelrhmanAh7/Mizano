@@ -16,24 +16,17 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import {
-  useVendor,
-  formatVendorAddress,
-  formatCurrency,
-  getBalanceColor,
-} from '@/lib/hooks/use-vendors';
+import { useVendor, formatVendorAddress, getBalanceColor } from '@/lib/hooks/use-vendors';
 import {
   useBills,
   getStatusVariant as getBillStatusVariant,
-  getStatusText as getBillStatusText,
+  useBillStatusLabel,
   type Bill,
 } from '@/lib/hooks/use-bills';
 import { useExpenses, type Expense } from '@/lib/hooks/use-expenses';
-import {
-  usePaymentsMade,
-  formatPaymentMode,
-  type PaymentMade,
-} from '@/lib/hooks/use-payments-made';
+import { usePaymentsMade, type PaymentMade } from '@/lib/hooks/use-payments-made';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
+import { PaymentModeText, type PaymentMode } from '@/components/sales/status-badge';
 import {
   useVendorCredits,
   getStatusVariant as getCreditStatusVariant,
@@ -51,6 +44,10 @@ interface VendorDetailPageProps {
 export default function VendorDetailPage({ params }: VendorDetailPageProps) {
   const { id } = params;
   const t = useTranslations('purchases');
+  // Bills, payments and balances are ledger amounts in the organization base currency, never
+  // the vendor's default currency (review-lessons §11).
+  const formatMoney = useMoneyFormatter();
+  const billStatusLabel = useBillStatusLabel();
   const tCommon = useTranslations('common');
   const { hasPermission } = usePermissions();
   const { data: vendor, isLoading } = useVendor(id);
@@ -157,7 +154,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
               </CardHeader>
               <CardContent>
                 <div className={cn('text-2xl font-bold font-mono', getBalanceColor(balance))}>
-                  {formatCurrency(balance, vendor.currency)}
+                  {formatMoney(balance)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">{t('vendors.amountOwed')}</p>
               </CardContent>
@@ -358,14 +355,14 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
                         <TableCell>{format(new Date(bill.dueDate), 'MMM dd, yyyy')}</TableCell>
                         <TableCell>
                           <Badge variant={getBillStatusVariant(bill.status)}>
-                            {getBillStatusText(bill.status)}
+                            {billStatusLabel(bill.status)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(bill.grandTotal, vendor.currency)}
+                          {formatMoney(bill.grandTotal)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(bill.balanceDue, vendor.currency)}
+                          {formatMoney(bill.balanceDue)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -404,7 +401,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
                         <TableCell>{expense.account?.name ?? '-'}</TableCell>
                         <TableCell>{expense.description ?? '-'}</TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(expense.amount, vendor.currency)}
+                          {formatMoney(expense.amount)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -448,9 +445,11 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
                           </Link>
                         </TableCell>
                         <TableCell>{format(new Date(payment.date), 'MMM dd, yyyy')}</TableCell>
-                        <TableCell>{formatPaymentMode(payment.paymentMode)}</TableCell>
+                        <TableCell>
+                          <PaymentModeText mode={payment.paymentMode as PaymentMode} />
+                        </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(payment.amount, vendor.currency)}
+                          {formatMoney(payment.amount)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -504,7 +503,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
                           )}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(credit.amount, vendor.currency)}
+                          {formatMoney(credit.amount)}
                         </TableCell>
                       </TableRow>
                     ))}

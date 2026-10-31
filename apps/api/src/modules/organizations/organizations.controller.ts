@@ -19,7 +19,6 @@ import {
   FinancialSettingsDto,
   InvoiceSettingsDto,
   InventorySettingsDto,
-  AiSettingsDto,
   EmailSettingsDto,
   LocalizationSettingsDto,
   BrandingSettingsDto,
@@ -109,13 +108,6 @@ export class OrganizationsController {
   @ApiOperation({ summary: 'Update inventory settings' })
   updateInventorySettings(@CurrentOrg() orgId: string, @Body() dto: InventorySettingsDto) {
     return this.organizationsService.updateInventorySettings(orgId, dto);
-  }
-
-  @Patch('settings/ai')
-  @Permissions('settings.edit')
-  @ApiOperation({ summary: 'Update AI settings' })
-  updateAiSettings(@CurrentOrg() orgId: string, @Body() dto: AiSettingsDto) {
-    return this.organizationsService.updateAiSettings(orgId, dto);
   }
 
   @Patch('settings/email')

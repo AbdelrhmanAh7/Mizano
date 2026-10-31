@@ -1,153 +1,151 @@
-import { Readable } from 'stream';
-import { of } from 'rxjs';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { HttpService } from '@nestjs/axios';
+import Decimal from 'decimal.js';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { DocumentIntakeService } from './document-intake.service';
-import { OllamaService } from './ollama.service';
-import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
-import { PaddleOcrService } from './paddle-ocr.service';
-import { DocumentClassificationService } from './document-classification.service';
-import { EntityExtractionService } from './entity-extraction.service';
-import { AiFeedbackService } from './ai-feedback.service';
+import { AiGatewayService } from '../account/ai-gateway.service';
+import { AiSettingsService, connectionFingerprint } from '../account/ai-settings.service';
+import { AiDocumentReader } from '../extraction/ai-document-reader';
 import { ExtractionStrategyResolver } from '../extraction/extraction-strategy-resolver.service';
-import { OcrLlmStrategy } from '../extraction/ocr-llm-strategy.service';
-import { ExtractionContext } from '../extraction/extraction-strategy.interface';
+import { RulesStrategy } from '../extraction/rules-strategy.service';
+import { AiProviderAdapter, AiProviderError } from '../providers/ai-provider';
+import { AiFeedbackService } from './ai-feedback.service';
+import { DocumentClassificationService } from './document-classification.service';
+import { DocumentIntakeService } from './document-intake.service';
+import { EntityExtractionService } from './entity-extraction.service';
 
 /**
  * AGENTS.md: "Never log invoice text, credentials, bot tokens or auth headers."
  *
- * These tests drive the real intake service, the real OCR+LLM strategy and the real Ollama
- * service end to end (only OCR engine, LLM gateway and database are faked) with a document
- * full of recognisable sentinel values, and assert that nothing printed through the Nest
- * Logger contains any of them.
+ * Drives the real intake service, resolver, AI reader and call gateway (only the provider,
+ * settings and database are faked) with a document full of recognisable sentinel values, and
+ * asserts that nothing printed through the Nest Logger contains any of them or the key.
  */
-
-// Distinct, greppable sentinels for every kind of document content.
 const SENTINELS = {
-  ocrLine: 'ZXQ-OCR-LINE-7731 Lotus Trading Supplies LLC',
-  vendor: 'Lotus Trading Supplies LLC',
+  vendor: 'Lotus Trading Supplies LLC ZXQ',
   taxId: '300-123-456-789',
   invoiceNumber: 'INV-ZXQ-90210',
   lineDescription: 'Industrial widget ZXQ-sku-5521',
   email: 'accounts@lotus-zxq.example',
-  phone: '+20-100-555-0199',
   total: '8765.43',
-  subtotal: '7688.0',
-  tax: '1077.43',
-  notes: 'Payment to IBAN EG380019000500000000263180002 ZXQ',
+  apiKey: 'sk-ant-SECRET-KEY-ZXQ',
 };
 
-const OCR_TEXT = [
-  SENTINELS.ocrLine,
-  `Tax ID ${SENTINELS.taxId}`,
-  `Invoice ${SENTINELS.invoiceNumber}`,
-  `${SENTINELS.lineDescription} 4 x 1922.00`,
-  `Subtotal ${SENTINELS.subtotal} VAT ${SENTINELS.tax} Total ${SENTINELS.total}`,
-  SENTINELS.notes,
-].join('\n');
-
-const RAW_LLM_JSON = {
+const ANSWER = JSON.stringify({
+  documentType: 'BILL',
   vendorName: SENTINELS.vendor,
-  vendorAddress: '12 Zamalek Street ZXQ',
-  vendorPhone: SENTINELS.phone,
   vendorEmail: SENTINELS.email,
   vendorTaxId: SENTINELS.taxId,
   invoiceNumber: SENTINELS.invoiceNumber,
   date: '2026-09-01',
-  dueDate: null,
-  total: 8765.43,
+  currency: 'EGP',
   subtotal: 7688,
   tax: 1077.43,
-  discount: null,
-  currency: 'EGP',
-  paymentTerms: null,
-  notes: SENTINELS.notes,
-  documentCategory: 'INVOICE',
-  lineItems: [
+  total: 8765.43,
+  lines: [
     {
       description: SENTINELS.lineDescription,
       quantity: 4,
       unitPrice: 1922,
-      taxAmount: 0,
       total: 7688,
+      accountCode: '5100',
     },
   ],
-};
+});
 
-/** Values that must never appear in a log line. */
-const FORBIDDEN_FRAGMENTS = [
+const FORBIDDEN = [
   'ZXQ',
-  SENTINELS.vendor,
   SENTINELS.taxId,
-  SENTINELS.invoiceNumber,
-  SENTINELS.lineDescription,
   SENTINELS.email,
-  SENTINELS.phone,
   SENTINELS.total,
   '7688',
-  '1077.43',
   '1922',
-  'IBAN',
-  'Zamalek',
+  'SECRET',
 ];
 
-type LoggerMethod = 'log' | 'warn' | 'error' | 'debug' | 'verbose' | 'fatal';
-
 function captureAllLogging(): () => string {
-  const spies = (['log', 'warn', 'error', 'debug', 'verbose', 'fatal'] as LoggerMethod[]).map(
-    (method) => jest.spyOn(Logger.prototype, method).mockImplementation(() => undefined),
+  const spies = (['log', 'warn', 'error', 'debug', 'verbose', 'fatal'] as const).map((method) =>
+    jest.spyOn(Logger.prototype, method).mockImplementation(() => undefined),
   );
   return () => JSON.stringify(spies.flatMap((spy) => spy.mock.calls));
 }
 
+/** The organization's AI settings row the gateway re-reads under its lock. */
+const SETTINGS_ROW = {
+  organizationId: 'org-1',
+  provider: 'anthropic',
+  model: 'claude-haiku-4-5',
+  keyCiphertext: 'v1.iv.tag.ct',
+  consentProvider: 'anthropic',
+  consentAt: new Date('2026-10-31T10:00:00Z'),
+  features: ['documents', 'categorization'],
+  monthlyLimitUsd: new Decimal(5),
+};
+
 function buildPrisma(): PrismaService {
   const model = {
-    findMany: jest.fn().mockResolvedValue([]),
+    findMany: jest.fn().mockResolvedValue([{ id: 'acc-1', code: '5100', name: 'Supplies ZXQ' }]),
     findFirst: jest.fn().mockResolvedValue(null),
+    findUnique: jest.fn().mockResolvedValue(SETTINGS_ROW),
+    aggregate: jest.fn().mockResolvedValue({ _sum: { costUsd: null } }),
+    create: jest.fn().mockResolvedValue({ id: 'usage-1' }),
+    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
   };
-  return new Proxy({}, { get: () => model }) as unknown as PrismaService;
+  const prisma: Record<string, unknown> = new Proxy(
+    {},
+    {
+      get: (_t, key) => {
+        if (key === '$transaction') return (fn: (tx: unknown) => unknown) => fn(prisma);
+        if (key === '$queryRaw') return jest.fn().mockResolvedValue([]);
+        return model;
+      },
+    },
+  );
+  return prisma as unknown as PrismaService;
 }
 
-describe('extraction and intake logging never contains document content', () => {
-  let paddle: { isAvailable: jest.Mock; canRenderPdf: jest.Mock; recognize: jest.Mock };
-  let gateway: { textModel: string; infer: jest.Mock };
-  let strategy: OcrLlmStrategy;
+describe('AI intake logging never contains document content or the key', () => {
+  let complete: jest.Mock;
   let service: DocumentIntakeService;
+  let rules: { extract: jest.Mock };
   let printed: () => string;
 
   beforeEach(() => {
     printed = captureAllLogging();
-
-    paddle = {
-      isAvailable: jest.fn().mockResolvedValue(true),
-      canRenderPdf: jest.fn().mockReturnValue(false),
-      recognize: jest.fn().mockResolvedValue({
-        text: OCR_TEXT,
-        confidence: 91,
-        regions: [{ text: SENTINELS.ocrLine, bbox: [0, 0, 1, 1], confidence: 91 }],
-        processingTimeMs: 12,
+    complete = jest.fn().mockResolvedValue({
+      text: ANSWER,
+      inputTokens: 1200,
+      outputTokens: 300,
+      reportedCostUsd: null,
+    });
+    const adapter = {
+      id: 'anthropic',
+      acceptsImages: true,
+      acceptsPdf: true,
+      listModels: jest.fn(),
+      complete,
+    } as unknown as AiProviderAdapter;
+    const settings = {
+      features: jest.fn().mockResolvedValue({ activeFeatures: ['documents', 'categorization'] }),
+      connection: jest.fn().mockResolvedValue({
+        provider: 'anthropic',
+        adapter,
+        model: 'claude-haiku-4-5',
+        apiKey: SENTINELS.apiKey,
+        price: null,
+        fingerprint: connectionFingerprint(SETTINGS_ROW),
       }),
-    };
-    gateway = {
-      textModel: 'test-model',
-      infer: jest.fn().mockResolvedValue({
-        data: RAW_LLM_JSON,
-        processingTimeMs: 25,
-        model: 'test-model',
-      }),
-    };
-
-    const ollama = new OllamaService(gateway as unknown as OllamaInferenceGateway);
-    strategy = new OcrLlmStrategy(ollama, paddle as unknown as PaddleOcrService);
-
+    } as unknown as AiSettingsService;
+    const prisma = buildPrisma();
+    const gateway = new AiGatewayService(prisma, settings);
+    rules = { extract: jest.fn().mockResolvedValue(null) };
+    const resolver = new ExtractionStrategyResolver(
+      { get: () => undefined } as unknown as ConfigService,
+      rules as unknown as RulesStrategy,
+      new AiDocumentReader(prisma, settings, gateway),
+    );
     service = new DocumentIntakeService(
-      buildPrisma(),
-      ollama,
-      {
-        resolve: (context: ExtractionContext) => strategy.extract(context),
-      } as unknown as ExtractionStrategyResolver,
+      prisma,
+      resolver,
       {
         classifyDocument: jest.fn().mockResolvedValue({ category: 'INVOICE', confidence: 0.9 }),
       } as unknown as DocumentClassificationService,
@@ -161,181 +159,53 @@ describe('extraction and intake logging never contains document content', () => 
 
   afterEach(() => jest.restoreAllMocks());
 
-  function expectNoDocumentContent(output: string): void {
-    for (const fragment of FORBIDDEN_FRAGMENTS) {
+  function expectNothingSensitive(output: string): void {
+    for (const fragment of FORBIDDEN) {
       expect({ fragment, leaked: output.includes(fragment) }).toEqual({ fragment, leaked: false });
     }
   }
 
-  it('happy path: image -> OCR -> LLM -> intake result logs only metadata', async () => {
+  it('happy path: the AI reading fills the draft while logs carry metadata only', async () => {
     const result = await service.processDocument(
       'org-1',
       Buffer.from('fake-image-bytes'),
       'image/png',
-      'lotus-invoice-ZXQ.png',
+      `${SENTINELS.invoiceNumber}.png`,
     );
 
-    // The pipeline really ran with the sensitive content...
+    expect(result.extractionMethod).toBe('ai');
     expect(result.extractedFields.vendorName).toBe(SENTINELS.vendor);
-    expect(result.rawText).toContain(SENTINELS.ocrLine);
-    expect(gateway.infer).toHaveBeenCalledTimes(1);
-    expect(String(gateway.infer.mock.calls[0][0])).toContain(SENTINELS.taxId);
-
-    // ...while the logs carry none of it, but do show that logging happened.
+    expect(result.extractedFields.lineItems[0].suggestedAccountId).toBe('acc-1');
+    expect(rules.extract).not.toHaveBeenCalled();
     const output = printed();
-    expect(output.length).toBeGreaterThan(50);
-    expect(output).toContain('Processing document intake');
-    expectNoDocumentContent(output);
+    expect(output).toContain('outcome=ok');
+    expectNothingSensitive(output);
   });
 
-  it('logs no file name even when the name contains document data', async () => {
-    await service.processDocument(
-      'org-1',
-      Buffer.from('x'),
-      'image/png',
-      `${SENTINELS.invoiceNumber}-${SENTINELS.vendor}.png`,
-    );
-    expectNoDocumentContent(printed());
-  });
-
-  it('inconsistent LLM totals take the number-fix path without logging amounts', async () => {
-    gateway.infer.mockResolvedValue({
-      data: {
-        ...RAW_LLM_JSON,
-        total: 8765.43,
-        subtotal: 100,
-        tax: 7,
-        lineItems: [
-          { description: 'item', quantity: 20, unitPrice: 438.27, taxAmount: 0, total: 40 },
-          { description: SENTINELS.lineDescription, quantity: 1, unitPrice: 7688, total: 7688 },
-        ],
-      },
-      processingTimeMs: 5,
-      model: 'test-model',
+  it('an answer that is not the expected JSON falls back to rules without echoing it', async () => {
+    complete.mockResolvedValue({
+      text: `I cannot read this. ${SENTINELS.vendor} ${SENTINELS.total}`,
+      inputTokens: 10,
+      outputTokens: 10,
+      reportedCostUsd: null,
     });
-
-    await service.processDocument('org-1', Buffer.from('x'), 'image/png');
-
-    const output = printed();
-    expect(output).toContain('NumberFix');
-    expectNoDocumentContent(output);
-    expect(output).not.toContain('8765');
-    expect(output).not.toContain('438.27');
-  });
-
-  it('column-header line items are dropped without logging their descriptions', async () => {
-    gateway.infer.mockResolvedValue({
-      data: {
-        ...RAW_LLM_JSON,
-        lineItems: [
-          { description: 'Qty', quantity: 1, unitPrice: 1, taxAmount: 0, total: 1 },
-          { description: SENTINELS.lineDescription, quantity: 4, unitPrice: 1922, total: 7688 },
-        ],
-      },
-      processingTimeMs: 5,
-      model: 'test-model',
-    });
-
-    await service.processDocument('org-1', Buffer.from('x'), 'image/png');
-
-    const output = printed();
-    expect(output).toContain('LineFix');
-    expect(output).not.toContain('Qty');
-    expect(output).not.toContain('Removing fake line item:');
-    expectNoDocumentContent(output);
-  });
-
-  it('unparseable LLM output is not echoed into the log', async () => {
-    // Drive the real gateway with a streamed response that is not JSON and quotes the document.
-    const ndjson =
-      JSON.stringify({ message: { content: `not json at all: ${OCR_TEXT}` }, done: false }) +
-      '\n' +
-      JSON.stringify({ message: { content: '' }, done: true, done_reason: 'stop' }) +
-      '\n';
-    const httpService = {
-      axiosRef: { defaults: { headers: { common: {} as Record<string, string> } } },
-      post: jest.fn(() => of({ data: Readable.from([Buffer.from(ndjson)]) })),
-    };
-    const realGateway = new OllamaInferenceGateway(
-      { get: (_key: string, fallback?: string) => fallback } as unknown as ConfigService,
-      httpService as unknown as HttpService,
-    );
-    const doInferOnce = (
-      realGateway as unknown as {
-        doInferOnce: (
-          prompt: string,
-          images: string[],
-          model: string,
-          options: undefined,
-          attempt: number,
-        ) => Promise<unknown>;
-      }
-    ).doInferOnce.bind(realGateway);
-
-    await expect(doInferOnce('extract this', [], 'test-model', undefined, 1)).resolves.toBeNull();
-
-    const output = printed();
-    expect(output).toContain('unparseable JSON');
-    expect(output).toContain('contentLen=');
-    expectNoDocumentContent(output);
-    expect(output).not.toContain('not json at all');
-  });
-
-  it('OCR engine failures are logged by type only, never with the text they choked on', async () => {
-    paddle.isAvailable.mockResolvedValue(false);
-    jest
-      .spyOn(strategy as unknown as { runTesseract: () => Promise<unknown> }, 'runTesseract')
-      .mockRejectedValue(new SyntaxError(`Unexpected token in "${OCR_TEXT}"`));
 
     const result = await service.processDocument('org-1', Buffer.from('x'), 'image/png');
 
-    expect(result.rawText).toBe('');
+    expect(result.extractionMethod).toBe('rules');
+    expect(rules.extract).toHaveBeenCalledTimes(1);
     const output = printed();
-    expect(output).toContain('Tesseract.js OCR failed');
-    expect(output).toContain('SyntaxError');
-    expectNoDocumentContent(output);
+    expect(output).toContain('AI_INVALID_OUTPUT');
+    expectNothingSensitive(output);
   });
 
-  it('service-level failures never log the error message of Prisma-style errors', async () => {
-    gateway.infer.mockResolvedValue({
-      data: RAW_LLM_JSON,
-      processingTimeMs: 1,
-      model: 'test-model',
-    });
-    const failingPrisma = new Proxy(
-      {},
-      {
-        get: () => ({
-          findMany: jest
-            .fn()
-            .mockRejectedValue(
-              Object.assign(
-                new Error(`Invalid prisma.vendor.findMany() args: { name: "${SENTINELS.vendor}" }`),
-                { name: 'PrismaClientValidationError' },
-              ),
-            ),
-          findFirst: jest.fn().mockResolvedValue(null),
-        }),
-      },
-    ) as unknown as PrismaService;
-    const failing = new DocumentIntakeService(
-      failingPrisma,
-      new OllamaService(gateway as unknown as OllamaInferenceGateway),
-      {
-        resolve: (context: ExtractionContext) => strategy.extract(context),
-      } as unknown as ExtractionStrategyResolver,
-      {
-        classifyDocument: jest.fn().mockResolvedValue({ category: 'INVOICE', confidence: 0.9 }),
-      } as unknown as DocumentClassificationService,
-      {
-        extractAndMatch: jest.fn().mockResolvedValue({ matches: [] }),
-      } as unknown as EntityExtractionService,
-      { processFeedback: jest.fn() } as unknown as AiFeedbackService,
-      {} as ConfigService,
-    );
+  it('a provider failure is logged by kind only', async () => {
+    complete.mockRejectedValue(new AiProviderError('invalid_key', 401));
 
-    await failing.processDocument('org-1', Buffer.from('x'), 'image/png').catch(() => undefined);
+    await service.processDocument('org-1', Buffer.from('x'), 'image/png');
 
-    expectNoDocumentContent(printed());
+    const output = printed();
+    expect(output).toContain('AI_KEY_INVALID');
+    expectNothingSensitive(output);
   });
 });

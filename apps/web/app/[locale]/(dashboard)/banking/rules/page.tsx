@@ -159,7 +159,7 @@ function BankRulesPageContent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('rules.title')}</h1>
           <p className="text-muted-foreground">{t('rules.description')}</p>

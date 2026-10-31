@@ -21,7 +21,7 @@ pnpm db:seed
 pnpm dev                # docker-compose up -d && turbo dev → web :5001, API :6001
 ```
 
-Never initialize, migrate or reset a shared or production database from a workstation. AI routes need an inference backend (`OLLAMA_BASE_URL`) until the CPU extraction work lands; they return errors rather than fake results when it is missing. Document intake processing requires Redis (`REDIS_URL`) and the intake worker (`intake-worker.ts`); without Redis, the API fails fast with a clear error instead of leaving uploads queued indefinitely.
+Never initialize, migrate or reset a shared or production database from a workstation. AI is optional: each organization connects its own provider in Settings → AI, and without one every AI feature is off while intake uses the CPU rules reader. Document intake processing requires Redis (`REDIS_URL`) and the intake worker (`intake-worker.ts`); without Redis, the API fails fast with a clear error instead of leaving uploads queued indefinitely.
 
 | Service    | Local port | URL                                                |
 | ---------- | ---------- | -------------------------------------------------- |
@@ -62,18 +62,18 @@ Four environment templates are tracked at the repository root. They hold placeho
 - **Web**: Next.js loads its own `.env*` files from `apps/web`. Only `NEXT_PUBLIC_*` reaches the browser and is fixed at build time. `NEXT_PUBLIC_API_URL` must include the `/api` prefix (default `http://localhost:6001/api`).
 - When adding a variable, add it to all four templates (secret placeholders as `__CHANGE_ME__`) and to the table below.
 
-| Group        | Variables                                                                                                                                                                                                                       |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Core         | `APP_ENV`, `NODE_ENV`, `API_PORT` (6001), `CORS_ORIGIN` (comma-separated; required in production), `FRONTEND_URL`                                                                                                               |
-| Database     | `DATABASE_URL`, `DATABASE_POOL_SIZE`, `DATABASE_POOL_TIMEOUT`, `READ_DATABASE_URL`, `DATABASE_READ_POOL_SIZE`, `SLOW_QUERY_THRESHOLD_MS`                                                                                        |
-| Redis        | `REDIS_URL`                                                                                                                                                                                                                     |
-| Auth         | `JWT_SECRET`, `JWT_REFRESH_SECRET`, `JWT_EXPIRATION` (15m), `JWT_REFRESH_EXPIRATION` (7d), `NEXTAUTH_SECRET`, `NEXTAUTH_URL`                                                                                                    |
-| Web          | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_NAME`, `NEXT_PUBLIC_APP_URL`, `API_INTERNAL_URL`                                                                                                                                        |
-| Limits       | `RATE_LIMIT_TTL`, `RATE_LIMIT_MAX`, `RATE_LIMIT_AUTH_MAX`                                                                                                                                                                       |
-| Logging      | `LOG_LEVEL`, `PRISMA_LOG_QUERIES` (default off)                                                                                                                                                                                 |
-| AI (current) | `OLLAMA_BASE_URL`, `OLLAMA_ENABLED`, `OLLAMA_{TEXT,VISION,FAST,SLOW}_MODEL`, `OLLAMA_TIMEOUT_MS`, `OLLAMA_MAX_CONCURRENT`, `OLLAMA_NUM_CTX`, `OLLAMA_NUM_THREAD`, `OLLAMA_WEBHOOK_SECRET`                                       |
-| Extraction   | `EXTRACTION_STRATEGY` (`vlm`/`ocr-llm`/`hybrid`), `EXTRACTION_OCR_CONFIDENCE_THRESHOLD`, `EXTRACTION_MAX_PDF_PAGES`, `PADDLE_OCR_{LANG,PKG_PATH,MODELS_DIR,TIMEOUT_MS}`, `PADDLE_OCR_API_{URL,TOKEN,TIMEOUT_MS}`, `PYTHON_PATH` |
-| Email        | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`                                                                                                                                     |
+| Group         | Variables                                                                                                                                                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Core          | `APP_ENV`, `NODE_ENV`, `API_PORT` (6001), `CORS_ORIGIN` (comma-separated; required in production), `FRONTEND_URL`                                                                                                               |
+| Database      | `DATABASE_URL`, `DATABASE_POOL_SIZE`, `DATABASE_POOL_TIMEOUT`, `READ_DATABASE_URL`, `DATABASE_READ_POOL_SIZE`, `SLOW_QUERY_THRESHOLD_MS`                                                                                        |
+| Redis         | `REDIS_URL`                                                                                                                                                                                                                     |
+| Auth          | `JWT_SECRET`, `JWT_REFRESH_SECRET`, `JWT_EXPIRATION` (15m), `JWT_REFRESH_EXPIRATION` (7d), `NEXTAUTH_SECRET`, `NEXTAUTH_URL`                                                                                                    |
+| Web           | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_NAME`, `NEXT_PUBLIC_APP_URL`, `API_INTERNAL_URL`                                                                                                                                        |
+| Limits        | `RATE_LIMIT_TTL`, `RATE_LIMIT_MAX`, `RATE_LIMIT_AUTH_MAX`                                                                                                                                                                       |
+| Logging       | `LOG_LEVEL`, `PRISMA_LOG_QUERIES` (default off)                                                                                                                                                                                 |
+| AI (optional) | `AI_OLLAMA_BASE_URL` (operator-set Ollama server), `INTAKE_EXTRACTION_STRATEGY=rules` (force the CPU reader); provider keys are per organization (Settings → AI)                                                                |
+| Extraction    | `EXTRACTION_STRATEGY` (`vlm`/`ocr-llm`/`hybrid`), `EXTRACTION_OCR_CONFIDENCE_THRESHOLD`, `EXTRACTION_MAX_PDF_PAGES`, `PADDLE_OCR_{LANG,PKG_PATH,MODELS_DIR,TIMEOUT_MS}`, `PADDLE_OCR_API_{URL,TOKEN,TIMEOUT_MS}`, `PYTHON_PATH` |
+| Email         | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`                                                                                                                                     |
 
 `OCR_SERVICE_*` and `VLM_*` entries still present in `.env.local` belong to removed Python services and are not read by the code.
 
@@ -93,7 +93,7 @@ Logs must never contain invoice/OCR text, LLM prompts or output, credentials, bo
 
 Error-log endpoints (`/api/logger/*`) and the `/logger` WebSocket require a signed-in user with the Admin-level `settings.edit` permission (`settings.delete` for clearing), see `LoggerController`. Entries are scoped to the caller's organization; entries without an organization (unauthenticated requests, schedulers) are never returned. The WebSocket handshake needs `auth: { token: <access token> }` (or an `Authorization: Bearer` header) and joins the caller's organization room only.
 
-The `ollama-proxy` container (`services/ollama-proxy`) has no default `WEBHOOK_SECRET`: it refuses to start when the variable is missing or a placeholder such as `change-me`. Set the same value as the API's `OLLAMA_WEBHOOK_SECRET`.
+AI provider keys are sealed with `INTEGRATIONS_ENCRYPTION_KEY` (the same key as the FlowLine webhook secrets), so set it before an organization connects a provider.
 
 ## Database
 
@@ -174,7 +174,7 @@ Zero-tolerance policy: `pnpm ci:full` must pass with no warnings or errors (no `
 
 Required secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `PRODUCTION_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `NEXTAUTH_SECRET`.
 
-The workflow still pulls an Ollama vision model on the host; the CPU-only demo mandate replaces that through the deployment/runtime issues (immutable digest deploys, restore and rollback evidence). Never report a deployment as verified without health and acceptance evidence for the exact SHA.
+The workflow no longer installs any AI model: AI runs through each organization's own provider account. Never report a deployment as verified without health and acceptance evidence for the exact SHA.
 
 **Production stack** (`docker-compose.production.yml`): `api` (6001), `web` (5001, standalone Next.js), `postgres` (5432), `redis` (6379, AOF), `nginx` (80/443 using `nginx/nginx.conf`) and optional `certbot` (`--profile with-nginx`). Manual equivalent: `pnpm docker:prod` with `.env.prod`; stop with `pnpm docker:prod:down`.
 

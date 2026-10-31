@@ -38,8 +38,10 @@ import { CheckCircle, Eye, Filter, Play, Plus, RefreshCw, Trash2, XCircle } from
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function WorkOrdersPageContent() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('manufacturing');
   const tCommon = useTranslations('common');
   const { toast } = useToast();
@@ -222,14 +224,16 @@ function WorkOrdersPageContent() {
       ),
       cell: ({ row }) =>
         row.original.plannedStartDate
-          ? format(new Date(row.original.plannedStartDate), 'MMM d, yyyy')
+          ? format(new Date(row.original.plannedStartDate), 'PP', { locale: dateLocale })
           : '-',
     },
     {
       accessorKey: 'dueDate',
       header: tCommon('date'),
       cell: ({ row }) =>
-        row.original.dueDate ? format(new Date(row.original.dueDate), 'MMM d, yyyy') : '-',
+        row.original.dueDate
+          ? format(new Date(row.original.dueDate), 'PP', { locale: dateLocale })
+          : '-',
     },
     {
       accessorKey: 'status',
@@ -279,7 +283,7 @@ function WorkOrdersPageContent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('workOrders.title')}</h1>
           <p className="text-muted-foreground">{t('workOrders.empty.description')}</p>

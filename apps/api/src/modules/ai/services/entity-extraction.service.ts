@@ -1,10 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
-import { buildEntityExtractionPrompt } from '../prompts/nlp.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
 import { findBestMatch } from '../utils/text-similarity.util';
-import { describeError } from '../../../common/utils/redact';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const nlp = require('compromise');
@@ -65,67 +62,11 @@ const MONEY_REGEX =
 export class EntityExtractionService {
   private readonly logger = new Logger(EntityExtractionService.name);
 
-  constructor(
-    private prisma: PrismaService,
-    private gateway: OllamaInferenceGateway,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   // ---------------------------------------------------------------------------
   // Public API
   // ---------------------------------------------------------------------------
-
-  /**
-   * Extract named entities from raw text (async).
-   * Tries Ollama first; falls back to compromise + regex.
-   */
-  async extractEntitiesAsync(text: string): Promise<ExtractionResult> {
-    if (!text || text.trim().length === 0) {
-      return this.emptyResult();
-    }
-
-    // --- Ollama-first inference path ---
-    try {
-      const prompt = buildEntityExtractionPrompt(text);
-      const ollamaResult = await this.gateway.infer<{
-        people: string[];
-        organizations: string[];
-        dates: string[];
-        places: string[];
-        money: Array<{ amount: number; currency: string }>;
-        emails: string[];
-        phones: string[];
-      }>(prompt);
-
-      if (ollamaResult) {
-        const d = ollamaResult.data;
-        const result: ExtractionResult = {
-          people: (d.people || []).map((t) => ({ text: t, type: 'person' as const })),
-          organizations: (d.organizations || []).map((t) => ({
-            text: t,
-            type: 'organization' as const,
-          })),
-          dates: (d.dates || []).map((t) => ({ text: t, type: 'date' as const })),
-          places: (d.places || []).map((t) => ({ text: t, type: 'place' as const })),
-          money: (d.money || []).map((m) => ({
-            text: `${m.currency} ${m.amount}`,
-            type: 'money' as const,
-          })),
-          emails: (d.emails || []).map((t) => ({ text: t, type: 'email' as const })),
-          phones: (d.phones || []).map((t) => ({ text: t, type: 'phone' as const })),
-          predictionMethod: 'OLLAMA',
-        };
-
-        return result;
-      }
-    } catch (error) {
-      this.logger.warn(
-        `Ollama entity extraction failed, falling back to compromise/regex: ${describeError(error)}`,
-      );
-    }
-
-    // --- Existing compromise + regex fallback ---
-    return { ...this.extractEntities(text), predictionMethod: 'RULE_BASED' };
-  }
 
   /**
    * Extract named entities from raw text.
@@ -163,15 +104,11 @@ export class EntityExtractionService {
    * against existing Customer and Vendor records in the database.
    * Uses fuzzy string matching via `findBestMatch` from text-similarity util.
    */
-  async extractAndMatch(
-    organizationId: string,
-    text: string,
-    options?: { useOllama?: boolean },
-  ): Promise<ExtractionAndMatchResult> {
-    const entities =
-      options?.useOllama === false
-        ? { ...this.extractEntities(text), predictionMethod: 'RULE_BASED' as PredictionMethod }
-        : await this.extractEntitiesAsync(text);
+  async extractAndMatch(organizationId: string, text: string): Promise<ExtractionAndMatchResult> {
+    const entities = {
+      ...this.extractEntities(text),
+      predictionMethod: 'RULE_BASED' as PredictionMethod,
+    };
     const matches: MatchedEntity[] = [];
 
     // Fetch all customer and vendor names for matching

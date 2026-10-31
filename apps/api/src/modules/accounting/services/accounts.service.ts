@@ -27,6 +27,7 @@ type DefaultAccountSettings = {
   defaultVatPayableAccountId?: string;
   defaultVatReceivableAccountId?: string;
   defaultRevenueAccountId?: string;
+  defaultSalesReturnsAccountId?: string;
 };
 
 @Injectable()
@@ -430,6 +431,7 @@ export class AccountsService {
       defaultVatPayableAccountId: '2200',
       defaultVatReceivableAccountId: '2210',
       defaultRevenueAccountId: '4000',
+      defaultSalesReturnsAccountId: '4400',
     },
     retail: {
       defaultCashAccountId: '1000',
@@ -439,6 +441,7 @@ export class AccountsService {
       defaultVatPayableAccountId: '2210',
       defaultVatReceivableAccountId: '2220',
       defaultRevenueAccountId: '4000',
+      defaultSalesReturnsAccountId: '4200',
     },
     construction: {
       defaultCashAccountId: '1000',
@@ -448,6 +451,7 @@ export class AccountsService {
       defaultVatPayableAccountId: '2200',
       defaultVatReceivableAccountId: '2210',
       defaultRevenueAccountId: '4000',
+      defaultSalesReturnsAccountId: '4400',
     },
   };
 
@@ -467,6 +471,7 @@ export class AccountsService {
         defaultVatPayableAccountId: true,
         defaultVatReceivableAccountId: true,
         defaultRevenueAccountId: true,
+        defaultSalesReturnsAccountId: true,
       },
     });
     if (!org) return;
@@ -513,6 +518,13 @@ export class AccountsService {
       { code: '4010', name: 'Project Revenue', type: AccountType.INCOME, parentId: null },
       { code: '4020', name: 'Retainer Revenue', type: AccountType.INCOME, parentId: null },
       { code: '4100', name: 'Other Income', type: AccountType.INCOME, parentId: null },
+      // Credit notes debit this contra-revenue account (organization default Sales Returns).
+      {
+        code: '4400',
+        name: 'Sales Returns & Allowances',
+        type: AccountType.INCOME,
+        parentId: null,
+      },
 
       // Cost of Services (5xxx)
       { code: '5000', name: 'Cost of Services', type: AccountType.EXPENSE, parentId: null },
@@ -681,6 +693,12 @@ export class AccountsService {
       { code: '4100', name: 'Change Orders', type: AccountType.INCOME, parentId: null },
       { code: '4200', name: 'Service & Repair Revenue', type: AccountType.INCOME, parentId: null },
       { code: '4300', name: 'Equipment Rental Income', type: AccountType.INCOME, parentId: null },
+      {
+        code: '4400',
+        name: 'Sales Returns & Allowances',
+        type: AccountType.INCOME,
+        parentId: null,
+      },
       { code: '4900', name: 'Other Income', type: AccountType.INCOME, parentId: null },
 
       // Direct Job Costs (5xxx)

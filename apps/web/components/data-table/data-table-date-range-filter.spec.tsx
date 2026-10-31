@@ -85,6 +85,17 @@ jest.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
 
+// Real English labels from common.dateRange; date-fns English locale.
+jest.mock('next-intl', () => {
+  const dict: Record<string, string> = jest.requireActual(
+    '../../messages/en/common.json',
+  ).dateRange;
+  return { useTranslations: () => (key: string) => dict[key] ?? key };
+});
+jest.mock('@/lib/date-locale', () => ({
+  useDateFnsLocale: () => jest.requireActual('date-fns/locale').enUS,
+}));
+
 import { DataTableDateRangeFilter } from './data-table-date-range-filter';
 
 describe('DataTableDateRangeFilter', () => {

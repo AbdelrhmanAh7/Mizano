@@ -6,17 +6,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { PhoneInput } from '@/components/ui/phone-input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   AddressCard,
@@ -26,6 +17,7 @@ import {
   addressSchema,
   emptyAddress,
 } from '@/components/shared/address-fields';
+import { PartyDetailsFields } from '@/components/shared/party-details-fields';
 import { Customer } from '@/lib/hooks/use-customers';
 import { useBaseCurrency } from '@/lib/hooks/use-organization';
 
@@ -89,7 +81,7 @@ export function buildCustomerPayload(data: CustomerFormData): Record<string, unk
   };
 }
 
-// Labels are keys under sales.customers.form.currencies and common.paymentTerms.
+// Labels are keys under sales.customers.form.currencies.
 const currencies = ['USD', 'EUR', 'GBP', 'EGP', 'AED', 'SAR'] as const;
 
 /** The listed currencies plus the org base currency and the saved one, base currency first. */
@@ -101,19 +93,10 @@ export function currencyOptions(
   return Array.from(new Set(codes));
 }
 
-const paymentTermsOptions = [
-  { value: 0, labelKey: 'dueOnReceipt' },
-  { value: 15, labelKey: 'net15' },
-  { value: 30, labelKey: 'net30' },
-  { value: 45, labelKey: 'net45' },
-  { value: 60, labelKey: 'net60' },
-];
-
 export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: CustomerFormProps) {
   const isEditing = !!customer;
   const t = useTranslations('sales.customers.form');
   const tValidation = useTranslations('sales.customers.validation');
-  const tTerms = useTranslations('common.paymentTerms');
   const fieldError = (message?: string) =>
     message ? (tValidation.has(message) ? tValidation(message) : message) : undefined;
 
@@ -187,99 +170,16 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
           <CardTitle>{t('basicInformation')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">
-                {t('name')} <span className="text-destructive">*</span>
-              </Label>
-              <Input id="name" placeholder={t('namePlaceholder')} {...form.register('name')} />
-              {form.formState.errors.name && (
-                <p className="text-sm text-red-500">
-                  {fieldError(form.formState.errors.name.message)}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="displayName">{t('displayName')}</Label>
-              <Input
-                id="displayName"
-                placeholder={t('displayNameHint')}
-                {...form.register('displayName')}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">{t('email')}</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="customer@example.com"
-                {...form.register('email')}
-              />
-              {form.formState.errors.email && (
-                <p className="text-sm text-red-500">
-                  {fieldError(form.formState.errors.email.message)}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phone">{t('phone')}</Label>
-              <PhoneInput
-                id="phone"
-                value={form.watch('phone') || ''}
-                onChange={(val) => form.setValue('phone', val)}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="currency">{t('currency')}</Label>
-              <Select
-                value={form.watch('currency')}
-                onValueChange={(value) => form.setValue('currency', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t('currencyPlaceholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {currencyOptions(baseCurrency, form.watch('currency')).map((code) => (
-                    <SelectItem key={code} value={code}>
-                      {t.has(`currencies.${code}`) ? t(`currencies.${code}`) : code}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="paymentTerms">{t('paymentTerms')}</Label>
-              <Select
-                value={String(form.watch('paymentTerms') ?? 30)}
-                onValueChange={(value) => form.setValue('paymentTerms', parseInt(value))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t('paymentTermsPlaceholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {paymentTermsOptions.map((term) => (
-                    <SelectItem key={term.value} value={String(term.value)}>
-                      {tTerms(term.labelKey)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="taxId">{t('taxId')}</Label>
-              <Input id="taxId" placeholder={t('taxIdHint')} {...form.register('taxId')} />
-            </div>
-          </div>
+          <PartyDetailsFields
+            form={form}
+            namespace="sales.customers.form"
+            currencies={currencyOptions(baseCurrency, form.watch('currency')).map((code) => ({
+              code,
+              label: t.has(`currencies.${code}`) ? t(`currencies.${code}`) : code,
+            }))}
+            emailPlaceholder="customer@example.com"
+            errorText={fieldError}
+          />
 
           <div className="space-y-2">
             <Label htmlFor="notes">{t('notes')}</Label>

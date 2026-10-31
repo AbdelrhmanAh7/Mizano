@@ -87,7 +87,6 @@ function LoginForm() {
         toast({
           variant: 'destructive',
           title: tErrors('invalidCredentials'),
-          description: tErrors('invalidCredentials'),
         });
       } else {
         const redirectTo = getSafeRedirectUrl(callbackUrl, `/${locale}/dashboard`);
@@ -158,7 +157,8 @@ function LoginForm() {
               <p className="text-muted-foreground mt-1 text-sm">{t('subtitle')}</p>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            {/* method="post": a submit before hydration must never put the password in the URL. */}
+            <form method="post" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="email">{t('email')}</Label>
                 <Input

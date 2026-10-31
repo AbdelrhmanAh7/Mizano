@@ -5,16 +5,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { PhoneInput } from '@/components/ui/phone-input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   AddressCard,
@@ -23,14 +13,18 @@ import {
   addressSchema,
   emptyAddress,
 } from '@/components/shared/address-fields';
+import { PartyDetailsFields } from '@/components/shared/party-details-fields';
 import { Vendor } from '@/lib/hooks/use-vendors';
+import { useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useLocale, useTranslations } from 'next-intl';
 
 const vendorSchema = z.object({
-  name: z.string().min(1, 'Vendor name is required'),
+  // Messages are keys of purchases.vendors.form.
+  name: z.string().min(1, 'nameRequired'),
   displayName: z.string().optional(),
-  email: z.string().email('Invalid email').optional().or(z.literal('')),
+  email: z.string().email('invalidEmail').optional().or(z.literal('')),
   phone: z.string().optional(),
-  currency: z.string().default('USD'),
+  currency: z.string(),
   taxId: z.string().optional(),
   paymentTerms: z.number().optional(),
   billingAddress: addressSchema.optional(),
@@ -45,36 +39,26 @@ interface VendorFormProps {
   isSubmitting?: boolean;
 }
 
-const currencies = [
-  { value: 'USD', label: 'USD - US Dollar' },
-  { value: 'EUR', label: 'EUR - Euro' },
-  { value: 'GBP', label: 'GBP - British Pound' },
-  { value: 'EGP', label: 'EGP - Egyptian Pound' },
-  { value: 'AED', label: 'AED - UAE Dirham' },
-  { value: 'SAR', label: 'SAR - Saudi Riyal' },
-];
-
-const addressLabels: AddressLabels = {
-  street: 'Street Address',
-  streetPlaceholder: 'Street address',
-  country: 'Country',
-  city: 'City',
-  state: 'State/Province',
-  statePlaceholder: 'State',
-  postalCode: 'Zip/Postal Code',
-  postalCodePlaceholder: 'Postal code',
-};
-
-const paymentTermsOptions = [
-  { value: 0, label: 'Due on Receipt' },
-  { value: 15, label: 'Net 15' },
-  { value: 30, label: 'Net 30' },
-  { value: 45, label: 'Net 45' },
-  { value: 60, label: 'Net 60' },
-];
+/** Currencies offered for a vendor; names come from Intl in the page language. */
+const CURRENCY_CODES = ['EGP', 'SAR', 'AED', 'USD', 'EUR', 'GBP'];
 
 export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorFormProps) {
   const isEditing = !!vendor;
+  const t = useTranslations('purchases.vendors.form');
+  const locale = useLocale();
+  const currencyNames = new Intl.DisplayNames([locale], { type: 'currency' });
+  const errorText = (message?: string): string | undefined =>
+    message && t.has(message) ? t(message) : message;
+  const addressLabels: AddressLabels = {
+    street: t('street'),
+    streetPlaceholder: t('streetPlaceholder'),
+    country: t('country'),
+    city: t('city'),
+    state: t('state'),
+    statePlaceholder: t('statePlaceholder'),
+    postalCode: t('postalCode'),
+    postalCodePlaceholder: t('postalCodePlaceholder'),
+  };
 
   const form = useForm<VendorFormData>({
     resolver: zodResolver(vendorSchema),
@@ -83,12 +67,23 @@ export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorF
       displayName: '',
       email: '',
       phone: '',
-      currency: 'USD',
+      currency: '',
       taxId: '',
       paymentTerms: 30,
       billingAddress: emptyAddress(),
     },
   });
+
+  // A new vendor starts in the org base currency, never USD; a choice already made stays.
+  const baseCurrency = useBaseCurrency();
+  useEffect(() => {
+    if (!isEditing && baseCurrency && !form.getValues('currency')) {
+      form.setValue('currency', baseCurrency);
+    }
+  }, [isEditing, baseCurrency, form]);
+  const currencies = [baseCurrency, ...CURRENCY_CODES]
+    .filter((code, i, all): code is string => !!code && all.indexOf(code) === i)
+    .map((code) => ({ code, label: `${code} - ${currencyNames.of(code)}` }));
 
   useEffect(() => {
     if (vendor) {
@@ -97,9 +92,10 @@ export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorF
         displayName: vendor.displayName || '',
         email: vendor.email || '',
         phone: vendor.phone || '',
-        currency: vendor.currency || 'USD',
+        currency: vendor.currency || '',
         taxId: vendor.taxId || '',
-        paymentTerms: vendor.paymentTerms || 30,
+        // 0 is "Due on Receipt", not "unset".
+        paymentTerms: vendor.paymentTerms ?? 30,
         billingAddress: addressFromParty(vendor, 'billing'),
       });
     }
@@ -112,9 +108,9 @@ export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorF
       displayName: data.displayName || null,
       email: data.email || null,
       phone: data.phone || null,
-      currency: data.currency,
+      currency: data.currency || baseCurrency,
       taxId: data.taxId || null,
-      paymentTerms: data.paymentTerms || 0,
+      paymentTerms: data.paymentTerms ?? 0,
       billingStreet: data.billingAddress?.street || null,
       billingCity: data.billingAddress?.city || null,
       billingState: data.billingAddress?.state || null,
@@ -129,113 +125,33 @@ export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorF
       {/* Basic Information */}
       <Card>
         <CardHeader>
-          <CardTitle>Basic Information</CardTitle>
+          <CardTitle>{t('details')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Vendor Name *</Label>
-              <Input id="name" placeholder="Enter vendor name" {...form.register('name')} />
-              {form.formState.errors.name && (
-                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="displayName">Display Name</Label>
-              <Input
-                id="displayName"
-                placeholder="How to display on documents"
-                {...form.register('displayName')}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="vendor@example.com"
-                {...form.register('email')}
-              />
-              {form.formState.errors.email && (
-                <p className="text-sm text-red-500">{form.formState.errors.email.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
-              <PhoneInput
-                id="phone"
-                value={form.watch('phone') || ''}
-                onChange={(val) => form.setValue('phone', val)}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="currency">Currency</Label>
-              <Select
-                value={form.watch('currency')}
-                onValueChange={(value) => form.setValue('currency', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select currency" />
-                </SelectTrigger>
-                <SelectContent>
-                  {currencies.map((currency) => (
-                    <SelectItem key={currency.value} value={currency.value}>
-                      {currency.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="paymentTerms">Payment Terms</Label>
-              <Select
-                value={String(form.watch('paymentTerms') || 30)}
-                onValueChange={(value) => form.setValue('paymentTerms', parseInt(value))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select payment terms" />
-                </SelectTrigger>
-                <SelectContent>
-                  {paymentTermsOptions.map((term) => (
-                    <SelectItem key={term.value} value={String(term.value)}>
-                      {term.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="taxId">Tax ID</Label>
-              <Input id="taxId" placeholder="Tax ID / VAT Number" {...form.register('taxId')} />
-            </div>
-          </div>
+          <PartyDetailsFields
+            form={form}
+            namespace="purchases.vendors.form"
+            currencies={currencies}
+            emailPlaceholder="vendor@example.com"
+            errorText={errorText}
+          />
         </CardContent>
       </Card>
 
       <AddressCard
         form={form}
         name="billingAddress"
-        title="Billing Address"
+        title={t('billingAddress')}
         labels={addressLabels}
       />
 
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {t('cancel')}
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : isEditing ? 'Update Vendor' : 'Create Vendor'}
+          {isSubmitting ? t('saving') : isEditing ? t('update') : t('create')}
         </Button>
       </div>
     </form>

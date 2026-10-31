@@ -163,6 +163,7 @@ describe('transformJournal', () => {
 
 jest.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
+  useLocale: () => 'en',
 }));
 
 jest.mock('next/navigation', () => ({

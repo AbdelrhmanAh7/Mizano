@@ -7,16 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import {
-  useBankAccounts,
-  getAccountTypeColor,
-  formatCurrency,
-  BankAccount,
-} from '@/lib/hooks/use-bank-accounts';
+import { useBankAccounts, getAccountTypeColor, BankAccount } from '@/lib/hooks/use-bank-accounts';
 import { useTranslations } from 'next-intl';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function ReconcilePage() {
   const t = useTranslations('banking');
+  const formatCurrency = useMoneyFormatter();
   const { data, isLoading } = useBankAccounts({ isActive: true });
   const accounts: BankAccount[] = data?.data || [];
 

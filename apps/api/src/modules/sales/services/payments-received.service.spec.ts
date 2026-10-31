@@ -554,6 +554,32 @@ describe('PaymentsReceivedService', () => {
       expect(result.paymentNumber).toBe('PMT-001');
     });
 
+    it('returns the deposit account, looked up inside the tenant (detail page showed "-")', async () => {
+      prisma.paymentReceived.findFirst.mockResolvedValue({
+        id: 'pmt-1',
+        paymentNumber: 'PMT-001',
+        depositToAccountId: 'acc-1010',
+        allocations: [],
+      } as any);
+      prisma.account.findFirst.mockResolvedValue({
+        id: 'acc-1010',
+        code: '1010',
+        name: 'Bank Account',
+      } as any);
+
+      const result = await service.findOne(ORG_ID, 'pmt-1');
+
+      expect(prisma.account.findFirst.mock.calls[0]![0]!.where).toEqual({
+        id: 'acc-1010',
+        organizationId: ORG_ID,
+      });
+      expect(result.depositToAccount).toEqual({
+        id: 'acc-1010',
+        code: '1010',
+        name: 'Bank Account',
+      });
+    });
+
     it('should throw NotFoundException when payment not found', async () => {
       prisma.paymentReceived.findFirst.mockResolvedValue(null);
 

@@ -1,14 +1,9 @@
 'use client';
 
+import { RowActionsMenu } from '@/components/shared/row-actions-menu';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   CompositeItem,
   formatCurrency,
@@ -17,7 +12,7 @@ import {
 } from '@/lib/hooks/use-composite-items';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Eye, Layers, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Layers, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
@@ -90,38 +85,19 @@ function CompositeItemsPageContent() {
       header: '',
       meta: { cellClassName: 'w-12' },
       cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem asChild>
-              <Link href={`/inventory/composite-items/${row.original.id}`}>
-                <Eye className="mr-2 h-4 w-4" />
-                View
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href={`/inventory/composite-items/${row.original.id}?edit=true`}>
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(row.original.id)}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <RowActionsMenu
+          viewHref={`/inventory/composite-items/${row.original.id}`}
+          editHref={`/inventory/composite-items/${row.original.id}?edit=true`}
+          onDelete={() => setDeleteId(row.original.id)}
+          labels={{ view: 'View', edit: 'Edit', delete: 'Delete' }}
+        />
       ),
     },
   ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Composite Items</h1>
           <p className="text-muted-foreground">

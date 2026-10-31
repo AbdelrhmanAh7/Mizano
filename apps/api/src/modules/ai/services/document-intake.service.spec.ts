@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { DocumentIntakeService, ConfirmIntakeInput } from './document-intake.service';
-import { OllamaService } from './ollama.service';
 import { DocumentClassificationService } from './document-classification.service';
 import { EntityExtractionService } from './entity-extraction.service';
 import { AiFeedbackService } from './ai-feedback.service';
@@ -121,7 +120,6 @@ describe('DocumentIntakeService', () => {
     feedback = { processFeedback: jest.fn().mockResolvedValue(undefined) };
     service = new DocumentIntakeService(
       prisma as unknown as PrismaService,
-      {} as OllamaService,
       { resolve: jest.fn().mockResolvedValue(null) } as unknown as ExtractionStrategyResolver,
       {} as DocumentClassificationService,
       {} as EntityExtractionService,

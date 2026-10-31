@@ -47,6 +47,8 @@ export interface IntakeLineItem {
   /** Extracted tax AMOUNT (not a rate); may be missing or 0 when not found. */
   taxAmount: number | null;
   total: number;
+  /** Account suggested by the organization's AI (categorization feature); advisory. */
+  suggestedAccountId?: string | null;
 }
 
 export interface DocumentIntakeResult {
@@ -81,21 +83,15 @@ export interface DocumentIntakeResult {
   } | null;
   rawText: string;
 
-  /** Accounting entry suggestion from Ollama */
+  /** Accounting entry suggestion (legacy; not produced by the current readers) */
   accountingEntry?: {
     debitAccount: string | null;
     creditAccount: string | null;
     taxAccount: string | null;
   } | null;
 
-  /** Which AI engine was used */
-  extractionMethod?:
-    | 'ollama-vision'
-    | 'ollama-text'
-    | 'ocr-llm'
-    | 'hybrid-ocr'
-    | 'hybrid-vlm'
-    | 'rules';
+  /** Who read the document: the organization's own AI provider, or the CPU rules reader */
+  extractionMethod?: 'ai' | 'rules';
 
   /** Suggested vendor creation when no existing vendor matched */
   suggestCreateVendor?: {

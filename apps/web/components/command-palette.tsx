@@ -20,7 +20,6 @@ import { useSearchHistoryStore } from '@/lib/stores/use-search-history-store';
 import {
   AlertCircle,
   BarChart3,
-  Brain,
   Briefcase,
   Building2,
   Calculator,
@@ -266,7 +265,6 @@ export function CommandPalette() {
       },
       { label: t('tax.vatReturns'), href: '/tax/returns', icon: Percent },
       { label: t('reports'), href: '/reports', icon: BarChart3 },
-      { label: t('aiInsights'), href: '/ai-insights', icon: Brain },
       { label: t('settings'), href: '/settings', icon: Settings },
     ],
     [t],

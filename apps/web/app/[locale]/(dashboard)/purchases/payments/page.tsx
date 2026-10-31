@@ -30,10 +30,10 @@ import { LEDGER_QUERY_KEYS, invalidateLedgerQueries } from '@/lib/hooks/use-jour
 import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import {
   formatCurrency,
-  formatPaymentMode,
   PaymentMade,
   useInfinitePaymentsMade,
 } from '@/lib/hooks/use-payments-made';
+import { PaymentModeText, type PaymentMode } from '@/components/sales/status-badge';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { useQueryClient } from '@tanstack/react-query';
@@ -43,8 +43,10 @@ import { Ban, Eye, Plus, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function PaymentsMadePageContent() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('purchases');
   const baseCurrency = useBaseCurrency();
   const tCommon = useTranslations('common');
@@ -150,12 +152,12 @@ function PaymentsMadePageContent() {
           onSort={tableParams.setSort}
         />
       ),
-      cell: ({ row }) => format(new Date(row.original.date), 'MMM d, yyyy'),
+      cell: ({ row }) => format(new Date(row.original.date), 'PP', { locale: dateLocale }),
     },
     {
       accessorKey: 'paymentMode',
       header: t('payments.table.mode'),
-      cell: ({ row }) => formatPaymentMode(row.original.paymentMode),
+      cell: ({ row }) => <PaymentModeText mode={row.original.paymentMode as PaymentMode} />,
     },
     {
       accessorKey: 'reference',
@@ -216,7 +218,7 @@ function PaymentsMadePageContent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('payments.title')}</h1>
           <p className="text-muted-foreground">{t('payments.pageDescription')}</p>
@@ -224,7 +226,7 @@ function PaymentsMadePageContent() {
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
-            Import
+            {tCommon('buttons.import')}
           </Button>
           <Button asChild>
             <Link href="/purchases/payments/new">

@@ -22,15 +22,22 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ReportFilters } from '@/components/reports/report-filters';
-import { ReportPageHeader, ReportPageSkeleton } from '@/components/reports/report-page';
+import {
+  ReportPageHeader,
+  ReportPageSkeleton,
+  useReportDateLabels,
+} from '@/components/reports/report-page';
 import { useGeneralLedgerReport } from '@/lib/hooks/use-reports';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { useAccounts } from '@/lib/hooks/use-accounts';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 export default function GeneralLedgerPage() {
+  const dateLocale = useDateFnsLocale();
   // Report figures are ledger amounts, in the organization base currency (audit B5).
   const formatCurrency = useMoneyFormatter();
   const t = useTranslations('reports');
+  const dateLabels = useReportDateLabels();
   const [dateRange, setDateRange] = useState({
     startDate: startOfYear(new Date()),
     endDate: endOfMonth(new Date()),
@@ -57,19 +64,15 @@ export default function GeneralLedgerPage() {
     <div className="space-y-6">
       <ReportPageHeader
         title={t('generalLedger.title')}
-        subtitle={
-          <>
-            {format(dateRange.startDate, 'MMMM d')} - {format(dateRange.endDate, 'MMMM d, yyyy')}
-          </>
-        }
+        subtitle={<>{dateLabels.period(dateRange.startDate, dateRange.endDate)}</>}
       />
 
       <div className="flex flex-wrap gap-4 items-end">
         <div className="w-[300px]">
-          <label className="text-sm font-medium mb-1.5 block">Account</label>
+          <label className="text-sm font-medium mb-1.5 block">{t('generalLedger.account')}</label>
           <Select value={accountId} onValueChange={setAccountId}>
             <SelectTrigger>
-              <SelectValue placeholder="Select an account" />
+              <SelectValue placeholder={t('generalLedger.selectAccount')} />
             </SelectTrigger>
             <SelectContent>
               {Array.isArray(accountList) &&
@@ -88,10 +91,8 @@ export default function GeneralLedgerPage() {
         <Card>
           <CardContent className="py-12 text-center">
             <BookOpen className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Select an Account</h3>
-            <p className="text-muted-foreground">
-              Choose an account from the dropdown above to view its general ledger entries.
-            </p>
+            <h3 className="text-lg font-semibold mb-2">{t('generalLedger.selectAccountTitle')}</h3>
+            <p className="text-muted-foreground">{t('generalLedger.selectAccountHint')}</p>
           </CardContent>
         </Card>
       ) : (
@@ -148,7 +149,9 @@ export default function GeneralLedgerPage() {
                         i: number,
                       ) => (
                         <TableRow key={i}>
-                          <TableCell>{format(new Date(entry.date), 'MMM d, yyyy')}</TableCell>
+                          <TableCell>
+                            {format(new Date(entry.date), 'PP', { locale: dateLocale })}
+                          </TableCell>
                           <TableCell>
                             {entry.journalNumber ? (
                               <Link

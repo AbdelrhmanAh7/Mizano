@@ -9,6 +9,7 @@ describe('payables reports net unapplied vendor credits', () => {
     id,
     billNumber: id,
     vendorId,
+    date: new Date('2029-12-01'),
     billDate: null,
     dueDate: new Date('2030-01-01'),
     balanceDue: new Decimal(balance),
@@ -39,7 +40,12 @@ describe('payables reports net unapplied vendor credits', () => {
       appliedToBillId: null,
       refundedAt: null,
     });
-    expect(report.summary.total).toBe(256);
+    // Money is exact and travels as 4-dp strings, like the receivables aging (review-lessons §6).
+    expect(report.summary.total).toBe('256.0000');
+    expect(report.summary.current).toBe('256.0000');
+    expect(report.buckets.current.map((b) => b.balanceDue)).toEqual(['114.0000', '142.0000']);
+    // Rows carry the accounting date even when the optional vendor bill date is empty.
+    expect(report.buckets.current[0].date).toEqual(new Date('2029-12-01'));
     expect(report.summary.unappliedCredits).toBe('200.0000');
     expect(report.summary.netTotal).toBe('56.0000');
     expect(report.unappliedCredits.vendors).toEqual([

@@ -36,8 +36,10 @@ import { ArrowLeft, CheckCircle, Package, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function CompositeItemDetailContent() {
+  const dateLocale = useDateFnsLocale();
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -190,7 +192,7 @@ function CompositeItemDetailContent() {
             <div>
               <dt className="text-sm text-muted-foreground">Created</dt>
               <dd className="text-sm">
-                {format(new Date(compositeItem.createdAt), 'MMM d, yyyy')}
+                {format(new Date(compositeItem.createdAt), 'PP', { locale: dateLocale })}
               </dd>
             </div>
             <div>

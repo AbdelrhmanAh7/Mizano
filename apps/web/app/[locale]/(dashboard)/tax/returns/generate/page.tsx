@@ -2,7 +2,7 @@
 
 import { format } from 'date-fns';
 import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Calculator } from 'lucide-react';
@@ -13,23 +13,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/components/ui/use-toast';
 import { useGenerateVATReturn } from '@/lib/hooks/use-tax';
 
-const MONTH_NAMES = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
+/** Short month names in the page language ("يناير" … / "Jan" …), Western digits. */
+function monthNames(locale: string): string[] {
+  const formatter = new Intl.DateTimeFormat(locale === 'ar' ? 'ar-u-nu-latn' : 'en-US', {
+    month: 'short',
+  });
+  return Array.from({ length: 12 }, (_, month) => formatter.format(new Date(2026, month, 1)));
+}
 
 export default function GenerateVATReturnPage() {
   const t = useTranslations('tax');
+  const locale = useLocale();
   const tCommon = useTranslations('common');
   const router = useRouter();
   const { toast } = useToast();
@@ -115,7 +109,7 @@ export default function GenerateVATReturnPage() {
           <div className="space-y-2">
             <Label>{t('generate.quickSelectMonth')}</Label>
             <div className="flex flex-wrap gap-2">
-              {MONTH_NAMES.map((name, idx) => (
+              {monthNames(locale).map((name, idx) => (
                 <Button
                   key={idx}
                   variant="outline"

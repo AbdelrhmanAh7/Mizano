@@ -20,6 +20,11 @@ jest.mock('@/components/ui/use-toast', () => ({
   useToast: () => ({ toast: jest.fn() }),
 }));
 
+// The mutations use useToastMutation, which translates its toasts.
+jest.mock('next-intl', () => ({
+  useTranslations: () => Object.assign((key: string) => key, { has: () => false }),
+}));
+
 // ── Imports after mocks ────────────────────────────────────────
 
 import { usersApi } from '@/lib/api';

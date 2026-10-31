@@ -27,7 +27,7 @@ const stubResolver = {
     stub.calls += 1;
     if (stub.mode === 'fail') throw new Error('stub extraction failure with INVOICE-TEXT-SECRET');
     return {
-      strategyUsed: 'ocr',
+      strategyUsed: 'rules',
       totalTimeMs: 1,
       extraction: {
         vendorName: 'E2E Vendor',

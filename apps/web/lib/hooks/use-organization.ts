@@ -1,75 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
+import type {
+  GeneralSettings,
+  InvoiceSettings,
+  InventorySettings,
+  EmailSettings,
+  LocalizationSettings,
+  BrandingSettings,
+} from './use-all-settings';
 
 // ============ Types ============
-
-export interface GeneralSettings {
-  name: string;
-  logoUrl: string | null;
-  address: string | null;
-  phone: string | null;
-  email: string | null;
-  website: string | null;
-  taxRegistrationNumber: string | null;
-  industry: string | null;
-  baseCurrency: string;
-}
 
 export interface FinancialSettings {
   fiscalYearStartMonth: number;
   lockDate: Date | null;
   defaultPaymentTermsDays: number;
   defaultTaxRateId: string | null;
-}
-
-export interface InvoiceSettings {
-  invoicePrefix: string;
-  invoiceNextNumber: number;
-  invoiceDefaultNotes: string | null;
-  invoiceDefaultTerms: string | null;
-  invoiceAutoSend: boolean;
-  bankDetails: string | null;
-  quotePrefix: string;
-  quoteNextNumber: number;
-  billPrefix: string;
-  billNextNumber: number;
-}
-
-export interface InventorySettings {
-  defaultValuationMethod: string;
-  enableMultiWarehouse: boolean;
-  enableBundles: boolean;
-}
-
-export interface AiSettings {
-  aiCategorizationEnabled: boolean;
-  aiReconciliationEnabled: boolean;
-
-  aiForecastingEnabled: boolean;
-  aiAnomalyEnabled: boolean;
-  aiLeadScoringEnabled: boolean;
-  anomalySensitivity: number;
-}
-
-export interface EmailSettings {
-  smtpHost: string | null;
-  smtpPort: number | null;
-  smtpUser: string | null;
-  smtpFromEmail: string | null;
-  smtpFromName: string | null;
-  isConfigured: boolean;
-}
-
-export interface LocalizationSettings {
-  dateFormat: string;
-  numberFormat: string;
-  timezone: string;
-}
-
-export interface BrandingSettings {
-  logoUrl: string | null;
-  primaryColor: string | null;
-  footerText: string | null;
 }
 
 export interface AccountSettings {
@@ -88,7 +34,6 @@ export interface AllSettings {
   financial: FinancialSettings;
   invoice: InvoiceSettings;
   inventory: InventorySettings;
-  ai: AiSettings;
   email: EmailSettings;
   localization: LocalizationSettings;
   branding: BrandingSettings;
@@ -157,10 +102,6 @@ const organizationApi = {
   },
   updateInventorySettings: async (data: Partial<InventorySettings>) => {
     const response = await api.patch('/organization/settings/inventory', data);
-    return response.data;
-  },
-  updateAiSettings: async (data: Partial<AiSettings>) => {
-    const response = await api.patch('/organization/settings/ai', data);
     return response.data;
   },
   updateEmailSettings: async (data: Partial<EmailSettings & { smtpPassword?: string }>) => {

@@ -1,14 +1,21 @@
-import { Controller, Get, Param, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
-import { CacheResponse, CacheTTL, CurrentOrg, Permissions } from '../../../common/decorators';
+import {
+  CacheResponse,
+  CacheTTL,
+  CurrentOrg,
+  CurrentUser,
+  Permissions,
+} from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { PdfService } from '../../documents/services/pdf.service';
 import { AgingReportsService } from '../services/aging-reports.service';
 import { DashboardService } from '../services/dashboard.service';
 import { FinancialReportsService } from '../services/financial-reports.service';
-import { FinancialNarrativeService } from '../../ai/services/financial-narrative.service';
+import { ReportSummaryService } from '../services/report-summary.service';
+import { SummaryMonthDto } from '../dto/summary-month.dto';
 import { MAX_DAYS, MAX_MONTHS, clampInt } from '../../../common/utils/report-utils';
 
 @ApiTags('Reports')
@@ -21,7 +28,7 @@ export class ReportsController {
     private readonly agingReportsService: AgingReportsService,
     private readonly dashboardService: DashboardService,
     private readonly pdfService: PdfService,
-    private readonly narrativeService: FinancialNarrativeService,
+    private readonly summaryService: ReportSummaryService,
   ) {}
 
   // Dashboard
@@ -181,24 +188,6 @@ export class ReportsController {
     return this.dashboardService.getPaymentCollection(orgId, clampInt(months, 6, 1, MAX_MONTHS));
   }
 
-  @Get('dashboard/churn-risk')
-  @Permissions('reports.view')
-  @CacheResponse('dashboard:churn-risk')
-  @CacheTTL(300)
-  @ApiOperation({ summary: 'Get customer churn risk distribution' })
-  getChurnRisk(@CurrentOrg() orgId: string) {
-    return this.dashboardService.getChurnRisk(orgId);
-  }
-
-  @Get('dashboard/clv-segments')
-  @Permissions('reports.view')
-  @CacheResponse('dashboard:clv-segments')
-  @CacheTTL(300)
-  @ApiOperation({ summary: 'Get customer lifetime value segments' })
-  getCLVSegments(@CurrentOrg() orgId: string) {
-    return this.dashboardService.getCLVSegments(orgId);
-  }
-
   // ============ Purchases (Tab 4) ============
 
   @Get('dashboard/bill-status')
@@ -284,15 +273,6 @@ export class ReportsController {
     return this.dashboardService.getSalaryDistribution(orgId);
   }
 
-  @Get('dashboard/attrition-risk')
-  @Permissions('reports.view')
-  @CacheResponse('dashboard:attrition-risk')
-  @CacheTTL(300)
-  @ApiOperation({ summary: 'Get employee attrition risk distribution' })
-  getAttritionRisk(@CurrentOrg() orgId: string) {
-    return this.dashboardService.getAttritionRisk(orgId);
-  }
-
   // ============ Inventory (Tab 6) ============
 
   @Get('dashboard/stock-levels')
@@ -311,15 +291,6 @@ export class ReportsController {
   @ApiOperation({ summary: 'Get monthly inventory movements' })
   getInventoryMovements(@CurrentOrg() orgId: string, @Query('months') months?: string) {
     return this.dashboardService.getInventoryMovements(orgId, clampInt(months, 6, 1, MAX_MONTHS));
-  }
-
-  @Get('dashboard/reorder-alerts')
-  @Permissions('reports.view')
-  @CacheResponse('dashboard:reorder-alerts')
-  @CacheTTL(300)
-  @ApiOperation({ summary: 'Get items needing reorder' })
-  getReorderAlerts(@CurrentOrg() orgId: string) {
-    return this.dashboardService.getReorderAlerts(orgId);
   }
 
   @Get('dashboard/work-order-status')
@@ -418,40 +389,38 @@ export class ReportsController {
 
   // ============ AI (Tab 9) ============
 
-  @Get('dashboard/anomaly-timeline')
-  @Permissions('reports.view')
-  @CacheResponse('dashboard:anomaly-timeline')
-  @CacheTTL(300)
-  @ApiOperation({ summary: 'Get AI anomaly timeline' })
-  getAnomalyTimeline(@CurrentOrg() orgId: string, @Query('days') days?: string) {
-    return this.dashboardService.getAnomalyTimeline(orgId, clampInt(days, 90, 1, MAX_DAYS));
-  }
-
   // Financial Reports
   @Get('profit-and-loss')
   @Permissions('reports.view')
   @CacheResponse('reports:pnl')
   @CacheTTL(600)
   @ApiOperation({ summary: 'Get Profit & Loss statement' })
-  async getProfitAndLoss(
+  getProfitAndLoss(
     @CurrentOrg() orgId: string,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
-    @Query('includeNarrative') includeNarrative?: string,
   ) {
-    const report = await this.financialReportsService.getProfitAndLoss(orgId, startDate, endDate);
+    return this.financialReportsService.getProfitAndLoss(orgId, startDate, endDate);
+  }
 
-    if (includeNarrative === 'true') {
-      const endDateObj = new Date(endDate);
-      const narrative = await this.narrativeService.generateMonthlyNarrative(
-        orgId,
-        endDateObj.getMonth() + 1,
-        endDateObj.getFullYear(),
-      );
-      return { ...report, narrative };
-    }
+  /** The stored plain-language summary of a month (AI `summary` feature), or null. */
+  @Get('summary')
+  @Permissions('reports.view')
+  @ApiOperation({ summary: "Get a month's AI-written plain-language P&L summary" })
+  async getSummary(@CurrentOrg() orgId: string, @Query() query: SummaryMonthDto) {
+    return { data: await this.summaryService.get(orgId, query.month) };
+  }
 
-    return report;
+  /** Writes the month's summary with the organization's own AI provider (counts as usage). */
+  @Post('summary')
+  @Permissions('reports.view')
+  @ApiOperation({ summary: "Write a month's plain-language P&L summary with the org's AI" })
+  async writeSummary(
+    @CurrentOrg() orgId: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: SummaryMonthDto,
+  ) {
+    return { data: await this.summaryService.generate(orgId, dto.month, userId) };
   }
 
   @Get('balance-sheet')
@@ -468,24 +437,12 @@ export class ReportsController {
   @CacheResponse('reports:cash-flow')
   @CacheTTL(600)
   @ApiOperation({ summary: 'Get Cash Flow Statement' })
-  async getCashFlow(
+  getCashFlow(
     @CurrentOrg() orgId: string,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
-    @Query('includeNarrative') includeNarrative?: string,
   ) {
-    const report = await this.financialReportsService.getCashFlowStatement(
-      orgId,
-      startDate,
-      endDate,
-    );
-
-    if (includeNarrative === 'true') {
-      const narrative = await this.narrativeService.generateCashFlowNarrative(orgId);
-      return { ...report, narrative };
-    }
-
-    return report;
+    return this.financialReportsService.getCashFlowStatement(orgId, startDate, endDate);
   }
 
   @Get('trial-balance')

@@ -44,7 +44,7 @@ The demo does not require GPU hardware, Colab or paid AI APIs. Free local softwa
 | UI/state/forms      | Tailwind/shadcn/Radix, TanStack Query, Zustand, React Hook Form/Zod                               |
 | Identity            | NextAuth + backend JWT/refresh tokens                                                             |
 | Workspace           | pnpm workspaces and Turborepo                                                                     |
-| Existing extraction | Ollama plus OCR strategy code; production docs describe a Colab proxy                             |
+| Existing extraction | CPU rules reader (tesseract.js + rules); optional AI through the organization's own account       |
 | Target extraction   | Isolated CPU parsing/OCR worker with deterministic validation; implementation tracked in the plan |
 
 Accounting, purchases, sales, banking, reports, inventory, tax, assets, projects, HR, manufacturing and CRM code exists. Demo acceptance covers the accounting journey above; peripheral modules need their own verification. Keep the existing stack during this sprint.
@@ -100,7 +100,6 @@ Runtime environment settings can be configured in `.env.local` or environment-sp
 apps/web     Next.js 14 accountant UI (en/ar, RTL)
 apps/api     NestJS 10 API, Prisma schema, migrations and seed
 packages/    shared-types and validators (Zod)
-services/    legacy ollama-proxy (Colab tunnel) still referenced by the AI module
 docs/        ARCHITECTURE, DEVELOPMENT, DESIGN-SYSTEM, roadmap, strategy, planning, agents, archive
 scripts/     GitHub planning sync and its offline tests
 nginx/       production reverse proxy configuration

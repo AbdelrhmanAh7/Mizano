@@ -73,26 +73,3 @@ export function createMockVendor(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
-
-/**
- * Generate mock time series data with optional trend and seasonality
- */
-export function generateTimeSeries(
-  length: number,
-  options: {
-    base?: number;
-    trend?: number;
-    seasonalAmplitude?: number;
-    seasonLength?: number;
-    noise?: number;
-  } = {},
-): number[] {
-  const { base = 100, trend = 0, seasonalAmplitude = 0, seasonLength = 12, noise = 0 } = options;
-
-  return Array.from({ length }, (_, i) => {
-    const trendComponent = trend * i;
-    const seasonalComponent = seasonalAmplitude * Math.sin((2 * Math.PI * i) / seasonLength);
-    const noiseComponent = noise * (Math.random() - 0.5) * 2;
-    return base + trendComponent + seasonalComponent + noiseComponent;
-  });
-}

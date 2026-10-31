@@ -20,7 +20,7 @@ const stubResolver = {
   resolve: async () => {
     if (stub.mode === 'fail') throw new Error(`stub extraction failure ${SECRET}`);
     return {
-      strategyUsed: 'ocr',
+      strategyUsed: 'rules',
       totalTimeMs: 1,
       extraction: {
         vendorName: SECRET,

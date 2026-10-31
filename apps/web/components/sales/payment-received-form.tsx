@@ -1,6 +1,13 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
+import {
+  compareDecimals,
+  isPositiveDecimal,
+  normalizeDecimal,
+  subtractDecimals,
+  sumDecimals,
+} from '@/lib/decimal';
 import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
 import { useDateFnsLocale } from '@/lib/date-locale';
@@ -38,6 +45,7 @@ import {
   PaymentMode,
   getPaymentModeOptions,
   validateAllocations,
+  type CreatePaymentReceivedData,
 } from '@/lib/hooks/use-payments-received';
 
 const allocationSchema = z.object({
@@ -67,6 +75,27 @@ const paymentReceivedSchema = z.object({
 
 export type PaymentReceivedFormData = z.infer<typeof paymentReceivedSchema>;
 
+/**
+ * The API payload for the form values: only the ticked invoices with a positive amount, without
+ * the form-only `selected` flag. The single place that shapes allocations, so the page never
+ * filters them a second time (a second `selected` filter on mapped rows sent `allocations: []`
+ * and every payment was rejected).
+ */
+export function toPaymentReceivedPayload(data: PaymentReceivedFormData): CreatePaymentReceivedData {
+  return {
+    customerId: data.customerId,
+    date: data.date,
+    amount: data.amount,
+    paymentMode: data.paymentMode,
+    depositToAccountId: data.depositToAccountId,
+    reference: data.reference,
+    notes: data.notes,
+    allocations: data.allocations
+      .filter((a) => a.selected && isPositiveDecimal(a.amount))
+      .map((a) => ({ invoiceId: a.invoiceId, amount: a.amount })),
+  };
+}
+
 // Labels live under common.paymentModes.
 const PAYMENT_MODE_KEYS: Record<PaymentReceivedFormData['paymentMode'], string> = {
   CASH: 'cash',
@@ -81,7 +110,7 @@ const PAYMENT_MODE_KEYS: Record<PaymentReceivedFormData['paymentMode'], string> 
 interface PaymentReceivedFormProps {
   defaultCustomerId?: string;
   defaultInvoiceId?: string;
-  onSubmit: (data: Record<string, unknown>) => void;
+  onSubmit: (data: CreatePaymentReceivedData) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -195,12 +224,9 @@ export function PaymentReceivedForm({
   // Payments are posted in the base currency; each invoice is shown in its own currency.
   const formatCurrency = useMoneyFormatter();
 
-  // Calculate total allocated
-  const totalAllocated = useMemo(() => {
-    return allocations
-      .filter((a) => a.selected)
-      .reduce((sum, a) => sum + (parseFloat(a.amount) || 0), 0);
-  }, [allocations]);
+  // Total allocated, for display. Not memoized: setValue on one row keeps the same array
+  // reference, so a memo showed a stale total next to an edited row.
+  const totalAllocated = sumDecimals(allocations.filter((a) => a.selected).map((a) => a.amount));
 
   const { isValid: isBalanced, difference } = validateAllocations(
     paymentAmount || '0',
@@ -224,20 +250,22 @@ export function PaymentReceivedForm({
 
   // Auto-distribute payment amount
   const autoDistribute = () => {
-    let remaining = parseFloat(paymentAmount) || 0;
+    // Exact decimal strings: a float remainder or toFixed(2) of a 4-dp balance could allocate
+    // more than is open, which the API rejects.
+    let remaining = normalizeDecimal(paymentAmount || '0');
     const newAllocations = [...allocations];
 
     for (let i = 0; i < newAllocations.length; i++) {
       const invoice = openInvoices.find((inv: Invoice) => inv.id === newAllocations[i].invoiceId);
-      if (invoice && remaining > 0) {
-        const balance = parseFloat(invoice.balanceDue || '0');
-        const toAllocate = Math.min(remaining, balance);
+      if (invoice && isPositiveDecimal(remaining)) {
+        const balance = normalizeDecimal(invoice.balanceDue || '0');
+        const toAllocate = compareDecimals(remaining, balance) < 0 ? remaining : balance;
         newAllocations[i] = {
           ...newAllocations[i],
-          selected: toAllocate > 0,
-          amount: toAllocate.toFixed(2),
+          selected: isPositiveDecimal(toAllocate),
+          amount: toAllocate,
         };
-        remaining -= toAllocate;
+        remaining = subtractDecimals(remaining, toAllocate);
       } else {
         newAllocations[i] = {
           ...newAllocations[i],
@@ -255,15 +283,7 @@ export function PaymentReceivedForm({
       return;
     }
 
-    // Filter to only selected allocations with amount > 0
-    const filteredData = {
-      ...data,
-      allocations: data.allocations
-        .filter((a) => a.selected && parseFloat(a.amount) > 0)
-        .map((a) => ({ invoiceId: a.invoiceId, amount: a.amount })),
-    };
-
-    onSubmit(filteredData);
+    onSubmit(toPaymentReceivedPayload(data));
   };
 
   return (
@@ -526,7 +546,10 @@ export function PaymentReceivedForm({
         <Button type="button" variant="outline" onClick={onCancel}>
           {t('cancel')}
         </Button>
-        <Button type="submit" disabled={isSubmitting || !isBalanced || totalAllocated === 0}>
+        <Button
+          type="submit"
+          disabled={isSubmitting || !isBalanced || !isPositiveDecimal(totalAllocated)}
+        >
           {isSubmitting ? t('recording') : t('recordPayment')}
         </Button>
       </div>

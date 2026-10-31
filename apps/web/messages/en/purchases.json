@@ -39,7 +39,26 @@
       "taxId": "Tax ID",
       "taxIdPlaceholder": "Enter tax ID",
       "paymentTerms": "Payment Terms",
-      "billingAddress": "Billing Address"
+      "billingAddress": "Billing Address",
+      "details": "Basic Information",
+      "nameRequired": "Vendor name is required",
+      "invalidEmail": "Enter a valid email address",
+      "displayNameHint": "How to display on documents",
+      "currencyPlaceholder": "Select currency",
+      "paymentTermsPlaceholder": "Select payment terms",
+      "taxIdHint": "Tax ID / VAT Number",
+      "street": "Street Address",
+      "streetPlaceholder": "Street address",
+      "country": "Country",
+      "city": "City",
+      "state": "State/Province",
+      "statePlaceholder": "State",
+      "postalCode": "Zip/Postal Code",
+      "postalCodePlaceholder": "Postal code",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "create": "Create Vendor",
+      "update": "Update Vendor"
     },
     "table": {
       "name": "Name",
@@ -237,7 +256,8 @@
       "partiallyPaid": "Partially Paid",
       "paid": "Paid",
       "overdue": "Overdue",
-      "void": "Void"
+      "void": "Void",
+      "pending": "Pending"
     },
     "empty": {
       "title": "No bills yet",
@@ -286,7 +306,12 @@
       "duplicateFailed": "Error duplicating bill",
       "genericError": "An error occurred"
     },
-    "onlyDraftsEditable": "Only draft bills can be edited"
+    "onlyDraftsEditable": "Only draft bills can be edited",
+    "from": "From {name}",
+    "quickActions": "Quick Actions",
+    "viewVendor": "View Vendor",
+    "scanBill": "Scan Bill",
+    "searchPlaceholder": "Search by bill number or vendor..."
   },
   "credits": {
     "title": "Vendor Credits",
@@ -415,7 +440,36 @@
       "reference": "Reference Number",
       "notes": "Notes",
       "allocations": "Bill Allocations",
-      "allocationRequired": "Payment must be allocated to at least 1 bill"
+      "allocationRequired": "Payment must be allocated to at least 1 bill",
+      "details": "Payment Details",
+      "vendorRequired": "Select a vendor",
+      "dateRequired": "Pick the payment date",
+      "amountPositive": "Enter an amount greater than zero",
+      "modeRequired": "Select a payment mode",
+      "accountRequired": "Select the account the payment is made from",
+      "pickDate": "Pick a date",
+      "modePlaceholder": "Select mode",
+      "accountPlaceholder": "Select account",
+      "referencePlaceholder": "Check number, transaction ID, etc.",
+      "notesPlaceholder": "Internal notes",
+      "allocateTitle": "Allocate to Bills",
+      "autoAllocate": "Auto-Allocate",
+      "clear": "Clear",
+      "loadingBills": "Loading bills...",
+      "noUnpaidBills": "No unpaid bills found for this vendor",
+      "billNumber": "Bill #",
+      "billDate": "Date",
+      "dueDate": "Due Date",
+      "total": "Total",
+      "balanceDue": "Balance Due",
+      "allocation": "Allocation",
+      "paymentAmount": "Payment Amount:",
+      "totalAllocated": "Total Allocated:",
+      "unallocated": "Unallocated:",
+      "cancel": "Cancel",
+      "recording": "Recording...",
+      "submit": "Record Payment",
+      "allocationMismatch": "Allocated {allocated} must equal the payment amount {amount}"
     },
     "table": {
       "paymentNumber": "Payment #",
@@ -439,6 +493,15 @@
       "title": "Void {count} payments?",
       "description": "Each payment is voided as a whole: every bill it paid is reopened and a linked reversal is posted to the ledger.",
       "confirm": "Void {count} payments"
+    },
+    "toast": {
+      "recorded": "Payment recorded",
+      "recordedDescription": "The payment has been recorded and posted.",
+      "recordError": "Could not record the payment",
+      "voided": "Payment voided",
+      "voidedDescription": "The bill balances were restored and a reversal journal was posted.",
+      "voidError": "Could not void the payment",
+      "genericError": "Something went wrong. Please try again."
     }
   },
   "lineItems": {

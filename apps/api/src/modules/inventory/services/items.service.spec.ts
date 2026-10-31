@@ -188,6 +188,20 @@ describe('ItemsService', () => {
       expect(mockPrismaService.item.create.mock.calls[0][0].data.currentStock).toBe(0);
     });
 
+    it('tracks stock for goods only, so a service never shows as out of stock', async () => {
+      mockPrismaService.item.findFirst.mockResolvedValue(null);
+      mockPrismaService.account.count.mockResolvedValue(0);
+      mockPrismaService.item.create.mockResolvedValue({ id: 'i1' });
+      for (const type of [ItemType.GOODS, ItemType.SERVICE, ItemType.DIGITAL]) {
+        await service.create('org-001', { name: 'X', sku: `X-${type}`, type, sellingPrice: '1' });
+      }
+      expect(
+        mockPrismaService.item.create.mock.calls.map(
+          (call: [{ data: { trackInventory: boolean } }]) => call[0].data.trackInventory,
+        ),
+      ).toEqual([true, false, false]);
+    });
+
     it('throws ConflictException when SKU already exists', async () => {
       mockPrismaService.item.findFirst.mockResolvedValue({ id: 'existing' });
       await expect(

@@ -8,6 +8,7 @@ import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { invalidateLedgerQueries } from '@/lib/hooks/use-journals';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
+import { useCallback } from 'react';
 
 // Types — mirror the API's BillStatus enum exactly.
 export type BillStatus =
@@ -359,20 +360,26 @@ export function getStatusVariant(status: BillStatus | string): BillBadgeVariant 
   return getBillStatusBadge(status).variant;
 }
 
-/**
- * Get status display text (English fallback; prefer t(`bills.status.${labelKey}`))
- */
-export function getStatusText(status: BillStatus | string): string {
-  const labels: Record<string, string> = {
-    DRAFT: 'Draft',
-    PENDING: 'Pending',
-    OPEN: 'Open',
-    PARTIALLY_PAID: 'Partially Paid',
-    OVERDUE: 'Overdue',
-    PAID: 'Paid',
-    VOID: 'Void',
-  };
-  return labels[status] ?? status;
+const BILL_STATUS_KEYS: Record<string, string> = {
+  DRAFT: 'draft',
+  PENDING: 'pending',
+  OPEN: 'open',
+  PARTIALLY_PAID: 'partiallyPaid',
+  OVERDUE: 'overdue',
+  PAID: 'paid',
+  VOID: 'void',
+};
+
+/** Translated bill status label (purchases.bills.status); unknown statuses show as sent. */
+export function useBillStatusLabel(): (status: BillStatus | string) => string {
+  const t = useTranslations('purchases.bills.status');
+  return useCallback(
+    (status: BillStatus | string) => {
+      const key = BILL_STATUS_KEYS[status];
+      return key && t.has(key) ? t(key) : status;
+    },
+    [t],
+  );
 }
 
 /**

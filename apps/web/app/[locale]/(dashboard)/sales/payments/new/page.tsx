@@ -5,11 +5,11 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PaymentReceivedForm } from '@/components/sales/payment-received-form';
 import {
-  PaymentReceivedForm,
-  PaymentReceivedFormData,
-} from '@/components/sales/payment-received-form';
-import { useCreatePaymentReceived } from '@/lib/hooks/use-payments-received';
+  useCreatePaymentReceived,
+  type CreatePaymentReceivedData,
+} from '@/lib/hooks/use-payments-received';
 
 export default function NewPaymentReceivedPage() {
   const router = useRouter();
@@ -20,23 +20,12 @@ export default function NewPaymentReceivedPage() {
 
   const createPayment = useCreatePaymentReceived();
 
-  const handleSubmit = async (formData: Record<string, unknown>) => {
+  // The form sends the API payload (ticked invoices only); pass it through unchanged.
+  const handleSubmit = async (payload: CreatePaymentReceivedData) => {
     try {
-      const data = formData as unknown as PaymentReceivedFormData;
-      const result = await createPayment.mutateAsync({
-        customerId: data.customerId,
-        date: data.date,
-        amount: data.amount,
-        paymentMode: data.paymentMode,
-        depositToAccountId: data.depositToAccountId,
-        reference: data.reference,
-        notes: data.notes,
-        allocations: data.allocations
-          .filter((a) => a.selected && parseFloat(a.amount) > 0)
-          .map((a) => ({ invoiceId: a.invoiceId, amount: a.amount })),
-      } as Parameters<typeof createPayment.mutateAsync>[0]);
+      const result = await createPayment.mutateAsync(payload);
       router.push(`/sales/payments/${result.id}`);
-    } catch (error) {
+    } catch {
       // Error is handled by the mutation
     }
   };

@@ -44,16 +44,6 @@ export interface InventorySettings {
   enableBundles: boolean;
 }
 
-export interface AISettings {
-  aiCategorizationEnabled: boolean;
-  aiReconciliationEnabled: boolean;
-
-  aiForecastingEnabled: boolean;
-  aiAnomalyEnabled: boolean;
-  aiLeadScoringEnabled: boolean;
-  anomalySensitivity: number;
-}
-
 export interface EmailSettings {
   smtpHost: string | null;
   smtpPort: number | null;
@@ -80,7 +70,6 @@ export interface AllOrganizationSettings {
   financial: FinancialSettings;
   invoice: InvoiceSettings;
   inventory: InventorySettings;
-  ai: AISettings;
   email: EmailSettings;
   localization: LocalizationSettings;
   branding: BrandingSettings;
@@ -138,10 +127,6 @@ export function useUpdateFinancialSettings() {
 
 export function useUpdateInvoiceSettings() {
   return useUpdateSection<InvoiceSettings>('invoice');
-}
-
-export function useUpdateAISettings() {
-  return useUpdateSection<AISettings>('ai');
 }
 
 export function useUpdateLocalizationSettings() {

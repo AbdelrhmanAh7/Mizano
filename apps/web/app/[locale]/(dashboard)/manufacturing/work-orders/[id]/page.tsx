@@ -68,8 +68,10 @@ import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 export default function WorkOrderDetailPage() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('manufacturing');
   const params = useParams();
   const router = useRouter();
@@ -366,9 +368,9 @@ export default function WorkOrderDetailPage() {
             </div>
             <div className="text-lg font-bold">
               {workOrder.plannedStartDate
-                ? format(new Date(workOrder.plannedStartDate), 'MMM d, yyyy')
+                ? format(new Date(workOrder.plannedStartDate), 'PP', { locale: dateLocale })
                 : workOrder.startDate
-                  ? format(new Date(workOrder.startDate), 'MMM d, yyyy')
+                  ? format(new Date(workOrder.startDate), 'PP', { locale: dateLocale })
                   : 'Not set'}
             </div>
           </CardContent>
@@ -381,7 +383,7 @@ export default function WorkOrderDetailPage() {
               End Date
             </div>
             <div className="text-lg font-bold">
-              {plannedEnd ? format(new Date(plannedEnd), 'MMM d, yyyy') : 'Not set'}
+              {plannedEnd ? format(new Date(plannedEnd), 'PP', { locale: dateLocale }) : 'Not set'}
             </div>
           </CardContent>
         </Card>
@@ -461,7 +463,9 @@ export default function WorkOrderDetailPage() {
                 <TableBody>
                   {productionHistory.map((entry) => (
                     <TableRow key={entry.id}>
-                      <TableCell>{format(new Date(entry.date), 'MMM d, yyyy')}</TableCell>
+                      <TableCell>
+                        {format(new Date(entry.date), 'PP', { locale: dateLocale })}
+                      </TableCell>
                       <TableCell className="text-right font-mono font-medium text-green-700">
                         {entry.quantityProduced}
                       </TableCell>

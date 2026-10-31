@@ -7,9 +7,9 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ItemForm } from '@/components/inventory/item-form';
-import { useItem, useUpdateItem } from '@/lib/hooks/use-items';
+import { CreateItemData, useItem, useUpdateItem } from '@/lib/hooks/use-items';
 import { useQuery } from '@tanstack/react-query';
-import { accountsApi, taxRatesApi } from '@/lib/api';
+import { accountsApi } from '@/lib/api';
 
 interface EditItemPageProps {
   params: { id: string };
@@ -31,32 +31,18 @@ export default function EditItemPage({ params }: EditItemPageProps) {
     },
   });
 
-  // Fetch tax rates
-  const { data: taxRatesData, isLoading: taxRatesLoading } = useQuery({
-    queryKey: ['tax-rates'],
-    queryFn: async () => {
-      try {
-        const response = await taxRatesApi.getAll();
-        return response.data;
-      } catch {
-        return { data: [] };
-      }
-    },
-  });
-
   const accounts = accountsData?.data || [];
-  const taxRates = taxRatesData?.data || [];
 
-  const handleSubmit = async (data: Record<string, unknown>) => {
+  const handleSubmit = async (data: CreateItemData): Promise<void> => {
     try {
       await updateItem.mutateAsync({ id, data });
       router.push(`/inventory/items/${id}`);
-    } catch (error) {
-      // Error is handled in the hook
+    } catch {
+      // The mutation's toast reports the error.
     }
   };
 
-  if (itemLoading || accountsLoading || taxRatesLoading) {
+  if (itemLoading || accountsLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-12 w-64" />
@@ -91,7 +77,7 @@ export default function EditItemPage({ params }: EditItemPageProps) {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('items.editItem')}</h1>
-          <p className="text-muted-foreground">Update {item.name}</p>
+          <p className="text-muted-foreground">{item.name}</p>
         </div>
       </div>
 
@@ -99,7 +85,6 @@ export default function EditItemPage({ params }: EditItemPageProps) {
       <ItemForm
         item={item}
         accounts={accounts}
-        taxRates={taxRates}
         onSubmit={handleSubmit}
         onCancel={() => router.push(`/inventory/items/${id}`)}
         isSubmitting={updateItem.isPending}

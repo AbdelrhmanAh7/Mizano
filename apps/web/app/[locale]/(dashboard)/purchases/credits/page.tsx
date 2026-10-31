@@ -34,9 +34,12 @@ import { useTranslations } from 'next-intl';
 import { Eye, Plus, Trash2, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function VendorCreditsPageContent() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('purchases');
+  const tCommon = useTranslations('common');
   const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
 
@@ -119,7 +122,7 @@ function VendorCreditsPageContent() {
           onSort={tableParams.setSort}
         />
       ),
-      cell: ({ row }) => format(new Date(row.original.date), 'MMM d, yyyy'),
+      cell: ({ row }) => format(new Date(row.original.date), 'PP', { locale: dateLocale }),
     },
     {
       accessorKey: 'amount',
@@ -172,7 +175,7 @@ function VendorCreditsPageContent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('credits.title')}</h1>
           <p className="text-muted-foreground">{t('credits.pageDescription')}</p>
@@ -180,7 +183,7 @@ function VendorCreditsPageContent() {
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
-            Import
+            {tCommon('buttons.import')}
           </Button>
           <Button asChild>
             <Link href="/purchases/credits/new">

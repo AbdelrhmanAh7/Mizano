@@ -58,10 +58,6 @@ jest.mock('@/lib/hooks/use-export-all', () => ({
   useExportAll: () => ({ onExportAll: jest.fn() }),
 }));
 
-jest.mock('@/components/ai', () => ({
-  FlightRiskCard: () => <div data-testid="flight-risk">FlightRisk</div>,
-}));
-
 // ── Import after mocks ────────────────────────────────────────────────────────
 
 import EmployeesPage from './page';

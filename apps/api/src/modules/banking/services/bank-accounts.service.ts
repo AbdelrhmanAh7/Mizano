@@ -5,6 +5,12 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { BankAccountQueryDto } from '../dto/bank-account-query.dto';
 import { CreateBankAccountDto } from '../dto/create-bank-account.dto';
 import { UpdateBankAccountDto } from '../dto/update-bank-account.dto';
+import {
+  endOfUtcDay,
+  money,
+  sumDecimals,
+  sumPostedLinesByAccount,
+} from '../../../common/utils/report-utils';
 
 @Injectable()
 export class BankAccountsService {
@@ -81,7 +87,10 @@ export class BankAccountsService {
       this.prisma.bankAccount.count({ where }),
     ]);
 
-    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    return {
+      data: await this.withLedgerBalances(organizationId, data),
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   async findOne(organizationId: string, id: string) {
@@ -90,7 +99,28 @@ export class BankAccountsService {
       include: { linkedAccount: true },
     });
     if (!account) throw new NotFoundException('Bank account not found');
-    return account;
+    const [withBalance] = await this.withLedgerBalances(organizationId, [account]);
+    return withBalance;
+  }
+
+  /**
+   * The system balance of a bank account is its linked ledger account's posted balance (as the
+   * dashboard shows it); the stored column is never updated by postings, so it always read 0.
+   */
+  private async withLedgerBalances<T extends { linkedAccountId: string }>(
+    organizationId: string,
+    accounts: T[],
+  ): Promise<Array<T & { systemBalance: string }>> {
+    const totals = await sumPostedLinesByAccount(
+      this.prisma,
+      organizationId,
+      { lte: endOfUtcDay(new Date()) },
+      [...new Set(accounts.map((a) => a.linkedAccountId))],
+    );
+    return accounts.map((account) => {
+      const t = totals.get(account.linkedAccountId);
+      return { ...account, systemBalance: money(t ? t.debit.sub(t.credit) : new Decimal(0)) };
+    });
   }
 
   async update(organizationId: string, id: string, dto: UpdateBankAccountDto) {
@@ -116,10 +146,10 @@ export class BankAccountsService {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const [accounts, pendingCount, monthlyCount] = await Promise.all([
+    const [activeAccounts, pendingCount, monthlyCount] = await Promise.all([
       this.prisma.bankAccount.findMany({
         where: { organizationId, isActive: true, deletedAt: null },
-        select: { systemBalance: true },
+        select: { linkedAccountId: true },
       }),
       this.prisma.bankTransaction.count({
         where: { organizationId, status: 'PENDING' },
@@ -129,10 +159,8 @@ export class BankAccountsService {
       }),
     ]);
 
-    const totalSystemBalance = accounts.reduce(
-      (sum, a) => sum + parseFloat(a.systemBalance.toString()),
-      0,
-    );
+    const accounts = await this.withLedgerBalances(organizationId, activeAccounts);
+    const totalSystemBalance = money(sumDecimals(accounts.map((a) => a.systemBalance)));
 
     return {
       totalAccounts: accounts.length,

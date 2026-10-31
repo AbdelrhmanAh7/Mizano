@@ -34,8 +34,78 @@ export interface AgingItem {
   balanceDue: number;
 }
 
-/** Receivables aging row: money is a fixed 4-dp decimal string. */
+/** Receivables and payables aging row: money is a fixed 4-dp decimal string. */
 export type ReceivableAgingItem = Omit<AgingItem, 'balanceDue'> & { balanceDue: string };
+
+/** Unapplied credits per counterparty (exact totals) and their sum. */
+function creditsByParty(credits: Array<{ partyId: string; partyName: string; amount: Decimal }>): {
+  byParty: Map<string, { name: string; amount: Decimal }>;
+  total: Decimal;
+} {
+  const byParty = new Map<string, { name: string; amount: Decimal }>();
+  for (const credit of credits) {
+    const row = byParty.get(credit.partyId) ?? { name: credit.partyName, amount: new Decimal(0) };
+    row.amount = row.amount.add(credit.amount);
+    byParty.set(credit.partyId, row);
+  }
+  return { byParty, total: sumDecimals([...byParty.values()].map((r) => r.amount)) };
+}
+
+type AgingRowFields = Omit<ReceivableAgingItem, 'dueDate' | 'daysOverdue' | 'balanceDue'>;
+
+/**
+ * Puts each open document in its aging bucket and returns the buckets with the summary, in exact
+ * Decimal sent as fixed 4-dp strings; `netTotal` nets the unapplied credits.
+ */
+function ageDocuments<D extends { dueDate: Date; balanceDue: Decimal }>(
+  documents: D[],
+  asOf: Date,
+  unappliedTotal: Decimal,
+  rowOf: (document: D) => AgingRowFields,
+): {
+  buckets: Record<AgingBucketKey, ReceivableAgingItem[]>;
+  summary: Record<AgingBucketKey | 'total' | 'unappliedCredits' | 'netTotal', string>;
+} {
+  const buckets: Record<AgingBucketKey, ReceivableAgingItem[]> = {
+    current: [],
+    days1_30: [],
+    days31_60: [],
+    days61_90: [],
+    over90: [],
+  };
+  const totals: Record<AgingBucketKey, Decimal> = {
+    current: new Decimal(0),
+    days1_30: new Decimal(0),
+    days31_60: new Decimal(0),
+    days61_90: new Decimal(0),
+    over90: new Decimal(0),
+  };
+  for (const document of documents) {
+    const days = daysPastDue(document.dueDate, asOf);
+    const key = agingBucket(days);
+    buckets[key].push({
+      ...rowOf(document),
+      dueDate: document.dueDate,
+      daysOverdue: Math.max(0, days),
+      balanceDue: money(document.balanceDue),
+    });
+    totals[key] = totals[key].add(document.balanceDue);
+  }
+  const total = sumDecimals(Object.values(totals));
+  return {
+    buckets,
+    summary: {
+      current: money(totals.current),
+      days1_30: money(totals.days1_30),
+      days31_60: money(totals.days31_60),
+      days61_90: money(totals.days61_90),
+      over90: money(totals.over90),
+      total: money(total),
+      unappliedCredits: money(unappliedTotal),
+      netTotal: money(total.sub(unappliedTotal)),
+    },
+  };
+}
 
 export interface StatementTransaction {
   date: Date;
@@ -90,70 +160,28 @@ export class AgingReportsService {
       }),
     ]);
 
-    const creditsByCustomer = new Map<string, { customerName: string; amount: Decimal }>();
-    for (const credit of credits) {
-      const row = creditsByCustomer.get(credit.customerId) ?? {
-        customerName: credit.customer.name,
-        amount: new Decimal(0),
-      };
-      row.amount = row.amount.add(credit.amount);
-      creditsByCustomer.set(credit.customerId, row);
-    }
-    const unappliedTotal = sumDecimals([...creditsByCustomer.values()].map((r) => r.amount));
-
-    const buckets: Record<AgingBucketKey, ReceivableAgingItem[]> = {
-      current: [],
-      days1_30: [],
-      days31_60: [],
-      days61_90: [],
-      over90: [],
-    };
-    const bucketTotals: Record<AgingBucketKey, Decimal> = {
-      current: new Decimal(0),
-      days1_30: new Decimal(0),
-      days31_60: new Decimal(0),
-      days61_90: new Decimal(0),
-      over90: new Decimal(0),
-    };
-
-    for (const invoice of invoices) {
-      const days = daysPastDue(invoice.dueDate, asOf);
-      const key = agingBucket(days);
-      buckets[key].push({
-        invoiceId: invoice.id,
-        invoiceNumber: invoice.invoiceNumber,
-        customerId: invoice.customer.id,
-        customerName: invoice.customer.name,
-        // Accounting date (what the aging cut-off uses); issueDate stays as an extra field.
-        date: invoice.date,
-        issueDate: invoice.issueDate,
-        dueDate: invoice.dueDate,
-        daysOverdue: Math.max(0, days),
-        balanceDue: money(invoice.balanceDue),
-      });
-      bucketTotals[key] = bucketTotals[key].add(invoice.balanceDue);
-    }
-
-    const invoicesTotal = sumDecimals(Object.values(bucketTotals));
+    const unapplied = creditsByParty(
+      credits.map((c) => ({ partyId: c.customerId, partyName: c.customer.name, amount: c.amount })),
+    );
+    const { buckets, summary } = ageDocuments(invoices, asOf, unapplied.total, (invoice) => ({
+      invoiceId: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+      customerId: invoice.customer.id,
+      customerName: invoice.customer.name,
+      // Accounting date (what the aging cut-off uses); issueDate stays as an extra field.
+      date: invoice.date,
+      issueDate: invoice.issueDate,
+    }));
 
     return {
       asOfDate: asOf,
       buckets,
-      summary: {
-        current: money(bucketTotals.current),
-        days1_30: money(bucketTotals.days1_30),
-        days31_60: money(bucketTotals.days31_60),
-        days61_90: money(bucketTotals.days61_90),
-        over90: money(bucketTotals.over90),
-        total: money(invoicesTotal),
-        unappliedCredits: money(unappliedTotal),
-        netTotal: money(invoicesTotal.sub(unappliedTotal)),
-      },
+      summary,
       unappliedCredits: {
-        total: money(unappliedTotal),
-        customers: [...creditsByCustomer.entries()].map(([customerId, r]) => ({
+        total: money(unapplied.total),
+        customers: [...unapplied.byParty.entries()].map(([customerId, r]) => ({
           customerId,
-          customerName: r.customerName,
+          customerName: r.name,
           amount: money(r.amount),
         })),
       },
@@ -162,107 +190,65 @@ export class AgingReportsService {
     };
   }
 
+  /**
+   * Payables aging, the mirror of {@link getReceivablesAging}: exact Decimal bucket totals sent as
+   * fixed 4-dp strings, a date-only as-of meaning the end of that UTC day, and the bill's
+   * accounting `date` on every row (billDate is optional and stays as an extra field).
+   */
   async getPayablesAging(organizationId: string, asOfDate?: string) {
-    const date = asOfDate ? new Date(asOfDate) : new Date();
-    date.setHours(23, 59, 59, 999);
+    const { asOf } = resolveAsOf(asOfDate);
 
-    const bills = await this.prisma.bill.findMany({
-      where: {
-        organizationId,
-        deletedAt: null,
-        balanceDue: { gt: 0 },
-        // Only bills posted to AP; `date` is the accounting date (billDate is optional).
-        status: { in: ['OPEN', 'PARTIALLY_PAID', 'OVERDUE'] },
-        date: { lte: date },
-      },
-      include: {
-        vendor: { select: { id: true, name: true } },
-      },
-    });
+    const [bills, credits] = await Promise.all([
+      this.prisma.bill.findMany({
+        where: {
+          organizationId,
+          deletedAt: null,
+          balanceDue: { gt: 0 },
+          // Only bills posted to AP; `date` is the accounting date (billDate is optional).
+          status: { in: POSTED_BILL_STATUSES },
+          date: { lte: asOf },
+        },
+        include: {
+          vendor: { select: { id: true, name: true } },
+        },
+      }),
+      // Live, unapplied, unrefunded vendor credits already debited AP but reduced no bill: they
+      // are shown per vendor and netted in `summary.netTotal`, which reconciles to the AP control
+      // account.
+      this.prisma.vendorCredit.findMany({
+        where: {
+          organizationId,
+          deletedAt: null,
+          appliedToBillId: null,
+          refundedAt: null,
+          date: { lte: asOf },
+        },
+        select: { vendorId: true, amount: true, vendor: { select: { id: true, name: true } } },
+      }),
+    ]);
 
-    // Live, unapplied, unrefunded vendor credits already debited AP but reduced no bill: they are
-    // shown per vendor and netted in `summary.netTotal`, which reconciles to the AP control account.
-    const credits = await this.prisma.vendorCredit.findMany({
-      where: {
-        organizationId,
-        deletedAt: null,
-        appliedToBillId: null,
-        refundedAt: null,
-        date: { lte: date },
-      },
-      select: { vendorId: true, amount: true, vendor: { select: { id: true, name: true } } },
-    });
-    const creditsByVendor = new Map<string, { vendorName: string; amount: Decimal }>();
-    for (const credit of credits) {
-      const row = creditsByVendor.get(credit.vendorId) ?? {
-        vendorName: credit.vendor.name,
-        amount: new Decimal(0),
-      };
-      row.amount = row.amount.add(credit.amount);
-      creditsByVendor.set(credit.vendorId, row);
-    }
-    const unappliedTotal = [...creditsByVendor.values()].reduce(
-      (sum, r) => sum.add(r.amount),
-      new Decimal(0),
+    const unapplied = creditsByParty(
+      credits.map((c) => ({ partyId: c.vendorId, partyName: c.vendor.name, amount: c.amount })),
     );
-    const billsTotal = bills.reduce((sum, b) => sum.add(b.balanceDue), new Decimal(0));
-
-    const buckets = {
-      current: [] as AgingItem[],
-      days1_30: [] as AgingItem[],
-      days31_60: [] as AgingItem[],
-      days61_90: [] as AgingItem[],
-      over90: [] as AgingItem[],
-    };
-
-    for (const bill of bills) {
-      const dueDate = bill.dueDate;
-      const daysOverdue = Math.floor((date.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
-      const balanceDue = parseFloat(bill.balanceDue.toString());
-
-      const item: AgingItem = {
-        billId: bill.id,
-        billNumber: bill.billNumber,
-        vendorId: bill.vendor.id,
-        vendorName: bill.vendor.name,
-        billDate: bill.billDate,
-        dueDate: bill.dueDate,
-        daysOverdue: Math.max(0, daysOverdue),
-        balanceDue,
-      };
-
-      if (daysOverdue <= 0) buckets.current.push(item);
-      else if (daysOverdue <= 30) buckets.days1_30.push(item);
-      else if (daysOverdue <= 60) buckets.days31_60.push(item);
-      else if (daysOverdue <= 90) buckets.days61_90.push(item);
-      else buckets.over90.push(item);
-    }
-
-    const summary = {
-      current: buckets.current.reduce((sum, i) => sum + i.balanceDue, 0),
-      days1_30: buckets.days1_30.reduce((sum, i) => sum + i.balanceDue, 0),
-      days31_60: buckets.days31_60.reduce((sum, i) => sum + i.balanceDue, 0),
-      days61_90: buckets.days61_90.reduce((sum, i) => sum + i.balanceDue, 0),
-      over90: buckets.over90.reduce((sum, i) => sum + i.balanceDue, 0),
-      total: 0,
-    };
-    summary.total =
-      summary.current + summary.days1_30 + summary.days31_60 + summary.days61_90 + summary.over90;
+    const { buckets, summary } = ageDocuments(bills, asOf, unapplied.total, (bill) => ({
+      billId: bill.id,
+      billNumber: bill.billNumber,
+      vendorId: bill.vendor.id,
+      vendorName: bill.vendor.name,
+      date: bill.date,
+      billDate: bill.billDate,
+    }));
 
     return {
-      asOfDate: date,
+      asOfDate: asOf,
       buckets,
-      summary: {
-        ...summary,
-        unappliedCredits: unappliedTotal.toFixed(4),
-        netTotal: billsTotal.sub(unappliedTotal).toFixed(4),
-      },
+      summary,
       unappliedCredits: {
-        total: unappliedTotal.toFixed(4),
-        vendors: [...creditsByVendor.entries()].map(([vendorId, r]) => ({
+        total: money(unapplied.total),
+        vendors: [...unapplied.byParty.entries()].map(([vendorId, r]) => ({
           vendorId,
-          vendorName: r.vendorName,
-          amount: r.amount.toFixed(4),
+          vendorName: r.name,
+          amount: money(r.amount),
         })),
       },
       vendorCount: new Set(bills.map((b) => b.vendorId)).size,

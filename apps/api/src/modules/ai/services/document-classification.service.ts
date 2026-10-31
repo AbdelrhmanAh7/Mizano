@@ -1,10 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { BoundedCache } from '../utils/bounded-cache.util';
-import { buildDocumentClassificationPrompt } from '../prompts/nlp.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
-import { describeError } from '../../../common/utils/redact';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const natural = require('natural');
@@ -238,10 +235,7 @@ export class DocumentClassificationService {
   /** In-memory cache of trained classifiers per organization (bounded: max 50, 1h TTL) */
   private classifierCache = new BoundedCache<unknown>(50, 60 * 60 * 1000);
 
-  constructor(
-    private prisma: PrismaService,
-    private gateway: OllamaInferenceGateway,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   /**
    * Classify raw text into a document category.
@@ -269,39 +263,7 @@ export class DocumentClassificationService {
     text: string,
     filename?: string,
   ): Promise<ClassificationResult> {
-    // --- Ollama-first inference path ---
-    try {
-      const prompt = buildDocumentClassificationPrompt(text, filename);
-      const ollamaResult = await this.gateway.infer<{
-        category: string;
-        confidence: number;
-        scores: Record<string, number>;
-      }>(prompt);
-
-      if (ollamaResult) {
-        const d = ollamaResult.data;
-        const category = (d.category as DocumentCategory) || DocumentCategory.OTHER;
-        const confidence = d.confidence ?? 0.8;
-        const scores: ClassificationScore[] = Object.values(DocumentCategory).map((cat) => ({
-          category: cat,
-          score: d.scores?.[cat] ?? (cat === category ? confidence : 0),
-        }));
-
-        const result: ClassificationResult = {
-          category,
-          confidence,
-          scores,
-          predictionMethod: 'OLLAMA',
-        };
-        return result;
-      }
-    } catch (error) {
-      this.logger.warn(
-        `Ollama document classification failed, falling back to Bayes: ${describeError(error)}`,
-      );
-    }
-
-    // --- Existing Bayes classifier fallback ---
+    // CPU-only: the organization's AI reader classifies when it is on; this is the fallback.
     const textResult = await this.classifyText(organizationId, text);
 
     if (!filename) {

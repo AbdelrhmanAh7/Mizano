@@ -9,7 +9,7 @@ import {
 } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useToast } from '@/components/ui/use-toast';
-import { getApiErrorMessage } from '@/lib/api-error';
+import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 
 interface ToastMutationOptions<TVariables, TData> {
   /** next-intl namespace of the toast copy, for example `sales.invoices.toast`. */
@@ -21,13 +21,17 @@ interface ToastMutationOptions<TVariables, TData> {
   beforeInvalidate?: (queryClient: QueryClient) => void;
   /** Success title key; its description is `<key>Description`. */
   success: string;
-  /** Error title key; the description is the API message, else `genericError`. */
+  /**
+   * Error title key; the description is the translated copy of a known API error code
+   * (`common.apiErrors`), else the API message, else `genericError`.
+   */
   error: string;
 }
 
 /**
  * A mutation with the standard toasts: translated success title and description, and on failure
- * a destructive toast carrying the API's own message (`getApiErrorMessage`).
+ * a destructive toast carrying the translated known error (for example a validation failure) or
+ * the API's own message (`getLocalizedApiErrorMessage`).
  */
 export function useToastMutation<TVariables, TData>({
   namespace,
@@ -40,6 +44,7 @@ export function useToastMutation<TVariables, TData>({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const t = useTranslations(namespace);
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn,
@@ -54,7 +59,7 @@ export function useToastMutation<TVariables, TData>({
       toast({
         variant: 'destructive',
         title: t(error),
-        description: getApiErrorMessage(err, t('genericError')),
+        description: getLocalizedApiErrorMessage(err, t('genericError'), tApiErrors),
       });
     },
   });

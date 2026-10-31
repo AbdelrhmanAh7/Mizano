@@ -6,37 +6,35 @@ import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
-import { ReportPageHeader, ReportPageSkeleton } from '@/components/reports/report-page';
+import {
+  ReportAccountRow,
+  ReportPageHeader,
+  ReportPageSkeleton,
+  useReportDateLabels,
+} from '@/components/reports/report-page';
 import { useBalanceSheetReport, ReportAccount } from '@/lib/hooks/use-reports';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
+
+/** Section rows the report transform adds (ids from use-reports), shown in the page language. */
+const SECTION_KEYS: Record<string, string> = {
+  'current-assets': 'currentAssets',
+  'fixed-assets': 'fixedAssets',
+  'current-liabilities': 'currentLiabilities',
+  'long-term-liabilities': 'longTermLiabilities',
+  'retained-earnings': 'retainedEarnings',
+};
 
 export default function BalanceSheetReportPage() {
   // Report figures are ledger amounts, in the organization base currency (audit B5).
   const formatCurrency = useMoneyFormatter();
   const t = useTranslations('reports');
+  const dateLabels = useReportDateLabels();
   const [asOfDate, setAsOfDate] = useState(new Date());
 
   const { data: report, isLoading } = useBalanceSheetReport(format(asOfDate, 'yyyy-MM-dd'));
 
-  const renderAccountRow = (account: ReportAccount, level = 0) => (
-    <div key={account.id}>
-      <div
-        className={cn(
-          'flex justify-between py-2 border-b',
-          level === 0 && 'font-medium',
-          level > 0 && 'text-sm',
-        )}
-        style={{ paddingLeft: `${level * 24}px` }}
-      >
-        <span className="flex items-center gap-2">
-          <span className="text-muted-foreground font-mono">{account.code}</span>
-          {account.name}
-        </span>
-        <span className="font-mono">{formatCurrency(account.balance)}</span>
-      </div>
-      {account.children?.map((child) => renderAccountRow(child, level + 1))}
-    </div>
-  );
+  const labelOf = (account: ReportAccount) =>
+    SECTION_KEYS[account.id] ? t(`balanceSheet.${SECTION_KEYS[account.id]}`) : account.name;
 
   if (isLoading) {
     return <ReportPageSkeleton />;
@@ -54,10 +52,7 @@ export default function BalanceSheetReportPage() {
 
   return (
     <div className="space-y-6">
-      <ReportPageHeader
-        title={t('balanceSheet.title')}
-        subtitle={`As of ${format(asOfDate, 'MMMM d, yyyy')}`}
-      />
+      <ReportPageHeader title={t('balanceSheet.title')} subtitle={dateLabels.asOf(asOfDate)} />
 
       {/* Filters */}
       <ReportFilters
@@ -107,7 +102,9 @@ export default function BalanceSheetReportPage() {
                 <CardTitle>{t('balanceSheet.assets')}</CardTitle>
               </CardHeader>
               <CardContent>
-                {assets.map((account: ReportAccount) => renderAccountRow(account))}
+                {assets.map((account: ReportAccount) => (
+                  <ReportAccountRow key={account.id} account={account} labelOf={labelOf} />
+                ))}
                 <div className="flex justify-between py-3 border-t-2 font-bold">
                   <span>{t('balanceSheet.totalAssets')}</span>
                   <span className="font-mono">{formatCurrency(totalAssets)}</span>
@@ -122,7 +119,9 @@ export default function BalanceSheetReportPage() {
                   <CardTitle>{t('balanceSheet.liabilities')}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {liabilities.map((account: ReportAccount) => renderAccountRow(account))}
+                  {liabilities.map((account: ReportAccount) => (
+                    <ReportAccountRow key={account.id} account={account} labelOf={labelOf} />
+                  ))}
                   <div className="flex justify-between py-3 border-t-2 font-bold">
                     <span>{t('balanceSheet.totalLiabilities')}</span>
                     <span className="font-mono">{formatCurrency(totalLiabilities)}</span>
@@ -135,7 +134,9 @@ export default function BalanceSheetReportPage() {
                   <CardTitle>{t('balanceSheet.equity')}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {equity.map((account: ReportAccount) => renderAccountRow(account))}
+                  {equity.map((account: ReportAccount) => (
+                    <ReportAccountRow key={account.id} account={account} labelOf={labelOf} />
+                  ))}
                   <div className="flex justify-between py-3 border-t-2 font-bold">
                     <span>{t('balanceSheet.totalEquity')}</span>
                     <span className="font-mono">{formatCurrency(totalEquity)}</span>
@@ -160,7 +161,7 @@ export default function BalanceSheetReportPage() {
                 </span>
               </div>
               <p className={cn('text-sm mt-2', isBalanced ? 'text-success' : 'text-destructive')}>
-                {isBalanced ? 'Balance sheet is balanced' : 'Balance sheet is not balanced'}
+                {isBalanced ? t('balanceSheet.balanced') : t('balanceSheet.notBalanced')}
               </p>
             </CardContent>
           </Card>

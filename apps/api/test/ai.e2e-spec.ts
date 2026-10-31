@@ -1,27 +1,23 @@
 /**
- * AI advisory endpoints through the real HTTP API. Only routes that exist are exercised; each
- * must succeed for a real tenant, never post anything and stay scoped to the caller. Models are
- * not required to be online: these endpoints read tenant data and return empty results.
+ * AI through the organization's own account, over the real HTTP API. No provider is called:
+ * a new tenant has AI off, the retired AI routes are gone, settings are permission-gated and
+ * never return a key, and nothing AI-related posts to the ledger.
  */
 import { INestApplication } from '@nestjs/common';
 import { ApiHelper } from './helpers/api-client.helper';
 import { createTestApp, getPrisma } from './helpers/app.helper';
 import { registerTenant, TestTenant } from './helpers/tenant.helper';
 
-describe('AI (e2e)', () => {
+describe('AI settings (e2e)', () => {
   let app: INestApplication;
   let tenantA: TestTenant;
-  let tenantB: TestTenant;
   let a: ApiHelper;
-  let b: ApiHelper;
   let anon: ApiHelper;
 
   beforeAll(async () => {
     app = await createTestApp();
     tenantA = await registerTenant(app, 'AiA');
-    tenantB = await registerTenant(app, 'AiB');
     a = tenantA.api;
-    b = tenantB.api;
     anon = ApiHelper.anonymous(app);
   });
 
@@ -29,74 +25,48 @@ describe('AI (e2e)', () => {
     await app.close();
   });
 
-  const readRoutes = [
+  it('a new organization has AI off and the status carries no key', async () => {
+    const res = await a.get('/ai-settings');
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ provider: 'none', activeFeatures: [], keyHint: null });
+    expect(JSON.stringify(res.body)).not.toMatch(/keyCiphertext|apiKey/);
+    expect((await a.get('/ai-settings/features')).body).toEqual({ activeFeatures: [] });
+  });
+
+  it('refuses anonymous callers', async () => {
+    expect((await anon.get('/ai-settings')).status).toBe(401);
+    expect((await anon.post('/ai-settings/connect').send({ provider: 'openai' })).status).toBe(401);
+  });
+
+  it('enables no feature without a connected provider and consent', async () => {
+    const res = await a.patch('/ai-settings').send({ features: ['documents'] });
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('AI_NOT_ENABLED');
+  });
+
+  it('validates the provider and the OpenRouter callback', async () => {
+    expect((await a.post('/ai-settings/connect').send({ provider: 'colab' })).status).toBe(400);
+    const start = await a
+      .post('/ai-settings/openrouter/start')
+      .send({ callbackUrl: 'https://evil.example/en/settings/ai' });
+    expect(start.status).toBe(400);
+  });
+
+  it.each([
     '/ai/insights',
-    '/ai/cash-flow/quick',
-    '/ai/demand-forecast/dashboard',
-    '/ai/anomalies',
-    '/ai/alerts',
-    '/ai/feedback/stats?feature=CATEGORIZATION',
-  ];
-
-  describe.each(readRoutes)('GET %s', (route) => {
-    it('succeeds for an authenticated tenant', async () => {
-      const res = await a.get(route);
-      expect(res.status).toBe(200);
-    });
-
-    it('returns 401 when anonymous', async () => {
-      expect((await anon.get(route)).status).toBe(401);
-    });
+    '/ai/chatbot/history',
+    '/ai/narrative/monthly',
+    '/internal/ollama-status',
+  ])('the retired route %s is gone', async (route) => {
+    expect((await a.get(route)).status).toBe(404);
   });
 
-  describe('feedback', () => {
-    it('accepts feedback and stores it only for the submitting tenant', async () => {
-      const res = await a.post('/ai/feedback').send({
-        feature: 'CATEGORIZATION',
-        userAction: 'ACCEPTED',
-        aiSuggestion: { label: 'Office Supplies', confidence: 0.85 },
-        inputData: { description: 'Office supplies purchase', amount: 150 },
-      });
-      expect(res.status).toBe(201);
-
-      const prisma = getPrisma(app);
-      const forA = await prisma.aiFeedback.count({
-        where: { organizationId: tenantA.organizationId },
-      });
-      const forB = await prisma.aiFeedback.count({
-        where: { organizationId: tenantB.organizationId },
-      });
-      expect(forA).toBe(1);
-      expect(forB).toBe(0);
-    });
-
-    it('rejects an unknown feature', async () => {
-      const res = await a.post('/ai/feedback').send({
-        feature: 'NOT_A_FEATURE',
-        userAction: 'ACCEPTED',
-        aiSuggestion: {},
-        inputData: {},
-      });
-      expect(res.status).toBe(400);
-    });
-
-    it('returns 401 when anonymous', async () => {
-      expect((await anon.post('/ai/feedback').send({})).status).toBe(401);
-    });
-  });
-
-  describe('advisory only', () => {
-    it('creates no journals while serving AI reads', async () => {
-      const prisma = getPrisma(app);
-      const before = await prisma.journal.count({
-        where: { organizationId: tenantB.organizationId },
-      });
-      expect((await b.get('/ai/insights')).status).toBe(200);
-      expect((await b.get('/ai/anomalies')).status).toBe(200);
-      const after = await prisma.journal.count({
-        where: { organizationId: tenantB.organizationId },
-      });
-      expect(after).toBe(before);
-    });
+  it('creates no journals while serving AI settings', async () => {
+    const prisma = getPrisma(app);
+    const where = { organizationId: tenantA.organizationId };
+    const before = await prisma.journal.count({ where });
+    await a.get('/ai-settings');
+    await a.get('/ai-settings/usage');
+    expect(await prisma.journal.count({ where })).toBe(before);
   });
 });

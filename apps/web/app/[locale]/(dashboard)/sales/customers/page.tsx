@@ -1,6 +1,5 @@
 'use client';
 
-import { CustomerAIInsights } from '@/components/ai';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
 import { ImportWizard } from '@/components/import/import-wizard';
@@ -212,7 +211,7 @@ function CustomersPageContent() {
     <div className="space-y-6">
       <AutoTourTrigger tourId="sales_customers" />
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('customers.title')}</h1>
           <p className="text-muted-foreground">{t('description')}</p>
@@ -220,7 +219,7 @@ function CustomersPageContent() {
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="me-2 h-4 w-4" />
-            Import
+            {tCommon('buttons.import')}
           </Button>
           {canCreate && (
             <Button asChild data-tour="create-customer-btn">
@@ -232,9 +231,6 @@ function CustomersPageContent() {
           )}
         </div>
       </div>
-
-      {/* AI Customer Insights */}
-      <CustomerAIInsights />
 
       {/* Filters */}
       <Card>

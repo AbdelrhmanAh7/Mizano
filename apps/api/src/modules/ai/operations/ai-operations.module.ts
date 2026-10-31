@@ -1,25 +1,16 @@
 import { Module } from '@nestjs/common';
-import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../../../prisma/prisma.module';
-import { AiCoreModule } from '../core/ai-core.module';
-import { AiNlpModule } from '../nlp/ai-nlp.module';
+import { AiAccountModule } from '../account/ai-account.module';
 
-// Operations Services
-import { OllamaService } from '../services/ollama.service';
-import { PaddleOcrService } from '../services/paddle-ocr.service';
-import { DocumentIntakeService } from '../services/document-intake.service';
-import { ReorderPointsService } from '../services/reorder-points.service';
-import { PatternDetectionService } from '../services/pattern-detection.service';
-import { AnomalyDetectionService } from '../services/anomaly-detection.service';
-import { ReconciliationMatcherService } from '../services/reconciliation-matcher.service';
-
-// Extraction Strategies
-import { VlmStrategy } from '../extraction/vlm-strategy.service';
-import { OcrLlmStrategy } from '../extraction/ocr-llm-strategy.service';
-import { HybridStrategy } from '../extraction/hybrid-strategy.service';
-import { RulesStrategy } from '../extraction/rules-strategy.service';
+// Document intake: readers, classification and party matching (CPU), jobs and storage
+import { AiDocumentReader } from '../extraction/ai-document-reader';
 import { ExtractionStrategyResolver } from '../extraction/extraction-strategy-resolver.service';
+import { RulesStrategy } from '../extraction/rules-strategy.service';
+import { AiFeedbackService } from '../services/ai-feedback.service';
+import { DocumentClassificationService } from '../services/document-classification.service';
+import { DocumentIntakeService } from '../services/document-intake.service';
+import { EntityExtractionService } from '../services/entity-extraction.service';
 
 import { IntakeJobOwnerGuard } from '../intake/intake-job-owner.guard';
 import { IntakeJobsService } from '../intake/intake-jobs.service';
@@ -27,56 +18,35 @@ import { IntakeQueueService } from '../intake/intake-queue.service';
 import { IntakeStorage, LocalFsIntakeStorage } from '../intake/intake-storage';
 import { INTAKE_CLOCK, monotonicClock } from '../intake/stage-timer';
 
-// Operations Controllers
 import { DocumentIntakeController } from '../controllers/document-intake.controller';
-import { ReorderPointsController } from '../controllers/reorder-points.controller';
-import { PatternDetectionController } from '../controllers/pattern-detection.controller';
-import { AnomalyDetectionController } from '../controllers/anomaly-detection.controller';
-import { ReconciliationAiController } from '../controllers/reconciliation-ai.controller';
-import { OllamaTunnelController } from '../controllers/ollama-tunnel.controller';
 
+/**
+ * Invoice and receipt intake. Reading uses the organization's own AI provider only when its
+ * `documents` feature is active (AiAccountModule); otherwise the CPU rules reader.
+ */
 @Module({
-  imports: [PrismaModule, AiCoreModule, AiNlpModule, HttpModule, ConfigModule],
-  controllers: [
-    DocumentIntakeController,
-    ReorderPointsController,
-    PatternDetectionController,
-    AnomalyDetectionController,
-    ReconciliationAiController,
-    OllamaTunnelController,
-  ],
+  imports: [PrismaModule, ConfigModule, AiAccountModule],
+  controllers: [DocumentIntakeController],
   providers: [
-    OllamaService,
-    PaddleOcrService,
-    VlmStrategy,
-    OcrLlmStrategy,
-    HybridStrategy,
     RulesStrategy,
+    AiDocumentReader,
     ExtractionStrategyResolver,
+    DocumentClassificationService,
+    EntityExtractionService,
+    AiFeedbackService,
     DocumentIntakeService,
     IntakeJobsService,
     IntakeJobOwnerGuard,
     IntakeQueueService,
     { provide: IntakeStorage, useClass: LocalFsIntakeStorage },
     { provide: INTAKE_CLOCK, useValue: monotonicClock },
-    ReorderPointsService,
-    PatternDetectionService,
-    AnomalyDetectionService,
-    ReconciliationMatcherService,
   ],
   exports: [
-    OllamaService,
-    PaddleOcrService,
-    ExtractionStrategyResolver,
     DocumentIntakeService,
     IntakeJobsService,
     IntakeJobOwnerGuard,
     IntakeQueueService,
     IntakeStorage,
-    ReorderPointsService,
-    PatternDetectionService,
-    AnomalyDetectionService,
-    ReconciliationMatcherService,
   ],
 })
 export class AiOperationsModule {}

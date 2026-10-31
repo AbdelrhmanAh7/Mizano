@@ -1,17 +1,12 @@
 'use client';
 
+import { RowActionsMenu } from '@/components/shared/row-actions-menu';
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { Plus, MoreHorizontal, Pencil, Trash2, Eye, MapPin, Star } from 'lucide-react';
+import { Plus, MapPin, Star } from 'lucide-react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { Badge } from '@/components/ui/badge';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
@@ -102,31 +97,12 @@ function WarehousesPageContent() {
       cell: ({ row }) => {
         const warehouse = row.original;
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link href={`/inventory/warehouses/${warehouse.id}`}>
-                  <Eye className="mr-2 h-4 w-4" />
-                  {t('common.view')}
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href={`/inventory/warehouses/${warehouse.id}?edit=true`}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  {t('common.edit')}
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(warehouse.id)}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                {t('common.delete')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <RowActionsMenu
+            viewHref={`/inventory/warehouses/${warehouse.id}`}
+            editHref={`/inventory/warehouses/${warehouse.id}?edit=true`}
+            onDelete={() => setDeleteId(warehouse.id)}
+            labels={{ view: t('common.view'), edit: t('common.edit'), delete: t('common.delete') }}
+          />
         );
       },
     },
@@ -135,7 +111,7 @@ function WarehousesPageContent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('warehouses.title')}</h1>
           <p className="text-muted-foreground">{t('description')}</p>

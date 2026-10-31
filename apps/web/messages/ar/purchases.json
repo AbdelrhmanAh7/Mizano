@@ -39,7 +39,26 @@
       "taxId": "الرقم الضريبي",
       "taxIdPlaceholder": "أدخل الرقم الضريبي",
       "paymentTerms": "شروط الدفع",
-      "billingAddress": "عنوان الفوترة"
+      "billingAddress": "عنوان الفوترة",
+      "details": "المعلومات الأساسية",
+      "nameRequired": "اسم المورد مطلوب",
+      "invalidEmail": "أدخل بريداً إلكترونياً صحيحاً",
+      "displayNameHint": "الاسم الظاهر في المستندات",
+      "currencyPlaceholder": "اختر العملة",
+      "paymentTermsPlaceholder": "اختر شروط الدفع",
+      "taxIdHint": "الرقم الضريبي / رقم ضريبة القيمة المضافة",
+      "street": "عنوان الشارع",
+      "streetPlaceholder": "عنوان الشارع",
+      "country": "الدولة",
+      "city": "المدينة",
+      "state": "المحافظة/المنطقة",
+      "statePlaceholder": "المحافظة",
+      "postalCode": "الرمز البريدي",
+      "postalCodePlaceholder": "الرمز البريدي",
+      "cancel": "إلغاء",
+      "saving": "جاري الحفظ...",
+      "create": "إنشاء المورد",
+      "update": "تحديث المورد"
     },
     "table": {
       "name": "الاسم",
@@ -237,7 +256,8 @@
       "partiallyPaid": "مدفوعة جزئياً",
       "paid": "مدفوعة",
       "overdue": "متأخرة",
-      "void": "ملغاة"
+      "void": "ملغاة",
+      "pending": "معلقة"
     },
     "empty": {
       "title": "لا توجد فواتير بعد",
@@ -286,7 +306,12 @@
       "duplicateFailed": "تعذّر نسخ الفاتورة",
       "genericError": "حدث خطأ"
     },
-    "onlyDraftsEditable": "لا يمكن تعديل إلا الفواتير المسودة"
+    "onlyDraftsEditable": "لا يمكن تعديل إلا الفواتير المسودة",
+    "from": "من {name}",
+    "quickActions": "إجراءات سريعة",
+    "viewVendor": "عرض المورد",
+    "scanBill": "مسح فاتورة",
+    "searchPlaceholder": "ابحث برقم الفاتورة أو اسم المورد..."
   },
   "credits": {
     "title": "ائتمانات الموردين",
@@ -415,7 +440,36 @@
       "reference": "رقم المرجع",
       "notes": "ملاحظات",
       "allocations": "توزيع الفواتير",
-      "allocationRequired": "يجب توزيع الدفعة على فاتورة واحدة على الأقل"
+      "allocationRequired": "يجب توزيع الدفعة على فاتورة واحدة على الأقل",
+      "details": "بيانات الدفعة",
+      "vendorRequired": "اختر المورد",
+      "dateRequired": "اختر تاريخ الدفع",
+      "amountPositive": "أدخل مبلغاً أكبر من صفر",
+      "modeRequired": "اختر طريقة الدفع",
+      "accountRequired": "اختر الحساب الذي تُدفع منه الدفعة",
+      "pickDate": "اختر تاريخاً",
+      "modePlaceholder": "اختر الطريقة",
+      "accountPlaceholder": "اختر الحساب",
+      "referencePlaceholder": "رقم الشيك أو رقم المعاملة وغيرها",
+      "notesPlaceholder": "ملاحظات داخلية",
+      "allocateTitle": "التوزيع على فواتير الموردين",
+      "autoAllocate": "توزيع تلقائي",
+      "clear": "مسح",
+      "loadingBills": "جاري تحميل الفواتير...",
+      "noUnpaidBills": "لا توجد فواتير غير مدفوعة لهذا المورد",
+      "billNumber": "رقم الفاتورة",
+      "billDate": "التاريخ",
+      "dueDate": "تاريخ الاستحقاق",
+      "total": "الإجمالي",
+      "balanceDue": "الرصيد المستحق",
+      "allocation": "المبلغ المخصص",
+      "paymentAmount": "مبلغ الدفعة:",
+      "totalAllocated": "إجمالي المخصص:",
+      "unallocated": "غير مخصص:",
+      "cancel": "إلغاء",
+      "recording": "جاري التسجيل...",
+      "submit": "تسجيل الدفعة",
+      "allocationMismatch": "المبلغ المخصص {allocated} يجب أن يساوي مبلغ الدفعة {amount}"
     },
     "table": {
       "paymentNumber": "رقم الدفعة",
@@ -439,6 +493,15 @@
       "title": "إلغاء {count} دفعات؟",
       "description": "تُلغى كل دفعة بالكامل: يُعاد فتح كل فاتورة سددتها ويُرحَّل قيد عكسي مرتبط إلى دفتر الأستاذ.",
       "confirm": "إلغاء {count} دفعات"
+    },
+    "toast": {
+      "recorded": "تم تسجيل الدفعة",
+      "recordedDescription": "سُجّلت الدفعة وتم ترحيلها.",
+      "recordError": "تعذّر تسجيل الدفعة",
+      "voided": "تم إلغاء الدفعة",
+      "voidedDescription": "أُعيدت أرصدة الفواتير وتم ترحيل قيد عكسي.",
+      "voidError": "تعذّر إلغاء الدفعة",
+      "genericError": "حدث خطأ ما. يرجى المحاولة مرة أخرى."
     }
   },
   "lineItems": {
