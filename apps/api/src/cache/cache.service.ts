@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { ConfigService } from '@nestjs/config';
 import { Cache } from 'cache-manager';
 import Redis from 'ioredis';
+import { resolveRedisUrl } from './redis-url';
 
 export interface CacheOptions {
   ttl?: number; // Time to live in seconds
@@ -45,7 +46,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    const redisUrl = this.configService.get<string>('REDIS_URL');
+    const redisUrl = resolveRedisUrl(this.configService);
     if (redisUrl) {
       try {
         this.redisClient = new Redis(redisUrl, {
