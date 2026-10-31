@@ -102,6 +102,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.
+- **A cache key must cover every file the task reads.** Turbo `inputs` of `src/**` matched nothing in `apps/web`, which has no `src/`, so its task hashes never changed and a warm cache (hub localci, pre-push) replayed old green lint, type-check and test results for new web code. Keep turbo's default (all package files); if you narrow `inputs`, prove with `turbo run <task> --dry=json` that editing a file of that package changes its hash. _(audit C1)_
+- **Tests must not depend on today's date.** Month arithmetic from `new Date()` (`setMonth(getMonth() - i)`) turns "Sep 31" into Oct 1 on the 29th to 31st, and the demand-forecast suite failed every CI run at month end. Pin the clock (`jest.useFakeTimers().setSystemTime(...)`) or build dates from fixed days such as day 1 of each month. _(audit C2)_
 
 ## Review process
 
@@ -123,4 +125,5 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Rollback must be repeatable.** Track an active pointer in `deployments.log` (`OK`/`ROLLBACK` lines), not "the previous OK line", or the second rollback is a no-op.
 - **Check DB readiness over TCP** (`pg_isready -h 127.0.0.1`). The temporary init server listens on the unix socket only and passes a socket probe.
 - **Dedupe alerts on stable keys** (check name), never on live values like percentages; alert once on start and once on recovery.
+- **The image must carry its runtime binaries for the target architecture.** Puppeteer's downloaded Chrome is a glibc x64 build (none exists for linux-arm64) and the Alpine API image had no browser or fonts, so no PDF could render on the Pi. Install system packages (`apk add chromium font-noto-arabic`), point the library at them (`PUPPETEER_EXECUTABLE_PATH`, `PUPPETEER_SKIP_DOWNLOAD=1`) and fail the image build when they are missing. _(audit B3)_
 - **Give pdf.js a zero-offset copy.** pdf-parse can misread a pooled `Buffer` with `byteOffset > 0` on newer Node; pass `new Uint8Array(buffer)` (fresh `ArrayBuffer`, offset 0) and test with a slice from a larger pool. _(#87)_
