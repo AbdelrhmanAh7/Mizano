@@ -154,12 +154,16 @@
     "lastQuarter": "Last Quarter",
     "thisYear": "This Year",
     "lastYear": "Last Year",
-    "custom": "Custom"
+    "custom": "Custom",
+    "selectPeriod": "Select period",
+    "asOf": "As of:",
+    "to": "to"
   },
   "actions": {
     "generate": "Generate Report",
     "export": "Export",
     "print": "Print",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "exporting": "Exporting..."
   }
 }

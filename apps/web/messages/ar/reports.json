@@ -154,12 +154,16 @@
     "lastQuarter": "الربع الماضي",
     "thisYear": "هذه السنة",
     "lastYear": "السنة الماضية",
-    "custom": "مخصص"
+    "custom": "مخصص",
+    "selectPeriod": "اختر الفترة",
+    "asOf": "حتى تاريخ:",
+    "to": "إلى"
   },
   "actions": {
     "generate": "إنشاء التقرير",
     "export": "تصدير",
     "print": "طباعة",
-    "refresh": "تحديث"
+    "refresh": "تحديث",
+    "exporting": "جارٍ التصدير..."
   }
 }

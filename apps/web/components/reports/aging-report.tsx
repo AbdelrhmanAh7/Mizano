@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import Link from 'next/link';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { Building2, LucideIcon, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,6 +31,7 @@ import {
   useARAgingReport,
 } from '@/lib/hooks/use-reports';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
+import { useDateFormatter } from '@/lib/hooks/use-date-locale';
 
 /** What differs between the receivable (customers, invoices) and payable (vendors, bills) report. */
 interface AgingSide {
@@ -88,10 +89,8 @@ export function AgingReportPage({ side }: { side: 'receivable' | 'payable' }): J
   const useReport = config.useReport;
   const formatCurrency = useMoneyFormatter();
   const t = useTranslations('reports');
-  // Dates in the page language (Western digits in Arabic, like amounts and the PDFs).
-  const dateLocale = useLocale() === 'ar' ? 'ar-u-nu-latn' : 'en-US';
-  const longDate = new Intl.DateTimeFormat(dateLocale, { dateStyle: 'long' });
-  const shortDate = new Intl.DateTimeFormat(dateLocale, { dateStyle: 'medium' });
+  const shortDate = useDateFormatter();
+  const longDate = useDateFormatter('long');
   /** A message of this side's namespace (arAging or apAging). */
   const ts = (key: string, values?: Record<string, string | number>) =>
     t(`${config.ns}.${key}`, values);
@@ -205,8 +204,8 @@ export function AgingReportPage({ side }: { side: 'receivable' | 'payable' }): J
                     </Link>
                   </TableCell>
                   <TableCell>{item.counterpartyName}</TableCell>
-                  <TableCell>{shortDate.format(new Date(item.date))}</TableCell>
-                  <TableCell>{shortDate.format(new Date(item.dueDate))}</TableCell>
+                  <TableCell>{shortDate(item.date)}</TableCell>
+                  <TableCell>{shortDate(item.dueDate)}</TableCell>
                   <TableCell className="text-right font-mono">
                     {formatCurrency(item.amount)}
                   </TableCell>
@@ -242,7 +241,7 @@ export function AgingReportPage({ side }: { side: 'receivable' | 'payable' }): J
     <div className="space-y-6">
       <ReportPageHeader
         title={ts('title')}
-        subtitle={t('aging.asOf', { date: longDate.format(asOfDate) })}
+        subtitle={t('aging.asOf', { date: longDate(asOfDate) })}
       />
 
       <ReportFilters
