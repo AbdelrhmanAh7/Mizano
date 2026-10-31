@@ -23,13 +23,15 @@ import {
   toDecimal,
 } from '../../../common/utils/report-utils';
 
-type AccountRow = Pick<Account, 'id' | 'code' | 'name' | 'type'>;
+type AccountRow = Pick<Account, 'id' | 'code' | 'name' | 'nameAr' | 'nameEn' | 'type'>;
 
 /** One account line in a statement. `balance` is on the account's normal side. */
 export interface StatementAccountLine {
   id: string;
   code: string;
   name: string;
+  nameAr?: string | null;
+  nameEn?: string | null;
   type: AccountType;
   balance: string;
 }
@@ -111,6 +113,8 @@ export interface TrialBalanceLine {
   accountId: string;
   code: string;
   name: string;
+  nameAr?: string | null;
+  nameEn?: string | null;
   type: AccountType;
   debit: string;
   credit: string;
@@ -273,7 +277,7 @@ export class FinancialReportsService {
           organizationId,
           type: { in: [...INCOME_ACCOUNT_TYPES, AccountType.EXPENSE] },
         },
-        select: { id: true, code: true, name: true, type: true },
+        select: { id: true, code: true, name: true, nameAr: true, nameEn: true, type: true },
         orderBy: { code: 'asc' },
       }),
     ]);
@@ -353,7 +357,7 @@ export class FinancialReportsService {
       getBaseCurrency(this.prisma, organizationId),
       this.prisma.account.findMany({
         where: { organizationId },
-        select: { id: true, code: true, name: true, type: true },
+        select: { id: true, code: true, name: true, nameAr: true, nameEn: true, type: true },
         orderBy: { code: 'asc' },
       }),
     ]);
@@ -456,7 +460,7 @@ export class FinancialReportsService {
       resolveCashAccountIds(this.prisma, organizationId),
       this.prisma.account.findMany({
         where: { organizationId },
-        select: { id: true, code: true, name: true, type: true },
+        select: { id: true, code: true, name: true, nameAr: true, nameEn: true, type: true },
       }),
       this.prisma.organization.findUnique({
         where: { id: organizationId },
@@ -574,7 +578,7 @@ export class FinancialReportsService {
       getBaseCurrency(this.prisma, organizationId),
       this.prisma.account.findMany({
         where: { organizationId },
-        select: { id: true, code: true, name: true, type: true },
+        select: { id: true, code: true, name: true, nameAr: true, nameEn: true, type: true },
         orderBy: { code: 'asc' },
       }),
       sumPostedLinesByAccount(this.prisma, organizationId, { lte: asOf }),
@@ -597,6 +601,9 @@ export class FinancialReportsService {
         accountId: account.id,
         code: account.code,
         name: account.name,
+        // Both languages ride along; the response is localized on the way out.
+        nameAr: account.nameAr,
+        nameEn: account.nameEn,
         type: account.type,
         debit: money(debit),
         credit: money(credit),
@@ -625,7 +632,7 @@ export class FinancialReportsService {
   ): Promise<GeneralLedgerReport> {
     const account = await this.prisma.account.findFirst({
       where: { id: accountId, organizationId },
-      select: { id: true, code: true, name: true, type: true },
+      select: { id: true, code: true, name: true, nameAr: true, nameEn: true, type: true },
     });
     if (!account) throw new NotFoundException('Account not found');
 
@@ -716,6 +723,9 @@ export class FinancialReportsService {
         id: account.id,
         code: account.code,
         name: account.name,
+        // Both languages ride along; the response is localized on the way out.
+        nameAr: account.nameAr,
+        nameEn: account.nameEn,
         type: account.type,
         balance: money(value),
       },

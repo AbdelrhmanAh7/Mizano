@@ -325,7 +325,8 @@ export default function AccountSettingsPage() {
                     <SelectItem value="__none__">{t('accountSettings.notSet')}</SelectItem>
                     {assetAccounts
                       .filter(
-                        (a) => a.name.toLowerCase().includes('bank') || a.code.startsWith('1001'),
+                        (a) =>
+                          /bank/i.test(`${a.name} ${a.nameEn ?? ''}`) || a.code.startsWith('1001'),
                       )
                       .map((account) => (
                         <SelectItem key={account.id} value={account.id}>
@@ -356,7 +357,8 @@ export default function AccountSettingsPage() {
                     <SelectItem value="__none__">{t('accountSettings.notSet')}</SelectItem>
                     {assetAccounts
                       .filter(
-                        (a) => a.name.toLowerCase().includes('cash') || a.code.startsWith('1000'),
+                        (a) =>
+                          /cash/i.test(`${a.name} ${a.nameEn ?? ''}`) || a.code.startsWith('1000'),
                       )
                       .map((account) => (
                         <SelectItem key={account.id} value={account.id}>

@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateRoleDto, UpdateRoleDto, AssignRoleDto } from './dto';
 import { DEFAULT_ROLES } from './constants/default-roles.constant';
+import { renameFields, systemName } from '../../common/i18n/localize';
 
 interface PaginationParams {
   page?: number;
@@ -71,6 +72,7 @@ export class RolesService {
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
+        { nameAr: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
       ];
     }
@@ -168,7 +170,8 @@ export class RolesService {
       return tx.role.update({
         where: { id },
         data: {
-          name: updateRoleDto.name,
+          // The edit form shows the localized name: saving it back keeps 'Admin' as 'Admin'.
+          ...renameFields(existingRole, updateRoleDto.name),
           description: updateRoleDto.description,
         },
         include: {
@@ -236,7 +239,7 @@ export class RolesService {
       // Create new role with permissions
       const role = await this.prisma.role.create({
         data: {
-          name: roleData.name,
+          ...systemName(roleData.name),
           description: roleData.description,
           isDefault: roleData.isDefault || false,
           organizationId,

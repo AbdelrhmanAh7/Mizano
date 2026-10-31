@@ -140,8 +140,8 @@ export function PaymentReceivedForm({
     return assetAccounts.filter(
       (acc: Account) =>
         acc.isActive &&
-        (acc.name.toLowerCase().includes('bank') ||
-          acc.name.toLowerCase().includes('cash') ||
+        // Seeded names come back in the UI language; their English stays in `nameEn`.
+        (/bank|cash/i.test(`${acc.name} ${acc.nameEn ?? ''}`) ||
           acc.code.startsWith('1000') ||
           acc.code.startsWith('1001') ||
           acc.code.startsWith('1002')),
