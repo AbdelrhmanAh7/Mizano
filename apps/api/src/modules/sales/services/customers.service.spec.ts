@@ -44,6 +44,22 @@ describe('CustomersService', () => {
     expect(outbox.customerCreated).toHaveBeenCalledWith(prisma, ORG_ID, { id: 'cust-1' });
   });
 
+  it("refuses another organization's price list on create and update", async () => {
+    prisma.priceList.findFirst.mockResolvedValue(null as never);
+    await expect(
+      service.create(ORG_ID, { name: 'Nile Co', priceListId: 'foreign-pl' }),
+    ).rejects.toThrow('Price list not found');
+    await expect(service.update(ORG_ID, 'cust-1', { priceListId: 'foreign-pl' })).rejects.toThrow(
+      'Price list not found',
+    );
+    expect(prisma.priceList.findFirst).toHaveBeenCalledWith({
+      where: { id: 'foreign-pl', organizationId: ORG_ID },
+      select: { id: true },
+    });
+    expect(prisma.customer.create).not.toHaveBeenCalled();
+    expect(prisma.customer.update).not.toHaveBeenCalled();
+  });
+
   it('keeps an explicitly chosen currency', async () => {
     await service.create(ORG_ID, { name: 'Gulf Co', currency: 'SAR' });
     expect(createdData().currency).toBe('SAR');
