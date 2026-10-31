@@ -141,6 +141,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## Ops and deploy
 
+- **Test the actual archive producer on the host OS.** macOS tar adds AppleDouble entries unless `COPYFILE_DISABLE=1`; omit that OS metadata before packaging backups instead of weakening archive traversal or manifest checks. _(#590)_
+
 - **A public-address fallback must not silently turn OAuth on over HTTP in production.** Require HTTPS for automatic MCP fallback; legacy REST addresses may lack TLS or be relative. An unusable automatic fallback disables the integration instead of failing API requests. Route root MCP/OAuth paths to the API on shared-host proxies. _(#600)_
 
 - **Migrate with the incoming image before replacing application containers.** A migration failure must stop deployment; never hide `prisma migrate deploy` behind `|| true`. Keep migrations backward compatible with the running release. _(#600)_

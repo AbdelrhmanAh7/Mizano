@@ -5,7 +5,8 @@ set -euo pipefail
 
 PI_DIR="${PI_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 ENV_FILE="${ENV_FILE:-$PI_DIR/.env.pi}"
-COMPOSE_FILE="$PI_DIR/docker-compose.pi.yml"
+COMPOSE_FILE="${COMPOSE_FILE:-$PI_DIR/docker-compose.pi.yml}"
+export COMPOSE_FILE ENV_FILE
 
 if [ ! -f "$ENV_FILE" ]; then
   echo "missing env file: $ENV_FILE" >&2
@@ -20,6 +21,29 @@ export DATA_DIR="${MIZANO_DATA_DIR:-/mnt/ssd/mizano}"
 
 dc() {
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
+}
+
+# Only a private password file is accepted; an inherited password must not override it.
+require_restic() {
+  if [ -z "${RESTIC_REPOSITORY:-}" ] || [ -z "${RESTIC_PASSWORD_FILE:-}" ]; then
+    echo "set RESTIC_REPOSITORY and RESTIC_PASSWORD_FILE" >&2
+    return 1
+  fi
+  command -v restic >/dev/null || { echo "restic not installed" >&2; return 1; }
+  local features
+  features="$(restic backup --help)" || return 1
+  [[ "$features" == *--stdin-from-command* ]] || { echo "restic needs stdin-from-command support" >&2; return 1; }
+  unset RESTIC_PASSWORD RESTIC_PASSWORD_COMMAND
+  python3 - "$RESTIC_PASSWORD_FILE" <<'PYTHON'
+import pathlib, stat, sys
+try:
+    key = pathlib.Path(sys.argv[1])
+    if not key.is_absolute() or not key.is_file() or stat.S_IMODE(key.stat().st_mode) & 0o077:
+        raise ValueError()
+except Exception:
+    print('restic password must be an absolute private file (mode 600 or 400)', file=sys.stderr)
+    sys.exit(1)
+PYTHON
 }
 
 log() {

@@ -8,7 +8,7 @@ Memory budget (8GB): postgres 1.5G, redis 256M, api 1G, web 512M, cloudflared 12
 
 1. Flash Raspberry Pi OS Lite 64-bit, enable SSH with a key, disable password login, run `sudo apt update && sudo apt full-upgrade`.
 2. Install Docker Engine and the compose plugin from Docker's apt repository. Add your user to the `docker` group.
-3. Install `age` (`sudo apt install age`) and `curl`.
+3. Install `restic`, `python3`, and `curl` (`sudo apt install restic python3 curl`). Use a restic build with `--stdin-from-command` support (checked by the scripts); the local drill uses 0.19.1. Keep `age` only if you need to read legacy backups.
 4. Mount the SSD at `/mnt/ssd` (ext4, `UUID=... /mnt/ssd ext4 defaults,noatime 0 2` in `/etc/fstab`), then:
    `sudo mkdir -p /mnt/ssd/mizano/{postgres,redis,originals,backups,monitor}`.
 5. Use an official Pi power supply and active cooling; the health check alerts on undervoltage and throttling.
@@ -90,17 +90,81 @@ This repository change does not run a deployment.
 
 ## 5. Backups and restore drill
 
+`backup.sh` uses PostgreSQL's custom-format `pg_dump` and restic's encrypted, deduplicated
+repository. One snapshot contains the dump, original files, and a checksum/accounting manifest.
+An exported repeatable-read snapshot binds the dump and per-organization counts to the same
+point in time while the app writes. Originals are immutable; a missing or changed original
+fails the backup. New uploads after that database snapshot may be copied too.
+
+1. Set `RESTIC_REPOSITORY` to your backup disk or existing off-machine restic repository.
+   A repository on the application's SSD alone does not protect against loss of that SSD.
+2. Put a strong repository password in your password manager, then provision its runtime copy
+   at `RESTIC_PASSWORD_FILE` (absolute path, mode 0600 or 0400, outside Git). Never put the
+   password itself in `.env.pi`, Git, terminal history, logs or this runbook. Keep remote-repository
+   access credentials and the application's sealing key (`INTEGRATIONS_ENCRYPTION_KEY`) recoverable too.
+3. Set stable `BACKUP_SET` and `BACKUP_HOST` labels for this installation. The host defaults
+   to the current hostname; on another recovery machine, set it to the source host's label.
+   Retention and snapshot selection filter by both host and application/set tags.
+4. Initialize the new repository **once**, using those settings, then test a backup and drill:
+
+```bash
+set -a
+. deploy/pi/.env.pi
+set +a
+restic init
+# After first initialization, use the scripts; do not re-initialize for each run.
+deploy/pi/scripts/backup.sh
+deploy/pi/scripts/restore-drill.sh
+```
+
+The drill always creates a fresh Postgres container with no network or published ports,
+restores originals into a private temporary directory, verifies dump/file hashes and each
+intake file's stored SHA-256, compares counts per organization in 13 critical table groups,
+and checks posted journal/organization balance, account tenancy, draft existence, and posted
+intake document → journal links. It never accepts an existing target database URL. All scratch
+containers and plaintext staging are removed on success or failure. Source data is read-only.
+A restored source that already has broken/unverifiable posting links or unbalanced journals
+fails the drill; the backup preserves source data as it was.
+
+After the initial successful drill, install nightly backups (02:30 Africa/Cairo) and health checks:
+
 ```bash
 sudo cp deploy/pi/systemd/*.{service,timer} /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now mizano-backup.timer mizano-healthcheck.timer
 ```
 
-The units assume the repo at `/opt/mizano`; edit `ExecStart` otherwise, and ensure the user running them can use Docker (they run as root by default).
+Run a drill monthly and before release. Proposed targets: **RPO ≤ 24 hours**, **RTO ≤ 4 hours**.
+These require the operator's actual schedule, off-machine repository and representative data;
+the [local synthetic drill evidence](../../docs/evidence/first-client-ops/restore-drill.md)
+does not establish live Pi/server recovery performance. Redis, host setup and runtime secrets
+are separate recovery inputs. Existing `.age` backups are retained, not converted or deleted;
+restore them with the [previous age runbook](https://github.com/AbdelrhmanAh7/Mizano/blob/a3f1630d05e20c8b149db2ea2e57f384a91cec4b/deploy/pi/README.md#5-backups-and-restore-drill) and its offline identity when necessary.
 
-- Generate a key pair on your own machine: `age-keygen -o mizano-backup.key`. Put only the public key in `BACKUP_AGE_RECIPIENT`. Store the private key offline (password manager); the Pi must not hold it.
-- `backup.sh` runs nightly at 02:30 Africa/Cairo: encrypted `pg_dump` (custom format) and a tar of `originals/` in `$MIZANO_DATA_DIR/backups`, retention `BACKUP_RETENTION_DAYS`, status in `backup.status`. Copy the folder off the Pi as well (a backup on the same SSD is not a disaster backup).
-- Run a drill monthly and before every demo: `AGE_IDENTITY_FILE=/path/mizano-backup.key deploy/pi/scripts/restore-drill.sh`. It restores the latest dump into a scratch Postgres container, then checks that tables exist and journal debits equal credits.
+### Server compose
+
+Use the same scripts with explicit paths and a private env file containing the restic settings:
+
+```bash
+ENV_FILE=/opt/mizano/.env COMPOSE_FILE=/opt/mizano/docker-compose.production.yml \
+  BACKUP_ORIGINALS_CONTAINER_PATH=/app/apps/api/storage/intake \
+  deploy/pi/scripts/backup.sh
+ENV_FILE=/opt/mizano/.env COMPOSE_FILE=/opt/mizano/docker-compose.production.yml \
+  deploy/pi/scripts/restore-drill.sh
+```
+
+Set `MIZANO_DATA_DIR` to a private host directory for backup status/staging. If the API uses
+an explicit `INTAKE_STORAGE_DIR`, use that container path, or set `BACKUP_ORIGINALS_DIR` for
+its host bind mount. `docker compose cp` reuses Docker's file-copy support for the server's
+container path. This change does not move or deploy production files. The operator must set
+up persistent original storage before replacing a container that holds the only originals.
+
+Developer regression gates (run through the shared `heavy.sh` on the owner's Mac):
+
+```bash
+deploy/pi/scripts/test-backup-restore.sh  # offline checks + shellcheck
+deploy/pi/scripts/test-restore-drill.sh   # full migrated disposable DB, real restic backup/restore
+```
 
 ## 6. Monitoring
 
