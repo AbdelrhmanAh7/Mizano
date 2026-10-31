@@ -14,5 +14,5 @@ export default function TaxError({
     console.error('Tax module error:', error.message);
   }, [error]);
 
-  return <ErrorState error={error} title="Tax Error" onRetry={reset} />;
+  return <ErrorState error={error} onRetry={reset} />;
 }

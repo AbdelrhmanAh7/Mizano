@@ -14,5 +14,5 @@ export default function ReportsError({
     console.error('Reports module error:', error.message);
   }, [error]);
 
-  return <ErrorState error={error} title="Reports Error" onRetry={reset} />;
+  return <ErrorState error={error} onRetry={reset} />;
 }

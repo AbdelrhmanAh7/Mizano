@@ -14,5 +14,5 @@ export default function CrmError({
     console.error('CRM module error:', error.message);
   }, [error]);
 
-  return <ErrorState error={error} title="CRM Error" onRetry={reset} />;
+  return <ErrorState error={error} onRetry={reset} />;
 }

@@ -14,5 +14,5 @@ export default function ProjectsError({
     console.error('Projects module error:', error.message);
   }, [error]);
 
-  return <ErrorState error={error} title="Projects Error" onRetry={reset} />;
+  return <ErrorState error={error} onRetry={reset} />;
 }

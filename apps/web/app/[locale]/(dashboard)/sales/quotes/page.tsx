@@ -103,22 +103,24 @@ function QuotesPageContent() {
   const [bulkDeclineOpen, setBulkDeclineOpen] = useState(false);
   const [bulkSelectedRows, setBulkSelectedRows] = useState<Quote[]>([]);
 
+  const tBulk = useTranslations('common.bulk');
+
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => quotesApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['quotes']],
-    successMessage: '{count} draft quotes deleted',
+    successMessage: tBulk.raw('quotesDeleted'),
   });
 
   const bulkSendAction = useBulkAction({
     mutationFn: (ids) => quotesApi.bulkSend(ids).then((r) => r.data),
     queryKeys: [['quotes']],
-    successMessage: '{count} quotes sent',
+    successMessage: tBulk.raw('quotesSent'),
   });
 
   const bulkDeclineAction = useBulkAction({
     mutationFn: (ids) => quotesApi.bulkDecline(ids).then((r) => r.data),
     queryKeys: [['quotes']],
-    successMessage: '{count} quotes declined',
+    successMessage: tBulk.raw('quotesDeclined'),
   });
 
   const bulkActions = [

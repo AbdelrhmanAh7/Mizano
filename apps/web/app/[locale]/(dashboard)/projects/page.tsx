@@ -84,34 +84,36 @@ function ProjectsPageContent() {
   const [bulkCancelOpen, setBulkCancelOpen] = useState(false);
   const [bulkSelectedRows, setBulkSelectedRows] = useState<Project[]>([]);
 
+  const tBulk = useTranslations('common.bulk');
+
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => projectsApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['projects']],
-    successMessage: '{count} projects deleted',
+    successMessage: tBulk.raw('projectsDeleted'),
   });
 
   const bulkActivateAction = useBulkAction({
     mutationFn: (ids) => projectsApi.bulkActivate(ids).then((r) => r.data),
     queryKeys: [['projects']],
-    successMessage: '{count} projects activated',
+    successMessage: tBulk.raw('projectsActivated'),
   });
 
   const bulkCompleteAction = useBulkAction({
     mutationFn: (ids) => projectsApi.bulkComplete(ids).then((r) => r.data),
     queryKeys: [['projects']],
-    successMessage: '{count} projects completed',
+    successMessage: tBulk.raw('projectsCompleted'),
   });
 
   const bulkHoldAction = useBulkAction({
     mutationFn: (ids) => projectsApi.bulkHold(ids).then((r) => r.data),
     queryKeys: [['projects']],
-    successMessage: '{count} projects put on hold',
+    successMessage: tBulk.raw('projectsOnHold'),
   });
 
   const bulkCancelAction = useBulkAction({
     mutationFn: (ids) => projectsApi.bulkCancel(ids).then((r) => r.data),
     queryKeys: [['projects']],
-    successMessage: '{count} projects cancelled',
+    successMessage: tBulk.raw('projectsCancelled'),
   });
 
   const bulkActions = [

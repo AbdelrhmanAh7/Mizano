@@ -74,10 +74,12 @@ function PaymentsMadePageContent() {
   });
   const canDelete = hasPermission('purchases.delete');
 
+  const tBulk = useTranslations('common.bulk');
+
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => paymentsMadeApi.bulkVoid(ids).then((r) => r.data),
     queryKeys: LEDGER_QUERY_KEYS,
-    successMessage: '{count} payments voided',
+    successMessage: tBulk.raw('paymentsVoided'),
   });
 
   const bulkActions = [

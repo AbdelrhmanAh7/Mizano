@@ -14,5 +14,5 @@ export default function InventoryError({
     console.error('Inventory module error:', error.message);
   }, [error]);
 
-  return <ErrorState error={error} title="Inventory Error" onRetry={reset} />;
+  return <ErrorState error={error} onRetry={reset} />;
 }

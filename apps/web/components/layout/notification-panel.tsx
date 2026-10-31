@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { Bell, CheckCheck, AlertTriangle, Info, TrendingUp, FileText } from 'lucide-react';
@@ -12,6 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { notificationsApi } from '@/lib/api';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 interface Notification {
   id: string;
@@ -61,6 +62,8 @@ function getEntityLink(entityType?: string, entityId?: string): string | null {
 
 export function NotificationPanel() {
   const locale = useLocale();
+  const t = useTranslations('common.notificationPanel');
+  const dateLocale = useDateFnsLocale();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -119,11 +122,11 @@ export function NotificationPanel() {
 
     let group: string;
     if (date.toDateString() === today.toDateString()) {
-      group = 'Today';
+      group = t('today');
     } else if (date.toDateString() === yesterday.toDateString()) {
-      group = 'Yesterday';
+      group = t('yesterday');
     } else {
-      group = 'Earlier';
+      group = t('earlier');
     }
     if (!acc[group]) acc[group] = [];
     acc[group].push(n);
@@ -133,7 +136,7 @@ export function NotificationPanel() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
+        <Button variant="ghost" size="icon" className="relative" aria-label={t('title')}>
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <span className="absolute -top-1 -end-1 h-4 w-4 rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground flex items-center justify-center">
@@ -144,7 +147,7 @@ export function NotificationPanel() {
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="end" sideOffset={8}>
         <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h3 className="font-semibold text-sm">Notifications</h3>
+          <h3 className="font-semibold text-sm">{t('title')}</h3>
           {unreadCount > 0 && (
             <Button
               variant="ghost"
@@ -153,7 +156,7 @@ export function NotificationPanel() {
               onClick={() => markAllAsRead.mutate()}
             >
               <CheckCheck className="h-3 w-3 me-1" />
-              Mark all read
+              {t('markAllRead')}
             </Button>
           )}
         </div>
@@ -174,7 +177,7 @@ export function NotificationPanel() {
           ) : notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full py-12 text-muted-foreground">
               <Bell className="h-8 w-8 mb-2 opacity-40" />
-              <p className="text-sm">No notifications yet</p>
+              <p className="text-sm">{t('empty')}</p>
             </div>
           ) : (
             <div>
@@ -219,6 +222,7 @@ export function NotificationPanel() {
                           <p className="text-[10px] text-muted-foreground mt-1">
                             {formatDistanceToNow(new Date(notification.createdAt), {
                               addSuffix: true,
+                              locale: dateLocale,
                             })}
                           </p>
                         </div>

@@ -1,3 +1,12 @@
+jest.mock('next-intl', () => ({
+  useTranslations: () =>
+    Object.assign(
+      (key: string, values?: Record<string, unknown>) =>
+        values ? `${key} ${JSON.stringify(values)}` : key,
+      { raw: (key: string) => key },
+    ),
+}));
+
 import { readBulkOutcome } from './use-bulk-action';
 
 describe('readBulkOutcome', () => {

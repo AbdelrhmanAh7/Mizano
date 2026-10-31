@@ -14,5 +14,5 @@ export default function SalesError({
     console.error('Sales module error:', error.message);
   }, [error]);
 
-  return <ErrorState error={error} title="Sales Error" onRetry={reset} />;
+  return <ErrorState error={error} onRetry={reset} />;
 }

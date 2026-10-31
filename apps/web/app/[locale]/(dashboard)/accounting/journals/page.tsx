@@ -80,16 +80,18 @@ function JournalsPageContent() {
   const [bulkPostOpen, setBulkPostOpen] = useState(false);
   const [bulkSelectedRows, setBulkSelectedRows] = useState<Journal[]>([]);
 
+  const tBulk = useTranslations('common.bulk');
+
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => journalsApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: LEDGER_QUERY_KEYS,
-    successMessage: '{count} unposted journals deleted',
+    successMessage: tBulk.raw('journalsDeleted'),
   });
 
   const bulkPostAction = useBulkAction({
     mutationFn: (ids) => journalsApi.bulkPost(ids).then((r) => r.data),
     queryKeys: LEDGER_QUERY_KEYS,
-    successMessage: '{count} journals posted',
+    successMessage: tBulk.raw('journalsPosted'),
   });
 
   const {

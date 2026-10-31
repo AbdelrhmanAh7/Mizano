@@ -132,16 +132,18 @@ function VATReturnsPageContent() {
   const [bulkSubmitOpen, setBulkSubmitOpen] = useState(false);
   const [bulkSelectedRows, setBulkSelectedRows] = useState<VATReturn[]>([]);
 
+  const tBulk = useTranslations('common.bulk');
+
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => vatReturnsApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['vat-returns']],
-    successMessage: '{count} VAT returns deleted',
+    successMessage: tBulk.raw('vatReturnsDeleted'),
   });
 
   const bulkSubmitAction = useBulkAction({
     mutationFn: (ids) => vatReturnsApi.bulkSubmit(ids).then((r) => r.data),
     queryKeys: [['vat-returns']],
-    successMessage: '{count} VAT returns submitted',
+    successMessage: tBulk.raw('vatReturnsSubmitted'),
   });
 
   const bulkActions = [

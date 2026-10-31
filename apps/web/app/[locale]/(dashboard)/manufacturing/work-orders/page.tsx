@@ -76,28 +76,30 @@ function WorkOrdersPageContent() {
   const [bulkCancelOpen, setBulkCancelOpen] = useState(false);
   const [bulkSelectedRows, setBulkSelectedRows] = useState<WorkOrder[]>([]);
 
+  const tBulk = useTranslations('common.bulk');
+
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => workOrdersApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['work-orders']],
-    successMessage: '{count} work orders deleted',
+    successMessage: tBulk.raw('workOrdersDeleted'),
   });
 
   const bulkStartAction = useBulkAction({
     mutationFn: (ids) => workOrdersApi.bulkStart(ids).then((r) => r.data),
     queryKeys: [['work-orders']],
-    successMessage: '{count} work orders started',
+    successMessage: tBulk.raw('workOrdersStarted'),
   });
 
   const bulkCompleteAction = useBulkAction({
     mutationFn: (ids) => workOrdersApi.bulkComplete(ids).then((r) => r.data),
     queryKeys: [['work-orders']],
-    successMessage: '{count} work orders completed',
+    successMessage: tBulk.raw('workOrdersCompleted'),
   });
 
   const bulkCancelAction = useBulkAction({
     mutationFn: (ids) => workOrdersApi.bulkCancel(ids).then((r) => r.data),
     queryKeys: [['work-orders']],
-    successMessage: '{count} work orders cancelled',
+    successMessage: tBulk.raw('workOrdersCancelled'),
   });
 
   const bulkActions = [
