@@ -34,6 +34,11 @@ export interface FieldMessageEntry {
 /** Generic messages per status, used when a thrown message has no entry of its own. */
 export const GENERIC_ERRORS: ErrorCatalogEntry[] = [
   {
+    code: 'EXTERNAL_EINVOICE_REFERENCE_EXISTS',
+    en: 'This ETA reference is already used in this organization',
+    ar: 'مرجع الفاتورة الإلكترونية مستخدم بالفعل في هذه المنشأة.',
+  },
+  {
     code: 'BAD_REQUEST',
     en: 'The request is not valid',
     ar: 'الطلب غير صالح. راجِع البيانات المدخلة وحاول مرة أخرى.',

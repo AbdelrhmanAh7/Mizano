@@ -13,6 +13,7 @@ export type CreditNoteType = 'REFUND' | 'APPLY_TO_INVOICE';
 export interface CreditNote {
   id: string;
   creditNoteNumber: string;
+  externalEInvoiceNumber?: string | null;
   customerId: string;
   customer?: {
     id: string;

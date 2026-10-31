@@ -136,6 +136,7 @@ export class InvoicesService {
       where.OR = [
         { invoiceNumber: { contains: search, mode: 'insensitive' } },
         { reference: { contains: search, mode: 'insensitive' } },
+        { externalEInvoiceNumber: { contains: search, mode: 'insensitive' } },
         { customer: { name: { contains: search, mode: 'insensitive' } } },
       ];
     }
@@ -198,6 +199,7 @@ export class InvoicesService {
       where.OR = [
         { invoiceNumber: { contains: search, mode: 'insensitive' } },
         { reference: { contains: search, mode: 'insensitive' } },
+        { externalEInvoiceNumber: { contains: search, mode: 'insensitive' } },
         { customer: { name: { contains: search, mode: 'insensitive' } } },
       ];
     }

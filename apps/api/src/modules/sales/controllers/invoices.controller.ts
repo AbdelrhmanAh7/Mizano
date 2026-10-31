@@ -15,11 +15,14 @@ import {
   CacheResponse,
   CacheTTL,
   CurrentOrg,
+  CurrentUser,
   HttpCache,
   InvalidateCache,
   InvalidatesLedger,
   Permissions,
 } from '../../../common/decorators';
+import { ExternalEInvoiceReferenceDto } from '../dto/external-einvoice-reference.dto';
+import { ExternalEInvoiceReferencesService } from '../services/external-einvoice-references.service';
 import { BulkIdsDto } from '../../../common/dto/bulk-ids.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -42,6 +45,7 @@ export class InvoicesController {
   constructor(
     private readonly invoicesService: InvoicesService,
     private readonly paymentsReceivedService: PaymentsReceivedService,
+    private readonly externalReferences: ExternalEInvoiceReferencesService,
   ) {}
 
   @Post()
@@ -111,6 +115,19 @@ export class InvoicesController {
   })
   taxRateOptions(@CurrentOrg() orgId: string) {
     return this.invoicesService.taxRateOptions(orgId);
+  }
+
+  @Patch(':id/external-einvoice-reference')
+  @Permissions('sales.edit')
+  @InvalidateCache('invoices:*')
+  @ApiOperation({ summary: 'Record the external ETA reference without changing financial values' })
+  updateExternalReference(
+    @CurrentOrg() orgId: string,
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+    @Body() dto: ExternalEInvoiceReferenceDto,
+  ) {
+    return this.externalReferences.update(orgId, userId, 'invoice', id, dto.externalEInvoiceNumber);
   }
 
   @Get(':id')

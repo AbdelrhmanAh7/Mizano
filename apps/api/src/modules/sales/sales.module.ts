@@ -1,3 +1,4 @@
+import { ExternalEInvoiceReferencesService } from './services/external-einvoice-references.service';
 import { Module } from '@nestjs/common';
 import { CustomersController } from './controllers/customers.controller';
 import { QuotesController } from './controllers/quotes.controller';
@@ -25,6 +26,7 @@ import { AccountingModule } from '../accounting/accounting.module';
     DeliveryChallansController,
   ],
   providers: [
+    ExternalEInvoiceReferencesService,
     AgingReportsService,
     CustomersService,
     QuotesService,

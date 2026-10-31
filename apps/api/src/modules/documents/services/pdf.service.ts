@@ -101,6 +101,7 @@ export class PdfService implements OnModuleDestroy {
       notes: invoice.notes || undefined,
       terms: invoice.terms || undefined,
       reference: invoice.reference || undefined,
+      externalEInvoiceNumber: invoice.externalEInvoiceNumber || undefined,
     };
 
     const html = generateInvoiceHtml(org, invoiceData, locale);

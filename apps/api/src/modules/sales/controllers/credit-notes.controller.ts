@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -15,10 +16,13 @@ import {
   CacheResponse,
   CacheTTL,
   CurrentOrg,
+  CurrentUser,
   InvalidateCache,
   InvalidatesLedger,
   Permissions,
 } from '../../../common/decorators';
+import { ExternalEInvoiceReferenceDto } from '../dto/external-einvoice-reference.dto';
+import { ExternalEInvoiceReferencesService } from '../services/external-einvoice-references.service';
 import { BulkIdsDto } from '../../../common/dto/bulk-ids.dto';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -36,7 +40,10 @@ import { CreditNotesService } from '../services/credit-notes.service';
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @UseInterceptors(CacheInvalidationInterceptor)
 export class CreditNotesController {
-  constructor(private readonly creditNotesService: CreditNotesService) {}
+  constructor(
+    private readonly creditNotesService: CreditNotesService,
+    private readonly externalReferences: ExternalEInvoiceReferencesService,
+  ) {}
 
   @Post()
   @Permissions('sales.create')
@@ -78,6 +85,25 @@ export class CreditNotesController {
   @ApiOperation({ summary: 'Bulk void credit notes (restores balances, reverses journals)' })
   bulkDelete(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.creditNotesService.bulkDelete(orgId, dto.ids);
+  }
+
+  @Patch(':id/external-einvoice-reference')
+  @Permissions('sales.edit')
+  @InvalidateCache('credit-notes:*')
+  @ApiOperation({ summary: 'Record the external ETA reference without changing financial values' })
+  updateExternalReference(
+    @CurrentOrg() orgId: string,
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+    @Body() dto: ExternalEInvoiceReferenceDto,
+  ) {
+    return this.externalReferences.update(
+      orgId,
+      userId,
+      'creditNote',
+      id,
+      dto.externalEInvoiceNumber,
+    );
   }
 
   @Get(':id')

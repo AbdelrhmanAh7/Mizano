@@ -700,5 +700,15 @@
     "recentQuotes": "Recent Quotes",
     "noQuotesYet": "No quotes yet",
     "noCreditNotesYet": "No credit notes yet"
+  },
+  "externalEInvoice": {
+    "title": "External e-invoice reference",
+    "label": "ETA number / UUID",
+    "help": "From your authorized ETA issuer, for matching your records.",
+    "empty": "No ETA reference recorded",
+    "save": "Save reference",
+    "saving": "Saving…",
+    "saved": "Reference saved",
+    "error": "Could not save. Check that this reference is not already used, then try again."
   }
 }
