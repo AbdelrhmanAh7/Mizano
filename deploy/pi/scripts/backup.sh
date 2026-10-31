@@ -29,10 +29,10 @@ backup_host="${BACKUP_HOST:-$(hostname)}"
 python3 "$here/backup-manifest.py" create "$work" || fail "snapshot or originals verification"
 # restic checks tar's exit code before committing a snapshot; no partial piped archive can win.
 COPYFILE_DISABLE=1 restic backup --host "$backup_host" --json --stdin-from-command --stdin-filename mizano.tar --tag mizano --tag "$set_name" \
-  -- tar -C "$work" -cf - db.dump originals manifest.json >"$work/restic.json" 2>"$work/restic.log" || fail "restic snapshot"
+  -- tar -C "$work" -cf - db.dump originals manifest.json >"$work/restic.json" 2>/dev/null || fail "restic snapshot"
 snapshot="$(python3 -c 'import json,sys; rows=[json.loads(s) for s in open(sys.argv[1])]; print(next(r["snapshot_id"] for r in rows if r.get("message_type")=="summary"))' "$work/restic.json")" || fail "snapshot identifier"
 [[ "$snapshot" =~ ^[0-9a-f]{8,64}$ ]] || fail "snapshot identifier"
 # Retention is scoped to this application's stable backup-set tag; legacy age files are untouched.
-restic forget --host "$backup_host" --tag "mizano,$set_name" --keep-within "${retention}d" --prune >"$work/retention.log" 2>&1 || fail "retention"
+restic forget --host "$backup_host" --tag "mizano,$set_name" --keep-within "${retention}d" --prune >/dev/null 2>&1 || fail "retention"
 printf 'OK %s snapshot=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$snapshot" >"$status"
 log "backup OK snapshot=$snapshot"

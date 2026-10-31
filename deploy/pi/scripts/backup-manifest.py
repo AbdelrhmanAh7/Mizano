@@ -78,7 +78,8 @@ def create(work):
     user = os.environ.get('POSTGRES_USER', 'mizano')
     database = os.environ.get('POSTGRES_DB', 'mizano_db')
     prefix = compose() + ['exec', '-T', 'postgres']
-    with (work / 'private.log').open('w') as errors:
+    # Database/tool errors may contain document values: discard raw diagnostics.
+    with open(os.devnull, 'w') as errors:
         # Keep the exporting transaction open until BOTH dump and accounting manifest exist.
         session = subprocess.Popen(prefix + ['psql', '-XqAt', '-v', 'ON_ERROR_STOP=1', '-U', user, '-d', database],
                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=errors, text=True)
