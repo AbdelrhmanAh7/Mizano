@@ -2,7 +2,7 @@
 
 Issue: [#590](https://github.com/AbdelrhmanAh7/Mizano/issues/590). Date: **1 November 2026**, Africa/Cairo.
 
-Tested Code Head: `d3fe16a9ea99f60a95fc87eea63eedf5c902ea9e`.
+Tested Code Head: `77b03e9a11aafc264ab4c8754baf2f4623eab230`.
 This identifies the exact scripts/fixture commit tested below (the last code commit; later commits,
 if any, change this document only). This evidence document was added after the run; no live deployment or Pi/server restore is claimed. Final PR-head checks and
 independent review are recorded in the PR.
@@ -19,7 +19,7 @@ postgres@sha256:1beaa3084eee2676f20a9cd9928f0bf2c5bf674f8e49f81017912183d377c61c
 
 The fixture is synthetic database data, not an accountant-journey or extraction-accuracy test:
 2 organizations, 4 immutable originals, 2 balanced posted bill journals and 4 intake → document
-links (2 posted bills and 2 unposted draft invoices). Currency is explicitly EGP and matches
+links (2 posted bills, 1 unposted draft invoice and 1 invoice voided as a draft, which has no journal). Currency is explicitly EGP and matches
 each organization's base currency. No real customer documents or credentials were used.
 
 The source database ran in a unique temporary Compose project on loopback. After the encrypted
@@ -45,9 +45,10 @@ bash deploy/pi/scripts/test-restore-drill.sh
 ```
 
 - Shell syntax and ShellCheck: passed, no findings.
-- Offline regressions: **7 passed**. They cover dump/original hash mismatches, tenant-prefixed
+- Offline regressions: **8 passed**. They cover dump/original hash mismatches, tenant-prefixed
   storage keys, archive traversal/symlinks, a real host-tar round trip, count/ledger failures,
-  and failed-backup status/plaintext-staging cleanup.
+  failed-backup status/plaintext-staging cleanup, and a fresh server with no intake folder yet
+  (empty backup only when the database lists no originals).
 - Real custom-format dump + encrypted restic backup: passed.
 - `restic check --read-data`: passed.
 - Isolated restore, file hashes and per-organization counts: passed.
@@ -64,13 +65,13 @@ bash deploy/pi/scripts/test-restore-drill.sh
 Metadata-only output from the exact-code run:
 
 ```text
-2026-10-31T23:02:27Z backup OK snapshot=c3bcafb236c08525798483ee4103353c0ab1102fb5d271be6dd9a53e38bc491b
+2026-10-31T23:27:06Z backup OK snapshot=02e20a8d5203e38bd1618762c2ef1172620d8f8d73abb4e341646126c34977d3
 fixture organizations=2 originals=4 journals=2 linked_drafts=4 source_database_stopped=1
-2026-10-31T23:02:29Z restore stage=verify-files
-2026-10-31T23:02:31Z restore stage=database
-2026-10-31T23:02:31Z restore stage=verify-ledger-links
+2026-10-31T23:27:10Z restore stage=verify-files
+2026-10-31T23:27:11Z restore stage=database
+2026-10-31T23:27:12Z restore stage=verify-ledger-links
 organizations=2 originals=4 linked_drafts=4 checks=all-zero
-2026-10-31T23:02:32Z restore drill OK snapshot=c3bcafb236c08525798483ee4103353c0ab1102fb5d271be6dd9a53e38bc491b elapsed_seconds=4
+2026-10-31T23:27:12Z restore drill OK snapshot=02e20a8d5203e38bd1618762c2ef1172620d8f8d73abb4e341646126c34977d3 elapsed_seconds=4
 incomplete_approval_negative_check=passed
 restic_check_read_data=passed source_project_cleanup=passed
 ```
