@@ -22,25 +22,19 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import { ArrowLeft, Calendar, Lock, Save } from 'lucide-react';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { useDateFormatter } from '@/lib/hooks/use-date-locale';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
-const MONTHS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
+/** Month names in the page language, Western digits (fiscal year start). */
+function monthNames(locale: string): string[] {
+  const formatter = new Intl.DateTimeFormat(locale === 'ar' ? 'ar-u-nu-latn' : 'en-US', {
+    month: 'long',
+  });
+  return Array.from({ length: 12 }, (_, month) => formatter.format(new Date(2026, month, 1)));
+}
 
 const schema = z.object({
   fiscalYearStartMonth: z.coerce.number().min(1).max(12),
@@ -51,6 +45,8 @@ type FormData = z.infer<typeof schema>;
 
 export default function FinancialSettingsPage() {
   const t = useTranslations('settings');
+  const locale = useLocale();
+  const formatLongDate = useDateFormatter('long');
   const { data: settings, isLoading } = useAllOrganizationSettings();
   const updateFinancial = useUpdateFinancialSettings();
   const updateLockDate = useUpdateLockDate();
@@ -142,7 +138,7 @@ export default function FinancialSettingsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {MONTHS.map((month, i) => (
+                    {monthNames(locale).map((month, i) => (
                       <SelectItem key={i + 1} value={String(i + 1)}>
                         {month}
                       </SelectItem>
@@ -185,7 +181,7 @@ export default function FinancialSettingsPage() {
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary" className="text-sm">
                       {t('financial.lockedThrough', {
-                        date: format(new Date(settings.financial.lockDate), 'MMMM d, yyyy'),
+                        date: formatLongDate(settings.financial.lockDate),
                       })}
                     </Badge>
                   </div>

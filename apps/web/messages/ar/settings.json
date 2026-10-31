@@ -89,7 +89,22 @@
     "baseCurrency": "العملة الأساسية",
     "selectCurrency": "اختر العملة",
     "industry": "القطاع",
-    "selectIndustry": "اختر القطاع"
+    "selectIndustry": "اختر القطاع",
+    "industries": {
+      "retail": "التجزئة",
+      "services": "الخدمات",
+      "construction": "المقاولات",
+      "manufacturing": "التصنيع",
+      "healthcare": "الرعاية الصحية",
+      "technology": "التقنية",
+      "other": "أخرى"
+    },
+    "validation": {
+      "nameRequired": "اسم المؤسسة مطلوب",
+      "invalidEmail": "أدخل بريداً إلكترونياً صحيحاً",
+      "invalidUrl": "أدخل رابطاً صحيحاً، مثل https://example.com",
+      "currencyRequired": "اختر العملة الأساسية"
+    }
   },
   "localization": {
     "title": "التوطين",

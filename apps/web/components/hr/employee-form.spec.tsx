@@ -16,6 +16,12 @@ import { render, screen } from '@testing-library/react';
 
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
+// The shared Calendar follows the page locale.
+jest.mock('next-intl', () => ({
+  useLocale: () => 'en',
+  useTranslations: () => (key: string) => key,
+}));
+
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
   usePathname: () => '/hr/employees/new',
@@ -108,7 +114,9 @@ describe('EmployeeForm', () => {
 
   it('does not crash when dateOfJoining is null (regression: Invalid time value)', () => {
     expect(() =>
-      render(<EmployeeForm employee={makeEmployee({ dateOfJoining: null as unknown as string })} />),
+      render(
+        <EmployeeForm employee={makeEmployee({ dateOfJoining: null as unknown as string })} />,
+      ),
     ).not.toThrow();
   });
 

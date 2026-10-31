@@ -89,7 +89,22 @@
     "baseCurrency": "Base Currency",
     "selectCurrency": "Select currency",
     "industry": "Industry",
-    "selectIndustry": "Select industry"
+    "selectIndustry": "Select industry",
+    "industries": {
+      "retail": "Retail",
+      "services": "Services",
+      "construction": "Construction",
+      "manufacturing": "Manufacturing",
+      "healthcare": "Healthcare",
+      "technology": "Technology",
+      "other": "Other"
+    },
+    "validation": {
+      "nameRequired": "Organization name is required",
+      "invalidEmail": "Enter a valid email address",
+      "invalidUrl": "Enter a valid URL, for example https://example.com",
+      "currencyRequired": "Select a base currency"
+    }
   },
   "localization": {
     "title": "Localization",
