@@ -554,6 +554,36 @@ describe('BillsService', () => {
       expectDecimalEqual(data.balanceDue, '375');
     });
 
+    it('keeps a bill due today OPEN and marks a bill due yesterday OVERDUE (audit B12)', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-10-31T15:00:00Z'));
+      try {
+        setup('575', []);
+        prisma.bill.findUnique.mockResolvedValue(
+          createMockBill({
+            id: 'bill-1',
+            grandTotal: dec('575'),
+            status: 'OPEN',
+            dueDate: new Date('2026-10-31'),
+          }) as any,
+        );
+        await service.recalculateBalance(prisma as any, 'bill-1');
+        expect((prisma.bill.update.mock.calls[0]![0]!.data as any).status).toBe('OPEN');
+
+        prisma.bill.findUnique.mockResolvedValue(
+          createMockBill({
+            id: 'bill-1',
+            grandTotal: dec('575'),
+            status: 'OPEN',
+            dueDate: new Date('2026-10-30'),
+          }) as any,
+        );
+        await service.recalculateBalance(prisma as any, 'bill-1');
+        expect((prisma.bill.update.mock.calls[1]![0]!.data as any).status).toBe('OVERDUE');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it('should return to OPEN when all payments were voided', async () => {
       setup('575', []);
       await service.recalculateBalance(prisma as any, 'bill-1');
@@ -576,6 +606,20 @@ describe('BillsService', () => {
       await expect(service.recalculateBalance(prisma as any, 'x')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('markOverdueBills', () => {
+    it('only marks bills due before the start of today (UTC) as overdue (audit B12)', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-10-31T15:00:00Z'));
+      try {
+        prisma.bill.updateMany.mockResolvedValue({ count: 0 });
+        await service.markOverdueBills();
+        const where = prisma.bill.updateMany.mock.calls[0]![0]!.where as any;
+        expect(where.dueDate).toEqual({ lt: new Date('2026-10-31T00:00:00.000Z') });
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 

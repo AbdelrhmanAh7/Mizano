@@ -12,7 +12,7 @@ import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
 import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 import { runBulk } from '../../../common/utils/run-bulk';
-import { assertTotalsFit } from '../../sales/utils/sales-helpers';
+import { assertTotalsFit, startOfTodayUtc } from '../../sales/utils/sales-helpers';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
 import { BillCursorQueryDto } from '../dto/bill-cursor-query.dto';
@@ -227,7 +227,8 @@ export class BillsService {
     let status = bill.status;
     if (balance.isZero()) status = BillStatus.PAID;
     else if (paid.greaterThan(0)) status = BillStatus.PARTIALLY_PAID;
-    else if (bill.dueDate < new Date()) status = BillStatus.OVERDUE;
+    // A bill due today is not yet overdue (same rule as invoices).
+    else if (bill.dueDate < startOfTodayUtc()) status = BillStatus.OVERDUE;
     else status = BillStatus.OPEN;
 
     await tx.bill.update({ where: { id: billId }, data: { balanceDue: balance, status } });
@@ -479,7 +480,7 @@ export class BillsService {
     await this.prisma.bill.updateMany({
       where: {
         status: { in: [BillStatus.OPEN, BillStatus.PARTIALLY_PAID] },
-        dueDate: { lt: new Date() },
+        dueDate: { lt: startOfTodayUtc() },
         balanceDue: { gt: 0 },
         deletedAt: null,
       },
