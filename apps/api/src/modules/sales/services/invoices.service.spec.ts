@@ -255,6 +255,22 @@ describe('InvoicesService', () => {
       },
     );
 
+    it('announces the edited draft as invoice.updated after writing it (audit F3)', async () => {
+      const outbox = { invoiceEvent: jest.fn().mockResolvedValue('evt_1') };
+      service = new InvoicesService(prisma as any, journalsService as any, outbox as any);
+      await service.update(ORG_ID, 'inv-1', { notes: 'x' });
+      expect(outbox.invoiceEvent).toHaveBeenCalledWith(prisma, ORG_ID, 'invoice.updated', 'inv-1');
+      expect(prisma.invoice.update.mock.invocationCallOrder[0]).toBeLessThan(
+        outbox.invoiceEvent.mock.invocationCallOrder[0],
+      );
+
+      // A refused edit (not a draft) writes no event.
+      outbox.invoiceEvent.mockClear();
+      prisma.invoice.findFirst.mockResolvedValue(invoiceRow({ status: 'SENT' }) as any);
+      await expect(service.update(ORG_ID, 'inv-1', { notes: 'x' })).rejects.toThrow();
+      expect(outbox.invoiceEvent).not.toHaveBeenCalled();
+    });
+
     it('takes the invoice row lock before reading the draft it edits', async () => {
       await service.update(ORG_ID, 'inv-1', { notes: 'x' });
       expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
@@ -762,6 +778,23 @@ describe('InvoicesService', () => {
     it('fails loudly for a missing invoice', async () => {
       prisma.invoice.findUnique.mockResolvedValue(null);
       await expect(service.recalculateBalance(prisma, 'x')).rejects.toThrow(NotFoundException);
+    });
+
+    it('announces every balance change in the same transaction: paid, else updated (audit F3)', async () => {
+      const outbox = { invoiceEvent: jest.fn().mockResolvedValue('evt_1') };
+      service = new InvoicesService(prisma as any, journalsService as any, outbox as any);
+      const events = () => outbox.invoiceEvent.mock.calls.map((c) => [c[0], c[2], c[3]]);
+      const sent = { status: 'SENT', grandTotal: dec('1000'), balanceDue: dec('1000') };
+
+      await run(sent, [], ['250']); // a partial credit note
+      await run(sent, ['1000']); // paid in full
+      await run({ status: 'PAID', grandTotal: dec('1000'), balanceDue: dec('0') }); // payment voided
+      await run(sent); // nothing changed
+      expect(events()).toEqual([
+        [prisma, 'invoice.updated', 'inv-1'],
+        [prisma, 'invoice.paid', 'inv-1'],
+        [prisma, 'invoice.updated', 'inv-1'],
+      ]);
     });
   });
 

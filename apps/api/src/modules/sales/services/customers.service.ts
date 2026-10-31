@@ -189,24 +189,27 @@ export class CustomersService {
       throw new NotFoundException('Customer not found');
     }
 
-    const updatedCustomer = await this.prisma.customer.update({
-      where: { id },
-      data: {
-        ...updateCustomerDto,
-        billingStreet: updateCustomerDto.billingAddress?.street,
-        billingCity: updateCustomerDto.billingAddress?.city,
-        billingState: updateCustomerDto.billingAddress?.state,
-        billingPostalCode: updateCustomerDto.billingAddress?.postalCode,
-        billingCountry: updateCustomerDto.billingAddress?.country,
-        shippingStreet: updateCustomerDto.shippingAddress?.street,
-        shippingCity: updateCustomerDto.shippingAddress?.city,
-        shippingState: updateCustomerDto.shippingAddress?.state,
-        shippingPostalCode: updateCustomerDto.shippingAddress?.postalCode,
-        shippingCountry: updateCustomerDto.shippingAddress?.country,
-      },
+    // The change and its customer.updated outbox event commit together (audit F3).
+    return this.prisma.$transaction(async (tx) => {
+      const updatedCustomer = await tx.customer.update({
+        where: { id },
+        data: {
+          ...updateCustomerDto,
+          billingStreet: updateCustomerDto.billingAddress?.street,
+          billingCity: updateCustomerDto.billingAddress?.city,
+          billingState: updateCustomerDto.billingAddress?.state,
+          billingPostalCode: updateCustomerDto.billingAddress?.postalCode,
+          billingCountry: updateCustomerDto.billingAddress?.country,
+          shippingStreet: updateCustomerDto.shippingAddress?.street,
+          shippingCity: updateCustomerDto.shippingAddress?.city,
+          shippingState: updateCustomerDto.shippingAddress?.state,
+          shippingPostalCode: updateCustomerDto.shippingAddress?.postalCode,
+          shippingCountry: updateCustomerDto.shippingAddress?.country,
+        },
+      });
+      await this.outbox?.customerEvent(tx, organizationId, 'customer.updated', updatedCustomer);
+      return updatedCustomer;
     });
-
-    return updatedCustomer;
   }
 
   async remove(organizationId: string, id: string) {

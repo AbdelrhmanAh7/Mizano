@@ -260,4 +260,50 @@ describe('ImportService hardening', () => {
       );
     });
   });
+
+  describe('customers (audit F3/F4)', () => {
+    it('creates an imported customer in the base currency with its customer.created event, and announces updates', async () => {
+      const outbox = {
+        customerCreated: jest.fn().mockResolvedValue('evt_1'),
+        customerEvent: jest.fn().mockResolvedValue('evt_2'),
+      };
+      const unused = { create: jest.fn() } as never;
+      const withOutbox = new ImportService(
+        prisma as unknown as PrismaService,
+        unused,
+        unused,
+        unused,
+        unused,
+        unused,
+        unused,
+        unused,
+        outbox as never,
+      );
+      const importCustomer = (row: Record<string, unknown>, updateExisting: boolean) =>
+        (withOutbox as any).importSingleRow(ORG, ImportEntityType.CUSTOMERS, row, updateExisting);
+      prisma.customer.create.mockResolvedValue({ id: 'c-new', name: 'Delta Co' });
+
+      expect(await importCustomer({ name: 'Delta Co', email: 'd@x.eg' }, false)).toBe('created');
+      expect(prisma.customer.create.mock.calls[0][0].data).toMatchObject({
+        name: 'Delta Co',
+        currency: 'EGP',
+        organizationId: ORG,
+      });
+      expect(outbox.customerCreated).toHaveBeenCalledWith(prisma, ORG, {
+        id: 'c-new',
+        name: 'Delta Co',
+      });
+
+      prisma.customer.findFirst.mockResolvedValue({ id: 'c1', name: 'Old', email: 'd@x.eg' });
+      prisma.customer.update.mockResolvedValue({ id: 'c1', name: 'Delta Co' });
+      expect(await importCustomer({ name: 'Delta Co', email: 'd@x.eg' }, true)).toBe('updated');
+      expect(prisma.customer.findFirst.mock.calls.at(-1)[0].where).toMatchObject({
+        organizationId: ORG,
+      });
+      expect(outbox.customerEvent).toHaveBeenCalledWith(prisma, ORG, 'customer.updated', {
+        id: 'c1',
+        name: 'Delta Co',
+      });
+    });
+  });
 });

@@ -79,7 +79,7 @@ export class WebhookOutboxService {
     return (await this.subscribers(db, organizationId, type)).length > 0;
   }
 
-  /** invoice.created / .sent / .paid / .overdue / .voided for one invoice. */
+  /** invoice.created / .updated / .sent / .paid / .overdue / .voided for one invoice. */
   async invoiceEvent(
     db: Db,
     organizationId: string,
@@ -110,10 +110,18 @@ export class WebhookOutboxService {
     organizationId: string,
     customer: Parameters<typeof serializeCustomer>[0],
   ): Promise<string | null> {
-    if (!(await this.hasSubscribers(db, organizationId, 'customer.created'))) return null;
-    return this.record(db, organizationId, 'customer.created', {
-      customer: serializeCustomer(customer),
-    });
+    return this.customerEvent(db, organizationId, 'customer.created', customer);
+  }
+
+  /** customer.created / customer.updated with the customer as it is after the change. */
+  async customerEvent(
+    db: Db,
+    organizationId: string,
+    type: Extract<WebhookEventType, `customer.${string}`>,
+    customer: Parameters<typeof serializeCustomer>[0],
+  ): Promise<string | null> {
+    if (!(await this.hasSubscribers(db, organizationId, type))) return null;
+    return this.record(db, organizationId, type, { customer: serializeCustomer(customer) });
   }
 
   async paymentReceived(db: Db, organizationId: string, paymentId: string): Promise<string | null> {

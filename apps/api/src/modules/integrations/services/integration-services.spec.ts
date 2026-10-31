@@ -523,6 +523,7 @@ describe('InvoicesService.recalculateBalance -> invoice.paid', () => {
           organizationId: ORG,
           status: previous,
           grandTotal: new Prisma.Decimal('100'),
+          balanceDue: new Prisma.Decimal(previous === InvoiceStatus.PAID ? '0' : '100'),
           dueDate: new Date(Date.now() + 86_400_000),
         }),
         update: jest.fn().mockResolvedValue({}),
@@ -551,10 +552,12 @@ describe('InvoicesService.recalculateBalance -> invoice.paid', () => {
     expect(outbox.invoiceEvent).toHaveBeenCalledWith(tx, ORG, 'invoice.paid', 'inv1');
   });
 
-  it('does not emit for a partial payment or an invoice that was already paid', async () => {
+  it('sends invoice.updated, not paid, for a partial payment; nothing for an unchanged paid invoice', async () => {
     const partial = run(InvoiceStatus.SENT, '40');
     await partial.promise;
-    expect(partial.outbox.invoiceEvent).not.toHaveBeenCalled();
+    expect(partial.outbox.invoiceEvent.mock.calls).toEqual([
+      [partial.tx, ORG, 'invoice.updated', 'inv1'],
+    ]);
     const again = run(InvoiceStatus.PAID, '100');
     await again.promise;
     expect(again.outbox.invoiceEvent).not.toHaveBeenCalled();

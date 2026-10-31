@@ -657,7 +657,9 @@
     },
     "events": {
       "customer_created": "Customer created",
+      "customer_updated": "Customer updated",
       "invoice_created": "Invoice created",
+      "invoice_updated": "Invoice updated",
       "invoice_sent": "Invoice sent",
       "invoice_paid": "Invoice paid",
       "invoice_voided": "Invoice voided",

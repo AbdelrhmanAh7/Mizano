@@ -657,7 +657,9 @@
     },
     "events": {
       "customer_created": "إنشاء عميل",
+      "customer_updated": "تعديل عميل",
       "invoice_created": "إنشاء فاتورة",
+      "invoice_updated": "تعديل فاتورة",
       "invoice_sent": "إرسال فاتورة",
       "invoice_paid": "سداد فاتورة",
       "invoice_voided": "إلغاء فاتورة",

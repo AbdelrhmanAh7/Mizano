@@ -6,7 +6,9 @@ export const INTEGRATION_API_VERSION = '2026-10-28';
 
 export const WEBHOOK_EVENT_TYPES = [
   'customer.created',
+  'customer.updated',
   'invoice.created',
+  'invoice.updated',
   'invoice.sent',
   'invoice.paid',
   'invoice.overdue',

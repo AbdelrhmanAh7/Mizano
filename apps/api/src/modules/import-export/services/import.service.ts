@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Optional } from '@nestjs/common';
 import { CreditNoteType, PaymentMode, Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -14,6 +14,7 @@ import { BillsService } from '../../purchases/services/bills.service';
 import { ExpensesService } from '../../purchases/services/expenses.service';
 import { PaymentsMadeService } from '../../purchases/services/payments-made.service';
 import { VendorCreditsService } from '../../purchases/services/vendor-credits.service';
+import { WebhookOutboxService } from '../../integrations/services/webhook-outbox.service';
 import {
   ColumnMappingDto,
   ENTITY_FIELD_DEFINITIONS,
@@ -65,6 +66,8 @@ export class ImportService {
     private expensesService: ExpensesService,
     private vendorCreditsService: VendorCreditsService,
     private paymentsMadeService: PaymentsMadeService,
+    // Outbound integration events, written in the same transaction (absent in the worker).
+    @Optional() private outbox?: WebhookOutboxService,
   ) {}
 
   // ============ File Parsing ============
@@ -552,37 +555,52 @@ export class ImportService {
       });
 
       if (existing) {
-        await this.prisma.customer.update({
-          where: { id: existing.id },
-          data: {
-            name: data.name || existing.name,
-            email: data.email || existing.email,
-            phone: data.phone || existing.phone,
-            address: data.address || existing.address,
-            city: data.city || existing.city,
-            country: data.country || existing.country,
-            taxId: data.taxId || existing.taxId,
-            paymentTerms: data.paymentTerms || existing.paymentTerms,
-            creditLimit: data.creditLimit ? new Decimal(data.creditLimit) : existing.creditLimit,
-          },
+        // The change and its customer.updated outbox event commit together (audit F3).
+        await this.prisma.$transaction(async (tx) => {
+          const updated = await tx.customer.update({
+            where: { id: existing.id },
+            data: {
+              name: data.name || existing.name,
+              email: data.email || existing.email,
+              phone: data.phone || existing.phone,
+              address: data.address || existing.address,
+              city: data.city || existing.city,
+              country: data.country || existing.country,
+              taxId: data.taxId || existing.taxId,
+              paymentTerms: data.paymentTerms || existing.paymentTerms,
+              creditLimit: data.creditLimit ? new Decimal(data.creditLimit) : existing.creditLimit,
+            },
+          });
+          await this.outbox?.customerEvent(tx, organizationId, 'customer.updated', updated);
         });
         return 'updated';
       }
     }
 
-    await this.prisma.customer.create({
-      data: {
-        name: data.name,
-        email: data.email,
-        phone: data.phone,
-        address: data.address,
-        city: data.city,
-        country: data.country,
-        taxId: data.taxId,
-        paymentTerms: data.paymentTerms,
-        creditLimit: data.creditLimit ? new Decimal(data.creditLimit) : undefined,
-        organizationId,
-      },
+    // Like CustomersService.create: the org base currency (not the column's USD default), and
+    // the customer.created outbox event in the same transaction (audit F3/F4).
+    await this.prisma.$transaction(async (tx) => {
+      const org = await tx.organization.findUnique({
+        where: { id: organizationId },
+        select: { baseCurrency: true },
+      });
+      if (!org) throw new BadRequestException('Organization not found');
+      const customer = await tx.customer.create({
+        data: {
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          address: data.address,
+          city: data.city,
+          country: data.country,
+          taxId: data.taxId,
+          paymentTerms: data.paymentTerms,
+          creditLimit: data.creditLimit ? new Decimal(data.creditLimit) : undefined,
+          currency: org.baseCurrency,
+          organizationId,
+        },
+      });
+      await this.outbox?.customerCreated(tx, organizationId, customer);
     });
     return 'created';
   }

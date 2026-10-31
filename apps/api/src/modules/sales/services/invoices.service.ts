@@ -317,7 +317,14 @@ export class InvoicesService {
         data.balanceDue = grandTotal;
       }
 
-      return tx.invoice.update({ where: { id }, data, include: INVOICE_VIEW_INCLUDE });
+      const updated = await tx.invoice.update({
+        where: { id },
+        data,
+        include: INVOICE_VIEW_INCLUDE,
+      });
+      // An edited draft reaches FlowLine with its new lines and totals (audit F3).
+      await this.outbox?.invoiceEvent(tx, organizationId, 'invoice.updated', id);
+      return updated;
     });
   }
 
@@ -549,10 +556,13 @@ export class InvoicesService {
     else status = InvoiceStatus.SENT;
 
     await tx.invoice.update({ where: { id: invoiceId }, data: { balanceDue: balance, status } });
-    // Every settlement path (payments, bulk pay, credit notes, bank matching) lands here, so
-    // this is the one place that announces the transition to PAID.
+    // Every settlement path (payments, bulk pay, credit notes, bank matching, voids) lands here,
+    // so this is the one place that announces the transition to PAID, and any other balance
+    // change (a partial credit, a voided payment reopening it) as invoice.updated (audit F3).
     if (status === InvoiceStatus.PAID && invoice.status !== InvoiceStatus.PAID) {
       await this.outbox?.invoiceEvent(tx, invoice.organizationId, 'invoice.paid', invoiceId);
+    } else if (!balance.equals(invoice.balanceDue) || status !== invoice.status) {
+      await this.outbox?.invoiceEvent(tx, invoice.organizationId, 'invoice.updated', invoiceId);
     }
   }
 
