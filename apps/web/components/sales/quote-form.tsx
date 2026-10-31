@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { useForm, Control, FieldValues, UseFormWatch, UseFormSetValue } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,13 +19,13 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCustomers, Customer } from '@/lib/hooks/use-customers';
 import { Quote } from '@/lib/hooks/use-quotes';
-import { LineItemsForm, taxFieldsForPercent, toApiLines } from './line-items-form';
+import { LineErrors, LineItemsForm, taxFieldsForPercent, toApiLines } from './line-items-form';
 
 const lineItemSchema = z.object({
   itemId: z.string().optional(),
-  description: z.string().min(1, 'Description is required'),
-  quantity: z.string().min(1, 'Quantity is required'),
-  rate: z.string().min(1, 'Rate is required'),
+  description: z.string().min(1, 'descriptionRequired'),
+  quantity: z.string().min(1, 'quantityRequired'),
+  rate: z.string().min(1, 'rateRequired'),
   discountPercent: z.string().optional(),
   taxRateId: z.string().optional(),
   taxPercent: z.string().optional(),
@@ -32,14 +33,14 @@ const lineItemSchema = z.object({
 });
 
 const quoteSchema = z.object({
-  customerId: z.string().min(1, 'Customer is required'),
-  quoteDate: z.string().min(1, 'Quote date is required'),
-  expiryDate: z.string().min(1, 'Expiry date is required'),
+  customerId: z.string().min(1, 'customerRequired'),
+  quoteDate: z.string().min(1, 'dateRequired'),
+  expiryDate: z.string().min(1, 'expiryDateRequired'),
   reference: z.string().optional(),
   subject: z.string().optional(),
   notes: z.string().optional(),
   terms: z.string().optional(),
-  lines: z.array(lineItemSchema).min(1, 'At least one line item is required'),
+  lines: z.array(lineItemSchema).min(1, 'lineItemRequired'),
 });
 
 type QuoteFormData = z.infer<typeof quoteSchema>;
@@ -67,6 +68,10 @@ export function QuoteForm({
   isSubmitting,
 }: QuoteFormProps) {
   const isEditing = !!quote;
+  const t = useTranslations('sales.quotes.form');
+  const tValidation = useTranslations('sales.quotes.validation');
+  const fieldError = (message?: string) =>
+    message ? (tValidation.has(message) ? tValidation(message) : message) : undefined;
   const { data: customersData } = useCustomers({ limit: 100 });
   const customers = customersData?.data || [];
 
@@ -157,19 +162,21 @@ export function QuoteForm({
       {/* Quote Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Quote Details</CardTitle>
+          <CardTitle>{t('details')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="customerId">Customer *</Label>
+              <Label htmlFor="customerId">
+                {t('customer')} <span className="text-destructive">*</span>
+              </Label>
               <Select
                 value={form.watch('customerId')}
                 onValueChange={(value) => form.setValue('customerId', value)}
                 disabled={isEditing}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a customer" />
+                  <SelectValue placeholder={t('customerPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {customers.map((customer: Customer) => (
@@ -180,15 +187,17 @@ export function QuoteForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.customerId && (
-                <p className="text-sm text-red-500">{form.formState.errors.customerId.message}</p>
+                <p className="text-sm text-red-500">
+                  {fieldError(form.formState.errors.customerId.message)}
+                </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="reference">Reference Number</Label>
+              <Label htmlFor="reference">{t('reference')}</Label>
               <Input
                 id="reference"
-                placeholder="PO-001 or project reference"
+                placeholder={t('referencePlaceholder')}
                 {...form.register('reference')}
               />
             </div>
@@ -196,27 +205,35 @@ export function QuoteForm({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="quoteDate">Quote Date *</Label>
+              <Label htmlFor="quoteDate">
+                {t('date')} <span className="text-destructive">*</span>
+              </Label>
               <Input id="quoteDate" type="date" {...form.register('quoteDate')} />
               {form.formState.errors.quoteDate && (
-                <p className="text-sm text-red-500">{form.formState.errors.quoteDate.message}</p>
+                <p className="text-sm text-red-500">
+                  {fieldError(form.formState.errors.quoteDate.message)}
+                </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="expiryDate">Expiry Date *</Label>
+              <Label htmlFor="expiryDate">
+                {t('expiryDate')} <span className="text-destructive">*</span>
+              </Label>
               <Input id="expiryDate" type="date" {...form.register('expiryDate')} />
               {form.formState.errors.expiryDate && (
-                <p className="text-sm text-red-500">{form.formState.errors.expiryDate.message}</p>
+                <p className="text-sm text-red-500">
+                  {fieldError(form.formState.errors.expiryDate.message)}
+                </p>
               )}
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="subject">Subject</Label>
+            <Label htmlFor="subject">{t('subject')}</Label>
             <Input
               id="subject"
-              placeholder="Quote for web development project"
+              placeholder={t('subjectPlaceholder')}
               {...form.register('subject')}
             />
           </div>
@@ -235,28 +252,29 @@ export function QuoteForm({
         showTax={true}
         showDiscount={true}
       />
+      <LineErrors errors={form.formState.errors.lines} translate={fieldError} />
 
       {/* Notes & Terms */}
       <Card>
         <CardHeader>
-          <CardTitle>Notes & Terms</CardTitle>
+          <CardTitle>{t('notesAndTerms')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="notes">Customer Notes</Label>
+            <Label htmlFor="notes">{t('customerNotes')}</Label>
             <Textarea
               id="notes"
-              placeholder="Notes visible to the customer"
+              placeholder={t('customerNotesPlaceholder')}
               {...form.register('notes')}
               rows={3}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="terms">Terms & Conditions</Label>
+            <Label htmlFor="terms">{t('terms')}</Label>
             <Textarea
               id="terms"
-              placeholder="Payment terms, warranty, etc."
+              placeholder={t('termsPlaceholder')}
               {...form.register('terms')}
               rows={3}
             />
@@ -267,10 +285,10 @@ export function QuoteForm({
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {t('cancel')}
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : isEditing ? 'Update Quote' : 'Create Quote'}
+          {isSubmitting ? t('saving') : isEditing ? t('updateQuote') : t('createQuote')}
         </Button>
       </div>
     </form>

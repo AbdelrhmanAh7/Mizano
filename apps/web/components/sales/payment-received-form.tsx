@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
+import { format } from 'date-fns';
+import { useDateFnsLocale } from '@/lib/date-locale';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -43,9 +46,9 @@ const allocationSchema = z.object({
 });
 
 const paymentReceivedSchema = z.object({
-  customerId: z.string().min(1, 'Customer is required'),
-  date: z.string().min(1, 'Date is required'),
-  amount: z.string().min(1, 'Amount is required'),
+  customerId: z.string().min(1, 'customerRequired'),
+  date: z.string().min(1, 'dateRequired'),
+  amount: z.string().min(1, 'amountRequired'),
   paymentMode: z.enum([
     'CASH',
     'BANK_TRANSFER',
@@ -55,13 +58,24 @@ const paymentReceivedSchema = z.object({
     'ONLINE',
     'OTHER',
   ]),
-  depositToAccountId: z.string().min(1, 'Deposit account is required'),
+  depositToAccountId: z.string().min(1, 'depositAccountRequired'),
   reference: z.string().optional(),
   notes: z.string().optional(),
   allocations: z.array(allocationSchema),
 });
 
 export type PaymentReceivedFormData = z.infer<typeof paymentReceivedSchema>;
+
+// Labels live under common.paymentModes.
+const PAYMENT_MODE_KEYS: Record<PaymentReceivedFormData['paymentMode'], string> = {
+  CASH: 'cash',
+  BANK_TRANSFER: 'bankTransfer',
+  CREDIT_CARD: 'creditCard',
+  DEBIT_CARD: 'debitCard',
+  CHEQUE: 'cheque',
+  ONLINE: 'online',
+  OTHER: 'other',
+};
 
 interface PaymentReceivedFormProps {
   defaultCustomerId?: string;
@@ -78,6 +92,12 @@ export function PaymentReceivedForm({
   onCancel,
   isSubmitting,
 }: PaymentReceivedFormProps) {
+  const t = useTranslations('sales.payments.form');
+  const tValidation = useTranslations('sales.payments.validation');
+  const tModes = useTranslations('common.paymentModes');
+  const dateLocale = useDateFnsLocale();
+  const fieldError = (message?: string) =>
+    message ? (tValidation.has(message) ? tValidation(message) : message) : undefined;
   const { data: customersData } = useCustomers({ limit: 100 });
   const customers = customersData?.data || [];
 
@@ -251,12 +271,14 @@ export function PaymentReceivedForm({
       {/* Payment Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Payment Details</CardTitle>
+          <CardTitle>{t('details')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="customerId">Customer *</Label>
+              <Label htmlFor="customerId">
+                {t('customer')} <span className="text-destructive">*</span>
+              </Label>
               <Select
                 value={form.watch('customerId')}
                 onValueChange={(value) => {
@@ -265,7 +287,7 @@ export function PaymentReceivedForm({
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a customer" />
+                  <SelectValue placeholder={t('customerPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {customers.map((customer: Customer) => (
@@ -276,22 +298,30 @@ export function PaymentReceivedForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.customerId && (
-                <p className="text-sm text-red-500">{form.formState.errors.customerId.message}</p>
+                <p className="text-sm text-red-500">
+                  {fieldError(form.formState.errors.customerId.message)}
+                </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="date">Payment Date *</Label>
+              <Label htmlFor="date">
+                {t('date')} <span className="text-destructive">*</span>
+              </Label>
               <Input id="date" type="date" {...form.register('date')} />
               {form.formState.errors.date && (
-                <p className="text-sm text-red-500">{form.formState.errors.date.message}</p>
+                <p className="text-sm text-red-500">
+                  {fieldError(form.formState.errors.date.message)}
+                </p>
               )}
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="amount">Amount Received *</Label>
+              <Label htmlFor="amount">
+                {t('amountReceived')} <span className="text-destructive">*</span>
+              </Label>
               <Input
                 id="amount"
                 type="number"
@@ -301,23 +331,27 @@ export function PaymentReceivedForm({
                 {...form.register('amount')}
               />
               {form.formState.errors.amount && (
-                <p className="text-sm text-red-500">{form.formState.errors.amount.message}</p>
+                <p className="text-sm text-red-500">
+                  {fieldError(form.formState.errors.amount.message)}
+                </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="paymentMode">Payment Mode *</Label>
+              <Label htmlFor="paymentMode">
+                {t('paymentMode')} <span className="text-destructive">*</span>
+              </Label>
               <Select
                 value={form.watch('paymentMode')}
                 onValueChange={(value) => form.setValue('paymentMode', value as PaymentMode)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select payment mode" />
+                  <SelectValue placeholder={t('paymentModePlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {paymentModeOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      {option.label}
+                      {tModes(PAYMENT_MODE_KEYS[option.value])}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -325,13 +359,15 @@ export function PaymentReceivedForm({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="depositToAccountId">Deposit To *</Label>
+              <Label htmlFor="depositToAccountId">
+                {t('depositTo')} <span className="text-destructive">*</span>
+              </Label>
               <Select
                 value={form.watch('depositToAccountId')}
                 onValueChange={(value) => form.setValue('depositToAccountId', value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select account" />
+                  <SelectValue placeholder={t('depositToPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {depositAccounts.map((account: Account) => (
@@ -343,17 +379,17 @@ export function PaymentReceivedForm({
               </Select>
               {form.formState.errors.depositToAccountId && (
                 <p className="text-sm text-red-500">
-                  {form.formState.errors.depositToAccountId.message}
+                  {fieldError(form.formState.errors.depositToAccountId.message)}
                 </p>
               )}
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="reference">Reference Number</Label>
+            <Label htmlFor="reference">{t('reference')}</Label>
             <Input
               id="reference"
-              placeholder="Check number, transaction ID, etc."
+              placeholder={t('referencePlaceholder')}
               {...form.register('reference')}
             />
           </div>
@@ -364,35 +400,31 @@ export function PaymentReceivedForm({
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Apply to Invoices</CardTitle>
+            <CardTitle>{t('applyToInvoices')}</CardTitle>
             {openInvoices.length > 0 && paymentAmount && (
               <Button type="button" variant="outline" size="sm" onClick={autoDistribute}>
-                Auto-Distribute
+                {t('autoDistribute')}
               </Button>
             )}
           </div>
         </CardHeader>
         <CardContent>
           {!selectedCustomerId ? (
-            <p className="text-center text-muted-foreground py-8">
-              Select a customer to see their open invoices
-            </p>
+            <p className="text-center text-muted-foreground py-8">{t('selectCustomerFirst')}</p>
           ) : openInvoices.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">
-              No open invoices for this customer
-            </p>
+            <p className="text-center text-muted-foreground py-8">{t('noOpenInvoices')}</p>
           ) : (
             <>
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-12"></TableHead>
-                    <TableHead>Invoice #</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Due Date</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-right">Balance Due</TableHead>
-                    <TableHead className="text-right">Amount to Apply</TableHead>
+                    <TableHead>{t('invoiceNumber')}</TableHead>
+                    <TableHead>{t('invoiceDate')}</TableHead>
+                    <TableHead>{t('dueDate')}</TableHead>
+                    <TableHead className="text-end">{t('total')}</TableHead>
+                    <TableHead className="text-end">{t('balanceDue')}</TableHead>
+                    <TableHead className="text-end">{t('amountToApply')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -411,21 +443,26 @@ export function PaymentReceivedForm({
                           />
                         </TableCell>
                         <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
-                        <TableCell>{new Date(invoice.date).toLocaleDateString()}</TableCell>
-                        <TableCell>{new Date(invoice.dueDate).toLocaleDateString()}</TableCell>
-                        <TableCell className="text-right font-mono">
+                        <TableCell>
+                          {format(new Date(invoice.date), 'PP', { locale: dateLocale })}
+                        </TableCell>
+                        <TableCell>
+                          {format(new Date(invoice.dueDate), 'PP', { locale: dateLocale })}
+                        </TableCell>
+                        <TableCell className="text-end font-mono">
                           {formatCurrency(invoice.grandTotal)}
                         </TableCell>
-                        <TableCell className="text-right font-mono text-red-600">
+                        <TableCell className="text-end font-mono text-red-600">
                           {formatCurrency(invoice.balanceDue)}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-end">
                           <Input
+                            aria-label={t('amountToApply')}
                             type="number"
                             step="0.01"
                             min="0"
                             max={invoice.balanceDue}
-                            className="w-28 text-right ml-auto"
+                            className="w-28 text-end ms-auto"
                             disabled={!form.watch(`allocations.${index}.selected`)}
                             value={form.watch(`allocations.${index}.amount`) || ''}
                             onChange={(e) =>
@@ -444,10 +481,10 @@ export function PaymentReceivedForm({
                 <div className="flex justify-between items-center">
                   <div className="space-y-1">
                     <div className="text-sm text-muted-foreground">
-                      Payment Amount: {formatCurrency(paymentAmount || '0')}
+                      {t('paymentAmount', { amount: formatCurrency(paymentAmount || '0') })}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Total Allocated: {formatCurrency(totalAllocated)}
+                      {t('totalAllocated', { amount: formatCurrency(totalAllocated) })}
                     </div>
                   </div>
                   <div
@@ -459,12 +496,12 @@ export function PaymentReceivedForm({
                     {isBalanced ? (
                       <>
                         <Check className="h-4 w-4" />
-                        Balanced
+                        {t('balanced')}
                       </>
                     ) : (
                       <>
                         <X className="h-4 w-4" />
-                        Difference: {formatCurrency(difference)}
+                        {t('difference', { amount: formatCurrency(difference) })}
                       </>
                     )}
                   </div>
@@ -478,11 +515,12 @@ export function PaymentReceivedForm({
       {/* Notes */}
       <Card>
         <CardHeader>
-          <CardTitle>Additional Notes</CardTitle>
+          <CardTitle>{t('additionalNotes')}</CardTitle>
         </CardHeader>
         <CardContent>
           <Textarea
-            placeholder="Notes about this payment..."
+            placeholder={t('notesPlaceholder')}
+            aria-label={t('additionalNotes')}
             rows={3}
             {...form.register('notes')}
           />
@@ -492,10 +530,10 @@ export function PaymentReceivedForm({
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {t('cancel')}
         </Button>
         <Button type="submit" disabled={isSubmitting || !isBalanced || totalAllocated === 0}>
-          {isSubmitting ? 'Recording...' : 'Record Payment'}
+          {isSubmitting ? t('recording') : t('recordPayment')}
         </Button>
       </div>
     </form>

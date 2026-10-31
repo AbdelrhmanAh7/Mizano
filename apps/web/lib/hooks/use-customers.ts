@@ -1,6 +1,8 @@
 'use client';
 
 import { useToast } from '@/components/ui/use-toast';
+import { useTranslations } from 'next-intl';
+import { getApiErrorMessage } from '@/lib/api-error';
 import { format } from 'date-fns';
 import { customersApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
@@ -167,6 +169,7 @@ export function useCustomerStatement(id: string | undefined) {
 export function useCreateCustomer() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const tToast = useTranslations('sales.customers.toast');
 
   return useMutation({
     mutationFn: async (data: CreateCustomerData) => {
@@ -176,15 +179,15 @@ export function useCreateCustomer() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       toast({
-        title: 'Customer created',
-        description: 'The customer has been created successfully.',
+        title: tToast('created'),
+        description: tToast('createdDescription'),
       });
     },
     onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
-        title: 'Error creating customer',
-        description: error.response?.data?.message || 'An error occurred',
+        title: tToast('createError'),
+        description: getApiErrorMessage(error, tToast('genericError')),
       });
     },
   });
@@ -196,6 +199,7 @@ export function useCreateCustomer() {
 export function useUpdateCustomer() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const tToast = useTranslations('sales.customers.toast');
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateCustomerData }) => {
@@ -206,15 +210,15 @@ export function useUpdateCustomer() {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['customers', variables.id] });
       toast({
-        title: 'Customer updated',
-        description: 'The customer has been updated successfully.',
+        title: tToast('updated'),
+        description: tToast('updatedDescription'),
       });
     },
     onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
-        title: 'Error updating customer',
-        description: error.response?.data?.message || 'An error occurred',
+        title: tToast('updateError'),
+        description: getApiErrorMessage(error, tToast('genericError')),
       });
     },
   });
@@ -226,6 +230,7 @@ export function useUpdateCustomer() {
 export function useDeleteCustomer() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const tToast = useTranslations('sales.customers.toast');
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -235,15 +240,15 @@ export function useDeleteCustomer() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       toast({
-        title: 'Customer deleted',
-        description: 'The customer has been deleted successfully.',
+        title: tToast('deleted'),
+        description: tToast('deletedDescription'),
       });
     },
     onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
-        title: 'Error deleting customer',
-        description: error.response?.data?.message || 'An error occurred',
+        title: tToast('deleteError'),
+        description: getApiErrorMessage(error, tToast('genericError')),
       });
     },
   });

@@ -1,6 +1,8 @@
 'use client';
 
 import { useToast } from '@/components/ui/use-toast';
+import { useTranslations } from 'next-intl';
+import { getApiErrorMessage } from '@/lib/api-error';
 import { paymentsReceivedApi } from '@/lib/api';
 import { invalidateLedgerQueries } from '@/lib/hooks/use-journals';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
@@ -130,6 +132,7 @@ export function usePaymentReceived(id: string | undefined) {
 export function useCreatePaymentReceived() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const tToast = useTranslations('sales.payments.toast');
 
   return useMutation({
     mutationFn: async (data: CreatePaymentReceivedData) => {
@@ -141,15 +144,15 @@ export function useCreatePaymentReceived() {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       toast({
-        title: 'Payment recorded',
-        description: 'The payment has been recorded successfully.',
+        title: tToast('recorded'),
+        description: tToast('recordedDescription'),
       });
     },
     onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
-        title: 'Error recording payment',
-        description: error.response?.data?.message || 'An error occurred',
+        title: tToast('recordError'),
+        description: getApiErrorMessage(error, tToast('genericError')),
       });
     },
   });
@@ -161,6 +164,7 @@ export function useCreatePaymentReceived() {
 export function useVoidPaymentReceived() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const tToast = useTranslations('sales.payments.toast');
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -173,15 +177,15 @@ export function useVoidPaymentReceived() {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       toast({
-        title: 'Payment voided',
-        description: 'The invoice balances were restored and a reversal journal was posted.',
+        title: tToast('voided'),
+        description: tToast('voidedDescription'),
       });
     },
     onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
-        title: 'Error voiding payment',
-        description: error.response?.data?.message || 'An error occurred',
+        title: tToast('voidError'),
+        description: getApiErrorMessage(error, tToast('genericError')),
       });
     },
   });

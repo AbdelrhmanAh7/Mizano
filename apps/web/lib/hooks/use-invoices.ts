@@ -1,6 +1,8 @@
 'use client';
 
 import { useToast } from '@/components/ui/use-toast';
+import { useTranslations } from 'next-intl';
+import { getApiErrorMessage } from '@/lib/api-error';
 import { invoicesApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -145,6 +147,7 @@ export function useInvoice(id: string | undefined) {
 export function useCreateInvoice() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const tToast = useTranslations('sales.invoices.toast');
 
   return useMutation({
     mutationFn: async (data: CreateInvoiceData) => {
@@ -155,15 +158,15 @@ export function useCreateInvoice() {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       toast({
-        title: 'Invoice created',
-        description: 'The invoice has been created successfully.',
+        title: tToast('created'),
+        description: tToast('createdDescription'),
       });
     },
     onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
-        title: 'Error creating invoice',
-        description: error.response?.data?.message || 'An error occurred',
+        title: tToast('createError'),
+        description: getApiErrorMessage(error, tToast('genericError')),
       });
     },
   });
@@ -175,6 +178,7 @@ export function useCreateInvoice() {
 export function useUpdateInvoice() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const tToast = useTranslations('sales.invoices.toast');
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateInvoiceData }) => {
@@ -185,15 +189,15 @@ export function useUpdateInvoice() {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoices', variables.id] });
       toast({
-        title: 'Invoice updated',
-        description: 'The invoice has been updated successfully.',
+        title: tToast('updated'),
+        description: tToast('updatedDescription'),
       });
     },
     onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
-        title: 'Error updating invoice',
-        description: error.response?.data?.message || 'An error occurred',
+        title: tToast('updateError'),
+        description: getApiErrorMessage(error, tToast('genericError')),
       });
     },
   });
@@ -205,6 +209,7 @@ export function useUpdateInvoice() {
 export function useDeleteInvoice() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const tToast = useTranslations('sales.invoices.toast');
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -215,15 +220,15 @@ export function useDeleteInvoice() {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       toast({
-        title: 'Invoice deleted',
-        description: 'The invoice has been deleted successfully.',
+        title: tToast('deleted'),
+        description: tToast('deletedDescription'),
       });
     },
     onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
-        title: 'Error deleting invoice',
-        description: error.response?.data?.message || 'An error occurred',
+        title: tToast('deleteError'),
+        description: getApiErrorMessage(error, tToast('genericError')),
       });
     },
   });
@@ -235,6 +240,7 @@ export function useDeleteInvoice() {
 export function useSendInvoice() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const tToast = useTranslations('sales.invoices.toast');
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -246,15 +252,15 @@ export function useSendInvoice() {
       queryClient.invalidateQueries({ queryKey: ['invoices', id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       toast({
-        title: 'Invoice sent',
-        description: 'The invoice has been sent successfully.',
+        title: tToast('sent'),
+        description: tToast('sentDescription'),
       });
     },
     onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
-        title: 'Error sending invoice',
-        description: error.response?.data?.message || 'An error occurred',
+        title: tToast('sendError'),
+        description: getApiErrorMessage(error, tToast('genericError')),
       });
     },
   });
@@ -266,6 +272,7 @@ export function useSendInvoice() {
 export function useVoidInvoice() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const tToast = useTranslations('sales.invoices.toast');
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -277,15 +284,15 @@ export function useVoidInvoice() {
       queryClient.invalidateQueries({ queryKey: ['invoices', id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       toast({
-        title: 'Invoice voided',
-        description: 'The invoice has been voided successfully.',
+        title: tToast('voided'),
+        description: tToast('voidedDescription'),
       });
     },
     onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
-        title: 'Error voiding invoice',
-        description: error.response?.data?.message || 'An error occurred',
+        title: tToast('voidError'),
+        description: getApiErrorMessage(error, tToast('genericError')),
       });
     },
   });
@@ -297,6 +304,7 @@ export function useVoidInvoice() {
 export function useCloneInvoice() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const tToast = useTranslations('sales.invoices.toast');
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -306,15 +314,15 @@ export function useCloneInvoice() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast({
-        title: 'Invoice duplicated',
-        description: 'A new draft copy has been created.',
+        title: tToast('duplicated'),
+        description: tToast('duplicatedDescription'),
       });
     },
     onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
-        title: 'Error duplicating invoice',
-        description: error.response?.data?.message || 'An error occurred',
+        title: tToast('duplicateError'),
+        description: getApiErrorMessage(error, tToast('genericError')),
       });
     },
   });

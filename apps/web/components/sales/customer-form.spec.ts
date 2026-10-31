@@ -1,4 +1,7 @@
 import { buildCustomerPayload } from './customer-form';
+
+// The form module uses next-intl (ESM); this spec only exercises the pure payload builder.
+jest.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
 import { createCustomerSchema } from '@mizano/validators';
 
 const baseFormData = {

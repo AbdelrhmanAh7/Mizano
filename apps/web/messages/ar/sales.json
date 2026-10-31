@@ -34,7 +34,35 @@
       "paymentTerms": "شروط الدفع",
       "priceList": "قائمة الأسعار",
       "billingAddress": "عنوان الفوترة",
-      "shippingAddress": "عنوان الشحن"
+      "shippingAddress": "عنوان الشحن",
+      "basicInformation": "البيانات الأساسية",
+      "displayNameHint": "الاسم الذي يظهر في المستندات",
+      "currencyPlaceholder": "اختر العملة",
+      "paymentTermsPlaceholder": "اختر شروط الدفع",
+      "taxIdHint": "الرقم الضريبي / رقم ضريبة القيمة المضافة",
+      "notes": "ملاحظات",
+      "notesPlaceholder": "ملاحظات داخلية عن هذا العميل",
+      "street": "عنوان الشارع",
+      "streetPlaceholder": "عنوان الشارع",
+      "country": "الدولة",
+      "city": "المدينة",
+      "state": "المحافظة / المنطقة",
+      "statePlaceholder": "المحافظة",
+      "postalCode": "الرمز البريدي",
+      "postalCodePlaceholder": "الرمز البريدي",
+      "copyFromBilling": "نسخ من عنوان الفوترة",
+      "cancel": "إلغاء",
+      "saving": "جارٍ الحفظ...",
+      "updateCustomer": "تحديث العميل",
+      "createCustomer": "إنشاء العميل",
+      "currencies": {
+        "USD": "USD - دولار أمريكي",
+        "EUR": "EUR - يورو",
+        "GBP": "GBP - جنيه إسترليني",
+        "EGP": "EGP - جنيه مصري",
+        "AED": "AED - درهم إماراتي",
+        "SAR": "SAR - ريال سعودي"
+      }
     },
     "table": {
       "name": "الاسم",
@@ -59,7 +87,8 @@
       "deletedDescription": "تم حذف العميل بنجاح.",
       "createError": "فشل في إنشاء العميل.",
       "updateError": "فشل في تحديث العميل.",
-      "deleteError": "فشل في حذف العميل. قد يكون له معاملات مرتبطة."
+      "deleteError": "فشل في حذف العميل. قد يكون له معاملات مرتبطة.",
+      "genericError": "حدث خطأ"
     },
     "statement": {
       "title": "كشف حساب",
@@ -86,6 +115,10 @@
         "Credit Note Refund": "استرداد إشعار دائن",
         "Invoice Void": "فاتورة ملغاة"
       }
+    },
+    "validation": {
+      "nameRequired": "اسم العميل مطلوب",
+      "emailInvalid": "البريد الإلكتروني غير صالح"
     }
   },
   "quotes": {
@@ -121,7 +154,20 @@
       "date": "تاريخ العرض",
       "expiryDate": "تاريخ الانتهاء",
       "notes": "ملاحظات",
-      "terms": "الشروط والأحكام"
+      "terms": "الشروط والأحكام",
+      "details": "بيانات عرض الأسعار",
+      "reference": "الرقم المرجعي",
+      "referencePlaceholder": "PO-001 أو مرجع المشروع",
+      "subject": "الموضوع",
+      "subjectPlaceholder": "عرض أسعار لمشروع تطوير موقع إلكتروني",
+      "notesAndTerms": "الملاحظات والشروط",
+      "customerNotes": "ملاحظات للعميل",
+      "customerNotesPlaceholder": "ملاحظات تظهر للعميل",
+      "termsPlaceholder": "شروط الدفع والضمان وغيرها",
+      "cancel": "إلغاء",
+      "saving": "جارٍ الحفظ...",
+      "updateQuote": "تحديث عرض الأسعار",
+      "createQuote": "إنشاء عرض الأسعار"
     },
     "table": {
       "quoteNumber": "رقم العرض",
@@ -171,7 +217,20 @@
       "sendError": "فشل في إرسال عرض الأسعار.",
       "acceptError": "فشل في قبول عرض الأسعار.",
       "declineError": "فشل في رفض عرض الأسعار.",
-      "convertError": "فشل في تحويل عرض الأسعار."
+      "convertError": "فشل في تحويل عرض الأسعار.",
+      "genericError": "حدث خطأ",
+      "duplicated": "تم نسخ عرض الأسعار",
+      "duplicatedDescription": "أُنشئت نسخة جديدة كمسودة.",
+      "duplicateError": "تعذّر نسخ عرض الأسعار."
+    },
+    "validation": {
+      "customerRequired": "العميل مطلوب",
+      "dateRequired": "تاريخ عرض الأسعار مطلوب",
+      "expiryDateRequired": "تاريخ انتهاء الصلاحية مطلوب",
+      "descriptionRequired": "الوصف مطلوب",
+      "quantityRequired": "الكمية مطلوبة",
+      "rateRequired": "السعر مطلوب",
+      "lineItemRequired": "يلزم بند واحد على الأقل"
     }
   },
   "invoices": {
@@ -204,7 +263,23 @@
       "notes": "ملاحظات",
       "terms": "الشروط والأحكام",
       "project": "المشروع",
-      "lineItemRequired": "مطلوب عنصر واحد على الأقل"
+      "lineItemRequired": "مطلوب عنصر واحد على الأقل",
+      "details": "بيانات الفاتورة",
+      "reference": "الرقم المرجعي",
+      "referencePlaceholder": "رقم أمر الشراء أو مرجع المشروع",
+      "paymentTerms": "شروط الدفع",
+      "paymentTermsPlaceholder": "اختر شروط الدفع",
+      "chargesAndTotals": "الرسوم الإضافية والإجماليات",
+      "shippingAndHandling": "الشحن والمناولة",
+      "grandTotal": "الإجمالي الكلي",
+      "notesAndTerms": "الملاحظات والشروط",
+      "customerNotes": "ملاحظات للعميل",
+      "customerNotesPlaceholder": "ملاحظات تظهر للعميل",
+      "termsPlaceholder": "شروط الدفع وغرامات التأخير وغيرها",
+      "cancel": "إلغاء",
+      "saving": "جارٍ الحفظ...",
+      "updateInvoice": "تحديث الفاتورة",
+      "createInvoice": "إنشاء الفاتورة"
     },
     "table": {
       "invoiceNumber": "رقم الفاتورة",
@@ -226,6 +301,36 @@
     "empty": {
       "title": "لا توجد فواتير بعد",
       "description": "أنشئ أول فاتورة للبدء بالفوترة"
+    },
+    "toast": {
+      "created": "تم إنشاء الفاتورة",
+      "createdDescription": "أُنشئت الفاتورة بنجاح.",
+      "createError": "تعذّر إنشاء الفاتورة",
+      "updated": "تم تحديث الفاتورة",
+      "updatedDescription": "حُدّثت الفاتورة بنجاح.",
+      "updateError": "تعذّر تحديث الفاتورة",
+      "deleted": "تم حذف الفاتورة",
+      "deletedDescription": "حُذفت الفاتورة بنجاح.",
+      "deleteError": "تعذّر حذف الفاتورة",
+      "sent": "تم إرسال الفاتورة",
+      "sentDescription": "أُرسلت الفاتورة بنجاح.",
+      "sendError": "تعذّر إرسال الفاتورة",
+      "voided": "تم إلغاء الفاتورة",
+      "voidedDescription": "أُلغيت الفاتورة بنجاح.",
+      "voidError": "تعذّر إلغاء الفاتورة",
+      "duplicated": "تم نسخ الفاتورة",
+      "duplicatedDescription": "أُنشئت نسخة جديدة كمسودة.",
+      "duplicateError": "تعذّر نسخ الفاتورة",
+      "genericError": "حدث خطأ"
+    },
+    "validation": {
+      "customerRequired": "العميل مطلوب",
+      "dateRequired": "تاريخ الفاتورة مطلوب",
+      "dueDateRequired": "تاريخ الاستحقاق مطلوب",
+      "descriptionRequired": "الوصف مطلوب",
+      "quantityRequired": "الكمية مطلوبة",
+      "rateRequired": "السعر مطلوب",
+      "lineItemRequired": "يلزم بند واحد على الأقل"
     }
   },
   "creditNotes": {
@@ -318,7 +423,31 @@
       "reference": "رقم المرجع",
       "notes": "ملاحظات",
       "allocations": "توزيع الفواتير",
-      "allocationRequired": "يجب توزيع الدفعة على فاتورة واحدة على الأقل"
+      "allocationRequired": "يجب توزيع الدفعة على فاتورة واحدة على الأقل",
+      "details": "بيانات الدفعة",
+      "amountReceived": "المبلغ المستلم",
+      "paymentModePlaceholder": "اختر طريقة الدفع",
+      "depositToPlaceholder": "اختر الحساب",
+      "referencePlaceholder": "رقم الشيك أو رقم المعاملة وغيرها",
+      "applyToInvoices": "التخصيص على الفواتير",
+      "autoDistribute": "توزيع تلقائي",
+      "selectCustomerFirst": "اختر عميلًا لعرض فواتيره المفتوحة",
+      "noOpenInvoices": "لا توجد فواتير مفتوحة لهذا العميل",
+      "invoiceNumber": "رقم الفاتورة",
+      "invoiceDate": "التاريخ",
+      "dueDate": "تاريخ الاستحقاق",
+      "total": "الإجمالي",
+      "balanceDue": "الرصيد المستحق",
+      "amountToApply": "المبلغ المخصص",
+      "paymentAmount": "مبلغ الدفعة: {amount}",
+      "totalAllocated": "إجمالي المخصص: {amount}",
+      "balanced": "متوازن",
+      "difference": "الفرق: {amount}",
+      "additionalNotes": "ملاحظات إضافية",
+      "notesPlaceholder": "ملاحظات عن هذه الدفعة...",
+      "cancel": "إلغاء",
+      "recording": "جارٍ التسجيل...",
+      "recordPayment": "تسجيل الدفعة"
     },
     "table": {
       "paymentNumber": "رقم الدفعة",
@@ -335,7 +464,22 @@
     "voidedBadge": "ملغاة",
     "voidPayment": "إلغاء الدفعة",
     "voidPaymentTitle": "إلغاء الدفعة",
-    "voidPaymentConfirm": "إلغاء {number} يلغي الدفعة بالكامل: تُستعاد أرصدة كل الفواتير المخصصة لها ويُسجَّل قيد عكسي."
+    "voidPaymentConfirm": "إلغاء {number} يلغي الدفعة بالكامل: تُستعاد أرصدة كل الفواتير المخصصة لها ويُسجَّل قيد عكسي.",
+    "toast": {
+      "recorded": "تم تسجيل الدفعة",
+      "recordedDescription": "سُجّلت الدفعة بنجاح.",
+      "recordError": "تعذّر تسجيل الدفعة",
+      "voided": "تم إلغاء الدفعة",
+      "voidedDescription": "استُعيدت أرصدة الفواتير ورُحّل قيد عكسي.",
+      "voidError": "تعذّر إلغاء الدفعة",
+      "genericError": "حدث خطأ"
+    },
+    "validation": {
+      "customerRequired": "العميل مطلوب",
+      "dateRequired": "التاريخ مطلوب",
+      "amountRequired": "المبلغ مطلوب",
+      "depositAccountRequired": "حساب الإيداع مطلوب"
+    }
   },
   "deliveryChallans": {
     "title": "سندات التسليم",
@@ -397,7 +541,18 @@
     "tax": "الضريبة",
     "amount": "المبلغ",
     "taxLoading": "جارٍ تحميل نسب الضريبة...",
-    "taxLoadFailed": "تعذّر تحميل نسب الضريبة. أعد تحميل الصفحة قبل الحفظ، وإلا سيتم حفظ البنود بدون ضريبة."
+    "taxLoadFailed": "تعذّر تحميل نسب الضريبة. أعد تحميل الصفحة قبل الحفظ، وإلا سيتم حفظ البنود بدون ضريبة.",
+    "itemDescription": "الصنف / الوصف",
+    "discountPercent": "الخصم %",
+    "itemPlaceholder": "اختر صنفًا (اختياري)",
+    "customItem": "صنف مخصص",
+    "noTax": "بدون ضريبة",
+    "removeLine": "حذف البند",
+    "subtotal": "المجموع الفرعي:",
+    "discountTotal": "الخصم:",
+    "taxTotal": "الضريبة:",
+    "total": "الإجمالي:",
+    "lineError": "البند {line}: {message}"
   },
   "overview": {
     "quickActions": "إجراءات سريعة",

@@ -50,11 +50,13 @@ import { usePermissions } from '@/lib/hooks/use-permissions';
 import { InvoiceStatusBadge } from '@/components/sales/status-badge';
 import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
+import { useDateFnsLocale } from '@/lib/date-locale';
 import { cn } from '@/lib/utils';
 
 export default function InvoiceDetailPage() {
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
+  const dateLocale = useDateFnsLocale();
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -318,7 +320,7 @@ export default function InvoiceDetailPage() {
               Due Date
             </div>
             <div className={cn('text-2xl font-bold', isOverdue && 'text-red-600')}>
-              {format(new Date(invoice.dueDate), 'MMM d, yyyy')}
+              {format(new Date(invoice.dueDate), 'MMM d, yyyy', { locale: dateLocale })}
             </div>
           </CardContent>
         </Card>
@@ -492,12 +494,14 @@ export default function InvoiceDetailPage() {
             <CardContent className="space-y-4">
               <div>
                 <div className="text-sm text-muted-foreground">{t('invoices.form.date')}</div>
-                <div className="font-medium">{format(new Date(invoice.date), 'MMMM d, yyyy')}</div>
+                <div className="font-medium">
+                  {format(new Date(invoice.date), 'MMMM d, yyyy', { locale: dateLocale })}
+                </div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">{t('invoices.form.dueDate')}</div>
                 <div className={cn('font-medium', isOverdue && 'text-red-600')}>
-                  {format(new Date(invoice.dueDate), 'MMMM d, yyyy')}
+                  {format(new Date(invoice.dueDate), 'MMMM d, yyyy', { locale: dateLocale })}
                   {isOverdue && ' (Overdue)'}
                 </div>
               </div>
@@ -559,7 +563,9 @@ export default function InvoiceDetailPage() {
                     </TableCell>
                     <TableCell>
                       {allocation.payment?.date
-                        ? format(new Date(allocation.payment.date), 'MMM d, yyyy')
+                        ? format(new Date(allocation.payment.date), 'MMM d, yyyy', {
+                            locale: dateLocale,
+                          })
                         : '-'}
                     </TableCell>
                     <TableCell className="text-right font-mono text-green-600">
@@ -603,7 +609,9 @@ export default function InvoiceDetailPage() {
                       </Link>
                     </TableCell>
                     <TableCell>
-                      {creditNote.date ? format(new Date(creditNote.date), 'MMM d, yyyy') : '-'}
+                      {creditNote.date
+                        ? format(new Date(creditNote.date), 'MMM d, yyyy', { locale: dateLocale })
+                        : '-'}
                     </TableCell>
                     <TableCell className="text-right font-mono text-orange-600">
                       {formatCurrency(creditNote.total || '0')}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { useForm, Control, FieldValues, UseFormWatch, UseFormSetValue } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -19,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCustomers, Customer } from '@/lib/hooks/use-customers';
 import { Invoice } from '@/lib/hooks/use-invoices';
 import {
+  LineErrors,
   LineItemsForm,
   calculateLineTotals,
   taxFieldsForPercent,
@@ -27,9 +29,9 @@ import {
 
 const lineItemSchema = z.object({
   itemId: z.string().optional(),
-  description: z.string().min(1, 'Description is required'),
-  quantity: z.string().min(1, 'Quantity is required'),
-  rate: z.string().min(1, 'Rate is required'),
+  description: z.string().min(1, 'descriptionRequired'),
+  quantity: z.string().min(1, 'quantityRequired'),
+  rate: z.string().min(1, 'rateRequired'),
   discountPercent: z.string().optional(),
   taxRateId: z.string().optional(),
   taxPercent: z.string().optional(),
@@ -37,15 +39,15 @@ const lineItemSchema = z.object({
 });
 
 const invoiceSchema = z.object({
-  customerId: z.string().min(1, 'Customer is required'),
-  invoiceDate: z.string().min(1, 'Invoice date is required'),
-  dueDate: z.string().min(1, 'Due date is required'),
+  customerId: z.string().min(1, 'customerRequired'),
+  invoiceDate: z.string().min(1, 'dateRequired'),
+  dueDate: z.string().min(1, 'dueDateRequired'),
   reference: z.string().optional(),
   paymentTerms: z.string().optional(),
   notes: z.string().optional(),
   terms: z.string().optional(),
   shippingCharge: z.string().optional(),
-  lines: z.array(lineItemSchema).min(1, 'At least one line item is required'),
+  lines: z.array(lineItemSchema).min(1, 'lineItemRequired'),
 });
 
 type InvoiceFormData = z.infer<typeof invoiceSchema>;
@@ -63,12 +65,13 @@ interface InvoiceFormProps {
   isSubmitting?: boolean;
 }
 
+// Labels are keys under common.paymentTerms.
 const paymentTermsOptions = [
-  { value: 'DUE_ON_RECEIPT', label: 'Due on Receipt', days: 0 },
-  { value: 'NET_15', label: 'Net 15', days: 15 },
-  { value: 'NET_30', label: 'Net 30', days: 30 },
-  { value: 'NET_45', label: 'Net 45', days: 45 },
-  { value: 'NET_60', label: 'Net 60', days: 60 },
+  { value: 'DUE_ON_RECEIPT', labelKey: 'dueOnReceipt', days: 0 },
+  { value: 'NET_15', labelKey: 'net15', days: 15 },
+  { value: 'NET_30', labelKey: 'net30', days: 30 },
+  { value: 'NET_45', labelKey: 'net45', days: 45 },
+  { value: 'NET_60', labelKey: 'net60', days: 60 },
 ];
 
 export function InvoiceForm({
@@ -81,6 +84,11 @@ export function InvoiceForm({
   isSubmitting,
 }: InvoiceFormProps) {
   const isEditing = !!invoice;
+  const t = useTranslations('sales.invoices.form');
+  const tValidation = useTranslations('sales.invoices.validation');
+  const tTerms = useTranslations('common.paymentTerms');
+  const fieldError = (message?: string) =>
+    message ? (tValidation.has(message) ? tValidation(message) : message) : undefined;
   const { data: customersData } = useCustomers({ limit: 100 });
   const customers = customersData?.data || [];
 
@@ -215,19 +223,21 @@ export function InvoiceForm({
       {/* Invoice Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Invoice Details</CardTitle>
+          <CardTitle>{t('details')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="customerId">Customer *</Label>
+              <Label htmlFor="customerId">
+                {t('customer')} <span className="text-destructive">*</span>
+              </Label>
               <Select
                 value={form.watch('customerId')}
                 onValueChange={(value) => form.setValue('customerId', value)}
                 disabled={isEditing}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a customer" />
+                  <SelectValue placeholder={t('customerPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {customers.map((customer: Customer) => (
@@ -238,15 +248,17 @@ export function InvoiceForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.customerId && (
-                <p className="text-sm text-red-500">{form.formState.errors.customerId.message}</p>
+                <p className="text-sm text-red-500">
+                  {fieldError(form.formState.errors.customerId.message)}
+                </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="reference">Reference Number</Label>
+              <Label htmlFor="reference">{t('reference')}</Label>
               <Input
                 id="reference"
-                placeholder="PO number or project reference"
+                placeholder={t('referencePlaceholder')}
                 {...form.register('reference')}
               />
             </div>
@@ -254,26 +266,30 @@ export function InvoiceForm({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="invoiceDate">Invoice Date *</Label>
+              <Label htmlFor="invoiceDate">
+                {t('date')} <span className="text-destructive">*</span>
+              </Label>
               <Input id="invoiceDate" type="date" {...form.register('invoiceDate')} />
               {form.formState.errors.invoiceDate && (
-                <p className="text-sm text-red-500">{form.formState.errors.invoiceDate.message}</p>
+                <p className="text-sm text-red-500">
+                  {fieldError(form.formState.errors.invoiceDate.message)}
+                </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="paymentTerms">Payment Terms</Label>
+              <Label htmlFor="paymentTerms">{t('paymentTerms')}</Label>
               <Select
                 value={form.watch('paymentTerms') || ''}
                 onValueChange={handlePaymentTermsChange}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select payment terms" />
+                  <SelectValue placeholder={t('paymentTermsPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {paymentTermsOptions.map((term) => (
                     <SelectItem key={term.value} value={term.value}>
-                      {term.label}
+                      {tTerms(term.labelKey)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -281,10 +297,14 @@ export function InvoiceForm({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dueDate">Due Date *</Label>
+              <Label htmlFor="dueDate">
+                {t('dueDate')} <span className="text-destructive">*</span>
+              </Label>
               <Input id="dueDate" type="date" {...form.register('dueDate')} />
               {form.formState.errors.dueDate && (
-                <p className="text-sm text-red-500">{form.formState.errors.dueDate.message}</p>
+                <p className="text-sm text-red-500">
+                  {fieldError(form.formState.errors.dueDate.message)}
+                </p>
               )}
             </div>
           </div>
@@ -303,31 +323,32 @@ export function InvoiceForm({
         showTax={true}
         showDiscount={true}
       />
+      <LineErrors errors={form.formState.errors.lines} translate={fieldError} />
 
       {/* Shipping & Totals */}
       <Card>
         <CardHeader>
-          <CardTitle>Additional Charges & Totals</CardTitle>
+          <CardTitle>{t('chargesAndTotals')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-4">
-              <Label htmlFor="shippingCharge" className="text-right">
-                Shipping & Handling
+              <Label htmlFor="shippingCharge" className="text-end">
+                {t('shippingAndHandling')}
               </Label>
               <Input
                 id="shippingCharge"
                 type="number"
                 step="0.01"
                 min="0"
-                className="w-32 text-right"
+                className="w-32 text-end"
                 placeholder="0.00"
                 {...form.register('shippingCharge')}
               />
             </div>
             <div className="border-t pt-4 mt-2 w-64">
               <div className="flex justify-between text-lg font-semibold">
-                <span>Grand Total</span>
+                <span>{t('grandTotal')}</span>
                 <span className="font-mono">
                   {new Intl.NumberFormat('en-US', {
                     style: 'currency',
@@ -343,24 +364,24 @@ export function InvoiceForm({
       {/* Notes & Terms */}
       <Card>
         <CardHeader>
-          <CardTitle>Notes & Terms</CardTitle>
+          <CardTitle>{t('notesAndTerms')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="notes">Customer Notes</Label>
+            <Label htmlFor="notes">{t('customerNotes')}</Label>
             <Textarea
               id="notes"
-              placeholder="Notes visible to the customer"
+              placeholder={t('customerNotesPlaceholder')}
               {...form.register('notes')}
               rows={3}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="terms">Terms & Conditions</Label>
+            <Label htmlFor="terms">{t('terms')}</Label>
             <Textarea
               id="terms"
-              placeholder="Payment terms, late fees, etc."
+              placeholder={t('termsPlaceholder')}
               {...form.register('terms')}
               rows={3}
             />
@@ -371,10 +392,10 @@ export function InvoiceForm({
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {t('cancel')}
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : isEditing ? 'Update Invoice' : 'Create Invoice'}
+          {isSubmitting ? t('saving') : isEditing ? t('updateInvoice') : t('createInvoice')}
         </Button>
       </div>
     </form>
