@@ -23,10 +23,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useToast } from '@/components/ui/use-toast';
 import {
   Customer,
-  formatCurrency,
   getBalanceColor,
   useDeleteCustomer,
   useInfiniteCustomers,
@@ -35,19 +33,35 @@ import { customersApi } from '@/lib/api';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import { useExportAll } from '@/lib/hooks/use-export-all';
 import type { ImportEntityType } from '@/lib/hooks/use-import-export';
+import { useBaseCurrency } from '@/lib/hooks/use-organization';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { cn } from '@/lib/utils';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Edit, Eye, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
 function CustomersPageContent() {
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
-  const { toast } = useToast();
+  const locale = useLocale();
+  const baseCurrency = useBaseCurrency();
+
+  // Balances are ledger (AR) amounts, so they are in the base currency, not in
+  // Customer.currency (a USD schema default).
+  const numberLocale = locale === 'ar' ? 'ar-u-nu-latn' : 'en';
+  const formatCurrency = (amount: string | number) => {
+    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+    const value = Number.isFinite(num) ? num : 0;
+    return new Intl.NumberFormat(
+      numberLocale,
+      baseCurrency
+        ? { style: 'currency', currency: baseCurrency }
+        : { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+    ).format(value);
+  };
   const { hasPermission } = usePermissions();
   const { onExportAll } = useExportAll('customers', 'customers');
   const tableParams = useTableParams({ defaultSortBy: 'createdAt', mode: 'virtual' });
@@ -78,14 +92,14 @@ function CustomersPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => customersApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['customers']],
-    successMessage: '{count} customers deleted',
+    successMessage: t.raw('customers.bulkDelete.success'),
   });
 
   const bulkActions = [
     ...(canDelete
       ? [
           {
-            label: 'Delete',
+            label: tCommon('buttons.delete'),
             icon: Trash2,
             variant: 'destructive' as const,
             onClick: (rows: Customer[]) => {
@@ -106,18 +120,8 @@ function CustomersPageContent() {
     if (customerToDelete) {
       try {
         await deleteCustomer.mutateAsync(customerToDelete.id);
-        toast({
-          title: 'Customer deleted',
-          description: `${customerToDelete.name} has been deleted.`,
-        });
-      } catch (error: unknown) {
-        toast({
-          title: 'Error',
-          description:
-            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-            'Failed to delete customer. They may have associated transactions.',
-          variant: 'destructive',
-        });
+      } catch {
+        // useDeleteCustomer shows the translated success and error toasts.
       }
       setDeleteDialogOpen(false);
       setCustomerToDelete(null);
@@ -175,12 +179,12 @@ function CustomersPageContent() {
           onSort={tableParams.setSort}
         />
       ),
-      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      meta: { headerClassName: 'text-end', cellClassName: 'text-end' },
       cell: ({ row }) => {
         const balance = parseFloat(row.original.outstandingBalance || '0');
         return (
           <span className={cn('font-mono font-medium', getBalanceColor(balance))}>
-            {formatCurrency(balance, row.original.currency)}
+            {formatCurrency(balance)}
           </span>
         );
       },
@@ -188,7 +192,7 @@ function CustomersPageContent() {
     {
       id: 'actions',
       header: '',
-      meta: { cellClassName: 'text-right' },
+      meta: { cellClassName: 'text-end' },
       cell: ({ row }) => {
         const customer = row.original;
         return (
@@ -201,21 +205,21 @@ function CustomersPageContent() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem asChild>
                 <Link href={`/sales/customers/${customer.id}`}>
-                  <Eye className="mr-2 h-4 w-4" />
+                  <Eye className="me-2 h-4 w-4" />
                   View
                 </Link>
               </DropdownMenuItem>
               {canEdit && (
                 <DropdownMenuItem asChild>
                   <Link href={`/sales/customers/${customer.id}/edit`}>
-                    <Edit className="mr-2 h-4 w-4" />
+                    <Edit className="me-2 h-4 w-4" />
                     Edit
                   </Link>
                 </DropdownMenuItem>
               )}
               {canDelete && (
                 <DropdownMenuItem onClick={() => handleDelete(customer)} className="text-red-600">
-                  <Trash2 className="mr-2 h-4 w-4" />
+                  <Trash2 className="me-2 h-4 w-4" />
                   Delete
                 </DropdownMenuItem>
               )}
@@ -237,13 +241,13 @@ function CustomersPageContent() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setImportOpen(true)}>
-            <Upload className="mr-2 h-4 w-4" />
+            <Upload className="me-2 h-4 w-4" />
             Import
           </Button>
           {canCreate && (
             <Button asChild data-tour="create-customer-btn">
               <Link href="/sales/customers/new">
-                <Plus className="mr-2 h-4 w-4" />
+                <Plus className="me-2 h-4 w-4" />
                 {t('customers.newCustomer')}
               </Link>
             </Button>
@@ -261,13 +265,13 @@ function CustomersPageContent() {
             <DataTableSearch
               value={tableParams.search}
               onChange={tableParams.setSearch}
-              placeholder="Search by name, email, or phone..."
+              placeholder={t('customers.list.searchPlaceholder')}
             />
             <Button
               variant="outline"
               size="icon"
               onClick={() => refetch()}
-              aria-label="Refresh customers"
+              aria-label={t('customers.list.refresh')}
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
@@ -303,7 +307,7 @@ function CustomersPageContent() {
               canCreate ? (
                 <Button asChild>
                   <Link href="/sales/customers/new">
-                    <Plus className="mr-2 h-4 w-4" />
+                    <Plus className="me-2 h-4 w-4" />
                     Add Your First Customer
                   </Link>
                 </Button>
@@ -320,7 +324,10 @@ function CustomersPageContent() {
         action="delete"
         count={bulkSelectedRows.length}
         itemType="customers"
-        description="Selected customers will be deleted. Customers with transactions will be skipped."
+        title={t('customers.bulkDelete.title', { count: bulkSelectedRows.length })}
+        description={t('customers.bulkDelete.description')}
+        confirmLabel={t('customers.bulkDelete.confirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         destructive
         isLoading={bulkDeleteAction.isLoading}
         onConfirm={async () => {
@@ -335,7 +342,7 @@ function CustomersPageContent() {
         open={importOpen}
         onOpenChange={setImportOpen}
         entityType={'customers' as ImportEntityType}
-        entityLabel="Customers"
+        entityLabel={t('customers.list.importLabel')}
         onComplete={() => refetch()}
       />
 

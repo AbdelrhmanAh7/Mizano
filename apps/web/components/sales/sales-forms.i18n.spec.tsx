@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { InvoiceForm } from './invoice-form';
+import { InvoiceStatusBadge, PaymentModeBadge, QuoteStatusBadge } from './status-badge';
 import enSales from '@/messages/en/sales.json';
 import arSales from '@/messages/ar/sales.json';
 
@@ -87,5 +88,27 @@ describe('sales forms in Arabic (audit B4)', () => {
       }
     }
     expect(Object.keys(arSales.lineItems).sort()).toEqual(Object.keys(enSales.lineItems).sort());
+    // Detail page, list pages and bulk dialogs too.
+    for (const section of ['invoices', 'customers', 'payments'] as const) {
+      expect({ section, keys: keys(arSales[section]).sort() }).toEqual({
+        section,
+        keys: keys(enSales[section]).sort(),
+      });
+    }
+  });
+
+  it('shows status and payment-mode badges in Arabic', () => {
+    mockLocale = 'ar';
+    render(
+      <>
+        <InvoiceStatusBadge status="SENT" />
+        <QuoteStatusBadge status="ACCEPTED" />
+        <PaymentModeBadge mode="BANK_TRANSFER" />
+      </>,
+    );
+    expect(screen.getByText(arSales.invoices.status.sent)).toBeInTheDocument();
+    expect(screen.getByText(arSales.quotes.status.accepted)).toBeInTheDocument();
+    expect(screen.getByText('تحويل بنكي')).toBeInTheDocument();
+    expect(screen.queryByText(/Sent|Accepted|Bank Transfer/)).not.toBeInTheDocument();
   });
 });

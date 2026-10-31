@@ -119,6 +119,17 @@
     "validation": {
       "nameRequired": "Customer name is required",
       "emailInvalid": "Invalid email"
+    },
+    "list": {
+      "searchPlaceholder": "Search by name, email, or phone...",
+      "refresh": "Refresh customers",
+      "importLabel": "Customers"
+    },
+    "bulkDelete": {
+      "title": "Delete {count} customers?",
+      "description": "Selected customers will be deleted. Customers with transactions will be skipped.",
+      "confirm": "Delete {count} customers",
+      "success": "{count} customers deleted"
     }
   },
   "quotes": {
@@ -538,6 +549,19 @@
       "dateRequired": "Date is required",
       "amountRequired": "Amount is required",
       "depositAccountRequired": "Deposit account is required"
+    },
+    "list": {
+      "searchPlaceholder": "Search by payment number or customer...",
+      "filterByMode": "Filter by mode",
+      "allModes": "All Modes",
+      "refresh": "Refresh payments",
+      "importLabel": "Payments"
+    },
+    "bulkDelete": {
+      "title": "Delete {count} payments?",
+      "description": "Selected payments will be deleted. Payments linked to reconciled transactions will be skipped.",
+      "confirm": "Delete {count} payments",
+      "success": "{count} payments deleted"
     }
   },
   "deliveryChallans": {

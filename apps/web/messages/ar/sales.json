@@ -119,6 +119,17 @@
     "validation": {
       "nameRequired": "اسم العميل مطلوب",
       "emailInvalid": "البريد الإلكتروني غير صالح"
+    },
+    "list": {
+      "searchPlaceholder": "ابحث بالاسم أو البريد الإلكتروني أو الهاتف...",
+      "refresh": "تحديث العملاء",
+      "importLabel": "العملاء"
+    },
+    "bulkDelete": {
+      "title": "حذف {count} عميل؟",
+      "description": "سيُحذف العملاء المحددون، وسيُتخطى العملاء الذين لديهم معاملات.",
+      "confirm": "حذف {count} عميل",
+      "success": "تم حذف {count} عميل"
     }
   },
   "quotes": {
@@ -538,6 +549,19 @@
       "dateRequired": "التاريخ مطلوب",
       "amountRequired": "المبلغ مطلوب",
       "depositAccountRequired": "حساب الإيداع مطلوب"
+    },
+    "list": {
+      "searchPlaceholder": "ابحث برقم الدفعة أو اسم العميل...",
+      "filterByMode": "تصفية حسب طريقة الدفع",
+      "allModes": "كل طرق الدفع",
+      "refresh": "تحديث المدفوعات",
+      "importLabel": "المدفوعات"
+    },
+    "bulkDelete": {
+      "title": "حذف {count} دفعة؟",
+      "description": "ستُحذف الدفعات المحددة، وستُتخطى الدفعات المرتبطة بمعاملات تمت مطابقتها.",
+      "confirm": "حذف {count} دفعة",
+      "success": "تم حذف {count} دفعة"
     }
   },
   "deliveryChallans": {

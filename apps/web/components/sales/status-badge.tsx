@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 
 // Invoice status types and colors
@@ -14,15 +15,6 @@ export const invoiceStatusColors: Record<InvoiceStatus, string> = {
   VOID: 'bg-gray-100 text-gray-500 border-gray-200',
 };
 
-export const invoiceStatusLabels: Record<InvoiceStatus, string> = {
-  DRAFT: 'Draft',
-  SENT: 'Sent',
-  PARTIALLY_PAID: 'Partially Paid',
-  PAID: 'Paid',
-  OVERDUE: 'Overdue',
-  VOID: 'Void',
-};
-
 // Quote status types and colors
 export type QuoteStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'INVOICED' | 'DECLINED' | 'EXPIRED';
 
@@ -35,26 +27,12 @@ export const quoteStatusColors: Record<QuoteStatus, string> = {
   EXPIRED: 'bg-orange-100 text-orange-800 border-orange-200',
 };
 
-export const quoteStatusLabels: Record<QuoteStatus, string> = {
-  DRAFT: 'Draft',
-  SENT: 'Sent',
-  ACCEPTED: 'Accepted',
-  INVOICED: 'Invoiced',
-  DECLINED: 'Declined',
-  EXPIRED: 'Expired',
-};
-
 // Credit note types
 export type CreditNoteType = 'REFUND' | 'APPLY_TO_INVOICE';
 
 export const creditNoteTypeColors: Record<CreditNoteType, string> = {
   REFUND: 'bg-green-100 text-green-800 border-green-200',
   APPLY_TO_INVOICE: 'bg-blue-100 text-blue-800 border-blue-200',
-};
-
-export const creditNoteTypeLabels: Record<CreditNoteType, string> = {
-  REFUND: 'Refund',
-  APPLY_TO_INVOICE: 'Applied to Invoice',
 };
 
 // Payment mode types
@@ -77,15 +55,46 @@ export const paymentModeColors: Record<PaymentMode, string> = {
   OTHER: 'bg-gray-100 text-gray-800 border-gray-200',
 };
 
-export const paymentModeLabels: Record<PaymentMode, string> = {
-  CASH: 'Cash',
-  BANK_TRANSFER: 'Bank Transfer',
-  CREDIT_CARD: 'Credit Card',
-  DEBIT_CARD: 'Debit Card',
-  CHEQUE: 'Cheque',
-  ONLINE: 'Online',
-  OTHER: 'Other',
+// Translation keys of each value; the badges show the user's language.
+const invoiceStatusKeys: Record<InvoiceStatus, string> = {
+  DRAFT: 'draft',
+  SENT: 'sent',
+  PARTIALLY_PAID: 'partiallyPaid',
+  PAID: 'paid',
+  OVERDUE: 'overdue',
+  VOID: 'void',
 };
+
+const quoteStatusKeys: Record<QuoteStatus, string> = {
+  DRAFT: 'draft',
+  SENT: 'sent',
+  ACCEPTED: 'accepted',
+  INVOICED: 'invoiced',
+  DECLINED: 'declined',
+  EXPIRED: 'expired',
+};
+
+const creditNoteTypeKeys: Record<CreditNoteType, string> = {
+  REFUND: 'refund',
+  APPLY_TO_INVOICE: 'applyToInvoice',
+};
+
+const paymentModeKeys: Record<PaymentMode, string> = {
+  CASH: 'cash',
+  BANK_TRANSFER: 'bankTransfer',
+  CREDIT_CARD: 'creditCard',
+  DEBIT_CARD: 'debitCard',
+  CHEQUE: 'cheque',
+  ONLINE: 'online',
+  OTHER: 'other',
+};
+
+/** Label of `value` in `namespace`, or the value itself when it is not a known one. */
+function useEnumLabel(namespace: string, keys: Record<string, string>, value: string): string {
+  const t = useTranslations(namespace);
+  const key = keys[value];
+  return key ? t(key) : value;
+}
 
 // Generic status badge component
 interface StatusBadgeProps {
@@ -127,11 +136,12 @@ interface InvoiceStatusBadgeProps {
 }
 
 export function InvoiceStatusBadge({ status, className }: InvoiceStatusBadgeProps) {
+  const label = useEnumLabel('sales.invoices.status', invoiceStatusKeys, status);
   return (
     <StatusBadge
       status={status}
       colorMap={invoiceStatusColors}
-      labelMap={invoiceStatusLabels}
+      labelMap={{ [status]: label }}
       strikethrough={status === 'VOID'}
       className={className}
     />
@@ -144,11 +154,12 @@ interface QuoteStatusBadgeProps {
 }
 
 export function QuoteStatusBadge({ status, className }: QuoteStatusBadgeProps) {
+  const label = useEnumLabel('sales.quotes.status', quoteStatusKeys, status);
   return (
     <StatusBadge
       status={status}
       colorMap={quoteStatusColors}
-      labelMap={quoteStatusLabels}
+      labelMap={{ [status]: label }}
       className={className}
     />
   );
@@ -160,11 +171,12 @@ interface CreditNoteTypeBadgeProps {
 }
 
 export function CreditNoteTypeBadge({ type, className }: CreditNoteTypeBadgeProps) {
+  const label = useEnumLabel('sales.creditNotes.types', creditNoteTypeKeys, type);
   return (
     <StatusBadge
       status={type}
       colorMap={creditNoteTypeColors}
-      labelMap={creditNoteTypeLabels}
+      labelMap={{ [type]: label }}
       className={className}
     />
   );
@@ -176,11 +188,12 @@ interface PaymentModeBadgeProps {
 }
 
 export function PaymentModeBadge({ mode, className }: PaymentModeBadgeProps) {
+  const label = useEnumLabel('common.paymentModes', paymentModeKeys, mode);
   return (
     <StatusBadge
       status={mode}
       colorMap={paymentModeColors}
-      labelMap={paymentModeLabels}
+      labelMap={{ [mode]: label }}
       className={className}
     />
   );
