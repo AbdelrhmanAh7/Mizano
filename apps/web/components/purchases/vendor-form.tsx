@@ -5,16 +5,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { PhoneInput } from '@/components/ui/phone-input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   AddressCard,
@@ -23,6 +13,7 @@ import {
   addressSchema,
   emptyAddress,
 } from '@/components/shared/address-fields';
+import { PartyDetailsFields } from '@/components/shared/party-details-fields';
 import { Vendor } from '@/lib/hooks/use-vendors';
 import { useBaseCurrency } from '@/lib/hooks/use-organization';
 import { useLocale, useTranslations } from 'next-intl';
@@ -51,18 +42,9 @@ interface VendorFormProps {
 /** Currencies offered for a vendor; names come from Intl in the page language. */
 const CURRENCY_CODES = ['EGP', 'SAR', 'AED', 'USD', 'EUR', 'GBP'];
 
-const paymentTermsOptions = [
-  { value: 0, labelKey: 'dueOnReceipt' },
-  { value: 15, labelKey: 'net15' },
-  { value: 30, labelKey: 'net30' },
-  { value: 45, labelKey: 'net45' },
-  { value: 60, labelKey: 'net60' },
-];
-
 export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorFormProps) {
   const isEditing = !!vendor;
   const t = useTranslations('purchases.vendors.form');
-  const tTerms = useTranslations('common.paymentTerms');
   const locale = useLocale();
   const currencyNames = new Intl.DisplayNames([locale], { type: 'currency' });
   const errorText = (message?: string): string | undefined =>
@@ -99,6 +81,9 @@ export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorF
       form.setValue('currency', baseCurrency);
     }
   }, [isEditing, baseCurrency, form]);
+  const currencies = [baseCurrency, ...CURRENCY_CODES]
+    .filter((code, i, all): code is string => !!code && all.indexOf(code) === i)
+    .map((code) => ({ code, label: `${code} - ${currencyNames.of(code)}` }));
 
   useEffect(() => {
     if (vendor) {
@@ -143,99 +128,13 @@ export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorF
           <CardTitle>{t('details')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">{t('name')} *</Label>
-              <Input id="name" placeholder={t('namePlaceholder')} {...form.register('name')} />
-              {form.formState.errors.name && (
-                <p className="text-sm text-red-500">
-                  {errorText(form.formState.errors.name.message)}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="displayName">{t('displayName')}</Label>
-              <Input
-                id="displayName"
-                placeholder={t('displayNameHint')}
-                {...form.register('displayName')}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">{t('email')}</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="vendor@example.com"
-                {...form.register('email')}
-              />
-              {form.formState.errors.email && (
-                <p className="text-sm text-red-500">
-                  {errorText(form.formState.errors.email.message)}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phone">{t('phone')}</Label>
-              <PhoneInput
-                id="phone"
-                value={form.watch('phone') || ''}
-                onChange={(val) => form.setValue('phone', val)}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="currency">{t('currency')}</Label>
-              <Select
-                value={form.watch('currency')}
-                onValueChange={(value) => value && form.setValue('currency', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t('currencyPlaceholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {[baseCurrency, ...CURRENCY_CODES]
-                    .filter((code, i, all): code is string => !!code && all.indexOf(code) === i)
-                    .map((code) => (
-                      <SelectItem key={code} value={code}>
-                        {code} - {currencyNames.of(code)}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="paymentTerms">{t('paymentTerms')}</Label>
-              <Select
-                value={String(form.watch('paymentTerms') ?? 30)}
-                onValueChange={(value) => form.setValue('paymentTerms', parseInt(value))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t('paymentTermsPlaceholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {paymentTermsOptions.map((term) => (
-                    <SelectItem key={term.value} value={String(term.value)}>
-                      {tTerms(term.labelKey)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="taxId">{t('taxId')}</Label>
-              <Input id="taxId" placeholder={t('taxIdHint')} {...form.register('taxId')} />
-            </div>
-          </div>
+          <PartyDetailsFields
+            form={form}
+            namespace="purchases.vendors.form"
+            currencies={currencies}
+            emailPlaceholder="vendor@example.com"
+            errorText={errorText}
+          />
         </CardContent>
       </Card>
 
