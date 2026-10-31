@@ -14,5 +14,5 @@ export default function PurchasesError({
     console.error('Purchases module error:', error.message);
   }, [error]);
 
-  return <ErrorState error={error} title="Purchases Error" onRetry={reset} />;
+  return <ErrorState error={error} onRetry={reset} />;
 }

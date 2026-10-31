@@ -1,33 +1,15 @@
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
-import { createHash, randomUUID, timingSafeEqual } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuthSessionsService } from './auth-sessions.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-
-/**
- * Refresh tokens are stored as SHA-256 digests. bcrypt is unsuitable here: it only
- * reads the first 72 bytes, and every JWT of one user shares that prefix, so a
- * rotated-out token would still verify.
- */
-function hashRefreshToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex');
-}
-
-function refreshTokenMatches(token: string, storedHash: string): boolean {
-  const a = Buffer.from(hashRefreshToken(token));
-  const b = Buffer.from(storedHash);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
-    private jwtService: JwtService,
-    private configService: ConfigService,
+    private sessions: AuthSessionsService,
   ) {}
 
   async register(registerDto: RegisterDto) {
@@ -98,20 +80,7 @@ export class AuthService {
       return { organization, user };
     });
 
-    // Generate tokens
-    const tokens = await this.generateTokens(
-      result.user.id,
-      result.user.email,
-      result.user.name,
-      result.organization.id,
-      result.user.roleId,
-    );
-
-    // Save refresh token
-    await this.prisma.user.update({
-      where: { id: result.user.id },
-      data: { refreshToken: hashRefreshToken(tokens.refreshToken) },
-    });
+    const tokens = await this.sessions.start(result.user);
 
     return {
       user: {
@@ -156,20 +125,8 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    // Generate tokens
-    const tokens = await this.generateTokens(
-      user.id,
-      user.email,
-      user.name,
-      user.organizationId,
-      user.roleId,
-    );
-
-    // Save refresh token
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { refreshToken: hashRefreshToken(tokens.refreshToken) },
-    });
+    // A new session per sign-in: other devices stay signed in.
+    const tokens = await this.sessions.start(user);
 
     return {
       user: {
@@ -193,47 +150,20 @@ export class AuthService {
     };
   }
 
-  async logout(userId: string) {
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { refreshToken: null },
-    });
+  /** Ends only the session the request was made with. */
+  async logout(userId: string, sessionId: string | undefined) {
+    if (sessionId) await this.sessions.end(userId, sessionId, 'logout');
     return { message: 'Logged out successfully' };
   }
 
-  async refreshTokens(userId: string, refreshToken: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
+  /** Ends every session of the user, on every device. */
+  async logoutAll(userId: string) {
+    const sessions = await this.sessions.endAll(userId, 'logout_all');
+    return { message: 'Signed out on all devices', sessions };
+  }
 
-    if (!user || !user.refreshToken || user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('Access denied');
-    }
-
-    const isRefreshTokenValid = refreshTokenMatches(refreshToken, user.refreshToken);
-    if (!isRefreshTokenValid) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    // Generate new tokens
-    const tokens = await this.generateTokens(
-      user.id,
-      user.email,
-      user.name,
-      user.organizationId,
-      user.roleId,
-    );
-
-    // Rotate atomically: only the request that still holds the stored token wins.
-    // A replayed or concurrent use of the same refresh token matches no row.
-    const rotated = await this.prisma.user.updateMany({
-      where: { id: user.id, refreshToken: user.refreshToken, status: 'ACTIVE' },
-      data: { refreshToken: hashRefreshToken(tokens.refreshToken) },
-    });
-    if (rotated.count !== 1) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
+  async refreshTokens(userId: string, sessionId: string | undefined, refreshToken: string) {
+    const tokens = await this.sessions.rotate(userId, sessionId, refreshToken);
     return { tokens };
   }
 
@@ -247,39 +177,5 @@ export class AuthService {
       return result;
     }
     return null;
-  }
-
-  private async generateTokens(
-    userId: string,
-    email: string,
-    name: string,
-    organizationId: string,
-    roleId: string,
-  ) {
-    const payload = {
-      sub: userId,
-      email,
-      name,
-      organizationId,
-      roleId,
-    };
-
-    const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload, {
-        secret: this.configService.get('JWT_SECRET'),
-        expiresIn: this.configService.get('JWT_EXPIRATION', '15m'),
-      }),
-      // Unique jti so two refresh tokens minted in the same second never collide.
-      this.jwtService.signAsync(payload, {
-        jwtid: randomUUID(),
-        secret: this.configService.get('JWT_REFRESH_SECRET'),
-        expiresIn: this.configService.get('JWT_REFRESH_EXPIRATION', '7d'),
-      }),
-    ]);
-
-    return {
-      accessToken,
-      refreshToken,
-    };
   }
 }

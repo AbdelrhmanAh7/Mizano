@@ -14,5 +14,5 @@ export default function ManufacturingError({
     console.error('Manufacturing module error:', error.message);
   }, [error]);
 
-  return <ErrorState error={error} title="Manufacturing Error" onRetry={reset} />;
+  return <ErrorState error={error} onRetry={reset} />;
 }

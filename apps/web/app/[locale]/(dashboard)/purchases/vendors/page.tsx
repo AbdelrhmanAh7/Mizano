@@ -64,10 +64,12 @@ function VendorsPageContent() {
   const canEdit = hasPermission('purchases.edit');
   const canDelete = hasPermission('purchases.delete');
 
+  const tBulk = useTranslations('common.bulk');
+
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => vendorsApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['vendors']],
-    successMessage: '{count} vendors deleted',
+    successMessage: tBulk.raw('vendorsDeleted'),
   });
 
   const bulkActions = [

@@ -12,15 +12,37 @@
  */
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
-// The shared Calendar follows the page locale.
-jest.mock('next-intl', () => ({
-  useLocale: () => 'en',
-  useTranslations: () => (key: string) => key,
-}));
+// The shared Calendar follows the page locale; labels come from the real messages.
+let mockLocale: 'en' | 'ar' = 'en';
+jest.mock('next-intl', () => {
+  const messages = {
+    en: {
+      hr: jest.requireActual('@/messages/en/hr.json'),
+      common: jest.requireActual('@/messages/en/common.json'),
+    },
+    ar: {
+      hr: jest.requireActual('@/messages/ar/hr.json'),
+      common: jest.requireActual('@/messages/ar/common.json'),
+    },
+  };
+  const lookup = (path: string): unknown =>
+    path
+      .split('.')
+      .reduce<unknown>(
+        (node, part) =>
+          node && typeof node === 'object' ? (node as Record<string, unknown>)[part] : undefined,
+        messages[mockLocale],
+      );
+  return {
+    useLocale: () => mockLocale,
+    useTranslations: (namespace: string) => (key: string) =>
+      String(lookup(`${namespace}.${key}`) ?? key),
+  };
+});
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
@@ -98,6 +120,7 @@ const makeEmployee = (overrides?: Partial<Employee>): Employee => ({
 describe('EmployeeForm', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockLocale = 'en';
     mockUseCreateEmployee.mockReturnValue(defaultMutation);
     mockUseUpdateEmployee.mockReturnValue(defaultMutation);
   });
@@ -159,5 +182,26 @@ describe('EmployeeForm', () => {
     expect(() =>
       render(<EmployeeForm employee={makeEmployee({ allowances: null })} />),
     ).not.toThrow();
+  });
+
+  // ── Arabic ────────────────────────────────────────────────────────────────
+
+  it('renders in Arabic without English labels', () => {
+    mockLocale = 'ar';
+    const { container } = render(<EmployeeForm />);
+    const english = Array.from(container.querySelectorAll('label, button, h3, p, span, div'))
+      .filter((el) => el.children.length === 0)
+      .map((el) => el.textContent?.trim() ?? '')
+      .filter((text) => /[A-Za-z]{3,}/.test(text));
+    expect(english).toEqual([]);
+    expect(screen.getByText('البيانات الشخصية')).toBeInTheDocument();
+  });
+
+  it('shows translated validation messages in Arabic', async () => {
+    mockLocale = 'ar';
+    render(<EmployeeForm />);
+    fireEvent.click(screen.getByRole('button', { name: 'إضافة الموظف' }));
+    expect(await screen.findByText('رقم الموظف مطلوب')).toBeInTheDocument();
+    expect(screen.getByText('أدخل بريدًا إلكترونيًا صحيحًا')).toBeInTheDocument();
   });
 });

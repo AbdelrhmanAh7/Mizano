@@ -3,11 +3,9 @@
 import { useTranslations } from 'next-intl';
 import { useCallback } from 'react';
 
-import { useToast } from '@/components/ui/use-toast';
+import { useToastMutation } from '@/lib/hooks/use-toast-mutation';
 import { accountsApi } from '@/lib/api';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-
-type ApiError = { response?: { data?: { message?: string } } };
+import { useQuery } from '@tanstack/react-query';
 
 // Types
 export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'INCOME' | 'EXPENSE';
@@ -113,32 +111,18 @@ export function useAccount(id: string | undefined) {
   });
 }
 
+const ACCOUNT_TOAST = 'accounting.accounts.toast';
+
 /**
  * Hook to create a new account
  */
 export function useCreateAccount() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (data: CreateAccountData) => {
-      const response = await accountsApi.create(data);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      toast({
-        title: 'Account created',
-        description: 'The account has been created successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error creating account',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: ACCOUNT_TOAST,
+    mutationFn: async (data: CreateAccountData) => (await accountsApi.create(data)).data,
+    invalidate: () => [['accounts']],
+    success: 'created',
+    error: 'createError',
   });
 }
 
@@ -146,29 +130,13 @@ export function useCreateAccount() {
  * Hook to update an existing account
  */
 export function useUpdateAccount() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateAccountData }) => {
-      const response = await accountsApi.update(id, data);
-      return response.data;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      queryClient.invalidateQueries({ queryKey: ['accounts', variables.id] });
-      toast({
-        title: 'Account updated',
-        description: 'The account has been updated successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error updating account',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: ACCOUNT_TOAST,
+    mutationFn: async ({ id, data }: { id: string; data: UpdateAccountData }) =>
+      (await accountsApi.update(id, data)).data,
+    invalidate: ({ id }) => [['accounts'], ['accounts', id]],
+    success: 'updated',
+    error: 'updateError',
   });
 }
 
@@ -176,28 +144,12 @@ export function useUpdateAccount() {
  * Hook to delete an account
  */
 export function useDeleteAccount() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await accountsApi.delete(id);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      toast({
-        title: 'Account deleted',
-        description: 'The account has been deleted successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error deleting account',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: ACCOUNT_TOAST,
+    mutationFn: async (id: string) => (await accountsApi.delete(id)).data,
+    invalidate: () => [['accounts']],
+    success: 'deleted',
+    error: 'deleteError',
   });
 }
 
@@ -220,30 +172,14 @@ export function useAccountBalance(id: string | undefined, asOfDate?: string) {
  * Hook to seed default accounts
  */
 export function useSeedAccounts() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (industry?: string) => {
-      const response = industry
-        ? await accountsApi.seedByIndustry(industry)
-        : await accountsApi.seedDefaults();
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      toast({
-        title: 'Accounts seeded',
-        description: 'Default accounts have been created successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error seeding accounts',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: ACCOUNT_TOAST,
+    mutationFn: async (industry?: string) =>
+      (industry ? await accountsApi.seedByIndustry(industry) : await accountsApi.seedDefaults())
+        .data,
+    invalidate: () => [['accounts']],
+    success: 'seeded',
+    error: 'seedError',
   });
 }
 

@@ -32,7 +32,7 @@ function BankRulesPageContent() {
   const tableParams = useTableParams({ defaultSortBy: 'name' });
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const { data, isLoading } = useBankRules({ ...tableParams.queryParams });
+  const { data, isLoading, isError, refetch } = useBankRules({ ...tableParams.queryParams });
   const deleteRule = useDeleteBankRule();
   const updateRule = useUpdateBankRule();
 
@@ -80,10 +80,12 @@ function BankRulesPageContent() {
           {(row.original.conditions ?? []).map((condition, idx) => (
             <p key={idx} className="text-sm">
               <span className="text-muted-foreground">
-                {getConditionFieldLabel(condition.field)}
+                {getConditionFieldLabel(condition.field, t)}
               </span>{' '}
-              <span className="font-medium">{getConditionOperatorLabel(condition.operator)}</span>{' '}
-              <span className="font-mono bg-muted px-1 rounded">{condition.value}</span>
+              <span className="font-medium">
+                {getConditionOperatorLabel(condition.operator, t)}
+              </span>{' '}
+              <bdi className="font-mono bg-muted px-1 rounded">{condition.value}</bdi>
             </p>
           ))}
         </div>
@@ -93,7 +95,7 @@ function BankRulesPageContent() {
       id: 'action',
       header: t('rules.table.action'),
       cell: ({ row }) => (
-        <Badge variant="outline">{getActionTypeLabel(row.original.action.type)}</Badge>
+        <Badge variant="outline">{getActionTypeLabel(row.original.action.type, t)}</Badge>
       ),
     },
     {
@@ -112,12 +114,12 @@ function BankRulesPageContent() {
           <button onClick={() => handleToggleActive(rule)} className="inline-flex items-center">
             {rule.isActive ? (
               <Badge className="bg-green-100 text-green-800 hover:bg-green-200">
-                <ToggleRight className="mr-1 h-3 w-3" />
+                <ToggleRight className="me-1 h-3 w-3" />
                 {t('rules.active')}
               </Badge>
             ) : (
               <Badge variant="secondary" className="hover:bg-secondary/80">
-                <ToggleLeft className="mr-1 h-3 w-3" />
+                <ToggleLeft className="me-1 h-3 w-3" />
                 {t('rules.inactive')}
               </Badge>
             )}
@@ -134,19 +136,19 @@ function BankRulesPageContent() {
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" aria-label={tc('table.actions')}>
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem asChild>
                 <Link href={`/banking/rules/${rule.id}/edit`}>
-                  <Pencil className="mr-2 h-4 w-4" />
+                  <Pencil className="me-2 h-4 w-4" />
                   {tc('buttons.edit')}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(rule.id)}>
-                <Trash2 className="mr-2 h-4 w-4" />
+                <Trash2 className="me-2 h-4 w-4" />
                 {tc('buttons.delete')}
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -166,7 +168,7 @@ function BankRulesPageContent() {
         </div>
         <Button asChild>
           <Link href="/banking/rules/new">
-            <Plus className="mr-2 h-4 w-4" />
+            <Plus className="me-2 h-4 w-4" />
             {t('rules.newRule')}
           </Link>
         </Button>
@@ -182,23 +184,32 @@ function BankRulesPageContent() {
       </div>
 
       {/* Table */}
-      <DataTable
-        columns={columns}
-        data={rules}
-        page={meta?.page || 1}
-        totalPages={meta?.totalPages || 1}
-        total={meta?.total || 0}
-        limit={tableParams.limit}
-        onPageChange={tableParams.setPage}
-        onLimitChange={tableParams.setLimit}
-        isLoading={isLoading}
-        emptyMessage={t('rules.empty.title')}
-        emptyAction={
-          <Button asChild>
-            <Link href="/banking/rules/new">{t('rules.createRule')}</Link>
+      {isError ? (
+        <div className="py-8 text-center space-y-4" role="alert">
+          <p className="text-sm text-muted-foreground">{tc('table.error')}</p>
+          <Button variant="outline" onClick={() => void refetch()}>
+            {tc('dashboard.tryAgain')}
           </Button>
-        }
-      />
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={rules}
+          page={meta?.page || 1}
+          totalPages={meta?.totalPages || 1}
+          total={meta?.total || 0}
+          limit={tableParams.limit}
+          onPageChange={tableParams.setPage}
+          onLimitChange={tableParams.setLimit}
+          isLoading={isLoading}
+          emptyMessage={t('rules.empty.title')}
+          emptyAction={
+            <Button asChild>
+              <Link href="/banking/rules/new">{t('rules.createRule')}</Link>
+            </Button>
+          }
+        />
+      )}
 
       {/* Delete Confirmation */}
       <DeleteConfirmDialog

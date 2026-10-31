@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/table';
 import { warehousesApi } from '@/lib/api';
 import {
+  CreateCompositeItemData,
   formatCurrency,
   useAssembleCompositeItem,
   useCheckAvailability,
@@ -92,13 +93,7 @@ function CompositeItemDetailContent() {
   }
 
   if (isEditing) {
-    const handleUpdate = async (data: {
-      name: string;
-      sku: string;
-      sellingPrice: string;
-      description: string;
-      components: Array<{ itemId: string; quantity: string }>;
-    }) => {
+    const handleUpdate = async (data: CreateCompositeItemData) => {
       await updateCompositeItem.mutateAsync({ id, data });
       router.push(`/inventory/composite-items/${id}`);
     };
@@ -124,7 +119,7 @@ function CompositeItemDetailContent() {
             description: compositeItem.description || '',
             components: compositeItem.components.map((c) => ({
               itemId: c.itemId,
-              quantity: c.quantity,
+              quantity: String(c.quantity),
             })),
           }}
           onSubmit={handleUpdate}

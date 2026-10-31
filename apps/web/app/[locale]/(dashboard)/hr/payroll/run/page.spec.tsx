@@ -14,6 +14,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
 jest.mock('next-intl', () => ({
+  useLocale: () => 'en',
   useTranslations: () => (key: string) => key,
 }));
 
@@ -40,6 +41,7 @@ jest.mock('@/lib/hooks/use-hr', () => ({
   useRunPayroll: () => mockUseRunPayroll(),
   useConfirmPayroll: () => mockUseConfirmPayroll(),
   formatCurrency: (v: number) => `$${v.toFixed(2)}`,
+  getMonthName: (m: number) => `Month${m}`,
 }));
 
 // ── Import after mocks ────────────────────────────────────────────────────────

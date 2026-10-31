@@ -162,7 +162,7 @@ describe('transformJournal', () => {
 // ── Page-level rendering tests ───────────────────────────────────────────────
 
 jest.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
+  useTranslations: () => Object.assign((key: string) => key, { raw: (key: string) => key }),
   useLocale: () => 'en',
 }));
 

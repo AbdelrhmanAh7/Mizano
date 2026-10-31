@@ -35,12 +35,17 @@ export default function AccountDetailPage() {
 
   const { data: account, isLoading: accountLoading } = useAccount(accountId);
   const tc = useTranslations('common');
+  const td = useTranslations('accounting.accounts.detail');
   const {
     data: balance,
     isLoading: balanceLoading,
     isError: balanceError,
   } = useAccountBalance(accountId);
-  const { data: journalsData } = useJournals({ limit: 10, sortBy: 'date', sortOrder: 'desc' });
+  const { data: journalsData, isError: journalsError } = useJournals({
+    limit: 10,
+    sortBy: 'date',
+    sortOrder: 'desc',
+  });
 
   if (accountLoading) {
     return (
@@ -59,20 +64,18 @@ export default function AccountDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={td('goBack')}>
             <Link href="/accounting/accounts">
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
             </Link>
           </Button>
-          <h1 className="text-3xl font-bold tracking-tight">Account Not Found</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{td('notFoundTitle')}</h1>
         </div>
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              The account you&apos;re looking for doesn&apos;t exist.
-            </p>
+            <p className="text-muted-foreground">{td('notFoundDescription')}</p>
             <Button asChild className="mt-4">
-              <Link href="/accounting/accounts">Back to Accounts</Link>
+              <Link href="/accounting/accounts">{td('backToAccounts')}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -90,19 +93,19 @@ export default function AccountDetailPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild aria-label="Go back">
+        <Button variant="ghost" size="icon" asChild aria-label={td('goBack')}>
           <Link href="/accounting/accounts">
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
           </Link>
         </Button>
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold tracking-tight">
-              {account.code} - {account.name}
+              <bdi>{account.code}</bdi> - {account.name}
             </h1>
             <Badge className={getAccountTypeColor(account.type)}>{typeLabel(account.type)}</Badge>
           </div>
-          <p className="text-muted-foreground">{account.description || 'No description'}</p>
+          <p className="text-muted-foreground">{account.description || td('noDescription')}</p>
         </div>
       </div>
 
@@ -110,16 +113,16 @@ export default function AccountDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle>Account Details</CardTitle>
+            <CardTitle>{td('details')}</CardTitle>
           </CardHeader>
           <CardContent>
             <dl className="grid grid-cols-2 gap-4">
               <div>
-                <dt className="text-sm font-medium text-muted-foreground">Code</dt>
+                <dt className="text-sm font-medium text-muted-foreground">{td('code')}</dt>
                 <dd className="text-lg font-semibold">{account.code}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-muted-foreground">Type</dt>
+                <dt className="text-sm font-medium text-muted-foreground">{td('type')}</dt>
                 <dd>
                   <Badge className={getAccountTypeColor(account.type)}>
                     {typeLabel(account.type)}
@@ -127,32 +130,32 @@ export default function AccountDetailPage() {
                 </dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-muted-foreground">Currency</dt>
+                <dt className="text-sm font-medium text-muted-foreground">{td('currency')}</dt>
                 <dd className="text-lg">{account.currency}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-muted-foreground">Status</dt>
+                <dt className="text-sm font-medium text-muted-foreground">{td('status')}</dt>
                 <dd>
                   <Badge variant={account.isActive ? 'default' : 'secondary'}>
-                    {account.isActive ? 'Active' : 'Inactive'}
+                    {account.isActive ? td('active') : td('inactive')}
                   </Badge>
                 </dd>
               </div>
               {account.parent && (
                 <div className="col-span-2">
-                  <dt className="text-sm font-medium text-muted-foreground">Parent Account</dt>
+                  <dt className="text-sm font-medium text-muted-foreground">{td('parent')}</dt>
                   <dd className="text-lg">
-                    {account.parent.code} - {account.parent.name}
+                    <bdi>{account.parent.code}</bdi> - {account.parent.name}
                   </dd>
                 </div>
               )}
               <div>
-                <dt className="text-sm font-medium text-muted-foreground">Created</dt>
+                <dt className="text-sm font-medium text-muted-foreground">{td('created')}</dt>
                 <dd>{format(new Date(account.createdAt), 'PP', { locale: dateLocale })}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-muted-foreground">System Account</dt>
-                <dd>{account.isSystem ? 'Yes' : 'No'}</dd>
+                <dt className="text-sm font-medium text-muted-foreground">{td('systemAccount')}</dt>
+                <dd>{account.isSystem ? td('yes') : td('no')}</dd>
               </div>
             </dl>
           </CardContent>
@@ -160,7 +163,7 @@ export default function AccountDetailPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Balance Summary</CardTitle>
+            <CardTitle>{td('balanceSummary')}</CardTitle>
           </CardHeader>
           <CardContent>
             {balanceLoading ? (
@@ -172,8 +175,10 @@ export default function AccountDetailPage() {
             ) : balance ? (
               <div className="space-y-4">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Current Balance</p>
-                  <p className="text-3xl font-bold">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {td('currentBalance')}
+                  </p>
+                  <p className="text-3xl font-bold" dir="ltr">
                     {new Intl.NumberFormat('en-US', {
                       style: 'currency',
                       currency: account.currency || 'USD',
@@ -183,13 +188,17 @@ export default function AccountDetailPage() {
                 {balance.totalDebits !== undefined && (
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Total Debits</p>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        {td('totalDebits')}
+                      </p>
                       <p className="text-lg font-mono">
                         {formatJournalAmount(balance.totalDebits)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Total Credits</p>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        {td('totalCredits')}
+                      </p>
                       <p className="text-lg font-mono">
                         {formatJournalAmount(balance.totalCredits)}
                       </p>
@@ -198,7 +207,7 @@ export default function AccountDetailPage() {
                 )}
               </div>
             ) : (
-              <p className="text-muted-foreground">No balance data available</p>
+              <p className="text-muted-foreground">{td('noBalance')}</p>
             )}
           </CardContent>
         </Card>
@@ -207,20 +216,24 @@ export default function AccountDetailPage() {
       {/* Recent Journal Lines */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Journal Entries</CardTitle>
+          <CardTitle>{td('recentJournals')}</CardTitle>
         </CardHeader>
         <CardContent>
-          {relevantJournals.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No journal entries for this account.</p>
+          {journalsError ? (
+            <p className="text-sm text-muted-foreground" role="alert">
+              {td('journalsError')}
+            </p>
+          ) : relevantJournals.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{td('noJournals')}</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Journal #</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Debit</TableHead>
-                  <TableHead className="text-right">Credit</TableHead>
+                  <TableHead>{td('date')}</TableHead>
+                  <TableHead>{td('journalNumber')}</TableHead>
+                  <TableHead>{td('description')}</TableHead>
+                  <TableHead className="text-end">{td('debit')}</TableHead>
+                  <TableHead className="text-end">{td('credit')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -253,12 +266,12 @@ export default function AccountDetailPage() {
                           </Link>
                         </TableCell>
                         <TableCell>{line.description || journal.notes || '-'}</TableCell>
-                        <TableCell className="text-right font-mono">
+                        <TableCell className="text-end font-mono">
                           {parseFloat(line.debit || '0') > 0
                             ? formatJournalAmount(line.debit)
                             : '-'}
                         </TableCell>
-                        <TableCell className="text-right font-mono">
+                        <TableCell className="text-end font-mono">
                           {parseFloat(line.credit || '0') > 0
                             ? formatJournalAmount(line.credit)
                             : '-'}

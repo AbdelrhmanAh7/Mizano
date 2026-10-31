@@ -17,14 +17,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
-import { useToast } from '@/components/ui/use-toast';
 import {
   useRecurringProfile,
   useDeleteRecurringProfile,
   useToggleRecurringProfile,
   useExecuteRecurringProfile,
   useRecurringProfileExecutions,
-  getFrequencyLabel,
+  useFrequencyLabel,
 } from '@/lib/hooks/use-recurring-profiles';
 import { formatJournalAmount } from '@/lib/hooks/use-journals';
 import { usePermissions } from '@/lib/hooks/use-permissions';
@@ -37,9 +36,11 @@ export default function RecurringProfileDetailPage() {
   const formatLongDate = useDateFormatter('long');
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('accounting');
+  const tPage = useTranslations('accounting.recurring.page');
+  const tDetail = useTranslations('accounting.recurring.detail');
+  const frequencyLabel = useFrequencyLabel();
   const params = useParams();
   const router = useRouter();
-  const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const profileId = params.id as string;
 
@@ -49,53 +50,33 @@ export default function RecurringProfileDetailPage() {
   const deleteProfile = useDeleteRecurringProfile();
   const toggleProfile = useToggleRecurringProfile();
   const executeProfile = useExecuteRecurringProfile();
-  const { data: executions } = useRecurringProfileExecutions(profileId, 10);
+  const { data: executions, isError: executionsError } = useRecurringProfileExecutions(
+    profileId,
+    10,
+  );
+  const executionStatus = (status?: string): string => {
+    const key = `executionStatus.${status || 'success'}`;
+    return tDetail.has(key) ? tDetail(key) : String(status);
+  };
 
   const canEdit = hasPermission('accounting.edit');
   const canDelete = hasPermission('accounting.delete');
 
-  const handleExecute = async () => {
-    try {
-      await executeProfile.mutateAsync(profileId);
-    } catch {
-      toast({
-        title: 'Error',
-        description: 'Failed to execute recurring profile.',
-        variant: 'destructive',
-      });
-    }
+  // The mutation hooks show the success and error toasts.
+  const handleExecute = () => {
+    executeProfile.mutate(profileId);
   };
 
-  const handleToggle = async () => {
-    try {
-      await toggleProfile.mutateAsync(profileId);
-      toast({
-        title: profile?.isActive ? 'Profile paused' : 'Profile activated',
-        description: `"${profile?.name}" has been ${profile?.isActive ? 'paused' : 'activated'}.`,
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to toggle recurring profile.',
-        variant: 'destructive',
-      });
-    }
+  const handleToggle = () => {
+    toggleProfile.mutate(profileId);
   };
 
   const confirmDelete = async () => {
     try {
       await deleteProfile.mutateAsync(profileId);
-      toast({
-        title: 'Profile deleted',
-        description: 'The recurring profile has been deleted.',
-      });
       router.push('/accounting/recurring');
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to delete recurring profile.',
-        variant: 'destructive',
-      });
+    } catch {
+      // Toasted by useDeleteRecurringProfile.
     }
     setDeleteDialogOpen(false);
   };
@@ -117,22 +98,20 @@ export default function RecurringProfileDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={tDetail('goBack')}>
             <Link href="/accounting/recurring">
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Profile Not Found</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{tDetail('notFoundTitle')}</h1>
           </div>
         </div>
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              The recurring profile you&apos;re looking for doesn&apos;t exist.
-            </p>
+            <p className="text-muted-foreground">{tDetail('notFoundDescription')}</p>
             <Button asChild className="mt-4">
-              <Link href="/accounting/recurring">Back to Profiles</Link>
+              <Link href="/accounting/recurring">{tDetail('backToProfiles')}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -147,11 +126,11 @@ export default function RecurringProfileDetailPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={tDetail('goBack')}>
             <Link href="/accounting/recurring">
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
             </Link>
           </Button>
           <div>
@@ -162,35 +141,37 @@ export default function RecurringProfileDetailPage() {
                   profile.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                 }
               >
-                {profile.isActive ? 'Active' : 'Inactive'}
+                {profile.isActive ? tPage('active') : tPage('inactive')}
               </Badge>
             </div>
-            <p className="text-muted-foreground">{profile.description || 'No description'}</p>
+            <p className="text-muted-foreground">
+              {profile.description || tDetail('noDescription')}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {canEdit && (
             <>
               <Button variant="outline" onClick={handleExecute}>
-                <Play className="mr-2 h-4 w-4" />
-                Execute Now
+                <Play className="me-2 h-4 w-4" />
+                {tPage('executeNow')}
               </Button>
               <Button variant="outline" onClick={handleToggle}>
                 {profile.isActive ? (
                   <>
-                    <Pause className="mr-2 h-4 w-4" />
-                    Pause
+                    <Pause className="me-2 h-4 w-4" />
+                    {tPage('pause')}
                   </>
                 ) : (
                   <>
-                    <Play className="mr-2 h-4 w-4" />
-                    Activate
+                    <Play className="me-2 h-4 w-4" />
+                    {tPage('activate')}
                   </>
                 )}
               </Button>
               <Button variant="outline" asChild>
                 <Link href={`/accounting/recurring/${profileId}/edit`}>
-                  <Edit className="mr-2 h-4 w-4" />
+                  <Edit className="me-2 h-4 w-4" />
                   {t('recurring.editProfile')}
                 </Link>
               </Button>
@@ -198,7 +179,7 @@ export default function RecurringProfileDetailPage() {
           )}
           {canDelete && (
             <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
-              <Trash2 className="mr-2 h-4 w-4" />
+              <Trash2 className="me-2 h-4 w-4" />
               {t('recurring.deleteProfile')}
             </Button>
           )}
@@ -217,7 +198,7 @@ export default function RecurringProfileDetailPage() {
                 {t('recurring.form.frequency')}
               </dt>
               <dd className="mt-1">
-                <Badge variant="outline">{getFrequencyLabel(profile.frequency)}</Badge>
+                <Badge variant="outline">{frequencyLabel(profile.frequency)}</Badge>
               </dd>
             </div>
             <div>
@@ -235,7 +216,7 @@ export default function RecurringProfileDetailPage() {
               </dt>
               <dd className="mt-1">
                 <Badge variant={profile.autoPost ? 'default' : 'secondary'}>
-                  {profile.autoPost ? 'Yes - Auto Post' : 'No - Save as Draft'}
+                  {profile.autoPost ? tDetail('autoPostYes') : tDetail('autoPostNo')}
                 </Badge>
               </dd>
             </div>
@@ -249,18 +230,20 @@ export default function RecurringProfileDetailPage() {
                     profile.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                   }
                 >
-                  {profile.isActive ? 'Active' : 'Inactive'}
+                  {profile.isActive ? tPage('active') : tPage('inactive')}
                 </Badge>
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">Created</dt>
+              <dt className="text-sm font-medium text-muted-foreground">{tDetail('created')}</dt>
               <dd className="mt-1">
                 {format(new Date(profile.createdAt), 'PP', { locale: dateLocale })}
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">Last Modified</dt>
+              <dt className="text-sm font-medium text-muted-foreground">
+                {tDetail('lastModified')}
+              </dt>
               <dd className="mt-1">
                 {format(new Date(profile.updatedAt), 'PP', { locale: dateLocale })}
               </dd>
@@ -272,7 +255,7 @@ export default function RecurringProfileDetailPage() {
       {/* Journal Template */}
       <Card>
         <CardHeader>
-          <CardTitle>Journal Template</CardTitle>
+          <CardTitle>{tDetail('journalTemplate')}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -280,8 +263,8 @@ export default function RecurringProfileDetailPage() {
               <TableRow>
                 <TableHead>{t('journals.form.account')}</TableHead>
                 <TableHead>{t('journals.form.description')}</TableHead>
-                <TableHead className="text-right">{t('journals.form.debit')}</TableHead>
-                <TableHead className="text-right">{t('journals.form.credit')}</TableHead>
+                <TableHead className="text-end">{t('journals.form.debit')}</TableHead>
+                <TableHead className="text-end">{t('journals.form.credit')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -289,16 +272,16 @@ export default function RecurringProfileDetailPage() {
                 <TableRow key={index}>
                   <TableCell>
                     <span className="font-medium">
-                      {line.account?.code} - {line.account?.name}
+                      <bdi>{line.account?.code}</bdi> - {line.account?.name}
                     </span>
                   </TableCell>
                   <TableCell>{line.description || '-'}</TableCell>
-                  <TableCell className="text-right font-mono">
+                  <TableCell className="text-end font-mono">
                     {parseFloat(line.debit || '0') > 0
                       ? formatJournalAmount(parseFloat(line.debit))
                       : '-'}
                   </TableCell>
-                  <TableCell className="text-right font-mono">
+                  <TableCell className="text-end font-mono">
                     {parseFloat(line.credit || '0') > 0
                       ? formatJournalAmount(parseFloat(line.credit))
                       : '-'}
@@ -307,11 +290,11 @@ export default function RecurringProfileDetailPage() {
               ))}
               {/* Totals Row */}
               <TableRow className="border-t-2 font-semibold">
-                <TableCell colSpan={2}>Total</TableCell>
-                <TableCell className="text-right font-mono">
+                <TableCell colSpan={2}>{tDetail('total')}</TableCell>
+                <TableCell className="text-end font-mono">
                   {formatJournalAmount(totalDebit)}
                 </TableCell>
-                <TableCell className="text-right font-mono">
+                <TableCell className="text-end font-mono">
                   {formatJournalAmount(totalCredit)}
                 </TableCell>
               </TableRow>
@@ -323,16 +306,20 @@ export default function RecurringProfileDetailPage() {
       {/* Execution History */}
       <Card>
         <CardHeader>
-          <CardTitle>Execution History</CardTitle>
+          <CardTitle>{tDetail('executionHistory')}</CardTitle>
         </CardHeader>
         <CardContent>
-          {executions && Array.isArray(executions) && executions.length > 0 ? (
+          {executionsError ? (
+            <p className="text-sm text-muted-foreground" role="alert">
+              {tDetail('executionsError')}
+            </p>
+          ) : executions && Array.isArray(executions) && executions.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Journal</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>{tDetail('date')}</TableHead>
+                  <TableHead>{tDetail('journal')}</TableHead>
+                  <TableHead>{tDetail('status')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -348,11 +335,11 @@ export default function RecurringProfileDetailPage() {
                   ) => (
                     <TableRow key={exec.id || index}>
                       <TableCell>
-                        {format(new Date(exec.executedAt), 'MMM d, yyyy HH:mm')}
+                        {format(new Date(exec.executedAt), 'PP p', { locale: dateLocale })}
                       </TableCell>
                       <TableCell>{exec.journalNumber || '-'}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{exec.status || 'Completed'}</Badge>
+                        <Badge variant="outline">{executionStatus(exec.status)}</Badge>
                       </TableCell>
                     </TableRow>
                   ),
@@ -360,7 +347,7 @@ export default function RecurringProfileDetailPage() {
               </TableBody>
             </Table>
           ) : (
-            <p className="text-sm text-muted-foreground">No executions yet.</p>
+            <p className="text-sm text-muted-foreground">{tDetail('noExecutions')}</p>
           )}
         </CardContent>
       </Card>
@@ -369,15 +356,10 @@ export default function RecurringProfileDetailPage() {
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         title={t('recurring.deleteProfile')}
-        description={
-          <>
-            Are you sure you want to delete this recurring profile? This action cannot be undone.
-            Previously created journals will not be affected.
-          </>
-        }
+        description={tPage('deleteConfirmThis')}
         onConfirm={confirmDelete}
-        cancelLabel="Cancel"
-        deleteLabel="Delete"
+        cancelLabel={tPage('cancel')}
+        deleteLabel={tPage('delete')}
       />
     </div>
   );

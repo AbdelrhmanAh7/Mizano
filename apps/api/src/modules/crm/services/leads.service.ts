@@ -1,32 +1,18 @@
 import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { LeadSource, LeadStatus, Prisma } from '@prisma/client';
-import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { Decimal } from '@prisma/client/runtime/library';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { WebhookOutboxService } from '../../integrations/services/webhook-outbox.service';
-
-export interface CreateLeadDto {
-  leadName: string;
-  companyName?: string;
-  email?: string;
-  phone?: string;
-  source?: LeadSource;
-  status?: LeadStatus;
-  notes?: string;
-  customFields?: Record<string, unknown>;
-  assignedToId?: string;
-}
-
-export interface UpdateLeadDto extends Partial<CreateLeadDto> {}
-
-export interface LeadQueryDto {
-  status?: LeadStatus;
-  source?: LeadSource;
-  assignedToId?: string;
-  search?: string;
-  limit?: number;
-  offset?: number;
-}
+import { crmPage } from '../dto/crm-list-query.dto';
+import {
+  ConvertLeadDto,
+  CreateLeadDto,
+  LeadCursorQueryDto,
+  LeadQueryDto,
+  UpdateLeadDto,
+} from '../dto/lead.dto';
+import { assertUserInOrg } from './crm-references';
 
 @Injectable()
 export class LeadsService {
@@ -37,6 +23,8 @@ export class LeadsService {
   ) {}
 
   async create(organizationId: string, dto: CreateLeadDto, userId: string) {
+    if (dto.assignedToId) await assertUserInOrg(this.prisma, organizationId, dto.assignedToId);
+
     return this.prisma.lead.create({
       data: {
         leadName: dto.leadName,
@@ -81,8 +69,7 @@ export class LeadsService {
           _count: { select: { deals: true, activities: true } },
         },
         orderBy: { createdAt: 'desc' },
-        take: query.limit || 50,
-        skip: query.offset || 0,
+        ...crmPage(query),
       }),
       this.prisma.lead.count({ where }),
     ]);
@@ -90,8 +77,17 @@ export class LeadsService {
     return { data, total };
   }
 
-  async findAllCursor(organizationId: string, query: CursorPaginationDto) {
+  private static readonly CURSOR_SORT_FIELDS = [
+    'createdAt',
+    'updatedAt',
+    'leadName',
+    'companyName',
+  ];
+
+  async findAllCursor(organizationId: string, query: LeadCursorQueryDto) {
     const where: Record<string, unknown> = { organizationId, deletedAt: null };
+    if (query.status) where.status = query.status;
+    if (query.source) where.source = query.source;
 
     if (query.search) {
       where.OR = [
@@ -101,7 +97,10 @@ export class LeadsService {
       ];
     }
 
-    const orderBy = { [query.sortBy || 'createdAt']: query.sortOrder || 'desc' };
+    const sortBy = LeadsService.CURSOR_SORT_FIELDS.includes(query.sortBy ?? '')
+      ? query.sortBy!
+      : 'createdAt';
+    const orderBy = { [sortBy]: query.sortOrder || 'desc' };
 
     return cursorPaginate(this.prisma.lead, where, orderBy, {
       cursor: query.cursor,
@@ -140,18 +139,23 @@ export class LeadsService {
 
   async update(organizationId: string, id: string, dto: UpdateLeadDto) {
     await this.findOne(organizationId, id);
+    if (dto.assignedToId) await assertUserInOrg(this.prisma, organizationId, dto.assignedToId);
 
+    // Explicit fields only; `null` clears an optional column but never a required one.
     return this.prisma.lead.update({
       where: { id },
       data: {
-        leadName: dto.leadName,
+        leadName: dto.leadName ?? undefined,
         companyName: dto.companyName,
         email: dto.email,
         phone: dto.phone,
-        source: dto.source,
-        status: dto.status,
+        source: dto.source ?? undefined,
+        status: dto.status ?? undefined,
         notes: dto.notes,
-        customFields: dto.customFields as Prisma.InputJsonValue | undefined,
+        customFields:
+          dto.customFields === null
+            ? Prisma.DbNull
+            : (dto.customFields as Prisma.InputJsonValue | undefined),
         assignedToId: dto.assignedToId,
       },
       include: {
@@ -172,11 +176,7 @@ export class LeadsService {
     return { message: 'Lead deleted' };
   }
 
-  async convertToCustomer(
-    organizationId: string,
-    id: string,
-    options?: { createDeal?: boolean; dealValue?: number },
-  ) {
+  async convertToCustomer(organizationId: string, id: string, options?: ConvertLeadDto) {
     const lead = await this.findOne(organizationId, id);
 
     if (lead.convertedToCustomerId) {
@@ -226,10 +226,10 @@ export class LeadsService {
       if (options?.createDeal) {
         deal = await tx.deal.create({
           data: {
-            dealName: `Deal for ${customer.name}`,
+            dealName: options.dealName || `Deal for ${customer.name}`,
             leadId: id,
             customerId: customer.id,
-            expectedAmount: options.dealValue || 0,
+            expectedAmount: new Decimal(options.expectedAmount ?? '0'),
             assignedToId: lead.assignedToId,
             organizationId,
           },
@@ -287,6 +287,7 @@ export class LeadsService {
 
   async assignLead(organizationId: string, id: string, assignedToId: string) {
     await this.findOne(organizationId, id);
+    await assertUserInOrg(this.prisma, organizationId, assignedToId);
 
     return this.prisma.lead.update({
       where: { id },
@@ -298,7 +299,10 @@ export class LeadsService {
   }
 
   async bulkAssign(organizationId: string, leadIds: string[], assignedToId: string) {
-    await this.prisma.lead.updateMany({
+    await assertUserInOrg(this.prisma, organizationId, assignedToId);
+
+    // Ids of other tenants (or deleted leads) simply match nothing; report what really changed.
+    const { count } = await this.prisma.lead.updateMany({
       where: {
         id: { in: leadIds },
         organizationId,
@@ -307,6 +311,6 @@ export class LeadsService {
       data: { assignedToId },
     });
 
-    return { updated: leadIds.length };
+    return { updated: count };
   }
 }

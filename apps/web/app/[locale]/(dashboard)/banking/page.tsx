@@ -20,33 +20,39 @@ import { useBankingStats } from '@/lib/hooks/use-bank-accounts';
 export default function BankingPage() {
   const t = useTranslations('banking');
   const formatCurrency = useMoneyFormatter();
-  const { data: stats, isLoading: statsLoading } = useBankingStats();
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    isError: statsFailed,
+    refetch: refetchStats,
+  } = useBankingStats();
+  const tCommon = useTranslations('common');
 
   const modules = [
     {
       title: t('accounts.title'),
-      description: 'View and manage your bank accounts, balances, and transactions.',
+      description: t('hub.accountsDescription'),
       icon: DollarSign,
       href: '/banking/accounts',
       color: 'text-blue-600',
     },
     {
       title: t('reconciliation.title'),
-      description: 'Match bank statements with your records for accurate bookkeeping.',
+      description: t('hub.reconcileDescription'),
       icon: BarChart3,
       href: '/banking/reconcile',
       color: 'text-green-600',
     },
     {
       title: t('rules.title'),
-      description: 'Automate transaction categorization with custom bank rules.',
+      description: t('hub.rulesDescription'),
       icon: FileText,
       href: '/banking/rules',
       color: 'text-purple-600',
     },
     {
       title: t('transactions.title'),
-      description: 'View all imported bank transactions and their matching status.',
+      description: t('hub.transactionsDescription'),
       icon: TrendingUp,
       href: '/banking/transactions',
       color: 'text-orange-600',
@@ -60,6 +66,18 @@ export default function BankingPage() {
         <p className="text-muted-foreground">{t('description')}</p>
       </div>
 
+      {statsFailed && (
+        <div
+          role="alert"
+          className="flex items-center justify-between gap-3 rounded-md border border-destructive/50 p-3 text-sm text-destructive"
+        >
+          <span>{t('hub.statsFailed')}</span>
+          <Button variant="outline" size="sm" onClick={() => void refetchStats()}>
+            {tCommon('combobox.retry')}
+          </Button>
+        </div>
+      )}
+
       {/* Stats Row */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -69,11 +87,13 @@ export default function BankingPage() {
                 <Landmark className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Accounts</p>
+                <p className="text-sm text-muted-foreground">{t('hub.totalAccounts')}</p>
                 {statsLoading ? (
                   <Skeleton className="h-7 w-12 mt-1" />
                 ) : (
-                  <p className="text-2xl font-bold">{stats?.totalAccounts ?? 0}</p>
+                  <p className="text-2xl font-bold">
+                    {statsFailed ? '—' : (stats?.totalAccounts ?? 0)}
+                  </p>
                 )}
               </div>
             </div>
@@ -87,12 +107,12 @@ export default function BankingPage() {
                 <DollarSign className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Balance</p>
+                <p className="text-sm text-muted-foreground">{t('hub.totalBalance')}</p>
                 {statsLoading ? (
                   <Skeleton className="h-7 w-24 mt-1" />
                 ) : (
                   <p className="text-2xl font-bold font-mono">
-                    {formatCurrency(stats?.totalSystemBalance ?? 0)}
+                    {statsFailed ? '—' : formatCurrency(stats?.totalSystemBalance ?? 0)}
                   </p>
                 )}
               </div>
@@ -107,11 +127,13 @@ export default function BankingPage() {
                 <Clock className="h-5 w-5 text-yellow-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Pending Transactions</p>
+                <p className="text-sm text-muted-foreground">{t('hub.pendingTransactions')}</p>
                 {statsLoading ? (
                   <Skeleton className="h-7 w-12 mt-1" />
                 ) : (
-                  <p className="text-2xl font-bold">{stats?.pendingTransactionCount ?? 0}</p>
+                  <p className="text-2xl font-bold">
+                    {statsFailed ? '—' : (stats?.pendingTransactionCount ?? 0)}
+                  </p>
                 )}
               </div>
             </div>
@@ -125,11 +147,13 @@ export default function BankingPage() {
                 <TrendingUp className="h-5 w-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">This Month</p>
+                <p className="text-sm text-muted-foreground">{t('hub.thisMonth')}</p>
                 {statsLoading ? (
                   <Skeleton className="h-7 w-12 mt-1" />
                 ) : (
-                  <p className="text-2xl font-bold">{stats?.monthlyTransactionCount ?? 0}</p>
+                  <p className="text-2xl font-bold">
+                    {statsFailed ? '—' : (stats?.monthlyTransactionCount ?? 0)}
+                  </p>
                 )}
               </div>
             </div>
@@ -153,8 +177,8 @@ export default function BankingPage() {
               <CardDescription className="text-sm">{module.description}</CardDescription>
               <Link href={module.href}>
                 <Button variant="outline" className="w-full group">
-                  Open
-                  <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  {tCommon('buttons.open')}
+                  <ArrowRight className="ms-2 h-4 w-4 transition-transform group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
                 </Button>
               </Link>
             </CardContent>

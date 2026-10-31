@@ -387,4 +387,59 @@ describe('PdfService HTML safety', () => {
       expect(html).not.toMatch(/US\$|USD/);
     }
   });
+
+  it('renders quotes and bills in Arabic with the organization digits (item 3)', async () => {
+    const doc = {
+      date: new Date('2026-10-31'),
+      dueDate: new Date('2026-11-30'),
+      expiryDate: new Date('2026-11-30'),
+      status: 'SENT',
+      currencyCode: 'EGP',
+      lines: [{ description: 'x', quantity: '2', rate: '50', taxRate: null, amount: '100' }],
+      subtotal: '100',
+      taxAmount: '0',
+      grandTotal: '100',
+      balanceDue: '100',
+      notes: null,
+      terms: null,
+    };
+    const party = { name: 'شركة النيل', email: null, phone: null, address: null, taxId: '311' };
+    prisma.quote = {
+      findFirst: jest.fn().mockResolvedValue({ ...doc, quoteNumber: 'Q-1', customer: party }),
+    };
+    prisma.bill = {
+      ...prisma.bill,
+      findFirst: jest.fn().mockResolvedValue({ ...doc, billNumber: 'B-1', vendor: party }),
+    };
+    const arabMoney = new Intl.NumberFormat('ar-u-nu-arab', {
+      style: 'currency',
+      currency: 'EGP',
+      minimumFractionDigits: 2,
+    }).format(100);
+
+    prisma.organization.findUnique.mockResolvedValue({ ...ORG_ROW, documentDigits: 'arab' });
+    await service.generateQuotePdf('org-1', 'quote-1', 'ar');
+    expect(prisma.quote.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'quote-1', organizationId: 'org-1', deletedAt: null },
+      }),
+    );
+    expect(lastHtml()).toContain('<html lang="ar" dir="rtl">');
+    expect(lastHtml()).toContain('عرض سعر');
+    expect(lastHtml()).toContain('الرقم الضريبي: 311'); // customer tax id now printed
+    expect(lastHtml()).toContain(arabMoney);
+
+    await service.generateBillPdf('org-1', 'bill-1', 'ar');
+    expect(lastHtml()).toContain('فاتورة مورد');
+    expect(lastHtml()).toContain(arabMoney);
+
+    // English ignores the setting; an unknown stored value means Western digits.
+    await service.generateBillPdf('org-1', 'bill-1', 'en');
+    expect(lastHtml()).toContain('<html lang="en" dir="ltr">');
+    expect(lastHtml()).toContain('100.00');
+    prisma.organization.findUnique.mockResolvedValue({ ...ORG_ROW, documentDigits: 'bogus' });
+    await service.generateQuotePdf('org-1', 'quote-1', 'ar');
+    expect(lastHtml()).toContain('100.00');
+    expect(lastHtml()).not.toContain(arabMoney);
+  });
 });

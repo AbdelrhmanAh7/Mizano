@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useToast } from '@/components/ui/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
@@ -35,9 +36,9 @@ interface UseBulkActionOptions<TResult = unknown> {
   mutationFn: (ids: string[]) => Promise<TResult>;
   /** Query keys to invalidate on success */
   queryKeys: string[][];
-  /** Success toast message. {count} will be replaced with the number of items. */
+  /** Translated success toast message (`t.raw(...)`); {count} becomes the number of items. */
   successMessage?: string;
-  /** Error toast message */
+  /** Translated error toast message, shown when the server sent none */
   errorMessage?: string;
   /** Callback on success */
   onSuccess?: (result: TResult) => void;
@@ -46,12 +47,13 @@ interface UseBulkActionOptions<TResult = unknown> {
 export function useBulkAction<TResult = unknown>({
   mutationFn,
   queryKeys,
-  successMessage = '{count} items updated successfully',
-  errorMessage = 'Failed to perform bulk action',
+  successMessage,
+  errorMessage,
   onSuccess,
 }: UseBulkActionOptions<TResult>) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('common.bulk');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const mutation = useMutation({
@@ -64,16 +66,24 @@ export function useBulkAction<TResult = unknown>({
       const { processed, failures } = readBulkOutcome(result, ids.length);
       if (failures.length === 0) {
         toast({
-          title: 'Success',
-          description: successMessage.replace('{count}', String(processed)),
+          title: t('success'),
+          description: (successMessage ?? t.raw('defaultSuccess')).replace(
+            '{count}',
+            String(processed),
+          ),
         });
       } else {
         const reasons = Array.from(new Set(failures.map((f) => f.reason)))
           .slice(0, 3)
           .join('; ');
         toast({
-          title: processed > 0 ? 'Partially completed' : 'Nothing was processed',
-          description: `${processed} of ${processed + failures.length} succeeded. ${failures.length} failed: ${reasons}`,
+          title: processed > 0 ? t('partialTitle') : t('noneTitle'),
+          description: t('partialBody', {
+            processed,
+            total: processed + failures.length,
+            failed: failures.length,
+            reasons,
+          }),
           variant: processed > 0 ? 'default' : 'destructive',
         });
       }
@@ -82,8 +92,8 @@ export function useBulkAction<TResult = unknown>({
     },
     onError: (error: Error) => {
       toast({
-        title: 'Error',
-        description: error.message || errorMessage,
+        title: t('errorTitle'),
+        description: error.message || errorMessage || t('defaultError'),
         variant: 'destructive',
       });
     },

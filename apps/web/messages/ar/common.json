@@ -218,7 +218,12 @@
     "welcomeBack": "مرحباً بعودتك، {name}",
     "signOut": "تسجيل الخروج",
     "profile": "الملف الشخصي",
-    "notifications": "الإشعارات"
+    "notifications": "الإشعارات",
+    "signOutEverywhere": "تسجيل الخروج من جميع الأجهزة",
+    "signOutEverywhereTitle": "تسجيل الخروج من جميع الأجهزة؟",
+    "signOutEverywhereBody": "سيتم تسجيل خروج كل هاتف وجهاز لوحي ومتصفح مسجّل الدخول إلى حسابك، ومنها هذا الجهاز.",
+    "signOutEverywhereConfirm": "تسجيل الخروج من الكل",
+    "signOutEverywhereFailed": "تعذّر تسجيل خروج الأجهزة الأخرى. حاول مرة أخرى."
   },
   "buttons": {
     "save": "حفظ",
@@ -332,12 +337,19 @@
     "forbidden": "الوصول مرفوض",
     "validation": "خطأ في التحقق",
     "network": "خطأ في الشبكة. يرجى التحقق من اتصالك.",
-    "server": "خطأ في الخادم. يرجى المحاولة مرة أخرى لاحقاً."
+    "server": "خطأ في الخادم. يرجى المحاولة مرة أخرى لاحقاً.",
+    "tryAgain": "حاول مرة أخرى"
   },
   "empty": {
     "title": "لا توجد بيانات",
     "description": "لا يوجد شيء هنا حتى الآن.",
     "action": "ابدأ"
+  },
+  "documentPdf": {
+    "exportPdf": "تصدير PDF",
+    "print": "طباعة",
+    "error": "تعذّر إنشاء ملف PDF",
+    "errorDescription": "يُرجى المحاولة مرة أخرى بعد قليل."
   },
   "paymentModes": {
     "cash": "نقداً",
@@ -421,7 +433,39 @@
     "deleteSelected": "حذف المحدد",
     "issueSelected": "إصدار المحدد",
     "confirmAction": "هل أنت متأكد من {action} {count} عناصر؟",
-    "processing": "جاري المعالجة..."
+    "processing": "جاري المعالجة...",
+    "success": "تم",
+    "partialTitle": "تم جزئيًا",
+    "noneTitle": "لم يتم شيء",
+    "partialBody": "تم {processed} من {total}. تعذّر تنفيذ {failed}: {reasons}",
+    "errorTitle": "حدث خطأ",
+    "defaultSuccess": "تم تحديث {count} من العناصر",
+    "defaultError": "تعذّر إكمال العملية",
+    "journalsDeleted": "تم حذف {count} من القيود غير المرحّلة",
+    "journalsPosted": "تم ترحيل {count} من القيود",
+    "vendorsDeleted": "تم حذف {count} من الموردين",
+    "paymentsVoided": "تم إلغاء {count} من المدفوعات",
+    "expensesDeleted": "تم حذف {count} من المصروفات",
+    "expensesApproved": "تم اعتماد {count} من المصروفات",
+    "billsDeleted": "تم حذف {count} من فواتير الشراء المسودة",
+    "billsApproved": "تم اعتماد وترحيل {count} من فواتير الشراء",
+    "billsPaid": "تم سداد {count} من فواتير الشراء وتسجيل الدفعات",
+    "vendorCreditsDeleted": "تم حذف {count} من إشعارات دائن الموردين",
+    "quotesDeleted": "تم حذف {count} من عروض الأسعار المسودة",
+    "quotesSent": "تم إرسال {count} من عروض الأسعار",
+    "quotesDeclined": "تم رفض {count} من عروض الأسعار",
+    "creditNotesDeleted": "تم حذف {count} من الإشعارات الدائنة",
+    "projectsDeleted": "تم حذف {count} من المشاريع",
+    "projectsActivated": "تم تفعيل {count} من المشاريع",
+    "projectsCompleted": "تم إكمال {count} من المشاريع",
+    "projectsOnHold": "تم إيقاف {count} من المشاريع مؤقتًا",
+    "projectsCancelled": "تم إلغاء {count} من المشاريع",
+    "workOrdersDeleted": "تم حذف {count} من أوامر التشغيل",
+    "workOrdersStarted": "تم بدء {count} من أوامر التشغيل",
+    "workOrdersCompleted": "تم إكمال {count} من أوامر التشغيل",
+    "workOrdersCancelled": "تم إلغاء {count} من أوامر التشغيل",
+    "vatReturnsDeleted": "تم حذف {count} من إقرارات ضريبة القيمة المضافة",
+    "vatReturnsSubmitted": "تم تقديم {count} من إقرارات ضريبة القيمة المضافة"
   },
   "clone": {
     "duplicate": "نسخ",
@@ -478,5 +522,13 @@
   },
   "apiErrors": {
     "VALIDATION_ERROR": "بعض الحقول ناقصة أو غير صحيحة. راجع النموذج وحاول مرة أخرى."
+  },
+  "notificationPanel": {
+    "title": "الإشعارات",
+    "markAllRead": "تحديد الكل كمقروء",
+    "empty": "لا توجد إشعارات بعد",
+    "today": "اليوم",
+    "yesterday": "أمس",
+    "earlier": "أقدم"
   }
 }

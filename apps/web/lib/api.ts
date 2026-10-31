@@ -1,6 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { getSession, signOut } from 'next-auth/react';
 import { createCrudApi } from './api/create-api-client';
+import { currentUiLocale } from './request-language';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:6001/api';
 
@@ -92,6 +93,15 @@ const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 });
+
+// Both clients ask for the current UI language: the API answers messages and errors in it.
+function withUiLanguage(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
+  const locale = currentUiLocale();
+  if (locale) config.headers['Accept-Language'] = locale;
+  return config;
+}
+publicApi.interceptors.request.use(withUiLanguage);
+api.interceptors.request.use(withUiLanguage);
 
 // REQUEST INTERCEPTOR: Use cached session
 api.interceptors.request.use(async (config) => {
@@ -191,7 +201,19 @@ export const authApi = {
     lastName: string;
     organizationName: string;
   }) => publicApi.post('/auth/register', data),
-  refreshToken: (refreshToken: string) => publicApi.post('/auth/refresh', { refreshToken }),
+  // The refresh route authenticates the refresh token as a bearer token.
+  refreshToken: (refreshToken: string) =>
+    publicApi.post(
+      '/auth/refresh',
+      { refreshToken },
+      { headers: { Authorization: `Bearer ${refreshToken}` } },
+    ),
+  forgotPassword: (email: string, locale: string) =>
+    publicApi.post('/auth/forgot-password', { email, locale }),
+  resetPassword: (token: string, password: string) =>
+    publicApi.post('/auth/reset-password', { token, password }),
+  /** Ends every signed-in session of the current user (this device included). */
+  logoutAll: () => api.post('/auth/logout-all'),
 };
 
 // ===========================================================================

@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { lockOrganizationLedger } from '../../common/utils/ledger-lock';
 import { PrismaService } from '../../prisma/prisma.service';
 import { timingSafeStringEqual } from '../../common/utils/secure-compare.util';
+import { documentDigitsFrom } from '../../common/utils/document-digits';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { UpdateAccountSettingsDto } from './dto/update-account-settings.dto';
 import {
@@ -226,6 +227,7 @@ export class OrganizationsService {
         dateFormat: org.dateFormat,
         numberFormat: org.numberFormat,
         timezone: org.timezone,
+        documentDigits: documentDigitsFrom(org.documentDigits),
       },
       branding: {
         logoUrl: org.logoUrl,
@@ -372,6 +374,8 @@ export class OrganizationsService {
         dateFormat: dto.dateFormat,
         numberFormat: dto.numberFormat,
         timezone: dto.timezone,
+        // Required column: a null clears nothing, it keeps the stored choice.
+        documentDigits: dto.documentDigits ?? undefined,
       },
       select: { id: true, updatedAt: true },
     });

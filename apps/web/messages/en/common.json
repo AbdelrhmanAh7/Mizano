@@ -218,7 +218,12 @@
     "welcomeBack": "Welcome back, {name}",
     "signOut": "Sign out",
     "profile": "Profile",
-    "notifications": "Notifications"
+    "notifications": "Notifications",
+    "signOutEverywhere": "Sign out on all devices",
+    "signOutEverywhereTitle": "Sign out on all devices?",
+    "signOutEverywhereBody": "Every phone, tablet and browser signed in to your account will be signed out, including this one.",
+    "signOutEverywhereConfirm": "Sign out everywhere",
+    "signOutEverywhereFailed": "Couldn't sign out the other devices. Try again."
   },
   "buttons": {
     "save": "Save",
@@ -332,12 +337,19 @@
     "forbidden": "Access denied",
     "validation": "Validation error",
     "network": "Network error. Please check your connection.",
-    "server": "Server error. Please try again later."
+    "server": "Server error. Please try again later.",
+    "tryAgain": "Try again"
   },
   "empty": {
     "title": "No data",
     "description": "There's nothing here yet.",
     "action": "Get started"
+  },
+  "documentPdf": {
+    "exportPdf": "Export PDF",
+    "print": "Print",
+    "error": "Could not create the PDF",
+    "errorDescription": "Please try again in a moment."
   },
   "paymentModes": {
     "cash": "Cash",
@@ -421,7 +433,39 @@
     "deleteSelected": "Delete Selected",
     "issueSelected": "Issue Selected",
     "confirmAction": "Are you sure you want to {action} {count} items?",
-    "processing": "Processing..."
+    "processing": "Processing...",
+    "success": "Done",
+    "partialTitle": "Partly done",
+    "noneTitle": "Nothing was done",
+    "partialBody": "{processed} of {total} done. {failed} could not be done: {reasons}",
+    "errorTitle": "Something went wrong",
+    "defaultSuccess": "{count} items updated",
+    "defaultError": "The action could not be completed",
+    "journalsDeleted": "{count} unposted journals deleted",
+    "journalsPosted": "{count} journals posted",
+    "vendorsDeleted": "{count} vendors deleted",
+    "paymentsVoided": "{count} payments voided",
+    "expensesDeleted": "{count} expenses deleted",
+    "expensesApproved": "{count} expenses approved",
+    "billsDeleted": "{count} draft bills deleted",
+    "billsApproved": "{count} bills approved and posted",
+    "billsPaid": "{count} bills paid (payments recorded)",
+    "vendorCreditsDeleted": "{count} vendor credits deleted",
+    "quotesDeleted": "{count} draft quotes deleted",
+    "quotesSent": "{count} quotes sent",
+    "quotesDeclined": "{count} quotes declined",
+    "creditNotesDeleted": "{count} credit notes deleted",
+    "projectsDeleted": "{count} projects deleted",
+    "projectsActivated": "{count} projects activated",
+    "projectsCompleted": "{count} projects completed",
+    "projectsOnHold": "{count} projects put on hold",
+    "projectsCancelled": "{count} projects cancelled",
+    "workOrdersDeleted": "{count} work orders deleted",
+    "workOrdersStarted": "{count} work orders started",
+    "workOrdersCompleted": "{count} work orders completed",
+    "workOrdersCancelled": "{count} work orders cancelled",
+    "vatReturnsDeleted": "{count} VAT returns deleted",
+    "vatReturnsSubmitted": "{count} VAT returns submitted"
   },
   "clone": {
     "duplicate": "Duplicate",
@@ -478,5 +522,13 @@
   },
   "apiErrors": {
     "VALIDATION_ERROR": "Some fields are missing or invalid. Check the form and try again."
+  },
+  "notificationPanel": {
+    "title": "Notifications",
+    "markAllRead": "Mark all as read",
+    "empty": "No notifications yet",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "earlier": "Earlier"
   }
 }

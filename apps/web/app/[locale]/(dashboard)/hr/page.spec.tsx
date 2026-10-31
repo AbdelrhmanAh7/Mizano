@@ -16,6 +16,7 @@ import { render, screen } from '@testing-library/react';
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
 jest.mock('next-intl', () => ({
+  useLocale: () => 'en',
   useTranslations: () => (key: string, opts?: Record<string, unknown>) =>
     opts ? `${key}:${JSON.stringify(opts)}` : key,
 }));

@@ -6,6 +6,15 @@ import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+jest.mock('next-intl', () => ({
+  useTranslations: () =>
+    Object.assign(
+      (key: string, values?: Record<string, unknown>) =>
+        values ? `${key} ${JSON.stringify(values)}` : key,
+      { raw: (key: string) => key },
+    ),
+}));
+
 // Mock useToast
 const mockToast = jest.fn();
 jest.mock('@/components/ui/use-toast', () => ({
@@ -68,7 +77,7 @@ describe('useBulkAction', () => {
 
     expect(mockToast).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: 'Success',
+        title: 'success',
         description: '2 items deleted',
       }),
     );
@@ -98,7 +107,7 @@ describe('useBulkAction', () => {
     await waitFor(() => {
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
-          title: 'Error',
+          title: 'errorTitle',
           variant: 'destructive',
         }),
       );

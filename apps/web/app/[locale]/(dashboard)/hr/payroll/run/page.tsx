@@ -35,23 +35,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useEmployees, useRunPayroll, useConfirmPayroll, formatCurrency } from '@/lib/hooks/use-hr';
-import { useTranslations } from 'next-intl';
-
-const months = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
+import {
+  useEmployees,
+  useRunPayroll,
+  useConfirmPayroll,
+  formatCurrency,
+  getMonthName,
+} from '@/lib/hooks/use-hr';
+import { useLocale, useTranslations } from 'next-intl';
 
 interface PayslipPreview {
   employeeId: string;
@@ -69,6 +60,8 @@ interface PayslipPreview {
 export default function RunPayrollPage() {
   const t = useTranslations('hr');
   const tCommon = useTranslations('common');
+  const locale = useLocale();
+  const months = Array.from({ length: 12 }, (_, i) => getMonthName(i + 1, locale));
   const router = useRouter();
   const today = new Date();
   const [month, setMonth] = useState(getMonth(today) + 1);
@@ -78,7 +71,12 @@ export default function RunPayrollPage() {
   const [payrollRunId, setPayrollRunId] = useState<string | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
-  const { data: employeesData, isLoading: employeesLoading } = useEmployees({ status: 'ACTIVE' });
+  const {
+    data: employeesData,
+    isLoading: employeesLoading,
+    isError: employeesError,
+    refetch: refetchEmployees,
+  } = useEmployees({ status: 'ACTIVE' });
   const runPayroll = useRunPayroll();
   const confirmPayroll = useConfirmPayroll();
 
@@ -168,13 +166,24 @@ export default function RunPayrollPage() {
     );
   }
 
+  if (employeesError) {
+    return (
+      <div className="text-center py-12 space-y-4" role="alert">
+        <p className="text-muted-foreground">{t('loadError')}</p>
+        <Button variant="outline" onClick={() => void refetchEmployees()}>
+          {t('retry')}
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
           <Link href="/hr/payroll">
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
           </Link>
         </Button>
         <div>
@@ -319,7 +328,7 @@ export default function RunPayrollPage() {
                   {t('payroll.preview.totalDeductions')}
                 </p>
                 <p className="text-2xl font-bold font-mono text-red-600">
-                  -{formatCurrency(totalDeductions)}
+                  <span dir="ltr">-{formatCurrency(totalDeductions)}</span>
                 </p>
               </CardContent>
             </Card>
@@ -343,33 +352,33 @@ export default function RunPayrollPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t('payroll.previewTable.employee')}</TableHead>
-                    <TableHead className="text-right">{t('payroll.previewTable.basic')}</TableHead>
-                    <TableHead className="text-right">
+                    <TableHead className="text-end">{t('payroll.previewTable.basic')}</TableHead>
+                    <TableHead className="text-end">
                       {t('payroll.previewTable.allowances')}
                     </TableHead>
-                    <TableHead className="text-right">{t('payroll.previewTable.gross')}</TableHead>
-                    <TableHead className="text-right">{t('payroll.previewTable.lop')}</TableHead>
-                    <TableHead className="text-right">
+                    <TableHead className="text-end">{t('payroll.previewTable.gross')}</TableHead>
+                    <TableHead className="text-end">{t('payroll.previewTable.lop')}</TableHead>
+                    <TableHead className="text-end">
                       {t('payroll.previewTable.deductions')}
                     </TableHead>
-                    <TableHead className="text-right">{t('payroll.previewTable.tax')}</TableHead>
-                    <TableHead className="text-right">{t('payroll.previewTable.netPay')}</TableHead>
+                    <TableHead className="text-end">{t('payroll.previewTable.tax')}</TableHead>
+                    <TableHead className="text-end">{t('payroll.previewTable.netPay')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {preview.map((slip) => (
                     <TableRow key={slip.employeeId}>
                       <TableCell className="font-medium">{slip.employeeName}</TableCell>
-                      <TableCell className="text-right font-mono">
+                      <TableCell className="text-end font-mono">
                         {formatCurrency(slip.basicSalary)}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-green-600">
-                        +{formatCurrency(slip.totalAllowances)}
+                      <TableCell className="text-end font-mono text-green-600">
+                        <span dir="ltr">+{formatCurrency(slip.totalAllowances)}</span>
                       </TableCell>
-                      <TableCell className="text-right font-mono">
+                      <TableCell className="text-end font-mono">
                         {formatCurrency(slip.gross)}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-end">
                         {slip.lopDays > 0 ? (
                           <span className="text-red-600">
                             {t('payroll.lopDays', { days: slip.lopDays })}
@@ -378,13 +387,13 @@ export default function RunPayrollPage() {
                           '-'
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-red-600">
-                        -{formatCurrency(slip.totalDeductions)}
+                      <TableCell className="text-end font-mono text-red-600">
+                        <span dir="ltr">-{formatCurrency(slip.totalDeductions)}</span>
                       </TableCell>
-                      <TableCell className="text-right font-mono text-red-600">
-                        -{formatCurrency(slip.taxAmount)}
+                      <TableCell className="text-end font-mono text-red-600">
+                        <span dir="ltr">-{formatCurrency(slip.taxAmount)}</span>
                       </TableCell>
-                      <TableCell className="text-right font-mono font-medium">
+                      <TableCell className="text-end font-mono font-medium">
                         {formatCurrency(slip.netPay)}
                       </TableCell>
                     </TableRow>
@@ -399,7 +408,7 @@ export default function RunPayrollPage() {
               {t('payroll.actions.back')}
             </Button>
             <Button onClick={handleRunPayroll} disabled={runPayroll.isPending}>
-              <Play className="mr-2 h-4 w-4" />
+              <Play className="me-2 h-4 w-4" />
               {runPayroll.isPending
                 ? t('payroll.actions.processing')
                 : t('payroll.actions.runPayroll')}
@@ -434,7 +443,7 @@ export default function RunPayrollPage() {
                   </Link>
                 </Button>
                 <Button onClick={() => setShowConfirmDialog(true)}>
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  <CheckCircle2 className="me-2 h-4 w-4" />
                   {t('payroll.actions.confirmPost')}
                 </Button>
               </div>

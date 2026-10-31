@@ -23,18 +23,39 @@ import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { useCreateTimesheet, useProjects, useTasks } from '@/lib/hooks/use-projects';
+import {
+  CreateTimesheetPayload,
+  useCreateTimesheet,
+  useProjects,
+  useTasks,
+} from '@/lib/hooks/use-projects';
 import { useTranslations } from 'next-intl';
 
 const timesheetSchema = z.object({
   projectId: z.string().min(1, 'Project is required'),
   taskId: z.string().min(1, 'Task is required'),
   date: z.date({ required_error: 'Date is required' }),
-  hours: z.number().min(0.1, 'Hours must be at least 0.1'),
+  // Decimal(10, 2) as the API checks it; kept as a string so nothing is rounded.
+  hours: z
+    .string()
+    .trim()
+    .regex(/^\d{1,8}(\.\d{1,2})?$/, 'Hours must be at least 0.1')
+    .refine((value) => Number(value) >= 0.1, 'Hours must be at least 0.1'),
   description: z.string().optional(),
 });
 
 type TimesheetFormData = z.infer<typeof timesheetSchema>;
+
+/** The exact POST /timesheets body: field names of the API DTO, hours as a decimal string. */
+function toTimesheetPayload(data: TimesheetFormData): CreateTimesheetPayload {
+  return {
+    projectId: data.projectId,
+    taskId: data.taskId,
+    date: format(data.date, 'yyyy-MM-dd'),
+    hours: data.hours.trim(),
+    description: data.description?.trim() || undefined,
+  };
+}
 
 export default function NewTimesheetPage() {
   const router = useRouter();
@@ -52,7 +73,7 @@ export default function NewTimesheetPage() {
       projectId: initialProjectId,
       taskId: '',
       date: new Date(),
-      hours: 1,
+      hours: '1',
       description: '',
     },
   });
@@ -65,10 +86,7 @@ export default function NewTimesheetPage() {
 
   const handleSubmit = async (data: TimesheetFormData) => {
     try {
-      await createTimesheet.mutateAsync({
-        ...data,
-        date: format(data.date, 'yyyy-MM-dd'),
-      });
+      await createTimesheet.mutateAsync(toTimesheetPayload(data));
       router.push('/projects/timesheets');
     } catch (error) {
       // Error handled by mutation
@@ -199,7 +217,7 @@ export default function NewTimesheetPage() {
                   step="0.25"
                   min="0.1"
                   placeholder="1.0"
-                  {...form.register('hours', { valueAsNumber: true })}
+                  {...form.register('hours')}
                 />
                 {form.formState.errors.hours && (
                   <p className="text-sm text-red-500">{form.formState.errors.hours.message}</p>

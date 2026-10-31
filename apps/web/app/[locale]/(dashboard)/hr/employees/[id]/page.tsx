@@ -45,17 +45,26 @@ import {
   useEmployeePayslips,
   getEmployeeStatusLabel,
   getEmployeeStatusColor,
+  getPayrollStatusLabel,
+  type PayrollStatus,
   formatCurrency,
 } from '@/lib/hooks/use-hr';
 import { useTranslations } from 'next-intl';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 export default function EmployeeDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const t = useTranslations('hr');
   const tCommon = useTranslations('common');
+  const dateLocale = useDateFnsLocale();
   const router = useRouter();
-  const { data: employee, isLoading } = useEmployee(id);
-  const { data: payslipsData } = useEmployeePayslips(id);
+  const { data: employee, isLoading, isError, refetch } = useEmployee(id);
+  const {
+    data: payslipsData,
+    isLoading: payslipsLoading,
+    isError: payslipsError,
+    refetch: refetchPayslips,
+  } = useEmployeePayslips(id);
   const deleteEmployee = useDeleteEmployee();
 
   const payslips = payslipsData?.data || [];
@@ -73,6 +82,17 @@ export default function EmployeeDetailPage({ params }: { params: { id: string } 
           <Skeleton className="h-64 md:col-span-1" />
           <Skeleton className="h-64 md:col-span-2" />
         </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="text-center py-12 space-y-4" role="alert">
+        <p className="text-muted-foreground">{t('loadError')}</p>
+        <Button variant="outline" onClick={() => void refetch()}>
+          {t('retry')}
+        </Button>
       </div>
     );
   }
@@ -110,9 +130,9 @@ export default function EmployeeDetailPage({ params }: { params: { id: string } 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/hr/employees">
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
             </Link>
           </Button>
           <div className="flex items-center gap-4">
@@ -130,11 +150,11 @@ export default function EmployeeDetailPage({ params }: { params: { id: string } 
               <div className="flex items-center gap-3">
                 <h1 className="text-3xl font-bold tracking-tight">{employee.name}</h1>
                 <Badge variant="outline" className={getEmployeeStatusColor(employee.status)}>
-                  {getEmployeeStatusLabel(employee.status)}
+                  {getEmployeeStatusLabel(employee.status, t)}
                 </Badge>
               </div>
               <p className="text-muted-foreground">
-                {employee.employeeNumber} • {employee.jobTitle || 'No title'}
+                <bdi>{employee.employeeNumber}</bdi> • {employee.jobTitle || t('noTitle')}
               </p>
             </div>
           </div>
@@ -142,14 +162,14 @@ export default function EmployeeDetailPage({ params }: { params: { id: string } 
         <div className="flex items-center gap-2">
           <Button variant="outline" asChild>
             <Link href={`/hr/employees/${id}/edit`}>
-              <Pencil className="mr-2 h-4 w-4" />
+              <Pencil className="me-2 h-4 w-4" />
               {t('employees.editEmployee')}
             </Link>
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive">
-                <Trash2 className="mr-2 h-4 w-4" />
+                <Trash2 className="me-2 h-4 w-4" />
                 {t('employees.deleteEmployee')}
               </Button>
             </AlertDialogTrigger>
@@ -206,7 +226,7 @@ export default function EmployeeDetailPage({ params }: { params: { id: string } 
                   <span className="text-sm">
                     {t('employees.joined', {
                       date: employee.joiningDate
-                        ? format(new Date(employee.joiningDate), 'MMMM d, yyyy')
+                        ? format(new Date(employee.joiningDate), 'PPP', { locale: dateLocale })
                         : '-',
                     })}
                   </span>
@@ -273,21 +293,21 @@ export default function EmployeeDetailPage({ params }: { params: { id: string } 
                   <TableBody>
                     <TableRow>
                       <TableCell>{t('payroll.payslip.basicSalary')}</TableCell>
-                      <TableCell className="text-right font-mono">
+                      <TableCell className="text-end font-mono">
                         {formatCurrency(basicSalary)}
                       </TableCell>
                     </TableRow>
                     {allowances.map((a: { name: string; amount: number }, i: number) => (
                       <TableRow key={i}>
                         <TableCell>{a.name}</TableCell>
-                        <TableCell className="text-right font-mono">
+                        <TableCell className="text-end font-mono">
                           {formatCurrency(a.amount)}
                         </TableCell>
                       </TableRow>
                     ))}
                     <TableRow className="font-bold">
                       <TableCell>{t('payroll.payslip.grossPay')}</TableCell>
-                      <TableCell className="text-right font-mono">
+                      <TableCell className="text-end font-mono">
                         {formatCurrency(grossSalary)}
                       </TableCell>
                     </TableRow>
@@ -308,15 +328,15 @@ export default function EmployeeDetailPage({ params }: { params: { id: string } 
                       {deductions.map((d: { name: string; amount: number }, i: number) => (
                         <TableRow key={i}>
                           <TableCell>{d.name}</TableCell>
-                          <TableCell className="text-right font-mono text-red-600">
-                            -{formatCurrency(d.amount)}
+                          <TableCell className="text-end font-mono text-red-600">
+                            <span dir="ltr">-{formatCurrency(d.amount)}</span>
                           </TableCell>
                         </TableRow>
                       ))}
                       <TableRow className="font-bold">
                         <TableCell>{t('employees.totalDeductions')}</TableCell>
-                        <TableCell className="text-right font-mono text-red-600">
-                          -{formatCurrency(totalDeductions)}
+                        <TableCell className="text-end font-mono text-red-600">
+                          <span dir="ltr">-{formatCurrency(totalDeductions)}</span>
                         </TableCell>
                       </TableRow>
                     </TableBody>
@@ -340,18 +360,29 @@ export default function EmployeeDetailPage({ params }: { params: { id: string } 
         </TabsContent>
 
         <TabsContent value="payslips" className="space-y-6">
-          {payslips.length > 0 ? (
+          {payslipsLoading ? (
+            <Skeleton className="h-48" />
+          ) : payslipsError ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-8 space-y-4" role="alert">
+                  <p className="text-muted-foreground">{t('loadError')}</p>
+                  <Button variant="outline" onClick={() => void refetchPayslips()}>
+                    {t('retry')}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : payslips.length > 0 ? (
             <Card>
               <CardContent className="pt-6">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>{t('payroll.payslip.period')}</TableHead>
-                      <TableHead className="text-right">{t('payroll.payslip.grossPay')}</TableHead>
-                      <TableHead className="text-right">
-                        {t('payroll.payslip.deductions')}
-                      </TableHead>
-                      <TableHead className="text-right">{t('payroll.payslip.netPay')}</TableHead>
+                      <TableHead className="text-end">{t('payroll.payslip.grossPay')}</TableHead>
+                      <TableHead className="text-end">{t('payroll.payslip.deductions')}</TableHead>
+                      <TableHead className="text-end">{t('payroll.payslip.netPay')}</TableHead>
                       <TableHead>{t('payroll.table.status')}</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
@@ -369,19 +400,23 @@ export default function EmployeeDetailPage({ params }: { params: { id: string } 
                       }) => (
                         <TableRow key={slip.id}>
                           <TableCell>
-                            {format(new Date(slip.year, slip.month - 1), 'MMMM yyyy')}
+                            {format(new Date(slip.year, slip.month - 1), 'MMMM yyyy', {
+                              locale: dateLocale,
+                            })}
                           </TableCell>
-                          <TableCell className="text-right font-mono">
+                          <TableCell className="text-end font-mono">
                             {formatCurrency(slip.gross)}
                           </TableCell>
-                          <TableCell className="text-right font-mono text-red-600">
-                            -{formatCurrency(slip.totalDeductions)}
+                          <TableCell className="text-end font-mono text-red-600">
+                            <span dir="ltr">-{formatCurrency(slip.totalDeductions)}</span>
                           </TableCell>
-                          <TableCell className="text-right font-mono font-medium">
+                          <TableCell className="text-end font-mono font-medium">
                             {formatCurrency(slip.netPay)}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline">{slip.status}</Badge>
+                            <Badge variant="outline">
+                              {getPayrollStatusLabel(slip.status as PayrollStatus, t)}
+                            </Badge>
                           </TableCell>
                           <TableCell>
                             <Button variant="ghost" size="sm" asChild>

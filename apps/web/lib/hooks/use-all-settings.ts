@@ -53,10 +53,15 @@ export interface EmailSettings {
   isConfigured: boolean;
 }
 
+/** Digits of Arabic PDFs (API enum); English PDFs always print Western digits. */
+export const DOCUMENT_DIGITS = ['latn', 'arab'] as const;
+export type DocumentDigits = (typeof DOCUMENT_DIGITS)[number];
+
 export interface LocalizationSettings {
   dateFormat: string;
   numberFormat: string;
   timezone: string;
+  documentDigits: DocumentDigits;
 }
 
 export interface BrandingSettings {

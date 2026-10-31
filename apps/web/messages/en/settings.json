@@ -113,7 +113,11 @@
     "displayFormatDescription": "Configure how dates, numbers, and times are displayed",
     "dateFormat": "Date Format",
     "numberFormat": "Number Format",
-    "timezone": "Timezone"
+    "timezone": "Timezone",
+    "documentDigits": "Digits in Arabic PDFs",
+    "documentDigitsDescription": "Invoices, quotes and bills printed in Arabic use these digits. English PDFs always use 0123.",
+    "digitsLatn": "Western (0123)",
+    "digitsArab": "Arabic-Indic (٠١٢٣)"
   },
   "branding": {
     "title": "Branding",

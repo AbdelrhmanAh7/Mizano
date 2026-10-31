@@ -14,5 +14,5 @@ export default function SettingsError({
     console.error('Settings module error:', error.message);
   }, [error]);
 
-  return <ErrorState error={error} title="Settings Error" onRetry={reset} />;
+  return <ErrorState error={error} onRetry={reset} />;
 }

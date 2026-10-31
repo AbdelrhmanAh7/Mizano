@@ -48,7 +48,7 @@ function AccountsPageContent() {
   const [parentAccount, setParentAccount] = useState<Account | null>(null);
   const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
 
-  const { data: accounts = [], isLoading, refetch } = useAccountsTree();
+  const { data: accounts = [], isLoading, isError, refetch } = useAccountsTree();
   const createAccount = useCreateAccount();
   const updateAccount = useUpdateAccount();
   const deleteAccount = useDeleteAccount();
@@ -140,7 +140,7 @@ function AccountsPageContent() {
           <p className="text-muted-foreground">{t('accounts.page.description')}</p>
         </div>
         <div className="flex items-center gap-2">
-          {canCreate && accounts.length === 0 && (
+          {canCreate && !isLoading && !isError && accounts.length === 0 && (
             <Select onValueChange={(value) => handleSeedAccounts(value)}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder={t('accounts.page.seed')} />
@@ -154,7 +154,7 @@ function AccountsPageContent() {
           )}
           {canCreate && (
             <Button onClick={handleCreate}>
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="me-2 h-4 w-4" />
               {t('accounts.newAccount')}
             </Button>
           )}
@@ -202,13 +202,22 @@ function AccountsPageContent() {
           <CardTitle>{t('accounts.page.listTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <AccountTree
-            accounts={filteredAccounts}
-            onEdit={canEdit ? handleEdit : undefined}
-            onDelete={canDelete ? handleDelete : undefined}
-            onAddChild={canCreate ? handleAddChild : undefined}
-            isLoading={isLoading}
-          />
+          {isError ? (
+            <div className="py-12 text-center text-muted-foreground" role="alert">
+              <p>{t('accounts.tree.loadError')}</p>
+              <Button variant="outline" className="mt-4" onClick={() => void refetch()}>
+                {t('accounts.tree.retry')}
+              </Button>
+            </div>
+          ) : (
+            <AccountTree
+              accounts={filteredAccounts}
+              onEdit={canEdit ? handleEdit : undefined}
+              onDelete={canDelete ? handleDelete : undefined}
+              onAddChild={canCreate ? handleAddChild : undefined}
+              isLoading={isLoading}
+            />
+          )}
         </CardContent>
       </Card>
 

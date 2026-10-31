@@ -43,13 +43,28 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
   const dateLocale = useDateFnsLocale();
   const { accountId } = params;
   const t = useTranslations('banking');
+  const tCommon = useTranslations('common');
   const formatCurrency = useMoneyFormatter();
   const [selectedTransaction, setSelectedTransaction] = useState<string | null>(null);
 
-  const { data: account, isLoading: accountLoading } = useBankAccount(accountId);
-  const { data: transactionsData, isLoading: transactionsLoading } =
-    useUnmatchedTransactions(accountId);
-  const { data: suggestedData } = useSuggestedMatches(selectedTransaction || '');
+  const {
+    data: account,
+    isLoading: accountLoading,
+    isError: accountFailed,
+    refetch: refetchAccount,
+  } = useBankAccount(accountId);
+  const {
+    data: transactionsData,
+    isLoading: transactionsLoading,
+    isError: transactionsFailed,
+    refetch: refetchTransactions,
+  } = useUnmatchedTransactions(accountId);
+  const {
+    data: suggestedData,
+    isLoading: suggestedLoading,
+    isError: suggestedFailed,
+    refetch: refetchSuggested,
+  } = useSuggestedMatches(selectedTransaction || '');
 
   const matchTransaction = useMatchTransaction();
   const excludeTransaction = useExcludeTransaction();
@@ -85,6 +100,20 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
     );
   }
 
+  if (accountFailed || transactionsFailed) {
+    return (
+      <div className="text-center py-12 space-y-4" role="alert">
+        <p className="text-muted-foreground">{tCommon('errors.generic')}</p>
+        <Button
+          variant="outline"
+          onClick={() => void (accountFailed ? refetchAccount() : refetchTransactions())}
+        >
+          {tCommon('dashboard.tryAgain')}
+        </Button>
+      </div>
+    );
+  }
+
   if (!account) {
     return (
       <div className="text-center py-12">
@@ -103,9 +132,9 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label={tCommon('buttons.back')}>
             <Link href="/banking/reconcile">
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
             </Link>
           </Button>
           <div>
@@ -198,7 +227,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                             {tx.payee && ` • ${tx.payee}`}
                           </p>
                         </div>
-                        <div className="text-right">
+                        <div className="text-end">
                           <p
                             className={cn(
                               'font-mono font-medium',
@@ -210,7 +239,9 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                           </p>
                           {tx.confidence !== null && (
                             <p className={cn('text-xs', getConfidenceColor(tx.confidence))}>
-                              {getConfidenceLabel(tx.confidence)} {t('reconciliation.confidence')}
+                              {t('reconciliation.confidenceWithLevel', {
+                                level: getConfidenceLabel(tx.confidence, t),
+                              })}
                             </p>
                           )}
                         </div>
@@ -262,7 +293,16 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                     )}
 
                     {/* Suggested Matches */}
-                    {suggestedMatches.length > 0 ? (
+                    {suggestedLoading ? (
+                      <Skeleton className="h-24" />
+                    ) : suggestedFailed ? (
+                      <div className="text-center py-8 space-y-4" role="alert">
+                        <p className="text-sm text-muted-foreground">{tCommon('table.error')}</p>
+                        <Button variant="outline" onClick={() => void refetchSuggested()}>
+                          {tCommon('dashboard.tryAgain')}
+                        </Button>
+                      </div>
+                    ) : suggestedMatches.length > 0 ? (
                       <div className="space-y-2">
                         {suggestedMatches.map((match) => (
                           <div
@@ -299,7 +339,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                                 size="sm"
                                 onClick={() => handleMatch(selectedTransaction, match)}
                               >
-                                <Check className="mr-1 h-3 w-3" />
+                                <Check className="me-1 h-3 w-3" />
                                 {t('reconciliation.match')}
                               </Button>
                             </div>
@@ -318,7 +358,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                         <Link
                           href={`/purchases/expenses/new?bankTransactionId=${selectedTransaction}`}
                         >
-                          <Plus className="mr-2 h-4 w-4" />
+                          <Plus className="me-2 h-4 w-4" />
                           {t('reconciliation.createExpense')}
                         </Link>
                       </Button>
@@ -327,7 +367,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                         className="w-full text-gray-600"
                         onClick={() => handleExclude(selectedTransaction)}
                       >
-                        <X className="mr-2 h-4 w-4" />
+                        <X className="me-2 h-4 w-4" />
                         {t('reconciliation.excludeTransaction')}
                       </Button>
                     </div>

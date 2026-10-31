@@ -8,6 +8,7 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
+import { createHash, randomBytes } from 'crypto';
 import * as request from 'supertest';
 import { io, Socket } from 'socket.io-client';
 import { AppModule } from '../src/app.module';
@@ -98,6 +99,19 @@ describe('Auth (e2e)', () => {
       expect(res.body.message).toBe('Validation Failed');
       expect(JSON.stringify(res.body.details)).toMatch(/uppercase/i);
     });
+
+    it('answers an Arabic request in Arabic with the same code', async () => {
+      const res = await anon
+        .withLanguage('ar')
+        .post('/auth/register')
+        .send({ ...testUser, email: `weak-ar-${suffix}@mizano.test`, password: 'alllowercase1' });
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('VALIDATION_ERROR');
+      expect(res.body.message).toBe('بعض البيانات المدخلة غير صحيحة. راجِع الحقول المحددة.');
+      expect(res.body.details).toEqual({
+        password: ['يجب أن تحتوي كلمة المرور على حرف إنجليزي كبير واحد على الأقل.'],
+      });
+    });
   });
 
   describe('POST /auth/login', () => {
@@ -170,6 +184,92 @@ describe('Auth (e2e)', () => {
       expect((await refresh(tokensA.refreshToken)).status).toBe(401);
       // Logout without a token is rejected, not a 500.
       expect((await anon.post('/auth/logout')).status).toBe(401);
+    });
+  });
+
+  // A real protected route (an unknown path would answer 404 once authenticated).
+  const ME = '/organization/account-settings';
+
+  describe('Sessions per device', () => {
+    const login = (email: string, password = TEST_PASSWORD) =>
+      anon.post('/auth/login').send({ email, password });
+
+    it('keeps the first device signed in, signs out one device, then all devices', async () => {
+      const tenant = await registerTenant(app, 'Devices');
+      const second = await login(tenant.email);
+      expect(second.status).toBe(200);
+      const phone = second.body.tokens as { accessToken: string; refreshToken: string };
+
+      // Signing in on the phone did not sign the laptop out.
+      expect((await tenant.api.get(ME)).status).toBe(200);
+      expect((await anon.withToken(phone.accessToken).get(ME)).status).toBe(200);
+
+      // Signing out the phone ends only the phone.
+      expect((await anon.withToken(phone.accessToken).post('/auth/logout')).status).toBe(200);
+      expect((await anon.withToken(phone.accessToken).get(ME)).status).toBe(401);
+      expect((await tenant.api.get(ME)).status).toBe(200);
+
+      // Sign out everywhere ends the laptop too, and its refresh token.
+      const third = (await login(tenant.email)).body.tokens as { accessToken: string };
+      expect((await tenant.api.post('/auth/logout-all')).status).toBe(200);
+      expect((await tenant.api.get(ME)).status).toBe(401);
+      expect((await anon.withToken(third.accessToken).get(ME)).status).toBe(401);
+      const refresh = await anon
+        .withToken(tenant.refreshToken)
+        .post('/auth/refresh')
+        .send({ refreshToken: tenant.refreshToken });
+      expect(refresh.status).toBe(401);
+    });
+  });
+
+  describe('Password reset', () => {
+    it('answers the same for known and unknown emails', async () => {
+      const tenant = await registerTenant(app, 'Forgot');
+      const known = await anon.post('/auth/forgot-password').send({ email: tenant.email });
+      const unknown = await anon
+        .post('/auth/forgot-password')
+        .send({ email: `nobody-${uniqueSuffix()}@mizano.test` });
+      expect(known.status).toBe(200);
+      expect(unknown.status).toBe(200);
+      expect(unknown.body).toEqual(known.body);
+    });
+
+    it('resets with a valid link once, signs out everywhere, and refuses reuse', async () => {
+      const tenant = await registerTenant(app, 'Reset');
+      const prisma = getPrisma(app);
+      const token = randomBytes(32).toString('base64url');
+      await prisma.passwordResetToken.create({
+        data: {
+          userId: tenant.userId,
+          organizationId: tenant.organizationId,
+          tokenHash: createHash('sha256').update(token).digest('hex'),
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        },
+      });
+
+      const weak = await anon.post('/auth/reset-password').send({ token, password: 'short' });
+      expect(weak.status).toBe(400);
+      expect(weak.body.code).toBe('VALIDATION_ERROR');
+
+      const reset = await anon
+        .post('/auth/reset-password')
+        .send({ token, password: 'BrandNew123' });
+      expect(reset.status).toBe(200);
+      expect((await tenant.api.get(ME)).status).toBe(401);
+      expect(
+        (await anon.post('/auth/login').send({ email: tenant.email, password: 'BrandNew123' }))
+          .status,
+      ).toBe(200);
+      expect(
+        (await anon.post('/auth/login').send({ email: tenant.email, password: TEST_PASSWORD }))
+          .status,
+      ).toBe(401);
+
+      const again = await anon
+        .post('/auth/reset-password')
+        .send({ token, password: 'AnotherOne123' });
+      expect(again.status).toBe(400);
+      expect(again.body.code).toBe('PASSWORD_RESET_INVALID');
     });
   });
 
@@ -347,9 +447,9 @@ describe('Logger endpoints and stream (e2e)', () => {
     });
 
     it("cannot be read, updated, summarised or deleted by another organization's admin", async () => {
+      // Another organization's id answers like a missing one (404), never confirming it exists.
       const byId = await tenantB.api.get(`/logger/logs/${entryId}`);
-      expect(byId.status).toBe(200);
-      expect(byId.text).toBe('');
+      expect(byId.status).toBe(404);
 
       const update = await tenantB.api
         .post('/logger/update-status')

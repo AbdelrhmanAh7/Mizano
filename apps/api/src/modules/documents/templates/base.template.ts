@@ -1,3 +1,5 @@
+import type { DocumentDigits } from '../../../common/utils/document-digits';
+
 // Base template configuration for PDF generation
 // Using PDFKit-compatible structure for server-side PDF generation
 
@@ -59,18 +61,33 @@ export interface OrganizationInfo {
   currency?: string;
   /** Ledger currency; documents fall back to it, not to `currency` (a USD schema default). */
   baseCurrency?: string;
+  /** Digits of Arabic documents (Organization.documentDigits); English ones always print latn. */
+  documentDigits?: DocumentDigits;
 }
 
-/** Language of a generated document. Arabic renders right-to-left with Western digits. */
+/** Language of a generated document. Arabic renders right-to-left. */
 export type DocumentLocale = 'en' | 'ar';
+
+/**
+ * The printed strings of one document type in one language: every label key, plus `status`
+ * keyed by the schema enum. Typing both languages with it makes a missing translation a
+ * compile error.
+ */
+export type DocumentCopy<K extends string> = Record<K, string> & {
+  status: Record<string, string>;
+};
 
 export function documentDirection(locale: DocumentLocale): 'ltr' | 'rtl' {
   return locale === 'ar' ? 'rtl' : 'ltr';
 }
 
-/** Intl locale for numbers and dates: Arabic with Western (latn) digits, or English. */
-export function intlLocaleFor(locale: DocumentLocale): string {
-  return locale === 'ar' ? 'ar-u-nu-latn' : 'en-SA';
+/**
+ * Intl locale for numbers and dates. English always uses Western digits; Arabic uses the
+ * organization's choice through the Unicode `nu` extension (`ar-u-nu-latn` / `ar-u-nu-arab`).
+ */
+export function intlLocaleFor(locale: DocumentLocale, digits: DocumentDigits = 'latn'): string {
+  if (locale !== 'ar') return 'en-SA';
+  return digits === 'arab' ? 'ar-u-nu-arab' : 'ar-u-nu-latn';
 }
 
 /**
@@ -218,14 +235,15 @@ export function renderAddressHtml(address: PostalAddress, style: string): string
   );
 }
 
-// Common formatting utilities
+// Common formatting utilities (display boundary only: the amounts were computed in Decimal)
 export function formatCurrency(
   amount: number | string,
   currency: string = 'SAR',
   locale: DocumentLocale = 'en',
+  digits: DocumentDigits = 'latn',
 ): string {
   const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat(intlLocaleFor(locale), {
+  return new Intl.NumberFormat(intlLocaleFor(locale, digits), {
     style: 'currency',
     currency: currency,
     minimumFractionDigits: 2,
@@ -240,6 +258,29 @@ export function formatDate(date: Date | string, locale: string = 'en-SA'): strin
     month: 'long',
     day: 'numeric',
   }).format(dateObj);
+}
+
+/** A quantity in the document's digits, up to the 4 decimals the database keeps. */
+export function formatQuantity(
+  value: number,
+  locale: DocumentLocale = 'en',
+  digits: DocumentDigits = 'latn',
+): string {
+  return new Intl.NumberFormat(intlLocaleFor(locale, digits), {
+    maximumFractionDigits: 4,
+  }).format(value);
+}
+
+/** A rate given in percent (15 = 15%), with the document's digits and percent sign. */
+export function formatPercent(
+  value: number,
+  locale: DocumentLocale = 'en',
+  digits: DocumentDigits = 'latn',
+): string {
+  return new Intl.NumberFormat(intlLocaleFor(locale, digits), {
+    style: 'percent',
+    maximumFractionDigits: 4,
+  }).format(value / 100);
 }
 
 // Generate header section for documents
@@ -304,9 +345,12 @@ export function generateItemsTableHtml(
   showTax: boolean = true,
   primaryColor?: string,
   locale: DocumentLocale = 'en',
+  digits: DocumentDigits = 'latn',
 ): string {
   const color = safeColor(primaryColor, defaultTemplateConfig.colors.primary);
   const l = BASE_LABELS[locale];
+  const money = (value: number) => formatCurrency(value, currency, locale, digits);
+  const percent = (value: number | undefined) => formatPercent(value || 0, locale, digits);
 
   // A line discount (percent) changes the line amount, so it must be printed whenever one exists;
   // otherwise "3 × 49.99 = 134.97" cannot be reconciled on paper.
@@ -332,11 +376,11 @@ export function generateItemsTableHtml(
       (item) => `
       <tr style="border-bottom: 1px solid ${defaultTemplateConfig.colors.border};">
         <td style="padding: 10px; text-align: start; font-size: 12px;"><bdi>${escapeHtml(item.description)}</bdi></td>
-        <td style="padding: 10px; text-align: end; font-size: 12px;">${escapeHtml(item.quantity)}</td>
-        <td style="padding: 10px; text-align: end; font-size: 12px;">${formatCurrency(item.rate, currency, locale)}</td>
-        ${showDiscount ? `<td style="padding: 10px; text-align: end; font-size: 12px;">${escapeHtml(item.discount || 0)}%</td>` : ''}
-        ${showTax ? `<td style="padding: 10px; text-align: end; font-size: 12px;">${escapeHtml(item.taxRate || 0)}%</td>` : ''}
-        <td style="padding: 10px; text-align: end; font-size: 12px; font-weight: bold;">${formatCurrency(item.amount, currency, locale)}</td>
+        <td style="padding: 10px; text-align: end; font-size: 12px;">${escapeHtml(formatQuantity(item.quantity, locale, digits))}</td>
+        <td style="padding: 10px; text-align: end; font-size: 12px;">${money(item.rate)}</td>
+        ${showDiscount ? `<td style="padding: 10px; text-align: end; font-size: 12px;">${escapeHtml(percent(item.discount))}</td>` : ''}
+        ${showTax ? `<td style="padding: 10px; text-align: end; font-size: 12px;">${escapeHtml(percent(item.taxRate))}</td>` : ''}
+        <td style="padding: 10px; text-align: end; font-size: 12px; font-weight: bold;">${money(item.amount)}</td>
       </tr>
     `,
     )
@@ -363,9 +407,10 @@ export function generateTotalsHtml(
   shippingAmount?: number,
   discountAmount?: number,
   locale: DocumentLocale = 'en',
+  digits: DocumentDigits = 'latn',
 ): string {
   const l = BASE_LABELS[locale];
-  const money = (value: number) => formatCurrency(value, currency, locale);
+  const money = (value: number) => formatCurrency(value, currency, locale, digits);
   const rows: Array<{ label: string; value: string; bold?: boolean }> = [
     { label: l.subtotal, value: money(subtotal) },
   ];

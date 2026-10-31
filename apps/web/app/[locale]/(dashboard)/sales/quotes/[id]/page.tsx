@@ -27,6 +27,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
+import { DocumentPdfActions } from '@/components/shared/document-pdf-actions';
 import { useToast } from '@/components/ui/use-toast';
 import {
   useQuote,
@@ -64,6 +65,8 @@ export default function QuoteDetailPage() {
 
   const canEdit = hasPermission('sales.edit');
   const canDelete = hasPermission('sales.delete');
+  // Same permission as GET /documents/quote/:id/pdf.
+  const canExportPdf = hasPermission('sales.view');
 
   const confirmDelete = async () => {
     try {
@@ -224,7 +227,14 @@ export default function QuoteDetailPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {canExportPdf && (
+            <DocumentPdfActions
+              kind="quote"
+              documentId={quoteId}
+              documentNumber={quote.quoteNumber}
+            />
+          )}
           {canEdit && quote.status === 'DRAFT' && (
             <>
               <Button variant="outline" asChild>

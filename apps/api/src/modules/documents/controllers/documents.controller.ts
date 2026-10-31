@@ -6,6 +6,7 @@ import {
   Param,
   Query,
   Res,
+  Headers,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -29,6 +30,7 @@ import {
   SendResultResponse,
   BulkSendResultResponse,
   DocumentLocaleQueryDto,
+  resolveDocumentLocale,
 } from '../dto/documents.dto';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
@@ -51,15 +53,22 @@ export class DocumentsController {
   @Permissions('sales.view')
   @ApiOperation({ summary: 'Generate invoice PDF' })
   @ApiParam({ name: 'id', description: 'Invoice ID' })
-  @ApiQuery({ name: 'locale', required: false, enum: ['en', 'ar'] })
+  @ApiQuery({
+    name: 'locale',
+    required: false,
+    enum: ['en', 'ar'],
+    description: 'Document language; default: the Accept-Language of the request, else ar',
+  })
   @ApiResponse({ status: 200, description: 'PDF file' })
   async getInvoicePdf(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
     @Query() query: DocumentLocaleQueryDto,
+    @Headers('accept-language') acceptLanguage: string | undefined,
     @Res() res: Response,
   ): Promise<void> {
-    const pdfBuffer = await this.pdfService.generateInvoicePdf(orgId, id, query.locale ?? 'en');
+    const locale = resolveDocumentLocale(query.locale, acceptLanguage);
+    const pdfBuffer = await this.pdfService.generateInvoicePdf(orgId, id, locale);
 
     res.set({
       'Content-Type': 'application/pdf',
@@ -80,8 +89,10 @@ export class DocumentsController {
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
     @Body() dto: SendDocumentDto,
+    @Headers('accept-language') acceptLanguage: string | undefined,
   ): Promise<SendResultResponse> {
-    return this.emailService.sendInvoice(orgId, id, dto);
+    const locale = resolveDocumentLocale(dto.locale, acceptLanguage);
+    return this.emailService.sendInvoice(orgId, id, { ...dto, locale });
   }
 
   // ============ Bill Documents ============
@@ -90,13 +101,22 @@ export class DocumentsController {
   @Permissions('purchases.view')
   @ApiOperation({ summary: 'Generate bill PDF' })
   @ApiParam({ name: 'id', description: 'Bill ID' })
+  @ApiQuery({
+    name: 'locale',
+    required: false,
+    enum: ['en', 'ar'],
+    description: 'Document language; default: the Accept-Language of the request, else ar',
+  })
   @ApiResponse({ status: 200, description: 'PDF file' })
   async getBillPdf(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
+    @Query() query: DocumentLocaleQueryDto,
+    @Headers('accept-language') acceptLanguage: string | undefined,
     @Res() res: Response,
   ): Promise<void> {
-    const pdfBuffer = await this.pdfService.generateBillPdf(orgId, id);
+    const locale = resolveDocumentLocale(query.locale, acceptLanguage);
+    const pdfBuffer = await this.pdfService.generateBillPdf(orgId, id, locale);
 
     res.set({
       'Content-Type': 'application/pdf',
@@ -113,13 +133,22 @@ export class DocumentsController {
   @Permissions('sales.view')
   @ApiOperation({ summary: 'Generate quote PDF' })
   @ApiParam({ name: 'id', description: 'Quote ID' })
+  @ApiQuery({
+    name: 'locale',
+    required: false,
+    enum: ['en', 'ar'],
+    description: 'Document language; default: the Accept-Language of the request, else ar',
+  })
   @ApiResponse({ status: 200, description: 'PDF file' })
   async getQuotePdf(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
+    @Query() query: DocumentLocaleQueryDto,
+    @Headers('accept-language') acceptLanguage: string | undefined,
     @Res() res: Response,
   ): Promise<void> {
-    const pdfBuffer = await this.pdfService.generateQuotePdf(orgId, id);
+    const locale = resolveDocumentLocale(query.locale, acceptLanguage);
+    const pdfBuffer = await this.pdfService.generateQuotePdf(orgId, id, locale);
 
     res.set({
       'Content-Type': 'application/pdf',
@@ -140,8 +169,10 @@ export class DocumentsController {
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
     @Body() dto: SendDocumentDto,
+    @Headers('accept-language') acceptLanguage: string | undefined,
   ): Promise<SendResultResponse> {
-    return this.emailService.sendQuote(orgId, id, dto);
+    const locale = resolveDocumentLocale(dto.locale, acceptLanguage);
+    return this.emailService.sendQuote(orgId, id, { ...dto, locale });
   }
 
   // ============ Payslip Documents ============

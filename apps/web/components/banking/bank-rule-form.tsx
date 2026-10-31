@@ -23,11 +23,12 @@ import {
   conditionOperatorOptions,
   actionTypeOptions,
 } from '@/lib/hooks/use-bank-rules';
+import { useTranslations } from 'next-intl';
 
 const conditionSchema = z.object({
   field: z.enum(['description', 'payee', 'amount', 'reference']),
   operator: z.enum(['contains', 'equals', 'startsWith', 'endsWith', 'greaterThan', 'lessThan']),
-  value: z.string().min(1, 'Value is required'),
+  value: z.string().min(1, 'valueRequired'),
 });
 
 const actionSchema = z.object({
@@ -39,8 +40,9 @@ const actionSchema = z.object({
 });
 
 const bankRuleSchema = z.object({
-  name: z.string().min(1, 'Rule name is required'),
-  conditions: z.array(conditionSchema).min(1, 'At least one condition is required'),
+  // Messages are keys of banking.rules.form.
+  name: z.string().min(1, 'nameRequired'),
+  conditions: z.array(conditionSchema).min(1, 'conditionsRequired'),
   action: actionSchema,
   priority: z.number().min(1).default(1),
   isActive: z.boolean().default(true),
@@ -69,6 +71,11 @@ export function BankRuleForm({
   isSubmitting,
 }: BankRuleFormProps) {
   const isEditing = !!rule;
+  const t = useTranslations('banking');
+  const tForm = useTranslations('banking.rules.form');
+  const tCommon = useTranslations('common');
+  const errorText = (message?: string): string | undefined =>
+    message && tForm.has(message) ? tForm(message) : message;
 
   const form = useForm<BankRuleFormData>({
     resolver: zodResolver(bankRuleSchema),
@@ -115,28 +122,24 @@ export function BankRuleForm({
       {/* Basic Information */}
       <Card>
         <CardHeader>
-          <CardTitle>Rule Details</CardTitle>
-          <CardDescription>Give your rule a descriptive name to identify it easily</CardDescription>
+          <CardTitle>{tForm('detailsTitle')}</CardTitle>
+          <CardDescription>{tForm('detailsDescription')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Rule Name *</Label>
-            <Input
-              id="name"
-              placeholder="e.g., Office Supplies from Amazon"
-              {...form.register('name')}
-            />
+            <Label htmlFor="name">{tForm('name')} *</Label>
+            <Input id="name" placeholder={tForm('nameExample')} {...form.register('name')} />
             {form.formState.errors.name && (
-              <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
+              <p className="text-sm text-red-500">
+                {errorText(form.formState.errors.name.message)}
+              </p>
             )}
           </div>
 
           <div className="flex items-center justify-between">
             <div>
-              <Label>Active</Label>
-              <p className="text-sm text-muted-foreground">
-                Inactive rules won't be applied to transactions
-              </p>
+              <Label>{tForm('isActive')}</Label>
+              <p className="text-sm text-muted-foreground">{tForm('isActiveHint')}</p>
             </div>
             <Switch
               checked={form.watch('isActive')}
@@ -151,14 +154,12 @@ export function BankRuleForm({
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Conditions</CardTitle>
-              <CardDescription>
-                Define when this rule should be applied (all conditions must match)
-              </CardDescription>
+              <CardTitle>{tForm('conditions')}</CardTitle>
+              <CardDescription>{tForm('conditionsDescription')}</CardDescription>
             </div>
             <Button type="button" variant="outline" size="sm" onClick={addCondition}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Condition
+              <Plus className="me-2 h-4 w-4" />
+              {tForm('addCondition')}
             </Button>
           </div>
         </CardHeader>
@@ -173,12 +174,12 @@ export function BankRuleForm({
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Field" />
+                    <SelectValue placeholder={tForm('fieldPlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
                     {conditionFieldOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
-                        {option.label}
+                        {t(option.labelKey)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -191,18 +192,21 @@ export function BankRuleForm({
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Operator" />
+                    <SelectValue placeholder={tForm('operatorPlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
                     {conditionOperatorOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
-                        {option.label}
+                        {t(option.labelKey)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
 
-                <Input placeholder="Value" {...form.register(`conditions.${index}.value`)} />
+                <Input
+                  placeholder={tForm('valuePlaceholder')}
+                  {...form.register(`conditions.${index}.value`)}
+                />
               </div>
               <Button
                 type="button"
@@ -210,14 +214,16 @@ export function BankRuleForm({
                 size="icon"
                 onClick={() => fields.length > 1 && remove(index)}
                 disabled={fields.length === 1}
-                aria-label="Remove condition"
+                aria-label={tForm('removeCondition')}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           ))}
           {form.formState.errors.conditions && (
-            <p className="text-sm text-red-500">{form.formState.errors.conditions.message}</p>
+            <p className="text-sm text-red-500">
+              {errorText(form.formState.errors.conditions.message)}
+            </p>
           )}
         </CardContent>
       </Card>
@@ -225,12 +231,12 @@ export function BankRuleForm({
       {/* Action */}
       <Card>
         <CardHeader>
-          <CardTitle>Action</CardTitle>
-          <CardDescription>What should happen when a transaction matches this rule</CardDescription>
+          <CardTitle>{tForm('action')}</CardTitle>
+          <CardDescription>{tForm('actionDescription')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Action Type *</Label>
+            <Label>{tForm('actionType')} *</Label>
             <Select
               value={form.watch('action.type')}
               onValueChange={(value: BankRuleFormData['action']['type']) =>
@@ -238,12 +244,12 @@ export function BankRuleForm({
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select action" />
+                <SelectValue placeholder={tForm('actionTypePlaceholder')} />
               </SelectTrigger>
               <SelectContent>
                 {actionTypeOptions.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
-                    {option.label}
+                    {t(option.labelKey)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -252,13 +258,13 @@ export function BankRuleForm({
 
           {(watchActionType === 'categorize' || watchActionType === 'createExpense') && (
             <div className="space-y-2">
-              <Label>Account *</Label>
+              <Label>{tForm('account')} *</Label>
               <Select
                 value={form.watch('action.accountId') || ''}
                 onValueChange={(value) => form.setValue('action.accountId', value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select account" />
+                  <SelectValue placeholder={tForm('accountPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {accounts.map((account) => (
@@ -273,13 +279,13 @@ export function BankRuleForm({
 
           {watchActionType === 'matchVendor' && (
             <div className="space-y-2">
-              <Label>Vendor *</Label>
+              <Label>{tForm('vendor')} *</Label>
               <Select
                 value={form.watch('action.vendorId') || ''}
                 onValueChange={(value) => form.setValue('action.vendorId', value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select vendor" />
+                  <SelectValue placeholder={tForm('vendorPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {vendors.map((vendor) => (
@@ -294,13 +300,13 @@ export function BankRuleForm({
 
           {watchActionType === 'matchCustomer' && (
             <div className="space-y-2">
-              <Label>Customer *</Label>
+              <Label>{tForm('customer')} *</Label>
               <Select
                 value={form.watch('action.customerId') || ''}
                 onValueChange={(value) => form.setValue('action.customerId', value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select customer" />
+                  <SelectValue placeholder={tForm('customerPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {customers.map((customer) => (
@@ -315,10 +321,8 @@ export function BankRuleForm({
 
           <div className="flex items-center justify-between pt-4 border-t">
             <div>
-              <Label>Auto-create transactions</Label>
-              <p className="text-sm text-muted-foreground">
-                Automatically create expenses when this rule matches
-              </p>
+              <Label>{tForm('autoCreate')}</Label>
+              <p className="text-sm text-muted-foreground">{tForm('autoCreateHint')}</p>
             </div>
             <Switch
               checked={form.watch('autoCreate')}
@@ -331,10 +335,10 @@ export function BankRuleForm({
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {tCommon('buttons.cancel')}
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : isEditing ? 'Update Rule' : 'Create Rule'}
+          {isSubmitting ? tCommon('loading.saving') : isEditing ? tForm('update') : tForm('create')}
         </Button>
       </div>
     </form>

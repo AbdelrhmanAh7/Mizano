@@ -63,10 +63,12 @@ function VendorCreditsPageContent() {
 
   const canDelete = hasPermission('purchases.delete');
 
+  const tBulk = useTranslations('common.bulk');
+
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => vendorCreditsApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['vendor-credits']],
-    successMessage: '{count} vendor credits deleted',
+    successMessage: tBulk.raw('vendorCreditsDeleted'),
   });
 
   const bulkActions = [

@@ -10,17 +10,44 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { BankAccountForm } from './bank-account-form';
 
-// Mock next-intl (not used directly in form but providers may need it)
-jest.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
-}));
+let mockLocale: 'en' | 'ar' = 'en';
+
+// Real en/ar messages, so the assertions read the copy a user sees.
+jest.mock('next-intl', () => {
+  const messages = {
+    en: {
+      banking: jest.requireActual('@/messages/en/banking.json'),
+      common: jest.requireActual('@/messages/en/common.json'),
+    },
+    ar: {
+      banking: jest.requireActual('@/messages/ar/banking.json'),
+      common: jest.requireActual('@/messages/ar/common.json'),
+    },
+  };
+  const lookup = (path: string): unknown =>
+    path
+      .split('.')
+      .reduce<unknown>(
+        (node, part) =>
+          node && typeof node === 'object' ? (node as Record<string, unknown>)[part] : undefined,
+        messages[mockLocale],
+      );
+  return {
+    useLocale: () => mockLocale,
+    useTranslations: (namespace: string) => {
+      const t = (key: string) => String(lookup(`${namespace}.${key}`) ?? key);
+      t.has = (key: string) => typeof lookup(`${namespace}.${key}`) === 'string';
+      return t;
+    },
+  };
+});
 
 // Mock the use-bank-accounts hook exports
 jest.mock('@/lib/hooks/use-bank-accounts', () => ({
   accountTypeOptions: [
-    { value: 'BANK', label: 'Bank Account' },
-    { value: 'CREDIT_CARD', label: 'Credit Card' },
-    { value: 'PETTY_CASH', label: 'Petty Cash' },
+    { value: 'BANK', labelKey: 'accounts.types.bank' },
+    { value: 'CREDIT_CARD', labelKey: 'accounts.types.creditCard' },
+    { value: 'PETTY_CASH', labelKey: 'accounts.types.pettyCash' },
   ],
 }));
 
@@ -36,6 +63,7 @@ const defaultProps = {
 describe('BankAccountForm', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockLocale = 'en';
   });
 
   it('renders without throwing (regression: empty SelectItem value crashed Radix UI)', () => {
@@ -111,5 +139,15 @@ describe('BankAccountForm', () => {
   it('shows opening balance field in create mode', () => {
     render(<BankAccountForm {...defaultProps} />);
     expect(screen.getByLabelText(/opening balance/i)).toBeInTheDocument();
+  });
+
+  it('renders in Arabic and translates its validation messages', async () => {
+    mockLocale = 'ar';
+    render(<BankAccountForm {...defaultProps} />);
+    expect(screen.getByText('بيانات الحساب')).toBeInTheDocument();
+    expect(screen.queryByText('Account Information')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'إنشاء الحساب' }));
+    expect(await screen.findByText('اسم الحساب مطلوب')).toBeInTheDocument();
+    expect(screen.getByText('حساب دفتر الأستاذ مطلوب')).toBeInTheDocument();
   });
 });

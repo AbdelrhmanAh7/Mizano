@@ -4,15 +4,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // ============ Types ============
 
+// The API's LeadSource / LeadStatus enums: any other value is refused with a 400.
 export type LeadSource =
   | 'FACEBOOK_ADS'
   | 'GOOGLE_ADS'
   | 'WEBSITE'
   | 'REFERRAL'
   | 'COLD_CALL'
-  | 'TRADE_SHOW'
   | 'OTHER';
-export type LeadStatus = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'UNQUALIFIED' | 'JUNK';
+export type LeadStatus = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'JUNK' | 'WON' | 'LOST';
 export type DealStage =
   | 'NEW'
   | 'MEETING_SCHEDULED'
@@ -91,36 +91,46 @@ export interface CreateLeadDto {
   customFields?: Record<string, unknown>;
 }
 
+/** `null` clears an optional field (an empty string would fail the email check). */
 export interface UpdateLeadDto {
   leadName?: string;
-  companyName?: string;
-  email?: string;
-  phone?: string;
+  companyName?: string | null;
+  email?: string | null;
+  phone?: string | null;
   source?: LeadSource;
   status?: LeadStatus;
-  assignedToId?: string;
-  notes?: string;
-  customFields?: Record<string, unknown>;
+  assignedToId?: string | null;
+  notes?: string | null;
+  customFields?: Record<string, unknown> | null;
 }
 
 export interface CreateDealDto {
   dealName: string;
   leadId?: string;
   customerId?: string;
-  expectedAmount: number;
+  /** Decimal string, e.g. "5000.00": money never travels as a JS number. */
+  expectedAmount: string;
+  /** Whole percentage, 0-100. */
   probability?: number;
   expectedCloseDate?: string;
   assignedToId?: string;
-  stage?: string;
+  stage?: DealStage;
   notes?: string;
 }
 
 export interface UpdateDealDto {
   dealName?: string;
-  expectedAmount?: number;
+  expectedAmount?: string;
   probability?: number;
-  expectedCloseDate?: string;
-  assignedToId?: string;
+  expectedCloseDate?: string | null;
+  assignedToId?: string | null;
+}
+
+export interface ConvertLeadOptions {
+  createDeal?: boolean;
+  dealName?: string;
+  /** Decimal string for the deal created with the customer. */
+  expectedAmount?: string;
 }
 
 export interface CreateActivityDto {
@@ -161,10 +171,7 @@ const leadsApi = {
     const response = await api.delete(`/crm/leads/${id}`);
     return response.data;
   },
-  convertToCustomer: async (
-    id: string,
-    options?: { createDeal?: boolean; dealName?: string; expectedAmount?: number },
-  ) => {
+  convertToCustomer: async (id: string, options?: ConvertLeadOptions) => {
     const response = await api.post(`/crm/leads/${id}/convert`, options);
     return response.data;
   },
@@ -172,8 +179,8 @@ const leadsApi = {
     const response = await api.post('/crm/leads/bulk-status', { ids, status });
     return response.data;
   },
-  bulkAssign: async (ids: string[], assignedToId: string) => {
-    const response = await api.post('/crm/leads/bulk-assign', { ids, assignedToId });
+  bulkAssign: async (leadIds: string[], assignedToId: string) => {
+    const response = await api.post('/crm/leads/bulk-assign', { leadIds, assignedToId });
     return response.data;
   },
 };
@@ -316,13 +323,8 @@ export function useDeleteLead() {
 export function useConvertLead() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      id,
-      options,
-    }: {
-      id: string;
-      options?: { createDeal?: boolean; dealName?: string; expectedAmount?: number };
-    }) => leadsApi.convertToCustomer(id, options),
+    mutationFn: ({ id, options }: { id: string; options?: ConvertLeadOptions }) =>
+      leadsApi.convertToCustomer(id, options),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
@@ -476,7 +478,6 @@ export function getLeadSourceLabel(source: LeadSource): string {
     WEBSITE: 'Website',
     REFERRAL: 'Referral',
     COLD_CALL: 'Cold Call',
-    TRADE_SHOW: 'Trade Show',
     OTHER: 'Other',
   };
   return labels[source] || source;
@@ -487,8 +488,9 @@ export function getLeadStatusColor(status: LeadStatus): string {
     NEW: 'bg-blue-100 text-blue-800',
     CONTACTED: 'bg-yellow-100 text-yellow-800',
     QUALIFIED: 'bg-green-100 text-green-800',
-    UNQUALIFIED: 'bg-gray-100 text-gray-800',
     JUNK: 'bg-red-100 text-red-800',
+    WON: 'bg-emerald-100 text-emerald-800',
+    LOST: 'bg-gray-100 text-gray-800',
   };
   return colors[status] || '';
 }
@@ -498,8 +500,9 @@ export function getLeadStatusLabel(status: LeadStatus): string {
     NEW: 'New',
     CONTACTED: 'Contacted',
     QUALIFIED: 'Qualified',
-    UNQUALIFIED: 'Unqualified',
     JUNK: 'Junk',
+    WON: 'Won',
+    LOST: 'Lost',
   };
   return labels[status] || status;
 }

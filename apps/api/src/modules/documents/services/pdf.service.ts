@@ -16,6 +16,7 @@ import {
   safeColor,
 } from '../templates/base.template';
 import { closePdfBrowser, renderHtmlToPdf } from './pdf-renderer';
+import { documentDigitsFrom } from '../../../common/utils/document-digits';
 
 /**
  * Ledger figures (statements, reports, payslips) are in the organization base currency, never in
@@ -43,7 +44,8 @@ export class PdfService implements OnModuleDestroy {
 
   /**
    * `locale` is the document language (`ar` renders right-to-left). The organization has no
-   * document-language setting, so callers pass the requesting user's UI locale.
+   * document-language setting, so callers pass the requesting user's UI locale; the digits of an
+   * Arabic document come from the organization setting `documentDigits`.
    */
   async generateInvoicePdf(
     organizationId: string,
@@ -107,7 +109,12 @@ export class PdfService implements OnModuleDestroy {
 
   // ============ Bill PDF ============
 
-  async generateBillPdf(organizationId: string, billId: string): Promise<Buffer> {
+  /** `locale` as for invoices. */
+  async generateBillPdf(
+    organizationId: string,
+    billId: string,
+    locale: DocumentLocale = 'en',
+  ): Promise<Buffer> {
     const bill = await this.prisma.bill.findFirst({
       where: { id: billId, organizationId, deletedAt: null },
       include: {
@@ -149,13 +156,18 @@ export class PdfService implements OnModuleDestroy {
       notes: bill.notes || undefined,
     };
 
-    const html = generateBillHtml(org, billData);
+    const html = generateBillHtml(org, billData, locale);
     return this.htmlToPdf(html);
   }
 
   // ============ Quote PDF ============
 
-  async generateQuotePdf(organizationId: string, quoteId: string): Promise<Buffer> {
+  /** `locale` as for invoices. */
+  async generateQuotePdf(
+    organizationId: string,
+    quoteId: string,
+    locale: DocumentLocale = 'en',
+  ): Promise<Buffer> {
     const quote = await this.prisma.quote.findFirst({
       where: { id: quoteId, organizationId, deletedAt: null },
       include: {
@@ -184,6 +196,7 @@ export class PdfService implements OnModuleDestroy {
         email: quote.customer.email || undefined,
         phone: quote.customer.phone || undefined,
         ...partyAddress(quote.customer),
+        taxId: quote.customer.taxId || undefined,
       },
       lines: quote.lines.map((line) => ({
         description: line.description || line.item?.name || '',
@@ -201,7 +214,7 @@ export class PdfService implements OnModuleDestroy {
       terms: quote.terms || undefined,
     };
 
-    const html = generateQuoteHtml(org, quoteData);
+    const html = generateQuoteHtml(org, quoteData, locale);
     return this.htmlToPdf(html);
   }
 
@@ -737,6 +750,7 @@ export class PdfService implements OnModuleDestroy {
       primaryColor: org.primaryColor || undefined,
       currency: org.currency || 'SAR',
       baseCurrency: org.baseCurrency,
+      documentDigits: documentDigitsFrom(org.documentDigits),
     };
   }
 

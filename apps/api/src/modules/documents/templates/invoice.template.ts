@@ -11,13 +11,27 @@ import {
   escapeHtml,
   renderAddressHtml,
   safeColor,
+  type DocumentCopy,
   type DocumentLocale,
   documentDirection,
   documentFontStack,
   intlLocaleFor,
 } from './base.template';
 
-const INVOICE_LABELS: Record<DocumentLocale, Record<string, string>> = {
+/** Every printed string of the invoice, in both languages; `status` is keyed by the schema enum. */
+type InvoiceLabel =
+  | 'invoice'
+  | 'titlePrefix'
+  | 'billTo'
+  | 'taxId'
+  | 'invoiceDate'
+  | 'dueDate'
+  | 'reference'
+  | 'balanceDue'
+  | 'notes'
+  | 'terms';
+
+const INVOICE_LABELS: Record<DocumentLocale, DocumentCopy<InvoiceLabel>> = {
   en: {
     invoice: 'INVOICE',
     titlePrefix: 'Invoice',
@@ -29,6 +43,14 @@ const INVOICE_LABELS: Record<DocumentLocale, Record<string, string>> = {
     balanceDue: 'Balance Due:',
     notes: 'Notes',
     terms: 'Terms & Conditions',
+    status: {
+      DRAFT: 'DRAFT',
+      SENT: 'SENT',
+      PAID: 'PAID',
+      PARTIALLY_PAID: 'PARTIALLY PAID',
+      OVERDUE: 'OVERDUE',
+      VOID: 'VOID',
+    },
   },
   ar: {
     invoice: 'فاتورة',
@@ -41,25 +63,14 @@ const INVOICE_LABELS: Record<DocumentLocale, Record<string, string>> = {
     balanceDue: 'الرصيد المستحق:',
     notes: 'ملاحظات',
     terms: 'الشروط والأحكام',
-  },
-};
-
-const INVOICE_STATUS_LABELS: Record<DocumentLocale, Record<string, string>> = {
-  en: {
-    DRAFT: 'DRAFT',
-    SENT: 'SENT',
-    PAID: 'PAID',
-    PARTIALLY_PAID: 'PARTIALLY PAID',
-    OVERDUE: 'OVERDUE',
-    VOID: 'VOID',
-  },
-  ar: {
-    DRAFT: 'مسودة',
-    SENT: 'مرسلة',
-    PAID: 'مدفوعة',
-    PARTIALLY_PAID: 'مدفوعة جزئيًا',
-    OVERDUE: 'متأخرة',
-    VOID: 'ملغاة',
+    status: {
+      DRAFT: 'مسودة',
+      SENT: 'مرسلة',
+      PAID: 'مدفوعة',
+      PARTIALLY_PAID: 'مدفوعة جزئيًا',
+      OVERDUE: 'متأخرة',
+      VOID: 'ملغاة',
+    },
   },
 };
 
@@ -90,8 +101,9 @@ export interface InvoiceData {
 }
 
 /**
- * Invoice document. `locale` sets the language, `<html lang dir>`, number and date formats
- * (Western digits in Arabic too) and the font stack; amounts use `invoice.currency`.
+ * Invoice document. `locale` sets the language, `<html lang dir>`, number and date formats and
+ * the font stack; Arabic prints the organization's digits (`org.documentDigits`), English always
+ * Western ones. Amounts use `invoice.currency`.
  */
 export function generateInvoiceHtml(
   org: OrganizationInfo,
@@ -101,9 +113,10 @@ export function generateInvoiceHtml(
   const primaryColor = safeColor(org.primaryColor, defaultTemplateConfig.colors.primary);
   const l = INVOICE_LABELS[locale];
   const dir = documentDirection(locale);
-  const dateLocale = intlLocaleFor(locale);
-  const money = (value: number) => formatCurrency(value, invoice.currency, locale);
-  const statusLabel = INVOICE_STATUS_LABELS[locale][invoice.status] ?? invoice.status;
+  const digits = org.documentDigits ?? 'latn';
+  const dateLocale = intlLocaleFor(locale, digits);
+  const money = (value: number) => formatCurrency(value, invoice.currency, locale, digits);
+  const statusLabel = l.status[invoice.status] ?? invoice.status;
 
   const statusColors: Record<string, string> = {
     DRAFT: '#9CA3AF',
@@ -185,7 +198,7 @@ export function generateInvoiceHtml(
         </div>
 
         <!-- Items Table -->
-        ${generateItemsTableHtml(invoice.lines, invoice.currency, true, primaryColor, locale)}
+        ${generateItemsTableHtml(invoice.lines, invoice.currency, true, primaryColor, locale, digits)}
 
         <!-- Totals -->
         ${generateTotalsHtml(
@@ -196,6 +209,7 @@ export function generateInvoiceHtml(
           invoice.shippingAmount,
           undefined,
           locale,
+          digits,
         )}
 
         <!-- Notes and Terms -->

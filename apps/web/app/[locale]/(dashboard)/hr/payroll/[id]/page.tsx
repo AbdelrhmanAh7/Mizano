@@ -40,26 +40,14 @@ import {
   formatCurrency,
 } from '@/lib/hooks/use-hr';
 import { useTranslations } from 'next-intl';
-
-const months = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 export default function PayrollDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const t = useTranslations('hr');
-  const { data: payrollRun, isLoading } = usePayrollRun(id);
+  const tCommon = useTranslations('common');
+  const dateLocale = useDateFnsLocale();
+  const { data: payrollRun, isLoading, isError, refetch } = usePayrollRun(id);
   const confirmPayroll = useConfirmPayroll();
 
   const handleConfirm = async () => {
@@ -81,10 +69,21 @@ export default function PayrollDetailPage({ params }: { params: { id: string } }
     );
   }
 
+  if (isError) {
+    return (
+      <div className="text-center py-12 space-y-4" role="alert">
+        <p className="text-muted-foreground">{t('loadError')}</p>
+        <Button variant="outline" onClick={() => void refetch()}>
+          {t('retry')}
+        </Button>
+      </div>
+    );
+  }
+
   if (!payrollRun) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-xl font-semibold">Payroll run not found</h2>
+        <h2 className="text-xl font-semibold">{t('payroll.detail.notFound')}</h2>
         <Button asChild className="mt-4">
           <Link href="/hr/payroll">{t('payroll.title')}</Link>
         </Button>
@@ -112,22 +111,28 @@ export default function PayrollDetailPage({ params }: { params: { id: string } }
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/hr/payroll">
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
             </Link>
           </Button>
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight">
-                Payroll - {months[payrollRun.month - 1]} {payrollRun.year}
+                {t('payroll.detail.title', {
+                  period: format(new Date(payrollRun.year, payrollRun.month - 1), 'MMMM yyyy', {
+                    locale: dateLocale,
+                  }),
+                })}
               </h1>
               <Badge variant="outline" className={getPayrollStatusColor(payrollRun.status)}>
-                {getPayrollStatusLabel(payrollRun.status)}
+                {getPayrollStatusLabel(payrollRun.status, t)}
               </Badge>
             </div>
             <p className="text-muted-foreground">
-              Created on {format(new Date(payrollRun.createdAt), 'MMMM d, yyyy')}
+              {t('payroll.detail.createdOn', {
+                date: format(new Date(payrollRun.createdAt), 'PPP', { locale: dateLocale }),
+              })}
             </p>
           </div>
         </div>
@@ -136,21 +141,22 @@ export default function PayrollDetailPage({ params }: { params: { id: string } }
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button>
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Confirm & Post
+                  <CheckCircle2 className="me-2 h-4 w-4" />
+                  {t('payroll.actions.confirmPost')}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Confirm Payroll</AlertDialogTitle>
+                  <AlertDialogTitle>{t('payroll.confirmDialog.title')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will finalize the payroll and create accounting entries. This action cannot
-                    be undone.
+                    {t('payroll.confirmDialog.description')}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleConfirm}>Confirm</AlertDialogAction>
+                  <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleConfirm}>
+                    {tCommon('buttons.confirm')}
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -158,26 +164,26 @@ export default function PayrollDetailPage({ params }: { params: { id: string } }
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">
-                <Download className="mr-2 h-4 w-4" />
-                Export
+                <Download className="me-2 h-4 w-4" />
+                {t('payroll.detail.export')}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem>
-                <FileText className="mr-2 h-4 w-4" />
-                Export as PDF
+                <FileText className="me-2 h-4 w-4" />
+                {t('payroll.detail.exportPdf')}
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <FileText className="mr-2 h-4 w-4" />
-                Export as CSV
+                <FileText className="me-2 h-4 w-4" />
+                {t('payroll.detail.exportCsv')}
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <Printer className="mr-2 h-4 w-4" />
-                Print All Payslips
+                <Printer className="me-2 h-4 w-4" />
+                {t('payroll.detail.printAll')}
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <Mail className="mr-2 h-4 w-4" />
-                Email All Payslips
+                <Mail className="me-2 h-4 w-4" />
+                {t('payroll.detail.emailAll')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -188,27 +194,27 @@ export default function PayrollDetailPage({ params }: { params: { id: string } }
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Employees</p>
+            <p className="text-sm text-muted-foreground">{t('payroll.preview.employees')}</p>
             <p className="text-2xl font-bold">{payslips.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Total Gross</p>
+            <p className="text-sm text-muted-foreground">{t('payroll.summary.totalGross')}</p>
             <p className="text-2xl font-bold font-mono">{formatCurrency(totalGross)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Total Deductions</p>
+            <p className="text-sm text-muted-foreground">{t('payroll.summary.totalDeductions')}</p>
             <p className="text-2xl font-bold font-mono text-red-600">
-              -{formatCurrency(totalDeductions)}
+              <span dir="ltr">-{formatCurrency(totalDeductions)}</span>
             </p>
           </CardContent>
         </Card>
         <Card className="bg-primary/5">
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Total Net Pay</p>
+            <p className="text-sm text-muted-foreground">{t('payroll.summary.totalNet')}</p>
             <p className="text-2xl font-bold font-mono">{formatCurrency(totalNetPay)}</p>
           </CardContent>
         </Card>
@@ -223,14 +229,14 @@ export default function PayrollDetailPage({ params }: { params: { id: string } }
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Employee</TableHead>
-                <TableHead className="text-right">Basic</TableHead>
-                <TableHead className="text-right">Allowances</TableHead>
-                <TableHead className="text-right">Gross</TableHead>
-                <TableHead className="text-right">LOP</TableHead>
-                <TableHead className="text-right">Deductions</TableHead>
-                <TableHead className="text-right">Tax</TableHead>
-                <TableHead className="text-right">Net Pay</TableHead>
+                <TableHead>{t('payroll.previewTable.employee')}</TableHead>
+                <TableHead className="text-end">{t('payroll.previewTable.basic')}</TableHead>
+                <TableHead className="text-end">{t('payroll.previewTable.allowances')}</TableHead>
+                <TableHead className="text-end">{t('payroll.previewTable.gross')}</TableHead>
+                <TableHead className="text-end">{t('payroll.previewTable.lop')}</TableHead>
+                <TableHead className="text-end">{t('payroll.previewTable.deductions')}</TableHead>
+                <TableHead className="text-end">{t('payroll.previewTable.tax')}</TableHead>
+                <TableHead className="text-end">{t('payroll.previewTable.netPay')}</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
@@ -256,40 +262,44 @@ export default function PayrollDetailPage({ params }: { params: { id: string } }
                         </p>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right font-mono">
+                    <TableCell className="text-end font-mono">
                       {formatCurrency(slip.basicSalary || 0)}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-green-600">
-                      +
-                      {formatCurrency(
-                        Object.values(slip.allowances || {}).reduce(
-                          (sum: number, a: number) => sum + (a || 0),
-                          0,
-                        ),
-                      )}
+                    <TableCell className="text-end font-mono text-green-600">
+                      <span dir="ltr">
+                        +
+                        {formatCurrency(
+                          Object.values(slip.allowances || {}).reduce(
+                            (sum: number, a: number) => sum + (a || 0),
+                            0,
+                          ),
+                        )}
+                      </span>
                     </TableCell>
-                    <TableCell className="text-right font-mono">
+                    <TableCell className="text-end font-mono">
                       {formatCurrency(slip.gross || 0)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-end">
                       {(slip.lopDays ?? 0) > 0 ? (
-                        <span className="text-red-600">{slip.lopDays} days</span>
+                        <span className="text-red-600">
+                          {t('payroll.lopDays', { days: slip.lopDays ?? 0 })}
+                        </span>
                       ) : (
                         '-'
                       )}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-red-600">
-                      -{formatCurrency(slip.totalDeductions || 0)}
+                    <TableCell className="text-end font-mono text-red-600">
+                      <span dir="ltr">-{formatCurrency(slip.totalDeductions || 0)}</span>
                     </TableCell>
-                    <TableCell className="text-right font-mono text-red-600">
-                      -{formatCurrency(slip.taxAmount || 0)}
+                    <TableCell className="text-end font-mono text-red-600">
+                      <span dir="ltr">-{formatCurrency(slip.taxAmount || 0)}</span>
                     </TableCell>
-                    <TableCell className="text-right font-mono font-medium">
+                    <TableCell className="text-end font-mono font-medium">
                       {formatCurrency(slip.netPay || 0)}
                     </TableCell>
                     <TableCell>
                       <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/hr/payslips/${slip.id}`}>View</Link>
+                        <Link href={`/hr/payslips/${slip.id}`}>{t('payroll.viewPayslip')}</Link>
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -304,21 +314,25 @@ export default function PayrollDetailPage({ params }: { params: { id: string } }
       {payrollRun.status === 'CONFIRMED' && payrollRun.journalId && (
         <Card>
           <CardHeader>
-            <CardTitle>Accounting Entry</CardTitle>
+            <CardTitle>{t('payroll.detail.accountingEntry')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
               <div className="flex items-center gap-3">
                 <FileText className="h-5 w-5 text-muted-foreground" />
                 <div>
-                  <p className="font-medium">Journal Entry Created</p>
+                  <p className="font-medium">{t('payroll.detail.journalCreated')}</p>
                   <p className="text-sm text-muted-foreground">
-                    Reference: JRN-{payrollRun.journalId.slice(-6).toUpperCase()}
+                    {t('payroll.detail.reference', {
+                      reference: `JRN-${payrollRun.journalId.slice(-6).toUpperCase()}`,
+                    })}
                   </p>
                 </div>
               </div>
               <Button variant="outline" size="sm" asChild>
-                <Link href={`/accounting/journals/${payrollRun.journalId}`}>View Journal</Link>
+                <Link href={`/accounting/journals/${payrollRun.journalId}`}>
+                  {t('payroll.detail.viewJournal')}
+                </Link>
               </Button>
             </div>
           </CardContent>

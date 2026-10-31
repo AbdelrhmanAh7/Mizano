@@ -87,9 +87,12 @@ describe('Tenant isolation of ledger and invoice reads (e2e) @issue-108', () => 
 
   async function tokenFor(tenant: TestTenant, expiresIn: number): Promise<string> {
     const user = await prisma.user.findUniqueOrThrow({ where: { id: tenant.userId } });
+    // Reuse the signed-in session: access tokens of a session that does not exist are refused.
+    const { sid } = app.get(JwtService).decode<{ sid: string }>(tenant.accessToken);
     return app.get(JwtService).signAsync(
       {
         sub: user.id,
+        sid,
         email: user.email,
         name: user.name,
         organizationId: user.organizationId,

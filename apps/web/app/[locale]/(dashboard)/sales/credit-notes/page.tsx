@@ -67,10 +67,12 @@ function CreditNotesPageContent() {
   const canCreate = hasPermission('sales.create');
   const canDelete = hasPermission('sales.delete');
 
+  const tBulk = useTranslations('common.bulk');
+
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => creditNotesApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['credit-notes']],
-    successMessage: '{count} credit notes deleted',
+    successMessage: tBulk.raw('creditNotesDeleted'),
   });
 
   const bulkActions = [
