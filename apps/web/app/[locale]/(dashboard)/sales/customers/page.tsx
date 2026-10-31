@@ -33,35 +33,22 @@ import { customersApi } from '@/lib/api';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import { useExportAll } from '@/lib/hooks/use-export-all';
 import type { ImportEntityType } from '@/lib/hooks/use-import-export';
-import { useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { cn } from '@/lib/utils';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Edit, Eye, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
 function CustomersPageContent() {
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
-  const locale = useLocale();
-  const baseCurrency = useBaseCurrency();
-
   // Balances are ledger (AR) amounts, so they are in the base currency, not in
   // Customer.currency (a USD schema default).
-  const numberLocale = locale === 'ar' ? 'ar-u-nu-latn' : 'en';
-  const formatCurrency = (amount: string | number) => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    const value = Number.isFinite(num) ? num : 0;
-    return new Intl.NumberFormat(
-      numberLocale,
-      baseCurrency
-        ? { style: 'currency', currency: baseCurrency }
-        : { minimumFractionDigits: 2, maximumFractionDigits: 2 },
-    ).format(value);
-  };
+  const formatCurrency = useMoneyFormatter();
   const { hasPermission } = usePermissions();
   const { onExportAll } = useExportAll('customers', 'customers');
   const tableParams = useTableParams({ defaultSortBy: 'createdAt', mode: 'virtual' });

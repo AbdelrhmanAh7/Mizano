@@ -22,13 +22,13 @@ import {
   getPaymentModeOptions,
   useInfinitePaymentsReceived,
 } from '@/lib/hooks/use-payments-received';
-import { useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { Eye, Filter, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
@@ -47,8 +47,6 @@ function PaymentsReceivedPageContent() {
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
   const tModes = useTranslations('common.paymentModes');
-  const locale = useLocale();
-  const baseCurrency = useBaseCurrency();
   const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
 
@@ -96,17 +94,7 @@ function PaymentsReceivedPageContent() {
   ];
 
   // Customer payments are posted in the organization base currency, so they are shown in it.
-  const numberLocale = locale === 'ar' ? 'ar-u-nu-latn' : 'en';
-  const formatCurrency = (amount: string | number) => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    const value = Number.isFinite(num) ? num : 0;
-    return new Intl.NumberFormat(
-      numberLocale,
-      baseCurrency
-        ? { style: 'currency', currency: baseCurrency }
-        : { minimumFractionDigits: 2, maximumFractionDigits: 2 },
-    ).format(value);
-  };
+  const formatCurrency = useMoneyFormatter();
 
   const paymentModeOptions = getPaymentModeOptions().map((option) => ({
     ...option,

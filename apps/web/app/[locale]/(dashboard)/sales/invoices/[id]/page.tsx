@@ -49,7 +49,7 @@ import {
   useVoidInvoice,
 } from '@/lib/hooks/use-invoices';
 import { usePermissions } from '@/lib/hooks/use-permissions';
-import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import {
   documentLocaleFor,
   downloadInvoicePdf,
@@ -67,7 +67,6 @@ export default function InvoiceDetailPage() {
   const tCommon = useTranslations('common');
   const locale = useLocale();
   const dateLocale = useDateFnsLocale();
-  const baseCurrency = useBaseCurrency();
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -91,19 +90,8 @@ export default function InvoiceDetailPage() {
   const canExportPdf = hasPermission('sales.view');
 
   // The invoice's own currency, else the organization base currency (never a guessed USD).
-  // Western digits in Arabic, like the PDF.
-  const numberLocale = locale === 'ar' ? 'ar-u-nu-latn' : 'en';
-  const formatCurrency = (amount: string | number) => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    const value = Number.isFinite(num) ? num : 0;
-    const currency = invoice ? documentCurrency(invoice.currencyCode, baseCurrency) : undefined;
-    return new Intl.NumberFormat(
-      numberLocale,
-      currency
-        ? { style: 'currency', currency }
-        : { minimumFractionDigits: 2, maximumFractionDigits: 2 },
-    ).format(value);
-  };
+  const money = useMoneyFormatter();
+  const formatCurrency = (amount: string | number) => money(amount, invoice?.currencyCode);
 
   // The mutation hooks show the translated error toast; the dialogs just close.
   const confirmDelete = async () => {

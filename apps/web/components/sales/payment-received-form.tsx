@@ -32,6 +32,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useCustomers, Customer } from '@/lib/hooks/use-customers';
 import { useInvoices, Invoice } from '@/lib/hooks/use-invoices';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { useAccountsByType, Account } from '@/lib/hooks/use-accounts';
 import {
   PaymentMode,
@@ -187,13 +188,8 @@ export function PaymentReceivedForm({
     }
   }, [openInvoices, defaultInvoiceId, replace, form]);
 
-  const formatCurrency = (amount: string | number) => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(num);
-  };
+  // Payments are posted in the base currency; each invoice is shown in its own currency.
+  const formatCurrency = useMoneyFormatter();
 
   // Calculate total allocated
   const totalAllocated = useMemo(() => {
@@ -450,10 +446,10 @@ export function PaymentReceivedForm({
                           {format(new Date(invoice.dueDate), 'PP', { locale: dateLocale })}
                         </TableCell>
                         <TableCell className="text-end font-mono">
-                          {formatCurrency(invoice.grandTotal)}
+                          {formatCurrency(invoice.grandTotal, invoice.currencyCode)}
                         </TableCell>
                         <TableCell className="text-end font-mono text-red-600">
-                          {formatCurrency(invoice.balanceDue)}
+                          {formatCurrency(invoice.balanceDue, invoice.currencyCode)}
                         </TableCell>
                         <TableCell className="text-end">
                           <Input

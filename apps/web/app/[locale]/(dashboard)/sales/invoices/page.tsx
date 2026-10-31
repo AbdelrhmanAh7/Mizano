@@ -48,7 +48,7 @@ import {
   useVoidInvoice,
 } from '@/lib/hooks/use-invoices';
 import { usePermissions } from '@/lib/hooks/use-permissions';
-import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { cn } from '@/lib/utils';
 import { type ColumnDef } from '@tanstack/react-table';
@@ -65,15 +65,13 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
 function InvoicesPageContent() {
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
-  const locale = useLocale();
-  const baseCurrency = useBaseCurrency();
 
   const STATUS_OPTIONS = [
     { value: 'DRAFT', label: t('invoices.status.draft') },
@@ -260,18 +258,7 @@ function InvoicesPageContent() {
   };
 
   // The invoice's own currency, else the organization base currency (never a guessed USD).
-  const numberLocale = locale === 'ar' ? 'ar-u-nu-latn' : 'en';
-  const formatCurrency = (amount: string | number, currencyCode?: string | null) => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    const value = Number.isFinite(num) ? num : 0;
-    const currency = documentCurrency(currencyCode, baseCurrency);
-    return new Intl.NumberFormat(
-      numberLocale,
-      currency
-        ? { style: 'currency', currency }
-        : { minimumFractionDigits: 2, maximumFractionDigits: 2 },
-    ).format(value);
-  };
+  const formatCurrency = useMoneyFormatter();
 
   const columns: ColumnDef<Invoice>[] = [
     {
