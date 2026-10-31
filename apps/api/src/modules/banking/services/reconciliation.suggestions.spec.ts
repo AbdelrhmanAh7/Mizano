@@ -104,6 +104,28 @@ describe('ReconciliationService.getSuggestions (#586 matching precision)', () =>
     expect(row.matches).toHaveLength(5);
   });
 
+  it('fetches payee matches in their own pools (exact amount first) when the bank line names one', async () => {
+    prisma.bankTransaction.findMany.mockResolvedValue([{ ...deposit, payee: 'customer' }]);
+    prisma.invoice.findMany.mockResolvedValue([]);
+    prisma.invoice.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([invoice('INV-PAYEE', '1000.0001')]);
+
+    const [row] = await service.getSuggestions(ORG, 'ba1');
+
+    const wheres = prisma.invoice.findMany.mock.calls.map((c: Array<{ where: any }>) => c[0].where);
+    const party = { name: { contains: 'customer', mode: 'insensitive' } };
+    expect(wheres[1]).toMatchObject({ organizationId: ORG, customer: party });
+    expect(wheres[1].balanceDue.toString()).toBe('1000.0001');
+    expect(wheres[2].customer).toEqual(party);
+    expect(row.matches).toEqual([
+      expect.objectContaining({
+        entity: expect.objectContaining({ id: 'INV-PAYEE' }),
+        confidence: 100,
+      }),
+    ]);
+  });
+
   it('matches a withdrawal stored negative against bills by its absolute amount', async () => {
     prisma.bankTransaction.findMany.mockResolvedValue([
       { ...deposit, type: 'WITHDRAWAL', amount: dec('-250.5') },

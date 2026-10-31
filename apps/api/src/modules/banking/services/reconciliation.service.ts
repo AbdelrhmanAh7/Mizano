@@ -44,6 +44,25 @@ function referenceTokens(
   return [...new Set(words)].slice(0, 20);
 }
 
+/**
+ * Pools of documents whose party name contains the bank line's payee (the same case-insensitive
+ * rule the score uses): with the exact amount first, then any amount. None without a payee.
+ */
+function payeePools(
+  payee: string | null,
+  amount: Decimal,
+): Array<{
+  amount: { balanceDue?: Decimal };
+  party: { name: { contains: string; mode: 'insensitive' } };
+}> {
+  if (!payee) return [];
+  const party = { name: { contains: payee, mode: 'insensitive' as const } };
+  return [
+    { amount: { balanceDue: amount }, party },
+    { amount: {}, party },
+  ];
+}
+
 function uniqueById<T extends { id: string }>(rows: T[]): T[] {
   return [...new Map(rows.map((r) => [r.id, r])).values()];
 }
@@ -123,8 +142,8 @@ export class ReconciliationService {
         take: MATCH_CANDIDATE_LIMIT,
       };
       // Separate pools in priority order, each bounded, so weaker candidates never crowd out
-      // stronger ones: a named number, then exact amount, then near amounts, then the newest open
-      // ones for name-only matches.
+      // stronger ones: a named number, the payee (with and without the exact amount), the exact
+      // amount, near amounts, then the newest open ones.
       const invoices = uniqueById(
         (
           await Promise.all([
@@ -132,6 +151,12 @@ export class ReconciliationService {
               ...query,
               where: { ...where, invoiceNumber: { in: tokens } },
             }),
+            ...payeePools(transaction.payee, amount).map((extra) =>
+              this.prisma.invoice.findMany({
+                ...query,
+                where: { ...where, ...extra.amount, customer: extra.party },
+              }),
+            ),
             this.prisma.invoice.findMany({ ...query, where: { ...where, balanceDue: amount } }),
             this.prisma.invoice.findMany({
               ...query,
@@ -175,11 +200,17 @@ export class ReconciliationService {
       const bills = uniqueById(
         (
           await Promise.all([
-            // Bills score no near amounts: a named number, then exact amount, then the newest.
+            // Bills score no near amounts: a named number, the payee, the exact amount, the newest.
             this.prisma.bill.findMany({
               ...query,
               where: { ...where, billNumber: { in: tokens } },
             }),
+            ...payeePools(transaction.payee, amount).map((extra) =>
+              this.prisma.bill.findMany({
+                ...query,
+                where: { ...where, ...extra.amount, vendor: extra.party },
+              }),
+            ),
             this.prisma.bill.findMany({ ...query, where: { ...where, balanceDue: amount } }),
             this.prisma.bill.findMany({ ...query, where }),
           ])
