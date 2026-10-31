@@ -79,7 +79,14 @@
     "days31to60": "31-60 Days",
     "days61to90": "61-90 Days",
     "over90": "Over 90 Days",
-    "total": "Total"
+    "total": "Total",
+    "outstanding": "Outstanding Invoices",
+    "number": "Invoice #",
+    "documentDate": "Invoice Date",
+    "bucketCount": "{count} invoices",
+    "bucketTitle": "{bucket} Invoices",
+    "bucketEmpty": "No invoices in this aging bucket",
+    "empty": "No accounts receivable aging data available."
   },
   "apAging": {
     "title": "AP Aging",
@@ -90,7 +97,23 @@
     "days31to60": "31-60 Days",
     "days61to90": "61-90 Days",
     "over90": "Over 90 Days",
-    "total": "Total"
+    "total": "Total",
+    "totalPayable": "Total Payable",
+    "outstanding": "Outstanding Bills",
+    "number": "Bill #",
+    "documentDate": "Bill Date",
+    "bucketCount": "{count} bills",
+    "bucketTitle": "{bucket} Bills",
+    "bucketEmpty": "No bills in this aging bucket",
+    "empty": "No outstanding payables found."
+  },
+  "aging": {
+    "summary": "Aging Summary",
+    "dueDate": "Due Date",
+    "amount": "Amount",
+    "balanceDue": "Balance Due",
+    "daysOverdue": "Days Overdue",
+    "asOf": "As of {date}"
   },
   "salesByCustomer": {
     "title": "Sales by Customer",

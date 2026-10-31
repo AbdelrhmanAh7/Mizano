@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { Building2, LucideIcon, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,63 +27,56 @@ import {
   AgingBucket,
   AgingReport,
   getAgingBucketColor,
-  getAgingBucketLabel,
   useAPAgingReport,
   useARAgingReport,
 } from '@/lib/hooks/use-reports';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
-type Translate = (key: string) => string;
-
 /** What differs between the receivable (customers, invoices) and payable (vendors, bills) report. */
 interface AgingSide {
   useReport: (asOfDate: string) => UseQueryResult<AgingReport>;
-  title: (t: Translate) => string;
-  totalLabel: (t: Translate) => string;
+  /** The side's namespace in `reports` messages (labels, headers and empty states). */
+  ns: 'arAging' | 'apAging';
+  totalKey: string;
+  partyKey: string;
   icon: LucideIcon;
   iconClassName: { box: string; icon: string };
-  countLabel: string;
-  documents: string;
-  numberHeader: string;
-  partyHeader: string;
-  dateHeader: string;
   detailPath: string;
   /** Receivables hide the summary when empty; payables keep it and say so in the buckets card. */
-  empty: { placement: 'page' | 'buckets'; message: string };
+  emptyPlacement: 'page' | 'buckets';
 }
 
 const AGING_SIDES: Record<'receivable' | 'payable', AgingSide> = {
   receivable: {
     useReport: useARAgingReport,
-    title: (t) => t('arAging.title'),
-    totalLabel: (t) => t('arAging.total'),
+    ns: 'arAging',
+    totalKey: 'total',
+    partyKey: 'customer',
     icon: Users,
     iconClassName: { box: 'bg-blue-100', icon: 'text-blue-600' },
-    countLabel: 'Outstanding Invoices',
-    documents: 'invoices',
-    numberHeader: 'Invoice #',
-    partyHeader: 'Customer',
-    dateHeader: 'Invoice Date',
     detailPath: '/sales/invoices',
-    empty: { placement: 'page', message: 'No accounts receivable aging data available.' },
+    emptyPlacement: 'page',
   },
   payable: {
     useReport: useAPAgingReport,
-    title: (t) => t('apAging.title'),
-    totalLabel: () => 'Total Payable',
+    ns: 'apAging',
+    totalKey: 'totalPayable',
+    partyKey: 'vendor',
     icon: Building2,
     iconClassName: { box: 'bg-orange-100', icon: 'text-orange-600' },
-    countLabel: 'Outstanding Bills',
-    documents: 'bills',
-    numberHeader: 'Bill #',
-    partyHeader: 'Vendor',
-    dateHeader: 'Bill Date',
     detailPath: '/purchases/bills',
-    empty: { placement: 'buckets', message: 'No outstanding payables found.' },
+    emptyPlacement: 'buckets',
   },
 };
 
-const capitalize = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
+/** Message key of each bucket range the API sends (an unknown range shows as sent). */
+const BUCKET_LABEL_KEYS: Record<string, string> = {
+  current: 'current',
+  '1-30': 'days1to30',
+  '31-60': 'days31to60',
+  '61-90': 'days61to90',
+  '90+': 'over90',
+};
 
 /**
  * The AR or AP aging report page: totals, clickable buckets and the documents of the open bucket.
@@ -95,6 +88,15 @@ export function AgingReportPage({ side }: { side: 'receivable' | 'payable' }): J
   const useReport = config.useReport;
   const formatCurrency = useMoneyFormatter();
   const t = useTranslations('reports');
+  // Dates in the page language (Western digits in Arabic, like amounts and the PDFs).
+  const dateLocale = useLocale() === 'ar' ? 'ar-u-nu-latn' : 'en-US';
+  const longDate = new Intl.DateTimeFormat(dateLocale, { dateStyle: 'long' });
+  const shortDate = new Intl.DateTimeFormat(dateLocale, { dateStyle: 'medium' });
+  /** A message of this side's namespace (arAging or apAging). */
+  const ts = (key: string, values?: Record<string, string | number>) =>
+    t(`${config.ns}.${key}`, values);
+  const bucketLabel = (range: string) =>
+    BUCKET_LABEL_KEYS[range] ? ts(BUCKET_LABEL_KEYS[range]) : range;
   const [asOfDate, setAsOfDate] = useState(new Date());
   const [expandedBucket, setExpandedBucket] = useState<string | null>(null);
   const { data: report, isLoading, isError, refetch } = useReport(format(asOfDate, 'yyyy-MM-dd'));
@@ -115,7 +117,7 @@ export function AgingReportPage({ side }: { side: 'receivable' | 'payable' }): J
               <Icon className={cn('h-5 w-5', config.iconClassName.icon)} />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">{config.totalLabel(t)}</p>
+              <p className="text-sm text-muted-foreground">{ts(config.totalKey)}</p>
               <p className="text-2xl font-bold font-mono">{formatCurrency(report?.total ?? 0)}</p>
               {report && report.unappliedCredits > 0 && (
                 <p className="text-xs text-muted-foreground">
@@ -130,7 +132,7 @@ export function AgingReportPage({ side }: { side: 'receivable' | 'payable' }): J
       </Card>
       <Card>
         <CardContent className="pt-6">
-          <p className="text-sm text-muted-foreground">{config.countLabel}</p>
+          <p className="text-sm text-muted-foreground">{ts('outstanding')}</p>
           <p className="text-2xl font-bold">{report?.totalCount ?? 0}</p>
         </CardContent>
       </Card>
@@ -140,11 +142,11 @@ export function AgingReportPage({ side }: { side: 'receivable' | 'payable' }): J
   const bucketsCard = (
     <Card>
       <CardHeader>
-        <CardTitle>Aging Summary</CardTitle>
+        <CardTitle>{t('aging.summary')}</CardTitle>
       </CardHeader>
       <CardContent>
         {buckets.length === 0 ? (
-          <p className="text-center py-8 text-muted-foreground">{config.empty.message}</p>
+          <p className="text-center py-8 text-muted-foreground">{ts('empty')}</p>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {buckets.map((bucket: AgingBucket) => (
@@ -161,11 +163,9 @@ export function AgingReportPage({ side }: { side: 'receivable' | 'payable' }): J
                   getAgingBucketColor(bucket.range),
                 )}
               >
-                <p className="text-sm font-medium">{getAgingBucketLabel(bucket.range)}</p>
+                <p className="text-sm font-medium">{bucketLabel(bucket.range)}</p>
                 <p className="text-xl font-bold font-mono mt-1">{formatCurrency(bucket.amount)}</p>
-                <p className="text-xs mt-1">
-                  {bucket.count} {config.documents}
-                </p>
+                <p className="text-xs mt-1">{ts('bucketCount', { count: bucket.count })}</p>
               </button>
             ))}
           </div>
@@ -177,22 +177,20 @@ export function AgingReportPage({ side }: { side: 'receivable' | 'payable' }): J
   const detailCard = expandedBucket && (
     <Card>
       <CardHeader>
-        <CardTitle>
-          {getAgingBucketLabel(expandedBucket)} {capitalize(config.documents)}
-        </CardTitle>
+        <CardTitle>{ts('bucketTitle', { bucket: bucketLabel(expandedBucket) })}</CardTitle>
       </CardHeader>
       <CardContent>
         {expanded?.items?.length ? (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{config.numberHeader}</TableHead>
-                <TableHead>{config.partyHeader}</TableHead>
-                <TableHead>{config.dateHeader}</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-right">Balance Due</TableHead>
-                <TableHead className="text-center">Days Overdue</TableHead>
+                <TableHead>{ts('number')}</TableHead>
+                <TableHead>{ts(config.partyKey)}</TableHead>
+                <TableHead>{ts('documentDate')}</TableHead>
+                <TableHead>{t('aging.dueDate')}</TableHead>
+                <TableHead className="text-right">{t('aging.amount')}</TableHead>
+                <TableHead className="text-right">{t('aging.balanceDue')}</TableHead>
+                <TableHead className="text-center">{t('aging.daysOverdue')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -207,8 +205,8 @@ export function AgingReportPage({ side }: { side: 'receivable' | 'payable' }): J
                     </Link>
                   </TableCell>
                   <TableCell>{item.counterpartyName}</TableCell>
-                  <TableCell>{format(new Date(item.date), 'MMM d, yyyy')}</TableCell>
-                  <TableCell>{format(new Date(item.dueDate), 'MMM d, yyyy')}</TableCell>
+                  <TableCell>{shortDate.format(new Date(item.date))}</TableCell>
+                  <TableCell>{shortDate.format(new Date(item.dueDate))}</TableCell>
                   <TableCell className="text-right font-mono">
                     {formatCurrency(item.amount)}
                   </TableCell>
@@ -234,9 +232,7 @@ export function AgingReportPage({ side }: { side: 'receivable' | 'payable' }): J
             </TableBody>
           </Table>
         ) : (
-          <p className="text-center py-8 text-muted-foreground">
-            No {config.documents} in this aging bucket
-          </p>
+          <p className="text-center py-8 text-muted-foreground">{ts('bucketEmpty')}</p>
         )}
       </CardContent>
     </Card>
@@ -245,8 +241,8 @@ export function AgingReportPage({ side }: { side: 'receivable' | 'payable' }): J
   return (
     <div className="space-y-6">
       <ReportPageHeader
-        title={config.title(t)}
-        subtitle={`As of ${format(asOfDate, 'MMMM d, yyyy')}`}
+        title={ts('title')}
+        subtitle={t('aging.asOf', { date: longDate.format(asOfDate) })}
       />
 
       <ReportFilters
@@ -256,10 +252,10 @@ export function AgingReportPage({ side }: { side: 'receivable' | 'payable' }): J
         showAsOfDate
       />
 
-      {buckets.length === 0 && config.empty.placement === 'page' ? (
+      {buckets.length === 0 && config.emptyPlacement === 'page' ? (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            {config.empty.message}
+            {ts('empty')}
           </CardContent>
         </Card>
       ) : (
