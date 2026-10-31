@@ -105,7 +105,7 @@ export class CreditNotesController {
 
   @Post(':id/apply')
   @Permissions('sales.edit')
-  @InvalidateCache('credit-notes:*', 'invoices:*', 'customers:*')
+  @InvalidatesLedger('credit-notes:*', 'invoices:*', 'customers:*')
   @ApiOperation({ summary: 'Apply an unapplied credit note to an invoice balance' })
   apply(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: ApplyCreditNoteDto) {
     return this.creditNotesService.apply(orgId, id, dto.invoiceId);
