@@ -65,7 +65,8 @@ status as **unknown**; the owner or a lawyer must search before filing for any n
 |---|---|
 | mizano.app | Registered 2026-05-24, the Saudi app above |
 | mizano.com, .co, .org | Registered (see 3.2) |
-| mizano.ai, .io, .net, .sa, .ae | Not registered (whois "not found"/"no match") |
+| mizano.ai, .io, .net, .sa | Not registered (whois "not found"/"no match") |
+| mizano.ae | whois answered "No Data Found", but the .ae registry rate-limits queries: **unverified** |
 | mizano.eg | No DNS records; `.eg` has no free whois, so **unverified** |
 
 ### 3.6 Handles and app stores
@@ -116,7 +117,7 @@ These claim no tax-authority invoicing: the code does not issue Egyptian or Saud
 | | Arabic | English |
 |---|---|---|
 | Tagline | حساباتك واضحة، وإقفال الشهر أسرع. | Clear books, a faster month-end. |
-| Two lines | دفتر حسابات بالعربية والإنجليزية لمنشأتك في مصر والسعودية: قيود المبيعات والمشتريات والمدفوعات والتقارير. نقرأ مستنداتك ونحوّلها إلى قيود مبدئية، ويراجعها محاسبك قبل ترحيلها. | Arabic and English bookkeeping for your business in Egypt and Saudi Arabia: sales and purchase records, payments and reports. We read your documents into draft entries, and your accountant reviews them before they post. |
+| Two lines | دفتر حسابات بالعربية والإنجليزية لمنشأتك في مصر والسعودية: قيود المبيعات والمشتريات، والمدفوعات، والتقارير. نقرأ مستنداتك ونحوّلها إلى قيود مبدئية، ويراجعها محاسبك قبل ترحيلها. | Arabic and English bookkeeping for your business in Egypt and Saudi Arabia: sales and purchase records, payments and reports. We read your documents into draft entries, and your accountant reviews them before they post. |
 
 ## 7. If the owner says yes (not done here)
 Footprint: product name in web and API copy (Arabic and English), the README and docs, package and bot names, the FlowLine
