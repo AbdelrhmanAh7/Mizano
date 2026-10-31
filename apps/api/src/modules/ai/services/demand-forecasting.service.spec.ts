@@ -16,6 +16,34 @@ describe('DemandForecastingService', () => {
 
   const orgId = TEST_ORG_ID;
 
+  // Pin "today" for the whole suite (Date only; timers stay real) so no result depends on the
+  // day the suite runs. The 31st is the month-end day the suite used to fail on.
+  beforeAll(() => {
+    jest.useFakeTimers({
+      now: new Date('2026-10-31T12:00:00Z'),
+      doNotFake: [
+        'hrtime',
+        'nextTick',
+        'performance',
+        'queueMicrotask',
+        'requestAnimationFrame',
+        'cancelAnimationFrame',
+        'requestIdleCallback',
+        'cancelIdleCallback',
+        'setImmediate',
+        'clearImmediate',
+        'setInterval',
+        'clearInterval',
+        'setTimeout',
+        'clearTimeout',
+      ],
+    });
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
   function createMockItem(overrides: Record<string, any> = {}) {
     return {
       id: 'item-001',
