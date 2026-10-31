@@ -460,10 +460,6 @@ export const auditLogsApi = {
 // Tax
 // ===========================================================================
 
-export const taxRatesApi = {
-  ...crud('/tax-rates', { hasCursor: false }),
-};
-
 export const vatReturnsApi = {
   getAll: (params?: Record<string, unknown>) => api.get('/vat-returns', { params }),
   getOne: (id: string) => api.get(`/vat-returns/${id}`),
