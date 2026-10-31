@@ -98,6 +98,19 @@ describe('Auth (e2e)', () => {
       expect(res.body.message).toBe('Validation Failed');
       expect(JSON.stringify(res.body.details)).toMatch(/uppercase/i);
     });
+
+    it('answers an Arabic request in Arabic with the same code', async () => {
+      const res = await anon
+        .withLanguage('ar')
+        .post('/auth/register')
+        .send({ ...testUser, email: `weak-ar-${suffix}@mizano.test`, password: 'alllowercase1' });
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('VALIDATION_ERROR');
+      expect(res.body.message).toBe('بعض البيانات المدخلة غير صحيحة. راجِع الحقول المحددة.');
+      expect(res.body.details).toEqual({
+        password: ['يجب أن تحتوي كلمة المرور على حرف إنجليزي كبير واحد على الأقل.'],
+      });
+    });
   });
 
   describe('POST /auth/login', () => {

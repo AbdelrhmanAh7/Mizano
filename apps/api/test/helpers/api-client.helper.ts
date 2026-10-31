@@ -3,12 +3,14 @@ import * as request from 'supertest';
 
 /**
  * Supertest wrapper that sends a real bearer token (see `registerTenant`). There is no default
- * token: a request is either made as a registered user or explicitly anonymous.
+ * token: a request is either made as a registered user or explicitly anonymous. Requests ask for
+ * English (`Accept-Language: en`) unless `withLanguage` picks another language.
  */
 export class ApiHelper {
   constructor(
     private readonly app: INestApplication,
     private readonly token: string | null,
+    private readonly language: 'ar' | 'en' = 'en',
   ) {}
 
   /** Same app, no Authorization header. */
@@ -17,7 +19,12 @@ export class ApiHelper {
   }
 
   withToken(token: string | null): ApiHelper {
-    return new ApiHelper(this.app, token);
+    return new ApiHelper(this.app, token, this.language);
+  }
+
+  /** Same user, answered in `language`. */
+  withLanguage(language: 'ar' | 'en'): ApiHelper {
+    return new ApiHelper(this.app, this.token, language);
   }
 
   get(url: string): request.Test {
@@ -45,6 +52,7 @@ export class ApiHelper {
   }
 
   private authorize(req: request.Test): request.Test {
-    return this.token ? req.set('Authorization', `Bearer ${this.token}`) : req;
+    const localized = req.set('Accept-Language', this.language);
+    return this.token ? localized.set('Authorization', `Bearer ${this.token}`) : localized;
   }
 }

@@ -37,8 +37,8 @@ export function getApiErrorCode(error: unknown): string | undefined {
 
 /**
  * A translated message for an API error whose `code` has a key in `t` (a next-intl translator),
- * else the server message, else `fallback`. Keeps Arabic screens from showing English API text
- * for the errors the UI knows about.
+ * else the server message, else `fallback`. The server message is already in the UI language
+ * (`lib/api.ts` sends `Accept-Language`); a key in `t` lets a screen word an error its own way.
  */
 export function getLocalizedApiErrorMessage(
   error: unknown,

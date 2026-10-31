@@ -86,7 +86,10 @@ describe('GET /timesheets/weekly-summary (HTTP, with AllExceptionsFilter)', () =
   });
 
   it('omitting both parameters returns the standard 400 validation response', async () => {
-    const res = await request(app.getHttpServer()).get('/timesheets/weekly-summary').expect(400);
+    const res = await request(app.getHttpServer())
+      .get('/timesheets/weekly-summary')
+      .set('Accept-Language', 'en')
+      .expect(400);
     expect(res.body.statusCode).toBe(400);
     expect(res.body.code).toBe('VALIDATION_ERROR');
     expect(res.body.message).toBe('Validation Failed');
