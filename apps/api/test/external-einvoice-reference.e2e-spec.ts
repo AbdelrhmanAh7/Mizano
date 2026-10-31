@@ -162,6 +162,16 @@ describe('external ETA reference (e2e)', () => {
     expect((await reference(a, ca2, 'ETA-credit', 'credit-notes')).status).toBe(409);
     expect((await reference(b, cb, 'ETA-credit', 'credit-notes')).status).toBe(200);
     expect((await reference(b, ca, 'foreign', 'credit-notes')).status).toBe(404);
+    const raced = await Promise.all([
+      reference(a, a.invoiceId, 'ETA-race'),
+      reference(a, ca2, 'ETA-race', 'credit-notes'),
+    ]);
+    expect(raced.map((result) => result.status).sort()).toEqual([200, 409]);
+    const raceWhere = { organizationId: a.organizationId, externalEInvoiceNumber: 'ETA-race' };
+    expect(
+      (await prisma.invoice.count({ where: raceWhere })) +
+        (await prisma.creditNote.count({ where: raceWhere })),
+    ).toBe(1);
     const stored = await prisma.creditNote.findFirstOrThrow({
       where: { id: ca, organizationId: a.organizationId },
     });
