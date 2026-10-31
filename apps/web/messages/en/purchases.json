@@ -468,6 +468,15 @@
       "title": "Void {count} payments?",
       "description": "Each payment is voided as a whole: every bill it paid is reopened and a linked reversal is posted to the ledger.",
       "confirm": "Void {count} payments"
+    },
+    "toast": {
+      "recorded": "Payment recorded",
+      "recordedDescription": "The payment has been recorded and posted.",
+      "recordError": "Could not record the payment",
+      "voided": "Payment voided",
+      "voidedDescription": "The bill balances were restored and a reversal journal was posted.",
+      "voidError": "Could not void the payment",
+      "genericError": "Something went wrong. Please try again."
     }
   },
   "lineItems": {

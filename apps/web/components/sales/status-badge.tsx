@@ -162,6 +162,11 @@ export function usePaymentModeLabel(mode: PaymentMode | undefined): string {
   return useEnumLabel('common.paymentModes', paymentModeKeys, mode ?? '');
 }
 
+/** Plain translated payment mode, for table cells (customer and vendor payments alike). */
+export function PaymentModeText({ mode }: { mode: PaymentMode }) {
+  return <>{usePaymentModeLabel(mode)}</>;
+}
+
 export function PaymentModeBadge({ mode, className }: PaymentModeBadgeProps) {
   const label = usePaymentModeLabel(mode);
   return (

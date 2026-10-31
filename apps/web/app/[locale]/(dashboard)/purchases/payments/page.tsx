@@ -30,10 +30,10 @@ import { LEDGER_QUERY_KEYS, invalidateLedgerQueries } from '@/lib/hooks/use-jour
 import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import {
   formatCurrency,
-  formatPaymentMode,
   PaymentMade,
   useInfinitePaymentsMade,
 } from '@/lib/hooks/use-payments-made';
+import { PaymentModeText, type PaymentMode } from '@/components/sales/status-badge';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { useQueryClient } from '@tanstack/react-query';
@@ -157,7 +157,7 @@ function PaymentsMadePageContent() {
     {
       accessorKey: 'paymentMode',
       header: t('payments.table.mode'),
-      cell: ({ row }) => formatPaymentMode(row.original.paymentMode),
+      cell: ({ row }) => <PaymentModeText mode={row.original.paymentMode as PaymentMode} />,
     },
     {
       accessorKey: 'reference',

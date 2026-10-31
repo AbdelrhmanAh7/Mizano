@@ -1,13 +1,12 @@
 'use client';
 
-import { useToast } from '@/components/ui/use-toast';
 import { billsApi, paymentsMadeApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { invalidateLedgerQueries } from '@/lib/hooks/use-journals';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToastMutation } from '@/lib/hooks/use-toast-mutation';
+import { useQuery } from '@tanstack/react-query';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
 
 export interface BillAllocation {
   billId: string;
@@ -145,30 +144,14 @@ export function useUnpaidBills(vendorId: string | undefined) {
  * Hook to create a new payment made
  */
 export function useCreatePaymentMade() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (data: CreatePaymentMadeData) => {
-      const response = await paymentsMadeApi.create(data);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['payments-made'] });
-      queryClient.invalidateQueries({ queryKey: ['bills'] });
-      queryClient.invalidateQueries({ queryKey: ['vendors'] });
-      toast({
-        title: 'Payment recorded',
-        description: 'The payment has been recorded successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error recording payment',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: 'purchases.payments.toast',
+    mutationFn: async (data: CreatePaymentMadeData) => (await paymentsMadeApi.create(data)).data,
+    // The payment posts a journal: refresh ledger views as well as the documents.
+    beforeInvalidate: (queryClient) => void invalidateLedgerQueries(queryClient),
+    invalidate: () => [['payments-made'], ['bills'], ['vendors']],
+    success: 'recorded',
+    error: 'recordError',
   });
 }
 
@@ -176,45 +159,15 @@ export function useCreatePaymentMade() {
  * Hook to delete a payment made
  */
 export function useDeletePaymentMade() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await paymentsMadeApi.delete(id);
-      return response.data;
-    },
-    onSuccess: () => {
-      // DELETE voids the payment: bill balances are restored and a reversal is posted.
-      void invalidateLedgerQueries(queryClient);
-      queryClient.invalidateQueries({ queryKey: ['vendors'] });
-      toast({
-        title: 'Payment voided',
-        description: 'The bill balance was restored and a reversal journal was posted.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error deleting payment',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: 'purchases.payments.toast',
+    mutationFn: async (id: string) => (await paymentsMadeApi.delete(id)).data,
+    // DELETE voids the payment: bill balances are restored and a reversal is posted.
+    beforeInvalidate: (queryClient) => void invalidateLedgerQueries(queryClient),
+    invalidate: () => [['vendors']],
+    success: 'voided',
+    error: 'voidError',
   });
-}
-
-/**
- * Format payment mode for display
- */
-export function formatPaymentMode(mode: string): string {
-  const modes: Record<string, string> = {
-    CASH: 'Cash',
-    CHEQUE: 'Cheque',
-    BANK_TRANSFER: 'Bank Transfer',
-    CREDIT_CARD: 'Credit Card',
-    OTHER: 'Other',
-  };
-  return modes[mode] || mode;
 }
 
 /**
