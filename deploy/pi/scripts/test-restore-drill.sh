@@ -10,7 +10,7 @@ export ENV_FILE="$work/source.env" COMPOSE_FILE="$work/compose.yml" DATA_DIR="$w
 export MIZANO_DISPOSABLE_DRILL=yes
 unset RESTIC_PASSWORD RESTIC_PASSWORD_COMMAND BACKUP_ORIGINALS_CONTAINER_PATH
 cleanup() {
-  if [ -f "$COMPOSE_FILE" ]; then docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" down -v >/dev/null 2>&1 || true; fi
+  if [ -f "$COMPOSE_FILE" ]; then docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" down -v >/dev/null 2>&1 || return 1; fi
   rm -rf "$work"
 }
 trap cleanup EXIT
@@ -66,4 +66,6 @@ dc stop postgres >"$work/source-stop.log" 2>&1
 mv "$DATA_DIR/originals" "$DATA_DIR/source-originals-unavailable"
 printf 'fixture organizations=2 originals=4 journals=2 linked_drafts=4 source_database_stopped=1\n'
 "$here/restore-drill.sh"
-printf 'restic_check_read_data=passed source_project_cleanup=EXIT-trap\n'
+cleanup || { echo 'fixture cleanup failed' >&2; exit 1; }
+trap - EXIT
+printf 'restic_check_read_data=passed source_project_cleanup=passed\n'

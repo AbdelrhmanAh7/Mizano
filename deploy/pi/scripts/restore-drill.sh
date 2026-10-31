@@ -14,7 +14,10 @@ name="mizano-restore-drill-$(python3 -c 'import secrets; print(secrets.token_hex
 container_id=""
 started=$SECONDS
 cleanup() {
-  if [ -n "$container_id" ]; then docker rm -f "$container_id" >/dev/null 2>&1 || true; fi
+  if [ -n "$container_id" ]; then
+    docker rm -fv "$container_id" >/dev/null 2>&1 || return 1
+    container_id=""
+  fi
   rm -rf "$work"
 }
 trap cleanup EXIT
@@ -41,4 +44,6 @@ docker exec -i "$name" pg_restore -U postgres -d drill --no-owner --no-privilege
   <"$work/db.dump" >/dev/null 2>&1
 log "restore stage=verify-ledger-links"
 python3 "$here/backup-manifest.py" verify-db "$name" "$work"
+cleanup || { echo "DRILL FAILED: scratch cleanup" >&2; exit 1; }
+trap - EXIT
 log "restore drill OK snapshot=$snapshot elapsed_seconds=$((SECONDS-started))"
