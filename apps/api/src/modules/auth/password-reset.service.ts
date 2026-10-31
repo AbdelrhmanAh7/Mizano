@@ -1,7 +1,14 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcrypt';
+import { AuditAction } from '@prisma/client';
 import nodemailer from 'nodemailer';
 import { PrismaService } from '../../prisma/prisma.service';
 import { describeError } from '../../common/utils/redact';
@@ -13,6 +20,18 @@ import type { ForgotPasswordDto, ResetLocale } from './dto/password.dto';
 const RESET_TTL_MINUTES = 30;
 /** At most this many links per account per hour, on top of the per-address route throttle. */
 const MAX_LINKS_PER_HOUR = 3;
+
+const ADMIN_ROLE = 'Admin';
+
+const ADMIN_ONLY = {
+  code: 'PASSWORD_RESET_LINK_ADMIN_ONLY',
+  message: 'Only an organization admin can create a password reset link',
+};
+
+const MEMBER_INACTIVE = {
+  code: 'PASSWORD_RESET_MEMBER_INACTIVE',
+  message: 'Only an active member can get a password reset link',
+};
 
 const INVALID_LINK = {
   code: 'PASSWORD_RESET_INVALID',
@@ -79,10 +98,62 @@ export class PasswordResetService {
         expiresAt: new Date(Date.now() + RESET_TTL_MINUTES * 60 * 1000),
       },
     });
-    // The token rides in the fragment, which browsers never send to a server or a Referer.
-    const link = `${this.webAppUrl()}/${locale}/reset-password#token=${token}`;
+    const link = this.linkFor(locale, token);
     const mail = buildPasswordResetMail(locale, user.name, link, RESET_TTL_MINUTES);
     await transport.send({ to: user.email, ...mail });
+  }
+
+  /**
+   * No-mail fallback (#599): the organization's Admin creates a one-time link for a member
+   * of the same organization and hands it over (WhatsApp, in person). Same rules as the emailed
+   * link: only the digest is stored, single use, 30 minutes, and using it ends every session.
+   * Earlier unused links of the member stop working, so only the newest handed-over link works.
+   */
+  async createLinkForMember(
+    organizationId: string,
+    actorId: string,
+    memberId: string,
+    locale: ResetLocale,
+  ): Promise<{ link: string; expiresAt: string }> {
+    // Only the organization's Admin (owner) may hand links over: a role that merely holds
+    // settings.edit must not be able to take over an Admin account this way.
+    const actor = await this.prisma.user.findFirst({
+      where: { id: actorId, organizationId, status: 'ACTIVE' },
+      select: { role: { select: { name: true } } },
+    });
+    if (actor?.role?.name !== ADMIN_ROLE) throw new ForbiddenException(ADMIN_ONLY);
+
+    const token = randomBytes(32).toString('base64url');
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + RESET_TTL_MINUTES * 60 * 1000);
+    await this.prisma.$transaction(async (tx) => {
+      // Lock the member row so two concurrent requests cannot both leave a valid link.
+      const [member] = await tx.$queryRaw<{ id: string; status: string }[]>`
+        SELECT id, status FROM "users"
+        WHERE id = ${memberId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+      if (!member) throw new NotFoundException('User not found');
+      if (member.status !== 'ACTIVE') throw new BadRequestException(MEMBER_INACTIVE);
+
+      await tx.passwordResetToken.updateMany({
+        where: { userId: member.id, organizationId, usedAt: null },
+        data: { usedAt: now },
+      });
+      await tx.passwordResetToken.create({
+        data: { userId: member.id, organizationId, tokenHash: hashToken(token), expiresAt },
+      });
+      // Who handed a link to whom, never the link itself.
+      await tx.auditLog.create({
+        data: {
+          userId: actorId,
+          organizationId,
+          action: AuditAction.CREATE,
+          entityType: 'password_reset_link',
+          entityId: member.id,
+          newValues: { expiresAt: expiresAt.toISOString() },
+        },
+      });
+    });
+    return { link: this.linkFor(locale, token), expiresAt: expiresAt.toISOString() };
   }
 
   /** Sets a new password with a valid link and signs the account out everywhere. */
@@ -94,6 +165,7 @@ export class PasswordResetService {
       select: {
         id: true,
         userId: true,
+        organizationId: true,
         usedAt: true,
         expiresAt: true,
         user: { select: { status: true } },
@@ -105,6 +177,11 @@ export class PasswordResetService {
 
     const passwordHash = await bcrypt.hash(password, 10);
     await this.prisma.$transaction(async (tx) => {
+      // Same lock order as createLinkForMember (member row, then tokens), so a link handed
+      // over while the member redeems another cannot deadlock.
+      await tx.$queryRaw`
+        SELECT id FROM "users"
+        WHERE id = ${record.userId} AND "organizationId" = ${record.organizationId} FOR UPDATE`;
       const claimed = await tx.passwordResetToken.updateMany({
         where: { id: record.id, usedAt: null, expiresAt: { gt: now } },
         data: { usedAt: now },
@@ -119,6 +196,11 @@ export class PasswordResetService {
       await this.sessions.endAll(record.userId, 'password_reset', tx);
     });
     return { message: 'Your password was changed. Sign in with the new password.' };
+  }
+
+  /** The token rides in the fragment, which browsers never send to a server or a Referer. */
+  private linkFor(locale: ResetLocale, token: string): string {
+    return `${this.webAppUrl()}/${locale}/reset-password#token=${token}`;
   }
 
   private webAppUrl(): string {

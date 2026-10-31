@@ -35,6 +35,13 @@ export function usePermissions() {
     return [];
   }, [session?.user?.role]);
 
+  /** The role's name ('Admin' is the organization owner's role and holds every permission). */
+  const roleName: string | null = useMemo(() => {
+    const role = session?.user?.role as string | { name?: string } | undefined;
+    if (typeof role === 'string') return role;
+    return typeof role === 'object' && role !== null ? (role.name ?? null) : null;
+  }, [session?.user?.role]);
+
   const isLoading = status === 'loading';
   const isAuthenticated = status === 'authenticated';
 
@@ -102,6 +109,7 @@ export function usePermissions() {
 
   return {
     permissions,
+    roleName,
     hasPermission,
     hasAnyPermission,
     hasAllPermissions,

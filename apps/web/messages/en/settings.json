@@ -488,7 +488,19 @@
       "userDeleted": "Member removed",
       "userDeletedDescription": "The team member has been removed.",
       "userDeleteError": "Could not remove the member",
-      "genericError": "Something went wrong. Please try again."
+      "genericError": "Something went wrong. Please try again.",
+      "resetLinkCreated": "Reset link ready",
+      "resetLinkCreatedDescription": "Copy the link and send it to the member.",
+      "resetLinkError": "Could not create the reset link"
+    },
+    "resetLink": {
+      "button": "Create a password reset link for {name}",
+      "title": "Password reset link for {name}",
+      "description": "Send this link privately, for example on WhatsApp. It works once and expires in 30 minutes. Creating a new link cancels the previous one.",
+      "linkLabel": "Reset link",
+      "copy": "Copy link",
+      "copied": "Copied",
+      "close": "Close"
     }
   },
   "performance": {
