@@ -2,6 +2,9 @@ import { AiFailureKind, AiProviderError, FetchLike } from './ai-provider';
 
 /** Map a provider status and error body to a reason an admin can act on. Never echoes the body. */
 export function classifyFailure(status: number, body: string): AiFailureKind {
+  // A server or gateway error other than a definite refusal (503, 529) doesn't say whether the model
+  // ran, whatever its body says: it stays "provider down" so its cost is kept and it isn't retried.
+  if (status >= 500 && status !== 503 && status !== 529) return 'provider_down';
   const t = body.toLowerCase();
   if (
     status === 402 ||

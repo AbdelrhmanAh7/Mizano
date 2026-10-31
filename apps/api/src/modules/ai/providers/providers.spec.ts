@@ -3,7 +3,7 @@ import { AnthropicProvider } from './anthropic.provider';
 import { GeminiProvider } from './gemini.provider';
 import { OllamaProvider, ollamaBaseUrl } from './ollama.provider';
 import { OpenAiCompatibleProvider } from './openai-compatible.provider';
-import { classifyFailure } from './provider-http';
+import { classifyFailure, requestJson } from './provider-http';
 
 /** A fake fetch that records every request and answers from a queue; no network. */
 function fakeFetch(...answers: Array<{ status?: number; body: unknown }>) {
@@ -226,6 +226,27 @@ describe('AI provider adapters (fake fetch)', () => {
     });
     expect(out).toEqual({ text: '{}', inputTokens: 7, outputTokens: 2, reportedCostUsd: '0' });
   });
+
+  it.each([
+    [502, { error: { message: 'upstream overloaded' } }],
+    [504, { error: { message: 'billing service timeout' } }],
+    [500, { error: { type: 'permission_denied' } }],
+  ])(
+    'keeps an ambiguous %i as possibly charged and not retried, whatever its body says',
+    async (status, body) => {
+      const { fn } = fakeFetch({ status, body });
+      const failure = await requestJson(
+        fn,
+        'https://api.anthropic.com/v1/messages',
+        { method: 'POST', headers: {}, body: {} },
+        signal,
+      ).catch((e: unknown) => e);
+      expect(failure).toBeInstanceOf(AiProviderError);
+      expect((failure as AiProviderError).kind).toBe('provider_down');
+      expect((failure as AiProviderError).retryable).toBe(false);
+      expect((failure as AiProviderError).possiblyBilled).toBe(true);
+    },
+  );
 
   it('maps failures to reasons without the provider text, and never follows a redirect', async () => {
     expect(classifyFailure(401, 'secret detail')).toBe('invalid_key');
