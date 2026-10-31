@@ -226,7 +226,10 @@ export default function OrganizationSettingsPage() {
                 <Label>{t('organization.baseCurrency')}</Label>
                 <Select
                   value={form.watch('baseCurrency')}
-                  onValueChange={(v) => form.setValue('baseCurrency', v)}
+                  // Radix emits '' while syncing its hidden select; never let that clear a value.
+                  onValueChange={(v) =>
+                    v && form.setValue('baseCurrency', v, { shouldDirty: true })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={t('organization.selectCurrency')} />
@@ -245,7 +248,7 @@ export default function OrganizationSettingsPage() {
                 <Label>{t('organization.industry')}</Label>
                 <Select
                   value={form.watch('industry') || ''}
-                  onValueChange={(v) => form.setValue('industry', v)}
+                  onValueChange={(v) => v && form.setValue('industry', v, { shouldDirty: true })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={t('organization.selectIndustry')} />
