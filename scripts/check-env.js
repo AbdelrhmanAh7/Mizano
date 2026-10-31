@@ -6,6 +6,10 @@ if (!existsSync(file)) {
   console.error(`Missing: ${file}`);
   process.exit(1);
 }
+if (typeof process.loadEnvFile !== 'function') {
+  console.error('env:check requires Node 20.12 or later.');
+  process.exit(1);
+}
 try {
   process.loadEnvFile(file);
   const explicit = process.env.MCP_PUBLIC_URL?.trim();
@@ -24,16 +28,20 @@ try {
       throw new Error('Invalid public API origin');
     }
   }
+  const insecureFallback =
+    !explicit && raw && process.env.NODE_ENV === 'production' && new URL(raw).protocol !== 'https:';
   console.log(`Using: ${file}`);
   console.log(
     `MCP: ${
-      explicit
-        ? 'MCP_PUBLIC_URL'
-        : fallback
-          ? 'public API origin'
-          : process.env.NODE_ENV === 'production'
-            ? 'off (no public API address)'
-            : 'localhost'
+      insecureFallback
+        ? 'off (public API address requires HTTPS)'
+        : explicit
+          ? 'MCP_PUBLIC_URL'
+          : fallback
+            ? 'public API origin'
+            : process.env.NODE_ENV === 'production'
+              ? 'off (no public API address)'
+              : 'localhost'
     }`,
   );
 } catch {

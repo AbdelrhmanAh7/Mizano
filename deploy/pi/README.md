@@ -68,6 +68,7 @@ OAuth routes are at the origin. Pass the actual public API hostname, never the w
 Run `APP_ENV=prod pnpm env:check` for `.env.prod`, or
 `pnpm env:check -- deploy/pi/.env.pi` for the Pi. It validates the effective origin without
 printing addresses or secrets. With no public API setting, MCP stays off in production.
+An HTTP fallback also keeps production MCP off; configure a public HTTPS API address.
 
 ## 4. First deploy
 

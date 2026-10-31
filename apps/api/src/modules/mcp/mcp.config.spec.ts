@@ -59,6 +59,17 @@ describe('MCP public origin', () => {
     expect(() => config({ MCP_PUBLIC_URL: 'https://api.example.com/api' }).issuer).toThrow();
   });
 
+  it('keeps production off for the legacy HTTP API fallback', () => {
+    expect(config({ NEXT_PUBLIC_API_URL: 'http://203.0.113.5:6001/api' }).enabled).toBe(false);
+    expect(config({ PUBLIC_API_URL: 'http://203.0.113.5:6001/api' }).resource).toBeNull();
+  });
+
+  it('allows HTTP fallback addresses during local development', () => {
+    expect(
+      config({ NODE_ENV: 'development', PUBLIC_API_URL: 'http://localhost:6001/api' }).issuer,
+    ).toBe('http://localhost:6001');
+  });
+
   it('keeps production off when no public API address exists', () => {
     expect(config().enabled).toBe(false);
   });

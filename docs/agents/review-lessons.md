@@ -136,6 +136,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## Ops and deploy
 
+- **A public-address fallback must not silently turn OAuth on over HTTP in production.** Require HTTPS for automatic MCP fallback; legacy REST addresses may lack TLS. _(#600)_
+
 - **Migrate with the incoming image before replacing application containers.** A migration failure must stop deployment; never hide `prisma migrate deploy` behind `|| true`. Keep migrations backward compatible with the running release. _(#600)_
 
 - **Health checks must probe a route that exists.** Grep the app's routes first (Next has no `/api/health` unless a route file exists; `/robots.txt` returns 200 without auth). A probe of a missing route makes the container permanently unhealthy.

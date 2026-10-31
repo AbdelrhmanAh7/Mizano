@@ -47,7 +47,12 @@ export class McpConfig {
       this.config.get<string>('NEXT_PUBLIC_API_URL')?.trim();
     if (apiUrl) {
       // These settings include the REST prefix; MCP/OAuth live at the API origin.
-      return normalizeOrigin(apiUrl.replace(/\/api\/?$/, '/'));
+      const origin = normalizeOrigin(apiUrl.replace(/\/api\/?$/, '/'));
+      // A legacy HTTP REST address must not silently expose OAuth credentials.
+      if (this.config.get<string>('NODE_ENV') === 'production' && !origin.startsWith('https:')) {
+        return null;
+      }
+      return origin;
     }
     if (this.config.get<string>('NODE_ENV') === 'production') return null;
     const port = this.config.get<string>('API_PORT') || this.config.get<string>('PORT') || '6001';

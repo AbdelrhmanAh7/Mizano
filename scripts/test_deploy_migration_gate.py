@@ -11,6 +11,9 @@ ROOT = Path(__file__).resolve().parents[1]
 class MigrationGateTest(unittest.TestCase):
     def test_failure_keeps_previous_application_containers(self):
         workflow = (ROOT / '.github/workflows/deploy.yml').read_text()
+        deploy = workflow[workflow.index('      - name: Deploy via SSH'):]
+        script = deploy.split('          script: |\n', 1)[1]
+        self.assertEqual(script.lstrip().splitlines()[0], 'set -e')
         start = workflow.index('            # Fail before replacing any app container')
         end = workflow.index('            # Seed database', start)
         block = '\n'.join(line[12:] for line in workflow[start:end].splitlines())
@@ -43,7 +46,8 @@ class MigrationGateTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             env_file = Path(tmp) / 'env'
             for url, valid in [('https://api.example.com/api', True),
-                               ('https://api.example.com/private', False)]:
+                               ('https://api.example.com/private', False),
+                               ('http://203.0.113.5:6001/api', True)]:
                 env_file.write_text(f'NODE_ENV=production\nPUBLIC_API_URL={url}\n')
                 env = {k: v for k, v in os.environ.items() if k not in
                        ('MCP_PUBLIC_URL', 'PUBLIC_API_URL', 'NEXT_PUBLIC_API_URL')}
@@ -52,7 +56,8 @@ class MigrationGateTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 0 if valid else 1)
                 self.assertNotIn(url, result.stdout + result.stderr)
                 if valid:
-                    self.assertIn('MCP: public API origin', result.stdout)
+                    self.assertIn('MCP: off (public API address requires HTTPS)' if url.startswith('http:')
+                                  else 'MCP: public API origin', result.stdout)
 
 
 if __name__ == '__main__':
