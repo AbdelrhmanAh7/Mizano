@@ -20,6 +20,9 @@
     "customerName": "اسم العميل",
     "noCustomerAssigned": "لم يتم تعيين عميل",
     "form": {
+      "createCustomer": "إنشاء عميل",
+      "updateCustomer": "تحديث العميل",
+      "saving": "جارٍ الحفظ...",
       "name": "اسم العميل",
       "namePlaceholder": "أدخل اسم العميل",
       "displayName": "الاسم المعروض",

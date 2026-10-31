@@ -94,6 +94,7 @@ export function currencyOptions(
 }
 
 export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: CustomerFormProps) {
+  const t = useTranslations('sales.customers.form');
   const isEditing = !!customer;
   const t = useTranslations('sales.customers.form');
   const tValidation = useTranslations('sales.customers.validation');
