@@ -76,7 +76,7 @@ describe('ReconciliationService.getSuggestions (#586 matching precision)', () =>
 
   it('fetches amount and reference matches first, so newer documents cannot crowd them out', async () => {
     prisma.bankTransaction.findMany.mockResolvedValue([
-      { ...deposit, reference: 'TRF INV-0007', description: 'Payment (INV-0009)' },
+      { ...deposit, reference: 'TRF=INV-0007', description: 'Payment (INV-0009).' },
     ]);
     // Each pool is queried on its own, so saturated weaker pools never hide a stronger match:
     // a named invoice behind 200 newer exact amounts, an exact one behind 200 near amounts.

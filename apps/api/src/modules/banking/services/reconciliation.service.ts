@@ -31,12 +31,16 @@ function matchWindow(transactionDate: Date): { gte: Date; lte: Date } {
   };
 }
 
-/** Words of the bank line's reference and description that could be a document number. */
+/**
+ * Words of the bank line's reference and description that could be a document number. Both the
+ * named-candidate query and the reference score use them, so every 100 % match is fetched.
+ */
 function referenceTokens(
   transaction: Pick<BankTransaction, 'reference' | 'description'>,
 ): string[] {
   const text = `${transaction.reference ?? ''} ${transaction.description ?? ''}`;
-  const words = text.split(/[\s,;:()]+/).filter((w) => w.length >= 2);
+  // Any character outside a document number (letters, digits, - / _) separates words.
+  const words = text.split(/[^\p{L}\p{N}\-/_]+/u).filter((w) => w.length >= 2);
   return [...new Set(words)].slice(0, 20);
 }
 
@@ -141,10 +145,8 @@ export class ReconciliationService {
       for (const invoice of invoices) {
         let confidence = amountScore(invoice.balanceDue);
 
-        // Reference matching
-        if (transaction.reference && transaction.reference.includes(invoice.invoiceNumber))
-          confidence = 100;
-        if (transaction.description?.includes(invoice.invoiceNumber)) confidence = 100;
+        // Reference matching: the number is a word of the reference or description.
+        if (tokens.includes(invoice.invoiceNumber)) confidence = 100;
 
         // Name matching
         if (
@@ -186,8 +188,7 @@ export class ReconciliationService {
 
       for (const bill of bills) {
         let confidence = bill.balanceDue.equals(amount) ? 90 : 0;
-        if (transaction.reference && transaction.reference.includes(bill.billNumber))
-          confidence = 100;
+        if (tokens.includes(bill.billNumber)) confidence = 100;
         if (
           transaction.payee &&
           bill.vendor.name.toLowerCase().includes(transaction.payee.toLowerCase())
