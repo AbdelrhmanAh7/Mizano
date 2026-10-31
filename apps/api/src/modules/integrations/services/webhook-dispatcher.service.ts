@@ -5,7 +5,9 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { describeError } from '../../../common/utils/redact';
 import { signedFlowlineHeaders } from '../utils/flowline-signature';
 import { openSecret } from '../utils/secret-box';
-import { assertPublicWebhookUrl } from '../utils/url-safety';
+import { request as httpRequest } from 'http';
+import { request as httpsRequest } from 'https';
+import { assertPublicWebhookUrl, publicOnlyLookup } from '../utils/url-safety';
 
 /** Delay before attempt n+1 after attempt n failed (seconds); the last value repeats. */
 export const RETRY_SCHEDULE_SECONDS = [30, 120, 600, 1800, 3600, 10800, 21600];
@@ -22,24 +24,37 @@ export type WebhookTransport = (
   init: { headers: Record<string, string>; body: string; timeoutMs: number },
 ) => Promise<TransportResult>;
 
-/** Plain POST; redirects are not followed (a 3xx is a failed attempt). */
-export const fetchTransport: WebhookTransport = async (url, { headers, body, timeoutMs }) => {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { ...headers, 'user-agent': 'Mizano-Webhooks/1.0' },
-      body,
-      redirect: 'manual',
-      signal: ctrl.signal,
-    });
-    await res.body?.cancel().catch(() => undefined);
-    return { status: res.status };
-  } finally {
-    clearTimeout(timer);
-  }
-};
+/**
+ * Plain POST through node:http(s) with `publicOnlyLookup`, so the connection goes to the address
+ * that was checked (no DNS rebinding). Redirects are never followed (a 3xx is a failed attempt).
+ */
+export const fetchTransport: WebhookTransport = (url, { headers, body, timeoutMs }) =>
+  new Promise<TransportResult>((resolve, reject) => {
+    const target = new URL(url);
+    const send = target.protocol === 'https:' ? httpsRequest : httpRequest;
+    const req = send(
+      target,
+      {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'user-agent': 'Mizano-Webhooks/1.0',
+          'content-length': Buffer.byteLength(body).toString(),
+        },
+        lookup: publicOnlyLookup(),
+        timeout: timeoutMs,
+      },
+      (res) => {
+        res.resume();
+        resolve({ status: res.statusCode ?? 0 });
+      },
+    );
+    req.on('timeout', () =>
+      req.destroy(Object.assign(new Error('Webhook delivery timed out'), { code: 'ETIMEDOUT' })),
+    );
+    req.on('error', (e) => reject(Object.assign(new TypeError('fetch failed'), { cause: e })));
+    req.end(body);
+  });
 
 /**
  * Retry 5xx, timeouts/network errors, 408, 425, 429 and 409 (FlowLine answers 409 while the

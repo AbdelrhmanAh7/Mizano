@@ -6,7 +6,12 @@ import {
   verifyFlowlineSignature,
 } from './flowline-signature';
 import { openSecret, sealSecret, secretHint } from './secret-box';
-import { assertPublicWebhookUrl, isPrivateAddress, parseWebhookUrl } from './url-safety';
+import {
+  assertPublicWebhookUrl,
+  isPrivateAddress,
+  parseWebhookUrl,
+  publicOnlyLookup,
+} from './url-safety';
 
 describe('FlowLine signature', () => {
   const secret = 'whsec_0123456789abcdef0123456789abcdef0123456789abcdef';
@@ -146,5 +151,32 @@ describe('webhook URL safety', () => {
   it('allows local http only when explicitly enabled (tests/dev)', () => {
     process.env.INTEGRATIONS_ALLOW_PRIVATE_WEBHOOKS = 'true';
     expect(parseWebhookUrl('http://127.0.0.1:8080/x').hostname).toBe('127.0.0.1');
+  });
+});
+
+describe('publicOnlyLookup (connection-time check against DNS rebinding)', () => {
+  const resolver = (answer: { address: string; family: number }[]) =>
+    ((_host: string, _opts: unknown, cb: (e: null, a: unknown) => void) =>
+      cb(null, answer)) as never;
+  const run = (answer: { address: string; family: number }[]) =>
+    new Promise<{ err: NodeJS.ErrnoException | null; address: unknown }>((resolve) =>
+      publicOnlyLookup(resolver(answer))('hook.example', {}, (err, address) =>
+        resolve({ err, address }),
+      ),
+    );
+
+  it('connects to a public answer', async () => {
+    expect(await run([{ address: '93.184.216.34', family: 4 }])).toEqual({
+      err: null,
+      address: '93.184.216.34',
+    });
+  });
+
+  it('refuses when the name now resolves to a private address', async () => {
+    const { err } = await run([
+      { address: '93.184.216.34', family: 4 },
+      { address: '10.0.0.5', family: 4 },
+    ]);
+    expect(err?.code).toBe('EPRIVATEADDRESS');
   });
 });

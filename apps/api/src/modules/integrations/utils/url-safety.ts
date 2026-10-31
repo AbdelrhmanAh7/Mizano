@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { lookup } from 'dns/promises';
+import { lookup as dnsLookup, type LookupAddress, type LookupOptions } from 'dns';
 import { BlockList, isIP } from 'net';
 
 /**
@@ -90,4 +91,39 @@ export async function assertPublicWebhookUrl(
     throw new BadRequestException('Webhook URL must resolve to a public address');
   }
   return url;
+}
+
+type LookupCallback = (
+  err: NodeJS.ErrnoException | null,
+  address: string | LookupAddress[],
+  family?: number,
+) => void;
+
+/**
+ * A `lookup` for `http(s).request` that resolves the host itself and refuses private answers at
+ * connection time, so the socket connects only to an address that passed the check: DNS
+ * rebinding between `assertPublicWebhookUrl` and the request can't reach the internal network.
+ * TLS still verifies the certificate against the hostname (SNI is the URL's host).
+ */
+export function publicOnlyLookup(
+  resolve: typeof dnsLookup = dnsLookup,
+): (hostname: string, options: LookupOptions, callback: LookupCallback) => void {
+  return (hostname, options, callback) => {
+    resolve(hostname, { ...options, all: true, verbatim: true }, (err, addresses) => {
+      if (err) return callback(err, []);
+      const list = addresses as LookupAddress[];
+      if (
+        !privateWebhooksAllowed() &&
+        (list.length === 0 || list.some((a) => isPrivateAddress(a.address)))
+      ) {
+        const refused: NodeJS.ErrnoException = new Error(
+          'Webhook host resolved to a private address',
+        );
+        refused.code = 'EPRIVATEADDRESS';
+        return callback(refused, []);
+      }
+      if (options.all) return callback(null, list);
+      return callback(null, list[0].address, list[0].family);
+    });
+  };
 }

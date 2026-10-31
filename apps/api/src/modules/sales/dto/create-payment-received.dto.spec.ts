@@ -19,12 +19,12 @@ const errorsOf = async (dto: CreatePaymentReceivedDto): Promise<string[]> => {
 };
 
 describe('CreatePaymentReceivedDto money scale (PR #560 review)', () => {
-  it('accepts whole cents', async () => {
-    expect(await errorsOf(payment('1140.50'))).not.toContain('amount');
+  it('accepts a balance left by a four-decimal credit note, so it can still be settled', async () => {
+    expect(await errorsOf(payment('99.9999'))).not.toContain('amount');
   });
 
-  it('refuses amounts with more than two decimals, on the payment and on its allocations', async () => {
-    expect(await errorsOf(payment('1.005', '1.00'))).toContain('amount');
-    expect(await errorsOf(payment('1.00', '1.005'))).toContain('amount');
+  it('refuses more decimals than the Decimal(19, 4) columns hold, on the payment and its allocations', async () => {
+    expect(await errorsOf(payment('1.00005', '1.0000'))).toContain('amount');
+    expect(await errorsOf(payment('1.0000', '1.00005'))).toContain('amount');
   });
 });

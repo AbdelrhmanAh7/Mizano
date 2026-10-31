@@ -13,21 +13,19 @@ import { ApiProperty } from '@nestjs/swagger';
 import { PaymentMode } from '@prisma/client';
 import { IsDecimalString } from '../../../common/dto/decimal-string';
 
-/** Money moves in whole cents (two decimals), like the documents it pays; the column keeps four. */
-const MONEY_DECIMALS = 2;
-
 export class PaymentAllocationDto {
   @IsString() invoiceId: string;
-  @IsDecimalString(MONEY_DECIMALS) amount: string;
+  @IsDecimalString() amount: string;
 }
 
 export class CreatePaymentReceivedDto {
   @ApiProperty() @IsString() customerId: string;
   @ApiProperty() @IsDateString() date: string;
   @ApiProperty({
-    description: 'Decimal string with at most two decimals; must equal the sum of the allocations',
+    description:
+      'Decimal string (up to four decimals, like balances after four-decimal credits); must equal the sum of the allocations',
   })
-  @IsDecimalString(MONEY_DECIMALS)
+  @IsDecimalString()
   amount: string;
   @ApiProperty({ enum: PaymentMode }) @IsEnum(PaymentMode) paymentMode: PaymentMode;
   @ApiProperty() @IsString() depositToAccountId: string;

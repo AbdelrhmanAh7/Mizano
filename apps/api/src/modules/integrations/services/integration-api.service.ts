@@ -131,7 +131,9 @@ export class IntegrationApiService {
       select: CUSTOMER_SHAPE_SELECT,
     });
     if (!c) throw new NotFoundException('Customer not found');
-    return { data: { ...serializeCustomer(c), balance: await this.customerBalance(orgId, id) } };
+    // No balance here: debts are only readable with the `balances:read` scope, through
+    // GET /customers/:id/balance (a customer-directory key must not see receivables).
+    return { data: serializeCustomer(c) };
   }
 
   async createCustomer(orgId: string, dto: CreateCustomerDto, tx?: Prisma.TransactionClient) {
