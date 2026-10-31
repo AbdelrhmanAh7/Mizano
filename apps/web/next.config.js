@@ -1,5 +1,7 @@
 const createNextIntlPlugin = require('next-intl/plugin');
 
+const { apiProxyRewrites } = require('./api-proxy');
+
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
 
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
@@ -34,6 +36,10 @@ const nextConfig = {
       bodySizeLimit: '2mb',
     },
     optimizePackageImports: ['lucide-react', 'date-fns'],
+  },
+
+  async rewrites() {
+    return apiProxyRewrites();
   },
 
   async headers() {
