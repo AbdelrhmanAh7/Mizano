@@ -9,6 +9,7 @@ import {
   useMonthlySummary,
   useWriteMonthlySummary,
 } from '@/lib/hooks/use-ai-settings';
+import { useDateFormatter } from '@/lib/hooks/use-date-locale';
 import { Sparkles } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 
@@ -23,10 +24,14 @@ export function MonthlySummaryCard({ month }: { month: string }) {
   const feature = useAiFeature('summary');
   const summary = useMonthlySummary(month, feature.active);
   const write = useWriteMonthlySummary(month);
+  const formatMonth = useDateFormatter('month');
 
   if (!feature.active) return null;
 
   const text = summary.data ? (locale === 'ar' ? summary.data.ar : summary.data.en) : null;
+  // `month` is yyyy-MM; the title names it in the page language ("أكتوبر 2026").
+  const [year, monthNumber] = month.split('-').map(Number);
+  const monthLabel = formatMonth(new Date(year, monthNumber - 1, 1));
 
   return (
     <Card>
@@ -34,7 +39,7 @@ export function MonthlySummaryCard({ month }: { month: string }) {
         <div>
           <CardTitle className="flex items-center gap-2 text-base">
             <Sparkles className="h-4 w-4" />
-            {t('title', { month })}
+            {t('title', { month: monthLabel })}
           </CardTitle>
           <CardDescription>{t('note')}</CardDescription>
         </div>

@@ -9,6 +9,8 @@ const DATE_STYLES = {
   medium: { day: 'numeric', month: 'short', year: 'numeric' },
   /** "October 31, 2026" / "31 أكتوبر 2026" */
   long: { dateStyle: 'long' },
+  /** "October 2026" / "أكتوبر 2026" */
+  month: { month: 'long', year: 'numeric' },
 } satisfies Record<string, Intl.DateTimeFormatOptions>;
 
 /**
