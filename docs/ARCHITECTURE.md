@@ -4,13 +4,12 @@ How the Mizano monorepo is built today, the rules every change must respect, and
 
 ## System overview
 
-| Workspace               | Technology                      | Role                                                                        |
-| ----------------------- | ------------------------------- | --------------------------------------------------------------------------- |
-| `apps/web`              | Next.js 14 App Router, React 18 | Accountant UI on port **5001**, Arabic/English with RTL                     |
-| `apps/api`              | NestJS 10, Prisma 5             | REST + WebSocket API on port **6001**, global prefix `/api`                 |
-| `packages/shared-types` | TypeScript                      | Types shared by web and API (`@mizano/shared-types`)                        |
-| `packages/validators`   | Zod                             | Schemas shared by forms and API (`@mizano/validators`)                      |
-| `services/ollama-proxy` | Python                          | Legacy Colab tunnel proxy still referenced by the AI module; not in compose |
+| Workspace               | Technology                      | Role                                                        |
+| ----------------------- | ------------------------------- | ----------------------------------------------------------- |
+| `apps/web`              | Next.js 14 App Router, React 18 | Accountant UI on port **5001**, Arabic/English with RTL     |
+| `apps/api`              | NestJS 10, Prisma 5             | REST + WebSocket API on port **6001**, global prefix `/api` |
+| `packages/shared-types` | TypeScript                      | Types shared by web and API (`@mizano/shared-types`)        |
+| `packages/validators`   | Zod                             | Schemas shared by forms and API (`@mizano/validators`)      |
 
 ```
 Browser ──► Next.js (5001)              pages, next-intl, NextAuth session
@@ -18,7 +17,8 @@ Browser ──► Next.js (5001)              pages, next-intl, NextAuth session
    └──axios + Bearer JWT──► NestJS /api (6001) ──► PostgreSQL 16 (Prisma, Decimal(19,4))
                               │                 └─► Redis 7 (cache, throttling)
                               ├─ socket.io gateways (notifications, logger)
-                              └─ AI module ──► Ollama (OLLAMA_BASE_URL) / PaddleOCR / tesseract.js
+                              └─ AI module ──► tesseract.js rules reader (always)
+                                                └► the organization's own AI provider (opt-in)
 ```
 
 The browser calls NestJS directly (`NEXT_PUBLIC_API_URL`); there is no Next.js BFF proxy. The only Next.js API route is NextAuth (`app/api/auth/[...nextauth]`). In production, Nginx routes `/api/` and `/socket.io/` to the API and everything else to the web container (see [deployment](DEVELOPMENT.md#deployment)).
@@ -41,7 +41,7 @@ mizano/
 │   │   │   ├── modules/{domain}/   one NestJS module per business domain
 │   │   │   └── test/               unit-test setup, Prisma/Redis mocks, factories
 │   │   ├── test/                   API E2E suites (jest-e2e.json)
-│   │   ├── scripts/                OCR model download helpers
+│   │   ├── scripts/                Node start helpers (heap, process)
 │   │   └── _run_tests.js, _jest.config.js, _jest_resolver.js   WSL-safe Jest runner
 │   └── web/
 │       ├── app/[locale]/(auth)/        login, register, onboarding
@@ -55,7 +55,6 @@ mizano/
 │       ├── messages/{en,ar}/           next-intl namespaces
 │       └── public/                     brand assets (svg, png, ico, pwa, social)
 ├── packages/{shared-types,validators}/
-├── services/ollama-proxy/
 ├── docs/                          this guide, DEVELOPMENT, DESIGN-SYSTEM, roadmap, strategy, planning, agents, archive
 ├── scripts/                       demo planning sync + offline tests (used by .github/workflows/demo-planning.yml)
 ├── nginx/nginx.conf               production reverse proxy (copied by deploy.yml)
@@ -93,15 +92,15 @@ Target journey (see [acceptance](strategy/demo-acceptance.md)): Telegram/web upl
 
 Current code path:
 
-| Step                     | Where                                                                                                                     |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| Upload / scan UI         | `apps/web/app/[locale]/(dashboard)/purchases/bills/scan`, `lib/hooks/use-ai-document-intake.ts`                           |
-| Intake endpoint and jobs | `apps/api/src/modules/ai/controllers/document-intake.controller.ts`, `services/document-intake.service.ts`                |
-| Extraction strategies    | `modules/ai/extraction/` (`vlm`, `ocr-llm`, `hybrid`, chosen by `EXTRACTION_STRATEGY`); PaddleOCR → tesseract.js fallback |
-| Draft bills and approval | `modules/purchases` (bills, payments made), `modules/bulk-operations`                                                     |
-| Ledger and reports       | `modules/accounting` (accounts, journals), `modules/reports` (GL, trial balance, AP aging, P&L, balance sheet)            |
+| Step                     | Where                                                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Upload / scan UI         | `apps/web/app/[locale]/(dashboard)/purchases/bills/scan`, `lib/hooks/use-ai-document-intake.ts`                                      |
+| Intake endpoint and jobs | `apps/api/src/modules/ai/controllers/document-intake.controller.ts`, `services/document-intake.service.ts`                           |
+| Readers                  | `modules/ai/extraction/`: `rules-strategy` (CPU: PDF text or tesseract.js + rules) and `ai-document-reader` (own-account AI, opt-in) |
+| Draft bills and approval | `modules/purchases` (bills, payments made), `modules/bulk-operations`                                                                |
+| Ledger and reports       | `modules/accounting` (accounts, journals), `modules/reports` (GL, trial balance, AP aging, P&L, balance sheet)                       |
 
-The CPU-only extraction worker, Telegram intake and durable queue replace the Ollama/VLM dependency through the planned issues; see [invoice extraction research](strategy/invoice-extraction.md).
+The rules reader is the default and the fallback: the organization's own AI reads a document only when its `documents` feature is on ([AI through the customer's own account](plans/ai-own-accounts.md)). Telegram intake is planned; see [invoice extraction research](strategy/invoice-extraction.md).
 
 ## API modules
 
@@ -114,7 +113,7 @@ All live in `apps/api/src/modules/`. Demo scope is accounting, purchases, AI int
 | `users`, `roles`        | Users, roles, permission sets                                     | yes  |
 | `accounting`            | Chart of accounts, journals/lines, recurring profiles, lock dates | yes  |
 | `purchases`             | Vendors, bills, expenses, vendor credits, payments made           | yes  |
-| `ai`                    | Document intake/extraction plus ~38 advisory feature controllers  | yes  |
+| `ai`                    | Invoice intake; AI settings and the own-account provider gateway  | yes  |
 | `bulk-operations`       | Batch actions across documents                                    | yes  |
 | `reports`               | P&L, balance sheet, cash flow, GL, trial balance, AR/AP aging     | yes  |
 | `tax`                   | Tax rates, VAT returns                                            | yes  |
@@ -153,7 +152,8 @@ Use these instead of re-implementing them; `jscpd` fails CI when duplication ris
 
 | Need                                                                              | Use                                                                                                                                                                                                                                                       |
 | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Scheduled AI job over every organization                                          | `modules/ai/schedulers/for-each-organization.ts` (`forEachOrganization`: batches of 5, per-org error isolation, start/complete/fail logs)                                                                                                                 |
+| A model call (any AI feature)                                                     | `AiGatewayService.run` (`modules/ai/account`): feature check, monthly limit reservation, one retry, zod validation, usage settlement; never call a provider directly                                                                                      |
+| Scheduled AI job                                                                  | `AiSettingsService.organizationsUsing(feature)` first: only organizations that turned the feature on (example: `ReportSummaryService.prepareLastMonth`)                                                                                                   |
 | Helpers several API modules use                                                   | `apps/api/src/common/utils/` (`sales-helpers`, `movement-sign`, `report-utils`, `bill-line-accounts`, `secure-compare.util`, `decimal`, `document-totals`, `cursor-paginate`, `ledger-lock`, `run-bulk`, `redact`)                                        |
 | Journal-shaped form lines (debit/credit, two-line minimum, totals, balance badge) | `components/accounting/journal-lines-editor.tsx` (`JournalLinesEditor`, `journalLineSchema`)                                                                                                                                                              |
 | Money display on the web                                                          | `useMoneyFormatter` (`lib/hooks/use-money-formatter.ts`)                                                                                                                                                                                                  |
@@ -163,6 +163,8 @@ Use these instead of re-implementing them; `jscpd` fails CI when duplication ris
 | Customer and vendor address fields                                                | `components/shared/address-fields.tsx` (`AddressCard`, `addressSchema`, `emptyAddress`, `addressFromParty`; labels passed in)                                                                                                                             |
 | AR and AP aging pages                                                             | `components/reports/aging-report.tsx` (`AgingReportPage`, `side` is `receivable` or `payable`)                                                                                                                                                            |
 | Report page title, loading and load error                                         | `components/reports/report-page.tsx` (`ReportPageHeader`, `ReportPageSkeleton`, `ReportLoadError`)                                                                                                                                                        |
+| A statement's account rows (code, name, amount, indented children)                | `components/reports/report-page.tsx` (`ReportAccountRow`; P&L and balance sheet)                                                                                                                                                                          |
+| View / edit / delete menu of a list row                                           | `components/shared/row-actions-menu.tsx` (`RowActionsMenu`, labels passed in)                                                                                                                                                                             |
 | Delete confirmation on list and detail pages                                      | `components/shared/delete-confirm-dialog.tsx` (`DeleteConfirmDialog`, common Cancel and Delete labels by default)                                                                                                                                         |
 | Bulk-action confirmation state on list pages                                      | `lib/hooks/use-bulk-confirm.ts` (`useBulkConfirm` with `BulkActionConfirmDialog`; bills and expenses)                                                                                                                                                     |
 | Mutation with success and error toasts                                            | `lib/hooks/use-toast-mutation.ts` (`useToastMutation`: invalidates the listed keys, translated success toast, API message on error); invoices, quotes, customers, payments received                                                                       |

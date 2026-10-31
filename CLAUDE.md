@@ -145,7 +145,7 @@ if (!totalDebits.equals(totalCredits)) throw new BadRequestException('Journal en
 | Tax           | `modules/tax/`           | TaxRates, VATReturns, VATPayments                     |
 | CRM           | `modules/crm/`           | Leads, Deals                                          |
 | Reports       | `modules/reports/`       | P&L, Balance Sheet, AR/AP Aging                       |
-| AI            | `modules/ai/`            | 33 inference models, Ollama-backed (100% local)       |
+| AI            | `modules/ai/`            | Invoice intake; optional own-account AI (settings)    |
 | Assets        | `modules/assets/`        | FixedAssets, Depreciation                             |
 | Documents     | `modules/documents/`     | Document management                                   |
 | Currency      | `modules/currency/`      | Exchange rates, multi-currency                        |
@@ -226,50 +226,16 @@ All workflows are in `.agents/workflows/`. Use these commands for full project c
 | `/add-component` | Add shadcn/ui components                            |
 | `/debug-api`     | Debug API (Docker/ports/DB/logs/endpoints)          |
 
-## Historical AI Infrastructure — Ollama via Google Colab
+## AI — the organization's own account
 
-> Current runtime description only, not the target architecture. The CPU-only demo mandate in AGENTS.md supersedes the old Colab-only constraints in this section. Replace this dependency through the CPU runtime/extraction issues; paid cloud AI remains disabled in the demo. Do not mistake this documented migration plan for an implemented change.
+Owner decision (31 Oct 2026); design and feature inventory: [docs/plans/ai-own-accounts.md](docs/plans/ai-own-accounts.md).
 
-Ollama does NOT run locally in production. It runs on a Google Colab notebook
-(T4 GPU, free tier) and is accessed through a reverse proxy.
-
-There is NO external AI API fallback. No Gemini, no OpenAI, no cloud AI.
-When Colab is down, AI features return 503 until the notebook is restarted.
-
-### Architecture
-
-```
-services (Docker) → ollama-proxy:11434 → Cloudflare tunnel → Colab (Ollama + GPU)
-                         ↓ (if Colab down)
-                    503 "AI temporarily unavailable"
-```
-
-### How it works
-
-- `ollama-proxy` service listens on port 11434 (same as real Ollama)
-- Reads tunnel URL from `/data/ollama_tunnel_url` in its container volume
-- All services use `OLLAMA_BASE_URL=http://ollama-proxy:11434` — no code changes
-- When Colab disconnects, all AI features return 503
-- Colab notebook pushes new tunnel URLs via `POST /api/internal/tunnel-update`
-- Telegram bot alerts admin when Ollama goes down
-
-### Key env vars
-
-- `OLLAMA_WEBHOOK_SECRET` — shared secret for tunnel URL updates
-- `OLLAMA_MODEL` — model name on Colab (default: qwen3-vl:8b)
-
-### Endpoints
-
-- `GET http://ollama-proxy:11434/health` — proxy + Ollama status
-- `GET /api/internal/ollama-status` — same, via NestJS (admin only)
-- `POST /api/internal/tunnel-update` — webhook from Colab (secret required)
-
-### Never
-
-- Add local Ollama or GPU config to docker-compose.yml
-- Add any external AI API (Gemini, OpenAI, etc.) as fallback
-- Assume Ollama is always available — always handle 503 gracefully
-- Hardcode tunnel URLs — they change every Colab restart
+- AI is optional, off by default, and runs only through the organization's own provider account: Anthropic (Claude), OpenAI, Google Gemini or OpenRouter (pasted API key or OpenRouter PKCE), or a self-hosted Ollama whose URL only the operator sets (`AI_OLLAMA_BASE_URL`). Personal Claude/ChatGPT subscriptions cannot power Mizano. There is no Colab tunnel and no shared Mizano key.
+- Three features, each enabled per organization after an admin's consent naming the provider: `documents` (read bills/receipts into drafts; the CPU rules reader is the fallback and the default), `categorization` (an account suggestion per read bill line) and `summary` (a monthly plain-language P&L summary).
+- Code: `modules/ai/providers/` (adapters on fixed hosts, fake `fetch` in tests), `modules/ai/account/` (settings, sealed keys with organization-bound AAD, OpenRouter PKCE, `AiGatewayService`), `modules/ai/extraction/` (rules reader + `AiDocumentReader`), `modules/reports/services/report-summary.service.ts`.
+- Every model call goes through `AiGatewayService.run`: feature active for the organization, estimated cost reserved under the monthly limit, one bounded retry, answer validated with zod, usage settled. Never call a provider directly.
+- A scheduled AI job asks `AiSettingsService.organizationsUsing(feature)` first; organizations without AI cost it nothing.
+- Never log or store prompts, answers, document text or keys outside their own tables; never return a key to the browser (hint only).
 
 ## Docs Reference
 

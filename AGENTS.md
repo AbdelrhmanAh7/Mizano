@@ -14,7 +14,8 @@ Run a tiny live deployment on a **Raspberry Pi 5 (8GB, arm64)** with the full ac
 - Posted history is immutable; correct through linked reversals. Enforce fiscal locks on single and bulk routes, and use the correct document/accounting date.
 - Automatically receive, parse, match and prepare drafts. Explicit authorized batch approval posts the validated records. Uncertain/missing values go to exceptions. No autonomous payment execution or statutory submission in the demo.
 - Preserve original documents, extraction evidence/version, correction and approval audit trail. Never log invoice text, credentials, bot tokens or auth headers.
-- CPU-only critical path; no required GPU, Colab, paid API, 7B/8B model or runtime model download. Build pinned language assets into the worker. Real documents never enter an unapproved external model/free tier.
+- CPU-only critical path: ledger, AP/AR, reports and invoice intake (the rules reader) work with no AI account, GPU, Colab tunnel, 7B/8B model or runtime model download. Build pinned language assets into the worker.
+- Owner decision (31 Oct 2026): AI is optional and runs only through the organization's own account (a Claude, OpenAI, Gemini or OpenRouter key, a connected OpenRouter account, or an Ollama server the operator configured), off by default and per feature, after an admin's consent naming the provider, under a monthly limit reserved before each call. It stays advisory. Real documents never reach a provider without that consent; Mizano never ships a shared or free-tier AI key. See [AI through the customer's own account](docs/plans/ai-own-accounts.md).
 - Unknown results stay unknown. No fabricated accuracy, benchmark, review, test, deployment, agent invocation or compliance claim.
 
 ## Collaboration and code discipline

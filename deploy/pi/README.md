@@ -49,7 +49,7 @@ Alternative: Tailscale. Run `tailscale serve` on the host for `http://127.0.0.1:
 - `CORS_ORIGIN` must be exactly the web origin (HTTPS, no wildcard, no trailing slash). The API refuses to start in production without it.
 - `NEXTAUTH_URL` is HTTPS so NextAuth issues secure cookies. Verify in browser dev tools that session cookies are `Secure` and `HttpOnly`.
 - JWT and NextAuth secrets are unique, random, and at least 32 bytes.
-- `OLLAMA_ENABLED=false`; no paid cloud AI.
+- No AI by default; an organization may connect its own AI account in Settings → AI (optional `AI_OLLAMA_BASE_URL` for a self-hosted Ollama).
 
 ### Verify no open ports
 
