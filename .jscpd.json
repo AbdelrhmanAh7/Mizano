@@ -15,6 +15,6 @@
   ],
   "reporters": ["console"],
   "silent": true,
-  "threshold": 3.2,
+  "threshold": 2.3,
   "gitignore": true
 }
