@@ -13,6 +13,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { describeError } from '../../common/utils/redact';
+import {
+  extractSocketToken,
+  rejectUnauthenticatedHandshakes,
+  SocketExpiryTimers,
+} from '../../common/utils/socket-auth';
 
 // Parse comma-separated CORS origins (same logic as main.ts bootstrap)
 const loggerWsOriginRaw =
@@ -36,9 +41,6 @@ export interface LoggerSocketUser {
   id: string;
   organizationId: string;
 }
-
-/** Max delay for setTimeout (2^31 - 1 ms). */
-const MAX_TIMER_MS = 2_147_483_647;
 
 /** Room that carries the log events of one organization. */
 export function loggerOrgRoom(organizationId: string): string {
@@ -68,7 +70,7 @@ export class LoggerGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   server: Server;
 
   private readonly logger = new Logger(LoggerGateway.name);
-  private readonly expiryTimers = new Map<string, NodeJS.Timeout>();
+  private readonly expiryTimers = new SocketExpiryTimers();
 
   constructor(
     private readonly jwtService: JwtService,
@@ -78,11 +80,7 @@ export class LoggerGateway implements OnGatewayInit, OnGatewayConnection, OnGate
 
   /** Reject unauthenticated handshakes before a connection is ever established. */
   afterInit(server: Server): void {
-    server.use((socket, next) => {
-      this.authenticate(socket)
-        .then(() => next())
-        .catch(() => next(new Error('Unauthorized')));
-    });
+    rejectUnauthenticatedHandshakes(server, (socket) => this.authenticate(socket));
   }
 
   handleConnection(client: Socket): void {
@@ -94,16 +92,12 @@ export class LoggerGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     }
 
     void client.join(loggerOrgRoom(user.organizationId));
-    this.scheduleExpiry(client);
+    this.expiryTimers.schedule(client);
     this.logger.log(`Logger client connected: ${client.id}`);
   }
 
   handleDisconnect(client: Socket): void {
-    const timer = this.expiryTimers.get(client.id);
-    if (timer) {
-      clearTimeout(timer);
-      this.expiryTimers.delete(client.id);
-    }
+    this.expiryTimers.clear(client.id);
     this.logger.log(`Logger client disconnected: ${client.id}`);
   }
 
@@ -112,7 +106,7 @@ export class LoggerGateway implements OnGatewayInit, OnGatewayConnection, OnGate
    * `socket.data`. Rejects (without saying why) otherwise.
    */
   async authenticate(socket: Socket): Promise<LoggerSocketUser> {
-    const token = this.extractToken(socket);
+    const token = extractSocketToken(socket);
     if (!token) throw new Error('missing token');
 
     let payload: LoggerJwtPayload;
@@ -165,19 +159,6 @@ export class LoggerGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     this.server?.to(loggerOrgRoom(organizationId)).emit('status-updated', { ids, status });
   }
 
-  private extractToken(socket: Socket): string | undefined {
-    const auth = socket.handshake?.auth as Record<string, unknown> | undefined;
-    if (typeof auth?.token === 'string' && auth.token.length > 0) {
-      return auth.token;
-    }
-    const header = socket.handshake?.headers?.authorization;
-    if (typeof header === 'string') {
-      const match = /^Bearer\s+(\S+)$/i.exec(header);
-      if (match) return match[1];
-    }
-    return undefined;
-  }
-
   private async hasLogAccess(user: { id: string; roleId: string | null }): Promise<boolean> {
     const context = {
       getHandler: () => LoggerSocketAccess.prototype.connect,
@@ -189,17 +170,5 @@ export class LoggerGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     } catch {
       return false;
     }
-  }
-
-  private scheduleExpiry(client: Socket): void {
-    const expiresAt = client.data?.tokenExpiresAt as number | undefined;
-    if (!expiresAt) return;
-    const delay = Math.min(Math.max(expiresAt - Date.now(), 0), MAX_TIMER_MS);
-    const timer = setTimeout(() => {
-      this.expiryTimers.delete(client.id);
-      client.disconnect(true);
-    }, delay);
-    timer.unref?.();
-    this.expiryTimers.set(client.id, timer);
   }
 }
