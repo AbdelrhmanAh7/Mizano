@@ -51,8 +51,9 @@ describe('MCP public origin', () => {
     'https://api.example.com/api?secret=value',
     'https://api.example.com/api#fragment',
     'file:///api',
-  ])('rejects an invalid fallback instead of publishing the wrong issuer: %s', (url) => {
-    expect(() => config({ PUBLIC_API_URL: url }).issuer).toThrow();
+    '/api',
+  ])('keeps MCP off for an invalid fallback without failing the API: %s', (url) => {
+    expect(config({ PUBLIC_API_URL: url }).issuer).toBeNull();
   });
 
   it('does not relax the explicit origin validation', () => {

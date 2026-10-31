@@ -68,7 +68,9 @@ OAuth routes are at the origin. Pass the actual public API hostname, never the w
 Run `APP_ENV=prod pnpm env:check` for `.env.prod`, or
 `pnpm env:check -- deploy/pi/.env.pi` for the Pi. It validates the effective origin without
 printing addresses or secrets. With no public API setting, MCP stays off in production.
-An HTTP fallback also keeps production MCP off; configure a public HTTPS API address.
+An HTTP or invalid fallback also keeps production MCP off; configure a public HTTPS API address.
+The server nginx profile routes `/mcp`, `/oauth/*` and `/.well-known/oauth-*` to the API too;
+when adding a TLS virtual host, retain those routes.
 
 ## 4. First deploy
 

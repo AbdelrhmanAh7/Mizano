@@ -50,7 +50,7 @@ class MigrationGateTest(unittest.TestCase):
                                ('http://203.0.113.5:6001/api', True)]:
                 env_file.write_text(f'NODE_ENV=production\nPUBLIC_API_URL={url}\n')
                 env = {k: v for k, v in os.environ.items() if k not in
-                       ('MCP_PUBLIC_URL', 'PUBLIC_API_URL', 'NEXT_PUBLIC_API_URL')}
+                       ('MCP_PUBLIC_URL', 'PUBLIC_API_URL', 'NEXT_PUBLIC_API_URL', 'NODE_ENV')}
                 result = subprocess.run(['node', str(ROOT / 'scripts/check-env.js'),
                                          '--', str(env_file)], env=env, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0 if valid else 1)

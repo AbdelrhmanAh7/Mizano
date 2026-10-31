@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 /** What a person may allow an AI app to do. `drafts` includes everything `read` allows. */
@@ -36,6 +36,9 @@ export const MCP_REQUESTS_PER_MINUTE = 90;
  */
 @Injectable()
 export class McpConfig {
+  private readonly logger = new Logger(McpConfig.name);
+  private warnedFallback = false;
+
   constructor(private readonly config: ConfigService) {}
 
   /** The issuer and API origin, without a trailing slash; null when not configured. */
@@ -47,7 +50,18 @@ export class McpConfig {
       this.config.get<string>('NEXT_PUBLIC_API_URL')?.trim();
     if (apiUrl) {
       // These settings include the REST prefix; MCP/OAuth live at the API origin.
-      const origin = normalizeOrigin(apiUrl.replace(/\/api\/?$/, '/'));
+      let origin: string;
+      try {
+        origin = normalizeOrigin(apiUrl.replace(/\/api\/?$/, '/'));
+      } catch {
+        if (!this.warnedFallback) {
+          this.logger.warn(
+            'MCP is off: the public API address is not an absolute origin or /api URL',
+          );
+          this.warnedFallback = true;
+        }
+        return null;
+      }
       // A legacy HTTP REST address must not silently expose OAuth credentials.
       if (this.config.get<string>('NODE_ENV') === 'production' && !origin.startsWith('https:')) {
         return null;
