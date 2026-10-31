@@ -1,6 +1,6 @@
 ---
 name: github-work
-description: Pick, build and ship Mizano work through GitHub - choose from the "First client ready" milestone, branch naming, labels, milestones, "Closes #" links, the Project card, the PR-as-merge-vehicle rule with the 4 checks, release notes and tags. Use when starting or finishing any tracked task.
+description: Pick, build and ship Mizano work through GitHub - choose from the "First client ready" milestone, branch naming, labels, milestones, issue-closing keywords, the Project card, the PR-as-merge-vehicle rule with the 4 checks, release notes and tags. Use when starting or finishing any tracked task.
 ---
 
 # github-work (Mizano, repo AbdelrhmanAh7/Mizano, branch `master`)
