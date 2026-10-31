@@ -7,6 +7,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useDateFormatter } from '@/lib/hooks/use-date-locale';
 
 /** A report page's title row: back to the reports index, title and period line. */
 export function ReportPageHeader({
@@ -29,6 +30,22 @@ export function ReportPageHeader({
       </div>
     </div>
   );
+}
+
+/**
+ * Report period lines in the page language with Western digits: "1 يناير 2026 - 31 أكتوبر 2026"
+ * and "حتى 31 أكتوبر 2026" ("As of October 31, 2026" in English).
+ */
+export function useReportDateLabels(): {
+  period: (start: Date, end: Date) => string;
+  asOf: (date: Date) => string;
+} {
+  const formatDate = useDateFormatter('long');
+  const t = useTranslations('reports');
+  return {
+    period: (start, end) => `${formatDate(start)} - ${formatDate(end)}`,
+    asOf: (date) => t('aging.asOf', { date: formatDate(date) }),
+  };
 }
 
 /** Loading placeholder of a report page (title, filters, body). */
