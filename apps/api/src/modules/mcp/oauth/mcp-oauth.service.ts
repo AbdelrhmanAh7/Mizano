@@ -565,8 +565,13 @@ export class McpOAuthService {
       const decoded = Buffer.from(authorization.replace(/^Basic\s+/i, ''), 'base64').toString();
       const sep = decoded.indexOf(':');
       if (sep < 0) throw new OAuthError('invalid_client', 'Malformed client credentials', 401);
-      clientId = decodeURIComponent(decoded.slice(0, sep));
-      secret = decodeURIComponent(decoded.slice(sep + 1));
+      try {
+        clientId = decodeURIComponent(decoded.slice(0, sep));
+        secret = decodeURIComponent(decoded.slice(sep + 1));
+      } catch {
+        // A bad percent-escape is a client error (RFC 6749 §5.2), not a server one.
+        throw new OAuthError('invalid_client', 'Malformed client credentials', 401);
+      }
       usedBasic = true;
     }
     const client = clientId

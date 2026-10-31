@@ -199,10 +199,10 @@ export function AiAppConnect() {
                       className="flex flex-wrap items-center gap-3 rounded-lg border p-3 text-sm"
                     >
                       <div className="min-w-0 flex-1 space-y-1">
-                        <p className="flex flex-wrap items-center gap-2 font-medium">
+                        <div className="flex flex-wrap items-center gap-2 font-medium">
                           <span className="break-words">{connection.clientName}</span>
                           <Badge variant="outline">{t(`access.${connection.access}`)}</Badge>
-                        </p>
+                        </div>
                         <p className="text-xs text-muted-foreground">
                           {t('connected.by', {
                             name: connection.isMine ? t('connected.you') : connection.userName,

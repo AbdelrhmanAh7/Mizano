@@ -49,7 +49,7 @@ export const MCP_TEXT = {
     en: 'Expense accounts and bank or cash accounts you can pay from',
   },
   draftSaved: ((what: Text, number: string) => ({
-    ar: `حُفظت ${what.ar} ${number} كمسودة. لم يُرحَّل أو يُرسل أو يُدفع أي شيء: راجعها في ميزان ثم رحّلها بنفسك.`,
+    ar: `تم حفظ ${what.ar} ${number} كمسودة. لم يُرحَّل أو يُرسل أو يُدفع أي شيء: راجع المسودة في ميزان ثم رحّلها بنفسك.`,
     en: `Saved ${what.en} ${number} as a draft. Nothing was posted, sent or paid: review it in Mizano and post it yourself.`,
   })) as Fn<[Text, string]>,
   quoteNoun: { ar: 'عرض السعر', en: 'quote' },

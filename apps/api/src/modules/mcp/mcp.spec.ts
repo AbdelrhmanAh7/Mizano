@@ -496,3 +496,13 @@ describe('Arabic search keys', () => {
     expect(containsPattern('50%_off')).toBe('%50\\%\\_off%');
   });
 });
+
+describe('MCP token endpoint client authentication', () => {
+  it('answers a malformed Basic credential with invalid_client, not a server error', async () => {
+    const s = await setup();
+    const basic = `Basic ${Buffer.from('%ZZ:secret').toString('base64')}`;
+    await expect(
+      s.service.token({ grant_type: 'refresh_token', refresh_token: 'x' }, basic),
+    ).rejects.toMatchObject({ error: 'invalid_client', status: 401 });
+  });
+});
