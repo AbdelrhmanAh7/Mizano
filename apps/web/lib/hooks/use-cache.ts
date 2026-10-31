@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useToast } from '@/components/ui/use-toast';
 import {
   cacheApi,
@@ -55,6 +56,7 @@ export function useCacheKeys(cursor?: string, count?: number) {
 export function useFlushCache() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('settings.cache.toast');
 
   return useMutation({
     mutationFn: async (): Promise<FlushCacheResponse> => {
@@ -64,15 +66,15 @@ export function useFlushCache() {
     },
     onSuccess: (data) => {
       toast({
-        title: 'Cache flushed',
-        description: `Successfully removed ${data.keysRemoved} cached items.`,
+        title: t('flushed'),
+        description: t('flushedDescription', { count: data.keysRemoved }),
       });
       queryClient.invalidateQueries({ queryKey: ['cache'] });
     },
     onError: () => {
       toast({
-        title: 'Error',
-        description: 'Failed to flush cache. Please try again.',
+        title: t('errorTitle'),
+        description: t('flushError'),
         variant: 'destructive',
       });
     },
@@ -85,6 +87,7 @@ export function useFlushCache() {
 export function useDeleteCachePattern() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('settings.cache.toast');
 
   return useMutation({
     mutationFn: async (pattern: string): Promise<DeletePatternResponse> => {
@@ -94,15 +97,18 @@ export function useDeleteCachePattern() {
     },
     onSuccess: (data) => {
       toast({
-        title: 'Pattern deleted',
-        description: `Deleted ${data.keysDeleted} keys matching "${data.pattern}".`,
+        title: t('patternDeleted'),
+        description: t('patternDeletedDescription', {
+          count: data.keysDeleted,
+          pattern: data.pattern,
+        }),
       });
       queryClient.invalidateQueries({ queryKey: ['cache'] });
     },
     onError: () => {
       toast({
-        title: 'Error',
-        description: 'Failed to delete cache pattern. Please try again.',
+        title: t('errorTitle'),
+        description: t('patternDeleteError'),
         variant: 'destructive',
       });
     },

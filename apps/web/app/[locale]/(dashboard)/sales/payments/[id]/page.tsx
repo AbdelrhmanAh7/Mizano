@@ -105,7 +105,9 @@ export default function PaymentReceivedDetailPage() {
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">{payment.paymentNumber}</h1>
+              <h1 dir="ltr" className="text-3xl font-bold tracking-tight whitespace-nowrap">
+                {payment.paymentNumber}
+              </h1>
               <PaymentModeBadge mode={payment.paymentMode} />
               {payment.deletedAt && (
                 <Badge variant="destructive">{t('payments.voidedBadge')}</Badge>

@@ -73,7 +73,16 @@
     "toast": {
       "deleted": "تم حذف المورد",
       "deletedDescription": "تم حذف {name} بنجاح.",
-      "deleteError": "فشل حذف المورد. قد يكون لديه معاملات مرتبطة."
+      "deleteError": "فشل حذف المورد. قد يكون لديه معاملات مرتبطة.",
+      "created": "تم إنشاء المورد",
+      "createdDescription": "تم إنشاء المورد بنجاح.",
+      "createError": "تعذّر إنشاء المورد",
+      "updated": "تم تحديث المورد",
+      "updatedDescription": "تم تحديث بيانات المورد بنجاح.",
+      "updateError": "تعذّر تحديث المورد",
+      "deletedGenericDescription": "تم حذف المورد بنجاح.",
+      "deleteErrorTitle": "تعذّر حذف المورد",
+      "genericError": "حدث خطأ ما. حاول مرة أخرى."
     },
     "bills": "الفواتير",
     "expenses": "المصروفات",
@@ -151,7 +160,9 @@
       "retry": "إعادة المحاولة",
       "cancel": "إلغاء",
       "saving": "جارٍ الحفظ...",
-      "submit": "تسجيل المصروف"
+      "submit": "تسجيل المصروف",
+      "taxNone": "بدون ضريبة (0%)",
+      "taxVat": "ضريبة القيمة المضافة {rate}%"
     },
     "total": "الإجمالي",
     "table": {
@@ -165,7 +176,17 @@
     "toast": {
       "deleted": "تم حذف المصروف",
       "deletedDescription": "تم حذف المصروف بنجاح.",
-      "deleteError": "فشل حذف المصروف."
+      "deleteError": "فشل حذف المصروف.",
+      "recorded": "تم تسجيل المصروف",
+      "recordedDescription": "تم تسجيل المصروف بنجاح.",
+      "recordError": "تعذّر تسجيل المصروف",
+      "posted": "تم ترحيل المصروف",
+      "postedDescription": "تم ترحيل المصروف إلى دفتر الأستاذ.",
+      "postError": "تعذّر ترحيل المصروف",
+      "voided": "تم إلغاء المصروف",
+      "voidedDescription": "تم إلغاء المصروف وعكس قيد اليومية الخاص به.",
+      "voidError": "تعذّر إلغاء المصروف",
+      "genericError": "حدث خطأ ما. حاول مرة أخرى."
     },
     "empty": {
       "title": "لا توجد مصروفات بعد",
@@ -174,7 +195,24 @@
     "voided": "ملغي",
     "pending": "قيد الانتظار",
     "post": "ترحيل المصروف",
-    "posting": "جارٍ الترحيل..."
+    "posting": "جارٍ الترحيل...",
+    "validation": {
+      "dateRequired": "التاريخ مطلوب",
+      "accountRequired": "حساب المصروف مطلوب",
+      "amountRequired": "المبلغ مطلوب",
+      "amountInvalid": "أدخل مبلغاً موجباً بأربع خانات عشرية كحد أقصى",
+      "paidThroughRequired": "حساب الدفع مطلوب"
+    },
+    "bulkDelete": {
+      "title": "حذف {count} من المصروفات؟",
+      "description": "ستُحذف المصروفات المحددة نهائياً.",
+      "confirm": "حذف {count} من المصروفات"
+    },
+    "bulkApprove": {
+      "title": "اعتماد {count} من المصروفات؟",
+      "description": "ستُعتمد المصروفات المحددة.",
+      "confirm": "اعتماد {count} من المصروفات"
+    }
   },
   "bills": {
     "title": "الفواتير",
@@ -401,7 +439,22 @@
     "cancel": "إلغاء",
     "voided": "ملغي",
     "refundAccountsError": "تعذر تحميل الحسابات البنكية والنقدية.",
-    "retry": "إعادة المحاولة"
+    "retry": "إعادة المحاولة",
+    "toast": {
+      "created": "تم إنشاء ائتمان المورد",
+      "createdDescription": "تم إنشاء ائتمان المورد بنجاح.",
+      "createError": "تعذّر إنشاء ائتمان المورد",
+      "applied": "تم تطبيق ائتمان المورد",
+      "appliedDescription": "تم تطبيق ائتمان المورد على فاتورة المورد.",
+      "applyError": "تعذّر تطبيق ائتمان المورد",
+      "refunded": "تم الاسترداد",
+      "refundedDescription": "تم استرداد مبلغ ائتمان المورد من المورد.",
+      "refundError": "تعذّر إتمام الاسترداد",
+      "voided": "تم إلغاء ائتمان المورد",
+      "voidedDescription": "تم إلغاء ائتمان المورد وعكس قيد اليومية الخاص به.",
+      "voidError": "تعذّر إلغاء ائتمان المورد",
+      "genericError": "حدث خطأ ما. حاول مرة أخرى."
+    }
   },
   "payments": {
     "title": "المدفوعات",

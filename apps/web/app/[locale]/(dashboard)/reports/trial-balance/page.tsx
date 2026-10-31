@@ -71,7 +71,7 @@ export default function TrialBalanceReportPage() {
       {!hasData ? (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            No trial balance data available. Create some transactions first.
+            {t('trialBalance.noData')}
           </CardContent>
         </Card>
       ) : (
@@ -79,7 +79,7 @@ export default function TrialBalanceReportPage() {
           {/* Balance Status */}
           <Card className={cn('border-2', isBalanced ? 'border-green-500' : 'border-red-500')}>
             <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   {isBalanced ? (
                     <CheckCircle className="h-8 w-8 text-green-600" />
@@ -125,49 +125,51 @@ export default function TrialBalanceReportPage() {
               <CardTitle>{t('trialBalance.accountBalances')}</CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('trialBalance.code')}</TableHead>
-                    <TableHead>{t('trialBalance.account')}</TableHead>
-                    <TableHead>{t('trialBalance.type')}</TableHead>
-                    <TableHead className="text-right">{t('trialBalance.debit')}</TableHead>
-                    <TableHead className="text-right">{t('trialBalance.credit')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {accounts.map((account: TrialBalanceAccount) => (
-                    <TableRow key={account.id}>
-                      <TableCell className="font-mono">{account.code}</TableCell>
-                      <TableCell className="font-medium">{account.name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={getAccountTypeColor(account.type)}>
-                          {tTypes.has(account.type.toLowerCase())
-                            ? tTypes(account.type.toLowerCase())
-                            : account.type}
-                        </Badge>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t('trialBalance.code')}</TableHead>
+                      <TableHead>{t('trialBalance.account')}</TableHead>
+                      <TableHead>{t('trialBalance.type')}</TableHead>
+                      <TableHead className="text-right">{t('trialBalance.debit')}</TableHead>
+                      <TableHead className="text-right">{t('trialBalance.credit')}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {accounts.map((account: TrialBalanceAccount) => (
+                      <TableRow key={account.id}>
+                        <TableCell className="font-mono">{account.code}</TableCell>
+                        <TableCell className="font-medium">{account.name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={getAccountTypeColor(account.type)}>
+                            {tTypes.has(account.type.toLowerCase())
+                              ? tTypes(account.type.toLowerCase())
+                              : account.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {account.debit > 0 ? formatCurrency(account.debit) : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {account.credit > 0 ? formatCurrency(account.credit) : '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow className="font-bold">
+                      <TableCell colSpan={3}>{t('trialBalance.total')}</TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatCurrency(totalDebits)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {account.debit > 0 ? formatCurrency(account.debit) : '-'}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {account.credit > 0 ? formatCurrency(account.credit) : '-'}
+                        {formatCurrency(totalCredits)}
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-                <TableFooter>
-                  <TableRow className="font-bold">
-                    <TableCell colSpan={3}>{t('trialBalance.total')}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(totalDebits)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(totalCredits)}
-                    </TableCell>
-                  </TableRow>
-                </TableFooter>
-              </Table>
+                  </TableFooter>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </>

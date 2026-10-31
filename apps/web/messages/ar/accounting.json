@@ -224,7 +224,16 @@
     "reverseConfirm": "سيتم ترحيل قيد جديد يعكس جميع بنود {number}. يبقى القيد الأصلي دون تغيير.",
     "reversed": "تم ترحيل القيد العكسي",
     "reverseFailed": "تعذر عكس القيد",
-    "newJournalDescription": "إنشاء قيد يومية يدوي جديد"
+    "newJournalDescription": "إنشاء قيد يومية يدوي جديد",
+    "toast": {
+      "created": "تم إنشاء قيد اليومية",
+      "createdDescription": "تم إنشاء قيد اليومية بنجاح.",
+      "createError": "تعذّر إنشاء قيد اليومية",
+      "updated": "تم تحديث قيد اليومية",
+      "updatedDescription": "تم تحديث قيد اليومية بنجاح.",
+      "updateError": "تعذّر تحديث قيد اليومية",
+      "genericError": "حدث خطأ ما. حاول مرة أخرى."
+    }
   },
   "recurring": {
     "title": "الملفات المتكررة",

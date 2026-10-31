@@ -1,12 +1,12 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
-
 export interface AccountSettings {
   defaultArAccountId: string | null;
   defaultRevenueAccountId: string | null;
@@ -48,6 +48,8 @@ export function useAccountSettings() {
 export function useUpdateAccountSettings() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('settings.accountSettings.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async (data: UpdateAccountSettingsData) => {
@@ -57,15 +59,15 @@ export function useUpdateAccountSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['organization', 'account-settings'] });
       toast({
-        title: 'Settings saved',
-        description: 'Account settings have been updated successfully.',
+        title: t('saved'),
+        description: t('savedDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error saving settings',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('saveError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });

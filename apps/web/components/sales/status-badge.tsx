@@ -135,6 +135,11 @@ export function InvoiceStatusBadge({ status, className }: InvoiceStatusBadgeProp
   );
 }
 
+/** Plain translated invoice status, for places that keep their own badge style. */
+export function InvoiceStatusText({ status }: { status: string }) {
+  return <>{useEnumLabel('sales.invoices.status', invoiceStatusKeys, status)}</>;
+}
+
 interface QuoteStatusBadgeProps {
   status: QuoteStatus;
   className?: string;

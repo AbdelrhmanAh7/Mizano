@@ -73,7 +73,16 @@
     "toast": {
       "deleted": "Vendor deleted",
       "deletedDescription": "{name} has been deleted.",
-      "deleteError": "Failed to delete vendor. They may have associated transactions."
+      "deleteError": "Failed to delete vendor. They may have associated transactions.",
+      "created": "Vendor created",
+      "createdDescription": "The vendor has been created successfully.",
+      "createError": "Error creating vendor",
+      "updated": "Vendor updated",
+      "updatedDescription": "The vendor has been updated successfully.",
+      "updateError": "Error updating vendor",
+      "deletedGenericDescription": "The vendor has been deleted successfully.",
+      "deleteErrorTitle": "Error deleting vendor",
+      "genericError": "Something went wrong. Please try again."
     },
     "bills": "Bills",
     "expenses": "Expenses",
@@ -151,7 +160,9 @@
       "retry": "Retry",
       "cancel": "Cancel",
       "saving": "Saving...",
-      "submit": "Record Expense"
+      "submit": "Record Expense",
+      "taxNone": "No Tax (0%)",
+      "taxVat": "VAT {rate}%"
     },
     "total": "Total",
     "table": {
@@ -165,7 +176,17 @@
     "toast": {
       "deleted": "Expense deleted",
       "deletedDescription": "The expense has been deleted.",
-      "deleteError": "Failed to delete expense."
+      "deleteError": "Failed to delete expense.",
+      "recorded": "Expense recorded",
+      "recordedDescription": "The expense has been recorded successfully.",
+      "recordError": "Error recording expense",
+      "posted": "Expense posted",
+      "postedDescription": "The expense was posted to the ledger.",
+      "postError": "Error posting expense",
+      "voided": "Expense voided",
+      "voidedDescription": "The expense was voided and its journal reversed.",
+      "voidError": "Error voiding expense",
+      "genericError": "Something went wrong. Please try again."
     },
     "empty": {
       "title": "No expenses yet",
@@ -174,7 +195,24 @@
     "voided": "Voided",
     "pending": "Pending",
     "post": "Post expense",
-    "posting": "Posting..."
+    "posting": "Posting...",
+    "validation": {
+      "dateRequired": "Date is required",
+      "accountRequired": "Expense account is required",
+      "amountRequired": "Amount is required",
+      "amountInvalid": "Enter a positive amount with at most 4 decimals",
+      "paidThroughRequired": "Paid through account is required"
+    },
+    "bulkDelete": {
+      "title": "Delete {count} expenses?",
+      "description": "Selected expenses will be permanently deleted.",
+      "confirm": "Delete {count} expenses"
+    },
+    "bulkApprove": {
+      "title": "Approve {count} expenses?",
+      "description": "Selected expenses will be approved.",
+      "confirm": "Approve {count} expenses"
+    }
   },
   "bills": {
     "title": "Bills",
@@ -401,7 +439,22 @@
     "cancel": "Cancel",
     "voided": "Voided",
     "refundAccountsError": "Could not load the bank and cash accounts.",
-    "retry": "Retry"
+    "retry": "Retry",
+    "toast": {
+      "created": "Vendor credit created",
+      "createdDescription": "The vendor credit has been created successfully.",
+      "createError": "Error creating vendor credit",
+      "applied": "Credit applied",
+      "appliedDescription": "The vendor credit has been applied to the bill.",
+      "applyError": "Error applying credit",
+      "refunded": "Refund processed",
+      "refundedDescription": "The vendor credit has been refunded.",
+      "refundError": "Error processing refund",
+      "voided": "Credit voided",
+      "voidedDescription": "The vendor credit was voided and its journal reversed.",
+      "voidError": "Error voiding credit",
+      "genericError": "Something went wrong. Please try again."
+    }
   },
   "payments": {
     "title": "Payments Made",

@@ -1,12 +1,12 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { warehousesApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
-
 export interface Warehouse {
   id: string;
   name: string;
@@ -107,6 +107,8 @@ export function useWarehouseStock(id: string | undefined) {
 export function useCreateWarehouse() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('inventory.warehouses.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async (data: CreateWarehouseData) => {
@@ -116,15 +118,15 @@ export function useCreateWarehouse() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouses'] });
       toast({
-        title: 'Warehouse created',
-        description: 'The warehouse has been created successfully.',
+        title: t('created'),
+        description: t('createdDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error creating warehouse',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('createError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });
@@ -136,6 +138,8 @@ export function useCreateWarehouse() {
 export function useUpdateWarehouse() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('inventory.warehouses.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateWarehouseData }) => {
@@ -146,15 +150,15 @@ export function useUpdateWarehouse() {
       queryClient.invalidateQueries({ queryKey: ['warehouses'] });
       queryClient.invalidateQueries({ queryKey: ['warehouses', variables.id] });
       toast({
-        title: 'Warehouse updated',
-        description: 'The warehouse has been updated successfully.',
+        title: t('updated'),
+        description: t('updatedDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error updating warehouse',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('updateError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });
@@ -166,6 +170,8 @@ export function useUpdateWarehouse() {
 export function useDeleteWarehouse() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('inventory.warehouses.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -175,15 +181,15 @@ export function useDeleteWarehouse() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouses'] });
       toast({
-        title: 'Warehouse deleted',
-        description: 'The warehouse has been deleted successfully.',
+        title: t('deleted'),
+        description: t('deletedDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error deleting warehouse',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('deleteError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });

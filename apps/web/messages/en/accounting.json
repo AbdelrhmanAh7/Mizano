@@ -224,7 +224,16 @@
     "reverseConfirm": "This posts a new journal that reverses every line of {number}. The original entry stays unchanged.",
     "reversed": "Reversal posted",
     "reverseFailed": "Failed to reverse journal",
-    "newJournalDescription": "Create a new manual journal entry"
+    "newJournalDescription": "Create a new manual journal entry",
+    "toast": {
+      "created": "Journal created",
+      "createdDescription": "The journal entry has been created successfully.",
+      "createError": "Error creating journal",
+      "updated": "Journal updated",
+      "updatedDescription": "The journal entry has been updated successfully.",
+      "updateError": "Error updating journal",
+      "genericError": "Something went wrong. Please try again."
+    }
   },
   "recurring": {
     "title": "Recurring Profiles",

@@ -153,5 +153,25 @@
       "noResults": "No time entries found",
       "description": "Start tracking your time"
     }
+  },
+  "toast": {
+    "projectCreated": "Project created successfully",
+    "projectCreateError": "Failed to create project",
+    "projectUpdated": "Project updated successfully",
+    "projectUpdateError": "Failed to update project",
+    "projectDeleted": "Project deleted successfully",
+    "projectDeleteError": "Failed to delete project",
+    "taskCreated": "Task created successfully",
+    "taskCreateError": "Failed to create task",
+    "taskUpdated": "Task updated successfully",
+    "taskUpdateError": "Failed to update task",
+    "timeEntryCreated": "Time entry created successfully",
+    "timeEntryCreateError": "Failed to create time entry",
+    "timeEntryDeleted": "Time entry deleted successfully",
+    "timeEntryDeleteError": "Failed to delete time entry",
+    "timerStarted": "Timer started",
+    "timerStartError": "Failed to start timer",
+    "timerStopped": "Timer stopped and time entry created",
+    "timerStopError": "Failed to stop timer"
   }
 }

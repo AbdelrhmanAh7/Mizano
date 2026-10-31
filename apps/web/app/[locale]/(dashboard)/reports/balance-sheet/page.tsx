@@ -65,7 +65,7 @@ export default function BalanceSheetReportPage() {
       {!hasData ? (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            No balance sheet data available. Create some transactions first.
+            {t('balanceSheet.noData')}
           </CardContent>
         </Card>
       ) : (

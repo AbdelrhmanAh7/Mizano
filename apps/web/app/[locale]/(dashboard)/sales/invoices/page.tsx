@@ -372,13 +372,13 @@ function InvoicesPageContent() {
               <DropdownMenuItem asChild>
                 <Link href={`/sales/invoices/${invoice.id}`}>
                   <Eye className="mr-2 h-4 w-4" />
-                  View
+                  {tCommon('buttons.view')}
                 </Link>
               </DropdownMenuItem>
               {canCreate && (
                 <DropdownMenuItem onClick={() => cloneInvoice.mutate(invoice.id)}>
                   <Copy className="mr-2 h-4 w-4" />
-                  Duplicate
+                  {tCommon('clone.duplicate')}
                 </DropdownMenuItem>
               )}
               {canEdit && invoice.status === 'DRAFT' && (
@@ -386,19 +386,19 @@ function InvoicesPageContent() {
                   <DropdownMenuItem asChild>
                     <Link href={`/sales/invoices/${invoice.id}/edit`}>
                       <Edit className="mr-2 h-4 w-4" />
-                      Edit
+                      {tCommon('buttons.edit')}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleSend(invoice)}>
                     <Send className="mr-2 h-4 w-4" />
-                    Send
+                    {tCommon('buttons.send')}
                   </DropdownMenuItem>
                 </>
               )}
               {canEdit && invoice.status !== 'VOID' && invoice.status !== 'DRAFT' && (
                 <DropdownMenuItem onClick={() => handleVoid(invoice)} className="text-orange-600">
                   <Ban className="mr-2 h-4 w-4" />
-                  Void
+                  {t('invoices.list.void')}
                 </DropdownMenuItem>
               )}
               {canDelete && invoice.status === 'DRAFT' && (
@@ -406,7 +406,7 @@ function InvoicesPageContent() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => handleDelete(invoice)} className="text-red-600">
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
+                    {tCommon('buttons.delete')}
                   </DropdownMenuItem>
                 </>
               )}
@@ -515,7 +515,7 @@ function InvoicesPageContent() {
                 <Button asChild>
                   <Link href="/sales/invoices/new">
                     <Plus className="mr-2 h-4 w-4" />
-                    Create Your First Invoice
+                    {t('invoices.empty.action')}
                   </Link>
                 </Button>
               ) : undefined
@@ -528,12 +528,9 @@ function InvoicesPageContent() {
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         title={t('invoices.deleteInvoice')}
-        description={
-          <>
-            Are you sure you want to delete invoice &quot;{selectedInvoice?.invoiceNumber}&quot;?
-            This action cannot be undone.
-          </>
-        }
+        description={t('invoices.detail.deleteConfirm', {
+          number: selectedInvoice?.invoiceNumber ?? '',
+        })}
         onConfirm={confirmDelete}
       />
 
@@ -543,9 +540,7 @@ function InvoicesPageContent() {
           <AlertDialogHeader>
             <AlertDialogTitle>{t('invoices.sendInvoice')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to mark invoice &quot;{selectedInvoice?.invoiceNumber}&quot; as
-              sent? This will create an accounting entry and you won&apos;t be able to edit it
-              anymore.
+              {t('invoices.detail.sendConfirm', { number: selectedInvoice?.invoiceNumber ?? '' })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -561,8 +556,7 @@ function InvoicesPageContent() {
           <AlertDialogHeader>
             <AlertDialogTitle>{t('invoices.voidInvoice')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to void invoice &quot;{selectedInvoice?.invoiceNumber}&quot;?
-              This action cannot be undone.
+              {t('invoices.detail.voidConfirm', { number: selectedInvoice?.invoiceNumber ?? '' })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -1,14 +1,14 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useToast } from '@/components/ui/use-toast';
+import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 import { vendorCreditsApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CreateVendorCreditPayload } from '@/components/purchases/vendor-credit-payload';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
-
 export type VendorCreditStatus = 'OPEN' | 'APPLIED' | 'REFUNDED';
 
 export interface VendorCreditLine {
@@ -123,6 +123,8 @@ export function useVendorCredit(id: string | undefined) {
 export function useCreateVendorCredit() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('purchases.credits.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async (data: CreateVendorCreditData) => {
@@ -133,15 +135,15 @@ export function useCreateVendorCredit() {
       queryClient.invalidateQueries({ queryKey: ['vendor-credits'] });
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
       toast({
-        title: 'Vendor credit created',
-        description: 'The vendor credit has been created successfully.',
+        title: t('created'),
+        description: t('createdDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error creating vendor credit',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('createError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });
@@ -153,6 +155,8 @@ export function useCreateVendorCredit() {
 export function useApplyVendorCredit() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('purchases.credits.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async ({ id, billId }: { id: string; billId: string }) => {
@@ -164,15 +168,15 @@ export function useApplyVendorCredit() {
       queryClient.invalidateQueries({ queryKey: ['bills'] });
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
       toast({
-        title: 'Credit applied',
-        description: 'The vendor credit has been applied to the bill.',
+        title: t('applied'),
+        description: t('appliedDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error applying credit',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('applyError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });
@@ -184,6 +188,8 @@ export function useApplyVendorCredit() {
 export function useRefundVendorCredit() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('purchases.credits.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async ({
@@ -202,15 +208,15 @@ export function useRefundVendorCredit() {
       queryClient.invalidateQueries({ queryKey: ['vendor-credits'] });
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
       toast({
-        title: 'Refund processed',
-        description: 'The vendor credit has been refunded.',
+        title: t('refunded'),
+        description: t('refundedDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error processing refund',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('refundError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });
@@ -222,6 +228,8 @@ export function useRefundVendorCredit() {
 export function useVoidVendorCredit() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('purchases.credits.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -232,15 +240,15 @@ export function useVoidVendorCredit() {
       queryClient.invalidateQueries({ queryKey: ['vendor-credits'] });
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
       toast({
-        title: 'Credit voided',
-        description: 'The vendor credit was voided and its journal reversed.',
+        title: t('voided'),
+        description: t('voidedDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error voiding credit',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('voidError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });

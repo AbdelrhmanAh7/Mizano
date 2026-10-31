@@ -153,5 +153,25 @@
       "noResults": "لم يتم العثور على إدخالات وقت",
       "description": "ابدأ تتبع وقتك"
     }
+  },
+  "toast": {
+    "projectCreated": "تم إنشاء المشروع بنجاح",
+    "projectCreateError": "تعذّر إنشاء المشروع",
+    "projectUpdated": "تم تحديث المشروع بنجاح",
+    "projectUpdateError": "تعذّر تحديث المشروع",
+    "projectDeleted": "تم حذف المشروع بنجاح",
+    "projectDeleteError": "تعذّر حذف المشروع",
+    "taskCreated": "تم إنشاء المهمة بنجاح",
+    "taskCreateError": "تعذّر إنشاء المهمة",
+    "taskUpdated": "تم تحديث المهمة بنجاح",
+    "taskUpdateError": "تعذّر تحديث المهمة",
+    "timeEntryCreated": "تم تسجيل الوقت بنجاح",
+    "timeEntryCreateError": "تعذّر تسجيل الوقت",
+    "timeEntryDeleted": "تم حذف سجل الوقت بنجاح",
+    "timeEntryDeleteError": "تعذّر حذف سجل الوقت",
+    "timerStarted": "بدأ المؤقت",
+    "timerStartError": "تعذّر تشغيل المؤقت",
+    "timerStopped": "تم إيقاف المؤقت وتسجيل الوقت",
+    "timerStopError": "تعذّر إيقاف المؤقت"
   }
 }

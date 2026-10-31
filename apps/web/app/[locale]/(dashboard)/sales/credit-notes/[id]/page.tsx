@@ -88,7 +88,9 @@ export default function CreditNoteDetailPage() {
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">{creditNote.creditNoteNumber}</h1>
+              <h1 dir="ltr" className="text-3xl font-bold tracking-tight whitespace-nowrap">
+                {creditNote.creditNoteNumber}
+              </h1>
               <Badge className={getCreditNoteTypeColor(creditNote.type)}>
                 {getCreditNoteTypeLabel(creditNote.type)}
               </Badge>

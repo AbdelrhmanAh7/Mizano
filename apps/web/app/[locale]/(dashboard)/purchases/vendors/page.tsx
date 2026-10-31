@@ -149,7 +149,7 @@ function VendorsPageContent() {
     {
       accessorKey: 'phone',
       header: t('vendors.table.phone'),
-      cell: ({ row }) => row.original.phone || '-',
+      cell: ({ row }) => (row.original.phone ? <span dir="ltr">{row.original.phone}</span> : '-'),
     },
     {
       accessorKey: 'currency',

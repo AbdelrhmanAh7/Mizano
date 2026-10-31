@@ -6,6 +6,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 
 // Mock shared types
+jest.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
+
 jest.mock('@mizano/shared-types', () => ({
   LogLevel: { ERROR: 'error', WARN: 'warn', INFO: 'info', DEBUG: 'debug' },
   LogSource: { FRONTEND: 'frontend', BACKEND: 'backend', AI_MODEL: 'ai-model' },
@@ -284,7 +286,7 @@ describe('LoggerDashboard', () => {
     mockUseLogger.accessDenied = true;
     const { container } = render(<LoggerDashboard />);
     expect(container).toBeEmptyDOMElement();
-    expect(screen.queryByLabelText('Toggle error logger')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('errorLogger')).not.toBeInTheDocument();
   });
 
   it('should render the empty state when no logs', () => {

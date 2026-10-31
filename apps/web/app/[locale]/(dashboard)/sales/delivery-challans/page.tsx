@@ -238,7 +238,7 @@ export default function DeliveryChallansPage() {
         open={importOpen}
         onOpenChange={setImportOpen}
         entityType={'delivery_challans' as ImportEntityType}
-        entityLabel="Delivery Challans"
+        entityLabel={t('deliveryChallans.title')}
         onComplete={() => {
           // Refetch handled by query invalidation
         }}

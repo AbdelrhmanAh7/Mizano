@@ -212,6 +212,28 @@
       "viewCustomers": "View Customers",
       "viewAccounts": "View Accounts",
       "viewItems": "View Items"
+    },
+    "customizer": {
+      "title": "Customize Dashboard",
+      "description": "Show, hide, and reorder dashboard widgets.",
+      "moveUp": "Move widget up",
+      "moveDown": "Move widget down",
+      "reset": "Reset to Default",
+      "widgets": {
+        "kpiRow1": "KPI Row 1 (Revenue, Expenses, Profit, Balance)",
+        "kpiRow2": "KPI Row 2 (Receivables, Payables, Overdue, Projects)",
+        "cashFlowRevenue": "Cash Flow & Revenue",
+        "arApExpenses": "AR/AP & Expenses",
+        "profitCustomers": "Profit Margin & Top Customers",
+        "bankInventory": "Bank Balance & Inventory Value",
+        "insightsTransactions": "Recent Transactions & Upcoming Payments",
+        "projectsBankAccounts": "Projects & Bank Accounts"
+      }
+    },
+    "widgetError": {
+      "failed": "Failed to load widget.",
+      "failedWithId": "Failed to load widget ({id}).",
+      "retry": "Retry"
     }
   },
   "header": {
@@ -338,7 +360,8 @@
     "validation": "Validation error",
     "network": "Network error. Please check your connection.",
     "server": "Server error. Please try again later.",
-    "tryAgain": "Try again"
+    "tryAgain": "Try again",
+    "title": "Error"
   },
   "empty": {
     "title": "No data",
@@ -530,5 +553,31 @@
     "today": "Today",
     "yesterday": "Yesterday",
     "earlier": "Earlier"
+  },
+  "phoneInput": {
+    "placeholder": "{count} digits",
+    "invalid": "A phone number in {country} has {lengths} digits",
+    "select": "Select"
+  },
+  "exportAll": {
+    "exporting": "Exporting...",
+    "exportingDescription": "Preparing the {format} file with all records. This may take a moment.",
+    "complete": "Export complete",
+    "completeDescription": "{file} has been downloaded.",
+    "failed": "Export failed",
+    "failedDescription": "An error occurred while exporting data. Please try again."
+  },
+  "a11y": {
+    "notificationsRegion": "Notifications ({hotkey})",
+    "notification": "Notification",
+    "mainNavigation": "Main navigation",
+    "mainNavigationMenu": "Main navigation menu",
+    "errorLogger": "Error log",
+    "selectCountry": "Select country",
+    "selectCity": "Select city",
+    "enterCity": "Enter city name",
+    "selectCountryFirst": "Select a country first",
+    "toastsRegion": "Notifications",
+    "closeToast": "Close"
   }
 }

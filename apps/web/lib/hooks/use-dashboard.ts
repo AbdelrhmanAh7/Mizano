@@ -255,7 +255,8 @@ export function transformDashboardOverview(
         id: inv.id,
         type: 'INVOICE',
         reference: inv.invoiceNumber,
-        description: `Invoice to ${inv.customer?.name || 'Unknown'}`,
+        // The icon shows the kind; the line names the customer (no English wording).
+        description: inv.customer?.name ?? '',
         amount: moneyToNumber(inv.grandTotal ?? inv.total),
         date: inv.createdAt,
         link: `/sales/invoices/${inv.id}`,
@@ -268,7 +269,7 @@ export function transformDashboardOverview(
         id: bill.id,
         type: 'BILL',
         reference: bill.billNumber,
-        description: `Bill from ${bill.vendor?.name || 'Unknown'}`,
+        description: bill.vendor?.name ?? '',
         amount: -moneyToNumber(bill.grandTotal ?? bill.total),
         date: bill.createdAt,
         link: `/purchases/bills/${bill.id}`,

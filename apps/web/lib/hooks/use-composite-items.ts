@@ -1,13 +1,13 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useToast } from '@/components/ui/use-toast';
+import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 import { compositeItemsApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
-
 export interface CompositeItemComponent {
   id: string;
   itemId: string;
@@ -82,6 +82,8 @@ export function useCompositeItem(id: string | undefined) {
 export function useCreateCompositeItem() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('inventory.compositeItems.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async (data: CreateCompositeItemData) => {
@@ -91,15 +93,15 @@ export function useCreateCompositeItem() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['composite-items'] });
       toast({
-        title: 'Composite item created',
-        description: 'The composite item has been created successfully.',
+        title: t('created'),
+        description: t('createdDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error creating composite item',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('createError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });
@@ -108,6 +110,8 @@ export function useCreateCompositeItem() {
 export function useUpdateCompositeItem() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('inventory.compositeItems.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateCompositeItemData }) => {
@@ -118,15 +122,15 @@ export function useUpdateCompositeItem() {
       queryClient.invalidateQueries({ queryKey: ['composite-items'] });
       queryClient.invalidateQueries({ queryKey: ['composite-items', variables.id] });
       toast({
-        title: 'Composite item updated',
-        description: 'The composite item has been updated successfully.',
+        title: t('updated'),
+        description: t('updatedDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error updating composite item',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('updateError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });
@@ -135,6 +139,8 @@ export function useUpdateCompositeItem() {
 export function useDeleteCompositeItem() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('inventory.compositeItems.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -144,15 +150,15 @@ export function useDeleteCompositeItem() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['composite-items'] });
       toast({
-        title: 'Composite item deleted',
-        description: 'The composite item has been deleted successfully.',
+        title: t('deleted'),
+        description: t('deletedDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error deleting composite item',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('deleteError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });
@@ -173,6 +179,8 @@ export function useCheckAvailability(id: string | undefined, quantity?: number) 
 export function useAssembleCompositeItem() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('inventory.compositeItems.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async ({
@@ -191,15 +199,15 @@ export function useAssembleCompositeItem() {
       queryClient.invalidateQueries({ queryKey: ['inventory-levels'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-movements'] });
       toast({
-        title: 'Assembly completed',
-        description: 'The composite item has been assembled successfully.',
+        title: t('assembled'),
+        description: t('assembledDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error assembling composite item',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('assembleError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });

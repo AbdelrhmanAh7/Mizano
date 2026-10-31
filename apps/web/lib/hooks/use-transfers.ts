@@ -1,13 +1,13 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useToast } from '@/components/ui/use-toast';
+import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 import { transfersApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
-
 export type TransferStatus = 'PENDING' | 'IN_TRANSIT' | 'COMPLETED' | 'CANCELLED';
 
 export interface TransferLine {
@@ -93,6 +93,8 @@ export function useTransfer(id: string | undefined) {
 export function useCreateTransfer() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('inventory.transfers.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async (data: CreateTransferData) => {
@@ -104,15 +106,15 @@ export function useCreateTransfer() {
       queryClient.invalidateQueries({ queryKey: ['warehouses'] });
       queryClient.invalidateQueries({ queryKey: ['items'] });
       toast({
-        title: 'Transfer created',
-        description: 'The stock transfer has been created successfully.',
+        title: t('created'),
+        description: t('createdDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error creating transfer',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('createError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });
@@ -124,6 +126,8 @@ export function useCreateTransfer() {
 export function useCompleteTransfer() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('inventory.transfers.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -135,15 +139,15 @@ export function useCompleteTransfer() {
       queryClient.invalidateQueries({ queryKey: ['warehouses'] });
       queryClient.invalidateQueries({ queryKey: ['items'] });
       toast({
-        title: 'Transfer completed',
-        description: 'The stock transfer has been completed.',
+        title: t('completed'),
+        description: t('completedDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error completing transfer',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('completeError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });
@@ -155,6 +159,8 @@ export function useCompleteTransfer() {
 export function useCancelTransfer() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('inventory.transfers.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -164,15 +170,15 @@ export function useCancelTransfer() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transfers'] });
       toast({
-        title: 'Transfer cancelled',
-        description: 'The stock transfer has been cancelled.',
+        title: t('cancelled'),
+        description: t('cancelledDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error cancelling transfer',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('cancelError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });

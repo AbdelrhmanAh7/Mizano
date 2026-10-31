@@ -21,6 +21,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -366,6 +367,7 @@ function PromptDialog({
 export function LoggerDashboard() {
   // Initialize global error capture
   useGlobalErrorCapture();
+  const tA11y = useTranslations('common.a11y');
 
   const {
     logs,
@@ -442,7 +444,7 @@ export function LoggerDashboard() {
             <Button
               variant="outline"
               size="icon"
-              aria-label="Toggle error logger"
+              aria-label={tA11y('errorLogger')}
               className="fixed bottom-20 right-4 z-50 h-12 w-12 rounded-full shadow-lg border-2 transition-all hover:scale-105"
               onClick={toggle}
               style={{

@@ -273,7 +273,7 @@ function PaymentsReceivedPageContent() {
                 <Button asChild>
                   <Link href="/sales/payments/new">
                     <Plus className="me-2 h-4 w-4" />
-                    Record Your First Payment
+                    {t('payments.empty.action')}
                   </Link>
                 </Button>
               ) : undefined
