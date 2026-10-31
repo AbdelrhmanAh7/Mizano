@@ -1,15 +1,11 @@
 'use client';
 
-import { useToast } from '@/components/ui/use-toast';
-import { useTranslations } from 'next-intl';
-import { getApiErrorMessage } from '@/lib/api-error';
 import { quotesApi } from '@/lib/api';
+import { useToastMutation } from '@/lib/hooks/use-toast-mutation';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
-
 export type QuoteStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'INVOICED' | 'DECLINED' | 'EXPIRED';
 
 export interface QuoteLine {
@@ -139,29 +135,12 @@ export function useQuote(id: string | undefined) {
  * Hook to create a new quote
  */
 export function useCreateQuote() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const tToast = useTranslations('sales.quotes.toast');
-
-  return useMutation({
-    mutationFn: async (data: CreateQuoteData) => {
-      const response = await quotesApi.create(data);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['quotes'] });
-      toast({
-        title: tToast('created'),
-        description: tToast('createdDescription'),
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: tToast('createError'),
-        description: getApiErrorMessage(error, tToast('genericError')),
-      });
-    },
+  return useToastMutation({
+    namespace: 'sales.quotes.toast',
+    mutationFn: async (data: CreateQuoteData) => (await quotesApi.create(data)).data,
+    invalidate: () => [['quotes']],
+    success: 'created',
+    error: 'createError',
   });
 }
 
@@ -169,30 +148,13 @@ export function useCreateQuote() {
  * Hook to update an existing quote
  */
 export function useUpdateQuote() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const tToast = useTranslations('sales.quotes.toast');
-
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateQuoteData }) => {
-      const response = await quotesApi.update(id, data);
-      return response.data;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['quotes'] });
-      queryClient.invalidateQueries({ queryKey: ['quotes', variables.id] });
-      toast({
-        title: tToast('updated'),
-        description: tToast('updatedDescription'),
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: tToast('updateError'),
-        description: getApiErrorMessage(error, tToast('genericError')),
-      });
-    },
+  return useToastMutation({
+    namespace: 'sales.quotes.toast',
+    mutationFn: async ({ id, data }: { id: string; data: UpdateQuoteData }) =>
+      (await quotesApi.update(id, data)).data,
+    invalidate: (variables) => [['quotes'], ['quotes', variables.id]],
+    success: 'updated',
+    error: 'updateError',
   });
 }
 
@@ -200,29 +162,12 @@ export function useUpdateQuote() {
  * Hook to delete a quote
  */
 export function useDeleteQuote() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const tToast = useTranslations('sales.quotes.toast');
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await quotesApi.delete(id);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['quotes'] });
-      toast({
-        title: tToast('deleted'),
-        description: tToast('deletedDescription'),
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: tToast('deleteError'),
-        description: getApiErrorMessage(error, tToast('genericError')),
-      });
-    },
+  return useToastMutation({
+    namespace: 'sales.quotes.toast',
+    mutationFn: async (id: string) => (await quotesApi.delete(id)).data,
+    invalidate: () => [['quotes']],
+    success: 'deleted',
+    error: 'deleteError',
   });
 }
 
@@ -230,30 +175,12 @@ export function useDeleteQuote() {
  * Hook to send a quote
  */
 export function useSendQuote() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const tToast = useTranslations('sales.quotes.toast');
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await quotesApi.send(id);
-      return response.data;
-    },
-    onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ['quotes'] });
-      queryClient.invalidateQueries({ queryKey: ['quotes', id] });
-      toast({
-        title: tToast('sent'),
-        description: tToast('sentDescription'),
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: tToast('sendError'),
-        description: getApiErrorMessage(error, tToast('genericError')),
-      });
-    },
+  return useToastMutation({
+    namespace: 'sales.quotes.toast',
+    mutationFn: async (id: string) => (await quotesApi.send(id)).data,
+    invalidate: (id) => [['quotes'], ['quotes', id]],
+    success: 'sent',
+    error: 'sendError',
   });
 }
 
@@ -261,30 +188,12 @@ export function useSendQuote() {
  * Hook to accept a quote
  */
 export function useAcceptQuote() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const tToast = useTranslations('sales.quotes.toast');
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await quotesApi.accept(id);
-      return response.data;
-    },
-    onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ['quotes'] });
-      queryClient.invalidateQueries({ queryKey: ['quotes', id] });
-      toast({
-        title: tToast('accepted'),
-        description: tToast('acceptedDescription'),
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: tToast('acceptError'),
-        description: getApiErrorMessage(error, tToast('genericError')),
-      });
-    },
+  return useToastMutation({
+    namespace: 'sales.quotes.toast',
+    mutationFn: async (id: string) => (await quotesApi.accept(id)).data,
+    invalidate: (id) => [['quotes'], ['quotes', id]],
+    success: 'accepted',
+    error: 'acceptError',
   });
 }
 
@@ -292,30 +201,12 @@ export function useAcceptQuote() {
  * Hook to decline a quote
  */
 export function useDeclineQuote() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const tToast = useTranslations('sales.quotes.toast');
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await quotesApi.decline(id);
-      return response.data;
-    },
-    onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ['quotes'] });
-      queryClient.invalidateQueries({ queryKey: ['quotes', id] });
-      toast({
-        title: tToast('declined'),
-        description: tToast('declinedDescription'),
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: tToast('declineError'),
-        description: getApiErrorMessage(error, tToast('genericError')),
-      });
-    },
+  return useToastMutation({
+    namespace: 'sales.quotes.toast',
+    mutationFn: async (id: string) => (await quotesApi.decline(id)).data,
+    invalidate: (id) => [['quotes'], ['quotes', id]],
+    success: 'declined',
+    error: 'declineError',
   });
 }
 
@@ -323,31 +214,12 @@ export function useDeclineQuote() {
  * Hook to convert quote to invoice
  */
 export function useConvertToInvoice() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const tToast = useTranslations('sales.quotes.toast');
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await quotesApi.convertToInvoice(id);
-      return response.data;
-    },
-    onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ['quotes'] });
-      queryClient.invalidateQueries({ queryKey: ['quotes', id] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      toast({
-        title: tToast('invoiceCreated'),
-        description: tToast('invoiceCreatedDescription'),
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: tToast('convertError'),
-        description: getApiErrorMessage(error, tToast('genericError')),
-      });
-    },
+  return useToastMutation({
+    namespace: 'sales.quotes.toast',
+    mutationFn: async (id: string) => (await quotesApi.convertToInvoice(id)).data,
+    invalidate: (id) => [['quotes'], ['quotes', id], ['invoices']],
+    success: 'invoiceCreated',
+    error: 'convertError',
   });
 }
 
@@ -355,28 +227,11 @@ export function useConvertToInvoice() {
  * Hook to clone/duplicate a quote
  */
 export function useCloneQuote() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const tToast = useTranslations('sales.quotes.toast');
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await quotesApi.clone(id);
-      return response.data as Quote;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['quotes'] });
-      toast({
-        title: tToast('duplicated'),
-        description: tToast('duplicatedDescription'),
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: tToast('duplicateError'),
-        description: getApiErrorMessage(error, tToast('genericError')),
-      });
-    },
+  return useToastMutation({
+    namespace: 'sales.quotes.toast',
+    mutationFn: async (id: string) => (await quotesApi.clone(id)).data as Quote,
+    invalidate: () => [['quotes']],
+    success: 'duplicated',
+    error: 'duplicateError',
   });
 }

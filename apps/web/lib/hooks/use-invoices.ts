@@ -1,14 +1,11 @@
 'use client';
 
-import { useToast } from '@/components/ui/use-toast';
-import { useTranslations } from 'next-intl';
-import { getApiErrorMessage } from '@/lib/api-error';
 import { invoicesApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToastMutation } from '@/lib/hooks/use-toast-mutation';
+import { useQuery } from '@tanstack/react-query';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
 
 export type InvoiceStatus = 'DRAFT' | 'SENT' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' | 'VOID';
 
@@ -147,34 +144,18 @@ export function useInvoice(id: string | undefined) {
   });
 }
 
+const INVOICE_TOAST = 'sales.invoices.toast';
+
 /**
  * Hook to create a new invoice
  */
 export function useCreateInvoice() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const tToast = useTranslations('sales.invoices.toast');
-
-  return useMutation({
-    mutationFn: async (data: CreateInvoiceData) => {
-      const response = await invoicesApi.create(data);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      toast({
-        title: tToast('created'),
-        description: tToast('createdDescription'),
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: tToast('createError'),
-        description: getApiErrorMessage(error, tToast('genericError')),
-      });
-    },
+  return useToastMutation({
+    namespace: INVOICE_TOAST,
+    mutationFn: async (data: CreateInvoiceData) => (await invoicesApi.create(data)).data,
+    invalidate: () => [['invoices'], ['customers']],
+    success: 'created',
+    error: 'createError',
   });
 }
 
@@ -182,30 +163,13 @@ export function useCreateInvoice() {
  * Hook to update an existing invoice
  */
 export function useUpdateInvoice() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const tToast = useTranslations('sales.invoices.toast');
-
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateInvoiceData }) => {
-      const response = await invoicesApi.update(id, data);
-      return response.data;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['invoices', variables.id] });
-      toast({
-        title: tToast('updated'),
-        description: tToast('updatedDescription'),
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: tToast('updateError'),
-        description: getApiErrorMessage(error, tToast('genericError')),
-      });
-    },
+  return useToastMutation({
+    namespace: INVOICE_TOAST,
+    mutationFn: async ({ id, data }: { id: string; data: UpdateInvoiceData }) =>
+      (await invoicesApi.update(id, data)).data,
+    invalidate: ({ id }) => [['invoices'], ['invoices', id]],
+    success: 'updated',
+    error: 'updateError',
   });
 }
 
@@ -213,30 +177,12 @@ export function useUpdateInvoice() {
  * Hook to delete an invoice
  */
 export function useDeleteInvoice() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const tToast = useTranslations('sales.invoices.toast');
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await invoicesApi.delete(id);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      toast({
-        title: tToast('deleted'),
-        description: tToast('deletedDescription'),
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: tToast('deleteError'),
-        description: getApiErrorMessage(error, tToast('genericError')),
-      });
-    },
+  return useToastMutation({
+    namespace: INVOICE_TOAST,
+    mutationFn: async (id: string) => (await invoicesApi.delete(id)).data,
+    invalidate: () => [['invoices'], ['customers']],
+    success: 'deleted',
+    error: 'deleteError',
   });
 }
 
@@ -244,31 +190,12 @@ export function useDeleteInvoice() {
  * Hook to send an invoice
  */
 export function useSendInvoice() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const tToast = useTranslations('sales.invoices.toast');
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await invoicesApi.send(id);
-      return response.data;
-    },
-    onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['invoices', id] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      toast({
-        title: tToast('sent'),
-        description: tToast('sentDescription'),
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: tToast('sendError'),
-        description: getApiErrorMessage(error, tToast('genericError')),
-      });
-    },
+  return useToastMutation({
+    namespace: INVOICE_TOAST,
+    mutationFn: async (id: string) => (await invoicesApi.send(id)).data,
+    invalidate: (id) => [['invoices'], ['invoices', id], ['customers']],
+    success: 'sent',
+    error: 'sendError',
   });
 }
 
@@ -276,31 +203,12 @@ export function useSendInvoice() {
  * Hook to void an invoice
  */
 export function useVoidInvoice() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const tToast = useTranslations('sales.invoices.toast');
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await invoicesApi.void(id);
-      return response.data;
-    },
-    onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['invoices', id] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      toast({
-        title: tToast('voided'),
-        description: tToast('voidedDescription'),
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: tToast('voidError'),
-        description: getApiErrorMessage(error, tToast('genericError')),
-      });
-    },
+  return useToastMutation({
+    namespace: INVOICE_TOAST,
+    mutationFn: async (id: string) => (await invoicesApi.void(id)).data,
+    invalidate: (id) => [['invoices'], ['invoices', id], ['customers']],
+    success: 'voided',
+    error: 'voidError',
   });
 }
 
@@ -308,29 +216,12 @@ export function useVoidInvoice() {
  * Hook to clone/duplicate an invoice
  */
 export function useCloneInvoice() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const tToast = useTranslations('sales.invoices.toast');
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await invoicesApi.clone(id);
-      return response.data as Invoice;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      toast({
-        title: tToast('duplicated'),
-        description: tToast('duplicatedDescription'),
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: tToast('duplicateError'),
-        description: getApiErrorMessage(error, tToast('genericError')),
-      });
-    },
+  return useToastMutation({
+    namespace: INVOICE_TOAST,
+    mutationFn: async (id: string) => (await invoicesApi.clone(id)).data as Invoice,
+    invalidate: () => [['invoices']],
+    success: 'duplicated',
+    error: 'duplicateError',
   });
 }
 

@@ -1,16 +1,12 @@
 'use client';
 
-import { useToast } from '@/components/ui/use-toast';
-import { useTranslations } from 'next-intl';
-import { getApiErrorMessage } from '@/lib/api-error';
 import { format } from 'date-fns';
 import { customersApi } from '@/lib/api';
+import { useToastMutation } from '@/lib/hooks/use-toast-mutation';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
-
 export interface CustomerAddress {
   street: string | null;
   city: string | null;
@@ -167,29 +163,12 @@ export function useCustomerStatement(id: string | undefined) {
  * Hook to create a new customer
  */
 export function useCreateCustomer() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const tToast = useTranslations('sales.customers.toast');
-
-  return useMutation({
-    mutationFn: async (data: CreateCustomerData) => {
-      const response = await customersApi.create(data);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      toast({
-        title: tToast('created'),
-        description: tToast('createdDescription'),
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: tToast('createError'),
-        description: getApiErrorMessage(error, tToast('genericError')),
-      });
-    },
+  return useToastMutation({
+    namespace: 'sales.customers.toast',
+    mutationFn: async (data: CreateCustomerData) => (await customersApi.create(data)).data,
+    invalidate: () => [['customers']],
+    success: 'created',
+    error: 'createError',
   });
 }
 
@@ -197,30 +176,13 @@ export function useCreateCustomer() {
  * Hook to update an existing customer
  */
 export function useUpdateCustomer() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const tToast = useTranslations('sales.customers.toast');
-
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateCustomerData }) => {
-      const response = await customersApi.update(id, data);
-      return response.data;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      queryClient.invalidateQueries({ queryKey: ['customers', variables.id] });
-      toast({
-        title: tToast('updated'),
-        description: tToast('updatedDescription'),
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: tToast('updateError'),
-        description: getApiErrorMessage(error, tToast('genericError')),
-      });
-    },
+  return useToastMutation({
+    namespace: 'sales.customers.toast',
+    mutationFn: async ({ id, data }: { id: string; data: UpdateCustomerData }) =>
+      (await customersApi.update(id, data)).data,
+    invalidate: (variables) => [['customers'], ['customers', variables.id]],
+    success: 'updated',
+    error: 'updateError',
   });
 }
 
@@ -228,29 +190,12 @@ export function useUpdateCustomer() {
  * Hook to delete a customer
  */
 export function useDeleteCustomer() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const tToast = useTranslations('sales.customers.toast');
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await customersApi.delete(id);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      toast({
-        title: tToast('deleted'),
-        description: tToast('deletedDescription'),
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: tToast('deleteError'),
-        description: getApiErrorMessage(error, tToast('genericError')),
-      });
-    },
+  return useToastMutation({
+    namespace: 'sales.customers.toast',
+    mutationFn: async (id: string) => (await customersApi.delete(id)).data,
+    invalidate: () => [['customers']],
+    success: 'deleted',
+    error: 'deleteError',
   });
 }
 

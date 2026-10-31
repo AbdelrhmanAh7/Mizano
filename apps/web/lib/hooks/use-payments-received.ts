@@ -1,16 +1,12 @@
 'use client';
 
-import { useToast } from '@/components/ui/use-toast';
-import { useTranslations } from 'next-intl';
-import { getApiErrorMessage } from '@/lib/api-error';
 import { paymentsReceivedApi } from '@/lib/api';
 import { invalidateLedgerQueries } from '@/lib/hooks/use-journals';
+import { useToastMutation } from '@/lib/hooks/use-toast-mutation';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
-
 export type PaymentMode =
   | 'CASH'
   | 'BANK_TRANSFER'
@@ -130,31 +126,13 @@ export function usePaymentReceived(id: string | undefined) {
  * Hook to create a new payment received
  */
 export function useCreatePaymentReceived() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const tToast = useTranslations('sales.payments.toast');
-
-  return useMutation({
-    mutationFn: async (data: CreatePaymentReceivedData) => {
-      const response = await paymentsReceivedApi.create(data);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['payments-received'] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      toast({
-        title: tToast('recorded'),
-        description: tToast('recordedDescription'),
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: tToast('recordError'),
-        description: getApiErrorMessage(error, tToast('genericError')),
-      });
-    },
+  return useToastMutation({
+    namespace: 'sales.payments.toast',
+    mutationFn: async (data: CreatePaymentReceivedData) =>
+      (await paymentsReceivedApi.create(data)).data,
+    invalidate: () => [['payments-received'], ['invoices'], ['customers']],
+    success: 'recorded',
+    error: 'recordError',
   });
 }
 
@@ -162,32 +140,13 @@ export function useCreatePaymentReceived() {
  * Hook to void a payment received (restores invoice balances, posts a reversal journal)
  */
 export function useVoidPaymentReceived() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const tToast = useTranslations('sales.payments.toast');
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await paymentsReceivedApi.void(id);
-      return response.data;
-    },
-    onSuccess: () => {
-      void invalidateLedgerQueries(queryClient);
-      queryClient.invalidateQueries({ queryKey: ['payments-received'] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      toast({
-        title: tToast('voided'),
-        description: tToast('voidedDescription'),
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: tToast('voidError'),
-        description: getApiErrorMessage(error, tToast('genericError')),
-      });
-    },
+  return useToastMutation({
+    namespace: 'sales.payments.toast',
+    mutationFn: async (id: string) => (await paymentsReceivedApi.void(id)).data,
+    beforeInvalidate: (queryClient) => void invalidateLedgerQueries(queryClient),
+    invalidate: () => [['payments-received'], ['invoices'], ['customers']],
+    success: 'voided',
+    error: 'voidError',
   });
 }
 
