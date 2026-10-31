@@ -623,7 +623,6 @@
       "backlogTitle": "Send reminders for old overdue invoices?",
       "backlogDescription": "New webhooks only hear about invoices that become overdue after they were added. This sends every invoice that is overdue now on the next hourly check, so FlowLine reminder flows may contact all of these customers at once.",
       "backlogQueued": "Overdue invoices will be sent on the next hourly check",
-      "backlogInactive": "Enable the webhook before sending the overdue backlog.",
       "delete": "Delete",
       "deleteTitle": "Delete this webhook?",
       "deleteDescription": "Mizano stops sending events to it. Queued deliveries will fail."
@@ -667,6 +666,9 @@
       "payment_voided": "Payment voided",
       "invoice_overdue": "Invoice overdue",
       "payment_received": "Payment received"
+    },
+    "errors": {
+      "WEBHOOK_ENDPOINT_INACTIVE": "Enable the webhook before sending the overdue backlog."
     }
   }
 }

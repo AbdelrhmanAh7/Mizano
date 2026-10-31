@@ -28,7 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/components/ui/use-toast';
-import { getApiErrorCode, getApiErrorMessage } from '@/lib/api-error';
+import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 import { integrationsBaseUrl, type DeliveryStatus } from '@/lib/api/integrations';
 import {
   useCreateIntegrationKey,
@@ -57,11 +57,6 @@ const STATUS_VARIANT: Record<DeliveryStatus, 'default' | 'secondary' | 'destruct
     DELIVERING: 'secondary',
     FAILED: 'destructive',
   };
-
-/** API error codes with their own en/ar copy (the server's English message is the fallback). */
-const ERROR_COPY: Record<string, string> = {
-  WEBHOOK_ENDPOINT_INACTIVE: 'step2.backlogInactive',
-};
 
 function ErrorBox({
   message,
@@ -179,6 +174,8 @@ function ScopeOrEventChecklist({
 /** One screen: API address + key for FlowLine, FlowLine webhook for events, delivery log. */
 export function FlowlineConnect() {
   const t = useTranslations('settings.flowline');
+  // API error codes with their own en/ar copy (the server's English message is the fallback).
+  const tErrors = useTranslations('settings.flowline.errors');
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const canEdit = hasPermission('settings.edit');
@@ -218,10 +215,9 @@ export function FlowlineConnect() {
   }, [catalog.data]);
 
   const fail = (error: unknown) => {
-    const copyKey = ERROR_COPY[getApiErrorCode(error) ?? ''];
     toast({
       title: t('error'),
-      description: copyKey ? t(copyKey) : getApiErrorMessage(error, t('error')),
+      description: getLocalizedApiErrorMessage(error, t('error'), tErrors),
       variant: 'destructive',
     });
   };

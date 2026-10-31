@@ -5,8 +5,17 @@ import arSettings from '@/messages/ar/settings.json';
 import { integrationsBaseUrl, unwrap } from '@/lib/api/integrations';
 
 jest.mock('next-intl', () => ({
-  useTranslations: () => (key: string, values?: Record<string, string>) =>
-    values ? `${key}|${Object.values(values).join('|')}` : key,
+  useTranslations: (namespace: string) =>
+    Object.assign(
+      (key: string, values?: Record<string, string>) =>
+        values ? `${key}|${Object.values(values).join('|')}` : key,
+      {
+        // Only the error-code namespace answers `has`, from the real English messages.
+        has: (key: string) =>
+          namespace === 'settings.flowline.errors' &&
+          key in jest.requireActual('@/messages/en/settings.json').flowline.errors,
+      },
+    ),
 }));
 const toast = jest.fn();
 jest.mock('@/components/ui/use-toast', () => ({ useToast: () => ({ toast }) }));
@@ -92,7 +101,7 @@ describe('FlowlineConnect', () => {
     const { onError } = sendBacklog.mock.calls[0][1] as { onError: (e: unknown) => void };
     onError({ response: { data: { code: 'WEBHOOK_ENDPOINT_INACTIVE', message: 'Enable it' } } });
     expect(toast).toHaveBeenLastCalledWith(
-      expect.objectContaining({ description: 'step2.backlogInactive', variant: 'destructive' }),
+      expect.objectContaining({ description: 'WEBHOOK_ENDPOINT_INACTIVE', variant: 'destructive' }),
     );
     onError({ response: { data: { message: 'Webhook endpoint not found' } } });
     expect(toast).toHaveBeenLastCalledWith(
