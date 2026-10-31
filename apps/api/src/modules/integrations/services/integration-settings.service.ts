@@ -58,6 +58,9 @@ const ENDPOINT_SELECT = {
 
 const OVERDUE_EVENT = 'invoice.overdue';
 
+/** Error code of an action that needs an active endpoint; the web maps it to en/ar copy. */
+export const WEBHOOK_ENDPOINT_INACTIVE = 'WEBHOOK_ENDPOINT_INACTIVE';
+
 /**
  * The new overdue cutoff when an endpoint starts listening to invoice.overdue (subscribes, or is
  * re-enabled while subscribed): now, so invoices that were already overdue are not announced.
@@ -235,12 +238,21 @@ export class IntegrationSettingsService {
 
   /**
    * Explicit opt-in to the overdue backlog: the next hourly scan announces every invoice that is
-   * overdue now, not only those that fall due from now on (audit F2).
+   * overdue now, not only those that fall due from now on (audit F2). An inactive endpoint is
+   * refused: re-enabling it restarts the cutoff, which would silently drop the opt-in.
    */
   async sendOverdueBacklog(organizationId: string, id: string) {
     const endpoint = await this.ownedEndpoint(organizationId, id);
     if (!endpoint.eventTypes.includes(OVERDUE_EVENT)) {
       throw new BadRequestException('The endpoint does not subscribe to invoice.overdue');
+    }
+    if (!endpoint.isActive) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: WEBHOOK_ENDPOINT_INACTIVE,
+        message: 'Enable the endpoint before sending the overdue backlog',
+        error: 'Bad Request',
+      });
     }
     return this.prisma.webhookEndpoint.update({
       where: { id },

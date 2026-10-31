@@ -8,7 +8,8 @@ jest.mock('next-intl', () => ({
   useTranslations: () => (key: string, values?: Record<string, string>) =>
     values ? `${key}|${Object.values(values).join('|')}` : key,
 }));
-jest.mock('@/components/ui/use-toast', () => ({ useToast: () => ({ toast: jest.fn() }) }));
+const toast = jest.fn();
+jest.mock('@/components/ui/use-toast', () => ({ useToast: () => ({ toast }) }));
 jest.mock('@/lib/hooks/use-permissions', () => ({
   usePermissions: () => ({
     hasPermission: (p: string) => p === 'settings.edit' || p === 'settings.view',
@@ -64,6 +65,7 @@ describe('FlowlineConnect', () => {
     keys = ok([]);
     endpoints = ok([]);
     sendBacklog.mockReset();
+    toast.mockReset();
   });
 
   it('sends the overdue backlog only after an explicit confirmation (audit F2)', () => {
@@ -85,6 +87,17 @@ describe('FlowlineConnect', () => {
     expect(screen.getByText('step2.backlogDescription')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'step2.backlog' }));
     expect(sendBacklog).toHaveBeenCalledWith('w1', expect.any(Object));
+
+    // The API refuses an endpoint that was disabled meanwhile: its code gets en/ar copy.
+    const { onError } = sendBacklog.mock.calls[0][1] as { onError: (e: unknown) => void };
+    onError({ response: { data: { code: 'WEBHOOK_ENDPOINT_INACTIVE', message: 'Enable it' } } });
+    expect(toast).toHaveBeenLastCalledWith(
+      expect.objectContaining({ description: 'step2.backlogInactive', variant: 'destructive' }),
+    );
+    onError({ response: { data: { message: 'Webhook endpoint not found' } } });
+    expect(toast).toHaveBeenLastCalledWith(
+      expect.objectContaining({ description: 'Webhook endpoint not found' }),
+    );
   });
 
   it('has every string in English and Arabic', () => {

@@ -23,6 +23,16 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+/** The API's machine-readable error `code` (for example `WEBHOOK_ENDPOINT_INACTIVE`), if any. */
+export function getApiErrorCode(error: unknown): string | undefined {
+  if (error && typeof error === 'object') {
+    const data = (error as { response?: { data?: unknown } }).response?.data;
+    const code = data && typeof data === 'object' ? (data as { code?: unknown }).code : undefined;
+    if (typeof code === 'string' && code) return code;
+  }
+  return undefined;
+}
+
 /** HTTP status of an API (axios) error, if any. */
 export function getApiErrorStatus(error: unknown): number | undefined {
   if (error && typeof error === 'object') {

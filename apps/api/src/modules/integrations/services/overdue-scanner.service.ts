@@ -14,6 +14,10 @@ const BATCH = 200;
  * never floods it with every old debt; the settings "send backlog" action opts in to those
  * (audit F2). The dedupe key makes the scan idempotent, so it can run hourly, after restarts,
  * and concurrently with the midnight status job. Moving the due date yields a fresh notice.
+ *
+ * Before F2 the key was org-wide (`invoice.overdue:<invoice>:<due date>`, no endpoint) and the
+ * event went to every subscriber. A notice recorded under that legacy key with a delivery to this
+ * endpoint counts as sent, so the key change never re-announces a debt the endpoint already heard.
  */
 @Injectable()
 export class OverdueScannerService {
@@ -88,10 +92,13 @@ export class OverdueScannerService {
     invoiceId: string,
     dueDate: Date,
   ): Promise<boolean> {
-    const due = dueDate.toISOString().slice(0, 10);
-    const dedupeKey = `invoice.overdue:${invoiceId}:${due}:${endpointId}`;
-    const exists = await this.prisma.webhookEvent.findUnique({
-      where: { organizationId_dedupeKey: { organizationId, dedupeKey } },
+    const legacyKey = `invoice.overdue:${invoiceId}:${dueDate.toISOString().slice(0, 10)}`;
+    const dedupeKey = `${legacyKey}:${endpointId}`;
+    const exists = await this.prisma.webhookEvent.findFirst({
+      where: {
+        organizationId,
+        OR: [{ dedupeKey }, { dedupeKey: legacyKey, deliveries: { some: { endpointId } } }],
+      },
       select: { id: true },
     });
     if (exists) return false;
