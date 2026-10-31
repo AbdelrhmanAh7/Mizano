@@ -200,7 +200,7 @@ export interface BillAccountOptions {
 }
 
 /**
- * Accounts the bill form offers on each line (GET /bills/account-options, purchases.create). The
+ * Accounts the bill form offers on each line (GET /bills/account-options, purchases.create or .edit). The
  * previous vendor's list stays shown while another vendor's default loads.
  */
 export function useBillAccountOptions(vendorId?: string) {

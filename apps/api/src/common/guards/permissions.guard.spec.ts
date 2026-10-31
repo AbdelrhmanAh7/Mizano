@@ -1,6 +1,8 @@
 import { ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionsGuard } from './permissions.guard';
+import { AnyPermission, Permissions } from '../decorators/permissions.decorator';
+import { BillsController } from '../../modules/purchases/controllers/bills.controller';
 
 describe('PermissionsGuard', () => {
   let guard: PermissionsGuard;
@@ -116,5 +118,53 @@ describe('PermissionsGuard', () => {
     });
     const context = createMockContext({ roleId: 'manager-role' });
     expect(await guard.canActivate(context)).toBe(true);
+  });
+  describe('@AnyPermission (one of)', () => {
+    class Routes {
+      @AnyPermission('purchases.create', 'purchases.edit')
+      anyOf(): void {}
+
+      @Permissions('purchases.view')
+      @AnyPermission('purchases.create', 'purchases.edit')
+      allAndAny(): void {}
+    }
+    const roleWith = (actions: string[]) =>
+      mockPrisma.role.findUnique.mockResolvedValue({
+        name: 'Custom',
+        permissions: [{ module: 'purchases', actions }],
+      });
+
+    it('passes a role holding either permission and refuses one holding neither', async () => {
+      roleWith(['edit']); // edit-only: may open a draft bill for editing
+      await expect(
+        guard.canActivate(createMockContext(undefined, Routes.prototype.anyOf, Routes)),
+      ).resolves.toBe(true);
+
+      roleWith(['create']);
+      await expect(
+        guard.canActivate(createMockContext({ roleId: 'role-2' }, Routes.prototype.anyOf, Routes)),
+      ).resolves.toBe(true);
+
+      roleWith(['view', 'delete']);
+      await expect(
+        guard.canActivate(createMockContext({ roleId: 'role-3' }, Routes.prototype.anyOf, Routes)),
+      ).rejects.toThrow('Missing permission: one of purchases.create, purchases.edit');
+    });
+
+    it('still requires every @Permissions entry next to @AnyPermission', async () => {
+      roleWith(['edit']);
+      await expect(
+        guard.canActivate(createMockContext(undefined, Routes.prototype.allAndAny, Routes)),
+      ).rejects.toThrow('Missing permission: purchases.view');
+    });
+
+    it('lets edit-only roles load the bill form account options', async () => {
+      roleWith(['edit']);
+      await expect(
+        guard.canActivate(
+          createMockContext(undefined, BillsController.prototype.accountOptions, BillsController),
+        ),
+      ).resolves.toBe(true);
+    });
   });
 });

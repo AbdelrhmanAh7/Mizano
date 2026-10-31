@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
+  AnyPermission,
   CacheResponse,
   CacheTTL,
   CurrentOrg,
@@ -46,7 +47,8 @@ export class BillsController {
   ) {}
 
   @Get('account-options')
-  @Permissions('purchases.create')
+  // The bill form uses it to create (purchases.create) and to edit a draft (purchases.edit).
+  @AnyPermission('purchases.create', 'purchases.edit')
   @ApiOperation({
     summary: 'Accounts a bill line may use (active expense/asset, no control accounts)',
   })
