@@ -2,14 +2,11 @@
 
 import { useState } from 'react';
 import { format } from 'date-fns';
-import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
+import { ReportPageHeader, ReportPageSkeleton } from '@/components/reports/report-page';
 import { useBalanceSheetReport, ReportAccount } from '@/lib/hooks/use-reports';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
@@ -42,13 +39,7 @@ export default function BalanceSheetReportPage() {
   );
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-12 w-full max-w-md" />
-        <Skeleton className="h-96" />
-      </div>
-    );
+    return <ReportPageSkeleton />;
   }
 
   const assets = Array.isArray(report?.assets) ? report.assets : [];
@@ -63,18 +54,10 @@ export default function BalanceSheetReportPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/reports">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t('balanceSheet.title')}</h1>
-          <p className="text-muted-foreground">As of {format(asOfDate, 'MMMM d, yyyy')}</p>
-        </div>
-      </div>
+      <ReportPageHeader
+        title={t('balanceSheet.title')}
+        subtitle={`As of ${format(asOfDate, 'MMMM d, yyyy')}`}
+      />
 
       {/* Filters */}
       <ReportFilters

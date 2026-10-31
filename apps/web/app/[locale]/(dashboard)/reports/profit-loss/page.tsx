@@ -2,14 +2,11 @@
 
 import { useState } from 'react';
 import { format, startOfYear, endOfMonth } from 'date-fns';
-import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
+import { ReportPageHeader, ReportPageSkeleton } from '@/components/reports/report-page';
 import { useProfitLossReport, ReportAccount } from '@/lib/hooks/use-reports';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
@@ -49,13 +46,7 @@ export default function ProfitLossReportPage() {
   );
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-12 w-full max-w-md" />
-        <Skeleton className="h-96" />
-      </div>
-    );
+    return <ReportPageSkeleton />;
   }
 
   const income = Array.isArray(report?.income) ? report.income : [];
@@ -67,21 +58,15 @@ export default function ProfitLossReportPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/reports">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t('profitLoss.title')}</h1>
-          <p className="text-muted-foreground">
+      <ReportPageHeader
+        title={t('profitLoss.title')}
+        subtitle={
+          <>
             {format(dateRange.startDate, 'MMMM d, yyyy')} -{' '}
             {format(dateRange.endDate, 'MMMM d, yyyy')}
-          </p>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Filters */}
       <ReportFilters dateRange={dateRange} onDateRangeChange={setDateRange} showDateRange />

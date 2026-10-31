@@ -4,8 +4,7 @@ import { useState } from 'react';
 import { format, startOfYear, endOfMonth } from 'date-fns';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { ArrowLeft, BookOpen } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { BookOpen } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -22,8 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
 import { ReportFilters } from '@/components/reports/report-filters';
+import { ReportPageHeader, ReportPageSkeleton } from '@/components/reports/report-page';
 import { useGeneralLedgerReport } from '@/lib/hooks/use-reports';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { useAccounts } from '@/lib/hooks/use-accounts';
@@ -47,13 +46,7 @@ export default function GeneralLedgerPage() {
   const accountList = accounts?.data || accounts || [];
 
   if (isLoading && accountId) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-12 w-full max-w-md" />
-        <Skeleton className="h-96" />
-      </div>
-    );
+    return <ReportPageSkeleton />;
   }
 
   const entries = ledger?.entries || [];
@@ -62,19 +55,14 @@ export default function GeneralLedgerPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/reports">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t('generalLedger.title')}</h1>
-          <p className="text-muted-foreground">
+      <ReportPageHeader
+        title={t('generalLedger.title')}
+        subtitle={
+          <>
             {format(dateRange.startDate, 'MMMM d')} - {format(dateRange.endDate, 'MMMM d, yyyy')}
-          </p>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="flex flex-wrap gap-4 items-end">
         <div className="w-[300px]">
