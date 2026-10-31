@@ -15,6 +15,7 @@ export NEXTAUTH_URL="$web" FRONTEND_URL="$web" CORS_ORIGIN="$web"
 # a private forwarded port rejects cross-origin calls. Live updates (WebSocket) stay off.
 export API_PROXY_TARGET="http://localhost:6001" NEXT_PUBLIC_API_URL="$web/api/backend"
 export API_INTERNAL_URL="http://localhost:6001/api"
+export NEXT_PUBLIC_INTEGRATIONS_BASE_URL="$web/api/backend/integrations/v1"
 echo "Web: $web  API: $api"
 # turbo 2 filters unlisted variables in strict mode; loose mode passes the ones set above.
 exec pnpm exec turbo dev --env-mode=loose
