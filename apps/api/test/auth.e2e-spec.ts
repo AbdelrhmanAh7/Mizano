@@ -174,6 +174,9 @@ describe('Auth (e2e)', () => {
     });
   });
 
+  // A real protected route (an unknown path would answer 404 once authenticated).
+  const ME = '/organization/account-settings';
+
   describe('Sessions per device', () => {
     const login = (email: string, password = TEST_PASSWORD) =>
       anon.post('/auth/login').send({ email, password });
@@ -185,19 +188,19 @@ describe('Auth (e2e)', () => {
       const phone = second.body.tokens as { accessToken: string; refreshToken: string };
 
       // Signing in on the phone did not sign the laptop out.
-      expect((await tenant.api.get('/users/me')).status).toBe(200);
-      expect((await anon.withToken(phone.accessToken).get('/users/me')).status).toBe(200);
+      expect((await tenant.api.get(ME)).status).toBe(200);
+      expect((await anon.withToken(phone.accessToken).get(ME)).status).toBe(200);
 
       // Signing out the phone ends only the phone.
       expect((await anon.withToken(phone.accessToken).post('/auth/logout')).status).toBe(200);
-      expect((await anon.withToken(phone.accessToken).get('/users/me')).status).toBe(401);
-      expect((await tenant.api.get('/users/me')).status).toBe(200);
+      expect((await anon.withToken(phone.accessToken).get(ME)).status).toBe(401);
+      expect((await tenant.api.get(ME)).status).toBe(200);
 
       // Sign out everywhere ends the laptop too, and its refresh token.
       const third = (await login(tenant.email)).body.tokens as { accessToken: string };
       expect((await tenant.api.post('/auth/logout-all')).status).toBe(200);
-      expect((await tenant.api.get('/users/me')).status).toBe(401);
-      expect((await anon.withToken(third.accessToken).get('/users/me')).status).toBe(401);
+      expect((await tenant.api.get(ME)).status).toBe(401);
+      expect((await anon.withToken(third.accessToken).get(ME)).status).toBe(401);
       const refresh = await anon
         .withToken(tenant.refreshToken)
         .post('/auth/refresh')
@@ -239,7 +242,7 @@ describe('Auth (e2e)', () => {
         .post('/auth/reset-password')
         .send({ token, password: 'BrandNew123' });
       expect(reset.status).toBe(200);
-      expect((await tenant.api.get('/users/me')).status).toBe(401);
+      expect((await tenant.api.get(ME)).status).toBe(401);
       expect(
         (await anon.post('/auth/login').send({ email: tenant.email, password: 'BrandNew123' }))
           .status,
@@ -431,9 +434,10 @@ describe('Logger endpoints and stream (e2e)', () => {
     });
 
     it("cannot be read, updated, summarised or deleted by another organization's admin", async () => {
+      // Another organization's id answers like a missing one (404), never confirming it exists.
       const byId = await tenantB.api.get(`/logger/logs/${entryId}`);
-      expect(byId.status).toBe(200);
-      expect(byId.text).toBe('');
+      expect(byId.status).toBe(404);
+      expect(byId.text).not.toContain(entryId);
 
       const update = await tenantB.api
         .post('/logger/update-status')
