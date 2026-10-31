@@ -155,31 +155,35 @@ export class BillsService {
 
   /** Draft bills only. When lines are supplied they replace the old lines and totals. */
   async update(organizationId: string, id: string, dto: UpdateBillDto) {
-    const bill = await this.prisma.bill.findFirst({
-      where: { id, organizationId, deletedAt: null },
-    });
-    if (!bill) throw new NotFoundException('Bill not found');
-    if (bill.status !== BillStatus.DRAFT) {
-      throw new BadRequestException('Only draft bills can be updated');
-    }
-
-    await this.assertReferences(this.prisma, organizationId, dto);
-
-    const data: Prisma.BillUpdateInput = {};
-    if (dto.billNumber !== undefined) data.billNumber = dto.billNumber;
-    if (dto.date !== undefined) data.date = new Date(dto.date);
-    if (dto.dueDate !== undefined) data.dueDate = new Date(dto.dueDate);
-    if (dto.reference !== undefined) data.reference = dto.reference;
-    if (dto.currencyCode !== undefined) data.currencyCode = dto.currencyCode;
-    if (dto.notes !== undefined) data.notes = dto.notes;
-    if (dto.vendorId !== undefined) data.vendor = { connect: { id: dto.vendorId } };
-    // The web form sends `projectId: null` for "no project"; Prisma rejects `connect: { id: null }`.
-    if (dto.projectId !== undefined) {
-      data.project = dto.projectId ? { connect: { id: dto.projectId } } : { disconnect: true };
-    }
-
     try {
       return await this.prisma.$transaction(async (tx) => {
+        // Same row lock as approve(): an edit and an approval serialize, so a posted journal
+        // always matches the lines and totals of the bill that was approved.
+        await this.lockBills(tx, organizationId, [id]);
+        const bill = await tx.bill.findFirst({
+          where: { id, organizationId, deletedAt: null },
+        });
+        if (!bill) throw new NotFoundException('Bill not found');
+        if (bill.status !== BillStatus.DRAFT) {
+          throw new BadRequestException('Only draft bills can be updated');
+        }
+
+        await this.assertReferences(tx, organizationId, dto);
+
+        const data: Prisma.BillUpdateInput = {};
+        if (dto.billNumber !== undefined) data.billNumber = dto.billNumber;
+        if (dto.date !== undefined) data.date = new Date(dto.date);
+        if (dto.dueDate !== undefined) data.dueDate = new Date(dto.dueDate);
+        if (dto.reference !== undefined) data.reference = dto.reference;
+        if (dto.currencyCode !== undefined) data.currencyCode = dto.currencyCode;
+        if (dto.notes !== undefined) data.notes = dto.notes;
+        if (dto.vendorId !== undefined) data.vendor = { connect: { id: dto.vendorId } };
+        // The web form sends `projectId: null` for "no project"; Prisma rejects
+        // `connect: { id: null }`.
+        if (dto.projectId !== undefined) {
+          data.project = dto.projectId ? { connect: { id: dto.projectId } } : { disconnect: true };
+        }
+
         if (dto.lines) {
           const { lineData, totals } = this.buildLines(dto.lines);
           await tx.billLine.deleteMany({ where: { billId: id } });
@@ -356,9 +360,14 @@ export class BillsService {
    */
   async approve(organizationId: string, id: string) {
     return this.prisma.$transaction(async (tx) => {
-      // Lock first: the currency/account checks below must see the same organization settings
-      // the journal is posted under (a base-currency change takes this lock too).
+      // Lock the bill row before reading the lines and totals that get posted: a concurrent
+      // edit waits, so the journal cannot disagree with the document. Lock order is
+      // bill -> ledger everywhere (payments made, vendor credits), so no deadlock.
+      await this.lockBills(tx, organizationId, [id]);
+      // Then the ledger: the currency/account checks below must see the same organization
+      // settings the journal is posted under (a base-currency change takes this lock too).
       await lockOrganizationLedger(tx, organizationId);
+      // Read only now, under both locks.
       const bill = await tx.bill.findFirst({
         where: { id, organizationId, deletedAt: null },
         include: { lines: true },

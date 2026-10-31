@@ -420,6 +420,27 @@ describe('BillsService', () => {
       expect((prisma.bill.update.mock.calls[1]![0]!.data as any).project).toBeUndefined();
     });
 
+    it('locks the bill row in its transaction before checking the status and replacing lines', async () => {
+      prisma.bill.findFirst.mockResolvedValue(createMockBill({ status: 'DRAFT' }) as any);
+      prisma.bill.updateMany.mockResolvedValue({ count: 1 });
+      prisma.bill.update.mockResolvedValue({} as any);
+
+      await service.update(ORG_ID, 'bill-1', {
+        lines: [{ description: 'x', quantity: '1', rate: '100' }],
+      });
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      const [sql, ...params] = prisma.$queryRaw.mock.calls[0] as [
+        TemplateStringsArray,
+        ...string[],
+      ];
+      expect(sql.join('?')).toContain('FOR UPDATE');
+      expect(params).toEqual(['bill-1', ORG_ID]);
+      const lockedAt = prisma.$queryRaw.mock.invocationCallOrder[0];
+      expect(lockedAt).toBeLessThan(prisma.bill.findFirst.mock.invocationCallOrder[0]);
+      expect(lockedAt).toBeLessThan(prisma.billLine.deleteMany.mock.invocationCallOrder[0]);
+    });
+
     it('should reject a project from another organization', async () => {
       prisma.bill.findFirst.mockResolvedValue(createMockBill({ status: 'DRAFT' }) as any);
       prisma.project.findFirst.mockResolvedValue(null);
@@ -558,15 +579,52 @@ describe('BillsService', () => {
       await expect(service.approve(ORG_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
 
-    it('takes the ledger lock before reading the bill and organization settings', async () => {
+    it('locks the bill row, then the ledger, before reading the bill and organization settings', async () => {
       prisma.bill.findFirst.mockResolvedValue(null);
 
       await expect(service.approve(ORG_ID, 'bill-1')).rejects.toThrow(NotFoundException);
 
-      expect(prisma.$executeRaw).toHaveBeenCalled();
+      // Document -> ledger, like payments made and vendor credits (review lessons §1).
+      const [sql, ...params] = prisma.$queryRaw.mock.calls[0] as [
+        TemplateStringsArray,
+        ...string[],
+      ];
+      expect(sql.join('?')).toMatch(
+        /FROM "bills" WHERE id = \? AND "organizationId" = \? FOR UPDATE/,
+      );
+      expect(params).toEqual(['bill-1', ORG_ID]);
+      expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.$executeRaw.mock.invocationCallOrder[0],
+      );
       expect(prisma.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
         prisma.bill.findFirst.mock.invocationCallOrder[0],
       );
+    });
+
+    it('posts the lines and totals of an edit that committed while it waited for the bill lock', async () => {
+      // The edit holds the row; approve's lock returns once it has committed.
+      let stored = draftBill();
+      prisma.$queryRaw.mockImplementation((async () => {
+        stored = createMockBill({
+          ...draftBill(),
+          subtotal: dec('800'),
+          taxAmount: dec('112'),
+          grandTotal: dec('912'),
+          lines: [{ accountId: 'acc-2', amount: dec('800'), description: 'Edited line' }],
+        });
+        return [];
+      }) as any);
+      prisma.bill.findFirst.mockImplementation((async () => stored) as any);
+      prisma.bill.updateMany.mockResolvedValue({ count: 1 });
+      prisma.bill.findUniqueOrThrow.mockResolvedValue({ ...stored, status: 'OPEN' } as any);
+
+      await service.approve(ORG_ID, 'bill-1');
+
+      expect(journalsService.create.mock.calls[0][1].lines).toEqual([
+        expect.objectContaining({ accountId: 'acc-2', debit: '800.0000' }),
+        expect.objectContaining({ accountId: 'vat-acc-1', debit: '112.0000' }),
+        expect.objectContaining({ accountId: 'ap-acc-1', credit: '912.0000' }),
+      ]);
     });
 
     it('bulkApprove should reuse approve and report per-record failures', async () => {
