@@ -62,6 +62,13 @@ nmap -Pn -p 22,80,443,5001,6001,5432,6379 <pi-ip>
 
 Only SSH (ideally LAN-only) should answer. No container should list a published port.
 
+MCP uses `MCP_PUBLIC_URL` when set, otherwise the origin of `PUBLIC_API_URL` (Pi), then
+`NEXT_PUBLIC_API_URL` (server). Both public API settings may end in `/api`; the MCP and
+OAuth routes are at the origin. Pass the actual public API hostname, never the web hostname.
+Run `APP_ENV=prod pnpm env:check` for `.env.prod`, or
+`pnpm env:check -- deploy/pi/.env.pi` for the Pi. It validates the effective origin without
+printing addresses or secrets. With no public API setting, MCP stays off in production.
+
 ## 4. First deploy
 
 `deploy.sh` takes the commit SHA and the image digests from the CI build (#38). Repositories come from `MIZANO_API_IMAGE`/`MIZANO_WEB_IMAGE` in `.env.pi`.
@@ -71,6 +78,12 @@ deploy/pi/scripts/deploy.sh <commit-sha> sha256:<api-digest> sha256:<web-digest>
 ```
 
 It pulls by digest, runs `prisma migrate deploy` (one-shot `migrate` service; the api only starts when it succeeds), restarts, waits for healthy, and appends `OK`/`FAILED` lines to `$MIZANO_DATA_DIR/deployments.log`. On failed health it rolls back to the previous recorded digests. Migrations are never reverted, so keep them backward compatible with the previous release.
+
+The server workflow follows the same gate: `docker compose -f docker-compose.production.yml
+run --rm migrate` must succeed before restarting the API/web. A migration failure exits the
+deploy and leaves the previous application containers running. Migrations must remain backward
+compatible; a failed migration may still have changed the database and requires operator inspection.
+This repository change does not run a deployment.
 
 ## 5. Backups and restore drill
 

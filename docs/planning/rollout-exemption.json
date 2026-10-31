@@ -31,5 +31,5 @@
     "scripts/test_sync_demo_planning.py",
     "scripts/test_demo_rollout_scope.py"
   ],
-  "deployment_workflow_sha256": "d5cd354cc6d1589b763e476a1d1a5763be7efa69ed42cc990a78b11b27467f13"
+  "deployment_workflow_sha256": "e6bbd78d9c4f82212b8e8a5041e4010185450d7f711113ea829078f66dab3e7d"
 }

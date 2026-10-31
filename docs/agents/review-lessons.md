@@ -136,6 +136,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## Ops and deploy
 
+- **Migrate with the incoming image before replacing application containers.** A migration failure must stop deployment; never hide `prisma migrate deploy` behind `|| true`. Keep migrations backward compatible with the running release. _(#600)_
+
 - **Health checks must probe a route that exists.** Grep the app's routes first (Next has no `/api/health` unless a route file exists; `/robots.txt` returns 200 without auth). A probe of a missing route makes the container permanently unhealthy.
 - **Next standalone in Docker needs `HOSTNAME=0.0.0.0`.** Docker sets `HOSTNAME` to the container id and Next binds to it, so probes on `127.0.0.1` and peers fail. Probe `127.0.0.1`, not `localhost` (IPv6 in alpine).
 - **Persist deploy state where later commands read it.** Pinned digests live in `.env.pi` (atomic rewrite of those keys only), or a later `compose up` silently reverts to the old images.

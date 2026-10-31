@@ -32,7 +32,7 @@ export const MCP_REQUESTS_PER_MINUTE = 90;
 
 /**
  * Public addresses. `MCP_PUBLIC_URL` is the API's public origin (the hostname that serves
- * /mcp, /oauth/* and /.well-known/*); without it in production the AI connection is off.
+ * /mcp, /oauth/* and /.well-known/*). Otherwise use the existing public API address.
  */
 @Injectable()
 export class McpConfig {
@@ -42,6 +42,13 @@ export class McpConfig {
   get issuer(): string | null {
     const raw = this.config.get<string>('MCP_PUBLIC_URL')?.trim();
     if (raw) return normalizeOrigin(raw);
+    const apiUrl =
+      this.config.get<string>('PUBLIC_API_URL')?.trim() ||
+      this.config.get<string>('NEXT_PUBLIC_API_URL')?.trim();
+    if (apiUrl) {
+      // These settings include the REST prefix; MCP/OAuth live at the API origin.
+      return normalizeOrigin(apiUrl.replace(/\/api\/?$/, '/'));
+    }
     if (this.config.get<string>('NODE_ENV') === 'production') return null;
     const port = this.config.get<string>('API_PORT') || this.config.get<string>('PORT') || '6001';
     return `http://localhost:${port}`;
