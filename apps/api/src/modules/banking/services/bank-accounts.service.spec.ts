@@ -54,3 +54,36 @@ describe('BankAccountsService.create opening balance', () => {
     });
   });
 });
+
+describe('BankAccountsService balances', () => {
+  let prisma: MockPrismaClient;
+  let service: BankAccountsService;
+
+  beforeEach(() => {
+    prisma = createMockPrisma();
+    prisma.bankAccount.findMany.mockResolvedValue([
+      { id: 'ba-1', linkedAccountId: 'acc-1010', systemBalance: '0' },
+      { id: 'ba-2', linkedAccountId: 'acc-1000', systemBalance: '0' },
+    ] as never);
+    prisma.bankAccount.count.mockResolvedValue(2 as never);
+    prisma.bankTransaction.count.mockResolvedValue(0 as never);
+    prisma.journalLine.groupBy.mockResolvedValue([
+      { accountId: 'acc-1010', _sum: { debit: '10542.4700', credit: '0' } },
+      { accountId: 'acc-1000', _sum: { debit: '100', credit: '364.2500' } },
+    ] as never);
+    service = new BankAccountsService(prisma as unknown as PrismaService);
+  });
+
+  it('lists each bank account with its linked ledger balance, not the stale stored 0', async () => {
+    const { data } = await service.findAll(ORG);
+    expect(data.map((a) => a.systemBalance)).toEqual(['10542.4700', '-264.2500']);
+    const where = (prisma.journalLine.groupBy.mock.calls[0][0] as { where: { journal: object } })
+      .where;
+    expect(where.journal).toEqual(expect.objectContaining({ organizationId: ORG }));
+  });
+
+  it('totals the stats from the same ledger balances, exactly', async () => {
+    const stats = await service.getDashboardStats(ORG);
+    expect(stats.totalSystemBalance).toBe('10278.2200');
+  });
+});
