@@ -34,6 +34,7 @@ import {
   useInfiniteBills,
 } from '@/lib/hooks/use-bills';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
+import { useBulkConfirm } from '@/lib/hooks/use-bulk-confirm';
 import { LEDGER_QUERY_KEYS } from '@/lib/hooks/use-journals';
 import { isPositiveDecimal } from '@/lib/decimal';
 import { useExportAll } from '@/lib/hooks/use-export-all';
@@ -114,28 +115,27 @@ function BillsPageContent() {
   const canDelete = hasPermission('purchases.delete');
 
   // Bulk action state
-  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
-  const [bulkApproveOpen, setBulkApproveOpen] = useState(false);
-  const [bulkPayOpen, setBulkPayOpen] = useState(false);
-  const [bulkSelectedRows, setBulkSelectedRows] = useState<Bill[]>([]);
 
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => billsApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: LEDGER_QUERY_KEYS,
     successMessage: '{count} draft bills deleted',
   });
+  const bulkDelete = useBulkConfirm<Bill>(bulkDeleteAction, () => void refetch());
 
   const bulkApproveAction = useBulkAction({
     mutationFn: (ids) => billsApi.bulkApprove(ids).then((r) => r.data),
     queryKeys: LEDGER_QUERY_KEYS,
     successMessage: '{count} bills approved and posted',
   });
+  const bulkApprove = useBulkConfirm<Bill>(bulkApproveAction, () => void refetch());
 
   const bulkPayAction = useBulkAction({
     mutationFn: (ids) => billsApi.bulkPay(ids).then((r) => r.data),
     queryKeys: LEDGER_QUERY_KEYS,
     successMessage: '{count} bills paid (payments recorded)',
   });
+  const bulkPay = useBulkConfirm<Bill>(bulkPayAction, () => void refetch());
 
   const bulkActions = [
     ...(canEdit
@@ -143,18 +143,12 @@ function BillsPageContent() {
           {
             label: t('bills.approvePost'),
             icon: CheckCircle,
-            onClick: (rows: Bill[]) => {
-              setBulkSelectedRows(rows);
-              setBulkApproveOpen(true);
-            },
+            onClick: bulkApprove.openFor,
           },
           {
             label: 'Mark as Paid',
             icon: DollarSign,
-            onClick: (rows: Bill[]) => {
-              setBulkSelectedRows(rows);
-              setBulkPayOpen(true);
-            },
+            onClick: bulkPay.openFor,
           },
         ]
       : []),
@@ -164,10 +158,7 @@ function BillsPageContent() {
             label: 'Delete',
             icon: Trash2,
             variant: 'destructive' as const,
-            onClick: (rows: Bill[]) => {
-              setBulkSelectedRows(rows);
-              setBulkDeleteOpen(true);
-            },
+            onClick: bulkDelete.openFor,
           },
         ]
       : []),
@@ -498,50 +489,26 @@ function BillsPageContent() {
 
       {/* Bulk Action Dialogs */}
       <BulkActionConfirmDialog
-        open={bulkDeleteOpen}
-        onOpenChange={setBulkDeleteOpen}
+        {...bulkDelete.dialogProps}
         action="delete"
-        count={bulkSelectedRows.length}
         itemType="bills"
         description="Only draft bills will be deleted. Non-draft bills will be skipped."
         destructive
-        isLoading={bulkDeleteAction.isLoading}
-        onConfirm={async () => {
-          await bulkDeleteAction.execute(bulkSelectedRows.map((r) => r.id));
-          setBulkDeleteOpen(false);
-          refetch();
-        }}
       />
       <BulkActionConfirmDialog
-        open={bulkApproveOpen}
-        onOpenChange={setBulkApproveOpen}
+        {...bulkApprove.dialogProps}
         action="approve & post"
-        count={bulkSelectedRows.length}
         itemType="bills"
-        title={t('bills.bulkApprove.title', { count: bulkSelectedRows.length })}
+        title={t('bills.bulkApprove.title', { count: bulkApprove.count })}
         description={t('bills.bulkApprove.description')}
-        confirmLabel={t('bills.bulkApprove.confirm', { count: bulkSelectedRows.length })}
+        confirmLabel={t('bills.bulkApprove.confirm', { count: bulkApprove.count })}
         cancelLabel={t('bills.bulkApprove.cancel')}
-        isLoading={bulkApproveAction.isLoading}
-        onConfirm={async () => {
-          await bulkApproveAction.execute(bulkSelectedRows.map((r) => r.id));
-          setBulkApproveOpen(false);
-          refetch();
-        }}
       />
       <BulkActionConfirmDialog
-        open={bulkPayOpen}
-        onOpenChange={setBulkPayOpen}
+        {...bulkPay.dialogProps}
         action="mark as paid"
-        count={bulkSelectedRows.length}
         itemType="bills"
         description="A payment for the full remaining balance will be recorded for each bill from the default bank account and posted to the ledger."
-        isLoading={bulkPayAction.isLoading}
-        onConfirm={async () => {
-          await bulkPayAction.execute(bulkSelectedRows.map((r) => r.id));
-          setBulkPayOpen(false);
-          refetch();
-        }}
       />
 
       {/* Import Wizard */}
