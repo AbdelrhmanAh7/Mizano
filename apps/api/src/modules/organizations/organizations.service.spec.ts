@@ -72,6 +72,7 @@ const mockPrisma = {
   },
   account: {
     findMany: jest.fn(),
+    updateMany: jest.fn(),
   },
   journal: {
     count: jest.fn(),
@@ -223,6 +224,23 @@ describe('OrganizationsService', () => {
       expect(data).toMatchObject({ baseCurrency: 'EGP', currency: 'EGP' });
     });
 
+    it('moves accounts kept in the old base currency to the new one before posting', async () => {
+      mockPrisma.organization.findUnique.mockResolvedValue({ baseCurrency: 'USD' });
+      mockPrisma.journal.count.mockResolvedValue(0);
+      mockPrisma.organization.update.mockResolvedValue({
+        id: ORG_ID,
+        name: 'X',
+        updatedAt: new Date(),
+      });
+
+      await service.updateGeneralSettings(ORG_ID, { name: 'X', baseCurrency: 'EGP' });
+
+      expect(mockPrisma.account.updateMany).toHaveBeenCalledWith({
+        where: { organizationId: ORG_ID, currency: 'USD' },
+        data: { currency: 'EGP' },
+      });
+    });
+
     it('rejects a base-currency change once journals are posted', async () => {
       mockPrisma.organization.findUnique.mockResolvedValue({ baseCurrency: 'USD' });
       mockPrisma.journal.count.mockResolvedValue(3);
@@ -235,6 +253,7 @@ describe('OrganizationsService', () => {
       });
       expect(mockPrisma.$executeRaw).toHaveBeenCalled(); // ledger lock taken before the check
       expect(mockPrisma.organization.update).not.toHaveBeenCalled();
+      expect(mockPrisma.account.updateMany).not.toHaveBeenCalled();
     });
 
     it('allows re-saving the same base currency after posting', async () => {

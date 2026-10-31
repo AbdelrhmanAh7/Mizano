@@ -200,6 +200,8 @@ export const authApi = {
     firstName: string;
     lastName: string;
     organizationName: string;
+    /** EG, SA or AE: sets the organization's base currency and prepares its accounts. */
+    country?: string;
   }) => publicApi.post('/auth/register', data),
   // The refresh route authenticates the refresh token as a bearer token.
   refreshToken: (refreshToken: string) =>

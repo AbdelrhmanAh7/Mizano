@@ -8,9 +8,11 @@ import { AuthSessionsService } from './auth-sessions.service';
 import { PasswordResetService } from './password-reset.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
+import { AccountingModule } from '../accounting/accounting.module';
 
 @Module({
   imports: [
+    AccountingModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

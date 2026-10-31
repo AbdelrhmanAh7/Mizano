@@ -72,6 +72,16 @@ describe('RegisterPage', () => {
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'accountCreated' }));
   });
 
+  it('starts the organization in Egypt unless another country is chosen', async () => {
+    mockRegister.mockResolvedValue({});
+    render(<RegisterPage />);
+    expect(screen.getByRole('combobox')).toHaveTextContent('Egypt (Egyptian Pound)');
+    fill('Password1');
+    await waitFor(() =>
+      expect(mockRegister).toHaveBeenCalledWith(expect.objectContaining({ country: 'EG' })),
+    );
+  });
+
   it('shows the translated duplicate-email message for a 409', async () => {
     mockRegister.mockRejectedValue({
       response: { status: 409, data: { message: 'Email already registered' } },

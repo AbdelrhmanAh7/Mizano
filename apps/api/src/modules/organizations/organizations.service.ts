@@ -248,9 +248,9 @@ export class OrganizationsService {
   }
 
   async updateGeneralSettings(id: string, dto: GeneralSettingsDto) {
-    // Guard and update commit together under the ledger lock (see assertBaseCurrencyChangeAllowed).
+    // Guard and update commit together under the ledger lock (see prepareBaseCurrencyChange).
     return this.prisma.$transaction(async (tx) => {
-      await this.assertBaseCurrencyChangeAllowed(tx, id, dto.baseCurrency);
+      await this.prepareBaseCurrencyChange(tx, id, dto.baseCurrency);
       return tx.organization.update({
         where: { id },
         data: {
@@ -273,9 +273,10 @@ export class OrganizationsService {
 
   /**
    * The ledger stores amounts in the base currency without conversion, so the base currency is
-   * frozen once anything is posted; changing it would relabel every historical amount.
+   * frozen once anything is posted; changing it would relabel every historical amount. Before
+   * that, accounts kept in the old base currency (the seeded chart) move to the new one.
    */
-  private async assertBaseCurrencyChangeAllowed(
+  private async prepareBaseCurrencyChange(
     tx: Prisma.TransactionClient,
     organizationId: string,
     baseCurrency: string | undefined,
@@ -296,6 +297,10 @@ export class OrganizationsService {
         'The base currency cannot be changed after journals have been posted',
       );
     }
+    await tx.account.updateMany({
+      where: { organizationId, currency: org.baseCurrency },
+      data: { currency: baseCurrency },
+    });
   }
 
   async updateFinancialSettings(id: string, dto: FinancialSettingsDto) {
@@ -475,9 +480,9 @@ export class OrganizationsService {
   }
 
   async completeCompanyInfoStep(orgId: string, dto: CompanyInfoStepDto) {
-    // Guard and update commit together under the ledger lock (see assertBaseCurrencyChangeAllowed).
+    // Guard and update commit together under the ledger lock (see prepareBaseCurrencyChange).
     await this.prisma.$transaction(async (tx) => {
-      await this.assertBaseCurrencyChangeAllowed(tx, orgId, dto.baseCurrency);
+      await this.prepareBaseCurrencyChange(tx, orgId, dto.baseCurrency);
       await tx.organization.update({
         where: { id: orgId },
         data: {

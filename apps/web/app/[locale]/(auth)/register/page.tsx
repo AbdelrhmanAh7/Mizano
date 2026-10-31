@@ -1,20 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { authApi } from '@/lib/api';
 import { LanguageSwitcher } from '@/components/layout/language-switcher';
 import { passwordRule, passwordSchema } from '@/lib/password-policy';
+
+/** Countries a new organization can start in, with the base currency each one sets. */
+const COUNTRIES = [
+  { code: 'EG', currency: 'EGP' },
+  { code: 'SA', currency: 'SAR' },
+  { code: 'AE', currency: 'AED' },
+] as const;
 
 const registerSchema = z
   .object({
@@ -24,6 +38,7 @@ const registerSchema = z
     password: passwordSchema,
     confirmPassword: z.string(),
     organizationName: z.string().min(2),
+    country: z.enum(['EG', 'SA', 'AE']),
   })
   .refine((data) => data.password === data.confirmPassword, {
     path: ['confirmPassword'],
@@ -39,13 +54,24 @@ export default function RegisterPage() {
   const tValidation = useTranslations('validation');
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  // Country and currency names in the screen's language, from the browser's own data.
+  const countryOptions = useMemo(() => {
+    const regions = new Intl.DisplayNames([locale], { type: 'region' });
+    const currencies = new Intl.DisplayNames([locale], { type: 'currency' });
+    return COUNTRIES.map(({ code, currency }) => ({
+      code,
+      label: `${regions.of(code) ?? code} (${currencies.of(currency) ?? currency})`,
+    }));
+  }, [locale]);
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
   } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
+    defaultValues: { country: 'EG' },
   });
 
   const onSubmit = async (data: RegisterForm) => {
@@ -57,6 +83,7 @@ export default function RegisterPage() {
         email: data.email,
         password: data.password,
         organizationName: data.organizationName,
+        country: data.country,
       });
 
       toast({
@@ -124,6 +151,30 @@ export default function RegisterPage() {
               {errors.organizationName && (
                 <p className="text-sm text-red-500">{tValidation('organizationMin')}</p>
               )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="country">{t('country')}</Label>
+              <Controller
+                control={control}
+                name="country"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger id="country" aria-describedby="country-hint">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {countryOptions.map((option) => (
+                        <SelectItem key={option.code} value={option.code}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <p id="country-hint" className="text-xs text-muted-foreground">
+                {t('countryHint')}
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">{t('email')}</Label>
