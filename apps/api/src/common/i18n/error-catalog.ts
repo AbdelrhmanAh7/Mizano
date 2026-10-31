@@ -2148,6 +2148,32 @@ const INTAKE_SETTINGS_ERRORS: ErrorCatalogEntry[] = [
   },
 ];
 
+/** Connecting the owner's AI app (MCP connection and its consent screen). */
+const AI_APP_CONNECTION_ERRORS: ErrorCatalogEntry[] = [
+  {
+    code: 'AI_APP_CONNECTION_NOT_CONFIGURED',
+    en: 'MCP is not configured',
+    ar: 'ربط تطبيقات الذكاء الاصطناعي غير مفعّل على هذا الخادم.',
+  },
+  {
+    code: 'AI_APP_REQUEST_NOT_FOUND',
+    en: 'This connection request was not found or was already answered',
+    ar: 'طلب الربط هذا غير موجود أو تم الرد عليه من قبل.',
+  },
+  {
+    code: 'AI_APP_REQUEST_EXPIRED',
+    en: 'This connection request expired',
+    ar: 'انتهت صلاحية طلب الربط هذا.',
+  },
+  { code: 'AI_APP_REQUEST_MISSING', en: 'Request not found', ar: 'الطلب غير موجود.' },
+  { code: 'AI_APP_CONNECTION_NOT_FOUND', en: 'Connection not found', ar: 'الربط غير موجود.' },
+  {
+    code: 'AI_APP_DISCONNECT_FORBIDDEN',
+    en: 'Only its owner or a settings manager can disconnect this app',
+    ar: 'لا يمكن إلغاء ربط هذا التطبيق إلا لصاحبه أو لمن يدير الإعدادات.',
+  },
+];
+
 /** Import, export and the external integration connector. */
 const IMPORT_INTEGRATION_ERRORS: ErrorCatalogEntry[] = [
   { code: 'ENTITY_TYPE_REQUIRED', en: 'Entity type is required', ar: 'يجب تحديد نوع البيانات.' },
@@ -2353,6 +2379,7 @@ export const ERROR_CATALOG: readonly ErrorCatalogEntry[] = [
   ...TAX_ERRORS,
   ...INTAKE_SETTINGS_ERRORS,
   ...IMPORT_INTEGRATION_ERRORS,
+  ...AI_APP_CONNECTION_ERRORS,
 ];
 
 /**
