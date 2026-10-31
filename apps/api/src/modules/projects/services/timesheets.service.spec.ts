@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { TimesheetsService } from './timesheets.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
@@ -47,7 +47,7 @@ describe('TimesheetsService.update: hours input', () => {
   });
 
   it('sets hours to 0 when 0 is supplied', async () => {
-    await service.update(ORG, 't1', { hours: 0 });
+    await service.update(ORG, 't1', { hours: '0' });
     const { data } = prisma.timesheetEntry.update.mock.calls[0][0] as unknown as {
       data: { hours: { toString(): string } };
     };
@@ -57,5 +57,66 @@ describe('TimesheetsService.update: hours input', () => {
   it('rejects non-numeric hours with 400', async () => {
     await expect(service.update(ORG, 't1', { hours: 'x' })).rejects.toThrow(BadRequestException);
     expect(prisma.timesheetEntry.update).not.toHaveBeenCalled();
+  });
+
+  it('keeps duration in step with hours', async () => {
+    await service.update(ORG, 't1', { hours: '3.25' });
+    const { data } = prisma.timesheetEntry.update.mock.calls[0][0] as unknown as {
+      data: { hours: { toString(): string }; duration: { toString(): string } };
+    };
+    expect(data.hours.toString()).toBe('3.25');
+    expect(data.duration.toString()).toBe('3.25');
+  });
+});
+
+describe('TimesheetsService: project and task belong to the organization', () => {
+  const ORG = 'org-1';
+  let prisma: MockPrismaClient;
+  let service: TimesheetsService;
+
+  beforeEach(() => {
+    prisma = createMockPrisma();
+    service = new TimesheetsService(prisma as unknown as PrismaService);
+  });
+
+  it('create refuses a project of another organization or a deleted one', async () => {
+    prisma.project.findFirst.mockResolvedValue(null);
+    await expect(
+      service.create(ORG, 'u1', { projectId: 'p-x', date: '2026-03-01', hours: '1' }),
+    ).rejects.toThrow(NotFoundException);
+    expect(prisma.project.findFirst.mock.calls[0][0]!.where).toEqual({
+      id: 'p-x',
+      organizationId: ORG,
+      deletedAt: null,
+    });
+    expect(prisma.timesheetEntry.create).not.toHaveBeenCalled();
+  });
+
+  it('start timer now checks the project and the task (it linked any id before)', async () => {
+    prisma.timesheetEntry.findFirst.mockResolvedValue(null);
+    prisma.project.findFirst.mockResolvedValue(null);
+    await expect(service.startTimer(ORG, 'u1', { projectId: 'p-x' })).rejects.toThrow(
+      'Project not found',
+    );
+
+    prisma.project.findFirst.mockResolvedValue({ id: 'p1' } as never);
+    prisma.task.findFirst.mockResolvedValue(null);
+    await expect(service.startTimer(ORG, 'u1', { projectId: 'p1', taskId: 't-x' })).rejects.toThrow(
+      'Task not found',
+    );
+    expect(prisma.task.findFirst.mock.calls[0][0]!.where).toEqual({
+      id: 't-x',
+      projectId: 'p1',
+      organizationId: ORG,
+      deletedAt: null,
+    });
+    expect(prisma.timesheetEntry.create).not.toHaveBeenCalled();
+  });
+
+  it('list ignores an unknown sort column instead of failing in Prisma', async () => {
+    prisma.timesheetEntry.findMany.mockResolvedValue([]);
+    prisma.timesheetEntry.count.mockResolvedValue(0);
+    await service.findAll(ORG, { sortBy: 'user.passwordHash' });
+    expect(prisma.timesheetEntry.findMany.mock.calls[0][0]!.orderBy).toEqual({ date: 'desc' });
   });
 });

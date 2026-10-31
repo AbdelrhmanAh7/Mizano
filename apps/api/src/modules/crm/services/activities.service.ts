@@ -1,22 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ActivityType, Prisma } from '@prisma/client';
-
-export interface CreateActivityDto {
-  type: ActivityType;
-  description: string;
-  leadId?: string;
-  dealId?: string;
-  date?: string;
-}
-
-export interface ActivityQueryDto {
-  leadId?: string;
-  dealId?: string;
-  type?: ActivityType;
-  limit?: number;
-  offset?: number;
-}
+import { ActivityQueryDto, CreateActivityDto, LogActivityDto } from '../dto/activity.dto';
+import { crmPage } from '../dto/crm-list-query.dto';
+import { assertLeadInOrg } from './crm-references';
 
 @Injectable()
 export class ActivitiesService {
@@ -25,16 +12,11 @@ export class ActivitiesService {
   async create(organizationId: string, dto: CreateActivityDto, userId: string) {
     // Validate that either leadId or dealId is provided
     if (!dto.leadId && !dto.dealId) {
-      throw new NotFoundException('Either leadId or dealId must be provided');
+      throw new BadRequestException('Either leadId or dealId must be provided');
     }
 
     // Verify lead exists if provided
-    if (dto.leadId) {
-      const lead = await this.prisma.lead.findFirst({
-        where: { id: dto.leadId, organizationId, deletedAt: null },
-      });
-      if (!lead) throw new NotFoundException('Lead not found');
-    }
+    if (dto.leadId) await assertLeadInOrg(this.prisma, organizationId, dto.leadId);
 
     // Verify deal exists if provided
     if (dto.dealId) {
@@ -78,8 +60,7 @@ export class ActivitiesService {
           deal: { select: { id: true, dealName: true } },
         },
         orderBy: { date: 'desc' },
-        take: query.limit || 50,
-        skip: query.offset || 0,
+        ...crmPage(query),
       }),
       this.prisma.activityLog.count({ where }),
     ]);
@@ -155,100 +136,38 @@ export class ActivitiesService {
     };
   }
 
-  async logCall(
-    organizationId: string,
-    userId: string,
-    params: {
-      leadId?: string;
-      dealId?: string;
-      description: string;
-    },
-  ) {
+  /** Quick logging: the route fixes the type, the body carries only the shared fields. */
+  private log(organizationId: string, userId: string, type: ActivityType, params: LogActivityDto) {
     return this.create(
       organizationId,
       {
-        type: 'CALL',
-        ...params,
+        type,
+        leadId: params.leadId,
+        dealId: params.dealId,
+        description: params.description,
+        date: params.date,
       },
       userId,
     );
   }
 
-  async logEmail(
-    organizationId: string,
-    userId: string,
-    params: {
-      leadId?: string;
-      dealId?: string;
-      description: string;
-    },
-  ) {
-    return this.create(
-      organizationId,
-      {
-        type: 'EMAIL',
-        ...params,
-      },
-      userId,
-    );
+  async logCall(organizationId: string, userId: string, params: LogActivityDto) {
+    return this.log(organizationId, userId, ActivityType.CALL, params);
   }
 
-  async logMeeting(
-    organizationId: string,
-    userId: string,
-    params: {
-      leadId?: string;
-      dealId?: string;
-      description: string;
-      date?: string;
-    },
-  ) {
-    return this.create(
-      organizationId,
-      {
-        type: 'MEETING',
-        ...params,
-      },
-      userId,
-    );
+  async logEmail(organizationId: string, userId: string, params: LogActivityDto) {
+    return this.log(organizationId, userId, ActivityType.EMAIL, params);
   }
 
-  async logNote(
-    organizationId: string,
-    userId: string,
-    params: {
-      leadId?: string;
-      dealId?: string;
-      description: string;
-    },
-  ) {
-    return this.create(
-      organizationId,
-      {
-        type: 'NOTE',
-        ...params,
-      },
-      userId,
-    );
+  async logMeeting(organizationId: string, userId: string, params: LogActivityDto) {
+    return this.log(organizationId, userId, ActivityType.MEETING, params);
   }
 
-  async logTask(
-    organizationId: string,
-    userId: string,
-    params: {
-      leadId?: string;
-      dealId?: string;
-      description: string;
-      date?: string;
-    },
-  ) {
-    return this.create(
-      organizationId,
-      {
-        type: 'TASK',
-        ...params,
-      },
-      userId,
-    );
+  async logNote(organizationId: string, userId: string, params: LogActivityDto) {
+    return this.log(organizationId, userId, ActivityType.NOTE, params);
+  }
+
+  async logTask(organizationId: string, userId: string, params: LogActivityDto) {
+    return this.log(organizationId, userId, ActivityType.TASK, params);
   }
 }

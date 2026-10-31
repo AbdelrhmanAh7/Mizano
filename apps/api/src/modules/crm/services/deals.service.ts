@@ -4,17 +4,9 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateDealDto, UpdateDealDto } from '../dto/deal.dto';
-
-export interface DealQueryDto {
-  stage?: DealStage;
-  assignedToId?: string;
-  customerId?: string;
-  leadId?: string;
-  search?: string;
-  limit?: number;
-  offset?: number;
-}
+import { crmPage } from '../dto/crm-list-query.dto';
+import { CreateDealDto, DealQueryDto, MarkDealWonDto, UpdateDealDto } from '../dto/deal.dto';
+import { assertCustomerInOrg, assertLeadInOrg, assertUserInOrg } from './crm-references';
 
 @Injectable()
 export class DealsService {
@@ -30,14 +22,25 @@ export class DealsService {
     [DealStage.LOST]: 0,
   };
 
+  /** The customer, lead and assignee a deal body links to must all be the tenant's own. */
+  private async assertReferencesInOrg(
+    organizationId: string,
+    dto: Pick<UpdateDealDto, 'customerId' | 'leadId' | 'assignedToId'>,
+  ): Promise<void> {
+    if (dto.customerId) await assertCustomerInOrg(this.prisma, organizationId, dto.customerId);
+    if (dto.leadId) await assertLeadInOrg(this.prisma, organizationId, dto.leadId);
+    if (dto.assignedToId) await assertUserInOrg(this.prisma, organizationId, dto.assignedToId);
+  }
+
   async create(organizationId: string, dto: CreateDealDto, userId: string) {
+    await this.assertReferencesInOrg(organizationId, dto);
     const stage = dto.stage || DealStage.NEW;
     const probability = dto.probability ?? this.stageProbability[stage];
 
     return this.prisma.deal.create({
       data: {
         dealName: dto.dealName,
-        expectedAmount: new Decimal(dto.expectedAmount || 0),
+        expectedAmount: new Decimal(dto.expectedAmount),
         probability,
         stage,
         expectedCloseDate: dto.expectedCloseDate ? new Date(dto.expectedCloseDate) : null,
@@ -77,14 +80,22 @@ export class DealsService {
           _count: { select: { activities: true } },
         },
         orderBy: { createdAt: 'desc' },
-        take: query.limit || 50,
-        skip: query.offset || 0,
+        ...crmPage(query),
       }),
       this.prisma.deal.count({ where }),
     ]);
 
     return { data, total };
   }
+
+  private static readonly CURSOR_SORT_FIELDS = [
+    'createdAt',
+    'updatedAt',
+    'dealName',
+    'expectedAmount',
+    'probability',
+    'expectedCloseDate',
+  ];
 
   async findAllCursor(organizationId: string, query: CursorPaginationDto) {
     const where: Record<string, unknown> = { organizationId, deletedAt: null };
@@ -93,7 +104,10 @@ export class DealsService {
       where.OR = [{ dealName: { contains: query.search, mode: 'insensitive' } }];
     }
 
-    const orderBy = { [query.sortBy || 'createdAt']: query.sortOrder || 'desc' };
+    const sortBy = DealsService.CURSOR_SORT_FIELDS.includes(query.sortBy ?? '')
+      ? query.sortBy!
+      : 'createdAt';
+    const orderBy = { [sortBy]: query.sortOrder || 'desc' };
 
     return cursorPaginate(this.prisma.deal, where, orderBy, {
       cursor: query.cursor,
@@ -128,24 +142,31 @@ export class DealsService {
 
   async update(organizationId: string, id: string, dto: UpdateDealDto) {
     const deal = await this.findOne(organizationId, id);
+    await this.assertReferencesInOrg(organizationId, dto);
 
+    // Explicit fields only. Required columns ignore `null`; a `null` link disconnects it.
     const data: Prisma.DealUpdateInput = {};
 
-    if (dto.dealName !== undefined) data.dealName = dto.dealName;
-    if (dto.expectedAmount !== undefined) data.expectedAmount = new Decimal(dto.expectedAmount);
-    if (dto.probability !== undefined) data.probability = dto.probability;
+    if (dto.dealName != null) data.dealName = dto.dealName;
+    if (dto.expectedAmount != null) data.expectedAmount = new Decimal(dto.expectedAmount);
+    if (dto.probability != null) data.probability = dto.probability;
     if (dto.expectedCloseDate !== undefined)
-      data.expectedCloseDate = new Date(dto.expectedCloseDate);
-    if (dto.customerId !== undefined) data.customer = { connect: { id: dto.customerId } };
-    if (dto.leadId !== undefined) data.lead = { connect: { id: dto.leadId } };
-    if (dto.assignedToId !== undefined) data.assignedTo = { connect: { id: dto.assignedToId } };
+      data.expectedCloseDate = dto.expectedCloseDate ? new Date(dto.expectedCloseDate) : null;
+    if (dto.customerId !== undefined)
+      data.customer = dto.customerId ? { connect: { id: dto.customerId } } : { disconnect: true };
+    if (dto.leadId !== undefined)
+      data.lead = dto.leadId ? { connect: { id: dto.leadId } } : { disconnect: true };
+    if (dto.assignedToId !== undefined)
+      data.assignedTo = dto.assignedToId
+        ? { connect: { id: dto.assignedToId } }
+        : { disconnect: true };
 
     // Track stage changes
     if (dto.stage && dto.stage !== deal.stage) {
       data.stage = dto.stage;
 
       // Update probability based on stage if not explicitly provided
-      if (dto.probability === undefined) {
+      if (dto.probability == null) {
         data.probability = this.stageProbability[dto.stage];
       }
 
@@ -179,7 +200,7 @@ export class DealsService {
     return { message: 'Deal deleted' };
   }
 
-  async markWon(organizationId: string, id: string, options?: { createQuote?: boolean }) {
+  async markWon(organizationId: string, id: string, options?: MarkDealWonDto) {
     const deal = await this.findOne(organizationId, id);
 
     if (deal.stage === DealStage.WON) {
@@ -480,6 +501,7 @@ export class DealsService {
 
   async assignDeal(organizationId: string, id: string, assignedToId: string) {
     await this.findOne(organizationId, id);
+    await assertUserInOrg(this.prisma, organizationId, assignedToId);
 
     return this.prisma.deal.update({
       where: { id },

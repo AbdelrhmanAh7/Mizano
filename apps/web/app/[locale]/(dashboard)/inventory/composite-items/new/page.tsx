@@ -2,7 +2,7 @@
 
 import { CompositeItemForm } from '@/components/inventory/composite-item-form';
 import { Button } from '@/components/ui/button';
-import { useCreateCompositeItem } from '@/lib/hooks/use-composite-items';
+import { CreateCompositeItemData, useCreateCompositeItem } from '@/lib/hooks/use-composite-items';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -12,13 +12,7 @@ function NewCompositeItemContent() {
   const router = useRouter();
   const createCompositeItem = useCreateCompositeItem();
 
-  const handleSubmit = async (data: {
-    name: string;
-    sku: string;
-    sellingPrice: string;
-    description: string;
-    components: Array<{ itemId: string; quantity: string }>;
-  }) => {
+  const handleSubmit = async (data: CreateCompositeItemData) => {
     await createCompositeItem.mutateAsync(data);
     router.push('/inventory/composite-items');
   };

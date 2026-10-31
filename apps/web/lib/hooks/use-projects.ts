@@ -80,6 +80,7 @@ export interface ProjectFilters {
   customerId?: string;
 }
 
+/** The filters GET /timesheets accepts; any other query parameter is refused with a 400. */
 export interface TimesheetFilters {
   page?: number;
   limit?: number;
@@ -87,10 +88,20 @@ export interface TimesheetFilters {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   projectId?: string;
-  employeeId?: string;
+  userId?: string;
   status?: 'UNBILLED' | 'INVOICED';
-  dateFrom?: string;
-  dateTo?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+/** POST /timesheets: hours travel as a decimal string ("1.50"). */
+export interface CreateTimesheetPayload {
+  projectId: string;
+  taskId?: string;
+  date: string;
+  hours: string;
+  description?: string;
+  isBillable?: boolean;
 }
 
 // Error type for API responses
@@ -119,8 +130,9 @@ const tasksApi = {
 
 const timesheetsApi = {
   getAll: (params?: TimesheetFilters) => api.get('/timesheets', { params }),
-  create: (data: Record<string, unknown>) => api.post('/timesheets', data),
-  update: (id: string, data: Record<string, unknown>) => api.put(`/timesheets/${id}`, data),
+  create: (data: CreateTimesheetPayload) => api.post('/timesheets', data),
+  update: (id: string, data: Partial<Omit<CreateTimesheetPayload, 'projectId' | 'taskId'>>) =>
+    api.put(`/timesheets/${id}`, data),
   delete: (id: string) => api.delete(`/timesheets/${id}`),
   startTimer: (data: { projectId: string; taskId?: string; description?: string }) =>
     api.post('/timesheets/timer/start', data),

@@ -18,19 +18,28 @@ import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { ActivityQueryDto, CreateActivityDto, LogActivityDto } from '../dto/activity.dto';
+import { CrmLimitQueryDto } from '../dto/crm-list-query.dto';
 import {
-  ActivitiesService,
-  ActivityQueryDto,
-  CreateActivityDto,
-} from '../services/activities.service';
-import { CreateDealDto, UpdateDealDto, UpdateDealStageDto } from '../dto/deal.dto';
-import { DealQueryDto, DealsService } from '../services/deals.service';
+  CreateDealDto,
+  DealQueryDto,
+  MarkDealLostDto,
+  MarkDealWonDto,
+  UpdateDealDto,
+  UpdateDealStageDto,
+} from '../dto/deal.dto';
 import {
+  AssignCrmRecordDto,
+  BulkAssignLeadsDto,
+  ConvertLeadDto,
   CreateLeadDto,
+  LeadCursorQueryDto,
   LeadQueryDto,
-  LeadsService,
   UpdateLeadDto,
-} from '../services/leads.service';
+} from '../dto/lead.dto';
+import { ActivitiesService } from '../services/activities.service';
+import { DealsService } from '../services/deals.service';
+import { LeadsService } from '../services/leads.service';
 
 @ApiTags('CRM')
 @ApiBearerAuth()
@@ -66,7 +75,7 @@ export class CrmController {
   @Get('leads/cursor')
   @Permissions('crm.view')
   @ApiOperation({ summary: 'Get leads with cursor-based pagination' })
-  findAllLeadsCursor(@CurrentOrg() orgId: string, @Query() query: CursorPaginationDto) {
+  findAllLeadsCursor(@CurrentOrg() orgId: string, @Query() query: LeadCursorQueryDto) {
     return this.leadsService.findAllCursor(orgId, query);
   }
 
@@ -110,7 +119,7 @@ export class CrmController {
   convertLead(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
-    @Body() options?: { createDeal?: boolean; dealValue?: number },
+    @Body() options: ConvertLeadDto,
   ) {
     return this.leadsService.convertToCustomer(orgId, id, options);
   }
@@ -123,7 +132,7 @@ export class CrmController {
   assignLead(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
-    @Body() dto: { assignedToId: string },
+    @Body() dto: AssignCrmRecordDto,
   ) {
     return this.leadsService.assignLead(orgId, id, dto.assignedToId);
   }
@@ -132,10 +141,7 @@ export class CrmController {
   @Permissions('crm.edit')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Bulk assign leads to user' })
-  bulkAssignLeads(
-    @CurrentOrg() orgId: string,
-    @Body() dto: { leadIds: string[]; assignedToId: string },
-  ) {
+  bulkAssignLeads(@CurrentOrg() orgId: string, @Body() dto: BulkAssignLeadsDto) {
     return this.leadsService.bulkAssign(orgId, dto.leadIds, dto.assignedToId);
   }
 
@@ -146,9 +152,9 @@ export class CrmController {
   getLeadActivities(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
-    @Query('limit') limit?: number,
+    @Query() query: CrmLimitQueryDto,
   ) {
-    return this.activitiesService.findAll(orgId, { leadId: id, limit: limit ? Number(limit) : 50 });
+    return this.activitiesService.findAll(orgId, { leadId: id, limit: query.limit ?? 50 });
   }
 
   // ============ Deals ============
@@ -238,7 +244,7 @@ export class CrmController {
   markDealWon(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
-    @Body() options?: { createQuote?: boolean },
+    @Body() options: MarkDealWonDto,
   ) {
     return this.dealsService.markWon(orgId, id, options);
   }
@@ -248,12 +254,8 @@ export class CrmController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Mark deal as lost' })
   @ApiParam({ name: 'id', description: 'Deal ID' })
-  markDealLost(
-    @CurrentOrg() orgId: string,
-    @Param('id') id: string,
-    @Body() dto?: { reason?: string },
-  ) {
-    return this.dealsService.markLost(orgId, id, dto?.reason);
+  markDealLost(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: MarkDealLostDto) {
+    return this.dealsService.markLost(orgId, id, dto.reason);
   }
 
   @Post('deals/:id/assign')
@@ -264,7 +266,7 @@ export class CrmController {
   assignDeal(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
-    @Body() dto: { assignedToId: string },
+    @Body() dto: AssignCrmRecordDto,
   ) {
     return this.dealsService.assignDeal(orgId, id, dto.assignedToId);
   }
@@ -276,9 +278,9 @@ export class CrmController {
   getDealActivities(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
-    @Query('limit') limit?: number,
+    @Query() query: CrmLimitQueryDto,
   ) {
-    return this.activitiesService.findAll(orgId, { dealId: id, limit: limit ? Number(limit) : 50 });
+    return this.activitiesService.findAll(orgId, { dealId: id, limit: query.limit ?? 50 });
   }
 
   @Delete('deals/:id')
@@ -313,8 +315,8 @@ export class CrmController {
   @Get('activities/recent')
   @Permissions('crm.view')
   @ApiOperation({ summary: 'Get recent activities' })
-  getRecentActivities(@CurrentOrg() orgId: string, @Query('limit') limit?: number) {
-    return this.activitiesService.getRecentActivities(orgId, limit);
+  getRecentActivities(@CurrentOrg() orgId: string, @Query() query: CrmLimitQueryDto) {
+    return this.activitiesService.getRecentActivities(orgId, query.limit);
   }
 
   @Get('activities/stats')
@@ -349,7 +351,7 @@ export class CrmController {
   logCall(
     @CurrentOrg() orgId: string,
     @CurrentUser() user: { id: string },
-    @Body() dto: { leadId?: string; dealId?: string; description: string },
+    @Body() dto: LogActivityDto,
   ) {
     return this.activitiesService.logCall(orgId, user.id, dto);
   }
@@ -361,7 +363,7 @@ export class CrmController {
   logEmail(
     @CurrentOrg() orgId: string,
     @CurrentUser() user: { id: string },
-    @Body() dto: { leadId?: string; dealId?: string; description: string },
+    @Body() dto: LogActivityDto,
   ) {
     return this.activitiesService.logEmail(orgId, user.id, dto);
   }
@@ -373,7 +375,7 @@ export class CrmController {
   logMeeting(
     @CurrentOrg() orgId: string,
     @CurrentUser() user: { id: string },
-    @Body() dto: { leadId?: string; dealId?: string; description: string; date?: string },
+    @Body() dto: LogActivityDto,
   ) {
     return this.activitiesService.logMeeting(orgId, user.id, dto);
   }
@@ -385,7 +387,7 @@ export class CrmController {
   logNote(
     @CurrentOrg() orgId: string,
     @CurrentUser() user: { id: string },
-    @Body() dto: { leadId?: string; dealId?: string; description: string },
+    @Body() dto: LogActivityDto,
   ) {
     return this.activitiesService.logNote(orgId, user.id, dto);
   }

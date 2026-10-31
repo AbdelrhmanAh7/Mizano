@@ -11,7 +11,8 @@ type ApiError = { response?: { data?: { message?: string } } };
 export interface CompositeItemComponent {
   id: string;
   itemId: string;
-  quantity: string;
+  /** Whole units (the column is an integer). */
+  quantity: number;
   item?: {
     id: string;
     name: string;
@@ -32,12 +33,13 @@ export interface CompositeItem {
   components: CompositeItemComponent[];
 }
 
-interface CreateCompositeItemData {
+/** POST/PATCH /composite-items: price as a decimal string, component quantities as whole units. */
+export interface CreateCompositeItemData {
   name: string;
   sku: string;
   sellingPrice: string;
   description?: string;
-  components: Array<{ itemId: string; quantity: string }>;
+  components: Array<{ itemId: string; quantity: number }>;
 }
 
 interface UpdateCompositeItemData extends Partial<CreateCompositeItemData> {}

@@ -3,41 +3,40 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import { DecimalUtils } from '../../../common/utils/decimal';
-
-export interface CreateTimesheetDto {
-  projectId: string;
-  taskId?: string;
-  date: string;
-  hours: string | number;
-  description?: string;
-  isBillable?: boolean;
-}
-
-export interface UpdateTimesheetDto {
-  hours?: string | number;
-  date?: string;
-  description?: string;
-  isBillable?: boolean;
-}
+import {
+  CreateTimesheetDto,
+  StartTimerDto,
+  TimesheetQueryDto,
+  UpdateTimesheetDto,
+} from '../dto/timesheet.dto';
 
 @Injectable()
 export class TimesheetsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, userId: string, dto: CreateTimesheetDto) {
-    // Verify project
+  /** The project (and task, if any) of an entry must be live rows of the caller's organization. */
+  private async assertProjectAndTask(
+    organizationId: string,
+    projectId: string,
+    taskId?: string,
+  ): Promise<void> {
     const project = await this.prisma.project.findFirst({
-      where: { id: dto.projectId, organizationId },
+      where: { id: projectId, organizationId, deletedAt: null },
+      select: { id: true },
     });
     if (!project) throw new NotFoundException('Project not found');
 
-    // Verify task if provided
-    if (dto.taskId) {
+    if (taskId) {
       const task = await this.prisma.task.findFirst({
-        where: { id: dto.taskId, projectId: dto.projectId, organizationId },
+        where: { id: taskId, projectId, organizationId, deletedAt: null },
+        select: { id: true },
       });
       if (!task) throw new NotFoundException('Task not found');
     }
+  }
+
+  async create(organizationId: string, userId: string, dto: CreateTimesheetDto) {
+    await this.assertProjectAndTask(organizationId, dto.projectId, dto.taskId);
 
     const hours = DecimalUtils.parseInput(dto.hours, 'hours');
 
@@ -62,11 +61,10 @@ export class TimesheetsService {
     });
   }
 
-  async startTimer(
-    organizationId: string,
-    userId: string,
-    dto: { projectId: string; taskId?: string; description?: string },
-  ) {
+  async startTimer(organizationId: string, userId: string, dto: StartTimerDto) {
+    // The timer was the one path that linked any project or task id without checking it.
+    await this.assertProjectAndTask(organizationId, dto.projectId, dto.taskId);
+
     // Check for existing running timer
     const existing = await this.prisma.timesheetEntry.findFirst({
       where: { userId, organizationId, timerStartedAt: { not: null }, timerEndedAt: null },
@@ -134,25 +132,14 @@ export class TimesheetsService {
     });
   }
 
-  async findAll(
-    organizationId: string,
-    query: {
-      page?: number;
-      limit?: number;
-      search?: string;
-      sortBy?: string;
-      sortOrder?: 'asc' | 'desc';
-      userId?: string;
-      projectId?: string;
-      startDate?: string;
-      endDate?: string;
-      status?: string;
-      isBilled?: boolean;
-    },
-  ) {
+  private static readonly SORT_FIELDS = ['date', 'hours', 'duration', 'createdAt', 'updatedAt'];
+
+  async findAll(organizationId: string, query: TimesheetQueryDto) {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 20;
-    const sortBy = query.sortBy || 'date';
+    const sortBy = TimesheetsService.SORT_FIELDS.includes(query.sortBy ?? '')
+      ? query.sortBy!
+      : 'date';
     const sortOrder = query.sortOrder || 'desc';
     const where: Prisma.TimesheetEntryWhereInput = { organizationId };
     if (query.userId) where.userId = query.userId;
@@ -214,8 +201,13 @@ export class TimesheetsService {
 
     const data: Prisma.TimesheetEntryUpdateInput = {};
     if (dto.description !== undefined) data.description = dto.description;
-    if (dto.isBillable !== undefined) data.isBillable = dto.isBillable;
-    if (dto.hours !== undefined) data.hours = DecimalUtils.parseInput(dto.hours, 'hours');
+    if (dto.isBillable != null) data.isBillable = dto.isBillable;
+    if (dto.hours != null) {
+      // Keep the `duration` column in step with `hours`, as create does.
+      const hours = DecimalUtils.parseInput(dto.hours, 'hours');
+      data.hours = hours;
+      data.duration = hours;
+    }
     if (dto.date) data.date = new Date(dto.date);
 
     return this.prisma.timesheetEntry.update({

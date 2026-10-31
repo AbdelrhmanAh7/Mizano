@@ -11,11 +11,15 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { TimesheetsService } from '../services/timesheets.service';
 import {
   CreateTimesheetDto,
+  StartTimerDto,
+  TimesheetQueryDto,
+  TimesheetReportQueryDto,
   UpdateTimesheetDto,
-  TimesheetsService,
-} from '../services/timesheets.service';
+  WeeklySummaryQueryDto,
+} from '../dto/timesheet.dto';
 import { CurrentOrg, CurrentUser, Permissions } from '../../../common/decorators';
 import { CurrentUserData } from '../../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -45,7 +49,7 @@ export class TimesheetsController {
   startTimer(
     @CurrentOrg() orgId: string,
     @CurrentUser() user: CurrentUserData,
-    @Body() dto: { projectId: string; taskId?: string; description?: string },
+    @Body() dto: StartTimerDto,
   ) {
     return this.timesheetsService.startTimer(orgId, user.id, dto);
   }
@@ -71,23 +75,7 @@ export class TimesheetsController {
   @Get()
   @Permissions('timesheets.view')
   @ApiOperation({ summary: 'Get timesheet entries' })
-  findAll(
-    @CurrentOrg() orgId: string,
-    @Query()
-    query: {
-      page?: number;
-      limit?: number;
-      search?: string;
-      sortBy?: string;
-      sortOrder?: 'asc' | 'desc';
-      userId?: string;
-      projectId?: string;
-      startDate?: string;
-      endDate?: string;
-      status?: string;
-      isBilled?: boolean;
-    },
-  ) {
+  findAll(@CurrentOrg() orgId: string, @Query() query: TimesheetQueryDto) {
     return this.timesheetsService.findAll(orgId, query);
   }
 
@@ -97,11 +85,10 @@ export class TimesheetsController {
   getWeeklySummary(
     @CurrentOrg() orgId: string,
     @CurrentUser() user: CurrentUserData,
-    @Query('weekStart') weekStart?: string,
-    @Query('weekStartDate') weekStartDate?: string,
+    @Query() query: WeeklySummaryQueryDto,
   ) {
     // weekStartDate is accepted as an alias; weekStart wins when both are sent
-    const week = weekStart || weekStartDate;
+    const week = query.weekStart || query.weekStartDate;
     if (!week) {
       throw new BadRequestException({
         code: 'VALIDATION_ERROR',
@@ -115,13 +102,13 @@ export class TimesheetsController {
   @Get('report')
   @Permissions('timesheets.view')
   @ApiOperation({ summary: 'Get timesheet report' })
-  getReport(
-    @CurrentOrg() orgId: string,
-    @Query('startDate') startDate: string,
-    @Query('endDate') endDate: string,
-    @Query('groupBy') groupBy: 'user' | 'project',
-  ) {
-    return this.timesheetsService.getTimesheetReport(orgId, startDate, endDate, groupBy || 'user');
+  getReport(@CurrentOrg() orgId: string, @Query() query: TimesheetReportQueryDto) {
+    return this.timesheetsService.getTimesheetReport(
+      orgId,
+      query.startDate,
+      query.endDate,
+      query.groupBy || 'user',
+    );
   }
 
   @Get(':id')
