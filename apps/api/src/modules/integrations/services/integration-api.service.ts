@@ -35,6 +35,23 @@ import {
 const IDEMPOTENCY_KEY_PATTERN = /^[\x21-\x7e]{1,200}$/;
 const IDEMPOTENCY_TTL_HOURS = 24;
 
+/**
+ * JSON with the object keys sorted at every depth (arrays keep their order), so the same payload
+ * sent with another key order gets the same Idempotency-Key fingerprint.
+ */
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(value ?? null, (_key, v: unknown) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : 1)))
+      : v,
+  );
+}
+
+/** The fingerprint an Idempotency-Key is bound to: method, path and the serialized body. */
+function requestFingerprint(request: { method: string; path: string }, body: string): string {
+  return createHash('sha256').update(`${request.method} ${request.path}\n${body}`).digest('hex');
+}
+
 export interface IdempotentResult {
   status: number;
   body: unknown;
@@ -391,12 +408,14 @@ export class IntegrationApiService {
     if (!IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
       throw new BadRequestException('Idempotency-Key must be 1-200 printable ASCII characters');
     }
-    const requestHash = createHash('sha256')
-      .update(`${request.method} ${request.path}\n${JSON.stringify(request.body ?? null)}`)
-      .digest('hex');
+    const requestHash = requestFingerprint(request, canonicalJson(request.body));
+    // Keys stored before the canonical form (kept IDEMPOTENCY_TTL_HOURS) still replay a
+    // byte-identical retry instead of answering 422 (review lessons 2: honour the old key).
+    const legacyHash = requestFingerprint(request, JSON.stringify(request.body ?? null));
+    const hashes = [requestHash, legacyHash];
 
     const existing = await this.findIdempotencyKey(p, idempotencyKey);
-    if (existing) return this.replay(existing, requestHash);
+    if (existing) return this.replay(existing, hashes);
 
     let keyClaimed = false;
     try {
@@ -431,7 +450,7 @@ export class IntegrationApiService {
       if (!lostTheKey) throw error;
       const winner = await this.findIdempotencyKey(p, idempotencyKey);
       if (!winner) throw new ConflictException('Idempotency-Key is being reused; retry');
-      return this.replay(winner, requestHash);
+      return this.replay(winner, hashes);
     }
   }
 
@@ -443,9 +462,9 @@ export class IntegrationApiService {
 
   private replay(
     existing: { requestHash: string; responseStatus: number | null; responseBody: unknown },
-    requestHash: string,
+    requestHashes: string[],
   ): IdempotentResult {
-    if (existing.requestHash !== requestHash) {
+    if (!requestHashes.includes(existing.requestHash)) {
       throw new UnprocessableEntityException(
         'Idempotency-Key was already used with a different request',
       );

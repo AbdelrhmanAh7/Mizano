@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { ExecutionContext, HttpException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { InvoiceStatus, Prisma } from '@prisma/client';
@@ -451,6 +452,42 @@ describe('IntegrationApiService.idempotent', () => {
       replayed: true,
     });
     expect(customers()).toEqual(['A']);
+  });
+
+  it('replays the same body sent with another key order; arrays keep their order', async () => {
+    const { svc } = service();
+    const body = { name: 'A', billingAddress: { city: 'Cairo', street: '1 Tahrir' }, tags: [1, 2] };
+    const reordered = {
+      tags: [1, 2],
+      billingAddress: { street: '1 Tahrir', city: 'Cairo' },
+      name: 'A',
+    };
+    const fn = jest.fn(createCustomer);
+    await svc.idempotent(principal, 'k-1', { ...req, body }, 201, fn);
+    await expect(
+      svc.idempotent(principal, 'k-1', { ...req, body: reordered }, 201, fn),
+    ).resolves.toMatchObject({ status: 201, replayed: true });
+    expect(fn).toHaveBeenCalledTimes(1);
+    await expect(
+      svc.idempotent(principal, 'k-1', { ...req, body: { ...body, tags: [2, 1] } }, 201, fn),
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('still replays a key stored under the pre-canonical hash', async () => {
+    const { svc, setRow } = service();
+    const body = { name: 'A', email: 'a@nile.example' };
+    const legacyHash = createHash('sha256')
+      .update(`${req.method} ${req.path}\n${JSON.stringify(body)}`)
+      .digest('hex');
+    setRow('k-1', {
+      id: 'k-1',
+      requestHash: legacyHash,
+      responseStatus: 201,
+      responseBody: { old: 1 },
+    });
+    await expect(
+      svc.idempotent(principal, 'k-1', { ...req, body }, 201, async () => 1),
+    ).resolves.toEqual({ status: 201, body: { old: 1 }, replayed: true });
   });
 
   it('rejects a different body with the same key (422) and a legacy unfinished key (409)', async () => {
