@@ -689,7 +689,9 @@ export class ImportService {
               : existing.purchasePrice,
             unit: data.unit || existing.unit,
             taxRate: data.taxRate ? new Decimal(data.taxRate) : existing.taxRate,
-            trackInventory: data.trackInventory ?? existing.trackInventory,
+            // Only goods hold stock, whatever the file says.
+            trackInventory:
+              existing.type === 'GOODS' && (data.trackInventory ?? existing.trackInventory),
             reorderLevel: data.reorderLevel || existing.reorderLevel,
           },
         });
@@ -697,17 +699,18 @@ export class ImportService {
       }
     }
 
+    const type = (data.type || 'GOODS').toUpperCase();
     await this.prisma.item.create({
       data: {
         name: data.name,
         sku: data.sku,
-        type: (data.type || 'GOODS').toUpperCase(),
+        type,
         description: data.description,
         salesPrice: data.salesPrice ? new Decimal(data.salesPrice) : undefined,
         purchasePrice: data.purchasePrice ? new Decimal(data.purchasePrice) : undefined,
         unit: data.unit,
         taxRate: data.taxRate ? new Decimal(data.taxRate) : undefined,
-        trackInventory: data.trackInventory ?? true,
+        trackInventory: type === 'GOODS' && (data.trackInventory ?? true),
         reorderLevel: data.reorderLevel,
         organizationId,
       },
