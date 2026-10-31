@@ -157,8 +157,13 @@ interface PaymentModeBadgeProps {
   className?: string;
 }
 
+/** Translated label of a payment mode (common.paymentModes), for badges and detail cards. */
+export function usePaymentModeLabel(mode: PaymentMode | undefined): string {
+  return useEnumLabel('common.paymentModes', paymentModeKeys, mode ?? '');
+}
+
 export function PaymentModeBadge({ mode, className }: PaymentModeBadgeProps) {
-  const label = useEnumLabel('common.paymentModes', paymentModeKeys, mode);
+  const label = usePaymentModeLabel(mode);
   return (
     <StatusBadge
       status={mode}

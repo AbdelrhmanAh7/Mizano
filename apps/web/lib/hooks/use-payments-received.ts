@@ -158,22 +158,6 @@ export function useVoidPaymentReceived() {
 }
 
 /**
- * Get payment mode label
- */
-export function getPaymentModeLabel(mode: PaymentMode): string {
-  const labelMap: Record<PaymentMode, string> = {
-    CASH: 'Cash',
-    BANK_TRANSFER: 'Bank Transfer',
-    CREDIT_CARD: 'Credit Card',
-    DEBIT_CARD: 'Debit Card',
-    CHEQUE: 'Cheque',
-    ONLINE: 'Online',
-    OTHER: 'Other',
-  };
-  return labelMap[mode] || mode;
-}
-
-/**
  * Get payment mode options for dropdown
  */
 export function getPaymentModeOptions(): Array<{ value: PaymentMode; label: string }> {

@@ -27,12 +27,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  usePaymentReceived,
-  useVoidPaymentReceived,
-  getPaymentModeLabel,
-} from '@/lib/hooks/use-payments-received';
-import { PaymentModeBadge } from '@/components/sales/status-badge';
+import { usePaymentReceived, useVoidPaymentReceived } from '@/lib/hooks/use-payments-received';
+import { PaymentModeBadge, usePaymentModeLabel } from '@/components/sales/status-badge';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { format } from 'date-fns';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useDateFnsLocale } from '@/lib/date-locale';
@@ -49,13 +46,9 @@ export default function PaymentReceivedDetailPage() {
   const { hasPermission } = usePermissions();
   const canVoid = hasPermission('sales.delete');
 
-  const formatCurrency = (amount: string | number, currency: string = 'USD') => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(num);
-  };
+  // Payments post in the organization base currency (never a guessed USD; review-lessons §11).
+  const formatCurrency = useMoneyFormatter();
+  const paymentModeLabel = usePaymentModeLabel(payment?.paymentMode);
 
   if (isLoading) {
     return (
@@ -194,7 +187,7 @@ export default function PaymentReceivedDetailPage() {
               <CreditCard className="h-4 w-4" />
               {t('payments.paymentMode')}
             </div>
-            <div className="text-xl font-bold">{getPaymentModeLabel(payment.paymentMode)}</div>
+            <div className="text-xl font-bold">{paymentModeLabel}</div>
           </CardContent>
         </Card>
 
