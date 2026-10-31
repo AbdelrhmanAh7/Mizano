@@ -14,12 +14,19 @@ describe('receivables aging', () => {
     date: new Date('2026-01-03'),
     issueDate: new Date('2026-01-01'),
     dueDate: new Date(due),
+    status: 'SENT',
+    grandTotal: new Decimal(balance),
     balanceDue: new Decimal(balance),
+    paymentAllocations: [],
+    appliedCredits: [],
     customer: { id: customerId, name: `Customer ${customerId}` },
   });
   const credit = (customerId: string, amount: string) => ({
+    id: `cn-${customerId}-${amount}`,
     customerId,
     amount: new Decimal(amount),
+    date: new Date('2026-02-01'),
+    deletedAt: null,
     customer: { id: customerId, name: `Customer ${customerId}` },
   });
 
@@ -31,25 +38,22 @@ describe('receivables aging', () => {
     return { prisma, service: new AgingReportsService(prisma as unknown as ReadReplicaService) };
   }
 
-  it('queries only issued, non-deleted invoices and unapplied APPLY credit notes of the org', async () => {
+  it('queries only issued (or later-voided), non-deleted invoices and APPLY credit notes of the org', async () => {
     const { prisma, service } = build([], []);
 
     await service.getReceivablesAging(ORG, '2026-03-31');
 
     const invoiceWhere = prisma.invoice.findMany.mock.calls[0][0].where;
-    expect(invoiceWhere).toMatchObject({
-      organizationId: ORG,
-      deletedAt: null,
-      balanceDue: { gt: 0 },
-      status: ISSUED,
-    });
+    expect(invoiceWhere).toMatchObject({ organizationId: ORG, deletedAt: null });
+    expect(invoiceWhere.OR[0].status).toEqual(ISSUED);
+    expect(invoiceWhere.OR[1]).toEqual({ status: 'VOID' });
     expect(invoiceWhere.date.lte.toISOString()).toBe('2026-03-31T23:59:59.999Z');
-    expect(prisma.creditNote.findMany.mock.calls[0][0].where).toMatchObject({
+    const creditWhere = prisma.creditNote.findMany.mock.calls[0][0].where;
+    expect(creditWhere).toMatchObject({
       organizationId: ORG,
-      deletedAt: null,
       type: CreditNoteType.APPLY_TO_INVOICE,
-      appliedToInvoiceId: null,
     });
+    expect(creditWhere.OR[0]).toEqual({ appliedToInvoiceId: null });
   });
 
   it('buckets by days past due and keeps every sum an exact 4-dp string', async () => {

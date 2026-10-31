@@ -36,6 +36,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **"Current" figures exclude future-dated entries.** Cash today means lines dated ≤ end of today.
 - **Side records carry the document date.** Inventory movements are dated on the adjustment date, not on `createdAt` = now.
 - **Historical reports keep later-voided documents in their original period** and show the reversal on the void date. Filtering on today's status rewrites history. _(customer statement)_
+- **An as-of balance is rebuilt from dated events, never read from today's `balanceDue` or status.** Subtract only the payments and applied credits dated on or before the cutoff and not voided by then (a void counts on its reversal journal's date), and keep documents voided after the cutoff. Aging read the current balance, so a bill paid in February vanished from January's aging. _(#586, receivables and payables aging)_
 - **Compare due dates as calendar dates.** A due date is stored at UTC midnight, so `new Date(dueDate) < new Date()` flags a bill overdue all day on its due date; compare its `yyyy-MM-dd` with today's local date (`lib/due-date.ts`). _(manual QA, bills)_
 
 ## 5. Single-currency ledger and data

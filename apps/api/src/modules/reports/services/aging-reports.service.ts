@@ -107,6 +107,37 @@ function ageDocuments<D extends { dueDate: Date; balanceDue: Decimal }>(
   };
 }
 
+/** Journal source types of the reversals that void a document (see JournalsService). */
+type VoidSourceType =
+  | 'INVOICE_VOID'
+  | 'PAYMENT_RECEIVED_VOID'
+  | 'CREDIT_NOTE_VOID'
+  | 'PAYMENT_MADE_VOID'
+  | 'VENDOR_CREDIT_VOID';
+
+/**
+ * True when an event dated on or before the cutoff was still live on it: not voided, or voided
+ * after the cutoff. The void date is its reversal journal's date, falling back to `deletedAt`.
+ */
+function liveAt(
+  event: { id: string; date: Date; deletedAt: Date | null },
+  voidDates: Map<string, Date>,
+  asOf: Date,
+): boolean {
+  if (event.date > asOf) return false;
+  if (!event.deletedAt) return true;
+  return (voidDates.get(event.id) ?? event.deletedAt) > asOf;
+}
+
+/** A document's open balance from its total and the settlements live on the cutoff. */
+function balanceAsOf(
+  total: Decimal,
+  settlements: Array<{ amount: Decimal; live: boolean }>,
+): Decimal {
+  const settled = sumDecimals(settlements.filter((s) => s.live).map((s) => s.amount));
+  return Decimal.max(total.sub(settled), new Decimal(0));
+}
+
 export interface StatementTransaction {
   date: Date;
   type: string;
@@ -123,47 +154,118 @@ export class AgingReportsService {
   constructor(private prisma: ReadReplicaService) {}
 
   /**
-   * Receivables aging. Only issued invoices count (DRAFT and VOID never do). Unapplied
-   * APPLY_TO_INVOICE credit notes credited the AR control account without reducing any invoice,
-   * so they are shown per customer and netted in `summary.netTotal`, which reconciles to the AR
-   * control account (mirrors the payables aging with vendor credits).
+   * Receivables aging as of the cutoff (#586). Each invoice's balance is rebuilt from dated
+   * events instead of today's `balanceDue`: payments and applied credit notes count only when
+   * dated on or before the cutoff and not voided by then (a void counts on its reversal journal's
+   * date). An invoice voided after the cutoff still shows; a voided draft never posted and never
+   * shows. Unapplied APPLY_TO_INVOICE credit notes credited the AR control account without
+   * reducing any invoice, so they are shown per customer and netted in `summary.netTotal`, which
+   * reconciles to the AR control account as of the cutoff (mirrors the payables aging).
+   *
+   * Known limit: no applied-at date is stored, so a credit dated before the cutoff but applied
+   * after it already reduces its invoice; the net total is the same either way.
    */
   async getReceivablesAging(organizationId: string, asOfDate?: string) {
     const { asOf } = resolveAsOf(asOfDate);
+    // Settled later or never: a zero balance today can be open as of the cutoff only when a live
+    // payment or credit is dated after it (voided ones never reduced today's balance).
+    const settledAfterCutoff = { deletedAt: null, date: { gt: asOf } };
 
     const [invoices, credits] = await Promise.all([
       this.prisma.invoice.findMany({
         where: {
           organizationId,
           deletedAt: null,
-          balanceDue: { gt: 0 },
-          status: { in: POSTED_INVOICE_STATUSES },
           date: { lte: asOf },
+          OR: [
+            {
+              status: { in: POSTED_INVOICE_STATUSES },
+              OR: [
+                { balanceDue: { gt: 0 } },
+                { paymentAllocations: { some: { payment: settledAfterCutoff } } },
+                { appliedCredits: { some: settledAfterCutoff } },
+              ],
+            },
+            { status: InvoiceStatus.VOID },
+          ],
         },
         include: {
           customer: { select: { id: true, name: true } },
+          paymentAllocations: {
+            select: {
+              amount: true,
+              payment: { select: { id: true, date: true, deletedAt: true } },
+            },
+          },
+          appliedCredits: { select: { id: true, amount: true, date: true, deletedAt: true } },
         },
       }),
       this.prisma.creditNote.findMany({
         where: {
           organizationId,
-          deletedAt: null,
           type: CreditNoteType.APPLY_TO_INVOICE,
-          appliedToInvoiceId: null,
           date: { lte: asOf },
+          // Applied to an invoice dated after the cutoff: still unapplied as of the cutoff.
+          OR: [{ appliedToInvoiceId: null }, { appliedToInvoice: { date: { gt: asOf } } }],
         },
         select: {
+          id: true,
           customerId: true,
           amount: true,
+          date: true,
+          deletedAt: true,
           customer: { select: { id: true, name: true } },
         },
       }),
     ]);
 
+    const voided = (rows: Array<{ id: string; deletedAt: Date | null }>): string[] =>
+      rows.filter((r) => r.deletedAt).map((r) => r.id);
+    const [paymentVoids, creditVoids, invoiceVoids] = await Promise.all([
+      this.voidDates(
+        organizationId,
+        'PAYMENT_RECEIVED_VOID',
+        voided(invoices.flatMap((i) => i.paymentAllocations.map((a) => a.payment))),
+      ),
+      this.voidDates(organizationId, 'CREDIT_NOTE_VOID', [
+        ...voided(invoices.flatMap((i) => i.appliedCredits)),
+        ...voided(credits),
+      ]),
+      this.voidDates(
+        organizationId,
+        'INVOICE_VOID',
+        invoices.filter((i) => i.status === InvoiceStatus.VOID).map((i) => i.id),
+      ),
+    ]);
+
+    const open = invoices
+      .filter((invoice) => {
+        if (invoice.status !== InvoiceStatus.VOID) return true;
+        // Posted and voided after the cutoff (a voided draft has no reversal and never posted).
+        const voidedOn = invoiceVoids.get(invoice.id);
+        return voidedOn !== undefined && voidedOn > asOf;
+      })
+      .map((invoice) => ({
+        ...invoice,
+        balanceDue: balanceAsOf(invoice.grandTotal, [
+          ...invoice.paymentAllocations.map((a) => ({
+            amount: a.amount,
+            live: liveAt(a.payment, paymentVoids, asOf),
+          })),
+          ...invoice.appliedCredits.map((c) => ({
+            amount: c.amount,
+            live: liveAt(c, creditVoids, asOf),
+          })),
+        ]),
+      }))
+      .filter((invoice) => invoice.balanceDue.greaterThan(0));
+
     const unapplied = creditsByParty(
-      credits.map((c) => ({ partyId: c.customerId, partyName: c.customer.name, amount: c.amount })),
+      credits
+        .filter((c) => liveAt(c, creditVoids, asOf))
+        .map((c) => ({ partyId: c.customerId, partyName: c.customer.name, amount: c.amount })),
     );
-    const { buckets, summary } = ageDocuments(invoices, asOf, unapplied.total, (invoice) => ({
+    const { buckets, summary } = ageDocuments(open, asOf, unapplied.total, (invoice) => ({
       invoiceId: invoice.id,
       invoiceNumber: invoice.invoiceNumber,
       customerId: invoice.customer.id,
@@ -185,52 +287,106 @@ export class AgingReportsService {
           amount: money(r.amount),
         })),
       },
-      customerCount: new Set(invoices.map((i) => i.customerId)).size,
-      invoiceCount: invoices.length,
+      customerCount: new Set(open.map((i) => i.customerId)).size,
+      invoiceCount: open.length,
     };
   }
 
   /**
-   * Payables aging, the mirror of {@link getReceivablesAging}: exact Decimal bucket totals sent as
-   * fixed 4-dp strings, a date-only as-of meaning the end of that UTC day, and the bill's
-   * accounting `date` on every row (billDate is optional and stays as an extra field).
+   * Payables aging as of the cutoff (#586), the mirror of {@link getReceivablesAging}: each bill's
+   * balance is rebuilt from payments and applied vendor credits dated on or before the cutoff and
+   * not voided by then (a void counts on its reversal journal's date). Exact Decimal bucket totals
+   * travel as fixed 4-dp strings; a date-only as-of means the end of that UTC day; every row
+   * carries the bill's accounting `date` (billDate is optional and stays as an extra field).
    */
   async getPayablesAging(organizationId: string, asOfDate?: string) {
     const { asOf } = resolveAsOf(asOfDate);
+    const settledAfterCutoff = { deletedAt: null, date: { gt: asOf } };
 
     const [bills, credits] = await Promise.all([
       this.prisma.bill.findMany({
         where: {
           organizationId,
           deletedAt: null,
-          balanceDue: { gt: 0 },
           // Only bills posted to AP; `date` is the accounting date (billDate is optional).
           status: { in: POSTED_BILL_STATUSES },
           date: { lte: asOf },
+          OR: [
+            { balanceDue: { gt: 0 } },
+            { billAllocations: { some: { payment: settledAfterCutoff } } },
+            { appliedCredits: { some: settledAfterCutoff } },
+          ],
         },
         include: {
           vendor: { select: { id: true, name: true } },
+          billAllocations: {
+            select: {
+              amount: true,
+              payment: { select: { id: true, date: true, deletedAt: true } },
+            },
+          },
+          appliedCredits: { select: { id: true, amount: true, date: true, deletedAt: true } },
         },
       }),
-      // Live, unapplied, unrefunded vendor credits already debited AP but reduced no bill: they
-      // are shown per vendor and netted in `summary.netTotal`, which reconciles to the AP control
-      // account.
+      // Vendor credits that debited AP by the cutoff but reduced no bill by then: shown per
+      // vendor and netted in `summary.netTotal`, which reconciles to the AP control account. A
+      // credit refunded or voided after the cutoff was still open on it.
       this.prisma.vendorCredit.findMany({
         where: {
           organizationId,
-          deletedAt: null,
-          appliedToBillId: null,
-          refundedAt: null,
           date: { lte: asOf },
+          AND: [
+            { OR: [{ appliedToBillId: null }, { appliedToBill: { date: { gt: asOf } } }] },
+            { OR: [{ refundedAt: null }, { refundedAt: { gt: asOf } }] },
+          ],
         },
-        select: { vendorId: true, amount: true, vendor: { select: { id: true, name: true } } },
+        select: {
+          id: true,
+          vendorId: true,
+          amount: true,
+          date: true,
+          deletedAt: true,
+          vendor: { select: { id: true, name: true } },
+        },
       }),
     ]);
 
+    const voided = (rows: Array<{ id: string; deletedAt: Date | null }>): string[] =>
+      rows.filter((r) => r.deletedAt).map((r) => r.id);
+    const [paymentVoids, creditVoids] = await Promise.all([
+      this.voidDates(
+        organizationId,
+        'PAYMENT_MADE_VOID',
+        voided(bills.flatMap((b) => b.billAllocations.map((a) => a.payment))),
+      ),
+      this.voidDates(organizationId, 'VENDOR_CREDIT_VOID', [
+        ...voided(bills.flatMap((b) => b.appliedCredits)),
+        ...voided(credits),
+      ]),
+    ]);
+
+    const open = bills
+      .map((bill) => ({
+        ...bill,
+        balanceDue: balanceAsOf(bill.grandTotal, [
+          ...bill.billAllocations.map((a) => ({
+            amount: a.amount,
+            live: liveAt(a.payment, paymentVoids, asOf),
+          })),
+          ...bill.appliedCredits.map((c) => ({
+            amount: c.amount,
+            live: liveAt(c, creditVoids, asOf),
+          })),
+        ]),
+      }))
+      .filter((bill) => bill.balanceDue.greaterThan(0));
+
     const unapplied = creditsByParty(
-      credits.map((c) => ({ partyId: c.vendorId, partyName: c.vendor.name, amount: c.amount })),
+      credits
+        .filter((c) => liveAt(c, creditVoids, asOf))
+        .map((c) => ({ partyId: c.vendorId, partyName: c.vendor.name, amount: c.amount })),
     );
-    const { buckets, summary } = ageDocuments(bills, asOf, unapplied.total, (bill) => ({
+    const { buckets, summary } = ageDocuments(open, asOf, unapplied.total, (bill) => ({
       billId: bill.id,
       billNumber: bill.billNumber,
       vendorId: bill.vendor.id,
@@ -251,9 +407,29 @@ export class AgingReportsService {
           amount: money(r.amount),
         })),
       },
-      vendorCount: new Set(bills.map((b) => b.vendorId)).size,
-      billCount: bills.length,
+      vendorCount: new Set(open.map((b) => b.vendorId)).size,
+      billCount: open.length,
     };
+  }
+
+  /** Date of each source document's void (its posted reversal journal), by source id. */
+  private async voidDates(
+    organizationId: string,
+    sourceType: VoidSourceType,
+    sourceIds: string[],
+  ): Promise<Map<string, Date>> {
+    if (sourceIds.length === 0) return new Map();
+    const journals = await this.prisma.journal.findMany({
+      where: {
+        organizationId,
+        deletedAt: null,
+        isPosted: true,
+        sourceType,
+        sourceId: { in: [...new Set(sourceIds)] },
+      },
+      select: { sourceId: true, date: true },
+    });
+    return new Map(journals.map((j) => [j.sourceId as string, j.date]));
   }
 
   /**
