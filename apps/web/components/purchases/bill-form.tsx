@@ -163,7 +163,7 @@ export function BillForm({
     [tValidation],
   );
 
-  // Resolved through a ref so the account check always uses the latest loaded options.
+  // Resolved through a ref so the account check uses the latest committed account options.
   const schemaRef = useRef<ReturnType<typeof createBillSchema>>(billSchema);
   const form = useForm<BillFormData>({
     resolver: ((values, context, options) =>
@@ -214,7 +214,11 @@ export function BillForm({
     [accountsReady, accountOptions],
   );
   const schema = useMemo(() => createBillSchema(eligibleAccountIds), [eligibleAccountIds]);
-  schemaRef.current = schema;
+  // Point the resolver at the schema of the committed render only: a render React discards
+  // (concurrent rendering, Strict Mode) must not change how the form validates.
+  useEffect(() => {
+    schemaRef.current = schema;
+  }, [schema]);
 
   useEffect(() => {
     if (bill) {
