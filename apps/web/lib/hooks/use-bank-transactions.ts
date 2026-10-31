@@ -3,8 +3,8 @@
 import { bankTransactionsApi } from '@/lib/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-
-type ApiError = { response?: { data?: { message?: string } } };
+import { useTranslations } from 'next-intl';
+import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 
 export interface BankTransaction {
   id: string;
@@ -98,6 +98,8 @@ export function useSuggestedMatches(transactionId: string) {
 
 export function useMatchTransaction() {
   const queryClient = useQueryClient();
+  const t = useTranslations('banking.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: ({
@@ -112,31 +114,35 @@ export function useMatchTransaction() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
-      toast.success('Transaction matched successfully');
+      toast.success(t('transactionMatched'));
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to match transaction');
+    onError: (error: unknown) => {
+      toast.error(getLocalizedApiErrorMessage(error, t('matchError'), tApiErrors));
     },
   });
 }
 
 export function useExcludeTransaction() {
   const queryClient = useQueryClient();
+  const t = useTranslations('banking.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: bankTransactionsApi.exclude,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
-      toast.success('Transaction excluded');
+      toast.success(t('transactionExcluded'));
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to exclude transaction');
+    onError: (error: unknown) => {
+      toast.error(getLocalizedApiErrorMessage(error, t('excludeError'), tApiErrors));
     },
   });
 }
 
 export function useImportTransactions() {
   const queryClient = useQueryClient();
+  const t = useTranslations('banking.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: ({ bankAccountId, file }: { bankAccountId: string; file: File }) => {
@@ -147,23 +153,24 @@ export function useImportTransactions() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
-      toast.success('Transactions imported successfully');
+      toast.success(t('transactionsImported'));
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to import transactions');
+    onError: (error: unknown) => {
+      toast.error(getLocalizedApiErrorMessage(error, t('importError'), tApiErrors));
     },
   });
 }
 
 // Helper functions
-export function getStatusLabel(status: TransactionStatus): string {
-  const labels: Record<TransactionStatus, string> = {
-    PENDING: 'Pending',
-    MATCHED: 'Matched',
-    CREATED: 'Created',
-    RECONCILED: 'Reconciled',
+/** Translated label of a transaction status; `t` is `useTranslations('banking')`. */
+export function getStatusLabel(status: TransactionStatus, t: (key: string) => string): string {
+  const keys: Record<TransactionStatus, string> = {
+    PENDING: 'transactions.status.pending',
+    MATCHED: 'transactions.status.matched',
+    CREATED: 'transactions.status.created',
+    RECONCILED: 'transactions.status.reconciled',
   };
-  return labels[status] || status;
+  return keys[status] ? t(keys[status]) : status;
 }
 
 export function getStatusColor(status: TransactionStatus): string {
@@ -183,9 +190,10 @@ export function getConfidenceColor(confidence: number | null): string {
   return 'text-red-600';
 }
 
-export function getConfidenceLabel(confidence: number | null): string {
-  if (confidence === null) return 'N/A';
-  if (confidence >= 80) return 'High';
-  if (confidence >= 50) return 'Medium';
-  return 'Low';
+/** Translated confidence level; `t` is `useTranslations('banking')`. */
+export function getConfidenceLabel(confidence: number | null, t: (key: string) => string): string {
+  if (confidence === null) return t('reconciliation.confidenceLevels.none');
+  if (confidence >= 80) return t('reconciliation.confidenceLevels.high');
+  if (confidence >= 50) return t('reconciliation.confidenceLevels.medium');
+  return t('reconciliation.confidenceLevels.low');
 }

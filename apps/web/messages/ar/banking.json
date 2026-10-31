@@ -16,7 +16,24 @@
       "type": "نوع الحساب",
       "openingBalance": "الرصيد الافتتاحي",
       "linkedAccount": "الحساب المرتبط",
-      "linkedAccountPlaceholder": "اختر الحساب المرتبط"
+      "linkedAccountPlaceholder": "اختر الحساب المرتبط",
+      "sectionInformation": "بيانات الحساب",
+      "sectionAccounting": "المحاسبة",
+      "nameExample": "مثال: الحساب الجاري الرئيسي",
+      "nameRequired": "اسم الحساب مطلوب",
+      "nameMax": "يجب ألا يزيد اسم الحساب على 100 حرف",
+      "typePlaceholder": "اختر النوع",
+      "accountNumberHint": "آخر 4 أرقام أو الرقم كاملًا",
+      "currencyPlaceholder": "اختر العملة",
+      "glAccount": "حساب دفتر الأستاذ",
+      "glAccountPlaceholder": "اربطه بحساب في دفتر الأستاذ",
+      "glAccountSelect": "اختر حسابًا من دفتر الأستاذ",
+      "glAccountHint": "اربط هذا الحساب البنكي بحساب في دفتر الأستاذ العام لتقارير مالية دقيقة",
+      "linkedAccountRequired": "حساب دفتر الأستاذ مطلوب",
+      "isActive": "نشط",
+      "isActiveHint": "الحسابات غير النشطة لا تظهر في القوائم",
+      "create": "إنشاء الحساب",
+      "update": "تحديث الحساب"
     },
     "types": {
       "bank": "حساب بنكي",
@@ -28,12 +45,30 @@
       "accountNumber": "رقم الحساب",
       "type": "النوع",
       "balance": "الرصيد",
-      "currency": "العملة"
+      "currency": "العملة",
+      "status": "الحالة"
     },
     "empty": {
       "title": "لا توجد حسابات بنكية بعد",
       "description": "أضف أول حساب بنكي"
-    }
+    },
+    "pageDescription": "أدِر حساباتك البنكية وتابع أرصدتها",
+    "newDescription": "أضف حسابًا بنكيًا جديدًا لمتابعة أموالك",
+    "totalBalance": "إجمالي الرصيد",
+    "activeAccounts": "الحسابات النشطة",
+    "searchPlaceholder": "ابحث في الحسابات...",
+    "allTypes": "كل الأنواع",
+    "deleteConfirm": "هل تريد حذف هذا الحساب البنكي؟ لا يمكن التراجع عن هذا الإجراء، وستُحذف كل الحركات المرتبطة به أيضًا.",
+    "deleteConfirmShort": "هل تريد حذف هذا الحساب البنكي؟ لا يمكن التراجع عن هذا الإجراء.",
+    "backToAccounts": "العودة إلى الحسابات",
+    "glAccountsFailed": "تعذّر تحميل حسابات دفتر الأستاذ. أعد المحاولة قبل إضافة حساب بنكي.",
+    "systemBalance": "الرصيد الدفتري",
+    "lastReconciled": "آخر تسوية",
+    "neverReconciled": "لم تتم بعد",
+    "balanceHistory": "حركة الرصيد خلال 30 يومًا",
+    "recentTransactions": "أحدث الحركات",
+    "viewAll": "عرض الكل",
+    "noTransactions": "لا توجد حركات بعد. استورد الحركات للبدء."
   },
   "transactions": {
     "title": "المعاملات البنكية",
@@ -87,7 +122,11 @@
     "empty": {
       "title": "لا توجد معاملات بعد",
       "description": "استورد أو أضف أول معاملة"
-    }
+    },
+    "notFound": "الحركة غير موجودة",
+    "noDescription": "بدون وصف",
+    "account": "الحساب",
+    "matchedTo": "مطابَقة مع"
   },
   "rules": {
     "title": "قواعد البنك",
@@ -113,7 +152,34 @@
       "bankAccount": "الحساب البنكي",
       "bankAccountPlaceholder": "جميع الحسابات",
       "conditions": "الشروط",
-      "action": "الإجراء"
+      "action": "الإجراء",
+      "detailsTitle": "بيانات القاعدة",
+      "detailsDescription": "أعطِ القاعدة اسمًا واضحًا يسهل التعرف عليها",
+      "nameExample": "مثال: مستلزمات مكتبية من أمازون",
+      "nameRequired": "اسم القاعدة مطلوب",
+      "isActive": "نشطة",
+      "isActiveHint": "القواعد غير النشطة لا تُطبَّق على الحركات",
+      "conditionsDescription": "حدّد متى تُطبَّق هذه القاعدة (يجب أن تتحقق كل الشروط)",
+      "conditionsRequired": "أضف شرطًا واحدًا على الأقل",
+      "addCondition": "إضافة شرط",
+      "fieldPlaceholder": "الحقل",
+      "operatorPlaceholder": "المعامل",
+      "valuePlaceholder": "القيمة",
+      "valueRequired": "القيمة مطلوبة",
+      "removeCondition": "حذف الشرط",
+      "actionDescription": "ما الذي يحدث عندما تطابق حركةٌ هذه القاعدة",
+      "actionType": "نوع الإجراء",
+      "actionTypePlaceholder": "اختر الإجراء",
+      "account": "الحساب",
+      "accountPlaceholder": "اختر الحساب",
+      "vendor": "المورد",
+      "vendorPlaceholder": "اختر المورد",
+      "customer": "العميل",
+      "customerPlaceholder": "اختر العميل",
+      "autoCreate": "إنشاء القيود تلقائيًا",
+      "autoCreateHint": "أنشئ المصروفات تلقائيًا عندما تطابق حركةٌ هذه القاعدة",
+      "create": "إنشاء القاعدة",
+      "update": "تحديث القاعدة"
     },
     "conditions": {
       "field": "الحقل",
@@ -122,13 +188,16 @@
       "fields": {
         "description": "الوصف",
         "payee": "المستفيد",
-        "amount": "المبلغ"
+        "amount": "المبلغ",
+        "reference": "المرجع"
       },
       "operators": {
         "contains": "يحتوي على",
         "equals": "يساوي",
         "startsWith": "يبدأ بـ",
-        "endsWith": "ينتهي بـ"
+        "endsWith": "ينتهي بـ",
+        "greaterThan": "أكبر من",
+        "lessThan": "أصغر من"
       }
     },
     "actions": {
@@ -137,7 +206,11 @@
       "vendor": "المورد",
       "types": {
         "expense": "إنشاء مصروف",
-        "transfer": "إنشاء تحويل"
+        "transfer": "إنشاء تحويل",
+        "categorize": "تصنيف إلى حساب",
+        "createExpense": "إنشاء مصروف",
+        "matchVendor": "مطابقة مع مورد",
+        "matchCustomer": "مطابقة مع عميل"
       }
     },
     "table": {
@@ -149,7 +222,9 @@
     "empty": {
       "title": "لا توجد قواعد بعد",
       "description": "أنشئ قواعد لأتمتة تصنيف المعاملات"
-    }
+    },
+    "notFound": "القاعدة غير موجودة",
+    "backToRules": "العودة إلى القواعد"
   },
   "reconciliation": {
     "title": "التسوية",
@@ -209,6 +284,60 @@
       "noAccounts": "لا توجد حسابات بنكية",
       "noAccountsDescription": "أضف حسابًا بنكيًا أولًا لبدء التسوية.",
       "addBankAccount": "إضافة حساب بنكي"
+    },
+    "confidenceWithLevel": "ثقة {level}",
+    "confidenceLevels": {
+      "high": "عالية",
+      "medium": "متوسطة",
+      "low": "منخفضة",
+      "none": "غير مقيّمة"
     }
+  },
+  "errorTitle": "حدث خطأ في البنوك",
+  "hub": {
+    "accountsDescription": "اعرض حساباتك البنكية وأرصدتها وحركاتها وأدِرها.",
+    "reconcileDescription": "طابِق كشوف الحساب البنكية مع سجلاتك لدفاتر دقيقة.",
+    "rulesDescription": "صنّف الحركات البنكية تلقائيًا بقواعد تضعها بنفسك.",
+    "transactionsDescription": "اعرض كل الحركات البنكية المستوردة وحالة مطابقتها.",
+    "totalAccounts": "إجمالي الحسابات",
+    "totalBalance": "إجمالي الرصيد",
+    "pendingTransactions": "حركات معلّقة",
+    "thisMonth": "هذا الشهر",
+    "statsFailed": "تعذّر تحميل ملخص البنوك."
+  },
+  "toast": {
+    "accountCreated": "تم إنشاء الحساب البنكي بنجاح",
+    "accountCreateError": "تعذّر إنشاء الحساب البنكي",
+    "accountUpdated": "تم تحديث الحساب البنكي بنجاح",
+    "accountUpdateError": "تعذّر تحديث الحساب البنكي",
+    "accountDeleted": "تم حذف الحساب البنكي بنجاح",
+    "accountDeleteError": "تعذّر حذف الحساب البنكي",
+    "ruleCreated": "تم إنشاء القاعدة البنكية بنجاح",
+    "ruleCreateError": "تعذّر إنشاء القاعدة البنكية",
+    "ruleUpdated": "تم تحديث القاعدة البنكية بنجاح",
+    "ruleUpdateError": "تعذّر تحديث القاعدة البنكية",
+    "ruleDeleted": "تم حذف القاعدة البنكية بنجاح",
+    "ruleDeleteError": "تعذّر حذف القاعدة البنكية",
+    "transactionMatched": "تمت مطابقة الحركة بنجاح",
+    "matchError": "تعذّرت مطابقة الحركة",
+    "transactionExcluded": "تم استبعاد الحركة",
+    "excludeError": "تعذّر استبعاد الحركة",
+    "transactionsImported": "تم استيراد الحركات بنجاح",
+    "importError": "تعذّر استيراد الحركات"
+  },
+  "import": {
+    "selectAccount": "اختر الحساب البنكي...",
+    "selectAccountFirst": "اختر حسابًا بنكيًا أولًا",
+    "accountsFailed": "تعذّر تحميل الحسابات البنكية.",
+    "failed": "تعذّر استيراد كشف الحساب",
+    "dropHere": "أفلت الملف هنا",
+    "dragOrClick": "اسحب الملف وأفلته هنا أو انقر للرفع",
+    "formats": "ملفات CSV وExcel وOFX وQFX",
+    "importing": "جارٍ استيراد الحركات...",
+    "total": "الإجمالي: {count}",
+    "imported": "تم استيراد {count}",
+    "duplicates": "تم تخطي {count} مكررة",
+    "rulesApplied": "طُبّقت {count} قاعدة",
+    "another": "استيراد ملف آخر"
   }
 }

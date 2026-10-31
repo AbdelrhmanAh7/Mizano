@@ -13,11 +13,17 @@ import { useTranslations } from 'next-intl';
 
 export default function NewBankAccountPage() {
   const t = useTranslations('banking');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const createBankAccount = useCreateBankAccount();
 
   // Fetch GL accounts for linking
-  const { data: accountsData, isLoading: accountsLoading } = useQuery({
+  const {
+    data: accountsData,
+    isLoading: accountsLoading,
+    isError: accountsFailed,
+    refetch: refetchAccounts,
+  } = useQuery({
     queryKey: ['accounts', { type: 'ASSET' }],
     queryFn: async () => {
       const response = await accountsApi.getAll({ type: 'ASSET' });
@@ -45,18 +51,29 @@ export default function NewBankAccountPage() {
     );
   }
 
+  if (accountsFailed) {
+    return (
+      <div className="text-center py-12 space-y-4" role="alert">
+        <p className="text-muted-foreground">{t('accounts.glAccountsFailed')}</p>
+        <Button variant="outline" onClick={() => void refetchAccounts()}>
+          {tCommon('dashboard.tryAgain')}
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label={tCommon('buttons.back')}>
           <Link href="/banking/accounts">
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
           </Link>
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('accounts.newAccount')}</h1>
-          <p className="text-muted-foreground">Add a new bank account to track your finances</p>
+          <p className="text-muted-foreground">{t('accounts.newDescription')}</p>
         </div>
       </div>
 

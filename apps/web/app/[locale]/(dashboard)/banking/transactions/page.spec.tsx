@@ -39,6 +39,10 @@ jest.mock('@/lib/hooks/use-bank-transactions', () => ({
   getStatusColor: () => '',
 }));
 
+jest.mock('@/lib/hooks/use-money-formatter', () => ({
+  useMoneyFormatter: () => (amount: number) => Number(amount).toFixed(2),
+}));
+
 jest.mock('@/components/banking/statement-import-zone', () => ({
   StatementImportZone: () => <div data-testid="import-zone">Import Zone</div>,
 }));

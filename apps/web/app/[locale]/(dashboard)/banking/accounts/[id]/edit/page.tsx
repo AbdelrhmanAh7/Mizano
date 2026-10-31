@@ -17,12 +17,23 @@ interface EditBankAccountPageProps {
 
 export default function EditBankAccountPage({ params }: EditBankAccountPageProps) {
   const t = useTranslations('banking');
+  const tCommon = useTranslations('common');
   const { id } = params;
   const router = useRouter();
-  const { data: account, isLoading: accountLoading } = useBankAccount(id);
+  const {
+    data: account,
+    isLoading: accountLoading,
+    isError: accountFailed,
+    refetch: refetchAccount,
+  } = useBankAccount(id);
   const updateBankAccount = useUpdateBankAccount();
 
-  const { data: accountsData, isLoading: accountsLoading } = useQuery({
+  const {
+    data: accountsData,
+    isLoading: accountsLoading,
+    isError: accountsFailed,
+    refetch: refetchAccounts,
+  } = useQuery({
     queryKey: ['accounts', { type: 'ASSET' }],
     queryFn: async () => {
       const response = await accountsApi.getAll({ type: 'ASSET' });
@@ -50,12 +61,26 @@ export default function EditBankAccountPage({ params }: EditBankAccountPageProps
     );
   }
 
+  if (accountFailed || accountsFailed) {
+    return (
+      <div className="text-center py-12 space-y-4" role="alert">
+        <p className="text-muted-foreground">{tCommon('errors.generic')}</p>
+        <Button
+          variant="outline"
+          onClick={() => void (accountFailed ? refetchAccount() : refetchAccounts())}
+        >
+          {tCommon('dashboard.tryAgain')}
+        </Button>
+      </div>
+    );
+  }
+
   if (!account) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Bank account not found</p>
+        <p className="text-muted-foreground">{t('reconciliation.accountNotFound')}</p>
         <Button asChild className="mt-4">
-          <Link href="/banking/accounts">Back to Accounts</Link>
+          <Link href="/banking/accounts">{t('accounts.backToAccounts')}</Link>
         </Button>
       </div>
     );
@@ -65,9 +90,9 @@ export default function EditBankAccountPage({ params }: EditBankAccountPageProps
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label={tCommon('buttons.back')}>
           <Link href={`/banking/accounts/${id}`}>
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
           </Link>
         </Button>
         <div>
