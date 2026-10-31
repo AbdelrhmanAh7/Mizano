@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   Users,
   Clock,
@@ -30,10 +30,22 @@ import {
 
 export default function HRPage() {
   const t = useTranslations('hr');
+  const tCommon = useTranslations('common');
+  const locale = useLocale();
 
   const { data: employeesData, isLoading: empLoading } = useEmployees({ limit: 200 });
-  const { data: payrollData, isLoading: payrollLoading } = usePayrollRuns({ limit: 20 });
-  const { data: deptSummary, isLoading: deptLoading } = useDepartmentSummary();
+  const {
+    data: payrollData,
+    isLoading: payrollLoading,
+    isError: payrollError,
+    refetch: refetchPayroll,
+  } = usePayrollRuns({ limit: 20 });
+  const {
+    data: deptSummary,
+    isLoading: deptLoading,
+    isError: deptError,
+    refetch: refetchDepts,
+  } = useDepartmentSummary();
 
   const employees = employeesData?.data || [];
   const payrollRuns = payrollData?.data || payrollData || [];
@@ -67,7 +79,7 @@ export default function HRPage() {
       icon: Users,
       href: '/hr/employees',
       color: 'bg-blue-500',
-      stats: `${activeCount} active`,
+      stats: t('activeCount', { count: activeCount }),
     },
     {
       title: t('attendance.title'),
@@ -83,7 +95,7 @@ export default function HRPage() {
       icon: DollarSign,
       href: '/hr/payroll',
       color: 'bg-purple-500',
-      stats: `${pendingPayroll} pending`,
+      stats: t('pendingCount', { count: pendingPayroll }),
     },
   ];
 
@@ -99,19 +111,19 @@ export default function HRPage() {
       <div className="flex flex-wrap gap-2">
         <Button asChild>
           <Link href="/hr/employees/new">
-            <UserPlus className="mr-2 h-4 w-4" />
+            <UserPlus className="me-2 h-4 w-4" />
             {t('hub.addEmployee')}
           </Link>
         </Button>
         <Button asChild variant="outline">
           <Link href="/hr/attendance/mark">
-            <ClipboardCheck className="mr-2 h-4 w-4" />
+            <ClipboardCheck className="me-2 h-4 w-4" />
             {t('hub.markAttendance')}
           </Link>
         </Button>
         <Button asChild variant="outline">
           <Link href="/hr/payroll/run">
-            <DollarSign className="mr-2 h-4 w-4" />
+            <DollarSign className="me-2 h-4 w-4" />
             {t('hub.runPayroll')}
           </Link>
         </Button>
@@ -215,7 +227,7 @@ export default function HRPage() {
               <Button asChild variant="outline" className="w-full group">
                 <Link href={module.href}>
                   {t('openModule', { title: module.title })}
-                  <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="ms-2 h-4 w-4 transition-transform group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
                 </Link>
               </Button>
             </CardContent>
@@ -242,13 +254,20 @@ export default function HRPage() {
                   <Skeleton key={i} className="h-12 w-full" />
                 ))}
               </div>
+            ) : payrollError ? (
+              <div className="py-8 text-center space-y-3" role="alert">
+                <p className="text-sm text-muted-foreground">{tCommon('table.error')}</p>
+                <Button variant="outline" size="sm" onClick={() => void refetchPayroll()}>
+                  {t('retry')}
+                </Button>
+              </div>
             ) : recentRuns.length === 0 ? (
               <div className="text-center py-8">
                 <DollarSign className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
                 <p className="text-muted-foreground text-sm">{t('hub.noRecentPayroll')}</p>
                 <Button asChild size="sm" className="mt-3">
                   <Link href="/hr/payroll/run">
-                    <Plus className="mr-2 h-4 w-4" />
+                    <Plus className="me-2 h-4 w-4" />
                     {t('hub.runPayroll')}
                   </Link>
                 </Button>
@@ -273,7 +292,7 @@ export default function HRPage() {
                           href={`/hr/payroll/${run.id}`}
                           className="font-medium hover:underline text-sm"
                         >
-                          {getMonthName(run.month)} {run.year}
+                          {getMonthName(run.month, locale)} {run.year}
                         </Link>
                         {run.employeeCount && (
                           <p className="text-xs text-muted-foreground">
@@ -281,13 +300,13 @@ export default function HRPage() {
                           </p>
                         )}
                       </div>
-                      <div className="text-right">
+                      <div className="text-end">
                         <Badge
                           className={getPayrollStatusColor(
                             run.status as 'DRAFT' | 'CONFIRMED' | 'PAID',
                           )}
                         >
-                          {getPayrollStatusLabel(run.status as 'DRAFT' | 'CONFIRMED' | 'PAID')}
+                          {getPayrollStatusLabel(run.status as 'DRAFT' | 'CONFIRMED' | 'PAID', t)}
                         </Badge>
                         <p className="text-sm font-mono mt-1">{formatCurrency(run.totalNet)}</p>
                       </div>
@@ -310,6 +329,13 @@ export default function HRPage() {
                 {[...Array(4)].map((_, i) => (
                   <Skeleton key={i} className="h-10 w-full" />
                 ))}
+              </div>
+            ) : deptError ? (
+              <div className="py-8 text-center space-y-3" role="alert">
+                <p className="text-sm text-muted-foreground">{tCommon('table.error')}</p>
+                <Button variant="outline" size="sm" onClick={() => void refetchDepts()}>
+                  {t('retry')}
+                </Button>
               </div>
             ) : departments.length === 0 ? (
               <div className="text-center py-8">

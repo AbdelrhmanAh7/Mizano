@@ -27,9 +27,15 @@ import { useDateFnsLocale } from '@/lib/date-locale';
 function PayrollPageContent() {
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('hr');
+  const tCommon = useTranslations('common');
   const tableParams = useTableParams({ defaultSortBy: 'createdAt' });
   const { hasPermission } = usePermissions();
-  const { data: payrollData, isLoading, refetch } = usePayrollRuns(tableParams.queryParams);
+  const {
+    data: payrollData,
+    isLoading,
+    isError,
+    refetch,
+  } = usePayrollRuns(tableParams.queryParams);
   const payrollRuns = payrollData?.data || [];
   const meta = payrollData?.meta;
 
@@ -45,26 +51,26 @@ function PayrollPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => payrollApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['payroll-runs']],
-    successMessage: '{count} payroll runs deleted',
+    successMessage: t.raw('payroll.bulk.deleteSuccess'),
   });
 
   const bulkProcessAction = useBulkAction({
     mutationFn: (ids) => payrollApi.bulkProcess(ids).then((r) => r.data),
     queryKeys: [['payroll-runs']],
-    successMessage: '{count} payroll runs processed',
+    successMessage: t.raw('payroll.bulk.processSuccess'),
   });
 
   const bulkPayAction = useBulkAction({
     mutationFn: (ids) => payrollApi.bulkPay(ids).then((r) => r.data),
     queryKeys: [['payroll-runs']],
-    successMessage: '{count} payroll runs marked as paid',
+    successMessage: t.raw('payroll.bulk.paySuccess'),
   });
 
   const bulkActions = [
     ...(canEdit
       ? [
           {
-            label: 'Process',
+            label: t('payroll.bulk.process'),
             icon: Play,
             onClick: (rows: { id: string }[]) => {
               setBulkSelectedRows(rows);
@@ -72,7 +78,7 @@ function PayrollPageContent() {
             },
           },
           {
-            label: 'Mark as Paid',
+            label: t('payroll.bulk.markPaid'),
             icon: DollarSign,
             onClick: (rows: { id: string }[]) => {
               setBulkSelectedRows(rows);
@@ -84,7 +90,7 @@ function PayrollPageContent() {
     ...(canDelete
       ? [
           {
-            label: 'Delete',
+            label: t('payroll.bulk.delete'),
             icon: Trash2,
             variant: 'destructive' as const,
             onClick: (rows: { id: string }[]) => {
@@ -120,7 +126,7 @@ function PayrollPageContent() {
       id: 'period',
       header: () => (
         <SortableHeader
-          label="Period"
+          label={t('payroll.table.period')}
           columnId="createdAt"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -129,37 +135,39 @@ function PayrollPageContent() {
       ),
       cell: ({ row }) => (
         <span className="font-medium">
-          {format(new Date(row.original.year, row.original.month - 1), 'MMMM yyyy')}
+          {format(new Date(row.original.year, row.original.month - 1), 'MMMM yyyy', {
+            locale: dateLocale,
+          })}
         </span>
       ),
     },
     {
       accessorKey: 'employeeCount',
-      header: 'Employees',
+      header: t('payroll.table.employeeCount'),
       cell: ({ row }) => row.original.employeeCount || 0,
     },
     {
       accessorKey: 'totalGross',
-      header: 'Gross Pay',
-      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      header: t('payroll.grossPay'),
+      meta: { headerClassName: 'text-end', cellClassName: 'text-end' },
       cell: ({ row }) => (
         <span className="font-mono">{formatCurrency(row.original.totalGross || 0)}</span>
       ),
     },
     {
       accessorKey: 'totalDeductions',
-      header: 'Deductions',
-      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      header: t('payroll.table.deductions'),
+      meta: { headerClassName: 'text-end', cellClassName: 'text-end' },
       cell: ({ row }) => (
         <span className="font-mono text-red-600">
-          -{formatCurrency(row.original.totalDeductions || 0)}
+          <span dir="ltr">-{formatCurrency(row.original.totalDeductions || 0)}</span>
         </span>
       ),
     },
     {
       accessorKey: 'totalNetPay',
-      header: 'Net Pay',
-      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      header: t('payroll.netPay'),
+      meta: { headerClassName: 'text-end', cellClassName: 'text-end' },
       cell: ({ row }) => (
         <span className="font-mono font-medium">
           {formatCurrency(row.original.totalNetPay || 0)}
@@ -168,19 +176,19 @@ function PayrollPageContent() {
     },
     {
       accessorKey: 'status',
-      header: 'Status',
+      header: t('payroll.table.status'),
       cell: ({ row }) => (
         <Badge
           variant="outline"
           className={getPayrollStatusColor(row.original.status as PayrollStatus)}
         >
-          {getPayrollStatusLabel(row.original.status as PayrollStatus)}
+          {getPayrollStatusLabel(row.original.status as PayrollStatus, t)}
         </Badge>
       ),
     },
     {
       accessorKey: 'createdAt',
-      header: 'Created',
+      header: t('payroll.createdColumn'),
       cell: ({ row }) => (
         <span className="text-muted-foreground">
           {format(new Date(row.original.createdAt), 'PP', { locale: dateLocale })}
@@ -191,7 +199,7 @@ function PayrollPageContent() {
       id: 'actions',
       header: '',
       cell: ({ row }) => (
-        <Button variant="ghost" size="sm" asChild>
+        <Button variant="ghost" size="sm" asChild aria-label={t('payroll.viewRun')}>
           <Link href={`/hr/payroll/${row.original.id}`}>
             <Eye className="h-4 w-4" />
           </Link>
@@ -206,11 +214,11 @@ function PayrollPageContent() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('payroll.title')}</h1>
-          <p className="text-muted-foreground">Manage payroll runs and process employee salaries</p>
+          <p className="text-muted-foreground">{t('payroll.listDescription')}</p>
         </div>
         <Button asChild>
           <Link href="/hr/payroll/run">
-            <Play className="mr-2 h-4 w-4" />
+            <Play className="me-2 h-4 w-4" />
             {t('payroll.newRun')}
           </Link>
         </Button>
@@ -225,7 +233,7 @@ function PayrollPageContent() {
                 <DollarSign className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Paid (YTD)</p>
+                <p className="text-sm text-muted-foreground">{t('payroll.totalPaid')}</p>
                 <p className="text-2xl font-bold font-mono">{formatCurrency(totalPaid)}</p>
               </div>
             </div>
@@ -238,7 +246,7 @@ function PayrollPageContent() {
                 <FileText className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Payroll Runs</p>
+                <p className="text-sm text-muted-foreground">{t('payroll.runsCount')}</p>
                 <p className="text-2xl font-bold">{payrollRuns.length}</p>
               </div>
             </div>
@@ -251,7 +259,7 @@ function PayrollPageContent() {
                 <Users className="h-5 w-5 text-yellow-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Pending</p>
+                <p className="text-sm text-muted-foreground">{t('payroll.pending')}</p>
                 <p className="text-2xl font-bold">{pendingRuns}</p>
               </div>
             </div>
@@ -264,7 +272,7 @@ function PayrollPageContent() {
                 <CheckCircle2 className="h-5 w-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Confirmed</p>
+                <p className="text-sm text-muted-foreground">{t('payroll.confirmed')}</p>
                 <p className="text-2xl font-bold">{confirmedRuns}</p>
               </div>
             </div>
@@ -275,31 +283,40 @@ function PayrollPageContent() {
       {/* Payroll Runs Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Payroll History</CardTitle>
+          <CardTitle>{t('payroll.history')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <DataTable
-            columns={columns}
-            data={payrollRuns}
-            page={meta?.page || 1}
-            totalPages={meta?.totalPages || 1}
-            total={meta?.total || 0}
-            limit={tableParams.limit}
-            onPageChange={tableParams.setPage}
-            onLimitChange={tableParams.setLimit}
-            isLoading={isLoading}
-            enableSelection
-            bulkActions={bulkActions}
-            emptyMessage={t('payroll.empty.title')}
-            emptyAction={
-              <Button asChild>
-                <Link href="/hr/payroll/run">
-                  <Play className="mr-2 h-4 w-4" />
-                  {t('payroll.newRun')}
-                </Link>
+          {isError ? (
+            <div className="py-8 text-center space-y-4" role="alert">
+              <p className="text-sm text-muted-foreground">{tCommon('table.error')}</p>
+              <Button variant="outline" onClick={() => void refetch()}>
+                {t('retry')}
               </Button>
-            }
-          />
+            </div>
+          ) : (
+            <DataTable
+              columns={columns}
+              data={payrollRuns}
+              page={meta?.page || 1}
+              totalPages={meta?.totalPages || 1}
+              total={meta?.total || 0}
+              limit={tableParams.limit}
+              onPageChange={tableParams.setPage}
+              onLimitChange={tableParams.setLimit}
+              isLoading={isLoading}
+              enableSelection
+              bulkActions={bulkActions}
+              emptyMessage={t('payroll.empty.title')}
+              emptyAction={
+                <Button asChild>
+                  <Link href="/hr/payroll/run">
+                    <Play className="me-2 h-4 w-4" />
+                    {t('payroll.newRun')}
+                  </Link>
+                </Button>
+              }
+            />
+          )}
         </CardContent>
       </Card>
 
@@ -310,7 +327,10 @@ function PayrollPageContent() {
         action="delete"
         count={bulkSelectedRows.length}
         itemType="payroll runs"
-        description="Only draft payroll runs will be deleted."
+        title={t('payroll.bulk.deleteTitle', { count: bulkSelectedRows.length })}
+        description={t('payroll.bulk.deleteDescription')}
+        confirmLabel={t('payroll.bulk.deleteConfirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         destructive
         isLoading={bulkDeleteAction.isLoading}
         onConfirm={async () => {
@@ -325,7 +345,10 @@ function PayrollPageContent() {
         action="process"
         count={bulkSelectedRows.length}
         itemType="payroll runs"
-        description="Draft payroll runs will be processed and calculations confirmed."
+        title={t('payroll.bulk.processTitle', { count: bulkSelectedRows.length })}
+        description={t('payroll.bulk.processDescription')}
+        confirmLabel={t('payroll.bulk.processConfirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         isLoading={bulkProcessAction.isLoading}
         onConfirm={async () => {
           await bulkProcessAction.execute(bulkSelectedRows.map((r) => r.id));
@@ -339,7 +362,10 @@ function PayrollPageContent() {
         action="mark as paid"
         count={bulkSelectedRows.length}
         itemType="payroll runs"
-        description="Confirmed payroll runs will be marked as paid."
+        title={t('payroll.bulk.payTitle', { count: bulkSelectedRows.length })}
+        description={t('payroll.bulk.payDescription')}
+        confirmLabel={t('payroll.bulk.payConfirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         isLoading={bulkPayAction.isLoading}
         onConfirm={async () => {
           await bulkPayAction.execute(bulkSelectedRows.map((r) => r.id));

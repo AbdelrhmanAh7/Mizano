@@ -2,11 +2,24 @@
 
 import api, { attendanceApi, employeesApi, payrollApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 
-// Types
-type ApiError = { response?: { data?: { message?: string } } };
+/** Toast copy for the HR mutations: `hr.toast.*`, with known API error codes translated. */
+function useHrToasts(): {
+  success: (key: string) => void;
+  failure: (error: unknown, fallbackKey: string) => void;
+} {
+  const t = useTranslations('hr.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
+  return {
+    success: (key) => toast.success(t(key)),
+    failure: (error, fallbackKey) =>
+      toast.error(getLocalizedApiErrorMessage(error, t(fallbackKey), tApiErrors)),
+  };
+}
 
 // Employee Types
 export interface Employee {
@@ -130,46 +143,49 @@ export function useEmployee(id: string) {
 
 export function useCreateEmployee() {
   const queryClient = useQueryClient();
+  const toasts = useHrToasts();
 
   return useMutation({
     mutationFn: employeesApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
-      toast.success('Employee created successfully');
+      toasts.success('employeeCreated');
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to create employee');
+    onError: (error: unknown) => {
+      toasts.failure(error, 'employeeCreateError');
     },
   });
 }
 
 export function useUpdateEmployee() {
   const queryClient = useQueryClient();
+  const toasts = useHrToasts();
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
       employeesApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
-      toast.success('Employee updated successfully');
+      toasts.success('employeeUpdated');
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to update employee');
+    onError: (error: unknown) => {
+      toasts.failure(error, 'employeeUpdateError');
     },
   });
 }
 
 export function useDeleteEmployee() {
   const queryClient = useQueryClient();
+  const toasts = useHrToasts();
 
   return useMutation({
     mutationFn: employeesApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
-      toast.success('Employee deleted successfully');
+      toasts.success('employeeDeleted');
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to delete employee');
+    onError: (error: unknown) => {
+      toasts.failure(error, 'employeeDeleteError');
     },
   });
 }
@@ -201,15 +217,16 @@ export function useAttendance(startDateOrParams?: string | AttendanceParams, end
 
 export function useBulkMarkAttendance() {
   const queryClient = useQueryClient();
+  const toasts = useHrToasts();
 
   return useMutation({
     mutationFn: attendanceApi.markBulk,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
-      toast.success('Attendance marked for all employees');
+      toasts.success('attendanceMarked');
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to mark attendance');
+    onError: (error: unknown) => {
+      toasts.failure(error, 'attendanceMarkError');
     },
   });
 }
@@ -247,6 +264,7 @@ export function usePayrollRun(id: string) {
 
 export function useRunPayroll() {
   const queryClient = useQueryClient();
+  const toasts = useHrToasts();
 
   return useMutation({
     mutationFn: async (data: { month: number; year: number }) => {
@@ -255,25 +273,26 @@ export function useRunPayroll() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payroll'] });
-      toast.success('Payroll run created');
+      toasts.success('payrollRunCreated');
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to run payroll');
+    onError: (error: unknown) => {
+      toasts.failure(error, 'payrollRunError');
     },
   });
 }
 
 export function useConfirmPayroll() {
   const queryClient = useQueryClient();
+  const toasts = useHrToasts();
 
   return useMutation({
     mutationFn: payrollApi.confirm,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payroll'] });
-      toast.success('Payroll confirmed');
+      toasts.success('payrollConfirmed');
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to confirm payroll');
+    onError: (error: unknown) => {
+      toasts.failure(error, 'payrollConfirmError');
     },
   });
 }
@@ -323,27 +342,33 @@ export function useDepartmentSummary() {
 }
 
 // Helper functions
-export const employeeStatusOptions = [
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'INACTIVE', label: 'Inactive' },
-  { value: 'TERMINATED', label: 'Terminated' },
-];
 
-export const attendanceStatusOptions = [
-  { value: 'PRESENT', label: 'Present' },
-  { value: 'ABSENT', label: 'Absent' },
-  { value: 'LEAVE', label: 'On Leave' },
-  { value: 'HALF_DAY', label: 'Half Day' },
-];
+/** A next-intl translator for the `hr` namespace (`useTranslations('hr')`). */
+type HrTranslator = (key: string) => string;
 
-export const payrollStatusOptions = [
-  { value: 'DRAFT', label: 'Draft' },
-  { value: 'CONFIRMED', label: 'Confirmed' },
-  { value: 'PAID', label: 'Paid' },
-];
+const EMPLOYEE_STATUS_KEYS: Record<string, string> = {
+  ACTIVE: 'employees.status.active',
+  INACTIVE: 'employees.status.inactive',
+  TERMINATED: 'employees.status.terminated',
+};
 
-export function getEmployeeStatusLabel(status: EmployeeStatus): string {
-  return employeeStatusOptions.find((s) => s.value === status)?.label || status || 'Unknown';
+const ATTENDANCE_STATUS_KEYS: Record<AttendanceStatus, string> = {
+  PRESENT: 'attendance.status.present',
+  ABSENT: 'attendance.status.absent',
+  LEAVE: 'attendance.status.leave',
+  HALF_DAY: 'attendance.status.halfDay',
+};
+
+const PAYROLL_STATUS_KEYS: Record<PayrollStatus, string> = {
+  DRAFT: 'payroll.status.draft',
+  CONFIRMED: 'payroll.status.confirmed',
+  PAID: 'payroll.status.paid',
+};
+
+/** The translated label of an employee status; the API value stays the option value. */
+export function getEmployeeStatusLabel(status: EmployeeStatus, t: HrTranslator): string {
+  const key = status ? EMPLOYEE_STATUS_KEYS[status] : undefined;
+  return key ? t(key) : status || t('unknownStatus');
 }
 
 export function getEmployeeStatusColor(status: EmployeeStatus): string {
@@ -355,8 +380,9 @@ export function getEmployeeStatusColor(status: EmployeeStatus): string {
   return (status && colors[status]) || colors.ACTIVE;
 }
 
-export function getAttendanceStatusLabel(status: AttendanceStatus): string {
-  return attendanceStatusOptions.find((s) => s.value === status)?.label || status;
+export function getAttendanceStatusLabel(status: AttendanceStatus, t: HrTranslator): string {
+  const key = ATTENDANCE_STATUS_KEYS[status];
+  return key ? t(key) : status;
 }
 
 export function getAttendanceStatusColor(status: AttendanceStatus): string {
@@ -369,8 +395,9 @@ export function getAttendanceStatusColor(status: AttendanceStatus): string {
   return colors[status] || colors.PRESENT;
 }
 
-export function getPayrollStatusLabel(status: PayrollStatus): string {
-  return payrollStatusOptions.find((s) => s.value === status)?.label || status;
+export function getPayrollStatusLabel(status: PayrollStatus, t: HrTranslator): string {
+  const key = PAYROLL_STATUS_KEYS[status];
+  return key ? t(key) : status;
 }
 
 export function getPayrollStatusColor(status: PayrollStatus): string {
@@ -391,20 +418,10 @@ export function formatCurrency(amount: string | number | null | undefined): stri
   }).format(num);
 }
 
-export function getMonthName(month: number): string {
-  const months = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-  ];
-  return months[month - 1] || '';
+/** The month name (1-12) in the page language, e.g. "October" or "أكتوبر". */
+export function getMonthName(month: number, locale: string): string {
+  if (month < 1 || month > 12) return '';
+  return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-u-nu-latn' : 'en-US', {
+    month: 'long',
+  }).format(new Date(2000, month - 1, 1));
 }

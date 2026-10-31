@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -21,27 +22,38 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { useDateFnsLocale } from '@/lib/date-locale';
 import { useCreateEmployee, useUpdateEmployee, Employee } from '@/lib/hooks/use-hr';
 
+// Validation messages are keys under `hr.employees.editor.errors`.
+const amountSchema = z
+  .number({ invalid_type_error: 'amountInvalid', required_error: 'amountInvalid' })
+  .min(0, 'amountInvalid');
+
 const allowanceSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  amount: z.number().min(0, 'Amount must be positive'),
+  name: z.string().min(1, 'itemNameRequired'),
+  amount: amountSchema,
 });
 
 const deductionSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  amount: z.number().min(0, 'Amount must be positive'),
+  name: z.string().min(1, 'itemNameRequired'),
+  amount: amountSchema,
 });
 
 const employeeSchema = z.object({
-  employeeNumber: z.string().min(1, 'Employee number is required'),
-  name: z.string().min(1, 'Name is required'),
-  email: z.string().email('Invalid email'),
+  employeeNumber: z.string().min(1, 'employeeNumberRequired'),
+  name: z.string().min(1, 'nameRequired'),
+  email: z.string().email('emailInvalid'),
   phone: z.string().optional(),
-  joiningDate: z.date({ required_error: 'Joining date is required' }),
+  joiningDate: z.date({
+    required_error: 'joiningDateRequired',
+    invalid_type_error: 'joiningDateRequired',
+  }),
   department: z.string().optional(),
   jobTitle: z.string().optional(),
-  basicSalary: z.number().min(0, 'Salary must be positive'),
+  basicSalary: z
+    .number({ invalid_type_error: 'salaryInvalid', required_error: 'salaryInvalid' })
+    .min(0, 'salaryInvalid'),
   allowances: z.array(allowanceSchema).default([]),
   deductions: z.array(deductionSchema).default([]),
   bankName: z.string().optional(),
@@ -57,7 +69,13 @@ interface EmployeeFormProps {
 }
 
 export function EmployeeForm({ employee }: EmployeeFormProps) {
+  const t = useTranslations('hr.employees.editor');
+  const tStatus = useTranslations('hr.employees.status');
+  const tCommon = useTranslations('common');
+  const dateLocale = useDateFnsLocale();
   const router = useRouter();
+  const errorText = (message: string | undefined) =>
+    message ? <p className="text-sm text-red-500">{t(`errors.${message}`)}</p> : null;
   const createEmployee = useCreateEmployee();
   const updateEmployee = useUpdateEmployee();
 
@@ -162,50 +180,43 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
       {/* Personal Information */}
       <Card>
         <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
-          <CardDescription>Basic employee details</CardDescription>
+          <CardTitle>{t('personalTitle')}</CardTitle>
+          <CardDescription>{t('personalDescription')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="employeeNumber">Employee Number *</Label>
+              <Label htmlFor="employeeNumber">{t('employeeNumber')} *</Label>
               <Input
                 id="employeeNumber"
                 placeholder="EMP-001"
                 {...form.register('employeeNumber')}
               />
-              {form.formState.errors.employeeNumber && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.employeeNumber.message}
-                </p>
-              )}
+              {errorText(form.formState.errors.employeeNumber?.message)}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name *</Label>
-              <Input id="name" placeholder="John Doe" {...form.register('name')} />
-              {form.formState.errors.name && (
-                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
-              )}
+              <Label htmlFor="name">{t('fullName')} *</Label>
+              <Input id="name" placeholder={t('fullNamePlaceholder')} {...form.register('name')} />
+              {errorText(form.formState.errors.name?.message)}
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
+              <Label htmlFor="email">{t('email')} *</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="john.doe@company.com"
+                placeholder="name@company.com"
+                dir="ltr"
                 {...form.register('email')}
               />
-              {form.formState.errors.email && (
-                <p className="text-sm text-red-500">{form.formState.errors.email.message}</p>
-              )}
+              {errorText(form.formState.errors.email?.message)}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
+              <Label htmlFor="phone">{t('phone')}</Label>
               <PhoneInput
                 id="phone"
                 value={form.watch('phone') || ''}
@@ -216,20 +227,20 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>Joining Date *</Label>
+              <Label>{t('joiningDate')} *</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     className={cn(
-                      'w-full justify-start text-left font-normal',
+                      'w-full justify-start text-start font-normal',
                       !form.watch('joiningDate') && 'text-muted-foreground',
                     )}
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    <CalendarIcon className="me-2 h-4 w-4" />
                     {form.watch('joiningDate') && isValid(form.watch('joiningDate'))
-                      ? format(form.watch('joiningDate'), 'PPP')
-                      : 'Pick a date'}
+                      ? format(form.watch('joiningDate'), 'PPP', { locale: dateLocale })
+                      : t('pickDate')}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -241,21 +252,30 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
                   />
                 </PopoverContent>
               </Popover>
+              {errorText(form.formState.errors.joiningDate?.message)}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="department">Department</Label>
-              <Input id="department" placeholder="Engineering" {...form.register('department')} />
+              <Label htmlFor="department">{t('department')}</Label>
+              <Input
+                id="department"
+                placeholder={t('departmentPlaceholder')}
+                {...form.register('department')}
+              />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="jobTitle">Job Title</Label>
-              <Input id="jobTitle" placeholder="Software Engineer" {...form.register('jobTitle')} />
+              <Label htmlFor="jobTitle">{t('jobTitle')}</Label>
+              <Input
+                id="jobTitle"
+                placeholder={t('jobTitlePlaceholder')}
+                {...form.register('jobTitle')}
+              />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label>Status</Label>
+            <Label>{t('status')}</Label>
             <Select
               value={form.watch('status')}
               onValueChange={(value: 'ACTIVE' | 'INACTIVE' | 'TERMINATED') =>
@@ -266,9 +286,9 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ACTIVE">Active</SelectItem>
-                <SelectItem value="INACTIVE">Inactive</SelectItem>
-                <SelectItem value="TERMINATED">Terminated</SelectItem>
+                <SelectItem value="ACTIVE">{tStatus('active')}</SelectItem>
+                <SelectItem value="INACTIVE">{tStatus('inactive')}</SelectItem>
+                <SelectItem value="TERMINATED">{tStatus('terminated')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -278,12 +298,12 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
       {/* Salary Structure */}
       <Card>
         <CardHeader>
-          <CardTitle>Salary Structure</CardTitle>
-          <CardDescription>Basic salary, allowances, and deductions</CardDescription>
+          <CardTitle>{t('salaryTitle')}</CardTitle>
+          <CardDescription>{t('salaryDescription')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="basicSalary">Basic Salary *</Label>
+            <Label htmlFor="basicSalary">{t('basicSalary')} *</Label>
             <Input
               id="basicSalary"
               type="number"
@@ -292,23 +312,21 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
               placeholder="5000.00"
               {...form.register('basicSalary', { valueAsNumber: true })}
             />
-            {form.formState.errors.basicSalary && (
-              <p className="text-sm text-red-500">{form.formState.errors.basicSalary.message}</p>
-            )}
+            {errorText(form.formState.errors.basicSalary?.message)}
           </div>
 
           {/* Allowances */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label>Allowances</Label>
+              <Label>{t('allowances')}</Label>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => appendAllowance({ name: '', amount: 0 })}
               >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Allowance
+                <Plus className="h-4 w-4 me-1" />
+                {t('addAllowance')}
               </Button>
             </div>
             {allowanceFields.length > 0 ? (
@@ -316,7 +334,8 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
                 {allowanceFields.map((field, index) => (
                   <div key={field.id} className="flex items-center gap-3">
                     <Input
-                      placeholder="Housing"
+                      placeholder={t('allowanceNamePlaceholder')}
+                      aria-label={t('allowanceName')}
                       {...form.register(`allowances.${index}.name`)}
                       className="flex-1"
                     />
@@ -325,6 +344,7 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
                       step="0.01"
                       min="0"
                       placeholder="0.00"
+                      aria-label={t('allowanceAmount')}
                       {...form.register(`allowances.${index}.amount`, { valueAsNumber: true })}
                       className="w-32"
                     />
@@ -333,7 +353,7 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
                       variant="ghost"
                       size="icon"
                       onClick={() => removeAllowance(index)}
-                      aria-label="Remove allowance"
+                      aria-label={t('removeAllowance')}
                     >
                       <Trash2 className="h-4 w-4 text-red-500" />
                     </Button>
@@ -341,22 +361,22 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No allowances added</p>
+              <p className="text-sm text-muted-foreground">{t('noAllowances')}</p>
             )}
           </div>
 
           {/* Deductions */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label>Deductions</Label>
+              <Label>{t('deductions')}</Label>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => appendDeduction({ name: '', amount: 0 })}
               >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Deduction
+                <Plus className="h-4 w-4 me-1" />
+                {t('addDeduction')}
               </Button>
             </div>
             {deductionFields.length > 0 ? (
@@ -364,7 +384,8 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
                 {deductionFields.map((field, index) => (
                   <div key={field.id} className="flex items-center gap-3">
                     <Input
-                      placeholder="Insurance"
+                      placeholder={t('deductionNamePlaceholder')}
+                      aria-label={t('deductionName')}
                       {...form.register(`deductions.${index}.name`)}
                       className="flex-1"
                     />
@@ -373,6 +394,7 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
                       step="0.01"
                       min="0"
                       placeholder="0.00"
+                      aria-label={t('deductionAmount')}
                       {...form.register(`deductions.${index}.amount`, { valueAsNumber: true })}
                       className="w-32"
                     />
@@ -381,7 +403,7 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
                       variant="ghost"
                       size="icon"
                       onClick={() => removeDeduction(index)}
-                      aria-label="Remove deduction"
+                      aria-label={t('removeDeduction')}
                     >
                       <Trash2 className="h-4 w-4 text-red-500" />
                     </Button>
@@ -389,30 +411,30 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No deductions added</p>
+              <p className="text-sm text-muted-foreground">{t('noDeductions')}</p>
             )}
           </div>
 
           {/* Salary Summary */}
           <div className="rounded-lg bg-muted p-4 space-y-2">
             <div className="flex justify-between">
-              <span>Basic Salary</span>
+              <span>{t('basicSalary')}</span>
               <span className="font-mono">{basicSalary.toLocaleString()}</span>
             </div>
             <div className="flex justify-between text-green-600">
-              <span>+ Allowances</span>
+              <span>{t('summaryAllowances')}</span>
               <span className="font-mono">{totalAllowances.toLocaleString()}</span>
             </div>
             <div className="flex justify-between border-t pt-2">
-              <span className="font-medium">Gross Salary</span>
+              <span className="font-medium">{t('grossSalary')}</span>
               <span className="font-mono font-medium">{grossSalary.toLocaleString()}</span>
             </div>
             <div className="flex justify-between text-red-600">
-              <span>- Deductions</span>
+              <span>{t('summaryDeductions')}</span>
               <span className="font-mono">{totalDeductions.toLocaleString()}</span>
             </div>
             <div className="flex justify-between border-t pt-2 text-lg">
-              <span className="font-bold">Net Salary</span>
+              <span className="font-bold">{t('netSalary')}</span>
               <span className="font-mono font-bold">{netSalary.toLocaleString()}</span>
             </div>
           </div>
@@ -422,18 +444,22 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
       {/* Banking Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Banking & Tax Details</CardTitle>
-          <CardDescription>Payment and tax information</CardDescription>
+          <CardTitle>{t('bankTitle')}</CardTitle>
+          <CardDescription>{t('bankDescription')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="bankName">Bank Name</Label>
-              <Input id="bankName" placeholder="National Bank" {...form.register('bankName')} />
+              <Label htmlFor="bankName">{t('bankName')}</Label>
+              <Input
+                id="bankName"
+                placeholder={t('bankNamePlaceholder')}
+                {...form.register('bankName')}
+              />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="bankAccountNumber">Account Number</Label>
+              <Label htmlFor="bankAccountNumber">{t('accountNumber')}</Label>
               <Input
                 id="bankAccountNumber"
                 placeholder="1234567890"
@@ -442,7 +468,7 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="taxId">Tax ID</Label>
+              <Label htmlFor="taxId">{t('taxId')}</Label>
               <Input id="taxId" placeholder="TAX-123456" {...form.register('taxId')} />
             </div>
           </div>
@@ -452,10 +478,10 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={() => router.back()}>
-          Cancel
+          {tCommon('buttons.cancel')}
         </Button>
         <Button type="submit" disabled={isPending}>
-          {isPending ? 'Saving...' : employee ? 'Update Employee' : 'Add Employee'}
+          {isPending ? tCommon('loading.saving') : employee ? t('submitUpdate') : t('submitCreate')}
         </Button>
       </div>
     </form>

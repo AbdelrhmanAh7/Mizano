@@ -34,10 +34,12 @@ import { Eye, Pencil, Plus, Trash2, UserCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function EmployeesPageContent() {
   const t = useTranslations('hr');
   const tCommon = useTranslations('common');
+  const dateLocale = useDateFnsLocale();
   const tableParams = useTableParams({ defaultSortBy: 'createdAt', mode: 'virtual' });
   const { onExportAll } = useExportAll('employees', 'employees');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -50,6 +52,8 @@ function EmployeesPageContent() {
     fetchNextPage,
     isFetchingNextPage,
     isLoading,
+    isError,
+    refetch,
   } = useInfiniteEmployees({
     ...tableParams.queryParams,
     status: statusFilter !== 'all' ? statusFilter : undefined,
@@ -92,7 +96,7 @@ function EmployeesPageContent() {
             <Link href={`/hr/employees/${employee.id}`} className="font-medium hover:underline">
               {employee.name}
             </Link>
-            <p className="text-sm text-muted-foreground">{employee.jobTitle || 'No title'}</p>
+            <p className="text-sm text-muted-foreground">{employee.jobTitle || t('noTitle')}</p>
           </div>
         );
       },
@@ -112,7 +116,7 @@ function EmployeesPageContent() {
       header: t('employees.table.status'),
       cell: ({ row }) => (
         <Badge variant="outline" className={getEmployeeStatusColor(row.original.status)}>
-          {getEmployeeStatusLabel(row.original.status)}
+          {getEmployeeStatusLabel(row.original.status, t)}
         </Badge>
       ),
     },
@@ -128,7 +132,9 @@ function EmployeesPageContent() {
         />
       ),
       cell: ({ row }) =>
-        row.original.dateOfJoining ? format(new Date(row.original.dateOfJoining), 'MMM yyyy') : '-',
+        row.original.dateOfJoining
+          ? format(new Date(row.original.dateOfJoining), 'MMM yyyy', { locale: dateLocale })
+          : '-',
     },
     {
       accessorKey: 'basicSalary',
@@ -141,39 +147,41 @@ function EmployeesPageContent() {
           onSort={tableParams.setSort}
         />
       ),
-      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      meta: { headerClassName: 'text-end', cellClassName: 'text-end' },
       cell: ({ row }) => (
-        <span className="font-mono font-medium">{formatCurrency(row.original.basicSalary)}/mo</span>
+        <span className="font-mono font-medium">
+          {t('employees.perMonth', { amount: formatCurrency(row.original.basicSalary) })}
+        </span>
       ),
     },
     {
       id: 'actions',
       header: '',
-      meta: { cellClassName: 'text-right' },
+      meta: { cellClassName: 'text-end' },
       cell: ({ row }) => {
         const employee = row.original;
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" aria-label={t('employees.rowActions')}>
                 ...
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem asChild>
                 <Link href={`/hr/employees/${employee.id}`}>
-                  <Eye className="mr-2 h-4 w-4" />
+                  <Eye className="me-2 h-4 w-4" />
                   {tCommon('buttons.view')}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href={`/hr/employees/${employee.id}/edit`}>
-                  <Pencil className="mr-2 h-4 w-4" />
+                  <Pencil className="me-2 h-4 w-4" />
                   {tCommon('buttons.edit')}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(employee.id)}>
-                <Trash2 className="mr-2 h-4 w-4" />
+                <Trash2 className="me-2 h-4 w-4" />
                 {tCommon('buttons.delete')}
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -193,7 +201,7 @@ function EmployeesPageContent() {
         </div>
         <Button asChild>
           <Link href="/hr/employees/new">
-            <Plus className="mr-2 h-4 w-4" />
+            <Plus className="me-2 h-4 w-4" />
             {t('employees.newEmployee')}
           </Link>
         </Button>
@@ -252,28 +260,37 @@ function EmployeesPageContent() {
           <CardTitle>{t('employees.title')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <DataTable
-            columns={columns}
-            data={employees}
-            total={total}
-            isLoading={isLoading}
-            enableVirtualization
-            hasNextPage={hasNextPage}
-            isFetchingNextPage={isFetchingNextPage}
-            onLoadMore={() => fetchNextPage()}
-            enableColumnResizing
-            tableId="employees"
-            onExportAll={onExportAll}
-            emptyMessage={t('employees.empty.title')}
-            emptyAction={
-              <Button asChild>
-                <Link href="/hr/employees/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  {t('employees.newEmployee')}
-                </Link>
+          {isError ? (
+            <div className="py-8 text-center space-y-4" role="alert">
+              <p className="text-sm text-muted-foreground">{tCommon('table.error')}</p>
+              <Button variant="outline" onClick={() => void refetch()}>
+                {t('retry')}
               </Button>
-            }
-          />
+            </div>
+          ) : (
+            <DataTable
+              columns={columns}
+              data={employees}
+              total={total}
+              isLoading={isLoading}
+              enableVirtualization
+              hasNextPage={hasNextPage}
+              isFetchingNextPage={isFetchingNextPage}
+              onLoadMore={() => fetchNextPage()}
+              enableColumnResizing
+              tableId="employees"
+              onExportAll={onExportAll}
+              emptyMessage={t('employees.empty.title')}
+              emptyAction={
+                <Button asChild>
+                  <Link href="/hr/employees/new">
+                    <Plus className="me-2 h-4 w-4" />
+                    {t('employees.newEmployee')}
+                  </Link>
+                </Button>
+              }
+            />
+          )}
         </CardContent>
       </Card>
 
