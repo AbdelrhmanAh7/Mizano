@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PaymentsReceivedService } from '../../sales/services/payments-received.service';
+import { RECEIVABLE_INVOICE_STATUSES } from '../../sales/services/invoices.service';
+import { PAYABLE_BILL_STATUSES } from '../../purchases/services/bills.service';
 import { ExpensesService } from '../../purchases/services/expenses.service';
 import { PaymentsMadeService } from '../../purchases/services/payments-made.service';
 import {
@@ -11,6 +13,29 @@ import {
   ReconciliationStatus,
 } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+
+/** At most this many open documents are scored per transaction (newest first). */
+const MATCH_CANDIDATE_LIMIT = 200;
+/** A balance up to 5 % above the transaction still reads as the same payment. */
+const MATCH_NEAR_RATIO = new Decimal('1.05');
+const DAY_MS = 86_400_000;
+
+/**
+ * Documents a bank line can settle: dated from a year before it to a week after it (a document is
+ * sometimes entered a few days after the money moved).
+ */
+function matchWindow(transactionDate: Date): { gte: Date; lte: Date } {
+  return {
+    gte: new Date(transactionDate.getTime() - 365 * DAY_MS),
+    lte: new Date(transactionDate.getTime() + 7 * DAY_MS),
+  };
+}
+
+/** An empty account currency means the base currency (the schema default). */
+function sameCurrency(accountCurrency: string | null, baseCurrency: string | null): boolean {
+  if (!accountCurrency || !baseCurrency) return true;
+  return accountCurrency.trim().toUpperCase() === baseCurrency.trim().toUpperCase();
+}
 
 export interface ReconciliationMatch {
   type: 'invoice' | 'bill';
@@ -27,39 +52,61 @@ export class ReconciliationService {
     private expensesService: ExpensesService,
   ) {}
 
+  /**
+   * Match suggestions for the latest pending transactions of one bank account. Only documents a
+   * confirmation could actually settle are offered (#586): posted and open (never draft, void or
+   * deleted), with an open balance that covers the transaction, dated within the match window.
+   * A bank account outside the base currency gets none, since confirming would be refused.
+   * Amounts compare as exact decimals. A person always confirms; nothing is matched here.
+   */
   async getSuggestions(organizationId: string, bankAccountId: string) {
     const pendingTransactions = await this.prisma.bankTransaction.findMany({
       where: { bankAccountId, organizationId, status: ReconciliationStatus.PENDING },
       orderBy: { date: 'desc' },
       take: 50,
     });
+    const postable =
+      pendingTransactions.length > 0 &&
+      (await this.isBaseCurrencyAccount(organizationId, bankAccountId));
 
     const suggestions = [];
     for (const transaction of pendingTransactions) {
-      const matches = await this.findMatches(organizationId, transaction);
+      const matches = postable ? await this.findMatches(organizationId, transaction) : [];
       suggestions.push({ transaction, matches });
     }
     return suggestions;
   }
 
   private async findMatches(organizationId: string, transaction: BankTransaction) {
-    const amount = parseFloat(transaction.amount.toString());
+    // Exact decimals end to end: a withdrawal may be stored negative, confirm posts its absolute.
+    const amount = transaction.amount.abs();
+    if (amount.isZero()) return [];
+    // Confirming allocates the whole amount, so the open balance must cover it; within 5 % above
+    // still reads as the same payment.
+    const nearCeiling = amount.mul(MATCH_NEAR_RATIO);
+    const dated = matchWindow(transaction.date);
     const matches: ReconciliationMatch[] = [];
+    const amountScore = (balanceDue: Decimal): number => {
+      if (balanceDue.equals(amount)) return 90;
+      return balanceDue.lessThanOrEqualTo(nearCeiling) ? 50 : 0;
+    };
 
     if (transaction.type === BankTransactionType.DEPOSIT) {
-      // Match against invoices
       const invoices = await this.prisma.invoice.findMany({
-        where: { organizationId, deletedAt: null, balanceDue: { gt: 0 } },
+        where: {
+          organizationId,
+          deletedAt: null,
+          status: { in: RECEIVABLE_INVOICE_STATUSES },
+          balanceDue: { gte: amount },
+          date: dated,
+        },
         include: { customer: { select: { id: true, name: true } } },
+        orderBy: { date: 'desc' },
+        take: MATCH_CANDIDATE_LIMIT,
       });
 
       for (const invoice of invoices) {
-        let confidence = 0;
-        const balanceDue = parseFloat(invoice.balanceDue.toString());
-
-        // Exact amount match
-        if (Math.abs(balanceDue - amount) < 0.01) confidence += 90;
-        else if (Math.abs(balanceDue - amount) / amount < 0.05) confidence += 50;
+        let confidence = amountScore(invoice.balanceDue);
 
         // Reference matching
         if (transaction.reference && transaction.reference.includes(invoice.invoiceNumber))
@@ -78,17 +125,21 @@ export class ReconciliationService {
         }
       }
     } else {
-      // Match against bills
       const bills = await this.prisma.bill.findMany({
-        where: { organizationId, deletedAt: null, balanceDue: { gt: 0 } },
+        where: {
+          organizationId,
+          deletedAt: null,
+          status: { in: PAYABLE_BILL_STATUSES },
+          balanceDue: { gte: amount },
+          date: dated,
+        },
         include: { vendor: { select: { id: true, name: true } } },
+        orderBy: { date: 'desc' },
+        take: MATCH_CANDIDATE_LIMIT,
       });
 
       for (const bill of bills) {
-        let confidence = 0;
-        const balanceDue = parseFloat(bill.balanceDue.toString());
-
-        if (Math.abs(balanceDue - amount) < 0.01) confidence += 90;
+        let confidence = bill.balanceDue.equals(amount) ? 90 : 0;
         if (transaction.reference && transaction.reference.includes(bill.billNumber))
           confidence = 100;
         if (
@@ -293,6 +344,25 @@ export class ReconciliationService {
     organizationId: string,
     bankAccountId: string,
   ): Promise<void> {
+    const { bankAccount, baseCurrency } = await this.accountCurrency(organizationId, bankAccountId);
+    if (!bankAccount) throw new NotFoundException('Bank account not found');
+    if (!sameCurrency(bankAccount.currency, baseCurrency)) {
+      throw new BadRequestException(
+        `Bank account currency ${bankAccount.currency} differs from the base currency ${baseCurrency}; foreign-currency transactions cannot be posted yet`,
+      );
+    }
+  }
+
+  /** The bank account belongs to the organization and is kept in its base currency. */
+  private async isBaseCurrencyAccount(
+    organizationId: string,
+    bankAccountId: string,
+  ): Promise<boolean> {
+    const { bankAccount, baseCurrency } = await this.accountCurrency(organizationId, bankAccountId);
+    return !!bankAccount && sameCurrency(bankAccount.currency, baseCurrency);
+  }
+
+  private async accountCurrency(organizationId: string, bankAccountId: string) {
     const [bankAccount, org] = await Promise.all([
       this.prisma.bankAccount.findFirst({
         where: { id: bankAccountId, organizationId },
@@ -303,16 +373,7 @@ export class ReconciliationService {
         select: { baseCurrency: true },
       }),
     ]);
-    if (!bankAccount) throw new NotFoundException('Bank account not found');
-    if (
-      bankAccount.currency &&
-      org &&
-      bankAccount.currency.trim().toUpperCase() !== org.baseCurrency.trim().toUpperCase()
-    ) {
-      throw new BadRequestException(
-        `Bank account currency ${bankAccount.currency} differs from the base currency ${org.baseCurrency}; foreign-currency transactions cannot be posted yet`,
-      );
-    }
+    return { bankAccount, baseCurrency: org?.baseCurrency ?? null };
   }
 
   async getSummary(organizationId: string, bankAccountId: string) {
