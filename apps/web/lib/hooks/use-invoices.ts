@@ -51,6 +51,8 @@ export interface Invoice {
   shippingAmount: string;
   grandTotal: string;
   balanceDue: string;
+  /** Null means the organization base currency. */
+  currencyCode?: string | null;
   notes: string | null;
   terms: string | null;
   lines: InvoiceLine[];

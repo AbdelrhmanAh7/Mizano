@@ -331,6 +331,33 @@
       "quantityRequired": "الكمية مطلوبة",
       "rateRequired": "السعر مطلوب",
       "lineItemRequired": "يلزم بند واحد على الأقل"
+    },
+    "detail": {
+      "grandTotal": "الإجمالي الكلي",
+      "amountPaid": "المبلغ المدفوع",
+      "balanceDue": "الرصيد المستحق",
+      "dueDate": "تاريخ الاستحقاق",
+      "dates": "التواريخ",
+      "overdue": "(متأخرة)",
+      "additionalInfo": "معلومات إضافية",
+      "noLineItems": "لا توجد بنود",
+      "noCustomer": "لم يُحدَّد عميل",
+      "paymentHistory": "سجل المدفوعات",
+      "paymentNumber": "رقم الدفعة",
+      "date": "التاريخ",
+      "amountApplied": "المبلغ المخصص",
+      "creditNotes": "إشعارات الائتمان",
+      "creditNoteNumber": "رقم إشعار الائتمان",
+      "amount": "المبلغ",
+      "deleteConfirm": "هل أنت متأكد من حذف الفاتورة \"{number}\"؟ لا يمكن التراجع عن هذا الإجراء.",
+      "sendConfirm": "هل تريد تعليم الفاتورة \"{number}\" كمرسلة؟ سيُنشأ قيد محاسبي ولن تتمكن من تعديلها بعد ذلك.",
+      "voidConfirm": "هل أنت متأكد من إلغاء الفاتورة \"{number}\"؟ لا يمكن التراجع عن هذا الإجراء.",
+      "exportPdf": "تصدير PDF",
+      "print": "طباعة",
+      "email": "البريد الإلكتروني",
+      "comingSoon": "قريبًا",
+      "pdfError": "تعذّر إنشاء ملف PDF",
+      "pdfErrorDescription": "يُرجى المحاولة مرة أخرى بعد قليل."
     }
   },
   "creditNotes": {

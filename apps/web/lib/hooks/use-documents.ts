@@ -58,10 +58,18 @@ export interface EmailLog {
 
 // ============ API Functions ============
 
+/** Language of a generated document; Arabic renders right-to-left. */
+export type DocumentLocale = 'en' | 'ar';
+
+export function documentLocaleFor(appLocale: string): DocumentLocale {
+  return appLocale === 'ar' ? 'ar' : 'en';
+}
+
 const documentsApi = {
   // Invoice PDFs
-  getInvoicePdf: async (invoiceId: string) => {
+  getInvoicePdf: async (invoiceId: string, locale?: DocumentLocale): Promise<Blob> => {
     const response = await api.get(`/documents/invoice/${invoiceId}/pdf`, {
+      params: locale ? { locale } : undefined,
       responseType: 'blob',
     });
     return response.data;
@@ -164,6 +172,53 @@ const documentsApi = {
     return response.data;
   },
 };
+
+// ============ Invoice PDF actions ============
+
+function pdfBlob(data: Blob): Blob {
+  return data.type === 'application/pdf' ? data : new Blob([data], { type: 'application/pdf' });
+}
+
+/** Downloads the invoice PDF (GET /documents/invoice/:id/pdf, `sales.view`) as `<number>.pdf`. */
+export async function downloadInvoicePdf(
+  invoiceId: string,
+  invoiceNumber: string,
+  locale: DocumentLocale,
+): Promise<void> {
+  const blob = pdfBlob(await documentsApi.getInvoicePdf(invoiceId, locale));
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  // Keep the number readable (Arabic too); drop only characters file systems refuse.
+  link.download = `${invoiceNumber.replace(/[\\/:*?"<>|\s]+/g, '_') || 'invoice'}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+/**
+ * Opens the invoice PDF in a new tab for printing. The tab must be opened synchronously in the
+ * click handler (popup blockers allow nothing later), so call this directly from onClick; it
+ * closes the tab again if the PDF cannot be generated.
+ */
+export async function openInvoicePdfForPrint(
+  invoiceId: string,
+  locale: DocumentLocale,
+): Promise<void> {
+  const tab = window.open('', '_blank');
+  try {
+    const blob = pdfBlob(await documentsApi.getInvoicePdf(invoiceId, locale));
+    const url = window.URL.createObjectURL(blob);
+    if (tab) tab.location.href = url;
+    else window.location.assign(url);
+    // The viewer has loaded the bytes long before this; keep the URL alive for its own save.
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 5 * 60_000);
+  } catch (error) {
+    tab?.close();
+    throw error;
+  }
+}
 
 // ============ Hooks - Invoice ============
 

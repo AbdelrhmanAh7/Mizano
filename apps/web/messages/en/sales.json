@@ -331,6 +331,33 @@
       "quantityRequired": "Quantity is required",
       "rateRequired": "Rate is required",
       "lineItemRequired": "At least one line item is required"
+    },
+    "detail": {
+      "grandTotal": "Grand Total",
+      "amountPaid": "Amount Paid",
+      "balanceDue": "Balance Due",
+      "dueDate": "Due Date",
+      "dates": "Dates",
+      "overdue": "(Overdue)",
+      "additionalInfo": "Additional Info",
+      "noLineItems": "No line items",
+      "noCustomer": "No customer assigned",
+      "paymentHistory": "Payment History",
+      "paymentNumber": "Payment #",
+      "date": "Date",
+      "amountApplied": "Amount Applied",
+      "creditNotes": "Credit Notes",
+      "creditNoteNumber": "Credit Note #",
+      "amount": "Amount",
+      "deleteConfirm": "Are you sure you want to delete invoice \"{number}\"? This action cannot be undone.",
+      "sendConfirm": "Are you sure you want to mark invoice \"{number}\" as sent? This will create an accounting entry and you won't be able to edit it anymore.",
+      "voidConfirm": "Are you sure you want to void invoice \"{number}\"? This action cannot be undone.",
+      "exportPdf": "Export PDF",
+      "print": "Print",
+      "email": "Email",
+      "comingSoon": "Coming soon",
+      "pdfError": "Could not create the PDF",
+      "pdfErrorDescription": "Please try again in a moment."
     }
   },
   "creditNotes": {
