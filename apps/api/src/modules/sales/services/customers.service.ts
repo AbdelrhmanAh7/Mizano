@@ -19,9 +19,16 @@ export class CustomersService {
     @Optional() private outbox?: WebhookOutboxService,
   ) {}
 
-  async create(organizationId: string, createCustomerDto: CreateCustomerDto) {
-    // One transaction so the customer.created outbox event commits with the customer.
-    return this.prisma.$transaction(async (tx) => {
+  /**
+   * Creates a customer and its customer.created outbox event in one transaction. Pass
+   * `options.tx` to compose it into a caller's transaction (integration idempotency, audit F1).
+   */
+  async create(
+    organizationId: string,
+    createCustomerDto: CreateCustomerDto,
+    options: { tx?: Prisma.TransactionClient } = {},
+  ) {
+    const run = async (tx: Prisma.TransactionClient) => {
       const customer = await tx.customer.create({
         data: {
           ...createCustomerDto,
@@ -40,7 +47,8 @@ export class CustomersService {
       });
       await this.outbox?.customerCreated(tx, organizationId, customer);
       return customer;
-    });
+    };
+    return options.tx ? run(options.tx) : this.prisma.$transaction(run);
   }
 
   async findAll(organizationId: string, query: PaginationDto) {

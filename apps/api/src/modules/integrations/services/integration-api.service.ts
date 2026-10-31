@@ -41,6 +41,21 @@ export interface IdempotentResult {
   replayed: boolean;
 }
 
+/** Database handle for reads that must see the caller's uncommitted writes. */
+type Db = Prisma.TransactionClient | PrismaService;
+
+/**
+ * An integration write. It runs inside the transaction that also stores its idempotency record,
+ * and registers side effects that must wait for the commit (realtime pushes) with `afterCommit`.
+ */
+export type IntegrationWrite = (
+  tx: Prisma.TransactionClient,
+  afterCommit: (effect: () => void) => void,
+) => Promise<unknown>;
+
+/** Room for a document write plus the idempotency record on the Pi (Prisma's default is 5 s). */
+const WRITE_TX_OPTIONS = { maxWait: 5_000, timeout: 15_000 };
+
 const CUSTOMER_SHAPE_SELECT = {
   id: true,
   name: true,
@@ -119,8 +134,8 @@ export class IntegrationApiService {
     return { data: { ...serializeCustomer(c), balance: await this.customerBalance(orgId, id) } };
   }
 
-  async createCustomer(orgId: string, dto: CreateCustomerDto) {
-    const created = await this.customers.create(orgId, dto);
+  async createCustomer(orgId: string, dto: CreateCustomerDto, tx?: Prisma.TransactionClient) {
+    const created = await this.customers.create(orgId, dto, { tx });
     return { data: serializeCustomer(created) };
   }
 
@@ -157,22 +172,21 @@ export class IntegrationApiService {
     };
   }
 
-  async getInvoice(orgId: string, id: string) {
-    const [inv, base] = await Promise.all([
-      this.prisma.invoice.findFirst({
-        where: { id, organizationId: orgId, deletedAt: null },
-        include: INVOICE_SHAPE_INCLUDE,
-      }),
-      this.baseCurrency(orgId),
-    ]);
+  async getInvoice(orgId: string, id: string, db: Db = this.prisma) {
+    // Sequential: a transaction client runs one query at a time anyway.
+    const inv = await db.invoice.findFirst({
+      where: { id, organizationId: orgId, deletedAt: null },
+      include: INVOICE_SHAPE_INCLUDE,
+    });
+    const base = await this.baseCurrency(orgId, db);
     if (!inv) throw new NotFoundException('Invoice not found');
     return { data: serializeInvoice(inv, base) };
   }
 
   /** Creates a DRAFT invoice with the web app's command (an accountant sends it). */
-  async createInvoice(orgId: string, dto: CreateInvoiceDto) {
-    const created = await this.invoices.create(orgId, dto);
-    return this.getInvoice(orgId, created.id);
+  async createInvoice(orgId: string, dto: CreateInvoiceDto, tx?: Prisma.TransactionClient) {
+    const created = await this.invoices.create(orgId, dto, { tx });
+    return this.getInvoice(orgId, created.id, tx);
   }
 
   // ── Balances ──────────────────────────────────────────
@@ -241,11 +255,16 @@ export class IntegrationApiService {
 
   // ── Notes ─────────────────────────────────────────────
 
-  async createNote(p: IntegrationPrincipal, dto: CreateIntegrationNoteDto) {
+  async createNote(
+    p: IntegrationPrincipal,
+    dto: CreateIntegrationNoteDto,
+    tx?: Prisma.TransactionClient,
+    afterCommit: (effect: () => void) => void = (effect) => effect(),
+  ) {
     const orgId = p.organizationId;
-    const label = await this.assertNoteTarget(orgId, dto.entityType, dto.entityId);
-    const note = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.integrationNote.create({
+    const label = await this.assertNoteTarget(orgId, dto.entityType, dto.entityId, tx);
+    const write = async (db: Prisma.TransactionClient) => {
+      const created = await db.integrationNote.create({
         data: {
           organizationId: orgId,
           apiKeyId: p.apiKeyId,
@@ -255,7 +274,7 @@ export class IntegrationApiService {
         },
       });
       // The key owner sees the note in the in-app bell, linked to the record.
-      await tx.notification.create({
+      await db.notification.create({
         data: {
           organizationId: orgId,
           userId: p.id,
@@ -267,16 +286,20 @@ export class IntegrationApiService {
         },
       });
       return created;
-    });
-    // Same realtime path as other in-app notifications (EntityEventListener -> gateway).
-    this.events.emit('notification.created', {
-      organizationId: orgId,
-      title: `${p.apiKeyName}: ${label}`.slice(0, 200),
-      message: dto.body.slice(0, 500),
-      type: 'integration.note',
-      entityType: dto.entityType,
-      entityId: dto.entityId,
-    });
+    };
+    const note = await (tx ? write(tx) : this.prisma.$transaction(write));
+    // Same realtime path as other in-app notifications (EntityEventListener -> gateway), once
+    // the note has committed.
+    afterCommit(() =>
+      this.events.emit('notification.created', {
+        organizationId: orgId,
+        title: `${p.apiKeyName}: ${label}`.slice(0, 200),
+        message: dto.body.slice(0, 500),
+        type: 'integration.note',
+        entityType: dto.entityType,
+        entityId: dto.entityId,
+      }),
+    );
     return { data: this.noteShape(note, p.apiKeyName) };
   }
 
@@ -310,9 +333,10 @@ export class IntegrationApiService {
     orgId: string,
     entityType: string,
     entityId: string,
+    db: Db = this.prisma,
   ): Promise<string> {
     if (entityType === 'customer') {
-      const c = await this.prisma.customer.findFirst({
+      const c = await db.customer.findFirst({
         where: { id: entityId, organizationId: orgId, deletedAt: null },
         select: { name: true },
       });
@@ -320,7 +344,7 @@ export class IntegrationApiService {
       return c.name;
     }
     if (entityType === 'invoice') {
-      const i = await this.prisma.invoice.findFirst({
+      const i = await db.invoice.findFirst({
         where: { id: entityId, organizationId: orgId, deletedAt: null },
         select: { invoiceNumber: true },
       });
@@ -334,18 +358,33 @@ export class IntegrationApiService {
 
   /**
    * Runs `fn` at most once per (key, Idempotency-Key). A repeat with the same body replays the
-   * stored response; a different body is 422; a repeat while the first is still running is 409
-   * (retry later). A failed first attempt frees the key so the client can retry.
+   * stored response; a different body is 422.
+   *
+   * The record `fn` writes, its outbox events and the idempotency record with the response
+   * commit in one transaction (audit F1). A crash or a failed write leaves neither, so a retry
+   * runs cleanly instead of getting 409 for a day or, after the purge, writing a duplicate. A
+   * concurrent duplicate waits on the key's unique index and then replays the winner.
    */
   async idempotent(
     p: IntegrationPrincipal,
     idempotencyKey: string | undefined,
     request: { method: string; path: string; body: unknown },
     successStatus: number,
-    fn: () => Promise<unknown>,
+    fn: IntegrationWrite,
   ): Promise<IdempotentResult> {
+    const effects: Array<() => void> = [];
+    const afterCommit = (effect: () => void) => {
+      effects.push(effect);
+    };
+    const committed = (body: unknown): IdempotentResult => {
+      for (const effect of effects) effect();
+      return { status: successStatus, body, replayed: false };
+    };
+
     if (idempotencyKey === undefined || idempotencyKey === '') {
-      return { status: successStatus, body: await fn(), replayed: false };
+      return committed(
+        await this.prisma.$transaction((tx) => fn(tx, afterCommit), WRITE_TX_OPTIONS),
+      );
     }
     if (!IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
       throw new BadRequestException('Idempotency-Key must be 1-200 printable ASCII characters');
@@ -354,51 +393,66 @@ export class IntegrationApiService {
       .update(`${request.method} ${request.path}\n${JSON.stringify(request.body ?? null)}`)
       .digest('hex');
 
-    let rowId: string;
-    try {
-      const row = await this.prisma.integrationIdempotencyKey.create({
-        data: {
-          organizationId: p.organizationId,
-          apiKeyId: p.apiKeyId,
-          key: idempotencyKey,
-          requestHash,
-        },
-        select: { id: true },
-      });
-      rowId = row.id;
-    } catch (error) {
-      if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'))
-        throw error;
-      const existing = await this.prisma.integrationIdempotencyKey.findUnique({
-        where: { apiKeyId_key: { apiKeyId: p.apiKeyId, key: idempotencyKey } },
-      });
-      if (!existing) throw new ConflictException('Idempotency-Key is being reused; retry');
-      if (existing.requestHash !== requestHash) {
-        throw new UnprocessableEntityException(
-          'Idempotency-Key was already used with a different request',
-        );
-      }
-      if (existing.responseStatus === null) {
-        throw new ConflictException('A request with this Idempotency-Key is still in progress');
-      }
-      return { status: existing.responseStatus, body: existing.responseBody, replayed: true };
-    }
+    const existing = await this.findIdempotencyKey(p, idempotencyKey);
+    if (existing) return this.replay(existing, requestHash);
 
-    let body: unknown;
+    let keyClaimed = false;
     try {
-      body = await fn();
+      const body = await this.prisma.$transaction(async (tx) => {
+        const row = await tx.integrationIdempotencyKey.create({
+          data: {
+            organizationId: p.organizationId,
+            apiKeyId: p.apiKeyId,
+            key: idempotencyKey,
+            requestHash,
+          },
+          select: { id: true },
+        });
+        keyClaimed = true;
+        const result = await fn(tx, afterCommit);
+        await tx.integrationIdempotencyKey.update({
+          where: { id: row.id },
+          data: {
+            responseStatus: successStatus,
+            responseBody: JSON.parse(JSON.stringify(result ?? null)) as Prisma.InputJsonValue,
+          },
+        });
+        return result;
+      }, WRITE_TX_OPTIONS);
+      return committed(body);
     } catch (error) {
-      await this.prisma.integrationIdempotencyKey
-        .delete({ where: { id: rowId } })
-        .catch(() => undefined);
-      throw error;
+      // Only a unique violation on claiming the key means another request won it.
+      const lostTheKey =
+        !keyClaimed &&
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002';
+      if (!lostTheKey) throw error;
+      const winner = await this.findIdempotencyKey(p, idempotencyKey);
+      if (!winner) throw new ConflictException('Idempotency-Key is being reused; retry');
+      return this.replay(winner, requestHash);
     }
-    const stored = JSON.parse(JSON.stringify(body ?? null)) as Prisma.InputJsonValue;
-    await this.prisma.integrationIdempotencyKey.update({
-      where: { id: rowId },
-      data: { responseStatus: successStatus, responseBody: stored },
+  }
+
+  private findIdempotencyKey(p: IntegrationPrincipal, key: string) {
+    return this.prisma.integrationIdempotencyKey.findUnique({
+      where: { apiKeyId_key: { apiKeyId: p.apiKeyId, key } },
     });
-    return { status: successStatus, body, replayed: false };
+  }
+
+  private replay(
+    existing: { requestHash: string; responseStatus: number | null; responseBody: unknown },
+    requestHash: string,
+  ): IdempotentResult {
+    if (existing.requestHash !== requestHash) {
+      throw new UnprocessableEntityException(
+        'Idempotency-Key was already used with a different request',
+      );
+    }
+    if (existing.responseStatus === null) {
+      // Only rows written before records and keys committed together can lack a response.
+      throw new ConflictException('A request with this Idempotency-Key is still in progress');
+    }
+    return { status: existing.responseStatus, body: existing.responseBody, replayed: true };
   }
 
   @Cron('0 23 3 * * *', { name: 'integration-idempotency-cleanup' })
@@ -409,8 +463,8 @@ export class IntegrationApiService {
     return count;
   }
 
-  private async baseCurrency(orgId: string): Promise<string> {
-    const org = await this.prisma.organization.findUnique({
+  private async baseCurrency(orgId: string, db: Db = this.prisma): Promise<string> {
+    const org = await db.organization.findUnique({
       where: { id: orgId },
       select: { baseCurrency: true },
     });

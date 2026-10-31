@@ -315,21 +315,30 @@ describe('IntegrationApiService.idempotent', () => {
   };
   const req = { method: 'POST', path: '/integrations/v1/customers', body: { name: 'A' } };
 
+  type Row = {
+    id: string;
+    requestHash: string;
+    responseStatus: number | null;
+    responseBody: unknown;
+  };
+
+  /**
+   * An in-memory store with transactional semantics: `$transaction` works on a copy and only
+   * replaces the committed state when its callback succeeds, like Postgres rolling back.
+   */
   function service() {
-    const rows = new Map<
-      string,
-      { id: string; requestHash: string; responseStatus: number | null; responseBody: unknown }
-    >();
-    const prisma = {
+    let rows = new Map<string, Row>();
+    let customers: string[] = [];
+    const store = (state: { rows: Map<string, Row>; customers: string[] }) => ({
       integrationIdempotencyKey: {
         create: jest.fn(async ({ data }: { data: { key: string; requestHash: string } }) => {
-          if (rows.has(data.key)) {
+          if (state.rows.has(data.key)) {
             throw new Prisma.PrismaClientKnownRequestError('dup', {
               code: 'P2002',
               clientVersion: 'x',
             });
           }
-          rows.set(data.key, {
+          state.rows.set(data.key, {
             id: data.key,
             requestHash: data.requestHash,
             responseStatus: null,
@@ -339,21 +348,40 @@ describe('IntegrationApiService.idempotent', () => {
         }),
         findUnique: jest.fn(
           async ({ where }: { where: { apiKeyId_key: { key: string } } }) =>
+            state.rows.get(where.apiKeyId_key.key) ?? null,
+        ),
+        update: jest.fn(async ({ where, data }: { where: { id: string }; data: Partial<Row> }) => {
+          if (failNextResponseUpdate) {
+            failNextResponseUpdate = false;
+            throw new Error('connection lost');
+          }
+          state.rows.set(where.id, { ...state.rows.get(where.id)!, ...data });
+        }),
+      },
+      customer: {
+        create: jest.fn(async ({ data }: { data: { name: string } }) => {
+          state.customers.push(data.name);
+          return { id: `c${state.customers.length}` };
+        }),
+      },
+    });
+    let failNextResponseUpdate = false;
+    const committed = () => store({ rows, customers });
+    const prisma = {
+      ...committed(),
+      integrationIdempotencyKey: {
+        findUnique: jest.fn(
+          async ({ where }: { where: { apiKeyId_key: { key: string } } }) =>
             rows.get(where.apiKeyId_key.key) ?? null,
         ),
-        update: jest.fn(
-          async ({
-            where,
-            data,
-          }: {
-            where: { id: string };
-            data: { responseStatus: number; responseBody: unknown };
-          }) => {
-            Object.assign(rows.get(where.id)!, data);
-          },
-        ),
-        delete: jest.fn(async ({ where }: { where: { id: string } }) => rows.delete(where.id)),
       },
+      $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+        const draft = { rows: new Map(rows), customers: [...customers] };
+        const result = await fn(store(draft));
+        rows = draft.rows;
+        customers = draft.customers;
+        return result;
+      }),
     };
     const svc = new IntegrationApiService(
       prisma as unknown as PrismaService,
@@ -361,28 +389,79 @@ describe('IntegrationApiService.idempotent', () => {
       {} as never,
       { emit: jest.fn() } as never,
     );
-    return { svc, rows };
+    return {
+      svc,
+      prisma,
+      rows: () => rows,
+      setRow: (key: string, row: Row) => rows.set(key, row),
+      customers: () => customers,
+      failNextResponseUpdate: () => {
+        failNextResponseUpdate = true;
+      },
+    };
   }
 
+  /** The integration write under test: creates a customer in the given transaction. */
+  const createCustomer = async (tx: unknown) => {
+    const t = tx as { customer: { create: (a: { data: { name: string } }) => Promise<unknown> } };
+    return { data: await t.customer.create({ data: { name: 'A' } }) };
+  };
+
   it('runs once and replays the stored response for the same request', async () => {
-    const { svc } = service();
-    const fn = jest.fn().mockResolvedValue({ data: { id: 'c1' } });
+    const { svc, customers } = service();
+    const fn = jest.fn(createCustomer);
     const first = await svc.idempotent(principal, 'k-1', req, 201, fn);
     const second = await svc.idempotent(principal, 'k-1', req, 201, fn);
     expect(fn).toHaveBeenCalledTimes(1);
+    expect(customers()).toEqual(['A']);
     expect(first).toMatchObject({ status: 201, replayed: false });
     expect(second).toEqual({ status: 201, body: { data: { id: 'c1' } }, replayed: true });
   });
 
-  it('rejects a different body with the same key (422) and an in-flight duplicate (409)', async () => {
-    const { svc, rows } = service();
+  it('commits the record and its idempotency key together (audit F1)', async () => {
+    const { svc, rows, customers, failNextResponseUpdate } = service();
+    // The customer is written, then storing the response fails (crash, lost connection).
+    failNextResponseUpdate();
+    await expect(svc.idempotent(principal, 'k-1', req, 201, createCustomer)).rejects.toThrow(
+      'connection lost',
+    );
+    // Neither the customer nor an in-progress key survives, so the retry is not a 409 and
+    // does not create a second customer.
+    expect(customers()).toEqual([]);
+    expect(rows().has('k-1')).toBe(false);
+    await expect(svc.idempotent(principal, 'k-1', req, 201, createCustomer)).resolves.toMatchObject(
+      { status: 201, replayed: false },
+    );
+    expect(customers()).toEqual(['A']);
+    expect(rows().get('k-1')).toMatchObject({ responseStatus: 201 });
+  });
+
+  it('replays the winner when a concurrent duplicate loses the key at insert', async () => {
+    const { svc, prisma, rows, setRow, customers } = service();
+    await svc.idempotent(principal, 'k-0', req, 201, createCustomer);
+    const requestHash = rows().get('k-0')!.requestHash;
+    // The pre-check misses the winner, which commits before this request claims the key.
+    prisma.integrationIdempotencyKey.findUnique.mockImplementationOnce(async () => {
+      setRow('k-1', { id: 'k-1', requestHash, responseStatus: 201, responseBody: { won: true } });
+      return null;
+    });
+    await expect(svc.idempotent(principal, 'k-1', req, 201, createCustomer)).resolves.toEqual({
+      status: 201,
+      body: { won: true },
+      replayed: true,
+    });
+    expect(customers()).toEqual(['A']);
+  });
+
+  it('rejects a different body with the same key (422) and a legacy unfinished key (409)', async () => {
+    const { svc, rows, setRow } = service();
     await svc.idempotent(principal, 'k-1', req, 201, async () => ({ ok: 1 }));
     await expect(
       svc.idempotent(principal, 'k-1', { ...req, body: { name: 'B' } }, 201, async () => 1),
     ).rejects.toMatchObject({ status: 422 });
-    rows.set('k-2', {
+    setRow('k-2', {
       id: 'k-2',
-      requestHash: rows.get('k-1')!.requestHash,
+      requestHash: rows().get('k-1')!.requestHash,
       responseStatus: null,
       responseBody: null,
     });
@@ -398,10 +477,28 @@ describe('IntegrationApiService.idempotent', () => {
         throw new Error('boom');
       }),
     ).rejects.toThrow('boom');
-    expect(rows.has('k-1')).toBe(false);
+    expect(rows().has('k-1')).toBe(false);
     await expect(
       svc.idempotent(principal, 'k-1', req, 201, async () => 'ok'),
     ).resolves.toMatchObject({ body: 'ok' });
+  });
+
+  it('runs side effects only after the commit', async () => {
+    const { svc } = service();
+    const effect = jest.fn();
+    await expect(
+      svc.idempotent(principal, 'k-1', req, 201, async (_tx, afterCommit) => {
+        afterCommit(effect);
+        throw new Error('boom');
+      }),
+    ).rejects.toThrow('boom');
+    expect(effect).not.toHaveBeenCalled();
+    await svc.idempotent(principal, 'k-1', req, 201, async (_tx, afterCommit) => {
+      afterCommit(effect);
+      expect(effect).not.toHaveBeenCalled();
+      return 1;
+    });
+    expect(effect).toHaveBeenCalledTimes(1);
   });
 
   it('validates the header and runs normally without one', async () => {

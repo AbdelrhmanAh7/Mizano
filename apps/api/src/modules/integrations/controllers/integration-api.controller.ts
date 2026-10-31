@@ -86,8 +86,8 @@ export class IntegrationApiController {
   ) {
     return this.reply(
       res,
-      await this.api.idempotent(req.user, key, this.describe(req), 201, () =>
-        this.api.createCustomer(req.user.organizationId, dto),
+      await this.api.idempotent(req.user, key, this.describe(req), 201, (tx) =>
+        this.api.createCustomer(req.user.organizationId, dto, tx),
       ),
     );
   }
@@ -121,8 +121,8 @@ export class IntegrationApiController {
   ) {
     return this.reply(
       res,
-      await this.api.idempotent(req.user, key, this.describe(req), 201, () =>
-        this.api.createInvoice(req.user.organizationId, dto),
+      await this.api.idempotent(req.user, key, this.describe(req), 201, (tx) =>
+        this.api.createInvoice(req.user.organizationId, dto, tx),
       ),
     );
   }
@@ -149,8 +149,8 @@ export class IntegrationApiController {
   ) {
     return this.reply(
       res,
-      await this.api.idempotent(req.user, key, this.describe(req), 201, () =>
-        this.api.createNote(req.user, dto),
+      await this.api.idempotent(req.user, key, this.describe(req), 201, (tx, afterCommit) =>
+        this.api.createNote(req.user, dto, tx, afterCommit),
       ),
     );
   }
