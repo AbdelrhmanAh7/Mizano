@@ -173,7 +173,12 @@ function LoginForm() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">{t('password')}</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">{t('password')}</Label>
+                  <Link href="/forgot-password" className="text-xs text-primary hover:underline">
+                    {t('forgotPassword')}
+                  </Link>
+                </div>
                 <div className="relative">
                   <Input
                     id="password"
@@ -190,7 +195,7 @@ function LoginForm() {
                     className="absolute end-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground"
                     onClick={() => setShowPassword(!showPassword)}
                     tabIndex={-1}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? t('hidePassword') : t('showPassword')}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>

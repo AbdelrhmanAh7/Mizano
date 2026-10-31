@@ -192,6 +192,12 @@ export const authApi = {
     organizationName: string;
   }) => publicApi.post('/auth/register', data),
   refreshToken: (refreshToken: string) => publicApi.post('/auth/refresh', { refreshToken }),
+  forgotPassword: (email: string, locale: string) =>
+    publicApi.post('/auth/forgot-password', { email, locale }),
+  resetPassword: (token: string, password: string) =>
+    publicApi.post('/auth/reset-password', { token, password }),
+  /** Ends every signed-in session of the current user (this device included). */
+  logoutAll: () => api.post('/auth/logout-all'),
 };
 
 // ===========================================================================

@@ -218,7 +218,12 @@
     "welcomeBack": "مرحباً بعودتك، {name}",
     "signOut": "تسجيل الخروج",
     "profile": "الملف الشخصي",
-    "notifications": "الإشعارات"
+    "notifications": "الإشعارات",
+    "signOutEverywhere": "تسجيل الخروج من جميع الأجهزة",
+    "signOutEverywhereTitle": "تسجيل الخروج من جميع الأجهزة؟",
+    "signOutEverywhereBody": "سيتم تسجيل خروج كل هاتف وجهاز لوحي ومتصفح مسجّل الدخول إلى حسابك، ومنها هذا الجهاز.",
+    "signOutEverywhereConfirm": "تسجيل الخروج من الكل",
+    "signOutEverywhereFailed": "تعذّر تسجيل خروج الأجهزة الأخرى. حاول مرة أخرى."
   },
   "buttons": {
     "save": "حفظ",

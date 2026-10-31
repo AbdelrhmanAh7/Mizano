@@ -6,7 +6,9 @@ import { routing } from './i18n/routing';
 const intlMiddleware = createMiddleware(routing);
 
 // Define public paths that don't require authentication
-const publicPaths = ['/login', '/register', '/onboarding'];
+const publicPaths = ['/login', '/register', '/onboarding', '/forgot-password', '/reset-password'];
+// Reachable while signed in too: a reset link opened in a signed-in browser must still work.
+const passwordPaths = ['/forgot-password', '/reset-password'];
 
 // Check if path is public (remove locale prefix for checking)
 function isPublicPath(pathname: string): boolean {
@@ -34,6 +36,9 @@ export async function middleware(request: NextRequest) {
   // For public paths: only check token if we need to redirect authenticated users away
   // This avoids expensive JWT verification for unauthenticated visitors on login/register
   if (isPublicPath(pathname)) {
+    if (passwordPaths.some((path) => pathWithoutLocale.startsWith(path))) {
+      return intlMiddleware(request);
+    }
     // Quick check: if no session cookie exists, skip token verification entirely
     const sessionCookie =
       request.cookies.get('next-auth.session-token') ||

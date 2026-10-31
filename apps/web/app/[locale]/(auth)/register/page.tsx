@@ -14,40 +14,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/components/ui/use-toast';
 import { authApi } from '@/lib/api';
 import { LanguageSwitcher } from '@/components/layout/language-switcher';
+import { passwordRule, passwordSchema } from '@/lib/password-policy';
 
-// Same password policy as the API's RegisterDto, so the form never sends a password the server
-// rejects with an untranslated "Validation Failed".
 const registerSchema = z
   .object({
     firstName: z.string().min(2),
     lastName: z.string().min(2),
     email: z.string().email(),
-    password: z
-      .string()
-      .min(8, 'passwordMin')
-      .max(128, 'passwordMax')
-      .regex(/[A-Z]/, 'passwordUppercase')
-      .regex(/[a-z]/, 'passwordLowercase')
-      .regex(/[0-9]/, 'passwordNumber'),
+    password: passwordSchema,
     confirmPassword: z.string(),
     organizationName: z.string().min(2),
   })
   .refine((data) => data.password === data.confirmPassword, {
     path: ['confirmPassword'],
   });
-
-const PASSWORD_RULES = [
-  'passwordMin',
-  'passwordMax',
-  'passwordUppercase',
-  'passwordLowercase',
-  'passwordNumber',
-] as const;
-type PasswordRule = (typeof PASSWORD_RULES)[number];
-
-function passwordRule(message: string | undefined): PasswordRule {
-  return PASSWORD_RULES.find((rule) => rule === message) ?? 'passwordMin';
-}
 
 type RegisterForm = z.infer<typeof registerSchema>;
 

@@ -218,7 +218,12 @@
     "welcomeBack": "Welcome back, {name}",
     "signOut": "Sign out",
     "profile": "Profile",
-    "notifications": "Notifications"
+    "notifications": "Notifications",
+    "signOutEverywhere": "Sign out on all devices",
+    "signOutEverywhereTitle": "Sign out on all devices?",
+    "signOutEverywhereBody": "Every phone, tablet and browser signed in to your account will be signed out, including this one.",
+    "signOutEverywhereConfirm": "Sign out everywhere",
+    "signOutEverywhereFailed": "Couldn't sign out the other devices. Try again."
   },
   "buttons": {
     "save": "Save",

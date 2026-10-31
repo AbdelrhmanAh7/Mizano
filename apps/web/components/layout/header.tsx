@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { signOut } from 'next-auth/react';
-import { LogOut, User, HelpCircle, Search } from 'lucide-react';
+import { LogOut, MonitorSmartphone, User, HelpCircle, Search } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { LanguageSwitcher } from './language-switcher';
 import { NotificationPanel } from './notification-panel';
+import { SignOutEverywhereDialog } from './sign-out-everywhere';
 import { useTourStore } from '@/lib/stores/use-tour-store';
 import { RunningTimerWidget } from '@/components/projects/running-timer-widget';
 
@@ -28,6 +30,7 @@ export function Header({ sessionUser }: HeaderProps) {
   const tTable = useTranslations('common.table');
   const pathname = usePathname();
   const { startTour } = useTourStore();
+  const [confirmSignOutAll, setConfirmSignOutAll] = useState(false);
   const t_tour = useTranslations('tour.header');
 
   const getTourId = (): string | null => {
@@ -102,8 +105,13 @@ export function Header({ sessionUser }: HeaderProps) {
                 <LogOut className="me-2 h-4 w-4" />
                 {t('signOut')}
               </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setConfirmSignOutAll(true)}>
+                <MonitorSmartphone className="me-2 h-4 w-4" />
+                {t('signOutEverywhere')}
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <SignOutEverywhereDialog open={confirmSignOutAll} onOpenChange={setConfirmSignOutAll} />
         </div>
       </div>
     </header>
