@@ -34,7 +34,7 @@ services:
     volumes:
       - ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
       interval: 10s
       timeout: 5s
       retries: 6
@@ -94,6 +94,9 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET}
       CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN}
       FRONTEND_URL: ${CORS_ORIGIN:?set CORS_ORIGIN}
+      MCP_PUBLIC_URL: ${MCP_PUBLIC_URL:-}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
       AI_OLLAMA_BASE_URL: ${AI_OLLAMA_BASE_URL:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_BOT_TOKEN_CREDENTIAL_ROTATED_AT: ${TELEGRAM_BOT_TOKEN_CREDENTIAL_ROTATED_AT:-}

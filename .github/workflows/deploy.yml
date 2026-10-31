@@ -13,7 +13,7 @@ name: Deploy to Production
 
 on:
   workflow_run:
-    workflows: ["CI"]
+    workflows: ['CI']
     types: [completed]
     branches: [master]
   release:
@@ -186,7 +186,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          source: "docker-compose.production.yml,apps/api/prisma/,nginx/"
+          source: 'docker-compose.production.yml,apps/api/prisma/,nginx/'
           target: ~/mizano
           overwrite: true
 
@@ -277,7 +277,7 @@ jobs:
             # Wait for postgres to be healthy (up to 60s)
             echo "Waiting for PostgreSQL to be ready..."
             for i in $(seq 1 12); do
-              if docker exec mizano-postgres pg_isready -U "${POSTGRES_USER:-mizano}" 2>/dev/null; then
+              if docker exec mizano-postgres pg_isready -h 127.0.0.1 -U "${POSTGRES_USER:-mizano}" 2>/dev/null; then
                 echo "PostgreSQL is ready"
                 break
               fi
@@ -304,14 +304,14 @@ jobs:
             fi
             echo "DB credentials verified (TCP)"
 
+            # Fail before replacing any app container; the old version keeps running.
+            docker compose -f docker-compose.production.yml run --rm migrate
+
             # Rolling restart app services
             docker compose -f docker-compose.production.yml up -d --no-deps api
             sleep 15
             docker compose -f docker-compose.production.yml up -d --no-deps web
             docker compose -f docker-compose.production.yml up -d --no-deps nginx
-
-            # Run database migrations
-            docker exec mizano-api npx prisma migrate deploy --schema /app/apps/api/prisma/schema.prisma || true
 
             # Seed database (idempotent — only creates data if missing)
             docker exec mizano-api npx prisma db seed --schema /app/apps/api/prisma/schema.prisma || true
@@ -364,4 +364,3 @@ jobs:
       - name: Notify failure
         if: failure()
         run: echo "Deployment verification FAILED at $(date)"
-
