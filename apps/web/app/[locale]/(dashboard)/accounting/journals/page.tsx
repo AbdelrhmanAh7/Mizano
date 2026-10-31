@@ -56,8 +56,10 @@ import { CheckCircle, Edit, Eye, Plus, RefreshCw, Trash2, Undo2 } from 'lucide-r
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function JournalsPageContent() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('accounting');
   const tCommon = useTranslations('common');
   const { toast } = useToast();
@@ -230,7 +232,7 @@ function JournalsPageContent() {
           onSort={tableParams.setSort}
         />
       ),
-      cell: ({ row }) => format(new Date(row.original.entryDate), 'MMM d, yyyy'),
+      cell: ({ row }) => format(new Date(row.original.entryDate), 'PP', { locale: dateLocale }),
     },
     {
       accessorKey: 'description',
@@ -313,7 +315,7 @@ function JournalsPageContent() {
     <div className="space-y-6">
       <AutoTourTrigger tourId="accounting_journals" />
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('journals.title')}</h1>
           <p className="text-muted-foreground">Create and manage manual journal entries</p>

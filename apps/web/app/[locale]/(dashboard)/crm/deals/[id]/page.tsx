@@ -61,6 +61,7 @@ import { ActivityLog } from '@/components/crm/activity-log';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 const STAGE_ORDER: DealStage[] = [
   'NEW',
@@ -82,6 +83,7 @@ const LOST_REASONS = [
 ];
 
 export default function DealDetailPage() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('crm');
   const params = useParams();
   const router = useRouter();
@@ -340,7 +342,7 @@ export default function DealDetailPage() {
             </div>
             <div className="text-lg font-bold">
               {deal.expectedCloseDate
-                ? format(new Date(deal.expectedCloseDate), 'MMM d, yyyy')
+                ? format(new Date(deal.expectedCloseDate), 'PP', { locale: dateLocale })
                 : 'Not set'}
             </div>
           </CardContent>

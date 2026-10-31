@@ -10,6 +10,7 @@ jest.mock('next/navigation', () => ({
 // Mock next-intl
 jest.mock('next-intl', () => ({
   useTranslations: () => (key: string, _params?: Record<string, unknown>) => key,
+  useLocale: () => 'en',
 }));
 
 // Mock next/link

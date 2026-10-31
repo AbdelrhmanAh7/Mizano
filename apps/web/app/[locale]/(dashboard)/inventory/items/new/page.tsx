@@ -7,9 +7,9 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ItemForm } from '@/components/inventory/item-form';
-import { useCreateItem } from '@/lib/hooks/use-items';
+import { CreateItemData, useCreateItem } from '@/lib/hooks/use-items';
 import { useQuery } from '@tanstack/react-query';
-import { accountsApi, taxRatesApi } from '@/lib/api';
+import { accountsApi } from '@/lib/api';
 
 export default function NewItemPage() {
   const t = useTranslations('inventory');
@@ -25,32 +25,18 @@ export default function NewItemPage() {
     },
   });
 
-  // Fetch tax rates
-  const { data: taxRatesData, isLoading: taxRatesLoading } = useQuery({
-    queryKey: ['tax-rates'],
-    queryFn: async () => {
-      try {
-        const response = await taxRatesApi.getAll();
-        return response.data;
-      } catch {
-        return { data: [] };
-      }
-    },
-  });
-
   const accounts = accountsData?.data || [];
-  const taxRates = taxRatesData?.data || [];
 
-  const handleSubmit = async (data: Record<string, unknown>) => {
+  const handleSubmit = async (data: CreateItemData): Promise<void> => {
     try {
-      await createItem.mutateAsync(data as unknown as Parameters<typeof createItem.mutateAsync>[0]);
+      await createItem.mutateAsync(data);
       router.push('/inventory/items');
-    } catch (error) {
-      // Error is handled in the hook
+    } catch {
+      // The mutation's toast reports the error.
     }
   };
 
-  if (accountsLoading || taxRatesLoading) {
+  if (accountsLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-12 w-64" />
@@ -77,7 +63,6 @@ export default function NewItemPage() {
       {/* Form */}
       <ItemForm
         accounts={accounts}
-        taxRates={taxRates}
         onSubmit={handleSubmit}
         onCancel={() => router.push('/inventory/items')}
         isSubmitting={createItem.isPending}

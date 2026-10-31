@@ -38,6 +38,29 @@
     "empty": {
       "title": "لا توجد حسابات بعد",
       "description": "أعد دليل الحسابات للبدء"
+    },
+    "page": {
+      "description": "إدارة هيكل حسابات مؤسستك",
+      "seed": "إنشاء دليل حسابات",
+      "seedServices": "قطاع الخدمات",
+      "seedRetail": "قطاع التجزئة",
+      "seedConstruction": "قطاع المقاولات",
+      "searchPlaceholder": "ابحث في الحسابات...",
+      "filterByType": "تصفية حسب النوع",
+      "allTypes": "كل الأنواع",
+      "assets": "الأصول",
+      "liabilities": "الالتزامات",
+      "equity": "حقوق الملكية",
+      "income": "الدخل",
+      "revenue": "الإيرادات",
+      "expenses": "المصروفات",
+      "listTitle": "الحسابات",
+      "refresh": "تحديث الحسابات",
+      "deleteConfirm": "هل تريد حذف \"{name}\"؟ لا يمكن التراجع عن هذا الإجراء. لا يمكن حذف الحسابات التي لها حركات أو حسابات فرعية.",
+      "cancel": "إلغاء",
+      "delete": "حذف",
+      "system": "نظامي",
+      "groupTitle": "حسابات {type}"
     }
   },
   "journals": {
@@ -60,7 +83,17 @@
       "description": "الوصف",
       "addLine": "إضافة بند",
       "minLines": "يجب أن يحتوي القيد على بندين على الأقل",
-      "mustBalance": "يجب أن يتساوى إجمالي المدين مع إجمالي الدائن"
+      "mustBalance": "يجب أن يتساوى إجمالي المدين مع إجمالي الدائن",
+      "totals": "الإجماليات",
+      "balanced": "متوازن",
+      "unbalanced": "غير متوازن (الفرق: {amount})",
+      "removeLine": "حذف سطر القيد",
+      "accountRequired": "الحساب مطلوب",
+      "dateRequired": "التاريخ مطلوب",
+      "cancel": "إلغاء",
+      "saving": "جاري الحفظ...",
+      "create": "إنشاء القيد",
+      "update": "تحديث القيد"
     },
     "table": {
       "journalNumber": "رقم القيد",
@@ -105,7 +138,8 @@
     "reverseTitle": "عكس قيد اليومية",
     "reverseConfirm": "سيتم ترحيل قيد جديد يعكس جميع بنود {number}. يبقى القيد الأصلي دون تغيير.",
     "reversed": "تم ترحيل القيد العكسي",
-    "reverseFailed": "تعذر عكس القيد"
+    "reverseFailed": "تعذر عكس القيد",
+    "newJournalDescription": "إنشاء قيد يومية يدوي جديد"
   },
   "recurring": {
     "title": "الملفات المتكررة",

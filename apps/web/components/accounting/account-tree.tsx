@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+
 import { useState } from 'react';
 import { ChevronRight, ChevronDown, Plus, Edit, Trash2, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,7 +17,7 @@ import {
   Account,
   AccountType,
   getAccountTypeColor,
-  getAccountTypeLabel,
+  useAccountTypeLabel,
 } from '@/lib/hooks/use-accounts';
 
 interface AccountTreeNodeProps {
@@ -27,6 +29,8 @@ interface AccountTreeNodeProps {
 }
 
 function AccountTreeNode({ account, level, onEdit, onDelete, onAddChild }: AccountTreeNodeProps) {
+  const typeLabel = useAccountTypeLabel();
+  const t = useTranslations('accounting.accounts.page');
   const [isExpanded, setIsExpanded] = useState(level < 2);
   const hasChildren = account.children && account.children.length > 0;
 
@@ -59,13 +63,13 @@ function AccountTreeNode({ account, level, onEdit, onDelete, onAddChild }: Accou
 
           {/* Account type badge */}
           <Badge variant="secondary" className={cn('text-xs', getAccountTypeColor(account.type))}>
-            {getAccountTypeLabel(account.type)}
+            {typeLabel(account.type)}
           </Badge>
 
           {/* System account indicator */}
           {account.isSystem && (
             <Badge variant="outline" className="text-xs">
-              System
+              {t('system')}
             </Badge>
           )}
 
@@ -146,6 +150,8 @@ export function AccountTree({
   onAddChild,
   isLoading,
 }: AccountTreeProps) {
+  const typeLabel = useAccountTypeLabel();
+  const tPage = useTranslations('accounting.accounts.page');
   // Group accounts by type
   const groupedAccounts = accounts.reduce(
     (acc, account) => {
@@ -196,7 +202,7 @@ export function AccountTree({
                 getAccountTypeColor(type),
               )}
             >
-              {getAccountTypeLabel(type)} Accounts
+              {tPage('groupTitle', { type: typeLabel(type) })}
             </h3>
             <div className="space-y-0.5">
               {typeAccounts.map((account) => (

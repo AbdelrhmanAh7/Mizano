@@ -153,12 +153,3 @@ export function getAccountTypeColor(type: BankAccountType): string {
   };
   return colors[type] || 'bg-gray-100 text-gray-800';
 }
-
-export function formatCurrency(amount: string | number | null | undefined): string {
-  if (amount === null || amount === undefined) return '$0.00';
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(num);
-}

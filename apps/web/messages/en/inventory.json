@@ -25,7 +25,51 @@
       "reorderPoint": "Reorder Point",
       "openingStock": "Opening Stock",
       "isActive": "Active",
-      "openingStockHint": "Add opening stock with an inventory adjustment"
+      "openingStockHint": "Add opening stock with an inventory adjustment",
+      "basicInfo": "Basic Information",
+      "pricing": "Pricing",
+      "inventory": "Inventory",
+      "accounting": "Accounting",
+      "selectAccount": "Select account",
+      "noAccount": "None",
+      "salesAccountHint": "Used when selling this item",
+      "purchaseAccountHint": "Used when purchasing this item",
+      "inventoryAccountHint": "Used for inventory valuation",
+      "reorderPointHint": "Alert when stock falls below this level",
+      "create": "Create Item",
+      "update": "Update Item",
+      "saving": "Saving...",
+      "typeDescriptions": {
+        "GOODS": "Physical products with inventory tracking",
+        "SERVICE": "Services without inventory",
+        "DIGITAL": "Digital products"
+      },
+      "units": {
+        "pcs": "Pieces",
+        "kg": "Kilograms",
+        "g": "Grams",
+        "lb": "Pounds",
+        "oz": "Ounces",
+        "l": "Liters",
+        "ml": "Milliliters",
+        "m": "Meters",
+        "cm": "Centimeters",
+        "ft": "Feet",
+        "in": "Inches",
+        "box": "Boxes",
+        "pack": "Packs",
+        "hr": "Hours",
+        "day": "Days"
+      },
+      "errors": {
+        "nameRequired": "Item name is required",
+        "nameTooLong": "Item name must be at most 200 characters",
+        "skuRequired": "SKU is required",
+        "skuTooLong": "SKU must be at most 50 characters",
+        "descriptionTooLong": "Description must be at most 500 characters",
+        "priceInvalid": "Enter a non-negative amount with at most 4 decimal places",
+        "reorderPointInvalid": "Enter a whole number"
+      }
     },
     "types": {
       "goods": "Goods",
@@ -44,6 +88,30 @@
     "empty": {
       "title": "No items yet",
       "description": "Add your first item to start managing inventory"
+    },
+    "toast": {
+      "created": "Item created",
+      "createdDescription": "The item has been created successfully.",
+      "createError": "Could not create the item",
+      "updated": "Item updated",
+      "updatedDescription": "The item has been updated successfully.",
+      "updateError": "Could not update the item",
+      "deleted": "Item deleted",
+      "deletedDescription": "The item has been deleted successfully.",
+      "deleteError": "Could not delete the item",
+      "genericError": "An error occurred"
+    },
+    "detail": {
+      "taxRate": "Tax Rate",
+      "inventorySettings": "Inventory Settings",
+      "currentStock": "Current Stock",
+      "reorderLevel": "Reorder Level"
+    },
+    "stockStatus": {
+      "ok": "In Stock",
+      "low": "Low Stock",
+      "out": "Out of Stock",
+      "notTracked": "Not tracked"
     }
   },
   "warehouses": {
@@ -133,7 +201,14 @@
       "namePlaceholder": "Enter price list name",
       "description": "Description",
       "type": "Type",
-      "adjustment": "Adjustment"
+      "adjustment": "Adjustment",
+      "adjustmentHint": "Percentage: markup such as 10 or markdown such as -10. Fixed: amount added to each price.",
+      "creating": "Creating...",
+      "errors": {
+        "nameRequired": "Price list name is required",
+        "adjustmentInvalid": "Enter a number with at most 4 decimal places, for example 10 or -5.5",
+        "nameTooLong": "Price list name must be at most 200 characters"
+      }
     },
     "types": {
       "percentage": "Percentage",
@@ -148,6 +223,22 @@
     "empty": {
       "title": "No price lists yet",
       "description": "Create price lists for different customer groups"
+    },
+    "toast": {
+      "created": "Price list created",
+      "createdDescription": "The price list has been created.",
+      "createError": "Could not create the price list",
+      "deleted": "Price list deleted",
+      "deletedDescription": "The price list has been deleted.",
+      "deleteError": "Could not delete the price list",
+      "genericError": "An error occurred"
+    },
+    "detail": {
+      "noItems": "No items in this price list yet.",
+      "item": "Item",
+      "sku": "SKU",
+      "price": "Custom Price",
+      "adjustment": "Adjustment: {value}"
     }
   },
   "transfers": {

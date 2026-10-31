@@ -5,6 +5,13 @@ import { invalidateLedgerQueries } from '@/lib/hooks/use-journals';
 import { useToastMutation } from '@/lib/hooks/use-toast-mutation';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useQuery } from '@tanstack/react-query';
+import {
+  absDecimal,
+  compareDecimals,
+  decimalToDisplayNumber,
+  subtractDecimals,
+  sumDecimals,
+} from '@/lib/decimal';
 
 // Types
 export type PaymentMode =
@@ -66,7 +73,7 @@ export interface PaymentReceivedParams {
   sortOrder?: 'asc' | 'desc';
 }
 
-interface CreatePaymentReceivedData {
+export interface CreatePaymentReceivedData {
   customerId: string;
   date: string;
   amount: string;
@@ -151,22 +158,6 @@ export function useVoidPaymentReceived() {
 }
 
 /**
- * Get payment mode label
- */
-export function getPaymentModeLabel(mode: PaymentMode): string {
-  const labelMap: Record<PaymentMode, string> = {
-    CASH: 'Cash',
-    BANK_TRANSFER: 'Bank Transfer',
-    CREDIT_CARD: 'Credit Card',
-    DEBIT_CARD: 'Debit Card',
-    CHEQUE: 'Cheque',
-    ONLINE: 'Online',
-    OTHER: 'Other',
-  };
-  return labelMap[mode] || mode;
-}
-
-/**
  * Get payment mode options for dropdown
  */
 export function getPaymentModeOptions(): Array<{ value: PaymentMode; label: string }> {
@@ -184,15 +175,19 @@ export function getPaymentModeOptions(): Array<{ value: PaymentMode; label: stri
 /**
  * Validate allocations total matches payment amount
  */
+/**
+ * Whether the selected allocations add up exactly to the payment, compared like the API does
+ * (Decimal, 4 dp; review-lessons §6). A float sum with a 0.01 tolerance called 100.005 against
+ * 100.00 balanced, and the server then rejected the payment. `difference` is for display.
+ */
 export function validateAllocations(
   paymentAmount: string,
   allocations: Array<{ amount: string }>,
 ): { isValid: boolean; difference: number } {
-  const total = parseFloat(paymentAmount) || 0;
-  const allocated = allocations.reduce((sum, a) => sum + (parseFloat(a.amount) || 0), 0);
-  const difference = Math.abs(total - allocated);
+  const allocated = sumDecimals(allocations.map((a) => a.amount));
+  const diff = absDecimal(subtractDecimals(paymentAmount || '0', allocated));
   return {
-    isValid: difference < 0.01,
-    difference,
+    isValid: compareDecimals(paymentAmount || '0', allocated) === 0,
+    difference: decimalToDisplayNumber(diff),
   };
 }

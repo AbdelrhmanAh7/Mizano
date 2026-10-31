@@ -20,9 +20,8 @@ import {
 } from '@/components/ui/select';
 import { useExportAll } from '@/lib/hooks/use-export-all';
 import {
-  formatCurrency,
   getItemTypeColor,
-  getItemTypeLabel,
+  useItemTypeLabel,
   getStockStatus,
   Item,
   ItemType,
@@ -31,6 +30,7 @@ import {
 } from '@/lib/hooks/use-items';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { cn } from '@/lib/utils';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { type ColumnDef } from '@tanstack/react-table';
 import { AlertTriangle, Eye, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
@@ -59,6 +59,8 @@ function ItemsPageContent() {
   });
 
   const deleteItem = useDeleteItem();
+  const formatMoney = useMoneyFormatter();
+  const typeLabel = useItemTypeLabel();
 
   const handleDelete = async () => {
     if (deleteId) {
@@ -111,21 +113,21 @@ function ItemsPageContent() {
             getItemTypeColor(row.original.type),
           )}
         >
-          {getItemTypeLabel(row.original.type)}
+          {typeLabel(row.original.type)}
         </span>
       ),
     },
     {
-      accessorKey: 'salesPrice',
+      accessorKey: 'sellingPrice',
       header: t('items.table.sellingPrice'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
-      cell: ({ row }) => formatCurrency(row.original.salesPrice || row.original.sellingPrice),
+      cell: ({ row }) => formatMoney(row.original.sellingPrice),
     },
     {
-      accessorKey: 'purchasePrice',
+      accessorKey: 'costPrice',
       header: t('items.table.costPrice'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
-      cell: ({ row }) => formatCurrency(row.original.purchasePrice),
+      cell: ({ row }) => formatMoney(row.original.costPrice),
     },
     {
       accessorKey: 'currentStock',
@@ -187,7 +189,7 @@ function ItemsPageContent() {
     <div className="space-y-6">
       <AutoTourTrigger tourId="inventory_items" />
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('items.title')}</h1>
           <p className="text-muted-foreground">{t('description')}</p>

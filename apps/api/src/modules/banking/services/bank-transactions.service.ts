@@ -6,25 +6,17 @@ import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { BankTransactionCursorQueryDto } from '../dto/bank-transaction-cursor-query.dto';
 
-import { BankTransactionType } from '@prisma/client';
+import { DecimalUtils } from '../../../common/utils/decimal';
+import {
+  BankTransactionLineDto,
+  CreateBankTransactionDto,
+} from '../dto/create-bank-transaction.dto';
 
-export interface CreateBankTransactionDto {
-  bankAccountId: string;
-  date: string;
-  type: BankTransactionType;
-  amount: string | number;
-  description?: string;
-  reference?: string;
-  payee?: string;
-}
-
-export interface BulkImportTransactionDto {
-  date: string;
-  type: BankTransactionType;
-  amount: string | number;
-  description?: string;
-  reference?: string;
-  payee?: string;
+/** A statement line moves money: zero is not a transaction (the direction is its type). */
+function positiveAmount(amount: string): Decimal {
+  const value = DecimalUtils.parseInput(amount, 'amount');
+  if (!value.gt(0)) throw new BadRequestException('amount must be greater than zero');
+  return value;
 }
 
 @Injectable()
@@ -47,7 +39,7 @@ export class BankTransactionsService {
         bankAccountId: dto.bankAccountId,
         date: new Date(dto.date),
         type: dto.type,
-        amount: new Decimal(dto.amount),
+        amount: positiveAmount(dto.amount),
         description: dto.description,
         reference: dto.reference,
         payee: dto.payee,
@@ -59,7 +51,7 @@ export class BankTransactionsService {
   async bulkImport(
     organizationId: string,
     bankAccountId: string,
-    transactions: BulkImportTransactionDto[],
+    transactions: BankTransactionLineDto[],
   ) {
     await this.assertOwnBankAccount(organizationId, bankAccountId);
     const created = await this.prisma.bankTransaction.createMany({
@@ -67,7 +59,7 @@ export class BankTransactionsService {
         bankAccountId,
         date: new Date(t.date),
         type: t.type,
-        amount: new Decimal(t.amount),
+        amount: positiveAmount(t.amount),
         description: t.description,
         reference: t.reference,
         payee: t.payee,

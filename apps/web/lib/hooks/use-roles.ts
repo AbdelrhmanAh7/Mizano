@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { rolesApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { useToastMutation } from '@/lib/hooks/use-toast-mutation';
 
 type ApiError = { response?: { data?: { message?: string } } };
 
@@ -62,28 +63,12 @@ export function useRole(id: string | undefined) {
  * Hook to create a new role
  */
 export function useCreateRole() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (data: CreateRoleData) => {
-      const response = await rolesApi.create(data);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['roles'] });
-      toast({
-        title: 'Role created',
-        description: 'The role has been created successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error creating role',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: 'settings.team.toast',
+    mutationFn: async (data: CreateRoleData) => (await rolesApi.create(data)).data,
+    invalidate: () => [['roles']],
+    success: 'roleCreated',
+    error: 'roleCreateError',
   });
 }
 
@@ -91,29 +76,13 @@ export function useCreateRole() {
  * Hook to update an existing role
  */
 export function useUpdateRole() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateRoleData }) => {
-      const response = await rolesApi.update(id, data);
-      return response.data;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['roles'] });
-      queryClient.invalidateQueries({ queryKey: ['roles', variables.id] });
-      toast({
-        title: 'Role updated',
-        description: 'The role has been updated successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error updating role',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: 'settings.team.toast',
+    mutationFn: async ({ id, data }: { id: string; data: UpdateRoleData }) =>
+      (await rolesApi.update(id, data)).data,
+    invalidate: ({ id }) => [['roles'], ['roles', id]],
+    success: 'roleUpdated',
+    error: 'roleUpdateError',
   });
 }
 
@@ -121,28 +90,12 @@ export function useUpdateRole() {
  * Hook to delete a role
  */
 export function useDeleteRole() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await rolesApi.delete(id);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['roles'] });
-      toast({
-        title: 'Role deleted',
-        description: 'The role has been deleted successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error deleting role',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: 'settings.team.toast',
+    mutationFn: async (id: string) => (await rolesApi.delete(id)).data,
+    invalidate: () => [['roles']],
+    success: 'roleDeleted',
+    error: 'roleDeleteError',
   });
 }
 

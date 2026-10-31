@@ -24,13 +24,16 @@ import {
   emptyAddress,
 } from '@/components/shared/address-fields';
 import { Vendor } from '@/lib/hooks/use-vendors';
+import { useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useLocale, useTranslations } from 'next-intl';
 
 const vendorSchema = z.object({
-  name: z.string().min(1, 'Vendor name is required'),
+  // Messages are keys of purchases.vendors.form.
+  name: z.string().min(1, 'nameRequired'),
   displayName: z.string().optional(),
-  email: z.string().email('Invalid email').optional().or(z.literal('')),
+  email: z.string().email('invalidEmail').optional().or(z.literal('')),
   phone: z.string().optional(),
-  currency: z.string().default('USD'),
+  currency: z.string(),
   taxId: z.string().optional(),
   paymentTerms: z.number().optional(),
   billingAddress: addressSchema.optional(),
@@ -45,36 +48,35 @@ interface VendorFormProps {
   isSubmitting?: boolean;
 }
 
-const currencies = [
-  { value: 'USD', label: 'USD - US Dollar' },
-  { value: 'EUR', label: 'EUR - Euro' },
-  { value: 'GBP', label: 'GBP - British Pound' },
-  { value: 'EGP', label: 'EGP - Egyptian Pound' },
-  { value: 'AED', label: 'AED - UAE Dirham' },
-  { value: 'SAR', label: 'SAR - Saudi Riyal' },
-];
-
-const addressLabels: AddressLabels = {
-  street: 'Street Address',
-  streetPlaceholder: 'Street address',
-  country: 'Country',
-  city: 'City',
-  state: 'State/Province',
-  statePlaceholder: 'State',
-  postalCode: 'Zip/Postal Code',
-  postalCodePlaceholder: 'Postal code',
-};
+/** Currencies offered for a vendor; names come from Intl in the page language. */
+const CURRENCY_CODES = ['EGP', 'SAR', 'AED', 'USD', 'EUR', 'GBP'];
 
 const paymentTermsOptions = [
-  { value: 0, label: 'Due on Receipt' },
-  { value: 15, label: 'Net 15' },
-  { value: 30, label: 'Net 30' },
-  { value: 45, label: 'Net 45' },
-  { value: 60, label: 'Net 60' },
+  { value: 0, labelKey: 'dueOnReceipt' },
+  { value: 15, labelKey: 'net15' },
+  { value: 30, labelKey: 'net30' },
+  { value: 45, labelKey: 'net45' },
+  { value: 60, labelKey: 'net60' },
 ];
 
 export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorFormProps) {
   const isEditing = !!vendor;
+  const t = useTranslations('purchases.vendors.form');
+  const tTerms = useTranslations('common.paymentTerms');
+  const locale = useLocale();
+  const currencyNames = new Intl.DisplayNames([locale], { type: 'currency' });
+  const errorText = (message?: string): string | undefined =>
+    message && t.has(message) ? t(message) : message;
+  const addressLabels: AddressLabels = {
+    street: t('street'),
+    streetPlaceholder: t('streetPlaceholder'),
+    country: t('country'),
+    city: t('city'),
+    state: t('state'),
+    statePlaceholder: t('statePlaceholder'),
+    postalCode: t('postalCode'),
+    postalCodePlaceholder: t('postalCodePlaceholder'),
+  };
 
   const form = useForm<VendorFormData>({
     resolver: zodResolver(vendorSchema),
@@ -83,12 +85,20 @@ export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorF
       displayName: '',
       email: '',
       phone: '',
-      currency: 'USD',
+      currency: '',
       taxId: '',
       paymentTerms: 30,
       billingAddress: emptyAddress(),
     },
   });
+
+  // A new vendor starts in the org base currency, never USD; a choice already made stays.
+  const baseCurrency = useBaseCurrency();
+  useEffect(() => {
+    if (!isEditing && baseCurrency && !form.getValues('currency')) {
+      form.setValue('currency', baseCurrency);
+    }
+  }, [isEditing, baseCurrency, form]);
 
   useEffect(() => {
     if (vendor) {
@@ -97,9 +107,10 @@ export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorF
         displayName: vendor.displayName || '',
         email: vendor.email || '',
         phone: vendor.phone || '',
-        currency: vendor.currency || 'USD',
+        currency: vendor.currency || '',
         taxId: vendor.taxId || '',
-        paymentTerms: vendor.paymentTerms || 30,
+        // 0 is "Due on Receipt", not "unset".
+        paymentTerms: vendor.paymentTerms ?? 30,
         billingAddress: addressFromParty(vendor, 'billing'),
       });
     }
@@ -112,9 +123,9 @@ export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorF
       displayName: data.displayName || null,
       email: data.email || null,
       phone: data.phone || null,
-      currency: data.currency,
+      currency: data.currency || baseCurrency,
       taxId: data.taxId || null,
-      paymentTerms: data.paymentTerms || 0,
+      paymentTerms: data.paymentTerms ?? 0,
       billingStreet: data.billingAddress?.street || null,
       billingCity: data.billingAddress?.city || null,
       billingState: data.billingAddress?.state || null,
@@ -129,23 +140,25 @@ export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorF
       {/* Basic Information */}
       <Card>
         <CardHeader>
-          <CardTitle>Basic Information</CardTitle>
+          <CardTitle>{t('details')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Vendor Name *</Label>
-              <Input id="name" placeholder="Enter vendor name" {...form.register('name')} />
+              <Label htmlFor="name">{t('name')} *</Label>
+              <Input id="name" placeholder={t('namePlaceholder')} {...form.register('name')} />
               {form.formState.errors.name && (
-                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
+                <p className="text-sm text-red-500">
+                  {errorText(form.formState.errors.name.message)}
+                </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="displayName">Display Name</Label>
+              <Label htmlFor="displayName">{t('displayName')}</Label>
               <Input
                 id="displayName"
-                placeholder="How to display on documents"
+                placeholder={t('displayNameHint')}
                 {...form.register('displayName')}
               />
             </div>
@@ -153,7 +166,7 @@ export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorF
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('email')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -161,12 +174,14 @@ export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorF
                 {...form.register('email')}
               />
               {form.formState.errors.email && (
-                <p className="text-sm text-red-500">{form.formState.errors.email.message}</p>
+                <p className="text-sm text-red-500">
+                  {errorText(form.formState.errors.email.message)}
+                </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
+              <Label htmlFor="phone">{t('phone')}</Label>
               <PhoneInput
                 id="phone"
                 value={form.watch('phone') || ''}
@@ -177,37 +192,39 @@ export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorF
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="currency">Currency</Label>
+              <Label htmlFor="currency">{t('currency')}</Label>
               <Select
                 value={form.watch('currency')}
-                onValueChange={(value) => form.setValue('currency', value)}
+                onValueChange={(value) => value && form.setValue('currency', value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select currency" />
+                  <SelectValue placeholder={t('currencyPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
-                  {currencies.map((currency) => (
-                    <SelectItem key={currency.value} value={currency.value}>
-                      {currency.label}
-                    </SelectItem>
-                  ))}
+                  {[baseCurrency, ...CURRENCY_CODES]
+                    .filter((code, i, all): code is string => !!code && all.indexOf(code) === i)
+                    .map((code) => (
+                      <SelectItem key={code} value={code}>
+                        {code} - {currencyNames.of(code)}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="paymentTerms">Payment Terms</Label>
+              <Label htmlFor="paymentTerms">{t('paymentTerms')}</Label>
               <Select
-                value={String(form.watch('paymentTerms') || 30)}
+                value={String(form.watch('paymentTerms') ?? 30)}
                 onValueChange={(value) => form.setValue('paymentTerms', parseInt(value))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select payment terms" />
+                  <SelectValue placeholder={t('paymentTermsPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {paymentTermsOptions.map((term) => (
                     <SelectItem key={term.value} value={String(term.value)}>
-                      {term.label}
+                      {tTerms(term.labelKey)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -215,8 +232,8 @@ export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorF
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="taxId">Tax ID</Label>
-              <Input id="taxId" placeholder="Tax ID / VAT Number" {...form.register('taxId')} />
+              <Label htmlFor="taxId">{t('taxId')}</Label>
+              <Input id="taxId" placeholder={t('taxIdHint')} {...form.register('taxId')} />
             </div>
           </div>
         </CardContent>
@@ -225,17 +242,17 @@ export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorF
       <AddressCard
         form={form}
         name="billingAddress"
-        title="Billing Address"
+        title={t('billingAddress')}
         labels={addressLabels}
       />
 
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {t('cancel')}
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : isEditing ? 'Update Vendor' : 'Create Vendor'}
+          {isSubmitting ? t('saving') : isEditing ? t('update') : t('create')}
         </Button>
       </div>
     </form>

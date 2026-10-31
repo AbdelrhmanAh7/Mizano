@@ -44,7 +44,6 @@ import {
   useDeleteBankAccount,
   getAccountTypeLabel,
   getAccountTypeColor,
-  formatCurrency,
 } from '@/lib/hooks/use-bank-accounts';
 import {
   getStatusLabel,
@@ -52,6 +51,7 @@ import {
   type TransactionStatus,
 } from '@/lib/hooks/use-bank-transactions';
 import { useTranslations } from 'next-intl';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import {
   LineChart,
   Line,
@@ -61,13 +61,16 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 interface BankAccountDetailPageProps {
   params: { id: string };
 }
 
 export default function BankAccountDetailPage({ params }: BankAccountDetailPageProps) {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('banking');
+  const formatCurrency = useMoneyFormatter();
   const { id } = params;
   const router = useRouter();
   const { data: account, isLoading } = useBankAccount(id);
@@ -232,7 +235,7 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
             <p className="text-sm text-muted-foreground">Last Reconciled</p>
             <p className="text-lg font-semibold">
               {account.lastReconciled
-                ? format(new Date(account.lastReconciled), 'MMM d, yyyy')
+                ? format(new Date(account.lastReconciled), 'PP', { locale: dateLocale })
                 : 'Never'}
             </p>
           </CardContent>
@@ -263,7 +266,9 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
                 />
                 <Tooltip
                   formatter={(value: number) => [formatCurrency(value), 'Balance']}
-                  labelFormatter={(label: string) => format(new Date(label), 'MMM d, yyyy')}
+                  labelFormatter={(label: string) =>
+                    format(new Date(label), 'PP', { locale: dateLocale })
+                  }
                 />
                 <Line
                   type="monotone"
@@ -355,7 +360,9 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
                       amount: string | number;
                     }) => (
                       <TableRow key={tx.id}>
-                        <TableCell>{format(new Date(tx.date), 'MMM d, yyyy')}</TableCell>
+                        <TableCell>
+                          {format(new Date(tx.date), 'PP', { locale: dateLocale })}
+                        </TableCell>
                         <TableCell>
                           <div>
                             <p className="font-medium">{tx.description}</p>

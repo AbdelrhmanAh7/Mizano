@@ -8,7 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
-import { ReportPageHeader, ReportPageSkeleton } from '@/components/reports/report-page';
+import {
+  ReportPageHeader,
+  ReportPageSkeleton,
+  useReportDateLabels,
+} from '@/components/reports/report-page';
 import { useCashFlowReport } from '@/lib/hooks/use-reports';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
@@ -23,6 +27,7 @@ export default function CashFlowReportPage() {
   // Report figures are ledger amounts, in the organization base currency (audit B5).
   const formatCurrency = useMoneyFormatter();
   const t = useTranslations('reports');
+  const dateLabels = useReportDateLabels();
   const [dateRange, setDateRange] = useState({
     startDate: startOfYear(new Date()),
     endDate: endOfMonth(new Date()),
@@ -100,11 +105,7 @@ export default function CashFlowReportPage() {
     <div className="space-y-6">
       <ReportPageHeader
         title={t('cashFlow.title')}
-        subtitle={
-          <>
-            {format(dateRange.startDate, 'MMMM d')} - {format(dateRange.endDate, 'MMMM d, yyyy')}
-          </>
-        }
+        subtitle={<>{dateLabels.period(dateRange.startDate, dateRange.endDate)}</>}
       />
 
       <ReportFilters dateRange={dateRange} onDateRangeChange={setDateRange} showDateRange />

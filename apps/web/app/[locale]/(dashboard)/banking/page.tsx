@@ -14,11 +14,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslations } from 'next-intl';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { useBankingStats } from '@/lib/hooks/use-bank-accounts';
-import { formatCurrency } from '@/lib/hooks/use-bank-accounts';
 
 export default function BankingPage() {
   const t = useTranslations('banking');
+  const formatCurrency = useMoneyFormatter();
   const { data: stats, isLoading: statsLoading } = useBankingStats();
 
   const modules = [

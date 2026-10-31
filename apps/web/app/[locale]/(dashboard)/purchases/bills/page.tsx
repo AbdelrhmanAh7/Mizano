@@ -27,7 +27,7 @@ import {
   Bill,
   BillStatus,
   formatCurrency,
-  getStatusText,
+  useBillStatusLabel,
   getStatusVariant,
   useCloneBill,
   useDeleteBill,
@@ -42,6 +42,7 @@ import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { cn } from '@/lib/utils';
+import { isPastDue } from '@/lib/due-date';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { useTranslations } from 'next-intl';
@@ -61,9 +62,12 @@ import {
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function BillsPageContent() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('purchases');
+  const statusLabel = useBillStatusLabel();
   const baseCurrency = useBaseCurrency();
   const tCommon = useTranslations('common');
   const { toast } = useToast();
@@ -237,7 +241,7 @@ function BillsPageContent() {
           onSort={tableParams.setSort}
         />
       ),
-      cell: ({ row }) => format(new Date(row.original.date), 'MMM d, yyyy'),
+      cell: ({ row }) => format(new Date(row.original.date), 'PP', { locale: dateLocale }),
     },
     {
       accessorKey: 'dueDate',
@@ -254,10 +258,10 @@ function BillsPageContent() {
         const bill = row.original;
         const isOverdue =
           bill.status === 'OVERDUE' ||
-          (bill.status === 'OPEN' && new Date(bill.dueDate) < new Date());
+          ((bill.status === 'OPEN' || bill.status === 'PARTIALLY_PAID') && isPastDue(bill.dueDate));
         return (
           <span className={cn(isOverdue && 'text-destructive')}>
-            {format(new Date(bill.dueDate), 'MMM d, yyyy')}
+            {format(new Date(bill.dueDate), 'PP', { locale: dateLocale })}
           </span>
         );
       },
@@ -267,7 +271,7 @@ function BillsPageContent() {
       header: t('bills.table.status'),
       cell: ({ row }) => (
         <Badge variant={getStatusVariant(row.original.status)}>
-          {getStatusText(row.original.status)}
+          {statusLabel(row.original.status)}
         </Badge>
       ),
     },
@@ -357,7 +361,7 @@ function BillsPageContent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('bills.title')}</h1>
           <p className="text-muted-foreground">{t('description')}</p>
@@ -365,14 +369,14 @@ function BillsPageContent() {
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
-            Import
+            {tCommon('buttons.import')}
           </Button>
           {canCreate && (
             <>
               <Button asChild variant="outline">
                 <Link href="/purchases/bills/scan">
                   <Sparkles className="mr-2 h-4 w-4" />
-                  Scan Bill
+                  {t('bills.scanBill')}
                 </Link>
               </Button>
               <Button asChild>
@@ -393,7 +397,7 @@ function BillsPageContent() {
             <DataTableSearch
               value={tableParams.search}
               onChange={tableParams.setSearch}
-              placeholder="Search by bill number or vendor..."
+              placeholder={t('bills.searchPlaceholder')}
             />
             <DataTableFacetedFilter
               title={t('bills.table.status')}
@@ -416,7 +420,7 @@ function BillsPageContent() {
                   tableParams.setFilters({ startDate: undefined, endDate: undefined });
                 }
               }}
-              placeholder="Date range"
+              placeholder={tCommon('dateRange.placeholder')}
             />
             {(tableParams.activeFilterCount > 0 || tableParams.search) && (
               <Button

@@ -48,8 +48,10 @@ import {
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { format } from 'date-fns';
 import { useTranslations } from 'next-intl';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function RecurringProfilesPageContent() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('accounting');
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
@@ -176,7 +178,7 @@ function RecurringProfilesPageContent() {
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-muted-foreground" />
-          {format(new Date(row.original.nextRunDate), 'MMM d, yyyy')}
+          {format(new Date(row.original.nextRunDate), 'PP', { locale: dateLocale })}
         </div>
       ),
     },
@@ -265,7 +267,7 @@ function RecurringProfilesPageContent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('recurring.title')}</h1>
           <p className="text-muted-foreground">Automate journal entries with recurring profiles</p>

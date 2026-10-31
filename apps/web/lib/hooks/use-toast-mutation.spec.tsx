@@ -6,7 +6,11 @@ import { useToastMutation } from './use-toast-mutation';
 const mockToast = jest.fn();
 jest.mock('@/components/ui/use-toast', () => ({ useToast: () => ({ toast: mockToast }) }));
 jest.mock('next-intl', () => ({
-  useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}`,
+  useTranslations: (namespace: string) => {
+    const t = (key: string) => `${namespace}.${key}`;
+    t.has = (key: string) => namespace === 'common.apiErrors' && key === 'VALIDATION_ERROR';
+    return t;
+  },
 }));
 
 function setup(mutationFn: (id: string) => Promise<unknown>) {
@@ -58,6 +62,20 @@ describe('useToastMutation', () => {
       variant: 'destructive',
       title: 'sales.invoices.toast.sendError',
       description: 'Period is locked',
+    });
+  });
+
+  it('translates a validation failure instead of showing the English "Validation Failed"', async () => {
+    const apiError = {
+      response: { data: { code: 'VALIDATION_ERROR', message: 'Validation Failed' } },
+    };
+    const { result } = setup(async () => Promise.reject(apiError));
+    act(() => result.current.mutate('inv-1'));
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: 'destructive',
+      title: 'sales.invoices.toast.sendError',
+      description: 'common.apiErrors.VALIDATION_ERROR',
     });
   });
 });

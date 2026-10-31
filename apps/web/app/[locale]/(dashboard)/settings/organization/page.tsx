@@ -17,49 +17,35 @@ import { useAllOrganizationSettings, useUpdateGeneralSettings } from '@/lib/hook
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, Building2, Save } from 'lucide-react';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
-const CURRENCIES = [
-  { value: 'USD', label: 'USD - US Dollar' },
-  { value: 'EUR', label: 'EUR - Euro' },
-  { value: 'GBP', label: 'GBP - British Pound' },
-  { value: 'SAR', label: 'SAR - Saudi Riyal' },
-  { value: 'AED', label: 'AED - UAE Dirham' },
-  { value: 'EGP', label: 'EGP - Egyptian Pound' },
-  { value: 'CAD', label: 'CAD - Canadian Dollar' },
-  { value: 'AUD', label: 'AUD - Australian Dollar' },
-  { value: 'JPY', label: 'JPY - Japanese Yen' },
-  { value: 'INR', label: 'INR - Indian Rupee' },
-];
+/** Currencies offered as the base currency; names come from Intl in the page language. */
+const CURRENCY_CODES = ['EGP', 'SAR', 'AED', 'USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'INR'];
 
+/** The API's industry values (GeneralSettingsDto); labels are settings.organization.industries. */
 const INDUSTRIES = [
-  'Technology',
-  'Retail',
-  'Manufacturing',
-  'Healthcare',
-  'Financial Services',
-  'Real Estate',
-  'Construction',
-  'Education',
-  'Professional Services',
-  'Food & Beverage',
-  'Transportation',
-  'Agriculture',
-  'Other',
-];
+  'retail',
+  'services',
+  'construction',
+  'manufacturing',
+  'healthcare',
+  'technology',
+  'other',
+] as const;
 
+// Messages are keys of settings.organization.validation.
 const schema = z.object({
-  name: z.string().min(1, 'Organization name is required'),
-  email: z.string().email('Invalid email').or(z.literal('')).nullable().optional(),
+  name: z.string().min(1, 'nameRequired'),
+  email: z.string().email('invalidEmail').or(z.literal('')).nullable().optional(),
   phone: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
-  website: z.string().url('Invalid URL').or(z.literal('')).nullable().optional(),
+  website: z.string().url('invalidUrl').or(z.literal('')).nullable().optional(),
   taxRegistrationNumber: z.string().nullable().optional(),
   industry: z.string().nullable().optional(),
-  baseCurrency: z.string().min(1, 'Currency is required'),
+  baseCurrency: z.string().min(1, 'currencyRequired'),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -98,9 +84,27 @@ export default function OrganizationSettingsPage() {
     }
   }, [settings, form]);
 
+  // Empty optional fields are cleared with null: the API validates '' as an email or an
+  // industry and refused the whole save (a new organization could not set its base currency).
   const onSubmit = (data: FormData) => {
-    updateGeneral.mutate(data);
+    const orNull = (value: string | null | undefined) => (value?.trim() ? value.trim() : null);
+    updateGeneral.mutate({
+      ...data,
+      email: orNull(data.email),
+      phone: orNull(data.phone),
+      address: orNull(data.address),
+      website: orNull(data.website),
+      taxRegistrationNumber: orNull(data.taxRegistrationNumber),
+      industry: data.industry || undefined,
+    });
   };
+
+  const locale = useLocale();
+  const currencyNames = new Intl.DisplayNames([locale], { type: 'currency' });
+  const errorText = (message?: string): string | undefined =>
+    message && t.has(`organization.validation.${message}`)
+      ? t(`organization.validation.${message}`)
+      : message;
 
   if (isLoading) {
     return (
@@ -150,7 +154,9 @@ export default function OrganizationSettingsPage() {
                 <Label htmlFor="name">{t('organization.form.nameRequired')}</Label>
                 <Input id="name" {...form.register('name')} placeholder="Acme Corp" />
                 {form.formState.errors.name && (
-                  <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
+                  <p className="text-sm text-destructive">
+                    {errorText(form.formState.errors.name.message)}
+                  </p>
                 )}
               </div>
 
@@ -163,7 +169,9 @@ export default function OrganizationSettingsPage() {
                   placeholder="contact@acme.com"
                 />
                 {form.formState.errors.email && (
-                  <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
+                  <p className="text-sm text-destructive">
+                    {errorText(form.formState.errors.email.message)}
+                  </p>
                 )}
               </div>
 
@@ -177,7 +185,7 @@ export default function OrganizationSettingsPage() {
                 <Input id="website" {...form.register('website')} placeholder="https://acme.com" />
                 {form.formState.errors.website && (
                   <p className="text-sm text-destructive">
-                    {form.formState.errors.website.message}
+                    {errorText(form.formState.errors.website.message)}
                   </p>
                 )}
               </div>
@@ -218,15 +226,18 @@ export default function OrganizationSettingsPage() {
                 <Label>{t('organization.baseCurrency')}</Label>
                 <Select
                   value={form.watch('baseCurrency')}
-                  onValueChange={(v) => form.setValue('baseCurrency', v)}
+                  // Radix emits '' while syncing its hidden select; never let that clear a value.
+                  onValueChange={(v) =>
+                    v && form.setValue('baseCurrency', v, { shouldDirty: true })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={t('organization.selectCurrency')} />
                   </SelectTrigger>
                   <SelectContent>
-                    {CURRENCIES.map((c) => (
-                      <SelectItem key={c.value} value={c.value}>
-                        {c.label}
+                    {CURRENCY_CODES.map((code) => (
+                      <SelectItem key={code} value={code}>
+                        {code} - {currencyNames.of(code)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -237,7 +248,7 @@ export default function OrganizationSettingsPage() {
                 <Label>{t('organization.industry')}</Label>
                 <Select
                   value={form.watch('industry') || ''}
-                  onValueChange={(v) => form.setValue('industry', v)}
+                  onValueChange={(v) => v && form.setValue('industry', v, { shouldDirty: true })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={t('organization.selectIndustry')} />
@@ -245,7 +256,7 @@ export default function OrganizationSettingsPage() {
                   <SelectContent>
                     {INDUSTRIES.map((ind) => (
                       <SelectItem key={ind} value={ind}>
-                        {ind}
+                        {t(`organization.industries.${ind}`)}
                       </SelectItem>
                     ))}
                   </SelectContent>

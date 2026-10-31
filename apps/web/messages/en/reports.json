@@ -34,7 +34,10 @@
     "totalLiabilities": "Total Liabilities",
     "equity": "Equity",
     "totalEquity": "Total Equity",
-    "totalLiabilitiesAndEquity": "Total Liabilities & Equity"
+    "totalLiabilitiesAndEquity": "Total Liabilities & Equity",
+    "retainedEarnings": "Retained Earnings",
+    "balanced": "Balance sheet is balanced",
+    "notBalanced": "Balance sheet is not balanced"
   },
   "cashFlow": {
     "title": "Cash Flow Statement",
@@ -64,11 +67,23 @@
     "debit": "Debit",
     "credit": "Credit",
     "totalDebit": "Total Debit",
-    "totalCredit": "Total Credit"
+    "totalCredit": "Total Credit",
+    "balanced": "Trial Balance is Balanced",
+    "notBalanced": "Trial Balance is Not Balanced",
+    "debitsEqualCredits": "Total debits equal total credits",
+    "difference": "Difference: {amount}",
+    "accountBalances": "Account Balances",
+    "code": "Code",
+    "type": "Type",
+    "total": "Total"
   },
   "generalLedger": {
     "title": "General Ledger",
-    "description": "Detailed account transactions"
+    "description": "Detailed account transactions",
+    "account": "Account",
+    "selectAccount": "Select an account",
+    "selectAccountTitle": "Select an Account",
+    "selectAccountHint": "Choose an account from the dropdown above to view its general ledger entries."
   },
   "arAging": {
     "title": "AR Aging",

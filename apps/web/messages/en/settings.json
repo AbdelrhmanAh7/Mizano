@@ -89,7 +89,22 @@
     "baseCurrency": "Base Currency",
     "selectCurrency": "Select currency",
     "industry": "Industry",
-    "selectIndustry": "Select industry"
+    "selectIndustry": "Select industry",
+    "industries": {
+      "retail": "Retail",
+      "services": "Services",
+      "construction": "Construction",
+      "manufacturing": "Manufacturing",
+      "healthcare": "Healthcare",
+      "technology": "Technology",
+      "other": "Other"
+    },
+    "validation": {
+      "nameRequired": "Organization name is required",
+      "invalidEmail": "Enter a valid email address",
+      "invalidUrl": "Enter a valid URL, for example https://example.com",
+      "currencyRequired": "Select a base currency"
+    }
   },
   "localization": {
     "title": "Localization",
@@ -294,7 +309,28 @@
     "passwordPlaceholder": "Min 8 chars, uppercase, lowercase, number",
     "selectRole": "Select a role",
     "save": "Save",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "toast": {
+      "roleCreated": "Role created",
+      "roleCreatedDescription": "The role has been created.",
+      "roleCreateError": "Could not create the role",
+      "roleUpdated": "Role updated",
+      "roleUpdatedDescription": "The role has been updated.",
+      "roleUpdateError": "Could not update the role",
+      "roleDeleted": "Role deleted",
+      "roleDeletedDescription": "The role has been deleted.",
+      "roleDeleteError": "Could not delete the role",
+      "userCreated": "Member added",
+      "userCreatedDescription": "The team member can now sign in.",
+      "userCreateError": "Could not add the member",
+      "userUpdated": "Member updated",
+      "userUpdatedDescription": "The team member has been updated.",
+      "userUpdateError": "Could not update the member",
+      "userDeleted": "Member removed",
+      "userDeletedDescription": "The team member has been removed.",
+      "userDeleteError": "Could not remove the member",
+      "genericError": "Something went wrong. Please try again."
+    }
   },
   "performance": {
     "title": "Database Performance",

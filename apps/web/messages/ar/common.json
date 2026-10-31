@@ -291,7 +291,24 @@
     "rowsPerPage": "صفوف في الصفحة",
     "of": "من",
     "selectAll": "تحديد الكل",
-    "deselectAll": "إلغاء تحديد الكل"
+    "deselectAll": "إلغاء تحديد الكل",
+    "exportCsv": "تصدير CSV",
+    "exportAll": "تصدير الكل",
+    "exportAsCsv": "تصدير بصيغة CSV",
+    "exportAsXlsx": "تصدير بصيغة XLSX",
+    "columns": "الأعمدة",
+    "resetColumnWidths": "إعادة ضبط عرض الأعمدة",
+    "loadingMore": "جاري تحميل المزيد...",
+    "showingLoaded": "عرض {count} من {total} نتيجة",
+    "resultsLoaded": "تم تحميل {count} نتيجة",
+    "scrollForMore": "مرّر لعرض المزيد",
+    "selectRow": "تحديد الصف",
+    "clearSearch": "مسح البحث",
+    "firstPage": "الانتقال إلى الصفحة الأولى",
+    "previousPage": "الانتقال إلى الصفحة السابقة",
+    "nextPage": "الانتقال إلى الصفحة التالية",
+    "lastPage": "الانتقال إلى الصفحة الأخيرة",
+    "searchPlaceholder": "بحث..."
   },
   "pagination": {
     "previous": "السابق",
@@ -444,5 +461,23 @@
     "previous": "السابق",
     "next": "التالي",
     "page": "صفحة {current} من {total}"
+  },
+  "dateRange": {
+    "placeholder": "الفترة",
+    "pickRange": "اختر فترة",
+    "quickSelect": "اختيار سريع",
+    "clear": "مسح الفترة",
+    "today": "اليوم",
+    "last7Days": "آخر 7 أيام",
+    "last30Days": "آخر 30 يوماً",
+    "thisMonth": "هذا الشهر",
+    "lastMonth": "الشهر الماضي",
+    "thisQuarter": "هذا الربع",
+    "lastQuarter": "الربع الماضي",
+    "thisYear": "هذه السنة",
+    "last12Months": "آخر 12 شهراً"
+  },
+  "apiErrors": {
+    "VALIDATION_ERROR": "بعض الحقول ناقصة أو غير صحيحة. راجع النموذج وحاول مرة أخرى."
   }
 }

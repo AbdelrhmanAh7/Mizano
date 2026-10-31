@@ -49,6 +49,7 @@ export class CustomersService {
     // The address objects map to flat columns; Prisma rejects them as fields of their own.
     const { billingAddress, shippingAddress, ...fields } = createCustomerDto;
     const run = async (tx: Prisma.TransactionClient) => {
+      await this.assertPriceListBelongsToOrg(tx, organizationId, fields.priceListId);
       const customer = await tx.customer.create({
         data: {
           ...fields,
@@ -63,6 +64,20 @@ export class CustomersService {
       return customer;
     };
     return options.tx ? run(options.tx) : this.prisma.$transaction(run);
+  }
+
+  /** A customer may only point at a price list of its own organization. */
+  private async assertPriceListBelongsToOrg(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    priceListId: string | null | undefined,
+  ): Promise<void> {
+    if (!priceListId) return;
+    const priceList = await tx.priceList.findFirst({
+      where: { id: priceListId, organizationId },
+      select: { id: true },
+    });
+    if (!priceList) throw new BadRequestException('Price list not found');
   }
 
   private async baseCurrency(
@@ -205,6 +220,7 @@ export class CustomersService {
     const { billingAddress, shippingAddress, ...fields } = updateCustomerDto;
     // The change and its customer.updated outbox event commit together (audit F3).
     return this.prisma.$transaction(async (tx) => {
+      await this.assertPriceListBelongsToOrg(tx, organizationId, fields.priceListId);
       const updatedCustomer = await tx.customer.update({
         where: { id },
         data: { ...fields, ...flatAddresses(billingAddress, shippingAddress) },

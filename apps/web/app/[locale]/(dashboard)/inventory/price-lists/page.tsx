@@ -26,12 +26,17 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePriceLists, useDeletePriceList } from '@/lib/hooks/use-price-lists';
+import {
+  usePriceLists,
+  useDeletePriceList,
+  usePriceListTypeLabel,
+} from '@/lib/hooks/use-price-lists';
 
 export default function PriceListsPage() {
   const t = useTranslations('inventory');
   const { data, isLoading } = usePriceLists();
   const deletePriceList = useDeletePriceList();
+  const typeLabel = usePriceListTypeLabel();
 
   const priceLists = data?.data || data || [];
 
@@ -46,7 +51,7 @@ export default function PriceListsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('priceLists.title')}</h1>
           <p className="text-muted-foreground">{t('description')}</p>
@@ -83,7 +88,7 @@ export default function PriceListsPage() {
                     name: string;
                     type: string;
                     isActive: boolean;
-                    items?: unknown[];
+                    _count?: { items: number };
                   }) => (
                     <TableRow key={pl.id}>
                       <TableCell>
@@ -95,16 +100,14 @@ export default function PriceListsPage() {
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">
-                          {pl.type === 'SALES' ? 'Sales' : 'Purchase'}
-                        </Badge>
+                        <Badge variant="outline">{typeLabel(pl.type)}</Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant={pl.isActive ? 'default' : 'secondary'}>
                           {pl.isActive ? t('common.active') : t('common.inactive')}
                         </Badge>
                       </TableCell>
-                      <TableCell>{pl.items?.length || 0} items</TableCell>
+                      <TableCell>{pl._count?.items ?? 0}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button size="sm" variant="ghost" asChild>

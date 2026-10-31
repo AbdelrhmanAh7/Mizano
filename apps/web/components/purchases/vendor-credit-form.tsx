@@ -20,6 +20,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { vendorCreditsApi, billsApi } from '@/lib/api';
 import { Bill, isBillPosted } from '@/lib/hooks/use-bills';
+import { VendorCombobox } from '@/components/shared/party-combobox';
 import { MONEY_PATTERN } from './expense-payload';
 import {
   buildVendorCreditPayload,
@@ -56,7 +57,6 @@ interface CreditAccount {
 }
 
 interface VendorCreditFormProps {
-  vendors: Array<{ id: string; name: string }>;
   onSubmit: (data: CreateVendorCreditPayload) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -64,7 +64,6 @@ interface VendorCreditFormProps {
 }
 
 export function VendorCreditForm({
-  vendors,
   onSubmit,
   onCancel,
   isSubmitting,
@@ -124,25 +123,18 @@ export function VendorCreditForm({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="vendorId">{t('vendor')} *</Label>
-              <Select
+              {/* Server-searched picker: a plain list only held the first page of vendors. */}
+              <VendorCombobox
+                id="vendorId"
                 value={vendorId}
                 onValueChange={(value) => {
-                  form.setValue('vendorId', value);
+                  form.setValue('vendorId', value, { shouldValidate: true });
                   form.setValue('billId', '');
                 }}
+                placeholder={t('vendorPlaceholder')}
                 disabled={!!preselectedVendorId}
-              >
-                <SelectTrigger id="vendorId">
-                  <SelectValue placeholder={t('vendorPlaceholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {vendors.map((vendor) => (
-                    <SelectItem key={vendor.id} value={vendor.id}>
-                      {vendor.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                isInvalid={!!form.formState.errors.vendorId}
+              />
               {form.formState.errors.vendorId && (
                 <p className="text-sm text-red-500">{form.formState.errors.vendorId.message}</p>
               )}

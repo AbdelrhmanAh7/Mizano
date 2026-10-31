@@ -14,8 +14,10 @@ import {
   getCreditNoteTypeLabel,
 } from '@/lib/hooks/use-credit-notes';
 import { format } from 'date-fns';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 export default function CreditNoteDetailPage() {
+  const dateLocale = useDateFnsLocale();
   const params = useParams();
   const t = useTranslations('sales');
   const creditNoteId = params.id as string;
@@ -124,7 +126,7 @@ export default function CreditNoteDetailPage() {
               {t('creditNotes.date')}
             </div>
             <div className="text-2xl font-bold">
-              {format(new Date(creditNote.date), 'MMM d, yyyy')}
+              {format(new Date(creditNote.date), 'PP', { locale: dateLocale })}
             </div>
           </CardContent>
         </Card>

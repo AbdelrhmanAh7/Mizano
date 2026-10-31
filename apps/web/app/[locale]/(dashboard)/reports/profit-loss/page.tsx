@@ -6,7 +6,11 @@ import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
-import { ReportPageHeader, ReportPageSkeleton } from '@/components/reports/report-page';
+import {
+  ReportPageHeader,
+  ReportPageSkeleton,
+  useReportDateLabels,
+} from '@/components/reports/report-page';
 import { useProfitLossReport, ReportAccount } from '@/lib/hooks/use-reports';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
@@ -14,6 +18,7 @@ export default function ProfitLossReportPage() {
   // Report figures are ledger amounts, in the organization base currency (audit B5).
   const formatCurrency = useMoneyFormatter();
   const t = useTranslations('reports');
+  const dateLabels = useReportDateLabels();
   const today = new Date();
   const [dateRange, setDateRange] = useState({
     startDate: startOfYear(today),
@@ -60,12 +65,7 @@ export default function ProfitLossReportPage() {
     <div className="space-y-6">
       <ReportPageHeader
         title={t('profitLoss.title')}
-        subtitle={
-          <>
-            {format(dateRange.startDate, 'MMMM d, yyyy')} -{' '}
-            {format(dateRange.endDate, 'MMMM d, yyyy')}
-          </>
-        }
+        subtitle={dateLabels.period(dateRange.startDate, dateRange.endDate)}
       />
 
       {/* Filters */}

@@ -1,6 +1,8 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { InvoiceForm } from './invoice-form';
+import { CreditNoteForm } from './credit-note-form';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { InvoiceStatusBadge, PaymentModeBadge, QuoteStatusBadge } from './status-badge';
 import enSales from '@/messages/en/sales.json';
 import arSales from '@/messages/ar/sales.json';
@@ -53,7 +55,15 @@ jest.mock('@/lib/hooks/use-organization', () => ({
   useBaseCurrency: () => 'EGP',
 }));
 jest.mock('@/lib/hooks/use-accounts', () => ({ useAccountsByType: () => ({ data: [] }) }));
-jest.mock('@/lib/hooks/use-invoices', () => ({ useInvoices: () => ({ data: { data: [] } }) }));
+let mockOpenInvoices: unknown[] = [];
+// The customer's invoices (the credit note form lists them for "original" and "apply to").
+jest.mock('@/lib/hooks/use-invoices', () => ({
+  useInvoices: () => ({ data: { data: mockOpenInvoices } }),
+}));
+jest.mock('@/lib/api', () => ({
+  ...jest.requireActual('@/lib/api'),
+  creditNotesApi: { refundAccounts: async () => ({ data: [] }) },
+}));
 
 /** Visible text that is a run of Latin words, i.e. an untranslated English label. */
 const englishText = (container: HTMLElement): string[] =>
@@ -119,5 +129,53 @@ describe('sales forms in Arabic (audit B4)', () => {
     expect(screen.getByText(arSales.quotes.status.accepted)).toBeInTheDocument();
     expect(screen.getByText('تحويل بنكي')).toBeInTheDocument();
     expect(screen.queryByText(/Sent|Accepted|Bank Transfer/)).not.toBeInTheDocument();
+  });
+
+  // Manual QA: "Apply to Invoice" listed only *other* open invoices, so the usual case (credit
+  // the still-open original invoice, the API's default target) was impossible; the form was
+  // also mostly English.
+  describe('credit note form', () => {
+    const renderForm = () =>
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <CreditNoteForm
+            defaultCustomerId="cust-1"
+            defaultInvoiceId="inv-6"
+            onSubmit={jest.fn()}
+            onCancel={jest.fn()}
+          />
+        </QueryClientProvider>,
+      );
+
+    beforeEach(() => {
+      mockOpenInvoices = [
+        {
+          id: 'inv-6',
+          invoiceNumber: 'INV-0006',
+          status: 'SENT',
+          grandTotal: '342',
+          balanceDue: '342',
+        },
+      ];
+    });
+
+    it('offers the still-open original invoice as the invoice to apply the credit to', () => {
+      renderForm();
+      fireEvent.click(screen.getByText(arSales.creditNotes.form.applyToInvoice));
+      const applyOptions = Array.from(document.querySelectorAll('select option')).map(
+        (o) => (o as HTMLOptionElement).value,
+      );
+      expect(applyOptions.filter((v) => v === 'inv-6').length).toBeGreaterThanOrEqual(2);
+      expect(screen.queryByText(arSales.creditNotes.form.noOpenInvoicesForCustomer)).toBeNull();
+    });
+
+    it('renders in Arabic without English labels and with en/ar key parity', () => {
+      const { container } = renderForm();
+      expect(screen.getByText('بيانات إشعار الائتمان')).toBeInTheDocument();
+      expect(englishText(container).filter((t) => !/INV-0006/.test(t))).toEqual([]);
+      expect(Object.keys(arSales.creditNotes.form).sort()).toEqual(
+        Object.keys(enSales.creditNotes.form).sort(),
+      );
+    });
   });
 });

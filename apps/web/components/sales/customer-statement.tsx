@@ -18,6 +18,7 @@ import { useCustomerStatement } from '@/lib/hooks/use-customers';
 import { moneyToNumber } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 interface CustomerStatementProps {
   customerId: string;
@@ -42,6 +43,7 @@ function balanceClass(value: string): string {
 }
 
 export function CustomerStatement({ customerId }: CustomerStatementProps) {
+  const dateLocale = useDateFnsLocale();
   // A statement is ledger amounts: the org base currency, not the customer's (audit B5, §11).
   const formatCurrency = useMoneyFormatter();
   const t = useTranslations('sales.customers.statement');
@@ -142,7 +144,9 @@ export function CustomerStatement({ customerId }: CustomerStatementProps) {
                 )}
                 {statement.transactions.map((line, index) => (
                   <TableRow key={`${line.type}-${line.reference}-${index}`}>
-                    <TableCell>{format(new Date(line.date), 'MMM d, yyyy')}</TableCell>
+                    <TableCell>
+                      {format(new Date(line.date), 'PP', { locale: dateLocale })}
+                    </TableCell>
                     <TableCell>
                       <span
                         className={cn(

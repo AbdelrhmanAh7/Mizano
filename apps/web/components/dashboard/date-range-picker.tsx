@@ -9,18 +9,23 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { useDashboardFilters, type DatePreset } from '@/lib/stores/use-dashboard-filters';
+import { useDateFnsLocale } from '@/lib/date-locale';
+import { useTranslations } from 'next-intl';
 
 const presets: { label: string; value: DatePreset }[] = [
-  { label: 'This Month', value: 'thisMonth' },
-  { label: 'Last Month', value: 'lastMonth' },
-  { label: 'Last Quarter', value: 'lastQuarter' },
-  { label: 'This Year', value: 'thisYear' },
-  { label: 'Last 12 Months', value: 'last12Months' },
+  { label: 'thisMonth', value: 'thisMonth' },
+  { label: 'lastMonth', value: 'lastMonth' },
+  { label: 'lastQuarter', value: 'lastQuarter' },
+  { label: 'thisYear', value: 'thisYear' },
+  { label: 'last12Months', value: 'last12Months' },
 ];
 
 export function DateRangePicker() {
   const { dateRange, preset, setDateRange, setPreset } = useDashboardFilters();
   const [open, setOpen] = useState(false);
+  const t = useTranslations('common.dateRange');
+  const locale = useDateFnsLocale();
+  const show = (date: Date) => format(date, 'PP', { locale });
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -28,7 +33,7 @@ export function DateRangePicker() {
         <Button
           variant="outline"
           className={cn(
-            'justify-start text-left font-normal min-w-[260px]',
+            'justify-start text-start font-normal min-w-[260px]',
             !dateRange && 'text-muted-foreground',
           )}
         >
@@ -36,20 +41,22 @@ export function DateRangePicker() {
           {dateRange?.from ? (
             dateRange.to ? (
               <>
-                {format(dateRange.from, 'MMM d, yyyy')} - {format(dateRange.to, 'MMM d, yyyy')}
+                {show(dateRange.from)} - {show(dateRange.to)}
               </>
             ) : (
-              format(dateRange.from, 'MMM d, yyyy')
+              show(dateRange.from)
             )
           ) : (
-            <span>Pick a date range</span>
+            <span>{t('pickRange')}</span>
           )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="end">
         <div className="flex">
           <div className="border-e p-3 space-y-1 min-w-[150px]">
-            <p className="text-xs font-medium text-muted-foreground mb-2 px-2">Quick Select</p>
+            <p className="text-xs font-medium text-muted-foreground mb-2 px-2">
+              {t('quickSelect')}
+            </p>
             {presets.map((p) => (
               <Button
                 key={p.value}
@@ -61,7 +68,7 @@ export function DateRangePicker() {
                   setOpen(false);
                 }}
               >
-                {p.label}
+                {t(p.label)}
               </Button>
             ))}
           </div>

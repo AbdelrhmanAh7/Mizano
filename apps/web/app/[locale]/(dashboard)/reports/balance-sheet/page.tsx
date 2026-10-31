@@ -6,14 +6,28 @@ import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
-import { ReportPageHeader, ReportPageSkeleton } from '@/components/reports/report-page';
+import {
+  ReportPageHeader,
+  ReportPageSkeleton,
+  useReportDateLabels,
+} from '@/components/reports/report-page';
 import { useBalanceSheetReport, ReportAccount } from '@/lib/hooks/use-reports';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
+
+/** Section rows the report transform adds (ids from use-reports), shown in the page language. */
+const SECTION_KEYS: Record<string, string> = {
+  'current-assets': 'currentAssets',
+  'fixed-assets': 'fixedAssets',
+  'current-liabilities': 'currentLiabilities',
+  'long-term-liabilities': 'longTermLiabilities',
+  'retained-earnings': 'retainedEarnings',
+};
 
 export default function BalanceSheetReportPage() {
   // Report figures are ledger amounts, in the organization base currency (audit B5).
   const formatCurrency = useMoneyFormatter();
   const t = useTranslations('reports');
+  const dateLabels = useReportDateLabels();
   const [asOfDate, setAsOfDate] = useState(new Date());
 
   const { data: report, isLoading } = useBalanceSheetReport(format(asOfDate, 'yyyy-MM-dd'));
@@ -30,7 +44,7 @@ export default function BalanceSheetReportPage() {
       >
         <span className="flex items-center gap-2">
           <span className="text-muted-foreground font-mono">{account.code}</span>
-          {account.name}
+          {SECTION_KEYS[account.id] ? t(`balanceSheet.${SECTION_KEYS[account.id]}`) : account.name}
         </span>
         <span className="font-mono">{formatCurrency(account.balance)}</span>
       </div>
@@ -54,10 +68,7 @@ export default function BalanceSheetReportPage() {
 
   return (
     <div className="space-y-6">
-      <ReportPageHeader
-        title={t('balanceSheet.title')}
-        subtitle={`As of ${format(asOfDate, 'MMMM d, yyyy')}`}
-      />
+      <ReportPageHeader title={t('balanceSheet.title')} subtitle={dateLabels.asOf(asOfDate)} />
 
       {/* Filters */}
       <ReportFilters
@@ -160,7 +171,7 @@ export default function BalanceSheetReportPage() {
                 </span>
               </div>
               <p className={cn('text-sm mt-2', isBalanced ? 'text-success' : 'text-destructive')}>
-                {isBalanced ? 'Balance sheet is balanced' : 'Balance sheet is not balanced'}
+                {isBalanced ? t('balanceSheet.balanced') : t('balanceSheet.notBalanced')}
               </p>
             </CardContent>
           </Card>

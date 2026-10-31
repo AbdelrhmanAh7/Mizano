@@ -5,10 +5,8 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { VendorCreditForm } from '@/components/purchases/vendor-credit-form';
 import { useCreateVendorCredit } from '@/lib/hooks/use-vendor-credits';
-import { useVendors } from '@/lib/hooks/use-vendors';
 
 export default function NewVendorCreditPage() {
   const router = useRouter();
@@ -18,9 +16,6 @@ export default function NewVendorCreditPage() {
 
   // Get preselected vendor from query params
   const preselectedVendorId = searchParams.get('vendorId') || undefined;
-
-  const { data: vendorsData, isLoading: vendorsLoading, isError, refetch } = useVendors();
-  const vendors = vendorsData?.data || [];
 
   const handleSubmit = async (
     data: Parameters<typeof createCredit.mutateAsync>[0],
@@ -47,26 +42,13 @@ export default function NewVendorCreditPage() {
         </div>
       </div>
 
-      {vendorsLoading ? (
-        <div className="space-y-6">
-          <Skeleton className="h-64" />
-        </div>
-      ) : isError ? (
-        <div className="rounded-md border border-destructive/50 p-6 text-center" role="alert">
-          <p className="text-destructive">{t('credits.form.loadError')}</p>
-          <Button className="mt-4" variant="outline" onClick={() => void refetch()}>
-            {t('expenses.form.retry')}
-          </Button>
-        </div>
-      ) : (
-        <VendorCreditForm
-          vendors={vendors}
-          onSubmit={(data) => void handleSubmit(data)}
-          onCancel={() => router.push('/purchases/credits')}
-          isSubmitting={createCredit.isPending}
-          preselectedVendorId={preselectedVendorId}
-        />
-      )}
+      {/* The vendor picker searches the server itself, so the form needs no preloaded list. */}
+      <VendorCreditForm
+        onSubmit={(data) => void handleSubmit(data)}
+        onCancel={() => router.push('/purchases/credits')}
+        isSubmitting={createCredit.isPending}
+        preselectedVendorId={preselectedVendorId}
+      />
     </div>
   );
 }

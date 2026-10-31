@@ -41,8 +41,10 @@ import { ActivityLog } from '@/components/crm/activity-log';
 import { LeadForm } from '@/components/crm/lead-form';
 import { format } from 'date-fns';
 import { useTranslations } from 'next-intl';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 export default function LeadDetailPage() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('crm');
   const params = useParams();
   const router = useRouter();
@@ -247,7 +249,7 @@ export default function LeadDetailPage() {
               <div className="flex items-center gap-2">
                 <Target className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">
-                  Created {format(new Date(lead.createdAt), 'MMM d, yyyy')}
+                  Created {format(new Date(lead.createdAt), 'PP', { locale: dateLocale })}
                 </span>
               </div>
             </CardContent>

@@ -46,8 +46,10 @@ import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 export default function CustomerDetailPage() {
+  const dateLocale = useDateFnsLocale();
   // Balances and documents are ledger amounts in the org base currency, not the customer's
   // default currency (audit B5, review-lessons §11).
   const formatCurrency = useMoneyFormatter();
@@ -419,12 +421,12 @@ export default function CustomerDetailPage() {
                           </TableCell>
                           <TableCell>
                             {invoice.invoiceDate
-                              ? format(new Date(invoice.invoiceDate), 'MMM d, yyyy')
+                              ? format(new Date(invoice.invoiceDate), 'PP', { locale: dateLocale })
                               : '-'}
                           </TableCell>
                           <TableCell>
                             {invoice.dueDate
-                              ? format(new Date(invoice.dueDate), 'MMM d, yyyy')
+                              ? format(new Date(invoice.dueDate), 'PP', { locale: dateLocale })
                               : '-'}
                           </TableCell>
                           <TableCell>
@@ -497,7 +499,7 @@ export default function CustomerDetailPage() {
                           </TableCell>
                           <TableCell>
                             {payment.paymentDate
-                              ? format(new Date(payment.paymentDate), 'MMM d, yyyy')
+                              ? format(new Date(payment.paymentDate), 'PP', { locale: dateLocale })
                               : '-'}
                           </TableCell>
                           <TableCell>{payment.paymentMode?.replace('_', ' ')}</TableCell>
@@ -565,11 +567,13 @@ export default function CustomerDetailPage() {
                             </Link>
                           </TableCell>
                           <TableCell>
-                            {quote.date ? format(new Date(quote.date), 'MMM d, yyyy') : '-'}
+                            {quote.date
+                              ? format(new Date(quote.date), 'PP', { locale: dateLocale })
+                              : '-'}
                           </TableCell>
                           <TableCell>
                             {quote.expiryDate
-                              ? format(new Date(quote.expiryDate), 'MMM d, yyyy')
+                              ? format(new Date(quote.expiryDate), 'PP', { locale: dateLocale })
                               : '-'}
                           </TableCell>
                           <TableCell>
@@ -636,7 +640,9 @@ export default function CustomerDetailPage() {
                             </Link>
                           </TableCell>
                           <TableCell>
-                            {cn.date ? format(new Date(cn.date), 'MMM d, yyyy') : '-'}
+                            {cn.date
+                              ? format(new Date(cn.date), 'PP', { locale: dateLocale })
+                              : '-'}
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">{cn.type.replace('_', ' ')}</Badge>

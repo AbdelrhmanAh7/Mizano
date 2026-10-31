@@ -372,7 +372,12 @@ export class PaymentsReceivedService {
       },
     });
     if (!payment) throw new NotFoundException('Payment not found');
-    return payment;
+    // No schema relation: resolve the deposit account inside the tenant for the detail page.
+    const depositToAccount = await this.prisma.account.findFirst({
+      where: { id: payment.depositToAccountId, organizationId },
+      select: { id: true, code: true, name: true },
+    });
+    return { ...payment, depositToAccount };
   }
 
   // === Bulk Operations — same command as the single-record route ===

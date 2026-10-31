@@ -15,18 +15,39 @@ import { useToast } from '@/components/ui/use-toast';
 import { authApi } from '@/lib/api';
 import { LanguageSwitcher } from '@/components/layout/language-switcher';
 
+// Same password policy as the API's RegisterDto, so the form never sends a password the server
+// rejects with an untranslated "Validation Failed".
 const registerSchema = z
   .object({
     firstName: z.string().min(2),
     lastName: z.string().min(2),
     email: z.string().email(),
-    password: z.string().min(8),
+    password: z
+      .string()
+      .min(8, 'passwordMin')
+      .max(128, 'passwordMax')
+      .regex(/[A-Z]/, 'passwordUppercase')
+      .regex(/[a-z]/, 'passwordLowercase')
+      .regex(/[0-9]/, 'passwordNumber'),
     confirmPassword: z.string(),
     organizationName: z.string().min(2),
   })
   .refine((data) => data.password === data.confirmPassword, {
     path: ['confirmPassword'],
   });
+
+const PASSWORD_RULES = [
+  'passwordMin',
+  'passwordMax',
+  'passwordUppercase',
+  'passwordLowercase',
+  'passwordNumber',
+] as const;
+type PasswordRule = (typeof PASSWORD_RULES)[number];
+
+function passwordRule(message: string | undefined): PasswordRule {
+  return PASSWORD_RULES.find((rule) => rule === message) ?? 'passwordMin';
+}
 
 type RegisterForm = z.infer<typeof registerSchema>;
 
@@ -59,18 +80,17 @@ export default function RegisterPage() {
       });
 
       toast({
-        title: t('title'),
-        description: t('subtitle'),
+        title: t('accountCreated'),
+        description: t('accountCreatedDescription'),
       });
 
       router.push(`/${locale}/login`);
     } catch (error: unknown) {
+      const status = (error as { response?: { status?: number } }).response?.status;
       toast({
         variant: 'destructive',
         title: tErrors('generic'),
-        description:
-          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          tErrors('generic'),
+        description: status === 409 ? tErrors('emailExists') : tErrors('generic'),
       });
     } finally {
       setIsLoading(false);
@@ -88,7 +108,8 @@ export default function RegisterPage() {
           <CardDescription>{t('subtitle')}</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* method="post": a submit before hydration must never put the password in the URL. */}
+          <form method="post" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="firstName">{t('firstName')}</Label>
@@ -143,7 +164,9 @@ export default function RegisterPage() {
                 {...register('password')}
               />
               {errors.password && (
-                <p className="text-sm text-red-500">{tValidation('passwordMin')}</p>
+                <p className="text-sm text-red-500">
+                  {tValidation(passwordRule(errors.password.message))}
+                </p>
               )}
             </div>
             <div className="space-y-2">

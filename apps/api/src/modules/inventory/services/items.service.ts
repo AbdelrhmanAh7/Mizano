@@ -42,6 +42,9 @@ export class ItemsService {
         inventoryAccountId: dto.inventoryAccountId,
         description: dto.description,
         reorderPoint: dto.reorderPoint,
+        // Only goods hold stock (adjustments accept GOODS only); a service or digital item
+        // tracked as stock would show as "out of stock" on the item page and dashboard.
+        trackInventory: dto.type === ItemType.GOODS,
         currentStock: 0,
         organizationId,
       },
@@ -111,6 +114,7 @@ export class ItemsService {
       data.sellingPrice = DecimalUtils.parseInput(dto.sellingPrice, 'sellingPrice');
     if (dto.costPrice !== undefined)
       data.costPrice = DecimalUtils.parseInput(dto.costPrice, 'costPrice');
+    if (dto.type !== undefined) data.trackInventory = dto.type === ItemType.GOODS;
     return this.prisma.item.update({ where: { id }, data });
   }
 

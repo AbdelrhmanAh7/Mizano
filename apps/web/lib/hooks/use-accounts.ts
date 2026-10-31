@@ -1,5 +1,8 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { useCallback } from 'react';
+
 import { useToast } from '@/components/ui/use-toast';
 import { accountsApi } from '@/lib/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -259,19 +262,16 @@ export function getAccountTypeColor(type: AccountType): string {
   return colorMap[type] || 'bg-gray-100 text-gray-800';
 }
 
-/**
- * Helper to get account type label
- */
-export function getAccountTypeLabel(type: AccountType): string {
-  const labelMap: Record<AccountType, string> = {
-    ASSET: 'Asset',
-    LIABILITY: 'Liability',
-    EQUITY: 'Equity',
-    REVENUE: 'Revenue',
-    INCOME: 'Income',
-    EXPENSE: 'Expense',
-  };
-  return labelMap[type] || type;
+/** Translated account type label (common.accountTypes); unknown types show as sent. */
+export function useAccountTypeLabel(): (type: AccountType | string) => string {
+  const t = useTranslations('common.accountTypes');
+  return useCallback(
+    (type: AccountType | string) => {
+      const key = String(type).toLowerCase();
+      return t.has(key) ? t(key) : String(type);
+    },
+    [t],
+  );
 }
 
 /**

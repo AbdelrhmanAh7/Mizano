@@ -30,8 +30,10 @@ import { Eye, MoreHorizontal, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function TransfersPageContent() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('inventory');
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -80,7 +82,7 @@ function TransfersPageContent() {
           onSort={tableParams.setSort}
         />
       ),
-      cell: ({ row }) => format(new Date(row.original.date), 'MMM d, yyyy'),
+      cell: ({ row }) => format(new Date(row.original.date), 'PP', { locale: dateLocale }),
     },
     {
       id: 'from',
@@ -144,7 +146,7 @@ function TransfersPageContent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('transfers.title')}</h1>
           <p className="text-muted-foreground">{t('description')}</p>

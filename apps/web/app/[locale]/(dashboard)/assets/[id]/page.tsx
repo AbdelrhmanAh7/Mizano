@@ -53,12 +53,14 @@ import {
   calculateRemainingLife,
 } from '@/lib/hooks/use-assets';
 import { useTranslations } from 'next-intl';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 interface AssetDetailPageProps {
   params: { id: string };
 }
 
 export default function AssetDetailPage({ params }: AssetDetailPageProps) {
+  const dateLocale = useDateFnsLocale();
   const { id } = params;
   const t = useTranslations('assets');
   const tc = useTranslations('common');
@@ -249,7 +251,7 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
           <CardContent className="space-y-3">
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t('detail.purchaseDate')}</span>
-              <span>{format(new Date(asset.purchaseDate), 'MMM d, yyyy')}</span>
+              <span>{format(new Date(asset.purchaseDate), 'PP', { locale: dateLocale })}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t('detail.usefulLife')}</span>
@@ -299,7 +301,7 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
               <>
                 <div className="flex justify-between border-t pt-2">
                   <span className="text-muted-foreground">{t('detail.disposalDate')}</span>
-                  <span>{format(new Date(asset.disposalDate), 'MMM d, yyyy')}</span>
+                  <span>{format(new Date(asset.disposalDate), 'PP', { locale: dateLocale })}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{t('detail.disposalAmount')}</span>

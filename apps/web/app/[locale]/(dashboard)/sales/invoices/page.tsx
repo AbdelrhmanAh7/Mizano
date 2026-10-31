@@ -69,8 +69,10 @@ import {
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 function InvoicesPageContent() {
+  const dateLocale = useDateFnsLocale();
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
 
@@ -295,7 +297,7 @@ function InvoicesPageContent() {
           onSort={tableParams.setSort}
         />
       ),
-      cell: ({ row }) => format(new Date(row.original.date), 'MMM d, yyyy'),
+      cell: ({ row }) => format(new Date(row.original.date), 'PP', { locale: dateLocale }),
     },
     {
       accessorKey: 'dueDate',
@@ -312,7 +314,7 @@ function InvoicesPageContent() {
         const isOverdue = row.original.status === 'OVERDUE';
         return (
           <span className={cn(isOverdue && 'text-red-600 font-medium')}>
-            {format(new Date(row.original.dueDate), 'MMM d, yyyy')}
+            {format(new Date(row.original.dueDate), 'PP', { locale: dateLocale })}
           </span>
         );
       },
@@ -420,7 +422,7 @@ function InvoicesPageContent() {
     <div className="space-y-6">
       <AutoTourTrigger tourId="sales_invoices" />
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('invoices.title')}</h1>
           <p className="text-muted-foreground">{t('description')}</p>
@@ -428,7 +430,7 @@ function InvoicesPageContent() {
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
-            Import
+            {tCommon('buttons.import')}
           </Button>
           {canCreate && (
             <Button asChild data-tour="create-invoice-btn">

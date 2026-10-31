@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -18,32 +17,94 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Item, itemTypeOptions, unitOptions } from '@/lib/hooks/use-items';
+import {
+  CreateItemData,
+  Item,
+  ItemType,
+  ITEM_TYPES,
+  UNIT_CODES,
+  useItemTypeLabel,
+} from '@/lib/hooks/use-items';
+
+/** Decimal(19, 4) money as typed: digits, an optional point and at most 4 decimals. */
+const PRICE_RE = /^\d{1,15}(\.\d{1,4})?$/;
 
 const itemSchema = z.object({
-  name: z.string().min(1, 'Item name is required'),
-  sku: z.string().optional(),
-  description: z.string().optional(),
-  type: z.enum(['GOODS', 'SERVICE', 'DIGITAL']),
-  unit: z.string().optional(),
-  salesPrice: z.number().min(0, 'Sales price must be positive').optional(),
-  purchasePrice: z.number().min(0, 'Purchase price must be positive').optional(),
-  taxRateId: z.string().optional(),
-  trackInventory: z.boolean().default(false),
-  reorderPoint: z.number().min(0).optional(),
-  reorderQuantity: z.number().min(0).optional(),
-  incomeAccountId: z.string().optional(),
-  expenseAccountId: z.string().optional(),
-  inventoryAccountId: z.string().optional(),
+  name: z.string().trim().min(1, 'nameRequired').max(200, 'nameTooLong'),
+  sku: z.string().trim().min(1, 'skuRequired').max(50, 'skuTooLong'),
+  description: z.string().max(500, 'descriptionTooLong'),
+  type: z.enum(ITEM_TYPES),
+  unit: z.string(),
+  sellingPrice: z.string().trim().regex(PRICE_RE, 'priceInvalid'),
+  costPrice: z.string().trim().regex(PRICE_RE, 'priceInvalid'),
+  reorderPoint: z
+    .string()
+    .trim()
+    .regex(/^\d{0,9}$/, 'reorderPointInvalid'),
+  salesAccountId: z.string(),
+  purchaseAccountId: z.string(),
+  inventoryAccountId: z.string(),
 });
 
 type ItemFormData = z.infer<typeof itemSchema>;
 
+/**
+ * The one payload the items API accepts (CreateItemDto / UpdateItemDto): prices travel as decimal
+ * strings, a cleared optional field is null (not ''), and fields the API does not store are never
+ * sent — its whitelist rejects them.
+ */
+export function toItemPayload(data: ItemFormData): CreateItemData {
+  return {
+    name: data.name.trim(),
+    sku: data.sku.trim(),
+    type: data.type,
+    unit: data.unit || undefined,
+    description: data.description.trim() || null,
+    sellingPrice: data.sellingPrice.trim(),
+    costPrice: data.costPrice.trim(),
+    reorderPoint: data.type === 'SERVICE' || !data.reorderPoint ? null : Number(data.reorderPoint),
+    salesAccountId: data.salesAccountId || null,
+    purchaseAccountId: data.purchaseAccountId || null,
+    inventoryAccountId: data.type === 'SERVICE' ? null : data.inventoryAccountId || null,
+  };
+}
+
+function toFormData(item: Item): ItemFormData {
+  return {
+    name: item.name || '',
+    sku: item.sku || '',
+    description: item.description || '',
+    type: item.type || 'GOODS',
+    unit: item.unit || 'pcs',
+    sellingPrice: item.sellingPrice ?? '0',
+    costPrice: item.costPrice ?? '0',
+    reorderPoint: item.reorderPoint == null ? '' : String(item.reorderPoint),
+    salesAccountId: item.salesAccountId || '',
+    purchaseAccountId: item.purchaseAccountId || '',
+    inventoryAccountId: item.inventoryAccountId || '',
+  };
+}
+
+const EMPTY_FORM: ItemFormData = {
+  name: '',
+  sku: '',
+  description: '',
+  type: 'GOODS',
+  unit: 'pcs',
+  sellingPrice: '0',
+  costPrice: '0',
+  reorderPoint: '',
+  salesAccountId: '',
+  purchaseAccountId: '',
+  inventoryAccountId: '',
+};
+
+type AccountOption = { id: string; name: string; code: string; type: string };
+
 interface ItemFormProps {
   item?: Item | null;
-  accounts: Array<{ id: string; name: string; code: string; type: string }>;
-  taxRates?: Array<{ id: string; name: string; rate: number }>;
-  onSubmit: (data: ItemFormData) => void;
+  accounts: AccountOption[];
+  onSubmit: (data: CreateItemData) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -51,135 +112,121 @@ interface ItemFormProps {
 export function ItemForm({
   item,
   accounts,
-  taxRates = [],
   onSubmit,
   onCancel,
   isSubmitting,
-}: ItemFormProps) {
-  const tItems = useTranslations('inventory.items.form');
+}: ItemFormProps): JSX.Element {
+  const t = useTranslations('inventory.items.form');
+  const tCommon = useTranslations('inventory.common');
+  const typeLabel = useItemTypeLabel();
   const isEditing = !!item;
 
   const form = useForm<ItemFormData>({
     resolver: zodResolver(itemSchema),
-    defaultValues: {
-      name: '',
-      sku: '',
-      description: '',
-      type: 'GOODS',
-      unit: 'pcs',
-      salesPrice: 0,
-      purchasePrice: 0,
-      taxRateId: '',
-      trackInventory: true,
-      reorderPoint: 10,
-      reorderQuantity: 20,
-      incomeAccountId: '',
-      expenseAccountId: '',
-      inventoryAccountId: '',
-    },
+    defaultValues: EMPTY_FORM,
   });
-
-  const watchType = form.watch('type');
-  const watchTrackInventory = form.watch('trackInventory');
+  const { errors } = form.formState;
+  const errorText = (message?: string): JSX.Element | null =>
+    message ? <p className="text-sm text-destructive">{t(`errors.${message}`)}</p> : null;
 
   useEffect(() => {
-    if (item) {
-      form.reset({
-        name: item.name || '',
-        sku: item.sku || '',
-        description: item.description || '',
-        type: item.type || 'GOODS',
-        unit: item.unit || 'pcs',
-        salesPrice: item.salesPrice ? parseFloat(item.salesPrice) : 0,
-        purchasePrice: item.purchasePrice ? parseFloat(item.purchasePrice) : 0,
-        taxRateId: item.taxRate || '',
-        trackInventory: item.trackInventory ?? true,
-        reorderPoint: item.reorderPoint || 10,
-        reorderQuantity: item.reorderLevel || 20,
-        incomeAccountId: item.salesAccountId || '',
-        expenseAccountId: item.purchaseAccountId || '',
-        inventoryAccountId: item.inventoryAccountId || '',
-      });
-    }
+    if (item) form.reset(toFormData(item));
   }, [item, form]);
 
-  // Auto-disable inventory tracking for services
-  useEffect(() => {
-    if (watchType === 'SERVICE') {
-      form.setValue('trackInventory', false);
-    }
-  }, [watchType, form]);
+  const watchType = form.watch('type');
+  const isService = watchType === 'SERVICE';
 
-  const handleSubmit = (data: ItemFormData) => {
-    onSubmit(data);
-  };
-
-  // Filter accounts by type
   const incomeAccounts = accounts.filter((a) => a.type === 'INCOME');
   const expenseAccounts = accounts.filter((a) => a.type === 'EXPENSE');
   const assetAccounts = accounts.filter((a) => a.type === 'ASSET');
 
+  const accountSelect = (
+    field: 'salesAccountId' | 'purchaseAccountId' | 'inventoryAccountId',
+    options: AccountOption[],
+  ): JSX.Element => (
+    <Select
+      value={form.watch(field) || 'none'}
+      onValueChange={(value) => value && form.setValue(field, value === 'none' ? '' : value)}
+    >
+      <SelectTrigger id={field}>
+        <SelectValue placeholder={t('selectAccount')} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="none">{t('noAccount')}</SelectItem>
+        {options.map((account) => (
+          <SelectItem key={account.id} value={account.id}>
+            {account.code} - {account.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
   return (
-    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-      {/* Basic Information */}
+    <form
+      onSubmit={form.handleSubmit((data) => onSubmit(toItemPayload(data)))}
+      className="space-y-6"
+    >
       <Card>
         <CardHeader>
-          <CardTitle>Basic Information</CardTitle>
+          <CardTitle>{t('basicInfo')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Item Name *</Label>
-              <Input id="name" placeholder="Enter item name" {...form.register('name')} />
-              {form.formState.errors.name && (
-                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
-              )}
+              <Label htmlFor="name">{t('name')} *</Label>
+              <Input id="name" placeholder={t('namePlaceholder')} {...form.register('name')} />
+              {errorText(errors.name?.message)}
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="sku">SKU</Label>
-              <Input id="sku" placeholder="Stock Keeping Unit" {...form.register('sku')} />
+              <Label htmlFor="sku">{t('sku')} *</Label>
+              <Input
+                id="sku"
+                dir="ltr"
+                placeholder={t('skuPlaceholder')}
+                {...form.register('sku')}
+              />
+              {errorText(errors.sku?.message)}
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="type">Type *</Label>
+              <Label htmlFor="type">{t('type')} *</Label>
               <Select
-                value={form.watch('type')}
-                onValueChange={(value: 'GOODS' | 'SERVICE' | 'DIGITAL') =>
-                  form.setValue('type', value)
-                }
+                value={watchType}
+                onValueChange={(value) => value && form.setValue('type', value as ItemType)}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
+                <SelectTrigger id="type">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {itemTypeOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
+                  {ITEM_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
                       <div>
-                        <div className="font-medium">{option.label}</div>
-                        <div className="text-xs text-muted-foreground">{option.description}</div>
+                        <div className="font-medium">{typeLabel(type)}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {t(`typeDescriptions.${type}`)}
+                        </div>
                       </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="unit">Unit</Label>
+              <Label htmlFor="unit">{t('unit')}</Label>
               <Select
                 value={form.watch('unit') || 'pcs'}
-                onValueChange={(value) => form.setValue('unit', value)}
+                onValueChange={(value) => value && form.setValue('unit', value)}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select unit" />
+                <SelectTrigger id="unit">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {unitOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
+                  {UNIT_CODES.map((unit) => (
+                    <SelectItem key={unit} value={unit}>
+                      {t(`units.${unit}`)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -188,214 +235,102 @@ export function ItemForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">{t('description')}</Label>
             <Textarea
               id="description"
-              placeholder="Item description"
+              placeholder={t('descriptionPlaceholder')}
               {...form.register('description')}
               rows={3}
             />
+            {errorText(errors.description?.message)}
           </div>
         </CardContent>
       </Card>
 
-      {/* Pricing */}
       <Card>
         <CardHeader>
-          <CardTitle>Pricing</CardTitle>
+          <CardTitle>{t('pricing')}</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="salesPrice">Sales Price</Label>
-              <Input
-                id="salesPrice"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-                {...form.register('salesPrice', { valueAsNumber: true })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="purchasePrice">Purchase Price</Label>
-              <Input
-                id="purchasePrice"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-                {...form.register('purchasePrice', { valueAsNumber: true })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="taxRateId">Tax Rate</Label>
-              <Select
-                value={form.watch('taxRateId') || 'none'}
-                onValueChange={(value) => form.setValue('taxRateId', value === 'none' ? '' : value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select tax rate" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No tax</SelectItem>
-                  {taxRates.map((rate) => (
-                    <SelectItem key={rate.id} value={rate.id}>
-                      {rate.name} ({rate.rate}%)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="sellingPrice">{t('sellingPrice')} *</Label>
+            <Input
+              id="sellingPrice"
+              inputMode="decimal"
+              dir="ltr"
+              placeholder="0.00"
+              {...form.register('sellingPrice')}
+            />
+            {errorText(errors.sellingPrice?.message)}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="costPrice">{t('costPrice')}</Label>
+            <Input
+              id="costPrice"
+              inputMode="decimal"
+              dir="ltr"
+              placeholder="0.00"
+              {...form.register('costPrice')}
+            />
+            {errorText(errors.costPrice?.message)}
           </div>
         </CardContent>
       </Card>
 
-      {/* Inventory */}
-      {watchType !== 'SERVICE' && (
+      {!isService && (
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Inventory</CardTitle>
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={watchTrackInventory}
-                  onCheckedChange={(checked) => form.setValue('trackInventory', checked)}
-                />
-                <Label>Track Inventory</Label>
-              </div>
-            </div>
+            <CardTitle>{t('inventory')}</CardTitle>
           </CardHeader>
-          {watchTrackInventory && (
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {!isEditing && (
-                  <p className="text-sm text-muted-foreground md:col-span-3">
-                    {tItems('openingStockHint')}
-                  </p>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="reorderPoint">Reorder Point</Label>
-                  <Input
-                    id="reorderPoint"
-                    type="number"
-                    min="0"
-                    placeholder="10"
-                    {...form.register('reorderPoint', { valueAsNumber: true })}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Alert when stock falls below this level
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="reorderQuantity">Reorder Quantity</Label>
-                  <Input
-                    id="reorderQuantity"
-                    type="number"
-                    min="0"
-                    placeholder="20"
-                    {...form.register('reorderQuantity', { valueAsNumber: true })}
-                  />
-                  <p className="text-xs text-muted-foreground">Suggested quantity to reorder</p>
-                </div>
-              </div>
-            </CardContent>
-          )}
+          <CardContent className="space-y-4">
+            {!isEditing && <p className="text-sm text-muted-foreground">{t('openingStockHint')}</p>}
+            <div className="space-y-2 md:w-1/3">
+              <Label htmlFor="reorderPoint">{t('reorderPoint')}</Label>
+              <Input
+                id="reorderPoint"
+                inputMode="numeric"
+                dir="ltr"
+                placeholder="10"
+                {...form.register('reorderPoint')}
+              />
+              <p className="text-xs text-muted-foreground">{t('reorderPointHint')}</p>
+              {errorText(errors.reorderPoint?.message)}
+            </div>
+          </CardContent>
         </Card>
       )}
 
-      {/* Accounting */}
       <Card>
         <CardHeader>
-          <CardTitle>Accounting</CardTitle>
+          <CardTitle>{t('accounting')}</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="incomeAccountId">Income Account</Label>
-              <Select
-                value={form.watch('incomeAccountId') || 'none'}
-                onValueChange={(value) =>
-                  form.setValue('incomeAccountId', value === 'none' ? '' : value)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select account" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {incomeAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.code} - {account.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">Used when selling this item</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="expenseAccountId">Expense Account</Label>
-              <Select
-                value={form.watch('expenseAccountId') || 'none'}
-                onValueChange={(value) =>
-                  form.setValue('expenseAccountId', value === 'none' ? '' : value)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select account" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {expenseAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.code} - {account.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">Used when purchasing this item</p>
-            </div>
-
-            {watchTrackInventory && (
-              <div className="space-y-2">
-                <Label htmlFor="inventoryAccountId">Inventory Account</Label>
-                <Select
-                  value={form.watch('inventoryAccountId') || 'none'}
-                  onValueChange={(value) =>
-                    form.setValue('inventoryAccountId', value === 'none' ? '' : value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select account" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {assetAccounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.code} - {account.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">Used for inventory valuation</p>
-              </div>
-            )}
+        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="salesAccountId">{t('salesAccount')}</Label>
+            {accountSelect('salesAccountId', incomeAccounts)}
+            <p className="text-xs text-muted-foreground">{t('salesAccountHint')}</p>
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="purchaseAccountId">{t('purchaseAccount')}</Label>
+            {accountSelect('purchaseAccountId', expenseAccounts)}
+            <p className="text-xs text-muted-foreground">{t('purchaseAccountHint')}</p>
+          </div>
+          {!isService && (
+            <div className="space-y-2">
+              <Label htmlFor="inventoryAccountId">{t('inventoryAccount')}</Label>
+              {accountSelect('inventoryAccountId', assetAccounts)}
+              <p className="text-xs text-muted-foreground">{t('inventoryAccountHint')}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {tCommon('cancel')}
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : isEditing ? 'Update Item' : 'Create Item'}
+          {isSubmitting ? t('saving') : isEditing ? t('update') : t('create')}
         </Button>
       </div>
     </form>

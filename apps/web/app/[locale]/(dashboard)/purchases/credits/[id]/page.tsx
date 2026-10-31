@@ -45,12 +45,14 @@ import { useQuery } from '@tanstack/react-query';
 import { billsApi, vendorCreditsApi } from '@/lib/api';
 import { compareDecimals } from '@/lib/decimal';
 import { usePermissions } from '@/lib/hooks/use-permissions';
+import { useDateFnsLocale } from '@/lib/date-locale';
 
 interface VendorCreditDetailPageProps {
   params: { id: string };
 }
 
 export default function VendorCreditDetailPage({ params }: VendorCreditDetailPageProps) {
+  const dateLocale = useDateFnsLocale();
   const { id } = params;
   const t = useTranslations('purchases');
   const [applyDialogOpen, setApplyDialogOpen] = useState(false);
@@ -369,7 +371,9 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('credits.date')}</p>
-                <p className="text-2xl font-bold">{format(new Date(credit.date), 'MMM d, yyyy')}</p>
+                <p className="text-2xl font-bold">
+                  {format(new Date(credit.date), 'PP', { locale: dateLocale })}
+                </p>
               </div>
             </div>
           </CardContent>

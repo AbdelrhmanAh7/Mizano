@@ -20,6 +20,7 @@ import {
 import { useTranslations } from 'next-intl';
 import { moneyToNumber } from '@/lib/money';
 import { useTrialBalance } from '@/lib/hooks/use-accounting-reports';
+import { useDateFormatter } from '@/lib/hooks/use-date-locale';
 
 interface TrialBalanceRow {
   accountId: string;
@@ -59,6 +60,7 @@ const formatAmount = (amount: string | number | undefined): string => {
 };
 
 export default function TrialBalancePage() {
+  const formatLongDate = useDateFormatter('long');
   const tc = useTranslations('common');
   const [asOfDate, setAsOfDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const { data, isLoading, isError, refetch } = useTrialBalance(asOfDate);
@@ -128,7 +130,7 @@ export default function TrialBalancePage() {
       {/* Trial Balance Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Trial Balance as of {format(new Date(asOfDate), 'MMMM d, yyyy')}</CardTitle>
+          <CardTitle>Trial Balance as of {formatLongDate(new Date(asOfDate))}</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
