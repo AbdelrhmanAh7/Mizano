@@ -1023,6 +1023,9 @@ model Invoice {
   updatedAt      DateTime      @updatedAt
   deletedAt      DateTime?
 
+  /// Number or UUID recorded from the external ETA issuer; bookkeeping metadata only.
+  externalEInvoiceNumber String? @db.VarChar(100)
+
   // Relations
   organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   customer           Customer            @relation(fields: [customerId], references: [id])
@@ -1036,6 +1039,7 @@ model Invoice {
   deliveryChallans   DeliveryChallan[]
 
   @@unique([invoiceNumber, organizationId])
+  @@unique([organizationId, externalEInvoiceNumber])
   @@index([organizationId])
   @@index([customerId])
   @@index([status])
@@ -1088,6 +1092,9 @@ model CreditNote {
   updatedAt          DateTime       @updatedAt
   deletedAt          DateTime?
 
+  /// Number or UUID recorded from the external ETA issuer; bookkeeping metadata only.
+  externalEInvoiceNumber String? @db.VarChar(100)
+
   // Relations
   organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   customer         Customer     @relation(fields: [customerId], references: [id])
@@ -1095,6 +1102,7 @@ model CreditNote {
   appliedToInvoice Invoice?     @relation("AppliedCredits", fields: [appliedToInvoiceId], references: [id])
 
   @@unique([creditNoteNumber, organizationId])
+  @@unique([organizationId, externalEInvoiceNumber])
   @@index([organizationId])
   @@index([customerId])
   @@index([organizationId, deletedAt])

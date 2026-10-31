@@ -832,6 +832,11 @@ const ACCOUNTING_ERRORS: ErrorCatalogEntry[] = [
 
 /** Customers, quotes, invoices, credit notes, payments, delivery challans. */
 const SALES_ERRORS: ErrorCatalogEntry[] = [
+  {
+    code: 'EXTERNAL_EINVOICE_REFERENCE_EXISTS',
+    en: 'This ETA reference is already used in this organization',
+    ar: 'مرجع الفاتورة الإلكترونية مستخدم بالفعل في هذه المنشأة.',
+  },
   { code: 'CUSTOMER_NOT_FOUND', en: 'Customer not found', ar: 'العميل غير موجود.' },
   {
     code: 'CUSTOMER_EMAIL_EXISTS',

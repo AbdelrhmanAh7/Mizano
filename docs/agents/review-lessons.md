@@ -6,6 +6,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 1. Locking and concurrency
 
+- **Use `$executeRaw` for advisory-lock functions that return PostgreSQL `void`.** `$queryRaw` attempts to deserialize the result and Prisma rejects it; prove new locks with a real database test. _(#585)_
+
 - **Lock the ledger before reading what you post with.** Take `lockOrganizationLedger(tx, orgId)` (`common/utils/ledger-lock.ts`) before reading org settings, the base currency or default accounts that the journal depends on. Every path that makes a journal posted must hold it: `create`, `reverse` and `post`. _(bill approve, invoice send, VAT submit, journal post)_
 - **Lock the document row before snapshotting the values you post.** If you post from a plain read, an edit that commits concurrently makes the ledger disagree with the document. Use `SELECT … FOR UPDATE` on the document first. _(invoice send/update)_
 - **Pick one lock order per workflow and use it on every path that touches the same rows.** The default is document → other documents (sorted by id) → ledger. VAT returns are a deliberate exception: submit and payment both take ledger → return row, because submission must freeze the ledger before recomputing. What deadlocks is two paths taking the same locks in opposite orders. _(VAT submit vs. payment)_
@@ -77,6 +79,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Use concrete DTO classes for `@Query()` parameters.** Intersections erase the runtime metatype, bypassing ValidationPipe transformation and leaving Prisma pagination values as strings. Decorate all service and existing client filters, preserve service defaults, and test through the real pipe options.
 
 ## 8. Voided and deleted records
+
+- **Deleting a never-posted draft releases its external invoice reference in the same guarded update.** Otherwise a hidden soft-deleted draft reserves the reference forever and cannot be corrected through the UI. Voided posted documents retain their reference. _(#585)_
 
 - **Posted documents that were voided stay readable** (read-only, with `deletedAt` set) on their detail endpoint so journal source links resolve. Lists exclude them. Deleted drafts, which never posted, return 404.
 - **Current figures (open balances, aging, dashboards) exclude DRAFT, VOID and deleted documents.** Historical statements and period reports keep a posted document that was voided later in its original period, with the reversal on the void date (see 4).

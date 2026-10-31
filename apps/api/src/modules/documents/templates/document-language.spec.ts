@@ -193,3 +193,24 @@ describe('document digits', () => {
     expect(intlLocaleFor('en', 'arab')).toBe('en-SA');
   });
 });
+
+describe('external ETA reference on the invoice PDF', () => {
+  it.each(['ar', 'en'] as const)(
+    'prints an escaped external reference in %s without submission claims',
+    (locale) => {
+      const html = generateInvoiceHtml(
+        org(),
+        { ...invoice, externalEInvoiceNumber: '<ETA-42>' },
+        locale,
+      );
+      expect(html).toContain('&lt;ETA-42&gt;');
+      expect(html).not.toContain('<ETA-42>');
+      expect(html).toContain(
+        locale === 'en' ? 'ETA UUID:' : 'معرّف الفاتورة الإلكترونية لدى مصلحة الضرائب:',
+      );
+    },
+  );
+  it('omits the ETA line when no reference has been recorded', () => {
+    expect(generateInvoiceHtml(org(), invoice, 'en')).not.toContain('ETA UUID:');
+  });
+});

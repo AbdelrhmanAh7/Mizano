@@ -241,8 +241,13 @@ export class CreditNotesService {
   }
 
   async findAll(organizationId: string, query: CreditNoteQueryDto) {
-    const { page = 1, limit = 20, sortBy = 'date', sortOrder = 'desc', customerId } = query;
+    const { page = 1, limit = 20, sortBy = 'date', sortOrder = 'desc', customerId, search } = query;
     const where: Prisma.CreditNoteWhereInput = { organizationId, deletedAt: null };
+    if (search)
+      where.OR = [
+        { creditNoteNumber: { contains: search, mode: 'insensitive' } },
+        { externalEInvoiceNumber: { contains: search, mode: 'insensitive' } },
+      ];
     if (customerId) where.customerId = customerId;
 
     const [creditNotes, total] = await Promise.all([
@@ -266,9 +271,14 @@ export class CreditNotesService {
   }
 
   async findAllCursor(organizationId: string, query: CursorPaginationDto) {
-    const { cursor, take = 50, sortBy = 'date', sortOrder = 'desc' } = query;
+    const { cursor, take = 50, sortBy = 'date', sortOrder = 'desc', search } = query;
 
     const where: Prisma.CreditNoteWhereInput = { organizationId, deletedAt: null };
+    if (search)
+      where.OR = [
+        { creditNoteNumber: { contains: search, mode: 'insensitive' } },
+        { externalEInvoiceNumber: { contains: search, mode: 'insensitive' } },
+      ];
 
     return cursorPaginate(
       this.prisma.creditNote,
