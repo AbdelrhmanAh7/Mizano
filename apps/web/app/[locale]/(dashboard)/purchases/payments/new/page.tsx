@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PaymentMadeForm } from '@/components/purchases/payment-made-form';
 import { useCreatePaymentMade } from '@/lib/hooks/use-payments-made';
-import { useVendors } from '@/lib/hooks/use-vendors';
 import { useBankAccounts } from '@/lib/hooks/use-bank-accounts';
 
 export default function NewPaymentMadePage() {
@@ -21,15 +20,11 @@ export default function NewPaymentMadePage() {
   const preselectedVendorId = searchParams.get('vendorId') || undefined;
   const preselectedBillId = searchParams.get('billId') || undefined;
 
-  // Fetch vendors
-  const { data: vendorsData, isLoading: vendorsLoading } = useVendors();
-
   // Fetch bank accounts
   const { data: bankAccountsData, isLoading: bankAccountsLoading } = useBankAccounts({
     isActive: true,
   });
 
-  const vendors = vendorsData?.data || [];
   const bankAccounts = bankAccountsData?.data || [];
 
   const handleSubmit = async (data: Record<string, unknown>) => {
@@ -43,7 +38,7 @@ export default function NewPaymentMadePage() {
     }
   };
 
-  if (vendorsLoading || bankAccountsLoading) {
+  if (bankAccountsLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-12 w-64" />
@@ -69,7 +64,6 @@ export default function NewPaymentMadePage() {
 
       {/* Form */}
       <PaymentMadeForm
-        vendors={vendors}
         bankAccounts={bankAccounts}
         onSubmit={handleSubmit}
         onCancel={() => router.push('/purchases/payments')}

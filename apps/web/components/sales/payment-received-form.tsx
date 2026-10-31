@@ -546,7 +546,10 @@ export function PaymentReceivedForm({
         <Button type="button" variant="outline" onClick={onCancel}>
           {t('cancel')}
         </Button>
-        <Button type="submit" disabled={isSubmitting || !isBalanced || totalAllocated === 0}>
+        <Button
+          type="submit"
+          disabled={isSubmitting || !isBalanced || !isPositiveDecimal(totalAllocated)}
+        >
           {isSubmitting ? t('recording') : t('recordPayment')}
         </Button>
       </div>
