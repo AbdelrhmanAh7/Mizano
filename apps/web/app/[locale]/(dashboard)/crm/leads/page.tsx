@@ -1,16 +1,7 @@
 'use client';
 
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -331,24 +322,20 @@ function LeadsPageContent() {
         </CardContent>
       </Card>
 
-      {/* Delete Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('leads.deleteLead')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete lead &quot;{selectedLead?.leadName}&quot;? This action
-              cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title={t('leads.deleteLead')}
+        description={
+          <>
+            Are you sure you want to delete lead &quot;{selectedLead?.leadName}&quot;? This action
+            cannot be undone.
+          </>
+        }
+        onConfirm={confirmDelete}
+        cancelLabel="Cancel"
+        deleteLabel="Delete"
+      />
     </div>
   );
 }

@@ -21,6 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -525,24 +526,18 @@ function InvoicesPageContent() {
         </CardContent>
       </Card>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('invoices.deleteInvoice')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete invoice &quot;{selectedInvoice?.invoiceNumber}&quot;?
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              {tCommon('buttons.delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title={t('invoices.deleteInvoice')}
+        description={
+          <>
+            Are you sure you want to delete invoice &quot;{selectedInvoice?.invoiceNumber}&quot;?
+            This action cannot be undone.
+          </>
+        }
+        onConfirm={confirmDelete}
+      />
 
       {/* Send Confirmation Dialog */}
       <AlertDialog open={sendDialogOpen} onOpenChange={setSendDialogOpen}>

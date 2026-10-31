@@ -3,16 +3,7 @@
 import { InventoryAIPanel } from '@/components/ai';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import { AutoTourTrigger } from '@/components/tour/auto-tour-trigger';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -265,20 +256,15 @@ function ItemsPageContent() {
       </div>
 
       {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('items.deleteItem')}</AlertDialogTitle>
-            <AlertDialogDescription>{t('common.confirmDelete')}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              {t('common.delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={!!deleteId}
+        onOpenChange={() => setDeleteId(null)}
+        title={t('items.deleteItem')}
+        description={t('common.confirmDelete')}
+        onConfirm={handleDelete}
+        cancelLabel={t('common.cancel')}
+        deleteLabel={t('common.delete')}
+      />
     </div>
   );
 }

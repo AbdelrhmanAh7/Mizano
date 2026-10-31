@@ -12,16 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { Badge } from '@/components/ui/badge';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import { useTableParams } from '@/lib/hooks/use-table-params';
@@ -186,20 +177,15 @@ function WarehousesPageContent() {
       />
 
       {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('warehouses.deleteWarehouse')}</AlertDialogTitle>
-            <AlertDialogDescription>{t('common.confirmDelete')}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              {t('common.delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={!!deleteId}
+        onOpenChange={() => setDeleteId(null)}
+        title={t('warehouses.deleteWarehouse')}
+        description={t('common.confirmDelete')}
+        onConfirm={handleDelete}
+        cancelLabel={t('common.cancel')}
+        deleteLabel={t('common.delete')}
+      />
     </div>
   );
 }

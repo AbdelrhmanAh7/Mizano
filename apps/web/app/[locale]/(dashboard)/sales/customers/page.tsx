@@ -5,16 +5,7 @@ import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-ta
 import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
 import { ImportWizard } from '@/components/import/import-wizard';
 import { AutoTourTrigger } from '@/components/tour/auto-tour-trigger';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -333,24 +324,18 @@ function CustomersPageContent() {
         onComplete={() => refetch()}
       />
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('customers.deleteCustomer')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete &quot;{customerToDelete?.name}&quot;? This action
-              cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              {tCommon('buttons.delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title={t('customers.deleteCustomer')}
+        description={
+          <>
+            Are you sure you want to delete &quot;{customerToDelete?.name}&quot;? This action cannot
+            be undone.
+          </>
+        }
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

@@ -11,16 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { DataTableSearch } from '@/components/data-table';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { AccountTree } from '@/components/accounting/account-tree';
@@ -232,24 +223,20 @@ function AccountsPageContent() {
         isSubmitting={createAccount.isPending || updateAccount.isPending}
       />
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('accounts.deleteAccount')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete &quot;{accountToDelete?.name}&quot;? This action
-              cannot be undone. Accounts with transactions or child accounts cannot be deleted.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title={t('accounts.deleteAccount')}
+        description={
+          <>
+            Are you sure you want to delete &quot;{accountToDelete?.name}&quot;? This action cannot
+            be undone. Accounts with transactions or child accounts cannot be deleted.
+          </>
+        }
+        onConfirm={confirmDelete}
+        cancelLabel="Cancel"
+        deleteLabel="Delete"
+      />
     </div>
   );
 }

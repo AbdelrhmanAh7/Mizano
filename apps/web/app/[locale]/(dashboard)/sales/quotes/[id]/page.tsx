@@ -26,6 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { useToast } from '@/components/ui/use-toast';
 import {
   useQuote,
@@ -421,21 +422,15 @@ export default function QuoteDetailPage() {
         </div>
       )}
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('quotes.deleteQuote')}</AlertDialogTitle>
-            <AlertDialogDescription>{t('quotes.deleteConfirmation')}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title={t('quotes.deleteQuote')}
+        description={t('quotes.deleteConfirmation')}
+        onConfirm={confirmDelete}
+        cancelLabel="Cancel"
+        deleteLabel="Delete"
+      />
 
       {/* Convert to Invoice Dialog */}
       <AlertDialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>

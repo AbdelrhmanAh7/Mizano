@@ -41,6 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import {
   Dialog,
   DialogContent,
@@ -624,26 +625,17 @@ export default function WorkOrderDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete work order &quot;{workOrder.workOrderNumber}&quot;?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => void confirmDelete()}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Work Order"
+        description={
+          <>Are you sure you want to delete work order &quot;{workOrder.workOrderNumber}&quot;?</>
+        }
+        onConfirm={() => void confirmDelete()}
+        cancelLabel="Cancel"
+        deleteLabel="Delete"
+      />
     </div>
   );
 }

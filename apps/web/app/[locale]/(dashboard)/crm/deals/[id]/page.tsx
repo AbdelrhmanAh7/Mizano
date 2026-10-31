@@ -28,6 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import {
   Dialog,
   DialogContent,
@@ -455,23 +456,17 @@ export default function DealDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('deals.deleteDeal')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete &quot;{deal.dealName}&quot;? This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title={t('deals.deleteDeal')}
+        description={
+          <>Are you sure you want to delete &quot;{deal.dealName}&quot;? This cannot be undone.</>
+        }
+        onConfirm={confirmDelete}
+        cancelLabel="Cancel"
+        deleteLabel="Delete"
+      />
     </div>
   );
 }
