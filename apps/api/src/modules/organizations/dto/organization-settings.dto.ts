@@ -202,45 +202,6 @@ export class InventorySettingsDto {
 }
 
 // ============================================
-// AI SETTINGS
-// ============================================
-
-export class AiSettingsDto {
-  @ApiPropertyOptional({ description: 'Enable auto-categorization' })
-  @IsOptional()
-  @IsBoolean()
-  aiCategorizationEnabled?: boolean;
-
-  @ApiPropertyOptional({ description: 'Enable bank reconciliation AI' })
-  @IsOptional()
-  @IsBoolean()
-  aiReconciliationEnabled?: boolean;
-
-  @ApiPropertyOptional({ description: 'Enable demand forecasting' })
-  @IsOptional()
-  @IsBoolean()
-  aiForecastingEnabled?: boolean;
-
-  @ApiPropertyOptional({ description: 'Enable anomaly detection' })
-  @IsOptional()
-  @IsBoolean()
-  aiAnomalyEnabled?: boolean;
-
-  @ApiPropertyOptional({ description: 'Enable lead scoring' })
-  @IsOptional()
-  @IsBoolean()
-  aiLeadScoringEnabled?: boolean;
-
-  @ApiPropertyOptional({ description: 'Anomaly detection sensitivity (Z-score threshold)' })
-  @IsOptional()
-  @IsInt()
-  @Min(2)
-  @Max(4)
-  @Type(() => Number)
-  anomalySensitivity?: number;
-}
-
-// ============================================
 // EMAIL SETTINGS
 // ============================================
 
@@ -363,15 +324,6 @@ export interface AllSettingsResponse {
     defaultValuationMethod: string;
     enableMultiWarehouse: boolean;
     enableBundles: boolean;
-  };
-  ai: {
-    aiCategorizationEnabled: boolean;
-    aiReconciliationEnabled: boolean;
-
-    aiForecastingEnabled: boolean;
-    aiAnomalyEnabled: boolean;
-    aiLeadScoringEnabled: boolean;
-    anomalySensitivity: number;
   };
   email: {
     smtpHost: string | null;

@@ -237,14 +237,6 @@ jobs:
               echo "RATE_LIMIT_MAX=30"
               echo "RATE_LIMIT_AUTH_MAX=10"
               echo "LOG_LEVEL=warn"
-              echo "OLLAMA_BASE_URL=http://host.docker.internal:11434"
-              echo "OLLAMA_ENABLED=true"
-              echo "OLLAMA_TEXT_MODEL=qwen3-vl:8b"
-              echo "OLLAMA_VISION_MODEL=qwen3-vl:8b"
-              echo "OLLAMA_TIMEOUT_MS=300000"
-              echo "OLLAMA_MAX_CONCURRENT=1"
-              echo "OLLAMA_NUM_CTX=8192"
-              echo "EXTRACTION_STRATEGY=vlm"
             } > ~/mizano/.env
 
             echo ".env written successfully"
@@ -328,27 +320,6 @@ jobs:
             docker image prune -f
 
             echo "Deployment completed: tag=${TAG}"
-
-      - name: Ensure Ollama models are available
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          script: |
-            # Ensure Ollama is running
-            if ! ollama list &> /dev/null 2>&1; then
-              echo "Starting Ollama..."
-              ollama serve &
-              sleep 5
-            fi
-
-            # Pull models (skips if already present)
-            ollama pull qwen3-vl:8b || echo "WARNING: Failed to pull qwen3-vl:8b"
-
-            echo "Ollama models ready:"
-            ollama list
 
   # ==========================================
   # Health check

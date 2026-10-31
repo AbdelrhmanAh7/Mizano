@@ -1,6 +1,5 @@
 'use client';
 
-import { CustomerAIInsights } from '@/components/ai';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
 import { ImportWizard } from '@/components/import/import-wizard';
@@ -232,9 +231,6 @@ function CustomersPageContent() {
           )}
         </div>
       </div>
-
-      {/* AI Customer Insights */}
-      <CustomerAIInsights />
 
       {/* Filters */}
       <Card>

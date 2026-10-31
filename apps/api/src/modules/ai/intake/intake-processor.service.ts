@@ -148,7 +148,6 @@ export class IntakeProcessorService implements OnModuleInit {
               })
               .catch(() => undefined);
           },
-          job.strategy ?? undefined,
         ),
         lostLease,
       ]);

@@ -7,10 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
 import {
+  ReportAccountRow,
   ReportPageHeader,
   ReportPageSkeleton,
   useReportDateLabels,
 } from '@/components/reports/report-page';
+import { MonthlySummaryCard } from '@/components/reports/monthly-summary-card';
 import { useProfitLossReport, ReportAccount } from '@/lib/hooks/use-reports';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
@@ -29,26 +31,6 @@ export default function ProfitLossReportPage() {
     startDate: format(dateRange.startDate, 'yyyy-MM-dd'),
     endDate: format(dateRange.endDate, 'yyyy-MM-dd'),
   });
-
-  const renderAccountRow = (account: ReportAccount, level = 0) => (
-    <div key={account.id}>
-      <div
-        className={cn(
-          'flex justify-between py-2 border-b',
-          level === 0 && 'font-medium',
-          level > 0 && 'text-sm',
-        )}
-        style={{ paddingLeft: `${level * 24}px` }}
-      >
-        <span className="flex items-center gap-2">
-          <span className="text-muted-foreground font-mono">{account.code}</span>
-          {account.name}
-        </span>
-        <span className="font-mono">{formatCurrency(account.balance)}</span>
-      </div>
-      {account.children?.map((child) => renderAccountRow(child, level + 1))}
-    </div>
-  );
 
   if (isLoading) {
     return <ReportPageSkeleton />;
@@ -70,6 +52,8 @@ export default function ProfitLossReportPage() {
 
       {/* Filters */}
       <ReportFilters dateRange={dateRange} onDateRangeChange={setDateRange} showDateRange />
+
+      <MonthlySummaryCard month={format(dateRange.endDate, 'yyyy-MM')} />
 
       {!hasData ? (
         <Card>
@@ -118,7 +102,9 @@ export default function ProfitLossReportPage() {
               <CardTitle>{t('profitLoss.revenue')}</CardTitle>
             </CardHeader>
             <CardContent>
-              {income.map((account: ReportAccount) => renderAccountRow(account))}
+              {income.map((account: ReportAccount) => (
+                <ReportAccountRow key={account.id} account={account} />
+              ))}
               <div className="flex justify-between py-3 border-t-2 font-bold">
                 <span>{t('profitLoss.revenue')}</span>
                 <span className="font-mono text-green-600">{formatCurrency(totalIncome)}</span>
@@ -131,7 +117,9 @@ export default function ProfitLossReportPage() {
               <CardTitle>{t('profitLoss.operatingExpenses')}</CardTitle>
             </CardHeader>
             <CardContent>
-              {expenses.map((account: ReportAccount) => renderAccountRow(account))}
+              {expenses.map((account: ReportAccount) => (
+                <ReportAccountRow key={account.id} account={account} />
+              ))}
               <div className="flex justify-between py-3 border-t-2 font-bold">
                 <span>{t('profitLoss.operatingExpenses')}</span>
                 <span className="font-mono text-red-600">{formatCurrency(totalExpenses)}</span>

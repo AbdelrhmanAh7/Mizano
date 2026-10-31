@@ -1,6 +1,5 @@
 'use client';
 
-import { PipelineForecastCard } from '@/components/ai';
 import { KanbanBoard } from '@/components/crm/kanban-board';
 import { DataTable, SortableHeader } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
@@ -224,9 +223,6 @@ function DealsPageContent() {
           </CardContent>
         </Card>
       )}
-
-      {/* AI Pipeline Forecast */}
-      <PipelineForecastCard />
 
       {/* Content */}
       {view === 'kanban' ? (

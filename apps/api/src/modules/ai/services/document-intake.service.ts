@@ -4,15 +4,12 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { WebhookOutboxService } from '../../integrations/services/webhook-outbox.service';
 import { AiFeature, AiFeedbackAction } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import { OllamaService, DocumentExtractionResult } from './ollama.service';
+import { DocumentExtractionResult, emptyExtraction } from '../extraction/extraction-result';
 import { DocumentClassificationService, DocumentCategory } from './document-classification.service';
 import { EntityExtractionService } from './entity-extraction.service';
 import { AiFeedbackService } from './ai-feedback.service';
 import { ExtractionStrategyResolver } from '../extraction/extraction-strategy-resolver.service';
-import {
-  ExtractionContext,
-  StrategyExtractionResult,
-} from '../extraction/extraction-strategy.interface';
+import { ExtractionContext } from '../extraction/extraction-strategy.interface';
 import { extractTextFromPdf } from '../utils/pdf-extractor.util';
 import { levenshteinSimilarity, normalizeText } from '../utils/text-similarity.util';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
@@ -43,6 +40,8 @@ export interface IntakeLineItem {
   unitPrice: number;
   taxAmount: number;
   total: number;
+  /** AI account suggestion (categorization feature): an id of this organization's accounts. */
+  suggestedAccountId?: string | null;
 }
 
 export interface DocumentIntakeResult {
@@ -114,14 +113,8 @@ export interface DocumentIntakeResult {
     taxId: string | null;
   } | null;
 
-  /** Which AI engine extracted the data */
-  extractionMethod:
-    | 'ollama-vision'
-    | 'ollama-text'
-    | 'ocr-llm'
-    | 'hybrid-ocr'
-    | 'hybrid-vlm'
-    | 'rules';
+  /** Which reader extracted the data: the organization's own AI provider or the CPU rules. */
+  extractionMethod: 'ai' | 'rules';
 }
 
 /**
@@ -197,8 +190,9 @@ export interface IntakeProgressEvent {
   error?: string;
 }
 
-/** Truncate PDF raw text to this length before sending to Ollama (speeds up inference). */
+/** PDF text kept with the result (review screen); the AI reader may see up to READER_TEXT_LIMIT. */
 const PDF_TEXT_TRUNCATION_LIMIT = 4000;
+const READER_TEXT_LIMIT = 12_000;
 
 function uniqueIds(values: Array<string | undefined>): string[] {
   return [...new Set(values.filter((v): v is string => typeof v === 'string' && v.length > 0))];
@@ -214,7 +208,6 @@ export class DocumentIntakeService {
 
   constructor(
     private prisma: PrismaService,
-    private ollamaService: OllamaService,
     private strategyResolver: ExtractionStrategyResolver,
     private classificationService: DocumentClassificationService,
     private entityExtractionService: EntityExtractionService,
@@ -225,10 +218,11 @@ export class DocumentIntakeService {
   ) {}
 
   /**
-   * Process a document through the AI intake pipeline (powered by Ollama).
+   * Process a document through the intake pipeline.
    *
    * Pipeline:
-   *  1. Extract structured data via Ollama (vision for images, text for PDFs)
+   *  1. Read it: the organization's own AI provider when its `documents` feature is active,
+   *     else (or when that fails) the CPU rules reader
    *  2. Classify document type (INVOICE, RECEIPT, PURCHASE_ORDER, etc.)
    *  3. Match vendor/customer against existing records
    *  4. Check for duplicates
@@ -240,16 +234,15 @@ export class DocumentIntakeService {
     filename?: string,
     _language: string = 'eng+ara',
     onProgress?: (stage: IntakeStage, progress: number, message: string) => void,
-    strategy?: string,
   ): Promise<DocumentIntakeResult> {
     // Log metadata only — never file names, document text or extracted values.
     this.logger.log(
-      `Processing document intake: org=${organizationId}, mime=${mimeType}, size=${fileBuffer.length}, strategy=${strategy || 'default'}`,
+      `Processing document intake: org=${organizationId}, mime=${mimeType}, size=${fileBuffer.length}`,
     );
 
     let rawText = '';
     let extraction: DocumentExtractionResult | null = null;
-    let extractionMethod: DocumentIntakeResult['extractionMethod'] = 'ocr-llm';
+    let extractionMethod: DocumentIntakeResult['extractionMethod'] = 'rules';
     const isPdf = mimeType === 'application/pdf';
 
     // Step 1: Build extraction context
@@ -274,11 +267,8 @@ export class DocumentIntakeService {
         context.pdfIsNativeText = pdfResult.isNativeText;
         context.pdfPageCount = pdfResult.pageCount;
         if (pdfResult.text.length > 20) {
-          rawText = pdfResult.text;
-          if (rawText.length > PDF_TEXT_TRUNCATION_LIMIT) {
-            rawText = rawText.slice(0, PDF_TEXT_TRUNCATION_LIMIT);
-            context.pdfText = rawText;
-          }
+          context.pdfText = pdfResult.text.slice(0, READER_TEXT_LIMIT);
+          rawText = pdfResult.text.slice(0, PDF_TEXT_TRUNCATION_LIMIT);
         }
       } catch (error) {
         this.logger.warn(
@@ -287,23 +277,23 @@ export class DocumentIntakeService {
       }
     }
 
-    // Step 2: Resolve and execute extraction strategy
-    const strategyResult = await this.strategyResolver.resolve(context, strategy);
+    // Step 2: Read it (AI when the organization turned it on, else the CPU rules)
+    const strategyResult = await this.strategyResolver.resolve(organizationId, context);
 
     if (strategyResult) {
       extraction = strategyResult.extraction;
-      rawText = extraction.rawText || rawText;
-      extractionMethod = this.mapStrategyToMethod(strategyResult);
+      rawText = (extraction.rawText || rawText).slice(0, PDF_TEXT_TRUNCATION_LIMIT);
+      extractionMethod = strategyResult.strategyUsed;
       this.logger.log(
-        `Strategy ${strategyResult.strategyUsed} (${strategyResult.subPathUsed || 'direct'}) succeeded: ` +
+        `Reader ${strategyResult.strategyUsed} succeeded: ` +
           `confidence=${extraction.ocrConfidence.toFixed(2)}, time=${strategyResult.totalTimeMs}ms`,
       );
     }
 
-    // Step 2b: Fallback — empty result if all strategies failed
+    // Step 2b: Fallback — empty result if no reader produced anything
     if (!extraction) {
-      this.logger.warn('All extraction strategies failed — returning empty result');
-      extraction = this.ollamaService.buildEmptyResult(rawText);
+      this.logger.warn('No reader produced a result — returning empty result');
+      extraction = emptyExtraction(rawText);
     }
 
     // Step 2: Classify document — use embedded category from extraction, or fall back to classifier
@@ -327,7 +317,7 @@ export class DocumentIntakeService {
     // Step 3: Run classification + entity matching in parallel (both only need rawText)
     const [classification, entityResult] = await Promise.all([
       classificationPromise,
-      this.entityExtractionService.extractAndMatch(organizationId, rawText, { useOllama: false }),
+      this.entityExtractionService.extractAndMatch(organizationId, rawText),
     ]);
 
     const documentType = this.mapClassificationToType(classification.category);
@@ -755,18 +745,6 @@ export class DocumentIntakeService {
     );
 
     return { type: 'invoice', id: invoice.id, number: invoiceNumber };
-  }
-
-  private mapStrategyToMethod(
-    result: StrategyExtractionResult,
-  ): DocumentIntakeResult['extractionMethod'] {
-    if (result.strategyUsed === 'hybrid') {
-      return result.subPathUsed === 'vlm-fallback' ? 'hybrid-vlm' : 'hybrid-ocr';
-    }
-    if (result.strategyUsed === 'rules') return 'rules';
-    if (result.strategyUsed === 'vlm') return 'ollama-vision';
-    if (result.strategyUsed === 'ocr-llm') return 'ocr-llm';
-    return 'ocr-llm';
   }
 
   private mapRawCategoryToDocumentCategory(raw: string): DocumentCategory {

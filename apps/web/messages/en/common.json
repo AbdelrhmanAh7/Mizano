@@ -28,8 +28,7 @@
       "hr": "HR & Payroll",
       "inventory": "Inventory",
       "projects": "Projects",
-      "crm": "CRM",
-      "ai": "AI Analytics"
+      "crm": "CRM"
     },
     "charts": {
       "cashFlowTrend": "Cash Flow Trend",

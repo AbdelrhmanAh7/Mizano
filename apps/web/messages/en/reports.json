@@ -180,5 +180,16 @@
     "print": "Print",
     "refresh": "Refresh",
     "exporting": "Exporting..."
+  },
+  "aiSummary": {
+    "title": "Plain-language summary of {month}",
+    "note": "Written by your AI account from this month's totals. Check it against the figures below.",
+    "write": "Write summary",
+    "rewrite": "Write again",
+    "writing": "Writing…",
+    "empty": "No summary for this month yet.",
+    "loadFailed": "Could not load the summary.",
+    "writeFailed": "Could not write the summary.",
+    "retry": "Retry"
   }
 }

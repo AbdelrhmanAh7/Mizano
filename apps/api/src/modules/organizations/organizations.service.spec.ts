@@ -125,7 +125,7 @@ describe('OrganizationsService', () => {
   // ── getAllSettings ──────────────────────────────────────────────
 
   describe('getAllSettings', () => {
-    it('returns all 8 setting categories plus accounts', async () => {
+    it('returns all 7 setting categories plus accounts', async () => {
       mockPrisma.organization.findUnique.mockResolvedValue(mockOrg);
 
       const result = await service.getAllSettings(ORG_ID);
@@ -133,7 +133,8 @@ describe('OrganizationsService', () => {
       expect(result).toHaveProperty('financial');
       expect(result).toHaveProperty('invoice');
       expect(result).toHaveProperty('inventory');
-      expect(result).toHaveProperty('ai');
+      // AI moved to /ai-settings (the organization's own AI account).
+      expect(result).not.toHaveProperty('ai');
       expect(result).toHaveProperty('email');
       expect(result).toHaveProperty('localization');
       expect(result).toHaveProperty('branding');
@@ -146,14 +147,6 @@ describe('OrganizationsService', () => {
       const result = await service.getAllSettings(ORG_ID);
       expect(result.general.name).toBe('Acme Corp');
       expect(result.general.baseCurrency).toBe('USD');
-    });
-
-    it('maps AI settings correctly', async () => {
-      mockPrisma.organization.findUnique.mockResolvedValue(mockOrg);
-
-      const result = await service.getAllSettings(ORG_ID);
-      expect(result.ai.anomalySensitivity).toBe(3);
-      expect(result.ai.aiCategorizationEnabled).toBe(true);
     });
 
     it('computes email isConfigured correctly', async () => {
@@ -307,21 +300,6 @@ describe('OrganizationsService', () => {
       expect(mockPrisma.organization.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ enableMultiWarehouse: true }),
-        }),
-      );
-    });
-  });
-
-  // ── updateAiSettings ───────────────────────────────────────────
-
-  describe('updateAiSettings', () => {
-    it('updates AI toggles and anomaly sensitivity', async () => {
-      mockPrisma.organization.update.mockResolvedValue({ id: ORG_ID, updatedAt: new Date() });
-
-      await service.updateAiSettings(ORG_ID, { anomalySensitivity: 4, aiAnomalyEnabled: true });
-      expect(mockPrisma.organization.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ anomalySensitivity: 4, aiAnomalyEnabled: true }),
         }),
       );
     });

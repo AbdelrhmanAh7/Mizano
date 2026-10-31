@@ -1,12 +1,9 @@
-import { DocumentExtractionResult } from '../services/ollama.service';
+import { DocumentExtractionResult } from './extraction-result';
 
-/** Strategy names for document extraction. */
-export type ExtractionStrategyName = 'vlm' | 'ocr-llm' | 'hybrid' | 'rules';
+/** Readers: the CPU rules reader, or the organization's own AI provider. */
+export type ExtractionStrategyName = 'ai' | 'rules';
 
-/** Configurable strategy selection (includes auto mode and scan-speed presets). */
-export type ExtractionStrategyOption = ExtractionStrategyName | 'auto' | 'fast' | 'slow';
-
-/** Context passed to every extraction strategy. */
+/** Context passed to every reader. */
 export interface ExtractionContext {
   fileBuffer: Buffer;
   mimeType: string;
@@ -19,30 +16,23 @@ export interface ExtractionContext {
   /** true if PDF has native embedded text (not a scanned image) */
   pdfIsNativeText?: boolean;
   pdfPageCount?: number;
-  /** Override the Ollama model used for extraction (set by fast/slow mode). */
-  modelOverride?: string;
 }
 
-/** Sub-path taken within a composite strategy. */
-export type ExtractionSubPath = 'ocr-fast' | 'vlm-fallback';
-
-/** Result wrapper with metadata about which strategy was used. */
+/** Result wrapper with metadata about which reader produced it. */
 export interface StrategyExtractionResult {
   extraction: DocumentExtractionResult;
   strategyUsed: ExtractionStrategyName;
-  /** For hybrid: which sub-path was taken */
-  subPathUsed?: ExtractionSubPath;
-  /** OCR confidence from PaddleOCR (0-100), if OCR was used */
+  /** OCR confidence (0-100), if OCR was used */
   ocrRawConfidence?: number;
-  /** Total wall-clock time for the strategy */
+  /** Total wall-clock time for the reader */
   totalTimeMs: number;
 }
 
-/** Interface that all extraction strategies must implement. */
+/** Interface that every reader implements. */
 export interface ExtractionStrategy {
   readonly name: ExtractionStrategyName;
 
-  /** Returns true if this strategy can handle the given context. */
+  /** Returns true if this reader can handle the given context. */
   canHandle(context: ExtractionContext): boolean;
 
   /** Execute the extraction. Returns null if extraction fails. */

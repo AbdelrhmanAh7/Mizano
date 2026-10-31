@@ -8,7 +8,7 @@ import { JournalsService } from '../../accounting/services/journals.service';
 import { IntegrationApiKeyGuard, KeyRateLimiter } from '../guards/integration-api-key.guard';
 import { integrationRequestContext } from '../integration-request-context';
 import { hashApiKey, generateApiKey } from '../utils/api-key';
-import { sealSecret } from '../utils/secret-box';
+import { sealSecret } from '../../../common/utils/secret-box';
 import { verifyFlowlineSignature } from '../utils/flowline-signature';
 import { IntegrationApiService } from './integration-api.service';
 import {

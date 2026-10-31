@@ -30,16 +30,6 @@ export const tourDefinitions: Record<string, Record<string, TourDefinition>> = {
           },
         },
         {
-          element: '[data-tour="dashboard-ai-alerts"]',
-          popover: {
-            title: 'AI-Powered Alerts',
-            description:
-              "Mizano's AI watches your data and surfaces important insights — anomalies, suggestions, and reminders.",
-            side: 'top',
-            align: 'start',
-          },
-        },
-        {
           element: '[data-tour="dashboard-transactions"]',
           popover: {
             title: 'Recent Transactions',
@@ -71,16 +61,6 @@ export const tourDefinitions: Record<string, Record<string, TourDefinition>> = {
               'تساعدك الرسوم البيانية التفاعلية على رصد اتجاهات التدفق النقدي والإيرادات بمرور الوقت.',
             side: 'top',
             align: 'center',
-          },
-        },
-        {
-          element: '[data-tour="dashboard-ai-alerts"]',
-          popover: {
-            title: 'تنبيهات الذكاء الاصطناعي',
-            description:
-              'يراقب الذكاء الاصطناعي في ميزانو بياناتك ويظهر رؤى مهمة — حالات شاذة واقتراحات وتذكيرات.',
-            side: 'top',
-            align: 'start',
           },
         },
         {
