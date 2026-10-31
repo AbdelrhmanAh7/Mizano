@@ -2,10 +2,11 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { AuthSessionsService } from '../auth-sessions.service';
 
 interface JwtPayload {
   sub: string;
+  sid?: string;
   email: string;
   name: string;
   organizationId: string;
@@ -16,7 +17,7 @@ interface JwtPayload {
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     private configService: ConfigService,
-    private prisma: PrismaService,
+    private sessions: AuthSessionsService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -26,17 +27,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: JwtPayload) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        status: true,
-        organizationId: true,
-        roleId: true,
-      },
-    });
+    // A signed-out session (this device, or everywhere) stops its access tokens at once.
+    const user = await this.sessions.activeUser(payload.sub, payload.sid);
 
     if (!user || user.status !== 'ACTIVE') {
       throw new UnauthorizedException('User not found or inactive');
@@ -48,6 +40,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       name: user.name,
       organizationId: user.organizationId,
       roleId: user.roleId,
+      sessionId: payload.sid,
     };
   }
 }

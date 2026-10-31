@@ -648,11 +648,53 @@ model User {
   assignedTasks    Task[]           @relation("AssignedTasks")
   activityLogs     ActivityLog[]
   searchHistories  SearchHistory[]
+  authSessions     AuthSession[]
+  passwordResets   PasswordResetToken[]
 
   @@unique([email, organizationId])
   @@index([organizationId])
   @@index([email])
   @@map("users")
+}
+
+/// One signed-in device or browser. The refresh token rotates on every use; presenting a rotated-out
+/// token after the grace window is treated as theft and ends the session.
+model AuthSession {
+  id                String    @id @default(cuid())
+  userId            String
+  organizationId    String
+  refreshTokenHash  String    @unique
+  previousTokenHash String?
+  rotatedAt         DateTime?
+  lastUsedAt        DateTime  @default(now())
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  revokedReason     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([organizationId])
+  @@map("auth_sessions")
+}
+
+/// A single-use password reset link. Only the SHA-256 of the token is stored.
+model PasswordResetToken {
+  id             String    @id @default(cuid())
+  userId         String
+  organizationId String
+  tokenHash      String    @unique
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([organizationId])
+  @@map("password_reset_tokens")
 }
 
 model UserPreferences {

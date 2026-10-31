@@ -6,6 +6,8 @@ export interface CurrentUserData {
   name: string;
   organizationId: string;
   roleId: string;
+  /** The signed-in device session the token belongs to. */
+  sessionId?: string;
 }
 
 export const CurrentUser = createParamDecorator(

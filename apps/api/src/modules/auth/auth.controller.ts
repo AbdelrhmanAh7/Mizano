@@ -5,6 +5,8 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { ForgotPasswordDto, ResetPasswordDto } from './dto/password.dto';
+import { PasswordResetService } from './password-reset.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Public } from '../../common/decorators';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
@@ -14,7 +16,10 @@ import { CurrentUser, CurrentUserData } from '../../common/decorators';
 @Controller('auth')
 @Throttle({ short: { ttl: 60000, limit: 5 } })
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly passwordReset: PasswordResetService,
+  ) {}
 
   @Public()
   @Post('register')
@@ -42,15 +47,42 @@ export class AuthController {
     @CurrentUser() user: CurrentUserData,
     @Body() refreshTokenDto: RefreshTokenDto,
   ) {
-    return this.authService.refreshTokens(user.id, refreshTokenDto.refreshToken);
+    return this.authService.refreshTokens(user.id, user.sessionId, refreshTokenDto.refreshToken);
   }
 
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Logout and invalidate refresh token' })
+  @ApiOperation({ summary: 'Sign out this device only' })
   @ApiBearerAuth()
   async logout(@CurrentUser() user: CurrentUserData) {
-    return this.authService.logout(user.id);
+    return this.authService.logout(user.id, user.sessionId);
+  }
+
+  @Post('logout-all')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Sign out on every device' })
+  @ApiBearerAuth()
+  async logoutAll(@CurrentUser() user: CurrentUserData) {
+    return this.authService.logoutAll(user.id);
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  // Per address: 5 requests per 15 minutes (the service also caps links per account).
+  @Throttle({ short: { ttl: 15 * 60_000, limit: 5 } })
+  @ApiOperation({ summary: 'Email a password reset link (same answer for unknown emails)' })
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.passwordReset.request(dto);
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Set a new password with a reset link' })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.passwordReset.reset(dto.token, dto.password);
   }
 }
