@@ -3,6 +3,7 @@ import {
   MAX_CONCURRENT_RENDERS,
   PDF_RENDER_TIMEOUT_MS,
   closePdfBrowser,
+  resetPdfRendererForTests,
   isAllowedPdfRequestUrl,
   renderHtmlToPdf,
 } from './pdf-renderer';
@@ -73,7 +74,7 @@ describe('renderHtmlToPdf (sandboxed PDF renderer)', () => {
   });
 
   afterEach(async () => {
-    await closePdfBrowser();
+    await resetPdfRendererForTests();
     delete process.env.PUPPETEER_EXECUTABLE_PATH;
   });
 
@@ -209,7 +210,7 @@ describe('renderHtmlToPdf (sandboxed PDF renderer)', () => {
     await renderHtmlToPdf('<p></p>');
     expect(puppeteer.launch).toHaveBeenCalledTimes(2);
 
-    await closePdfBrowser();
+    await resetPdfRendererForTests();
     (puppeteer.launch as jest.Mock).mockReset();
     (puppeteer.launch as jest.Mock).mockRejectedValueOnce(new Error('no chromium'));
     (puppeteer.launch as jest.Mock).mockResolvedValue(browser);
@@ -265,5 +266,51 @@ describe('renderHtmlToPdf (sandboxed PDF renderer)', () => {
     // The slots are free again: a new render starts at once.
     page.setContent.mockImplementation(async () => undefined);
     await expect(renderHtmlToPdf('<p>after</p>')).resolves.toBeInstanceOf(Buffer);
+  });
+  describe('closePdfBrowser (shutdown)', () => {
+    const hangRenders = () => {
+      const releases: Array<() => void> = [];
+      page.setContent.mockImplementation(
+        () => new Promise<void>((resolve) => releases.push(resolve)),
+      );
+      return releases;
+    };
+    const settle = () => new Promise((r) => setImmediate(r));
+
+    it('refuses queued and new renders, lets running ones finish, then closes the browser', async () => {
+      const releases = hangRenders();
+      const running = Array.from({ length: MAX_CONCURRENT_RENDERS }, (_, i) =>
+        renderHtmlToPdf(`<p>${i}</p>`),
+      );
+      while (releases.length < MAX_CONCURRENT_RENDERS) await settle();
+      const queued = renderHtmlToPdf('<p>queued</p>');
+
+      const closing = closePdfBrowser();
+      await expect(queued).rejects.toThrow('PDF renderer is shut down');
+      await expect(renderHtmlToPdf('<p>new</p>')).rejects.toThrow('PDF renderer is shut down');
+      await settle();
+      expect(browser.close).not.toHaveBeenCalled(); // still draining
+
+      releases.forEach((release) => release());
+      await expect(Promise.all(running)).resolves.toHaveLength(MAX_CONCURRENT_RENDERS);
+      await closing;
+      expect(browser.close).toHaveBeenCalledTimes(1);
+      expect(puppeteer.launch).toHaveBeenCalledTimes(1);
+      await expect(renderHtmlToPdf('<p>after</p>')).rejects.toThrow('PDF renderer is shut down');
+      expect(puppeteer.launch).toHaveBeenCalledTimes(1); // nothing relaunched after shutdown
+    });
+
+    it('stops waiting for a stuck render after the timeout', async () => {
+      const releases = hangRenders();
+      const stuck = renderHtmlToPdf('<p>stuck</p>');
+      while (releases.length < 1) await settle();
+
+      await closePdfBrowser(20);
+      expect(browser.close).toHaveBeenCalledTimes(1);
+
+      releases.forEach((release) => release());
+      await stuck; // finishes on the closed browser's context; nothing new is launched
+      expect(puppeteer.launch).toHaveBeenCalledTimes(1);
+    });
   });
 });

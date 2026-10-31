@@ -35,6 +35,17 @@ export function isAllowedPdfRequestUrl(url: string): boolean {
 
 let sharedBrowser: Promise<puppeteer.Browser> | null = null;
 
+const SHUT_DOWN_MESSAGE = 'PDF renderer is shut down';
+
+let activeRenders = 0;
+const waiting: Array<{ grant: () => void; refuse: (error: Error) => void }> = [];
+/** Resolved when no render holds a slot (used by the shutdown drain). */
+let idleListeners: Array<() => void> = [];
+/** Set once closePdfBrowser() starts: new and queued renders are refused from then on. */
+let shutdown: Promise<void> | null = null;
+/** Set when the shared browser is being closed: nothing may launch another one. */
+let browserClosed = false;
+
 function launchBrowser(timeoutMs: number): Promise<puppeteer.Browser> {
   const launching = puppeteer
     .launch({
@@ -63,6 +74,8 @@ function launchBrowser(timeoutMs: number): Promise<puppeteer.Browser> {
 }
 
 async function getBrowser(timeoutMs: number): Promise<puppeteer.Browser> {
+  // A render that outlived the shutdown drain must not launch a browser nobody will close.
+  if (browserClosed) throw new Error(SHUT_DOWN_MESSAGE);
   if (sharedBrowser) {
     const browser = await sharedBrowser.catch(() => null);
     if (browser?.connected) return browser;
@@ -71,9 +84,6 @@ async function getBrowser(timeoutMs: number): Promise<puppeteer.Browser> {
   sharedBrowser = launchBrowser(timeoutMs);
   return sharedBrowser;
 }
-
-let activeRenders = 0;
-const waiting: Array<() => void> = [];
 
 async function acquireRenderSlot(timeoutMs: number): Promise<void> {
   if (activeRenders < MAX_CONCURRENT_RENDERS) {
@@ -84,31 +94,77 @@ async function acquireRenderSlot(timeoutMs: number): Promise<void> {
   // waits longer than the render timeout gives up and leaves the queue, so a stuck render can't
   // make every later request wait forever.
   await new Promise<void>((resolve, reject) => {
-    const grant = (): void => {
-      clearTimeout(timer);
-      resolve();
+    const entry = {
+      grant: (): void => {
+        clearTimeout(timer);
+        resolve();
+      },
+      refuse: (error: Error): void => {
+        clearTimeout(timer);
+        reject(error);
+      },
     };
     const timer = setTimeout(() => {
-      const index = waiting.indexOf(grant);
+      const index = waiting.indexOf(entry);
       if (index !== -1) waiting.splice(index, 1);
       reject(new Error('PDF render queue timed out'));
     }, timeoutMs);
-    waiting.push(grant);
+    waiting.push(entry);
   });
 }
 
 function releaseRenderSlot(): void {
   const next = waiting.shift();
-  if (next) next();
-  else activeRenders -= 1;
+  if (next) {
+    next.grant();
+    return;
+  }
+  activeRenders -= 1;
+  if (activeRenders === 0) {
+    const listeners = idleListeners;
+    idleListeners = [];
+    listeners.forEach((notify) => notify());
+  }
 }
 
-/** Closes the shared browser (application shutdown). The next render launches a new one. */
-export async function closePdfBrowser(): Promise<void> {
+async function drainAndClose(timeoutMs: number): Promise<void> {
+  // 1. Queued renders never start.
+  for (const queued of waiting.splice(0)) queued.refuse(new Error(SHUT_DOWN_MESSAGE));
+  // 2. Renders already running may finish, but no longer than one render timeout.
+  if (activeRenders > 0) {
+    let timer: NodeJS.Timeout | undefined;
+    await Promise.race([
+      new Promise<void>((resolve) => idleListeners.push(resolve)),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, timeoutMs);
+      }),
+    ]);
+    clearTimeout(timer);
+  }
+  // 3. Close the browser; from here on nothing can launch another one.
+  browserClosed = true;
   const current = sharedBrowser;
   sharedBrowser = null;
   const browser = await current?.catch(() => null);
   if (browser) await browser.close().catch(() => undefined);
+}
+
+/**
+ * Shuts the renderer down (application shutdown): new and queued renders are refused, running
+ * renders get up to `timeoutMs` to finish, then the shared browser is closed. Idempotent; the
+ * renderer stays shut down, because Nest closes the HTTP server only after this runs.
+ */
+export function closePdfBrowser(timeoutMs: number = PDF_RENDER_TIMEOUT_MS): Promise<void> {
+  shutdown ??= drainAndClose(timeoutMs);
+  return shutdown;
+}
+
+/** Test helper: shut down, then make the renderer usable again with a fresh state. */
+export async function resetPdfRendererForTests(): Promise<void> {
+  await closePdfBrowser();
+  shutdown = null;
+  browserClosed = false;
+  idleListeners = [];
 }
 
 /** Render `html` to an A4 PDF in a locked-down headless browser. */
@@ -116,6 +172,7 @@ export async function renderHtmlToPdf(
   html: string,
   timeoutMs: number = PDF_RENDER_TIMEOUT_MS,
 ): Promise<Buffer> {
+  if (shutdown) throw new Error(SHUT_DOWN_MESSAGE);
   await acquireRenderSlot(timeoutMs);
   let context: puppeteer.BrowserContext | undefined;
   try {
