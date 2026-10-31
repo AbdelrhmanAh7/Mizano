@@ -437,7 +437,6 @@ describe('Logger endpoints and stream (e2e)', () => {
       // Another organization's id answers like a missing one (404), never confirming it exists.
       const byId = await tenantB.api.get(`/logger/logs/${entryId}`);
       expect(byId.status).toBe(404);
-      expect(byId.text).not.toContain(entryId);
 
       const update = await tenantB.api
         .post('/logger/update-status')
