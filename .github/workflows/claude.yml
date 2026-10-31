@@ -2,8 +2,7 @@
 # OAuth token - no API billing. Two jobs:
 #   claude  - answers "@claude" in issue comments, PR review comments, PR reviews and new issues (interactive/tag mode)
 #   review  - strict review of every PR opened/updated from a branch of THIS repo, kept in one sticky comment
-# Inert until the repo secret CLAUDE_CODE_OAUTH_TOKEN exists (then the Mac mini hub responder - bin/mention.sh - stays the
-# fallback and skips whatever this workflow already took). Setup, once per repo, by the owner on the Mac:
+# Inert until the repo secret CLAUDE_CODE_OAUTH_TOKEN exists (there is no other responder). Setup, once per repo, by the owner on the Mac:
 #   claude setup-token                                          (interactive; prints the token)
 #   gh secret set CLAUDE_CODE_OAUTH_TOKEN -R <owner>/<repo>     (paste the token when prompted)
 # The Claude GitHub App (https://github.com/apps/claude) must be installed on the repo: the action trades the job's OIDC
@@ -60,7 +59,7 @@ jobs:
         run: |
           set -euo pipefail
           skip() { echo "::notice::$1"; echo "run=false" >> "$GITHUB_OUTPUT"; exit 0; }
-          [ "$HAS_TOKEN" = "true" ] || skip "CLAUDE_CODE_OAUTH_TOKEN is not set - no-op (the Mac mini hub responder answers instead)."
+          [ "$HAS_TOKEN" = "true" ] || skip "CLAUDE_CODE_OAUTH_TOKEN is not set - no-op (no responder runs without it)."
           perm="$(gh api "repos/$REPO/collaborators/$ACTOR/permission" --jq .permission 2>/dev/null || echo none)"
           case "$perm" in admin|maintain|write) ;; *) skip "$ACTOR has no write access - ignored." ;; esac
           if [ -n "$PR_NUMBER" ]; then

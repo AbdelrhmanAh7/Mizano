@@ -22,7 +22,7 @@ BACKLOG = (ROOT / "docs" / "backlog-restructure.md").read_text(encoding="utf-8")
 # Live titles of the six goal milestones, in milestone-number order.
 EXPECTED_TITLES = {
     13: "MZ G1 · Safe, green master (P0 blockers)",
-    14: "MZ G2 · Mac mini stable: 15/15 pilot features green",
+    14: "MZ G2 · Stable: 15/15 pilot features green",
     15: "MZ G3 · Bill scan to posted entry, feature-complete",
     16: "MZ G4 · Pilot launch: 3 accountants post a scanned bill",
     17: "MZ G5 · FlowLine integration API (keys + webhooks)",
