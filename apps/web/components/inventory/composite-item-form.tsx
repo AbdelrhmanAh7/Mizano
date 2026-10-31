@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { itemsApi } from '@/lib/api';
+import type { CreateCompositeItemData } from '@/lib/hooks/use-composite-items';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
 import { useCallback, useEffect } from 'react';
@@ -31,9 +32,23 @@ interface CompositeItemFormValues {
   components: ComponentRow[];
 }
 
+/** The API body: whole-unit quantities as numbers, empty description omitted. */
+export function toCompositeItemPayload(values: CompositeItemFormValues): CreateCompositeItemData {
+  return {
+    name: values.name.trim(),
+    sku: values.sku.trim(),
+    sellingPrice: values.sellingPrice.trim(),
+    description: values.description.trim() || undefined,
+    components: values.components.map((row) => ({
+      itemId: row.itemId,
+      quantity: Number(row.quantity),
+    })),
+  };
+}
+
 interface CompositeItemFormProps {
   defaultValues?: Partial<CompositeItemFormValues>;
-  onSubmit: (data: CompositeItemFormValues) => void;
+  onSubmit: (data: CreateCompositeItemData) => void | Promise<void>;
   isSubmitting?: boolean;
   submitLabel?: string;
 }
@@ -87,7 +102,10 @@ export function CompositeItemForm({
   }, [fields.length, addComponent]);
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form
+      onSubmit={handleSubmit((values) => onSubmit(toCompositeItemPayload(values)))}
+      className="space-y-6"
+    >
       <Card>
         <CardHeader>
           <CardTitle>Basic Information</CardTitle>
@@ -117,9 +135,14 @@ export function CompositeItemForm({
             <Label htmlFor="sellingPrice">Selling Price *</Label>
             <Input
               id="sellingPrice"
-              type="number"
-              step="0.01"
-              {...register('sellingPrice', { required: 'Selling price is required' })}
+              inputMode="decimal"
+              {...register('sellingPrice', {
+                required: 'Selling price is required',
+                pattern: {
+                  value: /^\d{1,15}(\.\d{1,4})?$/,
+                  message: 'Enter a price of 0 or more, with up to 4 decimals',
+                },
+              })}
               placeholder="0.00"
             />
             {errors.sellingPrice && (
@@ -178,11 +201,11 @@ export function CompositeItemForm({
                 />
                 <Input
                   type="number"
-                  step="0.01"
-                  min="0.01"
+                  step="1"
+                  min="1"
                   {...register(`components.${index}.quantity`, {
                     required: 'Required',
-                    min: { value: 0.01, message: 'Min 0.01' },
+                    pattern: { value: /^[1-9]\d{0,5}$/, message: 'Whole units, 1 or more' },
                   })}
                   placeholder="1"
                 />

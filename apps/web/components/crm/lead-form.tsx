@@ -20,8 +20,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import {
   useCreateLead,
   useUpdateLead,
+  CreateLeadDto,
   Lead,
   LeadSource,
+  UpdateLeadDto,
   getLeadSourceLabel,
 } from '@/lib/hooks/use-crm';
 import { useToast } from '@/components/ui/use-toast';
@@ -32,7 +34,6 @@ const LEAD_SOURCES: LeadSource[] = [
   'WEBSITE',
   'REFERRAL',
   'COLD_CALL',
-  'TRADE_SHOW',
   'OTHER',
 ];
 
@@ -41,19 +42,27 @@ const leadSchema = z.object({
   companyName: z.string().optional(),
   email: z.string().email('Invalid email').optional().or(z.literal('')),
   phone: z.string().optional(),
-  source: z.enum([
-    'FACEBOOK_ADS',
-    'GOOGLE_ADS',
-    'WEBSITE',
-    'REFERRAL',
-    'COLD_CALL',
-    'TRADE_SHOW',
-    'OTHER',
-  ]),
+  source: z.enum(['FACEBOOK_ADS', 'GOOGLE_ADS', 'WEBSITE', 'REFERRAL', 'COLD_CALL', 'OTHER']),
   notes: z.string().optional(),
 });
 
 type LeadFormData = z.infer<typeof leadSchema>;
+
+/** Create omits an empty optional field; edit sends `null` so the API clears it. */
+export function toLeadPayload(data: LeadFormData): CreateLeadDto;
+export function toLeadPayload(data: LeadFormData, editing: true): UpdateLeadDto;
+export function toLeadPayload(data: LeadFormData, editing = false): CreateLeadDto | UpdateLeadDto {
+  const empty = editing ? null : undefined;
+  const optional = (value?: string) => (value && value.trim() ? value.trim() : empty);
+  return {
+    leadName: data.leadName.trim(),
+    companyName: optional(data.companyName),
+    email: optional(data.email),
+    phone: optional(data.phone),
+    source: data.source,
+    notes: optional(data.notes),
+  } as CreateLeadDto | UpdateLeadDto;
+}
 
 interface LeadFormProps {
   lead?: Lead;
@@ -89,11 +98,11 @@ export function LeadForm({ lead }: LeadFormProps) {
   const handleSubmit = async (data: LeadFormData) => {
     try {
       if (lead) {
-        await updateLead.mutateAsync({ id: lead.id, data });
+        await updateLead.mutateAsync({ id: lead.id, data: toLeadPayload(data, true) });
         toast({ title: 'Lead updated successfully' });
         router.push(`/crm/leads/${lead.id}`);
       } else {
-        const result = await createLead.mutateAsync(data);
+        const result = await createLead.mutateAsync(toLeadPayload(data));
         toast({ title: 'Lead created successfully' });
         router.push(`/crm/leads/${result?.id || result?.data?.id}`);
       }

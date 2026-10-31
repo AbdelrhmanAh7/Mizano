@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { useCreateDeal, useLeads, Deal, Lead } from '@/lib/hooks/use-crm';
+import { useCreateDeal, useLeads, CreateDealDto, Deal, DealStage, Lead } from '@/lib/hooks/use-crm';
 import { useToast } from '@/components/ui/use-toast';
 
 const DEAL_STAGES = [
@@ -26,17 +26,37 @@ const DEAL_STAGES = [
   { value: 'NEGOTIATION', label: 'Negotiation' },
 ] as const;
 
+const OPEN_STAGES: DealStage[] = DEAL_STAGES.map((stage) => stage.value);
+
+// Decimal(19, 4) as the API checks it: the amount stays a string end to end.
+const DECIMAL_PATTERN = /^\d{1,15}(\.\d{1,4})?$/;
+
 const dealSchema = z.object({
   dealName: z.string().min(1, 'Deal name is required'),
   leadId: z.string().optional(),
-  expectedAmount: z.number().min(0, 'Amount must be 0 or higher'),
-  probability: z.number().min(0).max(100).default(50),
+  expectedAmount: z
+    .string()
+    .trim()
+    .regex(DECIMAL_PATTERN, 'Enter an amount of 0 or more, with up to 4 decimals'),
+  probability: z.number().int().min(0).max(100).default(50),
   expectedCloseDate: z.string().optional(),
-  stage: z.string().optional().default('NEW'),
+  stage: z.enum(['NEW', 'MEETING_SCHEDULED', 'PROPOSAL_SENT', 'NEGOTIATION']).default('NEW'),
   notes: z.string().optional(),
 });
 
 type DealFormData = z.infer<typeof dealSchema>;
+
+export function toDealPayload(data: DealFormData): CreateDealDto {
+  return {
+    dealName: data.dealName,
+    leadId: data.leadId || undefined,
+    expectedAmount: data.expectedAmount.trim(),
+    probability: data.probability,
+    expectedCloseDate: data.expectedCloseDate || undefined,
+    stage: data.stage || 'NEW',
+    notes: data.notes || undefined,
+  };
+}
 
 interface DealFormProps {
   deal?: Deal;
@@ -58,16 +78,16 @@ export function DealForm({ deal }: DealFormProps) {
       ? {
           dealName: deal.dealName,
           leadId: deal.leadId || '',
-          expectedAmount: deal.expectedAmount,
+          expectedAmount: String(deal.expectedAmount ?? '0'),
           probability: deal.probability,
           expectedCloseDate: deal.expectedCloseDate?.split('T')[0] || '',
-          stage: deal.stage || 'NEW',
+          stage: (OPEN_STAGES.includes(deal.stage) ? deal.stage : 'NEW') as DealFormData['stage'],
           notes: deal.notes || '',
         }
       : {
           dealName: '',
           leadId: preselectedLeadId,
-          expectedAmount: 0,
+          expectedAmount: '0',
           probability: 50,
           expectedCloseDate: '',
           stage: 'NEW',
@@ -77,15 +97,7 @@ export function DealForm({ deal }: DealFormProps) {
 
   const handleSubmit = async (data: DealFormData) => {
     try {
-      const result = await createDeal.mutateAsync({
-        dealName: data.dealName,
-        leadId: data.leadId || undefined,
-        expectedAmount: data.expectedAmount,
-        probability: data.probability,
-        expectedCloseDate: data.expectedCloseDate || undefined,
-        stage: data.stage || 'NEW',
-        notes: data.notes || undefined,
-      });
+      const result = await createDeal.mutateAsync(toDealPayload(data));
       toast({ title: 'Deal created successfully' });
       router.push(`/crm/deals/${result?.id || result?.data?.id}`);
     } catch (error: unknown) {
@@ -145,10 +157,9 @@ export function DealForm({ deal }: DealFormProps) {
               <Label htmlFor="expectedAmount">Expected Amount *</Label>
               <Input
                 id="expectedAmount"
-                type="number"
-                min="0"
-                step="0.01"
-                {...form.register('expectedAmount', { valueAsNumber: true })}
+                inputMode="decimal"
+                placeholder="0.00"
+                {...form.register('expectedAmount')}
               />
               {form.formState.errors.expectedAmount && (
                 <p className="text-sm text-red-500">
@@ -164,6 +175,7 @@ export function DealForm({ deal }: DealFormProps) {
                 type="number"
                 min="0"
                 max="100"
+                step="1"
                 {...form.register('probability', { valueAsNumber: true })}
               />
             </div>
@@ -179,7 +191,10 @@ export function DealForm({ deal }: DealFormProps) {
               <Label>Stage</Label>
               <Select
                 value={form.watch('stage') || 'NEW'}
-                onValueChange={(value) => form.setValue('stage', value)}
+                onValueChange={(value) => {
+                  // Radix emits '' for a value missing from its options; keep the current stage.
+                  if (value) form.setValue('stage', value as DealFormData['stage']);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select stage" />

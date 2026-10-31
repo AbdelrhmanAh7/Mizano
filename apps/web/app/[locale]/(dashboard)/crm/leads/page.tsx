@@ -43,7 +43,6 @@ const STATUS_OPTIONS = [
   { value: 'NEW', label: 'New' },
   { value: 'CONTACTED', label: 'Contacted' },
   { value: 'QUALIFIED', label: 'Qualified' },
-  { value: 'UNQUALIFIED', label: 'Unqualified' },
   { value: 'JUNK', label: 'Junk' },
 ];
 
@@ -54,7 +53,6 @@ const SOURCE_OPTIONS = [
   { value: 'WEBSITE', label: 'Website' },
   { value: 'REFERRAL', label: 'Referral' },
   { value: 'COLD_CALL', label: 'Cold Call' },
-  { value: 'TRADE_SHOW', label: 'Trade Show' },
   { value: 'OTHER', label: 'Other' },
 ];
 
