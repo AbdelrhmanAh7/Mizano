@@ -20,7 +20,7 @@ The owner decides; this file changes no code.
 |---|---|
 | Latin / Arabic | Mizano / ميزانو |
 | Meaning in Arabic | ميزان is "scales, balance" (and ميزانية is "budget, balance sheet"); the final "-o" is not Arabic, it only makes the word sound like a brand. |
-| Say and spell | Easy to say in both languages. Latin spelling is stable (Mizano), but readers also write Mizanu, Mizan, Mezan and Mizanu; in Arabic ميزانو and ميزانوا both appear. |
+| Say and spell | Easy to say in both languages. In Latin letters the family appears as Mizano, Mizanu, Mizan and Mezan across the products found below, so a reader can drift to a neighbour; in Arabic ميزانو is the one form every product found uses. |
 | Fit | Good: balance is the heart of accounting. |
 | Generic? | The stem is: ميزان, Mizan, Mezan and ميزانية name many firms and apps. |
 
