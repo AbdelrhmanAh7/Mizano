@@ -15,7 +15,7 @@ async function main() {
   try {
     for (const label of ['A', 'B']) {
       const org = await prisma.organization.create({
-        data: { name: `Synthetic restore ${label}`, currency: 'EGP' },
+        data: { name: `Synthetic restore ${label}`, currency: 'EGP', baseCurrency: 'EGP' },
       });
       const role = await prisma.role.create({
         data: { name: 'Synthetic operator', organizationId: org.id },
@@ -49,6 +49,7 @@ async function main() {
       const bill = await prisma.bill.create({
         data: {
           billNumber: 'SYNTHETIC-BILL',
+          currencyCode: 'EGP',
           vendorId: vendor.id,
           date: day,
           dueDate: day,
@@ -89,6 +90,7 @@ async function main() {
       const invoice = await prisma.invoice.create({
         data: {
           invoiceNumber: 'SYNTHETIC-DRAFT',
+          currencyCode: 'EGP',
           customerId: customer.id,
           date: day,
           dueDate: day,
