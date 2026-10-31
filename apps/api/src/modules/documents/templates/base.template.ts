@@ -90,6 +90,7 @@ const BASE_LABELS: Record<DocumentLocale, Record<string, string>> = {
     qty: 'Qty',
     rate: 'Rate',
     taxPercent: 'Tax %',
+    discountPercent: 'Disc. %',
     amount: 'Amount',
     subtotal: 'Subtotal',
     discount: 'Discount',
@@ -106,6 +107,7 @@ const BASE_LABELS: Record<DocumentLocale, Record<string, string>> = {
     qty: 'الكمية',
     rate: 'السعر',
     taxPercent: 'الضريبة %',
+    discountPercent: 'الخصم %',
     amount: 'المبلغ',
     subtotal: 'المجموع الفرعي',
     discount: 'الخصم',
@@ -306,7 +308,17 @@ export function generateItemsTableHtml(
   const color = safeColor(primaryColor, defaultTemplateConfig.colors.primary);
   const l = BASE_LABELS[locale];
 
-  const headers = [l.description, l.qty, l.rate, ...(showTax ? [l.taxPercent] : []), l.amount];
+  // A line discount (percent) changes the line amount, so it must be printed whenever one exists;
+  // otherwise "3 × 49.99 = 134.97" cannot be reconciled on paper.
+  const showDiscount = items.some((item) => (item.discount ?? 0) > 0);
+  const headers = [
+    l.description,
+    l.qty,
+    l.rate,
+    ...(showDiscount ? [l.discountPercent] : []),
+    ...(showTax ? [l.taxPercent] : []),
+    l.amount,
+  ];
 
   const headerCells = headers
     .map(
@@ -322,6 +334,7 @@ export function generateItemsTableHtml(
         <td style="padding: 10px; text-align: start; font-size: 12px;"><bdi>${escapeHtml(item.description)}</bdi></td>
         <td style="padding: 10px; text-align: end; font-size: 12px;">${escapeHtml(item.quantity)}</td>
         <td style="padding: 10px; text-align: end; font-size: 12px;">${formatCurrency(item.rate, currency, locale)}</td>
+        ${showDiscount ? `<td style="padding: 10px; text-align: end; font-size: 12px;">${escapeHtml(item.discount || 0)}%</td>` : ''}
         ${showTax ? `<td style="padding: 10px; text-align: end; font-size: 12px;">${escapeHtml(item.taxRate || 0)}%</td>` : ''}
         <td style="padding: 10px; text-align: end; font-size: 12px; font-weight: bold;">${formatCurrency(item.amount, currency, locale)}</td>
       </tr>
