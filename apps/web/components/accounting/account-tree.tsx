@@ -31,6 +31,7 @@ interface AccountTreeNodeProps {
 function AccountTreeNode({ account, level, onEdit, onDelete, onAddChild }: AccountTreeNodeProps) {
   const typeLabel = useAccountTypeLabel();
   const t = useTranslations('accounting.accounts.page');
+  const tTree = useTranslations('accounting.accounts.tree');
   const [isExpanded, setIsExpanded] = useState(level < 2);
   const hasChildren = account.children && account.children.length > 0;
 
@@ -39,19 +40,22 @@ function AccountTreeNode({ account, level, onEdit, onDelete, onAddChild }: Accou
       <div
         className={cn(
           'flex items-center justify-between py-2 px-3 hover:bg-muted/50 rounded-md group',
-          level > 0 && 'ml-6',
+          level > 0 && 'ms-6',
         )}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {/* Expand/Collapse button */}
           <button
+            type="button"
             onClick={() => setIsExpanded(!isExpanded)}
             className={cn('p-0.5 hover:bg-muted rounded', !hasChildren && 'invisible')}
+            aria-expanded={hasChildren ? isExpanded : undefined}
+            aria-label={tTree(isExpanded ? 'collapse' : 'expand', { name: account.name })}
           >
             {isExpanded ? (
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             ) : (
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              <ChevronRight className="h-4 w-4 text-muted-foreground rtl:rotate-180" />
             )}
           </button>
 
@@ -76,7 +80,7 @@ function AccountTreeNode({ account, level, onEdit, onDelete, onAddChild }: Accou
           {/* Inactive indicator */}
           {!account.isActive && (
             <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">
-              Inactive
+              {tTree('inactive')}
             </Badge>
           )}
         </div>
@@ -85,21 +89,26 @@ function AccountTreeNode({ account, level, onEdit, onDelete, onAddChild }: Accou
         <div className="opacity-0 group-hover:opacity-100 transition-opacity">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                aria-label={tTree('actions', { name: account.name })}
+              >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {onAddChild && (
                 <DropdownMenuItem onClick={() => onAddChild(account)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Child Account
+                  <Plus className="me-2 h-4 w-4" />
+                  {tTree('addChild')}
                 </DropdownMenuItem>
               )}
               {onEdit && !account.isSystem && (
                 <DropdownMenuItem onClick={() => onEdit(account)}>
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
+                  <Edit className="me-2 h-4 w-4" />
+                  {tTree('edit')}
                 </DropdownMenuItem>
               )}
               {onDelete && !account.isSystem && (
@@ -107,8 +116,8 @@ function AccountTreeNode({ account, level, onEdit, onDelete, onAddChild }: Accou
                   onClick={() => onDelete(account)}
                   className="text-red-600 focus:text-red-600"
                 >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  <Trash2 className="me-2 h-4 w-4" />
+                  {tTree('delete')}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -118,7 +127,7 @@ function AccountTreeNode({ account, level, onEdit, onDelete, onAddChild }: Accou
 
       {/* Children */}
       {isExpanded && hasChildren && (
-        <div className="border-l border-muted ml-5">
+        <div className="border-s border-muted ms-5">
           {account.children!.map((child) => (
             <AccountTreeNode
               key={child.id}
@@ -152,6 +161,7 @@ export function AccountTree({
 }: AccountTreeProps) {
   const typeLabel = useAccountTypeLabel();
   const tPage = useTranslations('accounting.accounts.page');
+  const tTree = useTranslations('accounting.accounts.tree');
   // Group accounts by type
   const groupedAccounts = accounts.reduce(
     (acc, account) => {
@@ -180,10 +190,8 @@ export function AccountTree({
   if (accounts.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
-        <p>No accounts found.</p>
-        <p className="text-sm mt-1">
-          Create your first account or seed default accounts to get started.
-        </p>
+        <p>{tTree('emptyTitle')}</p>
+        <p className="text-sm mt-1">{tTree('emptyDescription')}</p>
       </div>
     );
   }

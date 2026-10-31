@@ -6,17 +6,16 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
-import { useToast } from '@/components/ui/use-toast';
 import { RecurringProfileForm } from '@/components/accounting/recurring-profile-form';
 import { useAccountsTree } from '@/lib/hooks/use-accounts';
 import { useRecurringProfile, useUpdateRecurringProfile } from '@/lib/hooks/use-recurring-profiles';
 import { useTranslations } from 'next-intl';
 
 export default function EditRecurringProfilePage() {
-  const t = useTranslations('accounting');
+  const tPage = useTranslations('accounting.recurring.page');
+  const tDetail = useTranslations('accounting.recurring.detail');
   const params = useParams();
   const router = useRouter();
-  const { toast } = useToast();
   const profileId = params.id as string;
 
   const { data: accounts = [], isLoading: accountsLoading } = useAccountsTree();
@@ -28,19 +27,9 @@ export default function EditRecurringProfilePage() {
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await updateProfile.mutateAsync({ id: profileId, data });
-      toast({
-        title: 'Profile updated',
-        description: 'The recurring profile has been updated successfully.',
-      });
       router.push(`/accounting/recurring/${profileId}`);
-    } catch (error: unknown) {
-      toast({
-        title: 'Error',
-        description:
-          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to update recurring profile.',
-        variant: 'destructive',
-      });
+    } catch {
+      // Toasted by useUpdateRecurringProfile.
     }
   };
 
@@ -64,22 +53,20 @@ export default function EditRecurringProfilePage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={tDetail('goBack')}>
             <Link href="/accounting/recurring">
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Profile Not Found</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{tDetail('notFoundTitle')}</h1>
           </div>
         </div>
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              The recurring profile you&apos;re looking for doesn&apos;t exist.
-            </p>
+            <p className="text-muted-foreground">{tDetail('notFoundDescription')}</p>
             <Button asChild className="mt-4">
-              <Link href="/accounting/recurring">Back to Profiles</Link>
+              <Link href="/accounting/recurring">{tDetail('backToProfiles')}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -91,16 +78,16 @@ export default function EditRecurringProfilePage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild aria-label="Go back">
+        <Button variant="ghost" size="icon" asChild aria-label={tDetail('goBack')}>
           <Link href={`/accounting/recurring/${profileId}`}>
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
           </Link>
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            {t('recurring.editProfile')} - {profile.name}
+            {tPage('editTitle', { name: profile.name })}
           </h1>
-          <p className="text-muted-foreground">Update the recurring profile details</p>
+          <p className="text-muted-foreground">{tPage('editDescription')}</p>
         </div>
       </div>
 
