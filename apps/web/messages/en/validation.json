@@ -13,6 +13,7 @@
   "date": "Please enter a valid date",
   "passwordRequired": "Password is required",
   "passwordMin": "Password must be at least 8 characters",
+  "passwordMax": "Password must not exceed 128 characters",
   "passwordUppercase": "Password must contain at least one uppercase letter",
   "passwordLowercase": "Password must contain at least one lowercase letter",
   "passwordNumber": "Password must contain at least one number",
