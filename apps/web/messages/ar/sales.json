@@ -427,6 +427,7 @@
     "reason": "السبب",
     "form": {
       "customer": "العميل",
+      "customerPlaceholder": "اختر عميلاً",
       "invoice": "الفاتورة",
       "date": "التاريخ",
       "reason": "السبب",

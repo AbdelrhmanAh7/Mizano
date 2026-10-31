@@ -10,15 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useCustomers, Customer } from '@/lib/hooks/use-customers';
+import { CustomerCombobox } from '@/components/shared/party-combobox';
 import { Quote } from '@/lib/hooks/use-quotes';
 import { LineErrors, LineItemsForm, taxFieldsForPercent, toApiLines } from './line-items-form';
 
@@ -73,8 +66,6 @@ export function QuoteForm({
   const tValidation = useTranslations('sales.quotes.validation');
   const fieldError = (message?: string) =>
     message ? (tValidation.has(message) ? tValidation(message) : message) : undefined;
-  const { data: customersData } = useCustomers({ limit: 100 });
-  const customers = customersData?.data || [];
 
   // Default dates
   const today = format(new Date(), 'yyyy-MM-dd');
@@ -168,22 +159,16 @@ export function QuoteForm({
               <Label htmlFor="customerId">
                 {t('customer')} <span className="text-destructive">*</span>
               </Label>
-              <Select
+              <CustomerCombobox
+                id="customerId"
                 value={form.watch('customerId')}
-                onValueChange={(value) => form.setValue('customerId', value)}
+                onValueChange={(value) =>
+                  form.setValue('customerId', value, { shouldValidate: form.formState.isSubmitted })
+                }
+                placeholder={t('customerPlaceholder')}
                 disabled={isEditing}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t('customerPlaceholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map((customer: Customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.displayName || customer.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                isInvalid={!!form.formState.errors.customerId}
+              />
               {form.formState.errors.customerId && (
                 <p className="text-sm text-red-500">
                   {fieldError(form.formState.errors.customerId.message)}

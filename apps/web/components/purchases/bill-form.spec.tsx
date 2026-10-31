@@ -43,8 +43,51 @@ const defaultVendors = [
 ];
 let mockVendors = defaultVendors;
 jest.mock('@/lib/hooks/use-vendors', () => ({
-  useVendors: () => ({ data: { data: mockVendors } }),
+  useVendor: (id?: string) => ({ data: mockVendors.find((v) => v.id === id) }),
 }));
+// The real pickers search the server (see async-combobox.spec): list the records as options.
+jest.mock('@/components/shared/party-combobox', () => {
+  const Picker = ({
+    records,
+    value,
+    noneLabel,
+    onValueChange,
+  }: {
+    records: Array<{ id: string; name: string }>;
+    value?: string;
+    noneLabel?: string;
+    onValueChange: (id: string, record: unknown) => void;
+  }) => (
+    <div>
+      {noneLabel && (
+        <button
+          type="button"
+          role="option"
+          aria-selected={!value}
+          onClick={() => onValueChange('', undefined)}
+        >
+          {noneLabel}
+        </button>
+      )}
+      {records.map((r) => (
+        <button
+          key={r.id}
+          type="button"
+          role="option"
+          aria-selected={r.id === value}
+          onClick={() => onValueChange(r.id, r)}
+        >
+          {r.name}
+        </button>
+      ))}
+    </div>
+  );
+  type Props = Omit<React.ComponentProps<typeof Picker>, 'records'>;
+  return {
+    VendorCombobox: (props: Props) => <Picker records={mockVendors} {...props} />,
+    ItemCombobox: (props: Props) => <Picker records={mockItems} {...props} />,
+  };
+});
 
 const accounts = [
   { id: 'acc-equipment', code: '1500', name: 'Equipment', type: 'ASSET' },
@@ -117,7 +160,7 @@ jest.mock('@/components/ui/select', () => {
   };
 });
 
-const items = [
+const mockItems = [
   {
     id: 'item-paper',
     name: 'Paper',
@@ -127,6 +170,7 @@ const items = [
   },
   { id: 'item-service', name: 'Consulting', sku: 'S-1', costPrice: '100', purchaseAccountId: null },
 ];
+const items = mockItems;
 
 function renderForm(props: Partial<React.ComponentProps<typeof BillForm>> = {}) {
   const onSubmit = jest.fn();

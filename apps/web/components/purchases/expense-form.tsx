@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { useVendors, Vendor } from '@/lib/hooks/use-vendors';
+import { VendorCombobox } from '@/components/shared/party-combobox';
 import {
   buildExpensePayload,
   CreateExpensePayload,
@@ -80,8 +80,6 @@ export function ExpenseForm({
   defaultVendorId,
 }: ExpenseFormProps) {
   const t = useTranslations('purchases.expenses.form');
-  const { data: vendorsData } = useVendors({ limit: 100 });
-  const vendors: Vendor[] = vendorsData?.data || [];
 
   const form = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
@@ -153,22 +151,13 @@ export function ExpenseForm({
 
             <div className="space-y-2">
               <Label htmlFor="vendorId">{t('vendor')}</Label>
-              <Select
+              <VendorCombobox
+                id="vendorId"
                 value={form.watch('vendorId') || ''}
-                onValueChange={(value) => form.setValue('vendorId', value === 'none' ? '' : value)}
-              >
-                <SelectTrigger id="vendorId">
-                  <SelectValue placeholder={t('vendorPlaceholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">{t('noVendor')}</SelectItem>
-                  {vendors.map((vendor) => (
-                    <SelectItem key={vendor.id} value={vendor.id}>
-                      {vendor.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onValueChange={(value) => form.setValue('vendorId', value)}
+                placeholder={t('vendorPlaceholder')}
+                noneLabel={t('noVendor')}
+              />
             </div>
           </div>
 

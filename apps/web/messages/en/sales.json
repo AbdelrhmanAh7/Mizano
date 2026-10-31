@@ -427,6 +427,7 @@
     "reason": "Reason",
     "form": {
       "customer": "Customer",
+      "customerPlaceholder": "Select a customer",
       "invoice": "Invoice",
       "date": "Date",
       "reason": "Reason",

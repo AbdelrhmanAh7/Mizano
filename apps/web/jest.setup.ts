@@ -6,3 +6,8 @@ global.ResizeObserver = class ResizeObserver {
   unobserve() {}
   disconnect() {}
 };
+
+// jsdom has no scrollIntoView; cmdk (the searchable pickers) calls it on keyboard navigation.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function scrollIntoView() {};
+}

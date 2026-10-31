@@ -12,9 +12,12 @@ jest.mock('next-intl', () => ({
     return t;
   },
 }));
-jest.mock('@/lib/hooks/use-vendors', () => ({
-  useVendors: () => ({ data: { data: [] } }),
-}));
+const mockNoVendor = { data: undefined };
+jest.mock('@/lib/hooks/use-vendors', () => ({ useVendor: () => mockNoVendor }));
+jest.mock('@/components/shared/party-combobox', () => {
+  const Closed = ({ placeholder }: { placeholder: string }) => <span>{placeholder}</span>;
+  return { VendorCombobox: Closed, ItemCombobox: Closed };
+});
 jest.mock('@/lib/hooks/use-bills', () => ({
   useBillAccountOptions: () => ({
     isSuccess: true,

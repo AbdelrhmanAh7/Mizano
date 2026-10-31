@@ -18,7 +18,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useCustomers, Customer } from '@/lib/hooks/use-customers';
+import { useCustomer } from '@/lib/hooks/use-customers';
+import { CustomerCombobox } from '@/components/shared/party-combobox';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { Invoice } from '@/lib/hooks/use-invoices';
 import {
@@ -104,8 +105,6 @@ export function InvoiceForm({
   // same, never the customer's default (audit B5, review-lessons §11).
   const formatMoney = useMoneyFormatter();
   const documentCurrencyCode = invoice?.currencyCode ?? null;
-  const { data: customersData } = useCustomers({ limit: 100 });
-  const customers = customersData?.data || [];
 
   // Default dates
   const today = format(new Date(), 'yyyy-MM-dd');
@@ -174,8 +173,9 @@ export function InvoiceForm({
     }
   }, [invoice, form, taxRates]);
 
+  // Fetched by id, so any customer works, not only the first page (audit B11).
   const selectedCustomerId = form.watch('customerId');
-  const selectedCustomer = customers.find((c: Customer) => c.id === selectedCustomerId);
+  const { data: selectedCustomer } = useCustomer(selectedCustomerId || undefined);
 
   // Update due date when payment terms change
   const handlePaymentTermsChange = (value: string) => {
@@ -190,7 +190,8 @@ export function InvoiceForm({
 
   // Auto-fill payment terms from customer
   useEffect(() => {
-    if (selectedCustomer?.paymentTerms && !isEditing) {
+    // 0 days is "due on receipt", not "no terms".
+    if (selectedCustomer && selectedCustomer.paymentTerms != null && !isEditing) {
       // Customer paymentTerms is a number (days), convert to form value
       const days = selectedCustomer.paymentTerms;
       if (days === 0) {
@@ -248,22 +249,16 @@ export function InvoiceForm({
               <Label htmlFor="customerId">
                 {t('customer')} <span className="text-destructive">*</span>
               </Label>
-              <Select
+              <CustomerCombobox
+                id="customerId"
                 value={form.watch('customerId')}
-                onValueChange={(value) => form.setValue('customerId', value)}
+                onValueChange={(value) =>
+                  form.setValue('customerId', value, { shouldValidate: form.formState.isSubmitted })
+                }
+                placeholder={t('customerPlaceholder')}
                 disabled={isEditing}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t('customerPlaceholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map((customer: Customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.displayName || customer.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                isInvalid={!!form.formState.errors.customerId}
+              />
               {form.formState.errors.customerId && (
                 <p className="text-sm text-red-500">
                   {fieldError(form.formState.errors.customerId.message)}

@@ -11,7 +11,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { computeTotals } from '@/lib/money';
-import { Item, useActiveItems } from '@/lib/hooks/use-items';
+import { type Item } from '@/lib/hooks/use-items';
+import { ItemCombobox } from '@/components/shared/party-combobox';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { Plus, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -183,7 +184,6 @@ export function LineItemsForm({
   const formatMoney = useMoneyFormatter();
   const formatAmount = (amount: number, code: string | null | undefined) =>
     formatMoney(amount, code);
-  const { data: items = [] } = useActiveItems();
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -193,26 +193,23 @@ export function LineItemsForm({
   const lines = watch(name) || [];
   const totals = calculateLineTotals(lines, taxRates);
 
-  const handleItemSelect = (index: number, itemId: string) => {
-    if (itemId === '__custom__') {
+  const handleItemSelect = (index: number, item: Item | undefined) => {
+    if (!item) {
       setValue(`${name}.${index}.itemId`, '');
       return;
     }
-    const item = items.find((i: Item) => i.id === itemId);
-    if (item) {
-      setValue(`${name}.${index}.itemId`, itemId);
-      setValue(`${name}.${index}.description`, item.description || item.name);
-      setValue(`${name}.${index}.rate`, item.sellingPrice);
-      // item.taxRate is a percent, not an option id: map it, or keep the percent itself.
-      const taxFields = taxFieldsForPercent(item.taxRate, taxRates);
-      setValue(`${name}.${index}.taxRateId`, taxFields.taxRateId);
-      setValue(`${name}.${index}.taxPercent`, taxFields.taxPercent ?? '');
-      // Recalculate amount
-      const qty = watch(`${name}.${index}.quantity`) || '1';
-      const discount = watch(`${name}.${index}.discountPercent`) || '0';
-      const amount = calculateLineAmount(qty, item.sellingPrice, discount);
-      setValue(`${name}.${index}.amount`, amount);
-    }
+    setValue(`${name}.${index}.itemId`, item.id);
+    setValue(`${name}.${index}.description`, item.description || item.name);
+    setValue(`${name}.${index}.rate`, item.sellingPrice);
+    // item.taxRate is a percent, not an option id: map it, or keep the percent itself.
+    const taxFields = taxFieldsForPercent(item.taxRate, taxRates);
+    setValue(`${name}.${index}.taxRateId`, taxFields.taxRateId);
+    setValue(`${name}.${index}.taxPercent`, taxFields.taxPercent ?? '');
+    // Recalculate amount
+    const qty = watch(`${name}.${index}.quantity`) || '1';
+    const discount = watch(`${name}.${index}.discountPercent`) || '0';
+    const amount = calculateLineAmount(qty, item.sellingPrice, discount);
+    setValue(`${name}.${index}.amount`, amount);
   };
 
   const handleQuantityChange = (index: number, value: string) => {
@@ -311,22 +308,15 @@ export function LineItemsForm({
             >
               {/* Item/Description */}
               <div className="space-y-1">
-                <Select
-                  value={watch(`${name}.${index}.itemId`) || '__custom__'}
-                  onValueChange={(value) => handleItemSelect(index, value)}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder={t('lineItems.itemPlaceholder')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__custom__">{t('lineItems.customItem')}</SelectItem>
-                    {items.map((item: Item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name} - {formatAmount(parseFloat(item.sellingPrice), currency)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <ItemCombobox
+                  className="h-9"
+                  ariaLabel={t('lineItems.item')}
+                  value={watch(`${name}.${index}.itemId`) || ''}
+                  onValueChange={(_id, item) => handleItemSelect(index, item)}
+                  placeholder={t('lineItems.itemPlaceholder')}
+                  noneLabel={t('lineItems.customItem')}
+                  describe={(item) => formatAmount(parseFloat(item.sellingPrice), currency)}
+                />
                 <Input
                   placeholder={t('lineItems.description')}
                   aria-label={t('lineItems.description')}

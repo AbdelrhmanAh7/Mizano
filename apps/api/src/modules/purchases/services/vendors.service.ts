@@ -34,6 +34,7 @@ export class VendorsService {
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
+        { displayName: { contains: search, mode: 'insensitive' } },
         { email: { contains: search, mode: 'insensitive' } },
       ];
     }
@@ -55,6 +56,7 @@ export class VendorsService {
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
+        { displayName: { contains: search, mode: 'insensitive' } },
         { email: { contains: search, mode: 'insensitive' } },
       ];
     }

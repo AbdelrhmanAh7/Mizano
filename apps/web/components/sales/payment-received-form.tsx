@@ -30,7 +30,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { useCustomers, Customer } from '@/lib/hooks/use-customers';
+import { CustomerCombobox } from '@/components/shared/party-combobox';
 import { useInvoices, Invoice } from '@/lib/hooks/use-invoices';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { useAccountsByType, Account } from '@/lib/hooks/use-accounts';
@@ -86,6 +86,9 @@ interface PaymentReceivedFormProps {
   isSubmitting?: boolean;
 }
 
+/** The API's page maximum: a customer's open invoices, all of them in practice. */
+const OPEN_INVOICES_LIMIT = 500;
+
 export function PaymentReceivedForm({
   defaultCustomerId,
   defaultInvoiceId,
@@ -99,8 +102,6 @@ export function PaymentReceivedForm({
   const dateLocale = useDateFnsLocale();
   const fieldError = (message?: string) =>
     message ? (tValidation.has(message) ? tValidation(message) : message) : undefined;
-  const { data: customersData } = useCustomers({ limit: 100 });
-  const customers = customersData?.data || [];
 
   const { data: assetAccounts } = useAccountsByType('ASSET');
 
@@ -141,10 +142,13 @@ export function PaymentReceivedForm({
   const paymentAmount = form.watch('amount');
   const allocations = form.watch('allocations');
 
-  // Fetch invoices for selected customer
+  // Every open invoice of the customer, oldest due first (not a filter of the newest 100, B11).
   const { data: invoicesData } = useInvoices({
     customerId: selectedCustomerId || undefined,
-    limit: 100,
+    open: true,
+    sortBy: 'dueDate',
+    sortOrder: 'asc',
+    limit: OPEN_INVOICES_LIMIT,
   });
 
   // Filter for open invoices (not paid, not void, not draft, with balance due)
@@ -275,24 +279,18 @@ export function PaymentReceivedForm({
               <Label htmlFor="customerId">
                 {t('customer')} <span className="text-destructive">*</span>
               </Label>
-              <Select
+              <CustomerCombobox
+                id="customerId"
                 value={form.watch('customerId')}
                 onValueChange={(value) => {
-                  form.setValue('customerId', value);
+                  form.setValue('customerId', value, {
+                    shouldValidate: form.formState.isSubmitted,
+                  });
                   form.setValue('amount', '');
                 }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t('customerPlaceholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map((customer: Customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.displayName || customer.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder={t('customerPlaceholder')}
+                isInvalid={!!form.formState.errors.customerId}
+              />
               {form.formState.errors.customerId && (
                 <p className="text-sm text-red-500">
                   {fieldError(form.formState.errors.customerId.message)}

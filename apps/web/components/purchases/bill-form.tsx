@@ -21,7 +21,8 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { Bill, useBillAccountOptions } from '@/lib/hooks/use-bills';
-import { useVendors, Vendor } from '@/lib/hooks/use-vendors';
+import { useVendor, Vendor } from '@/lib/hooks/use-vendors';
+import { ItemCombobox, VendorCombobox } from '@/components/shared/party-combobox';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { addDays, format, parseISO } from 'date-fns';
 import { AlertTriangle, Plus, Trash2 } from 'lucide-react';
@@ -117,6 +118,11 @@ export interface BillFormItemOption {
   purchaseAccountId?: string | null;
 }
 
+/** What a line needs from an item, whether the page passed it or the picker found it. */
+type BillItem = Pick<BillFormItemOption, 'id' | 'name' | 'purchaseAccountId'> & {
+  costPrice: string | null;
+};
+
 interface BillFormProps {
   bill?: Bill | null;
   items?: BillFormItemOption[];
@@ -171,8 +177,6 @@ export function BillForm({
   const tForm = useTranslations('purchases.bills.form');
   const tValidation = useTranslations('purchases.bills.validation');
   const tIntake = useTranslations('ai.intake');
-  const { data: vendorsData } = useVendors({ limit: 100 });
-  const vendors = useMemo(() => vendorsData?.data || [], [vendorsData?.data]);
 
   const translateError = useCallback(
     (message?: string) =>
@@ -212,6 +216,8 @@ export function BillForm({
   });
 
   const watchVendorId = form.watch('vendorId');
+  // Fetched by id, so any vendor works, not only the first page (audit B11).
+  const { data: selectedVendor } = useVendor(watchVendorId || undefined);
 
   // Expense/asset accounts the API accepts on a line, plus this vendor's last-used one.
   const accountOptionsQuery = useBillAccountOptions(watchVendorId || undefined);
@@ -272,8 +278,7 @@ export function BillForm({
 
   // The due date follows the vendor's terms only when the user picks a vendor or changes the
   // date. Loading the vendors, reset() of a saved bill and scan defaults never rewrite it.
-  const recomputeDueDate = (vendorId: string | undefined, date: string | undefined) => {
-    const vendor = vendorId ? vendors.find((v: Vendor) => v.id === vendorId) : undefined;
+  const recomputeDueDate = (vendor: Vendor | undefined, date: string | undefined) => {
     const dueDate = dueDateFor(date, dueDaysFor(vendor));
     if (dueDate) form.setValue('dueDate', dueDate, { shouldValidate: form.formState.isSubmitted });
   };
@@ -284,14 +289,13 @@ export function BillForm({
   const initialTermsApplied = useRef(false);
   useEffect(() => {
     if (initialTermsApplied.current || bill || scanDefaults?.dueDate) return;
-    const vendorId = form.getValues('vendorId');
-    const vendor = vendorId ? vendors.find((v: Vendor) => v.id === vendorId) : undefined;
+    const vendor = selectedVendor?.id === form.getValues('vendorId') ? selectedVendor : undefined;
     if (!vendor) return;
     initialTermsApplied.current = true;
     if (form.getFieldState('dueDate').isDirty) return;
     const dueDate = dueDateFor(form.getValues('date'), dueDaysFor(vendor));
     if (dueDate) form.setValue('dueDate', dueDate);
-  }, [vendors, bill, scanDefaults?.dueDate, form]);
+  }, [selectedVendor, bill, scanDefaults?.dueDate, form]);
 
   const handleSubmit = (data: BillFormData) => {
     // Never submit while the account options are unknown: the line accounts can't be checked.
@@ -352,9 +356,14 @@ export function BillForm({
       ? String(extractedTotals.discount)
       : null;
 
-  const handleItemSelect = (index: number, itemId: string) => {
+  // Items picked in this session (the picker searches the server), plus any the page passed.
+  const knownItems = useRef(new Map<string, BillItem>());
+  const findItem = (id: string | undefined): BillItem | undefined =>
+    id ? (knownItems.current.get(id) ?? items.find((i) => i.id === id)) : undefined;
+
+  const handleItemSelect = (index: number, item: BillItem | undefined) => {
     // An account that came from the previous item follows it out; one picked by hand stays.
-    const previousItem = items.find((i) => i.id === form.getValues(`lines.${index}.itemId`));
+    const previousItem = findItem(form.getValues(`lines.${index}.itemId`));
     const currentAccountId = form.getValues(`lines.${index}.accountId`);
     const fromPreviousItem =
       !!previousItem?.purchaseAccountId && currentAccountId === previousItem.purchaseAccountId;
@@ -365,22 +374,20 @@ export function BillForm({
         shouldValidate: form.formState.isSubmitted,
       });
 
-    if (itemId === 'none') {
+    if (!item) {
       form.setValue(`lines.${index}.itemId`, '');
       setAccount(fallbackAccountId);
       return;
     }
-    const item = items.find((i) => i.id === itemId);
-    if (item) {
-      form.setValue(`lines.${index}.itemId`, item.id);
-      form.setValue(`lines.${index}.description`, item.name);
-      form.setValue(`lines.${index}.rate`, item.costPrice);
-      setAccount(
-        item.purchaseAccountId && eligibleAccountIds?.has(item.purchaseAccountId)
-          ? item.purchaseAccountId
-          : fallbackAccountId,
-      );
-    }
+    knownItems.current.set(item.id, item);
+    form.setValue(`lines.${index}.itemId`, item.id);
+    form.setValue(`lines.${index}.description`, item.name);
+    form.setValue(`lines.${index}.rate`, item.costPrice ?? '0');
+    setAccount(
+      item.purchaseAccountId && eligibleAccountIds?.has(item.purchaseAccountId)
+        ? item.purchaseAccountId
+        : fallbackAccountId,
+    );
   };
 
   const required = <span className="text-destructive">*</span>;
@@ -399,24 +406,16 @@ export function BillForm({
               <Label htmlFor="vendorId">
                 {tForm('vendor')} {required}
               </Label>
-              <Select
+              <VendorCombobox
+                id="vendorId"
                 value={form.watch('vendorId')}
-                onValueChange={(value) => {
-                  form.setValue('vendorId', value);
-                  recomputeDueDate(value, form.getValues('date'));
+                onValueChange={(value, vendor) => {
+                  form.setValue('vendorId', value, { shouldValidate: form.formState.isSubmitted });
+                  recomputeDueDate(vendor, form.getValues('date'));
                 }}
-              >
-                <SelectTrigger id="vendorId">
-                  <SelectValue placeholder={tForm('vendorPlaceholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {vendors.map((vendor: Vendor) => (
-                    <SelectItem key={vendor.id} value={vendor.id}>
-                      {vendor.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder={tForm('vendorPlaceholder')}
+                isInvalid={!!form.formState.errors.vendorId}
+              />
               {form.formState.errors.vendorId && (
                 <p className="text-sm text-red-500">
                   {translateError(form.formState.errors.vendorId.message)}
@@ -435,7 +434,7 @@ export function BillForm({
                 {...dateField}
                 onChange={(event) => {
                   void dateField.onChange(event);
-                  recomputeDueDate(form.getValues('vendorId'), event.target.value);
+                  recomputeDueDate(selectedVendor, event.target.value);
                 }}
               />
               {form.formState.errors.date && (
@@ -580,22 +579,14 @@ export function BillForm({
                 return (
                   <TableRow key={field.id}>
                     <TableCell data-testid={`line-${index}-item`}>
-                      <Select
-                        value={form.watch(`lines.${index}.itemId`) || 'none'}
-                        onValueChange={(value) => handleItemSelect(index, value)}
-                      >
-                        <SelectTrigger className="h-8" aria-label={tForm('item')}>
-                          <SelectValue placeholder={tForm('itemPlaceholder')} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">{tForm('manualEntry')}</SelectItem>
-                          {items.map((item) => (
-                            <SelectItem key={item.id} value={item.id}>
-                              {item.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <ItemCombobox
+                        className="h-8"
+                        ariaLabel={tForm('item')}
+                        value={form.watch(`lines.${index}.itemId`) || ''}
+                        onValueChange={(_id, item) => handleItemSelect(index, item)}
+                        placeholder={tForm('itemPlaceholder')}
+                        noneLabel={tForm('manualEntry')}
+                      />
                     </TableCell>
                     <TableCell data-testid={`line-${index}-account`}>
                       <Select

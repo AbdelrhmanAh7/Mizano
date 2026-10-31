@@ -39,10 +39,15 @@ jest.mock('next-intl', () => {
   };
 });
 
-jest.mock('@/lib/hooks/use-customers', () => ({
-  useCustomers: () => ({ data: { data: [{ id: 'c1', name: 'Nile Co', paymentTerms: 30 }] } }),
-}));
-jest.mock('@/lib/hooks/use-items', () => ({ useActiveItems: () => ({ data: [] }) }));
+const mockNoCustomer = { data: undefined };
+jest.mock('@/lib/hooks/use-customers', () => ({ useCustomer: () => mockNoCustomer }));
+// The real pickers search the server (see async-combobox.spec); render their closed label.
+jest.mock('@/components/shared/party-combobox', () => {
+  const Closed = ({ placeholder, noneLabel }: { placeholder: string; noneLabel?: string }) => (
+    <span>{noneLabel ?? placeholder}</span>
+  );
+  return { CustomerCombobox: Closed, ItemCombobox: Closed };
+});
 jest.mock('@/lib/hooks/use-organization', () => ({
   ...jest.requireActual('@/lib/hooks/use-organization'),
   useBaseCurrency: () => 'EGP',

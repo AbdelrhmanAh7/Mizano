@@ -29,16 +29,25 @@ jest.mock('next-intl', () => {
   };
 });
 
-// A stable result, like React Query's: the form derives the selected customer from it.
-const mockCustomers = {
-  data: { data: [{ id: 'c1', name: 'Nile Co', paymentTerms: 30, currency: 'USD' }] },
-};
-jest.mock('@/lib/hooks/use-customers', () => ({ useCustomers: () => mockCustomers }));
+// A stable result, like React Query's: the form reads the selected customer by id.
+const mockCustomer = { data: { id: 'c1', name: 'Nile Co', paymentTerms: 30, currency: 'USD' } };
+const mockNoCustomer = { data: undefined };
+jest.mock('@/lib/hooks/use-customers', () => ({
+  useCustomer: (id?: string) => (id === 'c1' ? mockCustomer : mockNoCustomer),
+}));
+// The real pickers search the server (see async-combobox.spec).
+jest.mock('@/components/shared/party-combobox', () => ({
+  CustomerCombobox: ({ value }: { value?: string }) => (
+    <button type="button" role="option" aria-selected={value === 'c1'}>
+      Nile Co
+    </button>
+  ),
+  ItemCombobox: ({ placeholder }: { placeholder: string }) => <span>{placeholder}</span>,
+}));
 jest.mock('@/lib/hooks/use-organization', () => ({
   ...jest.requireActual('@/lib/hooks/use-organization'),
   useBaseCurrency: () => 'EGP',
 }));
-jest.mock('@/lib/hooks/use-items', () => ({ useActiveItems: () => ({ data: [] }) }));
 
 // Radix Select does not open in jsdom: render each option as a button wired to onValueChange.
 jest.mock('@/components/ui/select', () => {

@@ -65,6 +65,22 @@ describe('CustomersService', () => {
     expect(updated.billingCity).toBe('Alexandria');
   });
 
+  it('searches the display name the document pickers show, in the org only (audit B11)', async () => {
+    prisma.customer.findMany.mockResolvedValue([] as never);
+    prisma.customer.count.mockResolvedValue(0 as never);
+    await service.findAll(ORG_ID, { search: 'النيل', page: 2, limit: 20 });
+    expect(prisma.customer.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organizationId: ORG_ID,
+          OR: expect.arrayContaining([{ displayName: { contains: 'النيل', mode: 'insensitive' } }]),
+        }),
+        skip: 20,
+        take: 20,
+      }),
+    );
+  });
+
   it('refuses an organization that does not exist', async () => {
     prisma.organization.findUnique.mockResolvedValue(null);
     await expect(service.create(ORG_ID, { name: 'Nile Co' })).rejects.toBeInstanceOf(

@@ -78,6 +78,8 @@ export interface InvoiceParams {
   customerId?: string;
   dateFrom?: string;
   dateTo?: string;
+  /** Only posted invoices with a balance due (payment allocation, credit application). */
+  open?: boolean;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }

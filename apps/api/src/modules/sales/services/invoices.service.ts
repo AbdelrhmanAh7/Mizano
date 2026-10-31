@@ -118,6 +118,7 @@ export class InvoicesService {
       customerId,
       dateFrom,
       dateTo,
+      open,
     } = query;
 
     const where: Prisma.InvoiceWhereInput = {
@@ -134,6 +135,11 @@ export class InvoicesService {
     }
 
     if (status) where.status = status;
+    if (open) {
+      // Payment allocation and credit application: every open invoice, not the newest page.
+      where.AND = [{ status: { in: RECEIVABLE_INVOICE_STATUSES } }];
+      where.balanceDue = { gt: new Decimal(0) };
+    }
     if (customerId) where.customerId = customerId;
 
     if (dateFrom || dateTo) {

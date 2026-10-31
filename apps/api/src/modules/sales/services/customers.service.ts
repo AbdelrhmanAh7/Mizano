@@ -70,6 +70,7 @@ export class CustomersService {
       ...(search && {
         OR: [
           { name: { contains: search, mode: 'insensitive' as const } },
+          { displayName: { contains: search, mode: 'insensitive' as const } },
           { email: { contains: search, mode: 'insensitive' as const } },
           { phone: { contains: search, mode: 'insensitive' as const } },
         ],
@@ -129,6 +130,7 @@ export class CustomersService {
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' as const } },
+        { displayName: { contains: search, mode: 'insensitive' as const } },
         { email: { contains: search, mode: 'insensitive' as const } },
         { phone: { contains: search, mode: 'insensitive' as const } },
       ];

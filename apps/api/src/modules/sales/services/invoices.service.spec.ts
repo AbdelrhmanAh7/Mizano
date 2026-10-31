@@ -255,6 +255,20 @@ describe('InvoicesService', () => {
       expect(where.organizationId).toBe(ORG_ID);
       expect(where.OR).toContainEqual({ reference: { contains: 'PO-44', mode: 'insensitive' } });
     });
+
+    it("lists a customer's open invoices from the server, not the newest page (audit B11)", async () => {
+      prisma.invoice.findMany.mockResolvedValue([]);
+      prisma.invoice.count.mockResolvedValue(0);
+      await service.findAll(ORG_ID, { customerId: 'cust-1', open: true } as any);
+      const where = prisma.invoice.findMany.mock.calls[0][0]!.where as any;
+      expect(where).toMatchObject({
+        organizationId: ORG_ID,
+        customerId: 'cust-1',
+        deletedAt: null,
+      });
+      expect(where.AND).toEqual([{ status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] } }]);
+      expect(where.balanceDue.gt.toString()).toBe('0');
+    });
   });
 
   describe('update', () => {
