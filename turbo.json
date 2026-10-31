@@ -4,7 +4,6 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "prisma/**", "tsconfig.json", "package.json"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "dev": {
@@ -14,18 +13,15 @@
     },
     "lint": {
       "dependsOn": [],
-      "inputs": ["src/**/*.ts", "src/**/*.tsx", ".eslintrc.*", "tsconfig.json"],
       "outputs": [".eslintcache"]
     },
     "lint:fix": {
       "dependsOn": [],
-      "inputs": ["src/**/*.ts", "src/**/*.tsx", ".eslintrc.*", "tsconfig.json"],
       "outputs": [".eslintcache"],
       "cache": false
     },
     "test": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "test/**", "jest.config.*", "tsconfig.json"],
       "outputs": ["coverage/**"]
     },
     "test:e2e": {
@@ -35,7 +31,6 @@
     },
     "type-check": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**/*.ts", "src/**/*.tsx", "tsconfig.json", "package.json"],
       "outputs": []
     },
     "clean": {
