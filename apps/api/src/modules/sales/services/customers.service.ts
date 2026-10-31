@@ -32,6 +32,9 @@ export class CustomersService {
       const customer = await tx.customer.create({
         data: {
           ...createCustomerDto,
+          // Without an explicit currency a customer uses the org base currency, never the
+          // column's USD default (FlowLine and web alike; audit F4/B5).
+          currency: createCustomerDto.currency ?? (await this.baseCurrency(tx, organizationId)),
           billingStreet: createCustomerDto.billingAddress?.street,
           billingCity: createCustomerDto.billingAddress?.city,
           billingState: createCustomerDto.billingAddress?.state,
@@ -49,6 +52,18 @@ export class CustomersService {
       return customer;
     };
     return options.tx ? run(options.tx) : this.prisma.$transaction(run);
+  }
+
+  private async baseCurrency(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+  ): Promise<string> {
+    const org = await tx.organization.findUnique({
+      where: { id: organizationId },
+      select: { baseCurrency: true },
+    });
+    if (!org) throw new NotFoundException('Organization not found');
+    return org.baseCurrency;
   }
 
   async findAll(organizationId: string, query: PaginationDto) {

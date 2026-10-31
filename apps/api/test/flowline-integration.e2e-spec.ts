@@ -274,6 +274,12 @@ describe('FlowLine integration (e2e)', () => {
       expect(first.status).toBe(201);
       customerId = first.body.data.id;
       expect(first.body.data.name).toBe(body.name);
+      // No currency sent: the org base currency, never the column's USD default (audit F4).
+      const org = await prisma.organization.findUniqueOrThrow({
+        where: { id: tenantA.organizationId },
+        select: { baseCurrency: true },
+      });
+      expect(first.body.data.currency).toBe(org.baseCurrency);
 
       const again = await key()
         .post('/integrations/v1/customers')
