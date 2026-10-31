@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
@@ -8,6 +8,7 @@ import { AcceptLanguageResolver, HeaderResolver, I18nModule, QueryResolver } fro
 import * as path from 'path';
 import { CacheModule } from './cache/cache.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
+import { requestLocaleMiddleware } from './common/i18n/request-locale';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { CacheResponseInterceptor } from './common/interceptors/cache-response.interceptor';
 import { HttpCacheInterceptor } from './common/interceptors/http-cache.interceptor';
@@ -157,4 +158,9 @@ import { IpThrottlerGuard } from './throttler-ip.guard';
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  /** The request language (`Accept-Language`, default Arabic) is set once, for every route. */
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(requestLocaleMiddleware).forRoutes('*');
+  }
+}

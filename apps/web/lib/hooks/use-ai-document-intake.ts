@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSession } from 'next-auth/react';
 import api from '@/lib/api';
+import { acceptLanguageHeader } from '@/lib/request-language';
 import { useTranslations } from 'next-intl';
 
 // ============ Types ============
@@ -400,6 +401,7 @@ export function useDocumentIntakeStream(): {
         {
           headers: {
             Accept: 'text/event-stream',
+            ...acceptLanguageHeader(),
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           signal,

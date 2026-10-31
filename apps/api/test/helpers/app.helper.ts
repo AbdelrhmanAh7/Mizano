@@ -1,4 +1,5 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import type { NextFunction, Request, Response } from 'express';
 import { Test, TestingModuleBuilder } from '@nestjs/testing';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module';
@@ -17,7 +18,7 @@ class UnlimitedThrottlerStorage implements ThrottlerStorage {
 
 /**
  * Boots the real AppModule in-process with the same global validation pipe as `src/main.ts`,
- * so request validation and response shapes match production. The `/api` global prefix is not
+ * so request validation and response shapes match production. Requests default to English. The `/api` global prefix is not
  * applied: routes are addressed as `/bills`, `/journals`, ...
  */
 export async function createTestApp(
@@ -29,6 +30,13 @@ export async function createTestApp(
   const moduleFixture = await configure(builder).compile();
 
   const app = moduleFixture.createNestApplication();
+  // The API answers in Arabic when a request names no language. Suites assert the English
+  // messages, so a request without `Accept-Language` is sent as English; a test that checks
+  // the Arabic answer sets the header itself (see `ApiHelper.withLanguage`).
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    if (!req.headers['accept-language']) req.headers['accept-language'] = 'en';
+    next();
+  });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
