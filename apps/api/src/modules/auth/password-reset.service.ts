@@ -165,6 +165,7 @@ export class PasswordResetService {
       select: {
         id: true,
         userId: true,
+        organizationId: true,
         usedAt: true,
         expiresAt: true,
         user: { select: { status: true } },
@@ -176,6 +177,11 @@ export class PasswordResetService {
 
     const passwordHash = await bcrypt.hash(password, 10);
     await this.prisma.$transaction(async (tx) => {
+      // Same lock order as createLinkForMember (member row, then tokens), so a link handed
+      // over while the member redeems another cannot deadlock.
+      await tx.$queryRaw`
+        SELECT id FROM "users"
+        WHERE id = ${record.userId} AND "organizationId" = ${record.organizationId} FOR UPDATE`;
       const claimed = await tx.passwordResetToken.updateMany({
         where: { id: record.id, usedAt: null, expiresAt: { gt: now } },
         data: { usedAt: now },

@@ -221,10 +221,13 @@ describe('PasswordResetService', () => {
       await expect(service.reset(first, 'NewPassword1')).rejects.toBeInstanceOf(
         BadRequestException,
       );
+      store.$queryRaw.mockClear();
       await service.reset(second, 'NewPassword1');
       const member = store.user.rows.find((u) => u.id === 'm1');
       expect(await bcrypt.compare('NewPassword1', member?.passwordHash as string)).toBe(true);
       expect(store.authSession.rows[0].revokedReason).toBe('password_reset');
+      // Redemption locks the member row first, like link creation.
+      expect(store.$queryRaw.mock.calls[0]?.slice(1)).toEqual(['m1', 'org-1']);
       await expect(service.reset(second, 'OtherPassword1')).rejects.toBeInstanceOf(
         BadRequestException,
       );
