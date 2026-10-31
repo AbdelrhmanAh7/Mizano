@@ -31,6 +31,30 @@ function matchWindow(transactionDate: Date): { gte: Date; lte: Date } {
   };
 }
 
+/** Words of the bank line's reference and description that could be a document number. */
+function referenceTokens(
+  transaction: Pick<BankTransaction, 'reference' | 'description'>,
+): string[] {
+  const text = `${transaction.reference ?? ''} ${transaction.description ?? ''}`;
+  const words = text.split(/[\s,;:()]+/).filter((w) => w.length >= 2);
+  return [...new Set(words)].slice(0, 20);
+}
+
+/** Candidates scored on amount (exact or near) or on a document number named on the bank line. */
+function strongMatch<F extends string>(
+  numberField: F,
+  nearCeiling: Decimal,
+  tokens: string[],
+): Array<{ balanceDue: { lte: Decimal } } | Record<F, { in: string[] }>> {
+  const byAmount = { balanceDue: { lte: nearCeiling } };
+  if (tokens.length === 0) return [byAmount];
+  return [byAmount, { [numberField]: { in: tokens } } as Record<F, { in: string[] }>];
+}
+
+function uniqueById<T extends { id: string }>(rows: T[]): T[] {
+  return [...new Map(rows.map((r) => [r.id, r])).values()];
+}
+
 /** An empty account currency means the base currency (the schema default). */
 function sameCurrency(accountCurrency: string | null, baseCurrency: string | null): boolean {
   if (!accountCurrency || !baseCurrency) return true;
@@ -85,6 +109,7 @@ export class ReconciliationService {
     // still reads as the same payment.
     const nearCeiling = amount.mul(MATCH_NEAR_RATIO);
     const dated = matchWindow(transaction.date);
+    const tokens = referenceTokens(transaction);
     const matches: ReconciliationMatch[] = [];
     const amountScore = (balanceDue: Decimal): number => {
       if (balanceDue.equals(amount)) return 90;
@@ -92,18 +117,31 @@ export class ReconciliationService {
     };
 
     if (transaction.type === BankTransactionType.DEPOSIT) {
-      const invoices = await this.prisma.invoice.findMany({
-        where: {
-          organizationId,
-          deletedAt: null,
-          status: { in: RECEIVABLE_INVOICE_STATUSES },
-          balanceDue: { gte: amount },
-          date: dated,
-        },
+      const where = {
+        organizationId,
+        deletedAt: null,
+        status: { in: RECEIVABLE_INVOICE_STATUSES },
+        balanceDue: { gte: amount },
+        date: dated,
+      };
+      const query = {
         include: { customer: { select: { id: true, name: true } } },
-        orderBy: { date: 'desc' },
+        orderBy: { date: 'desc' as const },
         take: MATCH_CANDIDATE_LIMIT,
-      });
+      };
+      // Amount and reference matches first, so newer documents can never crowd them out; then
+      // the newest open ones for name-only matches.
+      const invoices = uniqueById(
+        (
+          await Promise.all([
+            this.prisma.invoice.findMany({
+              ...query,
+              where: { ...where, OR: strongMatch('invoiceNumber', nearCeiling, tokens) },
+            }),
+            this.prisma.invoice.findMany({ ...query, where }),
+          ])
+        ).flat(),
+      );
 
       for (const invoice of invoices) {
         let confidence = amountScore(invoice.balanceDue);
@@ -125,18 +163,29 @@ export class ReconciliationService {
         }
       }
     } else {
-      const bills = await this.prisma.bill.findMany({
-        where: {
-          organizationId,
-          deletedAt: null,
-          status: { in: PAYABLE_BILL_STATUSES },
-          balanceDue: { gte: amount },
-          date: dated,
-        },
+      const where = {
+        organizationId,
+        deletedAt: null,
+        status: { in: PAYABLE_BILL_STATUSES },
+        balanceDue: { gte: amount },
+        date: dated,
+      };
+      const query = {
         include: { vendor: { select: { id: true, name: true } } },
-        orderBy: { date: 'desc' },
+        orderBy: { date: 'desc' as const },
         take: MATCH_CANDIDATE_LIMIT,
-      });
+      };
+      const bills = uniqueById(
+        (
+          await Promise.all([
+            this.prisma.bill.findMany({
+              ...query,
+              where: { ...where, OR: strongMatch('billNumber', nearCeiling, tokens) },
+            }),
+            this.prisma.bill.findMany({ ...query, where }),
+          ])
+        ).flat(),
+      );
 
       for (const bill of bills) {
         let confidence = bill.balanceDue.equals(amount) ? 90 : 0;

@@ -74,6 +74,25 @@ describe('ReconciliationService.getSuggestions (#586 matching precision)', () =>
     ]);
   });
 
+  it('fetches amount and reference matches first, so newer documents cannot crowd them out', async () => {
+    prisma.bankTransaction.findMany.mockResolvedValue([
+      { ...deposit, reference: 'TRF INV-0007', description: 'Payment (INV-0009)' },
+    ]);
+    // The strong pool holds the old exact match; the newest pool is full of unrelated documents.
+    prisma.invoice.findMany
+      .mockResolvedValueOnce([invoice('INV-OLD', '1000.0001')])
+      .mockResolvedValueOnce([invoice('INV-NEW', '9000')]);
+
+    const [row] = await service.getSuggestions(ORG, 'ba1');
+
+    const strongWhere = prisma.invoice.findMany.mock.calls[0][0].where;
+    expect(strongWhere.OR[0].balanceDue.lte.toString()).toBe('1050.000105');
+    expect(strongWhere.OR[1]).toEqual({
+      invoiceNumber: { in: ['TRF', 'INV-0007', 'Payment', 'INV-0009'] },
+    });
+    expect(row.matches.map((m) => (m.entity as { id: string }).id)).toEqual(['INV-OLD']);
+  });
+
   it('matches a withdrawal stored negative against bills by its absolute amount', async () => {
     prisma.bankTransaction.findMany.mockResolvedValue([
       { ...deposit, type: 'WITHDRAWAL', amount: dec('-250.5') },
