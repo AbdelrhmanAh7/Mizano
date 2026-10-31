@@ -152,10 +152,11 @@ export function useSendChatMessageStream() {
   const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
+    // Not a DOM ref: sendMessage replaces the stream later, and unmount must close the latest
+    // one, so read .current at cleanup time through the (stable) ref object.
+    const streamRef = eventSourceRef;
     return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
+      streamRef.current?.close();
     };
   }, []);
 

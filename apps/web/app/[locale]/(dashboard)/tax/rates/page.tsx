@@ -71,7 +71,7 @@ export default function TaxRatesPage() {
   const { data: taxRatesData, isLoading, refetch } = useTaxRates();
   const deleteTaxRate = useDeleteTaxRate();
 
-  const allRates: TaxRate[] = taxRatesData?.data || [];
+  const allRates: TaxRate[] = useMemo(() => taxRatesData?.data || [], [taxRatesData]);
 
   // Client-side filtering
   const filteredRates = useMemo(() => {

@@ -6,7 +6,7 @@
     "dev": "next dev -p 5001",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "next lint --max-warnings 0",
     "lint:fix": "next lint --fix",
     "test": "jest --maxWorkers=2",
     "test:watch": "jest --watch --maxWorkers=2",
