@@ -1,5 +1,6 @@
 'use client';
 
+import { format } from 'date-fns';
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -50,7 +51,7 @@ export default function NewDeliveryChallanPage() {
 
   const [customerId, setCustomerId] = useState(searchParams.get('customerId') ?? '');
   const [challanType, setChallanType] = useState<ChallanType>('SUPPLY');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<ChallanLine[]>([
     { itemId: '', quantity: '1', description: '' },

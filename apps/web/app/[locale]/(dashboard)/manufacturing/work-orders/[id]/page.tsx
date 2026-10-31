@@ -84,7 +84,7 @@ export default function WorkOrderDetailPage() {
   const [rejectedQuantity, setRejectedQuantity] = useState<number>(0);
   const [wastageQuantity, setWastageQuantity] = useState<number>(0);
   const [productionNotes, setProductionNotes] = useState('');
-  const [productionDate, setProductionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [productionDate, setProductionDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
   const { data: workOrder, isLoading } = useWorkOrder(workOrderId);
   const { data: historyData } = useProductionHistory(workOrderId);
@@ -280,7 +280,7 @@ export default function WorkOrderDetailPage() {
                 variant="outline"
                 onClick={() => {
                   setProducedQuantity(1);
-                  setProductionDate(new Date().toISOString().split('T')[0]);
+                  setProductionDate(format(new Date(), 'yyyy-MM-dd'));
                   setRecordDialogOpen(true);
                 }}
               >

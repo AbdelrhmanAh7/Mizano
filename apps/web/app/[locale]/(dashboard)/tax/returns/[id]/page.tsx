@@ -98,7 +98,7 @@ export default function VATReturnDetailPage() {
   const [fileDialogOpen, setFileDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentDate, setPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [paymentRef, setPaymentRef] = useState('');
   const [bankAccountId, setBankAccountId] = useState('');
 

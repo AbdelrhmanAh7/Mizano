@@ -1,5 +1,6 @@
 'use client';
 
+import { format } from 'date-fns';
 import { useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -57,7 +58,7 @@ export function JournalForm({
   const form = useForm<JournalFormData>({
     resolver: zodResolver(journalSchema),
     defaultValues: {
-      date: new Date().toISOString().split('T')[0],
+      date: format(new Date(), 'yyyy-MM-dd'),
       reference: '',
       notes: '',
       lines: [

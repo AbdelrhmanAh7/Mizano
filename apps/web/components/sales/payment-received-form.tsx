@@ -121,7 +121,7 @@ export function PaymentReceivedForm({
     resolver: zodResolver(paymentReceivedSchema),
     defaultValues: {
       customerId: defaultCustomerId || '',
-      date: new Date().toISOString().split('T')[0],
+      date: format(new Date(), 'yyyy-MM-dd'),
       amount: '',
       paymentMode: 'BANK_TRANSFER',
       depositToAccountId: '',

@@ -1,5 +1,6 @@
 'use client';
 
+import { format, parseISO } from 'date-fns';
 import { useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { useForm, Control, FieldValues, UseFormWatch, UseFormSetValue } from 'react-hook-form';
@@ -93,10 +94,10 @@ export function InvoiceForm({
   const customers = customersData?.data || [];
 
   // Default dates
-  const today = new Date().toISOString().split('T')[0];
+  const today = format(new Date(), 'yyyy-MM-dd');
   const defaultDue = new Date();
   defaultDue.setDate(defaultDue.getDate() + 30);
-  const dueDate = defaultDue.toISOString().split('T')[0];
+  const dueDate = format(defaultDue, 'yyyy-MM-dd');
 
   const form = useForm<InvoiceFormData>({
     resolver: zodResolver(invoiceSchema),
@@ -167,9 +168,9 @@ export function InvoiceForm({
     form.setValue('paymentTerms', value);
     const term = paymentTermsOptions.find((t) => t.value === value);
     if (term) {
-      const invoiceDate = new Date(form.watch('invoiceDate'));
+      const invoiceDate = parseISO(form.watch('invoiceDate'));
       invoiceDate.setDate(invoiceDate.getDate() + term.days);
-      form.setValue('dueDate', invoiceDate.toISOString().split('T')[0]);
+      form.setValue('dueDate', format(invoiceDate, 'yyyy-MM-dd'));
     }
   };
 
@@ -190,9 +191,9 @@ export function InvoiceForm({
         handlePaymentTermsChange('NET_60');
       } else {
         // For custom terms, just set the due date based on days
-        const invoiceDate = new Date(form.watch('invoiceDate'));
+        const invoiceDate = parseISO(form.watch('invoiceDate'));
         invoiceDate.setDate(invoiceDate.getDate() + days);
-        form.setValue('dueDate', invoiceDate.toISOString().split('T')[0]);
+        form.setValue('dueDate', format(invoiceDate, 'yyyy-MM-dd'));
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

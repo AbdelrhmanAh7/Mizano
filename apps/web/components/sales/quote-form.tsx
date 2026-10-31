@@ -1,5 +1,6 @@
 'use client';
 
+import { format } from 'date-fns';
 import { useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { useForm, Control, FieldValues, UseFormWatch, UseFormSetValue } from 'react-hook-form';
@@ -76,10 +77,10 @@ export function QuoteForm({
   const customers = customersData?.data || [];
 
   // Default dates
-  const today = new Date().toISOString().split('T')[0];
+  const today = format(new Date(), 'yyyy-MM-dd');
   const defaultExpiry = new Date();
   defaultExpiry.setDate(defaultExpiry.getDate() + 30);
-  const expiryDate = defaultExpiry.toISOString().split('T')[0];
+  const expiryDate = format(defaultExpiry, 'yyyy-MM-dd');
 
   const form = useForm<QuoteFormData>({
     resolver: zodResolver(quoteSchema),

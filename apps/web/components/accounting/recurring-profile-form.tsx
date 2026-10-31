@@ -1,5 +1,6 @@
 'use client';
 
+import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -64,7 +65,7 @@ export function RecurringProfileForm({
       name: '',
       description: '',
       frequency: 'MONTHLY',
-      startDate: new Date().toISOString().split('T')[0],
+      startDate: format(new Date(), 'yyyy-MM-dd'),
       autoPost: false,
       lines: [
         { accountId: '', debit: '0', credit: '0', description: '' },
