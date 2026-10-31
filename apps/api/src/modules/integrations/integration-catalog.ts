@@ -46,8 +46,3 @@ export const SCOPE_PERMISSION: Record<IntegrationScope, string> = {
 };
 
 export const NOTE_ENTITY_TYPES = ['customer', 'invoice'] as const;
-export type NoteEntityType = (typeof NOTE_ENTITY_TYPES)[number];
-
-export function isWebhookEventType(value: string): value is WebhookEventType {
-  return (WEBHOOK_EVENT_TYPES as readonly string[]).includes(value);
-}
