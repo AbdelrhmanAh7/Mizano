@@ -230,7 +230,8 @@ export function transformDashboardOverview(
         name: b.name || 'Unknown',
         systemBalance: moneyToNumber(b.systemBalance),
         bankBalance: moneyToNumber(b.bankBalance),
-        currency: b.currency || 'USD',
+        // An empty currency displays in the org base currency, never a guessed USD.
+        currency: b.currency || '',
       }))
     : [];
 
@@ -580,29 +581,7 @@ export function aggregateCashFlowByMonth(
   }));
 }
 
-/**
- * Format currency amount
- */
-export function formatCurrency(amount: number, currency: string = 'USD'): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
-/**
- * Format compact currency (e.g., $1.2M)
- */
-export function formatCompactCurrency(amount: number, currency: string = 'USD'): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    notation: 'compact',
-    maximumFractionDigits: 1,
-  }).format(amount);
-}
+// Money is formatted with useMoneyFormatter / useCompactMoneyFormatter (org base currency).
 
 /**
  * Get alert icon and color based on severity

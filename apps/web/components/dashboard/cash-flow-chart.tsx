@@ -13,17 +13,16 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import { CashFlowPoint, formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { CashFlowPoint } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface CashFlowChartProps {
   data: CashFlowPoint[];
   currency?: string;
 }
 
-export const CashFlowChart = memo(function CashFlowChart({
-  data,
-  currency = 'USD',
-}: CashFlowChartProps) {
+export const CashFlowChart = memo(function CashFlowChart({ data, currency }: CashFlowChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   return (

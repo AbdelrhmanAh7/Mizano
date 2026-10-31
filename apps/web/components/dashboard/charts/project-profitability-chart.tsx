@@ -14,7 +14,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { ProjectProfitabilityItem } from '@/lib/hooks/use-dashboard-sections';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface ProjectProfitabilityChartProps {
   data: ProjectProfitabilityItem[];
@@ -23,8 +23,9 @@ interface ProjectProfitabilityChartProps {
 
 export const ProjectProfitabilityChart = memo(function ProjectProfitabilityChart({
   data,
-  currency = 'USD',
+  currency,
 }: ProjectProfitabilityChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   return (

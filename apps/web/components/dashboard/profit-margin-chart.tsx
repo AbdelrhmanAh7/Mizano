@@ -14,7 +14,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface ProfitPoint {
   month: string;
@@ -30,8 +30,9 @@ interface ProfitMarginChartProps {
 
 export const ProfitMarginChart = memo(function ProfitMarginChart({
   data,
-  currency = 'USD',
+  currency,
 }: ProfitMarginChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   return (

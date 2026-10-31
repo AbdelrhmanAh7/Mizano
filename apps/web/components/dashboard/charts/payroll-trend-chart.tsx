@@ -15,7 +15,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { PayrollTrendPoint } from '@/lib/hooks/use-dashboard-sections';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface PayrollTrendChartProps {
   data: PayrollTrendPoint[];
@@ -24,8 +24,9 @@ interface PayrollTrendChartProps {
 
 export const PayrollTrendChart = memo(function PayrollTrendChart({
   data,
-  currency = 'USD',
+  currency,
 }: PayrollTrendChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   return (

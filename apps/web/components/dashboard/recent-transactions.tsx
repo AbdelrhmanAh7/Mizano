@@ -14,8 +14,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { RecentTransaction, formatCurrency } from '@/lib/hooks/use-dashboard';
+import { RecentTransaction } from '@/lib/hooks/use-dashboard';
 import { Link } from '@/i18n/routing';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface RecentTransactionsProps {
   transactions: RecentTransaction[];
@@ -56,6 +57,7 @@ function getTransactionColors(type: RecentTransaction['type']) {
 }
 
 export function RecentTransactions({ transactions }: RecentTransactionsProps) {
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('common.dashboard.recentTransactions');
 
   return (

@@ -14,7 +14,7 @@ import {
   Cell,
 } from 'recharts';
 import { TopVendor } from '@/lib/hooks/use-dashboard-sections';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface TopVendorsChartProps {
   data: TopVendor[];
@@ -25,8 +25,9 @@ const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 export const TopVendorsChart = memo(function TopVendorsChart({
   data,
-  currency = 'USD',
+  currency,
 }: TopVendorsChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   return (

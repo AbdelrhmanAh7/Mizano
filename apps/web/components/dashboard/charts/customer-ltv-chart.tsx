@@ -4,8 +4,8 @@ import { memo } from 'react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
 import { CLVSegmentItem } from '@/lib/hooks/use-dashboard-sections';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface CustomerLTVChartProps {
   data: CLVSegmentItem[];
@@ -14,8 +14,9 @@ interface CustomerLTVChartProps {
 
 export const CustomerLTVChart = memo(function CustomerLTVChart({
   data,
-  currency = 'USD',
+  currency,
 }: CustomerLTVChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   return (

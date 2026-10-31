@@ -12,7 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface InventoryValuePoint {
   month: string;
@@ -27,8 +27,9 @@ interface InventoryValueChartProps {
 
 export const InventoryValueChart = memo(function InventoryValueChart({
   data,
-  currency = 'USD',
+  currency,
 }: InventoryValueChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   return (

@@ -10,9 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
-import { useBalanceSheetReport, formatCurrency, ReportAccount } from '@/lib/hooks/use-reports';
+import { useBalanceSheetReport, ReportAccount } from '@/lib/hooks/use-reports';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function BalanceSheetReportPage() {
+  // Report figures are ledger amounts, in the organization base currency (audit B5).
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('reports');
   const [asOfDate, setAsOfDate] = useState(new Date());
 

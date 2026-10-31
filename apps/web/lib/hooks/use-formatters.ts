@@ -5,7 +5,8 @@ import { useLocale } from 'next-intl';
 export function useFormatters() {
   const locale = useLocale();
 
-  const formatCurrency = (amount: number, currency: string = 'USD') => {
+  // No default currency (audit B5); prefer useMoneyFormatter, which falls back to the base currency.
+  const formatCurrency = (amount: number, currency: string) => {
     return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency,

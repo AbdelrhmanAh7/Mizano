@@ -12,8 +12,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
 import { PaymentCollectionPoint } from '@/lib/hooks/use-dashboard-sections';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface PaymentCollectionChartProps {
   data: PaymentCollectionPoint[];
@@ -22,8 +22,9 @@ interface PaymentCollectionChartProps {
 
 export const PaymentCollectionChart = memo(function PaymentCollectionChart({
   data,
-  currency = 'USD',
+  currency,
 }: PaymentCollectionChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   return (

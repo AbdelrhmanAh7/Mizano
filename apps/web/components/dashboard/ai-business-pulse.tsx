@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { useQuickCashForecast } from '@/lib/hooks/use-ai-cash-flow';
 import { useAlertSummary } from '@/lib/hooks/use-ai-alerts';
 import { useWeeklySnapshot } from '@/lib/hooks/use-ai-narrative';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function PulseSection({
   icon: Icon,
@@ -40,6 +40,7 @@ function ForecastCell({
   label: string;
   data?: { low: number; expected: number; high: number };
 }) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   return (
     <div className="text-center">
       <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">
@@ -70,6 +71,7 @@ function SectionSkeleton() {
 }
 
 export const AIBusinessPulse = memo(function AIBusinessPulse() {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const { data: cashForecast, isLoading: cashLoading } = useQuickCashForecast();
   const { data: alertSummary, isLoading: alertsLoading } = useAlertSummary();
   const { data: weeklySnapshot, isLoading: narrativeLoading } = useWeeklySnapshot();

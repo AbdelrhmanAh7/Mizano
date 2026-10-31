@@ -12,17 +12,16 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { RevenuePoint, formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { RevenuePoint } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface RevenueChartProps {
   data: RevenuePoint[];
   currency?: string;
 }
 
-export const RevenueChart = memo(function RevenueChart({
-  data,
-  currency = 'USD',
-}: RevenueChartProps) {
+export const RevenueChart = memo(function RevenueChart({ data, currency }: RevenueChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   return (

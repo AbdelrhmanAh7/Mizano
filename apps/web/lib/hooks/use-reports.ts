@@ -748,15 +748,7 @@ export function usePurchasesByVendorReport(params: DateRange) {
   });
 }
 
-// Helper functions
-export function formatCurrency(amount: number | string | null | undefined): string {
-  if (amount === null || amount === undefined) return '$0.00';
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(num);
-}
+// Helper functions. Money is formatted with useMoneyFormatter (org base currency), not here.
 
 export function getAgingBucketLabel(bucket: string): string {
   const labels: Record<string, string> = {

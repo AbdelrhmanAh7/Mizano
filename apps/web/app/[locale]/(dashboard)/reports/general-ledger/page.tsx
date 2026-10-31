@@ -24,10 +24,13 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportFilters } from '@/components/reports/report-filters';
-import { useGeneralLedgerReport, formatCurrency } from '@/lib/hooks/use-reports';
+import { useGeneralLedgerReport } from '@/lib/hooks/use-reports';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { useAccounts } from '@/lib/hooks/use-accounts';
 
 export default function GeneralLedgerPage() {
+  // Report figures are ledger amounts, in the organization base currency (audit B5).
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('reports');
   const [dateRange, setDateRange] = useState({
     startDate: startOfYear(new Date()),

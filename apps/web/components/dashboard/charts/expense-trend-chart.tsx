@@ -14,7 +14,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { ExpenseTrendPoint } from '@/lib/hooks/use-dashboard-sections';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface ExpenseTrendChartProps {
   data: ExpenseTrendPoint[];
@@ -23,8 +23,9 @@ interface ExpenseTrendChartProps {
 
 export const ExpenseTrendChart = memo(function ExpenseTrendChart({
   data,
-  currency = 'USD',
+  currency,
 }: ExpenseTrendChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   return (

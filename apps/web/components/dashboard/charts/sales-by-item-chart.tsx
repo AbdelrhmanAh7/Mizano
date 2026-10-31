@@ -4,7 +4,7 @@ import { memo } from 'react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface SalesByItemData {
   name: string;
@@ -19,8 +19,9 @@ interface SalesByItemChartProps {
 
 export const SalesByItemChart = memo(function SalesByItemChart({
   data,
-  currency = 'USD',
+  currency,
 }: SalesByItemChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   return (

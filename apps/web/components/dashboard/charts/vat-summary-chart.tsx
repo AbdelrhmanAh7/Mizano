@@ -13,8 +13,8 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
 import { VATSummaryItem } from '@/lib/hooks/use-dashboard-sections';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface VATSummaryChartProps {
   data: VATSummaryItem[];
@@ -23,8 +23,9 @@ interface VATSummaryChartProps {
 
 export const VATSummaryChart = memo(function VATSummaryChart({
   data,
-  currency = 'USD',
+  currency,
 }: VATSummaryChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   return (

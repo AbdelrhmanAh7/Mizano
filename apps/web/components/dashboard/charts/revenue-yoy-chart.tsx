@@ -13,8 +13,8 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
 import { RevenueYoYPoint } from '@/lib/hooks/use-dashboard-sections';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface RevenueYoYChartProps {
   data: RevenueYoYPoint[];
@@ -23,8 +23,9 @@ interface RevenueYoYChartProps {
 
 export const RevenueYoYChart = memo(function RevenueYoYChart({
   data,
-  currency = 'USD',
+  currency,
 }: RevenueYoYChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   return (

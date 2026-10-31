@@ -14,7 +14,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { DealPipelineItem } from '@/lib/hooks/use-dashboard-sections';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface DealPipelineChartProps {
   data: DealPipelineItem[];
@@ -32,8 +32,9 @@ const STAGE_COLORS: Record<string, string> = {
 
 export const DealPipelineChart = memo(function DealPipelineChart({
   data,
-  currency = 'USD',
+  currency,
 }: DealPipelineChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   const STAGE_LABELS: Record<string, string> = {

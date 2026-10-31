@@ -14,7 +14,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { ProjectBudgetItem } from '@/lib/hooks/use-dashboard-sections';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface ProjectBudgetsChartProps {
   data: ProjectBudgetItem[];
@@ -23,8 +23,9 @@ interface ProjectBudgetsChartProps {
 
 export const ProjectBudgetsChart = memo(function ProjectBudgetsChart({
   data,
-  currency = 'USD',
+  currency,
 }: ProjectBudgetsChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   return (

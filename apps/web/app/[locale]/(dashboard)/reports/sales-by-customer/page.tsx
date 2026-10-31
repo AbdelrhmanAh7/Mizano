@@ -4,11 +4,8 @@ import { DataTable } from '@/components/data-table/data-table';
 import { ReportFilters } from '@/components/reports/report-filters';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  formatCurrency,
-  useSalesByCustomerReport,
-  type SalesByCustomerEntry,
-} from '@/lib/hooks/use-reports';
+import { useSalesByCustomerReport, type SalesByCustomerEntry } from '@/lib/hooks/use-reports';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import type { ColumnDef } from '@tanstack/react-table';
 import { endOfMonth, format, startOfYear } from 'date-fns';
 import { DollarSign, Receipt, Users, Wallet } from 'lucide-react';
@@ -16,6 +13,8 @@ import { useTranslations } from 'next-intl';
 import { Suspense, useMemo, useState } from 'react';
 
 function SalesByCustomerContent() {
+  // Report figures are ledger amounts, in the organization base currency (audit B5).
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('reports');
   const today = new Date();
   const [dateRange, setDateRange] = useState({
@@ -69,7 +68,7 @@ function SalesByCustomerContent() {
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
     ],
-    [],
+    [formatCurrency],
   );
 
   return (

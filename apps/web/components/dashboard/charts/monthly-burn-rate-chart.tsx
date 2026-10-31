@@ -13,7 +13,8 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import { RevenuePoint, formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { RevenuePoint } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface MonthlyBurnRateChartProps {
   data: RevenuePoint[];
@@ -22,8 +23,9 @@ interface MonthlyBurnRateChartProps {
 
 export const MonthlyBurnRateChart = memo(function MonthlyBurnRateChart({
   data,
-  currency = 'USD',
+  currency,
 }: MonthlyBurnRateChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   return (

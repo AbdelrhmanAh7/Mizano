@@ -13,7 +13,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface AgingBucket {
   bucket: string;
@@ -29,8 +29,9 @@ const BUCKET_COLORS = ['#22c55e', '#84cc16', '#f59e0b', '#f97316', '#ef4444'];
 
 export const ReceivablesAgingChart = memo(function ReceivablesAgingChart({
   data,
-  currency = 'USD',
+  currency,
 }: ReceivablesAgingChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   return (

@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { BillStatusItem } from '@/lib/hooks/use-dashboard-sections';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface BillStatusChartProps {
   data: BillStatusItem[];
@@ -26,8 +26,9 @@ const FALLBACK_COLOR = '#94a3b8';
 
 export const BillStatusChart = memo(function BillStatusChart({
   data,
-  currency = 'USD',
+  currency,
 }: BillStatusChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   return (

@@ -4,14 +4,16 @@ import { memo } from 'react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { ReceivablesPayables, formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { ReceivablesPayables } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface ARAPChartProps {
   data: ReceivablesPayables;
   currency?: string;
 }
 
-export const ARAPChart = memo(function ARAPChart({ data, currency = 'USD' }: ARAPChartProps) {
+export const ARAPChart = memo(function ARAPChart({ data, currency }: ARAPChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   const chartData = [

@@ -33,3 +33,30 @@ export function useMoneyFormatter(): (
     [numberLocale, baseCurrency],
   );
 }
+
+/**
+ * Compact form of {@link useMoneyFormatter} for charts and stat tiles (EGP 1.2M), with the same
+ * currency rule: the given currency, else the organization base currency, never USD.
+ */
+export function useCompactMoneyFormatter(): (
+  amount: string | number | null | undefined,
+  currencyCode?: string | null,
+) => string {
+  const locale = useLocale();
+  const baseCurrency = useBaseCurrency();
+  const numberLocale = locale === 'ar' ? 'ar-u-nu-latn' : 'en';
+
+  return useCallback(
+    (amount, currencyCode) => {
+      const num = typeof amount === 'string' ? parseFloat(amount) : (amount ?? 0);
+      const value = Number.isFinite(num) ? num : 0;
+      const currency = documentCurrency(currencyCode, baseCurrency);
+      return new Intl.NumberFormat(numberLocale, {
+        ...(currency ? { style: 'currency' as const, currency } : {}),
+        notation: 'compact',
+        maximumFractionDigits: 1,
+      }).format(value);
+    },
+    [numberLocale, baseCurrency],
+  );
+}

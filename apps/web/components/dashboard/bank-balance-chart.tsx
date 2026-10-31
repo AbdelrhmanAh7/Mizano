@@ -12,7 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface BankBalancePoint {
   month: string;
@@ -26,8 +26,9 @@ interface BankBalanceChartProps {
 
 export const BankBalanceChart = memo(function BankBalanceChart({
   data,
-  currency = 'USD',
+  currency,
 }: BankBalanceChartProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   return (

@@ -4,7 +4,8 @@ import { memo } from 'react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { ExpenseCategory, formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { ExpenseCategory } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface ExpensesPieProps {
   data: ExpenseCategory[];
@@ -13,7 +14,8 @@ interface ExpensesPieProps {
 
 const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-export const ExpensesPie = memo(function ExpensesPie({ data, currency = 'USD' }: ExpensesPieProps) {
+export const ExpensesPie = memo(function ExpensesPie({ data, currency }: ExpensesPieProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard.charts');
 
   return (

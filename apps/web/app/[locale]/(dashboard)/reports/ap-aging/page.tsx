@@ -21,13 +21,15 @@ import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
 import {
   useAPAgingReport,
-  formatCurrency,
   getAgingBucketLabel,
   getAgingBucketColor,
   AgingBucket,
 } from '@/lib/hooks/use-reports';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function APAgingReportPage() {
+  // Report figures are ledger amounts, in the organization base currency (audit B5).
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('reports');
   const [asOfDate, setAsOfDate] = useState(new Date());
   const [expandedBucket, setExpandedBucket] = useState<string | null>(null);
