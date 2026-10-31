@@ -59,6 +59,8 @@ import {
   useDeleteUser,
   getUserStatusColor,
 } from '@/lib/hooks/use-users';
+import { usePermissions } from '@/lib/hooks/use-permissions';
+import { MemberResetLinkButton } from '@/components/settings/member-reset-link';
 
 // ── Constants (must match backend AVAILABLE_MODULES / AVAILABLE_ACTIONS) ─────
 
@@ -205,6 +207,8 @@ export default function TeamSettingsPage() {
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteUser();
+  const { hasPermission } = usePermissions();
+  const canEditMembers = hasPermission('settings.edit');
 
   // Dialog state
   const [addRoleOpen, setAddRoleOpen] = useState(false);
@@ -502,7 +506,7 @@ export default function TeamSettingsPage() {
                   <TableHead>{t('team.email')}</TableHead>
                   <TableHead>{t('team.role')}</TableHead>
                   <TableHead>{t('team.status')}</TableHead>
-                  <TableHead className="w-[100px]">{t('team.actions')}</TableHead>
+                  <TableHead className="w-[140px]">{t('team.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -531,6 +535,9 @@ export default function TeamSettingsPage() {
                         >
                           <Edit2 className="h-4 w-4" />
                         </Button>
+                        {canEditMembers && user.status === 'ACTIVE' && (
+                          <MemberResetLinkButton userId={user.id} name={user.name} />
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"

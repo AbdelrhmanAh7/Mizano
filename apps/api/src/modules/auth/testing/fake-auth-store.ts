@@ -77,6 +77,7 @@ export interface FakeAuthStore {
   user: Table;
   authSession: Table;
   passwordResetToken: Table;
+  auditLog: Table;
   organization: { findUnique: jest.Mock };
   $transaction: jest.Mock;
 }
@@ -88,6 +89,7 @@ export function createFakeAuthStore(): FakeAuthStore {
     user,
     authSession: new Table(userOf),
     passwordResetToken: new Table(userOf),
+    auditLog: new Table(),
     organization: { findUnique: jest.fn(() => Promise.resolve(null)) },
     $transaction: jest.fn((fn: (tx: FakeAuthStore) => Promise<unknown>) => fn(store)),
   };
