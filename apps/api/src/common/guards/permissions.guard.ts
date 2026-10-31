@@ -1,6 +1,6 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
+import { ANY_PERMISSION_KEY, PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
 
 interface CachedRole {
@@ -20,12 +20,13 @@ export class PermissionsGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const targets = [context.getHandler(), context.getClass()];
+    const requiredPermissions =
+      this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, targets) ?? [];
+    const anyOfPermissions =
+      this.reflector.getAllAndOverride<string[]>(ANY_PERMISSION_KEY, targets) ?? [];
 
-    if (!requiredPermissions || requiredPermissions.length === 0) {
+    if (requiredPermissions.length === 0 && anyOfPermissions.length === 0) {
       return true;
     }
 
@@ -47,14 +48,21 @@ export class PermissionsGuard implements CanActivate {
       return true;
     }
 
+    const holds = (permission: string): boolean => {
+      const [module, action] = permission.split('.');
+      return role.permissions.some((p) => p.module === module && p.actions.includes(action));
+    };
+
     // Check if user has all required permissions
     for (const required of requiredPermissions) {
-      const [module, action] = required.split('.');
-      const permission = role.permissions.find((p) => p.module === module);
-
-      if (!permission || !permission.actions.includes(action)) {
+      if (!holds(required)) {
         throw new ForbiddenException(`Missing permission: ${required}`);
       }
+    }
+
+    // ...and at least one of the @AnyPermission ones
+    if (anyOfPermissions.length > 0 && !anyOfPermissions.some(holds)) {
+      throw new ForbiddenException(`Missing permission: one of ${anyOfPermissions.join(', ')}`);
     }
 
     return true;

@@ -25,16 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -397,24 +388,20 @@ function RecurringProfilesPageContent() {
         </CardContent>
       </Card>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('recurring.deleteProfile')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete &quot;{profileToDelete?.name}&quot;? This action
-              cannot be undone. Previously created journals will not be affected.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title={t('recurring.deleteProfile')}
+        description={
+          <>
+            Are you sure you want to delete &quot;{profileToDelete?.name}&quot;? This action cannot
+            be undone. Previously created journals will not be affected.
+          </>
+        }
+        onConfirm={confirmDelete}
+        cancelLabel="Cancel"
+        deleteLabel="Delete"
+      />
     </div>
   );
 }

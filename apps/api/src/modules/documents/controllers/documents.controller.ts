@@ -28,6 +28,7 @@ import {
   resolveStatementPeriod,
   SendResultResponse,
   BulkSendResultResponse,
+  DocumentLocaleQueryDto,
 } from '../dto/documents.dto';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
@@ -50,13 +51,15 @@ export class DocumentsController {
   @Permissions('sales.view')
   @ApiOperation({ summary: 'Generate invoice PDF' })
   @ApiParam({ name: 'id', description: 'Invoice ID' })
+  @ApiQuery({ name: 'locale', required: false, enum: ['en', 'ar'] })
   @ApiResponse({ status: 200, description: 'PDF file' })
   async getInvoicePdf(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
+    @Query() query: DocumentLocaleQueryDto,
     @Res() res: Response,
   ): Promise<void> {
-    const pdfBuffer = await this.pdfService.generateInvoicePdf(orgId, id);
+    const pdfBuffer = await this.pdfService.generateInvoicePdf(orgId, id, query.locale ?? 'en');
 
     res.set({
       'Content-Type': 'application/pdf',

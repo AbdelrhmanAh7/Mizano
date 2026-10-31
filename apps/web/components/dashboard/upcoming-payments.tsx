@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { UpcomingPayment, formatCurrency } from '@/lib/hooks/use-dashboard';
+import { UpcomingPayment } from '@/lib/hooks/use-dashboard';
 import { Link } from '@/i18n/routing';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface UpcomingPaymentsProps {
   payments: UpcomingPayment[];
@@ -26,6 +27,7 @@ function getDueDateLabel(
 }
 
 export function UpcomingPayments({ payments }: UpcomingPaymentsProps) {
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('common.dashboard.upcomingPayments');
 
   return (

@@ -37,33 +37,6 @@ export interface Vendor {
   outstandingBalance?: string;
 }
 
-export interface VendorStatement {
-  vendor: Vendor;
-  bills: Array<{
-    id: string;
-    billNumber: string;
-    date: string;
-    dueDate: string;
-    grandTotal: string;
-    balanceDue: string;
-    status: string;
-  }>;
-  payments: Array<{
-    id: string;
-    paymentNumber: string;
-    date: string;
-    amount: string;
-    paymentMode: string;
-  }>;
-  vendorCredits: Array<{
-    id: string;
-    creditNumber: string;
-    date: string;
-    amount: string;
-    reason: string;
-  }>;
-}
-
 export interface VendorParams {
   page?: number;
   limit?: number;

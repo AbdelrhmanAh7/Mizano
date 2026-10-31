@@ -5,7 +5,7 @@ import { LucideIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface StatCardProps {
   title: string;
@@ -27,8 +27,9 @@ export const StatCard = memo(function StatCard({
   trend,
   iconColor = 'text-blue-600',
   iconBgColor = 'bg-blue-100',
-  currency = 'USD',
+  currency,
 }: StatCardProps) {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const t = useTranslations('common.dashboard');
 
   return (

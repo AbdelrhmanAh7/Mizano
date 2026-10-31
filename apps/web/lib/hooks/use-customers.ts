@@ -1,14 +1,12 @@
 'use client';
 
-import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 import { customersApi } from '@/lib/api';
+import { useToastMutation } from '@/lib/hooks/use-toast-mutation';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
-
 export interface CustomerAddress {
   street: string | null;
   city: string | null;
@@ -165,28 +163,12 @@ export function useCustomerStatement(id: string | undefined) {
  * Hook to create a new customer
  */
 export function useCreateCustomer() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (data: CreateCustomerData) => {
-      const response = await customersApi.create(data);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      toast({
-        title: 'Customer created',
-        description: 'The customer has been created successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error creating customer',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: 'sales.customers.toast',
+    mutationFn: async (data: CreateCustomerData) => (await customersApi.create(data)).data,
+    invalidate: () => [['customers']],
+    success: 'created',
+    error: 'createError',
   });
 }
 
@@ -194,29 +176,13 @@ export function useCreateCustomer() {
  * Hook to update an existing customer
  */
 export function useUpdateCustomer() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateCustomerData }) => {
-      const response = await customersApi.update(id, data);
-      return response.data;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      queryClient.invalidateQueries({ queryKey: ['customers', variables.id] });
-      toast({
-        title: 'Customer updated',
-        description: 'The customer has been updated successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error updating customer',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: 'sales.customers.toast',
+    mutationFn: async ({ id, data }: { id: string; data: UpdateCustomerData }) =>
+      (await customersApi.update(id, data)).data,
+    invalidate: (variables) => [['customers'], ['customers', variables.id]],
+    success: 'updated',
+    error: 'updateError',
   });
 }
 
@@ -224,28 +190,12 @@ export function useUpdateCustomer() {
  * Hook to delete a customer
  */
 export function useDeleteCustomer() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await customersApi.delete(id);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      toast({
-        title: 'Customer deleted',
-        description: 'The customer has been deleted successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error deleting customer',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: 'sales.customers.toast',
+    mutationFn: async (id: string) => (await customersApi.delete(id)).data,
+    invalidate: () => [['customers']],
+    success: 'deleted',
+    error: 'deleteError',
   });
 }
 
@@ -300,15 +250,4 @@ export function getBalanceColor(balance: string | number | undefined): string {
   if (value > 0) return 'text-red-600 font-semibold';
   if (value < 0) return 'text-green-600';
   return 'text-gray-600';
-}
-
-/**
- * Format currency amount
- */
-export function formatCurrency(amount: string | number, currency: string = 'USD'): string {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(num);
 }

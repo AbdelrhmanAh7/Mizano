@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/use-toast';
 import { CustomerForm } from '@/components/sales/customer-form';
 import { useCreateCustomer } from '@/lib/hooks/use-customers';
 import Link from 'next/link';
@@ -12,7 +11,6 @@ import Link from 'next/link';
 export default function NewCustomerPage() {
   const router = useRouter();
   const t = useTranslations('sales');
-  const { toast } = useToast();
 
   const createCustomer = useCreateCustomer();
 
@@ -21,19 +19,9 @@ export default function NewCustomerPage() {
       await createCustomer.mutateAsync(
         data as unknown as Parameters<typeof createCustomer.mutateAsync>[0],
       );
-      toast({
-        title: t('customers.toast.created'),
-        description: t('customers.toast.createdDescription'),
-      });
       router.push('/sales/customers');
-    } catch (error: unknown) {
-      toast({
-        title: 'Error',
-        description:
-          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          t('customers.toast.createError'),
-        variant: 'destructive',
-      });
+    } catch {
+      // useCreateCustomer shows the translated success and error toasts.
     }
   };
 

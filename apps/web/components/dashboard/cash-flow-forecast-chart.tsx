@@ -15,7 +15,7 @@ import {
   Legend,
 } from 'recharts';
 import { useCashFlowForecast, type CashFlowForecast } from '@/lib/hooks/use-ai-insights';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -23,6 +23,7 @@ function formatDate(dateStr: string): string {
 }
 
 export const CashFlowForecastChart = memo(function CashFlowForecastChart() {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const { data, isLoading } = useCashFlowForecast(30);
 
   const forecasts: CashFlowForecast[] = Array.isArray(data?.data)

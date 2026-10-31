@@ -6,9 +6,10 @@ import { ProjectsController } from './controllers/projects.controller';
 import { TasksController } from './controllers/tasks.controller';
 import { TimesheetsController } from './controllers/timesheets.controller';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { SalesModule } from '../sales/sales.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, SalesModule],
   controllers: [ProjectsController, TasksController, TimesheetsController],
   providers: [ProjectsService, TasksService, TimesheetsService],
   exports: [ProjectsService, TasksService, TimesheetsService],

@@ -38,6 +38,10 @@ reviews:
     - "!**/*.tsbuildinfo"
     - "!**/*.min.js"
     - "!apps/api/prisma/migrations/**/migration_lock.toml"
+    # Evidence records are run logs, not code: reviewing them spawned issues that produced more
+    # evidence (audit C4). Evidence belongs in PR descriptions.
+    - "!docs/evidence/**"
+    - "!**/EVIDENCE.md"
   path_instructions:
     - path: "**/*"
       instructions: "Review against docs/agents/review-lessons.md and AGENTS.md. Every rule there is a past review finding; flag any change that repeats one of those root causes, even in a different module (lock order, original-journal accounts, dates, single-currency ledger, Decimal money, tenant scoping, voided records, report reconciliation, logging, en/ar strings, error vs empty states)."

@@ -5,16 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Plus, Trash2, Edit, Star, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import {
   Dialog,
   DialogContent,
@@ -71,7 +62,7 @@ export default function TaxRatesPage() {
   const { data: taxRatesData, isLoading, refetch } = useTaxRates();
   const deleteTaxRate = useDeleteTaxRate();
 
-  const allRates: TaxRate[] = taxRatesData?.data || [];
+  const allRates: TaxRate[] = useMemo(() => taxRatesData?.data || [], [taxRatesData]);
 
   // Client-side filtering
   const filteredRates = useMemo(() => {
@@ -336,23 +327,13 @@ export default function TaxRatesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('rates.deleteTitle')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('rates.deleteDescription', { name: selectedRate?.name ?? '' })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              {tCommon('buttons.delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title={t('rates.deleteTitle')}
+        description={t('rates.deleteDescription', { name: selectedRate?.name ?? '' })}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

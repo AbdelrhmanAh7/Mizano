@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
@@ -7,35 +7,74 @@ import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { runBulk } from '../../../common/utils/run-bulk';
 import { AgingReportsService } from '../../reports/services/aging-reports.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { WebhookOutboxService } from '../../integrations/services/webhook-outbox.service';
 import { CreateCustomerDto } from '../dto/create-customer.dto';
 import { UpdateCustomerDto } from '../dto/update-customer.dto';
+
+type CustomerAddress = CreateCustomerDto['billingAddress'];
+
+/** The flat billing and shipping columns of the two address objects (undefined leaves a column). */
+function flatAddresses(billing: CustomerAddress, shipping: CustomerAddress) {
+  return {
+    billingStreet: billing?.street,
+    billingCity: billing?.city,
+    billingState: billing?.state,
+    billingPostalCode: billing?.postalCode,
+    billingCountry: billing?.country,
+    shippingStreet: shipping?.street,
+    shippingCity: shipping?.city,
+    shippingState: shipping?.state,
+    shippingPostalCode: shipping?.postalCode,
+    shippingCountry: shipping?.country,
+  };
+}
 
 @Injectable()
 export class CustomersService {
   constructor(
     private prisma: PrismaService,
     private agingReports: AgingReportsService,
+    @Optional() private outbox?: WebhookOutboxService,
   ) {}
 
-  async create(organizationId: string, createCustomerDto: CreateCustomerDto) {
-    const customer = await this.prisma.customer.create({
-      data: {
-        ...createCustomerDto,
-        billingStreet: createCustomerDto.billingAddress?.street,
-        billingCity: createCustomerDto.billingAddress?.city,
-        billingState: createCustomerDto.billingAddress?.state,
-        billingPostalCode: createCustomerDto.billingAddress?.postalCode,
-        billingCountry: createCustomerDto.billingAddress?.country,
-        shippingStreet: createCustomerDto.shippingAddress?.street,
-        shippingCity: createCustomerDto.shippingAddress?.city,
-        shippingState: createCustomerDto.shippingAddress?.state,
-        shippingPostalCode: createCustomerDto.shippingAddress?.postalCode,
-        shippingCountry: createCustomerDto.shippingAddress?.country,
-        organizationId,
-      },
-    });
+  /**
+   * Creates a customer and its customer.created outbox event in one transaction. Pass
+   * `options.tx` to compose it into a caller's transaction (integration idempotency, audit F1).
+   */
+  async create(
+    organizationId: string,
+    createCustomerDto: CreateCustomerDto,
+    options: { tx?: Prisma.TransactionClient } = {},
+  ) {
+    // The address objects map to flat columns; Prisma rejects them as fields of their own.
+    const { billingAddress, shippingAddress, ...fields } = createCustomerDto;
+    const run = async (tx: Prisma.TransactionClient) => {
+      const customer = await tx.customer.create({
+        data: {
+          ...fields,
+          // Without an explicit currency a customer uses the org base currency, never the
+          // column's USD default (FlowLine and web alike; audit B5/F4).
+          currency: fields.currency ?? (await this.baseCurrency(tx, organizationId)),
+          ...flatAddresses(billingAddress, shippingAddress),
+          organizationId,
+        },
+      });
+      await this.outbox?.customerCreated(tx, organizationId, customer);
+      return customer;
+    };
+    return options.tx ? run(options.tx) : this.prisma.$transaction(run);
+  }
 
-    return customer;
+  private async baseCurrency(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+  ): Promise<string> {
+    const org = await tx.organization.findUnique({
+      where: { id: organizationId },
+      select: { baseCurrency: true },
+    });
+    if (!org) throw new NotFoundException('Organization not found');
+    return org.baseCurrency;
   }
 
   async findAll(organizationId: string, query: PaginationDto) {
@@ -47,6 +86,7 @@ export class CustomersService {
       ...(search && {
         OR: [
           { name: { contains: search, mode: 'insensitive' as const } },
+          { displayName: { contains: search, mode: 'insensitive' as const } },
           { email: { contains: search, mode: 'insensitive' as const } },
           { phone: { contains: search, mode: 'insensitive' as const } },
         ],
@@ -106,6 +146,7 @@ export class CustomersService {
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' as const } },
+        { displayName: { contains: search, mode: 'insensitive' as const } },
         { email: { contains: search, mode: 'insensitive' as const } },
         { phone: { contains: search, mode: 'insensitive' as const } },
       ];
@@ -161,24 +202,16 @@ export class CustomersService {
       throw new NotFoundException('Customer not found');
     }
 
-    const updatedCustomer = await this.prisma.customer.update({
-      where: { id },
-      data: {
-        ...updateCustomerDto,
-        billingStreet: updateCustomerDto.billingAddress?.street,
-        billingCity: updateCustomerDto.billingAddress?.city,
-        billingState: updateCustomerDto.billingAddress?.state,
-        billingPostalCode: updateCustomerDto.billingAddress?.postalCode,
-        billingCountry: updateCustomerDto.billingAddress?.country,
-        shippingStreet: updateCustomerDto.shippingAddress?.street,
-        shippingCity: updateCustomerDto.shippingAddress?.city,
-        shippingState: updateCustomerDto.shippingAddress?.state,
-        shippingPostalCode: updateCustomerDto.shippingAddress?.postalCode,
-        shippingCountry: updateCustomerDto.shippingAddress?.country,
-      },
+    const { billingAddress, shippingAddress, ...fields } = updateCustomerDto;
+    // The change and its customer.updated outbox event commit together (audit F3).
+    return this.prisma.$transaction(async (tx) => {
+      const updatedCustomer = await tx.customer.update({
+        where: { id },
+        data: { ...fields, ...flatAddresses(billingAddress, shippingAddress) },
+      });
+      await this.outbox?.customerEvent(tx, organizationId, 'customer.updated', updatedCustomer);
+      return updatedCustomer;
     });
-
-    return updatedCustomer;
   }
 
   async remove(organizationId: string, id: string) {

@@ -40,26 +40,6 @@ export interface BalanceSheetReport {
   asOfDate: string;
 }
 
-export interface CashFlowReport {
-  operations: {
-    netIncome: number;
-    adjustments: Array<{ key?: string; name: string; amount: number }>;
-    total: number;
-  };
-  investing: {
-    items: Array<{ key?: string; name: string; amount: number }>;
-    total: number;
-  };
-  financing: {
-    items: Array<{ key?: string; name: string; amount: number }>;
-    total: number;
-  };
-  netChange: number;
-  openingBalance: number;
-  closingBalance: number;
-  period: DateRange;
-}
-
 export interface AgingBucket {
   range: string;
   amount: number;
@@ -748,27 +728,7 @@ export function usePurchasesByVendorReport(params: DateRange) {
   });
 }
 
-// Helper functions
-export function formatCurrency(amount: number | string | null | undefined): string {
-  if (amount === null || amount === undefined) return '$0.00';
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(num);
-}
-
-export function getAgingBucketLabel(bucket: string): string {
-  const labels: Record<string, string> = {
-    current: 'Current',
-    '1-15': '1-15 Days',
-    '16-30': '16-30 Days',
-    '31-60': '31-60 Days',
-    '61-90': '61-90 Days',
-    '90+': 'Over 90 Days',
-  };
-  return labels[bucket] || bucket;
-}
+// Helper functions. Money is formatted with useMoneyFormatter (org base currency), not here.
 
 export function getAgingBucketColor(bucket: string): string {
   const colors: Record<string, string> = {

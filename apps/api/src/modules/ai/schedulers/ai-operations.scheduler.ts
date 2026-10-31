@@ -11,8 +11,7 @@ import { LeadScoringService } from '../services/lead-scoring.service';
 import { PatternDetectionService } from '../services/pattern-detection.service';
 import { AiAlertsService } from '../services/ai-alerts.service';
 import { describeError } from '../../../common/utils/redact';
-
-const BATCH_SIZE = 5;
+import { forEachOrganization } from './for-each-organization';
 
 @Injectable()
 export class AiOperationsScheduler {
@@ -37,47 +36,25 @@ export class AiOperationsScheduler {
    */
   @Cron('0 2 * * *')
   async runDailyAnomalyScan() {
-    this.logger.log('Starting daily anomaly scan...');
+    let totalAnomalies = 0;
 
-    try {
-      // Get all active organizations
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
+    await forEachOrganization(
+      this.prisma,
+      this.logger,
+      {
+        name: 'daily anomaly scan',
+        failure: 'scanning anomalies',
+        completed: () => `Daily anomaly scan completed. Total anomalies found: ${totalAnomalies}`,
+      },
+      async (org) => {
+        const result = await this.anomalyService.dailyAnomalyScan(org.id);
+        totalAnomalies += result.newAnomaliesCreated;
 
-      let totalAnomalies = 0;
-
-      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
-        const batch = organizations.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map(async (org) => {
-            try {
-              const result = await this.anomalyService.dailyAnomalyScan(org.id);
-              totalAnomalies += result.newAnomaliesCreated;
-
-              if (result.newAnomaliesCreated > 0) {
-                this.logger.log(`Org ${org.name}: Found ${result.newAnomaliesCreated} anomalies`);
-              }
-            } catch (error) {
-              this.logger.error(
-                `Error scanning anomalies for org ${org.id}: ${describeError(error)}`,
-              );
-            }
-          }),
-        );
-        // Log any unexpected rejections
-        for (const r of results) {
-          if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
-          }
+        if (result.newAnomaliesCreated > 0) {
+          this.logger.log(`Org ${org.name}: Found ${result.newAnomaliesCreated} anomalies`);
         }
-      }
-
-      this.logger.log(`Daily anomaly scan completed. Total anomalies found: ${totalAnomalies}`);
-    } catch (error) {
-      this.logger.error(`Daily anomaly scan failed: ${describeError(error)}`);
-    }
+      },
+    );
   }
 
   /**
@@ -86,40 +63,15 @@ export class AiOperationsScheduler {
    */
   @Cron('0 0 * * 0')
   async runWeeklyReorderUpdate() {
-    this.logger.log('Starting weekly reorder points update...');
-
-    try {
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
-
-      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
-        const batch = organizations.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map(async (org) => {
-            try {
-              const result = await this.reorderService.updateItemReorderPoints(org.id);
-              this.logger.log(`Org ${org.name}: Updated ${result.updated} item reorder points`);
-            } catch (error) {
-              this.logger.error(
-                `Error updating reorder points for org ${org.id}: ${describeError(error)}`,
-              );
-            }
-          }),
-        );
-        // Log any unexpected rejections
-        for (const r of results) {
-          if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
-          }
-        }
-      }
-
-      this.logger.log('Weekly reorder points update completed');
-    } catch (error) {
-      this.logger.error(`Weekly reorder points update failed: ${describeError(error)}`);
-    }
+    await forEachOrganization(
+      this.prisma,
+      this.logger,
+      { name: 'weekly reorder points update', failure: 'updating reorder points' },
+      async (org) => {
+        const result = await this.reorderService.updateItemReorderPoints(org.id);
+        this.logger.log(`Org ${org.name}: Updated ${result.updated} item reorder points`);
+      },
+    );
   }
 
   /**
@@ -128,49 +80,22 @@ export class AiOperationsScheduler {
    */
   @Cron('0 1 * * 0')
   async runWeeklyDemandForecast() {
-    this.logger.log('Starting weekly demand forecast update...');
+    await forEachOrganization(
+      this.prisma,
+      this.logger,
+      { name: 'weekly demand forecast update', failure: 'updating demand forecasts' },
+      async (org) => {
+        const result = await this.demandForecastingService.forecastAllItems(org.id);
 
-    try {
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
-
-      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
-        const batch = organizations.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map(async (org) => {
-            try {
-              const result = await this.demandForecastingService.forecastAllItems(org.id);
-
-              this.logger.log(
-                `Org ${org.name}: Processed ${result.processed} items, skipped ${result.skipped} (insufficient data)`,
-              );
-
-              if (result.errors.length > 0) {
-                this.logger.warn(
-                  `Org ${org.name}: ${result.errors.length} errors during forecasting`,
-                );
-              }
-            } catch (error) {
-              this.logger.error(
-                `Error updating demand forecasts for org ${org.id}: ${describeError(error)}`,
-              );
-            }
-          }),
+        this.logger.log(
+          `Org ${org.name}: Processed ${result.processed} items, skipped ${result.skipped} (insufficient data)`,
         );
-        // Log any unexpected rejections
-        for (const r of results) {
-          if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
-          }
-        }
-      }
 
-      this.logger.log('Weekly demand forecast update completed');
-    } catch (error) {
-      this.logger.error(`Weekly demand forecast update failed: ${describeError(error)}`);
-    }
+        if (result.errors.length > 0) {
+          this.logger.warn(`Org ${org.name}: ${result.errors.length} errors during forecasting`);
+        }
+      },
+    );
   }
 
   /**
@@ -179,43 +104,16 @@ export class AiOperationsScheduler {
    */
   @Cron('0 3 * * *')
   async runDailyCashFlowPrediction() {
-    this.logger.log('Starting daily cash flow prediction update...');
+    await forEachOrganization(
+      this.prisma,
+      this.logger,
+      { name: 'daily cash flow prediction update', failure: 'updating cash flow' },
+      async (org) => {
+        const result = await this.cashFlowPredictionService.dailyRecalculate(org.id);
 
-    try {
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
-
-      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
-        const batch = organizations.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map(async (org) => {
-            try {
-              const result = await this.cashFlowPredictionService.dailyRecalculate(org.id);
-
-              this.logger.log(
-                `Org ${org.name}: Updated ${result.updated} days of cash flow forecasts`,
-              );
-            } catch (error) {
-              this.logger.error(
-                `Error updating cash flow for org ${org.id}: ${describeError(error)}`,
-              );
-            }
-          }),
-        );
-        // Log any unexpected rejections
-        for (const r of results) {
-          if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
-          }
-        }
-      }
-
-      this.logger.log('Daily cash flow prediction update completed');
-    } catch (error) {
-      this.logger.error(`Daily cash flow prediction update failed: ${describeError(error)}`);
-    }
+        this.logger.log(`Org ${org.name}: Updated ${result.updated} days of cash flow forecasts`);
+      },
+    );
   }
 
   /**
@@ -224,43 +122,18 @@ export class AiOperationsScheduler {
    */
   @Cron('0 0 * * 0')
   async runWeeklyLeadScoringUpdate() {
-    this.logger.log('Starting weekly lead scoring update...');
+    await forEachOrganization(
+      this.prisma,
+      this.logger,
+      { name: 'weekly lead scoring update', failure: 'updating lead scores' },
+      async (org) => {
+        const result = await this.leadScoringService.updateScores(org.id);
 
-    try {
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
-
-      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
-        const batch = organizations.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map(async (org) => {
-            try {
-              const result = await this.leadScoringService.updateScores(org.id);
-
-              this.logger.log(
-                `Org ${org.name}: Updated ${result.updated} lead scores, ${result.decayed} leads had decay applied`,
-              );
-            } catch (error) {
-              this.logger.error(
-                `Error updating lead scores for org ${org.id}: ${describeError(error)}`,
-              );
-            }
-          }),
+        this.logger.log(
+          `Org ${org.name}: Updated ${result.updated} lead scores, ${result.decayed} leads had decay applied`,
         );
-        // Log any unexpected rejections
-        for (const r of results) {
-          if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
-          }
-        }
-      }
-
-      this.logger.log('Weekly lead scoring update completed');
-    } catch (error) {
-      this.logger.error(`Weekly lead scoring update failed: ${describeError(error)}`);
-    }
+      },
+    );
   }
 
   /**
@@ -269,40 +142,15 @@ export class AiOperationsScheduler {
    */
   @Cron('0 2 * * 0')
   async runWeeklyPaymentPredictionUpdate() {
-    this.logger.log('Starting weekly payment prediction update...');
-
-    try {
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
-
-      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
-        const batch = organizations.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map(async (org) => {
-            try {
-              const result = await this.paymentPredictionService.updatePredictions(org.id);
-              this.logger.log(`Org ${org.name}: Updated ${result.updated} payment predictions`);
-            } catch (error) {
-              this.logger.error(
-                `Error updating payment predictions for org ${org.id}: ${describeError(error)}`,
-              );
-            }
-          }),
-        );
-        // Log any unexpected rejections
-        for (const r of results) {
-          if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
-          }
-        }
-      }
-
-      this.logger.log('Weekly payment prediction update completed');
-    } catch (error) {
-      this.logger.error(`Weekly payment prediction update failed: ${describeError(error)}`);
-    }
+    await forEachOrganization(
+      this.prisma,
+      this.logger,
+      { name: 'weekly payment prediction update', failure: 'updating payment predictions' },
+      async (org) => {
+        const result = await this.paymentPredictionService.updatePredictions(org.id);
+        this.logger.log(`Org ${org.name}: Updated ${result.updated} payment predictions`);
+      },
+    );
   }
 
   /**
@@ -311,69 +159,40 @@ export class AiOperationsScheduler {
    */
   @Cron('0 6 1 * *')
   async runMonthlyNarrativeGeneration() {
-    this.logger.log('Starting monthly narrative generation...');
+    // Generate narrative for the previous month
+    const prevMonth = new Date();
+    prevMonth.setMonth(prevMonth.getMonth() - 1);
+    const month = prevMonth.getMonth() + 1;
+    const year = prevMonth.getFullYear();
 
-    try {
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
+    await forEachOrganization(
+      this.prisma,
+      this.logger,
+      { name: 'monthly narrative generation', failure: 'generating narrative' },
+      async (org) => {
+        const narrative = await this.narrativeService.generateMonthlyNarrative(org.id, month, year);
 
-      // Generate narrative for the previous month
-      const prevMonth = new Date();
-      prevMonth.setMonth(prevMonth.getMonth() - 1);
-      const month = prevMonth.getMonth() + 1;
-      const year = prevMonth.getFullYear();
+        // Store as AI Insight for historical reference
+        await this.prisma.aIInsight.create({
+          data: {
+            organizationId: org.id,
+            type: 'NARRATIVE',
+            severity: 'info',
+            priority: 'MEDIUM',
+            title: `Monthly Summary - ${prevMonth.toLocaleString('default', { month: 'long' })} ${year}`,
+            description:
+              narrative.summary ||
+              narrative.sections
+                .map((s) => s.content)
+                .join(' ')
+                .slice(0, 500),
+            data: narrative as unknown as import('@prisma/client').Prisma.InputJsonValue,
+          },
+        });
 
-      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
-        const batch = organizations.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map(async (org) => {
-            try {
-              const narrative = await this.narrativeService.generateMonthlyNarrative(
-                org.id,
-                month,
-                year,
-              );
-
-              // Store as AI Insight for historical reference
-              await this.prisma.aIInsight.create({
-                data: {
-                  organizationId: org.id,
-                  type: 'NARRATIVE',
-                  severity: 'info',
-                  priority: 'MEDIUM',
-                  title: `Monthly Summary - ${prevMonth.toLocaleString('default', { month: 'long' })} ${year}`,
-                  description:
-                    narrative.summary ||
-                    narrative.sections
-                      .map((s) => s.content)
-                      .join(' ')
-                      .slice(0, 500),
-                  data: narrative as unknown as import('@prisma/client').Prisma.InputJsonValue,
-                },
-              });
-
-              this.logger.log(`Org ${org.name}: Monthly narrative generated for ${month}/${year}`);
-            } catch (error) {
-              this.logger.error(
-                `Error generating narrative for org ${org.id}: ${describeError(error)}`,
-              );
-            }
-          }),
-        );
-        // Log any unexpected rejections
-        for (const r of results) {
-          if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
-          }
-        }
-      }
-
-      this.logger.log('Monthly narrative generation completed');
-    } catch (error) {
-      this.logger.error(`Monthly narrative generation failed: ${describeError(error)}`);
-    }
+        this.logger.log(`Org ${org.name}: Monthly narrative generated for ${month}/${year}`);
+      },
+    );
   }
 
   /**
@@ -382,43 +201,18 @@ export class AiOperationsScheduler {
    */
   @Cron('0 3 * * 0')
   async runWeeklyPatternDetection() {
-    this.logger.log('Starting weekly pattern detection analysis...');
+    await forEachOrganization(
+      this.prisma,
+      this.logger,
+      { name: 'weekly pattern detection analysis', failure: 'analyzing patterns' },
+      async (org) => {
+        const result = await this.patternDetectionService.analyzePatterns(org.id);
 
-    try {
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
-
-      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
-        const batch = organizations.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map(async (org) => {
-            try {
-              const result = await this.patternDetectionService.analyzePatterns(org.id);
-
-              this.logger.log(
-                `Org ${org.name}: Detected ${result.patternsDetected} patterns, created ${result.suggestionsCreated} suggestions, found ${result.duplicatesFound} potential duplicates`,
-              );
-            } catch (error) {
-              this.logger.error(
-                `Error analyzing patterns for org ${org.id}: ${describeError(error)}`,
-              );
-            }
-          }),
+        this.logger.log(
+          `Org ${org.name}: Detected ${result.patternsDetected} patterns, created ${result.suggestionsCreated} suggestions, found ${result.duplicatesFound} potential duplicates`,
         );
-        // Log any unexpected rejections
-        for (const r of results) {
-          if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
-          }
-        }
-      }
-
-      this.logger.log('Weekly pattern detection analysis completed');
-    } catch (error) {
-      this.logger.error(`Weekly pattern detection analysis failed: ${describeError(error)}`);
-    }
+      },
+    );
   }
 
   /**
@@ -427,45 +221,20 @@ export class AiOperationsScheduler {
    */
   @Cron('30 */4 * * *')
   async runHourlyAlertAggregation() {
-    this.logger.log('Starting hourly AI alerts aggregation...');
+    await forEachOrganization(
+      this.prisma,
+      this.logger,
+      { name: 'hourly AI alerts aggregation', failure: 'aggregating alerts' },
+      async (org) => {
+        const result = await this.aiAlertsService.aggregateAlerts(org.id);
 
-    try {
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
-
-      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
-        const batch = organizations.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map(async (org) => {
-            try {
-              const result = await this.aiAlertsService.aggregateAlerts(org.id);
-
-              if (result.created > 0 || result.updated > 0) {
-                this.logger.log(
-                  `Org ${org.name}: Created ${result.created} new alerts, updated ${result.updated}, expired ${result.expired}`,
-                );
-              }
-            } catch (error) {
-              this.logger.error(
-                `Error aggregating alerts for org ${org.id}: ${describeError(error)}`,
-              );
-            }
-          }),
-        );
-        // Log any unexpected rejections
-        for (const r of results) {
-          if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
-          }
+        if (result.created > 0 || result.updated > 0) {
+          this.logger.log(
+            `Org ${org.name}: Created ${result.created} new alerts, updated ${result.updated}, expired ${result.expired}`,
+          );
         }
-      }
-
-      this.logger.log('Hourly AI alerts aggregation completed');
-    } catch (error) {
-      this.logger.error(`Hourly AI alerts aggregation failed: ${describeError(error)}`);
-    }
+      },
+    );
   }
 
   /**
@@ -474,42 +243,21 @@ export class AiOperationsScheduler {
    */
   @Cron('0 4 * * *')
   async runDailyAlertCleanup() {
-    this.logger.log('Starting daily AI alerts cleanup...');
+    let totalCleaned = 0;
 
-    try {
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
-
-      let totalCleaned = 0;
-
-      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
-        const batch = organizations.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map(async (org) => {
-            try {
-              const cleaned = await this.aiAlertsService.cleanupExpiredAlerts(org.id);
-              totalCleaned += cleaned;
-            } catch (error) {
-              this.logger.error(
-                `Error cleaning up alerts for org ${org.id}: ${describeError(error)}`,
-              );
-            }
-          }),
-        );
-        // Log any unexpected rejections
-        for (const r of results) {
-          if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
-          }
-        }
-      }
-
-      this.logger.log(`Daily AI alerts cleanup completed. Cleaned ${totalCleaned} alerts`);
-    } catch (error) {
-      this.logger.error(`Daily AI alerts cleanup failed: ${describeError(error)}`);
-    }
+    await forEachOrganization(
+      this.prisma,
+      this.logger,
+      {
+        name: 'daily AI alerts cleanup',
+        failure: 'cleaning up alerts',
+        completed: () => `Daily AI alerts cleanup completed. Cleaned ${totalCleaned} alerts`,
+      },
+      async (org) => {
+        const cleaned = await this.aiAlertsService.cleanupExpiredAlerts(org.id);
+        totalCleaned += cleaned;
+      },
+    );
   }
 
   /**
@@ -586,43 +334,18 @@ export class AiOperationsScheduler {
    */
   @Cron('0 2 1 * *')
   async runMonthlyAbcAnalysis() {
-    this.logger.log('Starting monthly ABC analysis...');
+    await forEachOrganization(
+      this.prisma,
+      this.logger,
+      { name: 'monthly ABC analysis', failure: 'running ABC analysis' },
+      async (org) => {
+        const result = await this.reorderService.recalculateWithAbcServiceLevels(org.id);
 
-    try {
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
-
-      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
-        const batch = organizations.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map(async (org) => {
-            try {
-              const result = await this.reorderService.recalculateWithAbcServiceLevels(org.id);
-
-              this.logger.log(
-                `Org ${org.name}: ABC analysis updated ${result.updated} items ` +
-                  `(A:${result.byCategory.A}, B:${result.byCategory.B}, C:${result.byCategory.C})`,
-              );
-            } catch (error) {
-              this.logger.error(
-                `Error running ABC analysis for org ${org.id}: ${describeError(error)}`,
-              );
-            }
-          }),
+        this.logger.log(
+          `Org ${org.name}: ABC analysis updated ${result.updated} items ` +
+            `(A:${result.byCategory.A}, B:${result.byCategory.B}, C:${result.byCategory.C})`,
         );
-        // Log any unexpected rejections
-        for (const r of results) {
-          if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
-          }
-        }
-      }
-
-      this.logger.log('Monthly ABC analysis completed');
-    } catch (error) {
-      this.logger.error(`Monthly ABC analysis failed: ${describeError(error)}`);
-    }
+      },
+    );
   }
 }

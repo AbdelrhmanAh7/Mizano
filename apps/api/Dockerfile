@@ -6,8 +6,20 @@
 # Single-stage build (avoids pnpm symlink issues across stages)
 FROM node:20-alpine
 
-# OpenSSL is required by Prisma engine (Alpine ships OpenSSL 3.x)
-RUN apk add --no-cache openssl
+# OpenSSL is required by Prisma engine (Alpine ships OpenSSL 3.x).
+# Invoice/statement PDFs are rendered by Puppeteer with Alpine's own Chromium: Chrome for
+# Testing is a glibc x64 build with no linux-arm64 release, so it can run neither here nor on
+# the Raspberry Pi. The renderer has no network, so it needs system fonts: Noto Arabic shapes
+# Arabic text, DejaVu covers Latin and symbols.
+RUN apk add --no-cache openssl \
+    chromium nss freetype harfbuzz ca-certificates \
+    fontconfig font-noto-arabic font-dejavu
+
+# Skip Puppeteer's Chrome download at install time and use the system Chromium at runtime.
+ENV PUPPETEER_SKIP_DOWNLOAD=1 \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+# Fail the build, not the first PDF, if the browser or the Arabic font is missing.
+RUN test -x "$PUPPETEER_EXECUTABLE_PATH" && fc-list | grep -qi "noto.*arabic"
 
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate

@@ -1,27 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 
-export interface PriceList {
-  id: string;
-  name: string;
-  description?: string;
-  type: 'SALES' | 'PURCHASE';
-  isActive: boolean;
-  startDate?: string;
-  endDate?: string;
-  items?: PriceListItem[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface PriceListItem {
-  id: string;
-  itemId: string;
-  item?: { id: string; name: string; sku: string };
-  price: number | string;
-  minQuantity?: number;
-}
-
 const priceListsApi = {
   list: async () => {
     const response = await api.get('/price-lists');
@@ -66,17 +45,6 @@ export function useCreatePriceList() {
     mutationFn: priceListsApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['price-lists'] });
-    },
-  });
-}
-
-export function useUpdatePriceList() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: priceListsApi.update,
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['price-lists'] });
-      queryClient.invalidateQueries({ queryKey: ['price-lists', variables.id] });
     },
   });
 }

@@ -1,7 +1,7 @@
 import {
   signedMovementQuantity,
   signedMovementQuantityDecimal,
-} from '../../inventory/utils/movement-sign';
+} from '../../../common/utils/movement-sign';
 import { Injectable } from '@nestjs/common';
 import {
   AccountType,
@@ -40,7 +40,7 @@ import {
   sumPostedLinesByAccount,
   toDecimal,
   toIsoDate,
-} from '../utils/report-utils';
+} from '../../../common/utils/report-utils';
 
 const ZERO = new Decimal(0);
 const COGS_PREFIX = '5';

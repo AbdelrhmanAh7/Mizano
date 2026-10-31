@@ -159,14 +159,6 @@ export class ScoreAllResultResponse {
   };
 }
 
-export class UpdateScoresResultResponse {
-  @ApiProperty({ description: 'Number of scores updated' })
-  updated: number;
-
-  @ApiProperty({ description: 'Number of scores that decayed' })
-  decayed: number;
-}
-
 export class ScoreDistributionResponse {
   @ApiProperty({ description: 'Distribution by tier' })
   byTier: Array<{

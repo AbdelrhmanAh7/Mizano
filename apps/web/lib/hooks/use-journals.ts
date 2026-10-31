@@ -325,21 +325,6 @@ export function getStatusColor(status: JournalStatus): string {
   return colorMap[status] || 'border-border bg-muted text-muted-foreground';
 }
 
-/** Badge variant for a journal status (design-system tokens). */
-export function getJournalStatusVariant(status: JournalStatus): 'muted' | 'success' {
-  return status === 'POSTED' ? 'success' : 'muted';
-}
-
-/**
- * Get journal status display (legacy support)
- */
-export function getJournalStatus(journal: Journal): { label: string; color: string } {
-  return {
-    label: journal.status,
-    color: getStatusColor(journal.status),
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Posting rules (mirror the API: posted history is immutable)
 // ---------------------------------------------------------------------------

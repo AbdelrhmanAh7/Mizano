@@ -199,13 +199,3 @@ export function formatCurrency(amount: string | number, currency: string = 'USD'
     currency,
   }).format(num);
 }
-
-/**
- * Calculate total with tax
- */
-export function calculateTotal(amount: number, taxAmount: number, taxInclusive: boolean): number {
-  if (taxInclusive) {
-    return amount;
-  }
-  return amount + taxAmount;
-}

@@ -84,7 +84,8 @@ export default function FinancialSettingsPage() {
     // Set lock date to end of previous month
     const now = new Date();
     const lastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-    updateLockDate.mutate(lastMonth.toISOString());
+    // Local calendar date: toISOString() is the previous day in UTC+ zones such as Cairo.
+    updateLockDate.mutate(format(lastMonth, 'yyyy-MM-dd'));
   };
 
   if (isLoading) {

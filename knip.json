@@ -1,0 +1,71 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["_lint_staged.js", "commitlint.config.js"],
+      "project": ["*.js"]
+    },
+    "apps/api": {
+      "entry": [
+        "src/main.ts",
+        "src/intake-worker.ts",
+        "src/intake-worker-healthcheck.ts",
+        "prisma/seed.ts",
+        "scripts/*.js",
+        "_run_tests.js",
+        "_jest.config.js",
+        "_jest_resolver.js",
+        "src/**/*.spec.ts",
+        "test/**/*.e2e-spec.ts",
+        "test/setup-e2e.ts",
+        "src/test/mocks/*.js",
+        "src/test/setup.ts"
+      ],
+      "project": ["src/**/*.ts", "test/**/*.ts", "prisma/**/*.ts", "scripts/*.js", "*.js"],
+      "jest": false
+    },
+    "apps/web": {
+      "entry": [
+        "app/**/{page,layout,loading,error,not-found,global-error,template,default,route}.tsx",
+        "app/**/route.ts",
+        "middleware.ts",
+        "i18n/request.ts",
+        "*.config.js",
+        "jest.setup.ts",
+        "**/*.{spec,test}.{ts,tsx}",
+        "messages/*/index.ts"
+      ],
+      "project": [
+        "app/**/*.{ts,tsx}",
+        "components/**/*.{ts,tsx}",
+        "lib/**/*.{ts,tsx}",
+        "i18n/**/*.ts",
+        "messages/**/*.ts",
+        "*.ts"
+      ],
+      "jest": false
+    },
+    "packages/shared-types": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/validators": {
+      "entry": ["src/index.ts", "test/**/*.spec.ts"],
+      "project": ["src/**/*.ts", "test/**/*.ts"]
+    }
+  },
+  "ignoreExportsUsedInFile": true,
+  "ignore": ["e2e-army/**"],
+  "ignoreBinaries": ["docker-compose", "eslint", "prisma"],
+  "ignoreDependencies": [
+    "@img/sharp-linux-x64",
+    "@types/multer",
+    "ts-jest",
+    "jest-environment-jsdom",
+    "@commitlint/cli"
+  ],
+  "exclude": ["enumMembers"],
+  "ignoreIssues": {
+    "apps/web/components/ui/{dialog,dropdown-menu,select,sheet}.tsx": ["exports"]
+  }
+}

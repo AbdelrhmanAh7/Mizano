@@ -4,6 +4,7 @@ import { StatCard } from './stat-card';
 
 // Mock next-intl
 jest.mock('next-intl', () => ({
+  useLocale: () => 'en',
   useTranslations: () => (key: string, params?: Record<string, unknown>) => {
     if (key === 'fromLastMonth' && params?.value !== undefined) {
       return `${params.value}% from last month`;
@@ -47,16 +48,10 @@ jest.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
 
-// Mock formatCompactCurrency
-jest.mock('@/lib/hooks/use-dashboard', () => ({
-  formatCompactCurrency: (amount: number, currency: string) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-      notation: 'compact',
-      maximumFractionDigits: 1,
-    }).format(amount);
-  },
+// The real compact money formatter, with the organization base currency mocked.
+jest.mock('@/lib/hooks/use-organization', () => ({
+  useBaseCurrency: () => 'EGP',
+  documentCurrency: (code: string | null | undefined, base: string | undefined) => code || base,
 }));
 
 // Grab a reference to one of the mocked icons
@@ -68,10 +63,16 @@ describe('StatCard', () => {
     expect(screen.getByText('Total Revenue')).toBeInTheDocument();
   });
 
-  it('renders a formatted currency value by default', () => {
+  it('renders a value in the currency it is given', () => {
     render(<StatCard title="Revenue" value={1500000} icon={DollarSign} currency="USD" />);
     // Compact notation: $1.5M
     expect(screen.getByText('$1.5M')).toBeInTheDocument();
+  });
+
+  it('renders the org base currency by default, never USD (audit B5)', () => {
+    render(<StatCard title="Revenue" value={1500000} icon={DollarSign} />);
+    expect(screen.getByText(/^EGP\s1\.5M$/)).toBeInTheDocument();
+    expect(screen.queryByText(/\$/)).not.toBeInTheDocument();
   });
 
   it('renders a plain number when currency is "count"', () => {

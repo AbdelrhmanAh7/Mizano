@@ -76,16 +76,3 @@ export function createCrudApi<TCreate = unknown, TUpdate = unknown>(
     delete: (id: string) => apiInstance.delete(`${endpoint}/${id}`),
   };
 }
-
-/**
- * Creates bulk operation helpers for an entity.
- * @param endpoint - The API endpoint path, e.g. '/invoices'.
- * @param apiInstance - Authenticated Axios instance for making requests.
- * @returns Object with a `bulkAction` method for batch operations (e.g. bulk-delete, bulk-approve).
- */
-export function createBulkApi(endpoint: string, apiInstance: AxiosInstance) {
-  return {
-    bulkAction: (action: string, ids: string[]) =>
-      apiInstance.post(`${endpoint}/bulk-${action}`, { ids }),
-  };
-}

@@ -1,26 +1,55 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleDestroy } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { generateInvoiceHtml, InvoiceData } from '../templates/invoice.template';
 import { generateQuoteHtml, QuoteData } from '../templates/quote.template';
 import { generatePayslipHtml, PayslipData } from '../templates/payslip.template';
 import { generateBillHtml, BillData } from '../templates/bill.template';
 import {
+  DocumentLocale,
   OrganizationInfo,
   escapeHtml,
   formatCurrency,
   formatDate,
+  partyAddress,
+  renderAddressHtml,
   renderLogoHtml,
   safeColor,
 } from '../templates/base.template';
-import { renderHtmlToPdf } from './pdf-renderer';
+import { closePdfBrowser, renderHtmlToPdf } from './pdf-renderer';
+
+/**
+ * Ledger figures (statements, reports, payslips) are in the organization base currency, never in
+ * Organization.currency, a USD schema default.
+ */
+function ledgerCurrency(org: OrganizationInfo): string {
+  return org.baseCurrency || 'SAR';
+}
+
+/** A document's own currency, else the base currency it is posted in. */
+function documentCurrency(currencyCode: string | null | undefined, org: OrganizationInfo): string {
+  return currencyCode?.trim().toUpperCase() || ledgerCurrency(org);
+}
 
 @Injectable()
-export class PdfService {
+export class PdfService implements OnModuleDestroy {
   constructor(private prisma: PrismaService) {}
+
+  /** The renderer shares one Chromium process; stop it with the application. */
+  async onModuleDestroy(): Promise<void> {
+    await closePdfBrowser();
+  }
 
   // ============ Invoice PDF ============
 
-  async generateInvoicePdf(organizationId: string, invoiceId: string): Promise<Buffer> {
+  /**
+   * `locale` is the document language (`ar` renders right-to-left). The organization has no
+   * document-language setting, so callers pass the requesting user's UI locale.
+   */
+  async generateInvoicePdf(
+    organizationId: string,
+    invoiceId: string,
+    locale: DocumentLocale = 'en',
+  ): Promise<Buffer> {
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: invoiceId, organizationId, deletedAt: null },
       include: {
@@ -48,9 +77,7 @@ export class PdfService {
         name: invoice.customer.name,
         email: invoice.customer.email || undefined,
         phone: invoice.customer.phone || undefined,
-        address: invoice.customer.address || undefined,
-        city: invoice.customer.city || undefined,
-        country: invoice.customer.country || undefined,
+        ...partyAddress(invoice.customer),
         taxId: invoice.customer.taxId || undefined,
       },
       lines: invoice.lines.map((line) => ({
@@ -68,12 +95,13 @@ export class PdfService {
         : undefined,
       grandTotal: parseFloat(invoice.grandTotal.toString()),
       balanceDue: parseFloat(invoice.balanceDue.toString()),
-      currency: org.currency || 'SAR',
+      currency: documentCurrency(invoice.currencyCode, org),
       notes: invoice.notes || undefined,
       terms: invoice.terms || undefined,
+      reference: invoice.reference || undefined,
     };
 
-    const html = generateInvoiceHtml(org, invoiceData);
+    const html = generateInvoiceHtml(org, invoiceData, locale);
     return this.htmlToPdf(html);
   }
 
@@ -103,9 +131,7 @@ export class PdfService {
         name: bill.vendor.name,
         email: bill.vendor.email || undefined,
         phone: bill.vendor.phone || undefined,
-        address: bill.vendor.address || undefined,
-        city: bill.vendor.city || undefined,
-        country: bill.vendor.country || undefined,
+        ...partyAddress(bill.vendor),
         taxId: bill.vendor.taxId || undefined,
       },
       lines: bill.lines.map((line) => ({
@@ -119,7 +145,7 @@ export class PdfService {
       taxAmount: parseFloat(bill.taxAmount.toString()),
       grandTotal: parseFloat(bill.grandTotal.toString()),
       balanceDue: parseFloat(bill.balanceDue.toString()),
-      currency: org.currency || 'SAR',
+      currency: documentCurrency(bill.currencyCode, org),
       notes: bill.notes || undefined,
     };
 
@@ -157,9 +183,7 @@ export class PdfService {
         name: quote.customer.name,
         email: quote.customer.email || undefined,
         phone: quote.customer.phone || undefined,
-        address: quote.customer.address || undefined,
-        city: quote.customer.city || undefined,
-        country: quote.customer.country || undefined,
+        ...partyAddress(quote.customer),
       },
       lines: quote.lines.map((line) => ({
         description: line.description || line.item?.name || '',
@@ -172,7 +196,7 @@ export class PdfService {
       subtotal: parseFloat(quote.subtotal.toString()),
       taxAmount: parseFloat(quote.taxAmount.toString()),
       grandTotal: parseFloat(quote.grandTotal.toString()),
-      currency: org.currency || 'SAR',
+      currency: documentCurrency(quote.currencyCode, org),
       notes: quote.notes || undefined,
       terms: quote.terms || undefined,
     };
@@ -305,7 +329,7 @@ export class PdfService {
       grossPay: parseFloat((payslip.grossPay || payslip.grossSalary).toString()),
       totalDeductions: parseFloat((payslip.totalDeductions || 0).toString()),
       netPay: parseFloat((payslip.netPay || payslip.netSalary).toString()),
-      currency: 'SAR',
+      currency: ledgerCurrency(org),
     };
 
     const html = generatePayslipHtml(org, payslipData);
@@ -434,16 +458,14 @@ export class PdfService {
       customer: {
         name: customer.name,
         email: customer.email || undefined,
-        address: customer.address || undefined,
-        city: customer.city || undefined,
-        country: customer.country || undefined,
+        ...partyAddress(customer),
       },
       dateFrom,
       dateTo,
       openingBalance,
       transactions,
       closingBalance,
-      currency: 'SAR',
+      currency: ledgerCurrency(org),
     });
 
     return this.htmlToPdf(html);
@@ -458,7 +480,7 @@ export class PdfService {
   ): Promise<Buffer> {
     const org = await this.getOrganizationInfo(organizationId);
     const primaryColor = safeColor(org.primaryColor, '#3B82F6');
-    const currency = org.currency || 'SAR';
+    const currency = ledgerCurrency(org);
     const journalLines = await this.prisma.journalLine.findMany({
       where: {
         journal: {
@@ -521,7 +543,7 @@ export class PdfService {
   async generateBalanceSheetPdf(organizationId: string, asOfDate: string): Promise<Buffer> {
     const org = await this.getOrganizationInfo(organizationId);
     const pc = safeColor(org.primaryColor, '#3B82F6');
-    const cur = org.currency || 'SAR';
+    const cur = ledgerCurrency(org);
     const lines = await this.prisma.journalLine.findMany({
       where: {
         journal: {
@@ -592,7 +614,7 @@ export class PdfService {
   ): Promise<Buffer> {
     const org = await this.getOrganizationInfo(organizationId);
     const pc = safeColor(org.primaryColor, '#3B82F6'),
-      cur = org.currency || 'SAR';
+      cur = ledgerCurrency(org);
     const ref = asOfDate ? new Date(asOfDate) : new Date();
     const cat = (due: Date, amt: number) => {
       const d = Math.floor((ref.getTime() - due.getTime()) / 86400000);
@@ -714,6 +736,7 @@ export class PdfService {
       footerText: org.footerText || undefined,
       primaryColor: org.primaryColor || undefined,
       currency: org.currency || 'SAR',
+      baseCurrency: org.baseCurrency,
     };
   }
 
@@ -795,8 +818,7 @@ export class PdfService {
           <div style="margin-bottom: 30px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px;">CUSTOMER</h4>
             <p style="font-weight: bold;">${escapeHtml(data.customer.name)}</p>
-            ${data.customer.address ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(data.customer.address)}</p>` : ''}
-            ${data.customer.city && data.customer.country ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(data.customer.city)}, ${escapeHtml(data.customer.country)}</p>` : ''}
+            ${renderAddressHtml(data.customer, 'color: #6B7280; font-size: 12px;')}
           </div>
 
           <!-- Opening Balance -->

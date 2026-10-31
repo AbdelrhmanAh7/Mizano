@@ -1,5 +1,6 @@
 'use client';
 
+import { format } from 'date-fns';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -81,7 +82,7 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
       : {
           bomId: preselectedBomId,
           quantity: 1,
-          startDate: new Date().toISOString().split('T')[0],
+          startDate: format(new Date(), 'yyyy-MM-dd'),
           dueDate: '',
           notes: '',
         },

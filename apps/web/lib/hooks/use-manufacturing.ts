@@ -80,13 +80,6 @@ export interface ProductionEntry {
   createdAt: string;
 }
 
-export interface ManufacturingStats {
-  active: number;
-  draft: number;
-  activeBoms: number;
-  completedThisMonth: number;
-}
-
 // ============ API Functions ============
 
 const bomApi = {
@@ -303,17 +296,6 @@ export function useCreateWorkOrder() {
     mutationFn: workOrderApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
-    },
-  });
-}
-
-export function useUpdateWorkOrder() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: workOrderApi.update,
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
-      queryClient.invalidateQueries({ queryKey: ['work-orders', variables.id] });
     },
   });
 }

@@ -5,14 +5,16 @@ import { Building2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { BankAccountSummary, formatCurrency } from '@/lib/hooks/use-dashboard';
+import { BankAccountSummary } from '@/lib/hooks/use-dashboard';
 import { Link } from '@/i18n/routing';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface BankAccountsSummaryProps {
   accounts: BankAccountSummary[];
 }
 
 export function BankAccountsSummary({ accounts }: BankAccountsSummaryProps) {
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('common.dashboard.bankAccounts');
 
   return (

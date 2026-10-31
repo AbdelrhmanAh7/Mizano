@@ -6,3 +6,9 @@ global.ResizeObserver = class ResizeObserver {
   unobserve() {}
   disconnect() {}
 };
+
+// jsdom has no scrollIntoView; cmdk (the searchable pickers) calls it on keyboard navigation.
+// Suites on `@jest-environment node` (auth, NextAuth route) have no DOM at all.
+if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function scrollIntoView() {};
+}

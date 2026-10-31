@@ -12,7 +12,9 @@ import {
   CreditCard,
   Download,
   FileText,
+  Loader2,
   Mail,
+  Printer,
   User,
   Calendar,
   DollarSign,
@@ -39,6 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { useToast } from '@/components/ui/use-toast';
 import {
   useInvoice,
@@ -47,14 +50,24 @@ import {
   useVoidInvoice,
 } from '@/lib/hooks/use-invoices';
 import { usePermissions } from '@/lib/hooks/use-permissions';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
+import {
+  documentLocaleFor,
+  downloadInvoicePdf,
+  openInvoicePdfForPrint,
+} from '@/lib/hooks/use-documents';
 import { InvoiceStatusBadge } from '@/components/sales/status-badge';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { format } from 'date-fns';
+import { useDateFnsLocale } from '@/lib/date-locale';
 import { cn } from '@/lib/utils';
 
 export default function InvoiceDetailPage() {
   const t = useTranslations('sales');
+  const tDetail = useTranslations('sales.invoices.detail');
   const tCommon = useTranslations('common');
+  const locale = useLocale();
+  const dateLocale = useDateFnsLocale();
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -64,6 +77,7 @@ export default function InvoiceDetailPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [voidDialogOpen, setVoidDialogOpen] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState<'download' | 'print' | null>(null);
 
   const { data: invoice, isLoading } = useInvoice(invoiceId);
   const deleteInvoice = useDeleteInvoice();
@@ -73,26 +87,20 @@ export default function InvoiceDetailPage() {
   const canEdit = hasPermission('sales.edit');
   const canDelete = hasPermission('sales.delete');
 
-  const formatCurrency = (amount: string | number, currency: string = 'USD') => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(num);
-  };
+  // Same permission as GET /documents/invoice/:id/pdf.
+  const canExportPdf = hasPermission('sales.view');
 
+  // The invoice's own currency, else the organization base currency (never a guessed USD).
+  const money = useMoneyFormatter();
+  const formatCurrency = (amount: string | number) => money(amount, invoice?.currencyCode);
+
+  // The mutation hooks show the translated error toast; the dialogs just close.
   const confirmDelete = async () => {
     try {
       await deleteInvoice.mutateAsync(invoiceId);
       router.push('/sales/invoices');
-    } catch (error: unknown) {
-      toast({
-        title: 'Error',
-        description:
-          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to delete invoice',
-        variant: 'destructive',
-      });
+    } catch {
+      // handled by useDeleteInvoice
     }
     setDeleteDialogOpen(false);
   };
@@ -100,14 +108,8 @@ export default function InvoiceDetailPage() {
   const confirmSend = async () => {
     try {
       await sendInvoice.mutateAsync(invoiceId);
-    } catch (error: unknown) {
-      toast({
-        title: 'Error',
-        description:
-          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to send invoice',
-        variant: 'destructive',
-      });
+    } catch {
+      // handled by useSendInvoice
     }
     setSendDialogOpen(false);
   };
@@ -115,16 +117,42 @@ export default function InvoiceDetailPage() {
   const confirmVoid = async () => {
     try {
       await voidInvoice.mutateAsync(invoiceId);
-    } catch (error: unknown) {
-      toast({
-        title: 'Error',
-        description:
-          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to void invoice',
-        variant: 'destructive',
-      });
+    } catch {
+      // handled by useVoidInvoice
     }
     setVoidDialogOpen(false);
+  };
+
+  const pdfLocale = documentLocaleFor(locale);
+  const showPdfError = () =>
+    toast({
+      title: tDetail('pdfError'),
+      description: tDetail('pdfErrorDescription'),
+      variant: 'destructive',
+    });
+
+  const handleExportPdf = async () => {
+    if (!invoice) return;
+    setPdfBusy('download');
+    try {
+      await downloadInvoicePdf(invoiceId, invoice.invoiceNumber, pdfLocale);
+    } catch {
+      showPdfError();
+    } finally {
+      setPdfBusy(null);
+    }
+  };
+
+  // Must stay synchronous up to window.open (inside openInvoicePdfForPrint) for popup blockers.
+  const handlePrint = async () => {
+    setPdfBusy('print');
+    try {
+      await openInvoicePdfForPrint(invoiceId, pdfLocale);
+    } catch {
+      showPdfError();
+    } finally {
+      setPdfBusy(null);
+    }
   };
 
   if (isLoading) {
@@ -149,22 +177,20 @@ export default function InvoiceDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/sales/invoices">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Invoice Not Found</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{t('invoices.invoiceNotFound')}</h1>
           </div>
         </div>
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              The invoice you&apos;re looking for doesn&apos;t exist.
-            </p>
+            <p className="text-muted-foreground">{t('invoices.notFoundMessage')}</p>
             <Button asChild className="mt-4">
-              <Link href="/sales/invoices">Back to Invoices</Link>
+              <Link href="/sales/invoices">{t('invoices.backToInvoices')}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -197,9 +223,15 @@ export default function InvoiceDetailPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button
+            variant="ghost"
+            size="icon"
+            asChild
+            aria-label={t('goBack')}
+            className="print:hidden"
+          >
             <Link href="/sales/invoices">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -219,17 +251,17 @@ export default function InvoiceDetailPage() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 print:hidden">
           {canEdit && isDraft && (
             <>
               <Button variant="outline" asChild>
                 <Link href={`/sales/invoices/${invoiceId}/edit`}>
-                  <Edit className="mr-2 h-4 w-4" />
+                  <Edit className="me-2 h-4 w-4" />
                   {tCommon('buttons.edit')}
                 </Link>
               </Button>
               <Button onClick={() => setSendDialogOpen(true)}>
-                <Send className="mr-2 h-4 w-4" />
+                <Send className="me-2 h-4 w-4" />
                 {tCommon('buttons.send')}
               </Button>
             </>
@@ -239,20 +271,33 @@ export default function InvoiceDetailPage() {
               <Link
                 href={`/sales/payments/new?invoiceId=${invoice.id}&customerId=${invoice.customerId}`}
               >
-                <CreditCard className="mr-2 h-4 w-4" />
+                <CreditCard className="me-2 h-4 w-4" />
                 {t('invoices.recordPayment')}
               </Link>
             </Button>
           )}
-          {!isDraft && (
+          {canExportPdf && !isDraft && (
             <>
-              <Button variant="outline" disabled title="Coming soon">
-                <Download className="mr-2 h-4 w-4" />
-                Export PDF
+              <Button variant="outline" onClick={handleExportPdf} disabled={pdfBusy !== null}>
+                {pdfBusy === 'download' ? (
+                  <Loader2 className="me-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="me-2 h-4 w-4" />
+                )}
+                {tDetail('exportPdf')}
               </Button>
-              <Button variant="outline" disabled title="Coming soon">
-                <Mail className="mr-2 h-4 w-4" />
-                Email
+              <Button variant="outline" onClick={handlePrint} disabled={pdfBusy !== null}>
+                {pdfBusy === 'print' ? (
+                  <Loader2 className="me-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Printer className="me-2 h-4 w-4" />
+                )}
+                {tDetail('print')}
+              </Button>
+              {/* Sending needs a configured mail provider. */}
+              <Button variant="outline" disabled title={tDetail('comingSoon')}>
+                <Mail className="me-2 h-4 w-4" />
+                {tDetail('email')}
               </Button>
             </>
           )}
@@ -262,13 +307,13 @@ export default function InvoiceDetailPage() {
               onClick={() => setVoidDialogOpen(true)}
               className="text-orange-600 hover:text-orange-700"
             >
-              <Ban className="mr-2 h-4 w-4" />
+              <Ban className="me-2 h-4 w-4" />
               {t('invoices.voidInvoice')}
             </Button>
           )}
           {canDelete && isDraft && (
             <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
-              <Trash2 className="mr-2 h-4 w-4" />
+              <Trash2 className="me-2 h-4 w-4" />
               {tCommon('buttons.delete')}
             </Button>
           )}
@@ -281,7 +326,7 @@ export default function InvoiceDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <DollarSign className="h-4 w-4" />
-              Grand Total
+              {tDetail('grandTotal')}
             </div>
             <div className="text-2xl font-bold font-mono">{formatCurrency(grandTotal)}</div>
           </CardContent>
@@ -291,7 +336,7 @@ export default function InvoiceDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <CreditCard className="h-4 w-4" />
-              Amount Paid
+              {tDetail('amountPaid')}
             </div>
             <div className="text-2xl font-bold font-mono text-green-600">
               {formatCurrency(amountPaid)}
@@ -303,7 +348,7 @@ export default function InvoiceDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <DollarSign className="h-4 w-4" />
-              Balance Due
+              {tDetail('balanceDue')}
             </div>
             <div className={cn('text-2xl font-bold font-mono', balanceDue > 0 && 'text-red-600')}>
               {formatCurrency(balanceDue)}
@@ -315,10 +360,10 @@ export default function InvoiceDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Calendar className="h-4 w-4" />
-              Due Date
+              {tDetail('dueDate')}
             </div>
             <div className={cn('text-2xl font-bold', isOverdue && 'text-red-600')}>
-              {format(new Date(invoice.dueDate), 'MMM d, yyyy')}
+              {format(new Date(invoice.dueDate), 'MMM d, yyyy', { locale: dateLocale })}
             </div>
           </CardContent>
         </Card>
@@ -340,11 +385,11 @@ export default function InvoiceDetailPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[40%]">{t('lineItems.description')}</TableHead>
-                    <TableHead className="text-right">{t('lineItems.quantity')}</TableHead>
-                    <TableHead className="text-right">{t('lineItems.rate')}</TableHead>
-                    <TableHead className="text-right">{t('lineItems.discount')}</TableHead>
-                    <TableHead className="text-right">{t('lineItems.tax')}</TableHead>
-                    <TableHead className="text-right">{t('lineItems.amount')}</TableHead>
+                    <TableHead className="text-end">{t('lineItems.quantity')}</TableHead>
+                    <TableHead className="text-end">{t('lineItems.rate')}</TableHead>
+                    <TableHead className="text-end">{t('lineItems.discount')}</TableHead>
+                    <TableHead className="text-end">{t('lineItems.tax')}</TableHead>
+                    <TableHead className="text-end">{t('lineItems.amount')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -374,19 +419,19 @@ export default function InvoiceDetailPage() {
                               {line.description}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right font-mono">
+                          <TableCell className="text-end font-mono">
                             {parseFloat(line.quantity || '0').toFixed(2)}
                           </TableCell>
-                          <TableCell className="text-right font-mono">
+                          <TableCell className="text-end font-mono">
                             {formatCurrency(line.rate || '0')}
                           </TableCell>
-                          <TableCell className="text-right font-mono">
+                          <TableCell className="text-end font-mono">
                             {parseFloat(line.discount || '0').toFixed(0)}%
                           </TableCell>
-                          <TableCell className="text-right font-mono">
+                          <TableCell className="text-end font-mono">
                             {parseFloat(line.taxRate || '0').toFixed(0)}%
                           </TableCell>
-                          <TableCell className="text-right font-mono font-medium whitespace-nowrap">
+                          <TableCell className="text-end font-mono font-medium whitespace-nowrap">
                             {formatCurrency(line.amount || '0')}
                           </TableCell>
                         </TableRow>
@@ -395,45 +440,45 @@ export default function InvoiceDetailPage() {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                        No line items
+                        {tDetail('noLineItems')}
                       </TableCell>
                     </TableRow>
                   )}
                 </TableBody>
                 <TableFooter>
                   <TableRow>
-                    <TableCell colSpan={5} className="text-right">
+                    <TableCell colSpan={5} className="text-end">
                       {tCommon('subtotal')}
                     </TableCell>
-                    <TableCell className="text-right font-mono">
+                    <TableCell className="text-end font-mono">
                       {formatCurrency(invoice.subtotal || '0')}
                     </TableCell>
                   </TableRow>
                   {parseFloat(invoice.taxAmount || '0') > 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-right">
+                      <TableCell colSpan={5} className="text-end">
                         {tCommon('tax')}
                       </TableCell>
-                      <TableCell className="text-right font-mono">
+                      <TableCell className="text-end font-mono">
                         {formatCurrency(invoice.taxAmount || '0')}
                       </TableCell>
                     </TableRow>
                   )}
                   {parseFloat(invoice.shippingAmount || '0') > 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-right">
+                      <TableCell colSpan={5} className="text-end">
                         {t('invoices.form.shippingAmount')}
                       </TableCell>
-                      <TableCell className="text-right font-mono">
+                      <TableCell className="text-end font-mono">
                         {formatCurrency(invoice.shippingAmount || '0')}
                       </TableCell>
                     </TableRow>
                   )}
                   <TableRow className="font-bold">
-                    <TableCell colSpan={5} className="text-right">
+                    <TableCell colSpan={5} className="text-end">
                       {tCommon('total')}
                     </TableCell>
-                    <TableCell className="text-right font-mono">
+                    <TableCell className="text-end font-mono">
                       {formatCurrency(invoice.grandTotal || '0')}
                     </TableCell>
                   </TableRow>
@@ -477,7 +522,7 @@ export default function InvoiceDetailPage() {
                   )}
                 </>
               ) : (
-                <p className="text-muted-foreground">No customer assigned</p>
+                <p className="text-muted-foreground">{tDetail('noCustomer')}</p>
               )}
             </CardContent>
           </Card>
@@ -486,28 +531,40 @@ export default function InvoiceDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5" />
-                Dates
+                {tDetail('dates')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <div className="text-sm text-muted-foreground">{t('invoices.form.date')}</div>
-                <div className="font-medium">{format(new Date(invoice.date), 'MMMM d, yyyy')}</div>
+                <div className="font-medium">
+                  {format(new Date(invoice.date), 'MMMM d, yyyy', { locale: dateLocale })}
+                </div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">{t('invoices.form.dueDate')}</div>
                 <div className={cn('font-medium', isOverdue && 'text-red-600')}>
-                  {format(new Date(invoice.dueDate), 'MMMM d, yyyy')}
-                  {isOverdue && ' (Overdue)'}
+                  {format(new Date(invoice.dueDate), 'MMMM d, yyyy', { locale: dateLocale })}
+                  {isOverdue && ` ${tDetail('overdue')}`}
                 </div>
               </div>
+              {invoice.reference && (
+                <div>
+                  <div className="text-sm text-muted-foreground">
+                    {t('invoices.form.reference')}
+                  </div>
+                  <div className="font-medium" dir="auto">
+                    {invoice.reference}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
           {(invoice.notes || invoice.terms) && (
             <Card>
               <CardHeader>
-                <CardTitle>Additional Info</CardTitle>
+                <CardTitle>{tDetail('additionalInfo')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {invoice.notes && (
@@ -534,16 +591,16 @@ export default function InvoiceDetailPage() {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <CreditCard className="h-5 w-5" />
-              Payment History
+              {tDetail('paymentHistory')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Payment #</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Amount Applied</TableHead>
+                  <TableHead>{tDetail('paymentNumber')}</TableHead>
+                  <TableHead>{tDetail('date')}</TableHead>
+                  <TableHead className="text-end">{tDetail('amountApplied')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -559,10 +616,12 @@ export default function InvoiceDetailPage() {
                     </TableCell>
                     <TableCell>
                       {allocation.payment?.date
-                        ? format(new Date(allocation.payment.date), 'MMM d, yyyy')
+                        ? format(new Date(allocation.payment.date), 'MMM d, yyyy', {
+                            locale: dateLocale,
+                          })
                         : '-'}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-green-600">
+                    <TableCell className="text-end font-mono text-green-600">
                       {formatCurrency(allocation.amount || '0')}
                     </TableCell>
                   </TableRow>
@@ -579,16 +638,16 @@ export default function InvoiceDetailPage() {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Credit Notes
+              {tDetail('creditNotes')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Credit Note #</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>{tDetail('creditNoteNumber')}</TableHead>
+                  <TableHead>{tDetail('date')}</TableHead>
+                  <TableHead className="text-end">{tDetail('amount')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -603,9 +662,11 @@ export default function InvoiceDetailPage() {
                       </Link>
                     </TableCell>
                     <TableCell>
-                      {creditNote.date ? format(new Date(creditNote.date), 'MMM d, yyyy') : '-'}
+                      {creditNote.date
+                        ? format(new Date(creditNote.date), 'MMM d, yyyy', { locale: dateLocale })
+                        : '-'}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-orange-600">
+                    <TableCell className="text-end font-mono text-orange-600">
                       {formatCurrency(creditNote.total || '0')}
                     </TableCell>
                   </TableRow>
@@ -616,24 +677,13 @@ export default function InvoiceDetailPage() {
         </Card>
       )}
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('invoices.deleteInvoice')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete invoice &quot;{invoice.invoiceNumber}&quot;? This
-              action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              {tCommon('buttons.delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title={t('invoices.deleteInvoice')}
+        description={tDetail('deleteConfirm', { number: invoice.invoiceNumber })}
+        onConfirm={confirmDelete}
+      />
 
       {/* Send Confirmation Dialog */}
       <AlertDialog open={sendDialogOpen} onOpenChange={setSendDialogOpen}>
@@ -641,8 +691,7 @@ export default function InvoiceDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>{t('invoices.sendInvoice')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to mark invoice &quot;{invoice.invoiceNumber}&quot; as sent?
-              This will create an accounting entry and you won&apos;t be able to edit it anymore.
+              {tDetail('sendConfirm', { number: invoice.invoiceNumber })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -658,8 +707,7 @@ export default function InvoiceDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>{t('invoices.voidInvoice')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to void invoice &quot;{invoice.invoiceNumber}&quot;? This action
-              cannot be undone.
+              {tDetail('voidConfirm', { number: invoice.invoiceNumber })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

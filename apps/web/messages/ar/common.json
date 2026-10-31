@@ -434,5 +434,15 @@
     "filterDeals": "الصفقات",
     "filterQuotes": "عروض الأسعار",
     "filterExpenses": "المصروفات"
+  },
+  "combobox": {
+    "search": "بحث…",
+    "loading": "جارٍ التحميل…",
+    "empty": "لا توجد نتائج",
+    "error": "تعذّر تحميل القائمة.",
+    "retry": "إعادة المحاولة",
+    "previous": "السابق",
+    "next": "التالي",
+    "page": "صفحة {current} من {total}"
   }
 }

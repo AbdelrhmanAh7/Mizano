@@ -1,5 +1,12 @@
 import * as puppeteer from 'puppeteer';
-import { PDF_RENDER_TIMEOUT_MS, isAllowedPdfRequestUrl, renderHtmlToPdf } from './pdf-renderer';
+import {
+  MAX_CONCURRENT_RENDERS,
+  PDF_RENDER_TIMEOUT_MS,
+  closePdfBrowser,
+  resetPdfRendererForTests,
+  isAllowedPdfRequestUrl,
+  renderHtmlToPdf,
+} from './pdf-renderer';
 
 jest.mock('puppeteer', () => ({ launch: jest.fn() }));
 
@@ -23,7 +30,14 @@ describe('renderHtmlToPdf (sandboxed PDF renderer)', () => {
   const calls: string[] = [];
   let handler: RequestHandler | undefined;
   let page: Record<string, jest.Mock>;
-  let browser: { newPage: jest.Mock; close: jest.Mock };
+  let context: { newPage: jest.Mock; close: jest.Mock };
+  let browser: {
+    createBrowserContext: jest.Mock;
+    close: jest.Mock;
+    once: jest.Mock;
+    connected: boolean;
+  };
+  let onDisconnected: (() => void) | undefined;
 
   beforeEach(() => {
     calls.length = 0;
@@ -43,8 +57,25 @@ describe('renderHtmlToPdf (sandboxed PDF renderer)', () => {
         return new Uint8Array([37, 80, 68, 70]);
       }),
     };
-    browser = { newPage: jest.fn().mockResolvedValue(page), close: jest.fn() };
+    context = {
+      newPage: jest.fn().mockResolvedValue(page),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    onDisconnected = undefined;
+    browser = {
+      createBrowserContext: jest.fn().mockResolvedValue(context),
+      close: jest.fn().mockResolvedValue(undefined),
+      once: jest.fn((event: string, cb: () => void) => {
+        if (event === 'disconnected') onDisconnected = cb;
+      }),
+      connected: true,
+    };
     (puppeteer.launch as jest.Mock).mockReset().mockResolvedValue(browser);
+  });
+
+  afterEach(async () => {
+    await resetPdfRendererForTests();
+    delete process.env.PUPPETEER_EXECUTABLE_PATH;
   });
 
   describe('isAllowedPdfRequestUrl', () => {
@@ -142,23 +173,144 @@ describe('renderHtmlToPdf (sandboxed PDF renderer)', () => {
     expect(page.setDefaultNavigationTimeout).toHaveBeenCalledWith(PDF_RENDER_TIMEOUT_MS);
   });
 
-  it('returns the PDF bytes as a Buffer and closes the browser', async () => {
+  it('returns the PDF bytes as a Buffer and closes its browser context', async () => {
     const pdf = await renderHtmlToPdf('<p></p>');
     expect(Buffer.isBuffer(pdf)).toBe(true);
     expect(pdf.toString()).toBe('%PDF');
-    expect(browser.close).toHaveBeenCalledTimes(1);
+    expect(context.close).toHaveBeenCalledTimes(1);
   });
 
-  it('closes the browser and rethrows when rendering fails', async () => {
+  it('closes the context and rethrows when rendering fails', async () => {
     page.setContent.mockRejectedValue(new Error('Navigation timeout of 30000 ms exceeded'));
     await expect(renderHtmlToPdf('<p></p>')).rejects.toThrow('Navigation timeout');
-    expect(browser.close).toHaveBeenCalledTimes(1);
+    expect(context.close).toHaveBeenCalledTimes(1);
   });
 
   it('does not render when the lock-down itself fails', async () => {
     page.setRequestInterception.mockRejectedValue(new Error('interception unavailable'));
     await expect(renderHtmlToPdf('<p></p>')).rejects.toThrow('interception unavailable');
     expect(page.setContent).not.toHaveBeenCalled();
-    expect(browser.close).toHaveBeenCalledTimes(1);
+    expect(context.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('reuses one browser for every render, each in its own context (audit B3)', async () => {
+    await renderHtmlToPdf('<p>1</p>');
+    await renderHtmlToPdf('<p>2</p>');
+    expect(puppeteer.launch).toHaveBeenCalledTimes(1);
+    expect(browser.createBrowserContext).toHaveBeenCalledTimes(2);
+    expect(context.close).toHaveBeenCalledTimes(2);
+    expect(browser.close).not.toHaveBeenCalled();
+  });
+
+  it('relaunches after the browser died, and after a failed launch', async () => {
+    await renderHtmlToPdf('<p></p>');
+    browser.connected = false;
+    onDisconnected?.();
+    browser.connected = true;
+    await renderHtmlToPdf('<p></p>');
+    expect(puppeteer.launch).toHaveBeenCalledTimes(2);
+
+    await resetPdfRendererForTests();
+    (puppeteer.launch as jest.Mock).mockReset();
+    (puppeteer.launch as jest.Mock).mockRejectedValueOnce(new Error('no chromium'));
+    (puppeteer.launch as jest.Mock).mockResolvedValue(browser);
+    await expect(renderHtmlToPdf('<p></p>')).rejects.toThrow('no chromium');
+    await expect(renderHtmlToPdf('<p></p>')).resolves.toBeInstanceOf(Buffer);
+    expect(puppeteer.launch).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses the system Chromium from PUPPETEER_EXECUTABLE_PATH', async () => {
+    process.env.PUPPETEER_EXECUTABLE_PATH = '/usr/bin/chromium-browser';
+    await renderHtmlToPdf('<p></p>');
+    expect(puppeteer.launch).toHaveBeenCalledWith(
+      expect.objectContaining({ executablePath: '/usr/bin/chromium-browser' }),
+    );
+  });
+
+  it(`renders at most ${MAX_CONCURRENT_RENDERS} pages at once`, async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const releases: Array<() => void> = [];
+    page.setContent.mockImplementation(async () => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise<void>((resolve) => releases.push(resolve));
+      inFlight -= 1;
+    });
+
+    const renders = Array.from({ length: MAX_CONCURRENT_RENDERS + 2 }, (_, i) =>
+      renderHtmlToPdf(`<p>${i}</p>`),
+    );
+    while (releases.length < MAX_CONCURRENT_RENDERS) await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    expect(inFlight).toBe(MAX_CONCURRENT_RENDERS);
+    while (releases.length > 0 || inFlight > 0) {
+      releases.shift()?.();
+      await new Promise((r) => setImmediate(r));
+    }
+    await Promise.all(renders);
+    expect(peak).toBe(MAX_CONCURRENT_RENDERS);
+  });
+  it('gives up waiting for a render slot after the timeout, without taking a slot', async () => {
+    const releases: Array<() => void> = [];
+    page.setContent.mockImplementation(
+      () => new Promise<void>((resolve) => releases.push(resolve)),
+    );
+    const busy = Array.from({ length: MAX_CONCURRENT_RENDERS }, (_, i) =>
+      renderHtmlToPdf(`<p>${i}</p>`, 1_000),
+    );
+    while (releases.length < MAX_CONCURRENT_RENDERS) await new Promise((r) => setImmediate(r));
+    await expect(renderHtmlToPdf('<p>late</p>', 20)).rejects.toThrow('PDF render queue timed out');
+    releases.forEach((release) => release());
+    await Promise.all(busy);
+    // The slots are free again: a new render starts at once.
+    page.setContent.mockImplementation(async () => undefined);
+    await expect(renderHtmlToPdf('<p>after</p>')).resolves.toBeInstanceOf(Buffer);
+  });
+  describe('closePdfBrowser (shutdown)', () => {
+    const hangRenders = () => {
+      const releases: Array<() => void> = [];
+      page.setContent.mockImplementation(
+        () => new Promise<void>((resolve) => releases.push(resolve)),
+      );
+      return releases;
+    };
+    const settle = () => new Promise((r) => setImmediate(r));
+
+    it('refuses queued and new renders, lets running ones finish, then closes the browser', async () => {
+      const releases = hangRenders();
+      const running = Array.from({ length: MAX_CONCURRENT_RENDERS }, (_, i) =>
+        renderHtmlToPdf(`<p>${i}</p>`),
+      );
+      while (releases.length < MAX_CONCURRENT_RENDERS) await settle();
+      const queued = renderHtmlToPdf('<p>queued</p>');
+
+      const closing = closePdfBrowser();
+      await expect(queued).rejects.toThrow('PDF renderer is shut down');
+      await expect(renderHtmlToPdf('<p>new</p>')).rejects.toThrow('PDF renderer is shut down');
+      await settle();
+      expect(browser.close).not.toHaveBeenCalled(); // still draining
+
+      releases.forEach((release) => release());
+      await expect(Promise.all(running)).resolves.toHaveLength(MAX_CONCURRENT_RENDERS);
+      await closing;
+      expect(browser.close).toHaveBeenCalledTimes(1);
+      expect(puppeteer.launch).toHaveBeenCalledTimes(1);
+      await expect(renderHtmlToPdf('<p>after</p>')).rejects.toThrow('PDF renderer is shut down');
+      expect(puppeteer.launch).toHaveBeenCalledTimes(1); // nothing relaunched after shutdown
+    });
+
+    it('stops waiting for a stuck render after the timeout', async () => {
+      const releases = hangRenders();
+      const stuck = renderHtmlToPdf('<p>stuck</p>');
+      while (releases.length < 1) await settle();
+
+      await closePdfBrowser(20);
+      expect(browser.close).toHaveBeenCalledTimes(1);
+
+      releases.forEach((release) => release());
+      await stuck; // finishes on the closed browser's context; nothing new is launched
+      expect(puppeteer.launch).toHaveBeenCalledTimes(1);
+    });
   });
 });

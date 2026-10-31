@@ -1,5 +1,4 @@
 import api from '@/lib/api';
-import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // ============ Types ============
@@ -39,18 +38,6 @@ export interface Asset {
   updatedAt: string;
 }
 
-export interface DepreciationScheduleItem {
-  id: string;
-  assetId: string;
-  month: number;
-  year: number;
-  amount: number;
-  accumulatedTotal: number;
-  bookValue: number;
-  journalId?: string;
-  executedAt?: string;
-}
-
 export interface CreateAssetDto {
   name: string;
   description?: string;
@@ -76,15 +63,6 @@ export interface UpdateAssetDto {
 export interface DisposeAssetDto {
   disposalDate: string;
   disposalAmount: number;
-}
-
-export interface AssetSummary {
-  totalAssets: number;
-  totalValue: number;
-  totalAccumulatedDepreciation: number;
-  totalBookValue: number;
-  byType: Record<AssetType, { count: number; value: number }>;
-  byStatus: Record<AssetStatus, number>;
 }
 
 // ============ API Functions ============
@@ -148,17 +126,6 @@ export function useAssets(params?: {
   return useQuery({
     queryKey: ['assets', params],
     queryFn: () => assetsApi.getAll(params),
-  });
-}
-
-export function useInfiniteAssets(params?: Record<string, unknown>) {
-  return useInfiniteTableData<Asset, Record<string, unknown>>({
-    queryKey: ['assets'],
-    fetchFn: async (p) => {
-      const response = await api.get('/assets/cursor', { params: p });
-      return response.data;
-    },
-    params: params || {},
   });
 }
 
@@ -226,33 +193,10 @@ export function useDepreciationSchedule(assetId: string) {
   });
 }
 
-export function useRunMonthlyDepreciation() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: assetsApi.runMonthlyDepreciation,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['assets'] });
-      queryClient.invalidateQueries({ queryKey: ['asset-depreciation-schedule'] });
-      queryClient.invalidateQueries({ queryKey: ['asset-summary'] });
-      queryClient.invalidateQueries({ queryKey: ['journals'] });
-    },
-  });
-}
-
 export function useAssetSummary() {
   return useQuery({
     queryKey: ['asset-summary'],
     queryFn: () => assetsApi.getSummary(),
-  });
-}
-
-export function useRecalculateSchedule() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: assetsApi.recalculateSchedule,
-    onSuccess: (_, assetId) => {
-      queryClient.invalidateQueries({ queryKey: ['asset-depreciation-schedule', assetId] });
-    },
   });
 }
 
@@ -268,18 +212,6 @@ export function getAssetTypeLabel(type: AssetType): string {
     OTHER: 'Other',
   };
   return labels[type] || type;
-}
-
-export function getAssetTypeIcon(type: AssetType): string {
-  const icons: Record<AssetType, string> = {
-    ELECTRONICS: '💻',
-    FURNITURE: '🪑',
-    VEHICLES: '🚗',
-    MACHINERY: '⚙️',
-    BUILDINGS: '🏢',
-    OTHER: '📦',
-  };
-  return icons[type] || '📦';
 }
 
 export function getAssetStatusColor(status: AssetStatus): string {

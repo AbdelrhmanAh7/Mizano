@@ -22,6 +22,7 @@ import {
   getPaymentModeOptions,
   useInfinitePaymentsReceived,
 } from '@/lib/hooks/use-payments-received';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { type ColumnDef } from '@tanstack/react-table';
@@ -31,8 +32,21 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
+// Labels live under common.paymentModes.
+const PAYMENT_MODE_KEYS: Record<PaymentMode, string> = {
+  CASH: 'cash',
+  BANK_TRANSFER: 'bankTransfer',
+  CREDIT_CARD: 'creditCard',
+  DEBIT_CARD: 'debitCard',
+  CHEQUE: 'cheque',
+  ONLINE: 'online',
+  OTHER: 'other',
+};
+
 function PaymentsReceivedPageContent() {
   const t = useTranslations('sales');
+  const tCommon = useTranslations('common');
+  const tModes = useTranslations('common.paymentModes');
   const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
 
@@ -60,14 +74,14 @@ function PaymentsReceivedPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => paymentsReceivedApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['payments-received']],
-    successMessage: '{count} payments deleted',
+    successMessage: t.raw('payments.bulkDelete.success'),
   });
 
   const bulkActions = [
     ...(canDelete
       ? [
           {
-            label: 'Delete',
+            label: tCommon('buttons.delete'),
             icon: Trash2,
             variant: 'destructive' as const,
             onClick: (rows: PaymentReceived[]) => {
@@ -79,15 +93,13 @@ function PaymentsReceivedPageContent() {
       : []),
   ];
 
-  const formatCurrency = (amount: string | number, currency: string = 'USD') => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(num);
-  };
+  // Customer payments are posted in the organization base currency, so they are shown in it.
+  const formatCurrency = useMoneyFormatter();
 
-  const paymentModeOptions = getPaymentModeOptions();
+  const paymentModeOptions = getPaymentModeOptions().map((option) => ({
+    ...option,
+    label: tModes(PAYMENT_MODE_KEYS[option.value]),
+  }));
 
   const columns: ColumnDef<PaymentReceived>[] = [
     {
@@ -156,15 +168,15 @@ function PaymentsReceivedPageContent() {
         />
       ),
       meta: {
-        headerClassName: 'text-right',
-        cellClassName: 'text-right font-mono text-green-600 font-semibold',
+        headerClassName: 'text-end',
+        cellClassName: 'text-end font-mono text-green-600 font-semibold',
       },
       cell: ({ row }) => formatCurrency(row.original.amount),
     },
     {
       id: 'actions',
       header: '',
-      meta: { cellClassName: 'text-right' },
+      meta: { cellClassName: 'text-end' },
       cell: ({ row }) => (
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/sales/payments/${row.original.id}`}>
@@ -185,13 +197,13 @@ function PaymentsReceivedPageContent() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setImportOpen(true)}>
-            <Upload className="mr-2 h-4 w-4" />
+            <Upload className="me-2 h-4 w-4" />
             Import
           </Button>
           {canCreate && (
             <Button asChild>
               <Link href="/sales/payments/new">
-                <Plus className="mr-2 h-4 w-4" />
+                <Plus className="me-2 h-4 w-4" />
                 {t('invoices.recordPayment')}
               </Link>
             </Button>
@@ -206,15 +218,15 @@ function PaymentsReceivedPageContent() {
             <DataTableSearch
               value={tableParams.search}
               onChange={tableParams.setSearch}
-              placeholder="Search by payment number or customer..."
+              placeholder={t('payments.list.searchPlaceholder')}
             />
             <Select value={selectedMode} onValueChange={setSelectedMode}>
               <SelectTrigger className="w-[180px]">
-                <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Filter by mode" />
+                <Filter className="me-2 h-4 w-4" />
+                <SelectValue placeholder={t('payments.list.filterByMode')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Modes</SelectItem>
+                <SelectItem value="all">{t('payments.list.allModes')}</SelectItem>
                 {paymentModeOptions.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
@@ -226,7 +238,7 @@ function PaymentsReceivedPageContent() {
               variant="outline"
               size="icon"
               onClick={() => refetch()}
-              aria-label="Refresh payments"
+              aria-label={t('payments.list.refresh')}
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
@@ -258,7 +270,7 @@ function PaymentsReceivedPageContent() {
               canCreate ? (
                 <Button asChild>
                   <Link href="/sales/payments/new">
-                    <Plus className="mr-2 h-4 w-4" />
+                    <Plus className="me-2 h-4 w-4" />
                     Record Your First Payment
                   </Link>
                 </Button>
@@ -275,7 +287,10 @@ function PaymentsReceivedPageContent() {
         action="delete"
         count={bulkSelectedRows.length}
         itemType="payments"
-        description="Selected payments will be deleted. Payments linked to reconciled transactions will be skipped."
+        title={t('payments.bulkDelete.title', { count: bulkSelectedRows.length })}
+        description={t('payments.bulkDelete.description')}
+        confirmLabel={t('payments.bulkDelete.confirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         destructive
         isLoading={bulkDeleteAction.isLoading}
         onConfirm={async () => {
@@ -290,7 +305,7 @@ function PaymentsReceivedPageContent() {
         open={importOpen}
         onOpenChange={setImportOpen}
         entityType={'payments_received' as ImportEntityType}
-        entityLabel="Payments"
+        entityLabel={t('payments.list.importLabel')}
         onComplete={() => refetch()}
       />
     </div>

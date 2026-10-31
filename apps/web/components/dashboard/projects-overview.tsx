@@ -7,8 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import { ProjectOverview, formatCurrency } from '@/lib/hooks/use-dashboard';
+import { ProjectOverview } from '@/lib/hooks/use-dashboard';
 import { Link } from '@/i18n/routing';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface ProjectsOverviewProps {
   projects: ProjectOverview[];
@@ -47,6 +48,7 @@ function getStatusLabel(status: string, t: (key: string) => string): string {
 }
 
 export function ProjectsOverview({ projects }: ProjectsOverviewProps) {
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('common.dashboard.projects');
 
   return (

@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma, QuoteStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -12,6 +13,7 @@ import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
 import { runBulk } from '../../../common/utils/run-bulk';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { WebhookOutboxService } from '../../integrations/services/webhook-outbox.service';
 import { CreateQuoteDto, QuoteLineDto } from '../dto/create-quote.dto';
 import { QuoteQueryDto } from '../dto/quote-query.dto';
 import { UpdateQuoteDto } from '../dto/update-quote.dto';
@@ -23,7 +25,7 @@ import {
   mapDocumentNumberConflict,
   parseDocumentDate,
   startOfTodayUtc,
-} from '../utils/sales-helpers';
+} from '../../../common/utils/sales-helpers';
 
 const QUOTE_VIEW_INCLUDE = {
   customer: { select: { id: true, name: true } },
@@ -35,7 +37,11 @@ const DEFAULT_PAYMENT_TERMS_DAYS = 30;
 
 @Injectable()
 export class QuotesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    // Outbound integration events, written in the same transaction (absent in the worker).
+    @Optional() private outbox?: WebhookOutboxService,
+  ) {}
 
   async create(organizationId: string, dto: CreateQuoteDto) {
     const date = parseDocumentDate(dto.date, 'quote date');
@@ -226,7 +232,7 @@ export class QuotesService {
         const dueDate = new Date(date);
         dueDate.setUTCDate(dueDate.getUTCDate() + DEFAULT_PAYMENT_TERMS_DAYS);
 
-        return tx.invoice.create({
+        const invoice = await tx.invoice.create({
           data: {
             invoiceNumber,
             customerId: quote.customerId,
@@ -262,6 +268,9 @@ export class QuotesService {
             lines: true,
           },
         });
+        // The copied invoice is a new draft like any other (audit F3).
+        await this.outbox?.invoiceEvent(tx, organizationId, 'invoice.created', invoice.id);
+        return invoice;
       });
     } catch (error) {
       throw mapDocumentNumberConflict(error, 'Invoice');

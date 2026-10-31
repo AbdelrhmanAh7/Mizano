@@ -21,7 +21,10 @@ export class PaymentAllocationDto {
 export class CreatePaymentReceivedDto {
   @ApiProperty() @IsString() customerId: string;
   @ApiProperty() @IsDateString() date: string;
-  @ApiProperty({ description: 'Decimal string; must equal the sum of the allocations' })
+  @ApiProperty({
+    description:
+      'Decimal string (up to four decimals, like balances after four-decimal credits); must equal the sum of the allocations',
+  })
   @IsDecimalString()
   amount: string;
   @ApiProperty({ enum: PaymentMode }) @IsEnum(PaymentMode) paymentMode: PaymentMode;

@@ -1,5 +1,6 @@
 'use client';
 
+import { format } from 'date-fns';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,12 +18,13 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { useCustomers, Customer } from '@/lib/hooks/use-customers';
+import { CustomerCombobox } from '@/components/shared/party-combobox';
 import { useInvoices, Invoice } from '@/lib/hooks/use-invoices';
 import { useTranslations } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import { creditNotesApi } from '@/lib/api';
 import { CreditNoteType } from '@/lib/hooks/use-credit-notes';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 const creditNoteSchema = z
   .object({
@@ -79,15 +81,12 @@ export function CreditNoteForm({
   onCancel,
   isSubmitting,
 }: CreditNoteFormProps) {
-  const { data: customersData } = useCustomers({ limit: 100 });
-  const customers = customersData?.data || [];
-
   const form = useForm<CreditNoteFormData>({
     resolver: zodResolver(creditNoteSchema),
     defaultValues: {
       customerId: defaultCustomerId || '',
       invoiceId: defaultInvoiceId || '',
-      date: new Date().toISOString().split('T')[0],
+      date: format(new Date(), 'yyyy-MM-dd'),
       type: 'REFUND',
       amount: '',
       reason: '',
@@ -115,13 +114,16 @@ export function CreditNoteForm({
   });
   const invoices = invoicesData?.data || [];
 
-  // Filter for open invoices (to apply credit to)
-  const openInvoices = invoices.filter(
-    (inv: Invoice) =>
-      inv.id !== selectedInvoiceId &&
-      inv.status !== 'VOID' &&
-      inv.status !== 'DRAFT' &&
-      parseFloat(inv.balanceDue || '0') > 0,
+  // Open invoices to apply the credit to: every one of the customer's, from the server (B11).
+  const { data: openInvoicesData } = useInvoices({
+    customerId: selectedCustomerId || undefined,
+    open: true,
+    sortBy: 'dueDate',
+    sortOrder: 'asc',
+    limit: 500,
+  });
+  const openInvoices = (openInvoicesData?.data || []).filter(
+    (inv: Invoice) => inv.id !== selectedInvoiceId,
   );
 
   // Get selected invoice details
@@ -134,13 +136,10 @@ export function CreditNoteForm({
     }
   }, [selectedInvoice, form]);
 
-  const formatCurrency = (amount: string | number) => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(num);
-  };
+  // Invoice amounts in the invoice's own currency, else the org base currency (audit B5).
+  const formatMoney = useMoneyFormatter();
+  const formatCurrency = (amount: string | number) =>
+    formatMoney(amount, selectedInvoice?.currencyCode);
 
   const handleSubmit = (data: CreditNoteFormData) => {
     onSubmit(data);
@@ -156,26 +155,22 @@ export function CreditNoteForm({
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="customerId">Customer *</Label>
-              <Select
+              <Label htmlFor="customerId">
+                {t('creditNotes.form.customer')} <span className="text-destructive">*</span>
+              </Label>
+              <CustomerCombobox
+                id="customerId"
                 value={form.watch('customerId')}
                 onValueChange={(value) => {
-                  form.setValue('customerId', value);
+                  form.setValue('customerId', value, {
+                    shouldValidate: form.formState.isSubmitted,
+                  });
                   form.setValue('invoiceId', '');
                   form.setValue('appliedToInvoiceId', '');
                 }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a customer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map((customer: Customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.displayName || customer.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder={t('creditNotes.form.customerPlaceholder')}
+                isInvalid={!!form.formState.errors.customerId}
+              />
               {form.formState.errors.customerId && (
                 <p className="text-sm text-red-500">{form.formState.errors.customerId.message}</p>
               )}

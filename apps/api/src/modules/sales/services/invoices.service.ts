@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InvoiceStatus, Prisma, TaxType } from '@prisma/client';
@@ -14,6 +15,7 @@ import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 import { runBulk } from '../../../common/utils/run-bulk';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
+import { WebhookOutboxService } from '../../integrations/services/webhook-outbox.service';
 import { CreateInvoiceDto, InvoiceLineDto } from '../dto/create-invoice.dto';
 import { InvoiceCursorQueryDto } from '../dto/invoice-cursor-query.dto';
 import { InvoiceQueryDto } from '../dto/invoice-query.dto';
@@ -25,7 +27,7 @@ import {
   assertTotalsFit,
   parseDocumentDate,
   startOfTodayUtc,
-} from '../utils/sales-helpers';
+} from '../../../common/utils/sales-helpers';
 
 /** Invoice statuses that carry an open AR balance and can receive payments or credits. */
 export const RECEIVABLE_INVOICE_STATUSES: InvoiceStatus[] = [
@@ -42,6 +44,11 @@ const INVOICE_VIEW_INCLUDE = {
   },
 } satisfies Prisma.InvoiceInclude;
 
+/** A typed reference is trimmed; an empty one is stored as no reference. */
+function normalizeReference(reference: string | null | undefined): string | null {
+  return reference?.trim() || null;
+}
+
 interface InvoiceReferences {
   customerId?: string;
   quoteId?: string;
@@ -54,6 +61,8 @@ export class InvoicesService {
   constructor(
     private prisma: PrismaService,
     private journalsService: JournalsService,
+    // Outbound integration events, written in the same transaction (absent in the worker).
+    @Optional() private outbox?: WebhookOutboxService,
   ) {}
 
   /**
@@ -72,7 +81,7 @@ export class InvoicesService {
     const run = async (tx: Prisma.TransactionClient) => {
       await this.assertReferences(tx, organizationId, dto, dto.customerId);
       const invoiceNumber = await allocateInvoiceNumber(tx, organizationId);
-      return tx.invoice.create({
+      const invoice = await tx.invoice.create({
         data: {
           invoiceNumber,
           customerId: dto.customerId,
@@ -87,11 +96,14 @@ export class InvoicesService {
           balanceDue: totals.grandTotal,
           notes: dto.notes,
           terms: dto.terms,
+          reference: normalizeReference(dto.reference),
           organizationId,
           lines: { create: lineData },
         },
         include: INVOICE_VIEW_INCLUDE,
       });
+      await this.outbox?.invoiceEvent(tx, organizationId, 'invoice.created', invoice.id);
+      return invoice;
     };
 
     try {
@@ -112,6 +124,7 @@ export class InvoicesService {
       customerId,
       dateFrom,
       dateTo,
+      open,
     } = query;
 
     const where: Prisma.InvoiceWhereInput = {
@@ -122,11 +135,17 @@ export class InvoicesService {
     if (search) {
       where.OR = [
         { invoiceNumber: { contains: search, mode: 'insensitive' } },
+        { reference: { contains: search, mode: 'insensitive' } },
         { customer: { name: { contains: search, mode: 'insensitive' } } },
       ];
     }
 
     if (status) where.status = status;
+    if (open) {
+      // Payment allocation and credit application: every open invoice, not the newest page.
+      where.AND = [{ status: { in: RECEIVABLE_INVOICE_STATUSES } }];
+      where.balanceDue = { gt: new Decimal(0) };
+    }
     if (customerId) where.customerId = customerId;
 
     if (dateFrom || dateTo) {
@@ -178,6 +197,7 @@ export class InvoicesService {
     if (search) {
       where.OR = [
         { invoiceNumber: { contains: search, mode: 'insensitive' } },
+        { reference: { contains: search, mode: 'insensitive' } },
         { customer: { name: { contains: search, mode: 'insensitive' } } },
       ];
     }
@@ -285,6 +305,7 @@ export class InvoicesService {
       if (date) data.date = date;
       if (dueDate) data.dueDate = dueDate;
       if (dto.notes !== undefined) data.notes = dto.notes;
+      if (dto.reference !== undefined) data.reference = normalizeReference(dto.reference);
       if (dto.terms !== undefined) data.terms = dto.terms;
 
       if (dto.lines) {
@@ -311,7 +332,14 @@ export class InvoicesService {
         data.balanceDue = grandTotal;
       }
 
-      return tx.invoice.update({ where: { id }, data, include: INVOICE_VIEW_INCLUDE });
+      const updated = await tx.invoice.update({
+        where: { id },
+        data,
+        include: INVOICE_VIEW_INCLUDE,
+      });
+      // An edited draft reaches FlowLine with its new lines and totals (audit F3).
+      await this.outbox?.invoiceEvent(tx, organizationId, 'invoice.updated', id);
+      return updated;
     });
   }
 
@@ -411,6 +439,7 @@ export class InvoicesService {
         },
         { tx, source: { type: JournalSourceType.INVOICE_SEND, id: invoice.id } },
       );
+      await this.outbox?.invoiceEvent(tx, organizationId, 'invoice.sent', invoice.id);
 
       return tx.invoice.findUniqueOrThrow({ where: { id }, include: INVOICE_VIEW_INCLUDE });
     });
@@ -489,6 +518,7 @@ export class InvoicesService {
           source: { type: JournalSourceType.INVOICE_VOID, id },
         });
       }
+      await this.outbox?.invoiceEvent(tx, organizationId, 'invoice.voided', id);
 
       return tx.invoice.findUniqueOrThrow({ where: { id }, include: INVOICE_VIEW_INCLUDE });
     });
@@ -541,6 +571,14 @@ export class InvoicesService {
     else status = InvoiceStatus.SENT;
 
     await tx.invoice.update({ where: { id: invoiceId }, data: { balanceDue: balance, status } });
+    // Every settlement path (payments, bulk pay, credit notes, bank matching, voids) lands here,
+    // so this is the one place that announces the transition to PAID, and any other balance
+    // change (a partial credit, a voided payment reopening it) as invoice.updated (audit F3).
+    if (status === InvoiceStatus.PAID && invoice.status !== InvoiceStatus.PAID) {
+      await this.outbox?.invoiceEvent(tx, invoice.organizationId, 'invoice.paid', invoiceId);
+    } else if (!balance.equals(invoice.balanceDue) || status !== invoice.status) {
+      await this.outbox?.invoiceEvent(tx, invoice.organizationId, 'invoice.updated', invoiceId);
+    }
   }
 
   /** Locks one invoice row, but only if it belongs to the organization (404 otherwise). */
@@ -632,7 +670,7 @@ export class InvoicesService {
     try {
       return await this.prisma.$transaction(async (tx) => {
         const invoiceNumber = await allocateInvoiceNumber(tx, organizationId);
-        return tx.invoice.create({
+        const copy = await tx.invoice.create({
           data: {
             invoiceNumber,
             customerId: original.customerId,
@@ -662,6 +700,8 @@ export class InvoicesService {
           },
           include: INVOICE_VIEW_INCLUDE,
         });
+        await this.outbox?.invoiceEvent(tx, organizationId, 'invoice.created', copy.id);
+        return copy;
       });
     } catch (error) {
       throw mapDocumentNumberConflict(error, 'Invoice');

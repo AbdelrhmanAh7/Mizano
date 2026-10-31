@@ -207,33 +207,6 @@ export function useDeleteProject() {
   });
 }
 
-export function useCreateProjectInvoice() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
-      projectsApi.createInvoice(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      toast.success('Invoice created from project');
-    },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to create invoice');
-    },
-  });
-}
-
-export function useProjectSummary() {
-  return useQuery({
-    queryKey: ['projects', 'summary'],
-    queryFn: async () => {
-      const response = await projectsApi.getSummary();
-      return response.data?.data || response.data;
-    },
-  });
-}
-
 // Task Hooks
 export function useTasks(projectId: string) {
   return useQuery({
@@ -283,23 +256,6 @@ export function useUpdateTask() {
     },
     onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to update task');
-    },
-  });
-}
-
-export function useDeleteTask() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ taskId }: { projectId: string; taskId: string }) => tasksApi.delete(taskId),
-    onSuccess: (_, { projectId }) => {
-      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['projects', projectId] });
-      queryClient.invalidateQueries({ queryKey: ['tasks', 'my-tasks'] });
-      toast.success('Task deleted successfully');
-    },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to delete task');
     },
   });
 }

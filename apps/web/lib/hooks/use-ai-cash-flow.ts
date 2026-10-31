@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 
 // ============ Types ============
@@ -99,84 +99,10 @@ const cashFlowApi = {
   },
 };
 
-// ============ Hooks ============
-
-export function useCashFlowPrediction(horizon?: number) {
-  return useQuery({
-    queryKey: ['ai-cash-flow-forecast', horizon],
-    queryFn: () => cashFlowApi.getCashFlowPrediction(horizon),
-  });
-}
-
 export function useQuickCashForecast() {
   return useQuery({
     queryKey: ['ai-cash-flow-quick'],
     queryFn: () => cashFlowApi.getQuickCashForecast(),
     staleTime: 5 * 60 * 1000,
   });
-}
-
-export function useCashFlowScenarios() {
-  return useQuery({
-    queryKey: ['ai-cash-flow-scenarios'],
-    queryFn: () => cashFlowApi.getCashFlowScenarios(),
-  });
-}
-
-export function useCashFlowAlerts() {
-  return useQuery({
-    queryKey: ['ai-cash-flow-alerts'],
-    queryFn: () => cashFlowApi.getCashFlowAlerts(),
-  });
-}
-
-export function useWhatIfAnalysis() {
-  return useMutation({
-    mutationFn: (scenario: WhatIfScenario) => cashFlowApi.whatIfAnalysis(scenario),
-  });
-}
-
-export function useRecalculateCashFlow() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: cashFlowApi.recalculateCashFlow,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-cash-flow-forecast'] });
-      queryClient.invalidateQueries({ queryKey: ['ai-cash-flow-quick'] });
-      queryClient.invalidateQueries({ queryKey: ['ai-cash-flow-scenarios'] });
-      queryClient.invalidateQueries({ queryKey: ['ai-cash-flow-alerts'] });
-    },
-  });
-}
-
-// ============ Helper Functions ============
-
-export function getCashFlowAlertColor(type: 'warning' | 'critical'): string {
-  const colors = {
-    warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-    critical: 'bg-red-50 border-red-200 text-red-800',
-  };
-  return colors[type];
-}
-
-export function getMonthName(monthNumber: number): string {
-  const months = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-  ];
-  return months[monthNumber - 1] || '';
-}
-
-export function formatPercentage(value: number, decimals: number = 1): string {
-  return `${(value * 100).toFixed(decimals)}%`;
 }

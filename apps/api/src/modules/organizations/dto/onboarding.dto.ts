@@ -225,17 +225,6 @@ export class AiFeaturesStepDto {
 }
 
 // ============================================
-// STEP 7: TOUR COMPLETED
-// ============================================
-
-export class TourCompletedStepDto {
-  @ApiPropertyOptional({ description: 'Tour completed' })
-  @IsOptional()
-  @IsBoolean()
-  completed?: boolean;
-}
-
-// ============================================
 // SKIP STEP
 // ============================================
 

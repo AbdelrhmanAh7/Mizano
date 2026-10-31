@@ -1,4 +1,7 @@
-import { buildCustomerPayload } from './customer-form';
+import { buildCustomerPayload, currencyOptions } from './customer-form';
+
+// The form module uses next-intl (ESM); this spec only exercises the pure payload builder.
+jest.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
 import { createCustomerSchema } from '@mizano/validators';
 
 const baseFormData = {
@@ -158,10 +161,10 @@ describe('buildCustomerPayload - DTO boundary validation', () => {
     expect(result.success).toBe(true);
   });
 
-  it('defaults currency to USD when not provided', () => {
+  it('leaves the currency to the API (org base currency) when not provided', () => {
     const dataWithoutCurrency = { ...baseFormData, currency: '' };
     const payload = buildCustomerPayload(dataWithoutCurrency);
-    expect(payload.currency).toBe('USD');
+    expect(payload.currency).toBeUndefined();
     const result = createCustomerSchema.safeParse(payload);
     expect(result.success).toBe(true);
   });
@@ -242,5 +245,20 @@ describe('buildCustomerPayload - isolation & performance', () => {
     const duration = performance.now() - start;
     expect(payload.name).toBe('Test Customer');
     expect(duration).toBeLessThan(50); // Should complete in under 50ms
+  });
+});
+
+describe('customer currency defaults (audit B5)', () => {
+  it('leaves an unset currency out so the API uses the org base currency, never USD', () => {
+    const payload = buildCustomerPayload({ ...baseFormData, currency: '' });
+    expect(JSON.parse(JSON.stringify(payload))).not.toHaveProperty('currency');
+    expect(buildCustomerPayload({ ...baseFormData, currency: 'EGP' }).currency).toBe('EGP');
+  });
+
+  it('offers the base currency first and keeps a saved currency that is not listed', () => {
+    expect(currencyOptions('EGP', 'EGP')[0]).toBe('EGP');
+    expect(currencyOptions('KWD', undefined)[0]).toBe('KWD');
+    expect(currencyOptions('EGP', 'JPY')).toContain('JPY');
+    expect(new Set(currencyOptions('USD', 'USD')).size).toBe(currencyOptions('USD', 'USD').length);
   });
 });

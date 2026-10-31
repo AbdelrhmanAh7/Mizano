@@ -34,8 +34,10 @@ export default function VATPaymentsPage() {
   const t = useTranslations('tax');
 
   const { data: returnsData, isLoading } = useVATReturns();
-  const rawReturns: VATReturn[] = returnsData?.data || returnsData || [];
-  const returns = useMemo(() => rawReturns.map(normalizeVATReturn), [rawReturns]);
+  const returns = useMemo(() => {
+    const rawReturns: VATReturn[] = returnsData?.data || returnsData || [];
+    return rawReturns.map(normalizeVATReturn);
+  }, [returnsData]);
 
   // Extract payments from returns that have them
   const paymentRows: PaymentRow[] = useMemo(

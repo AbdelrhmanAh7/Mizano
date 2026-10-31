@@ -9,16 +9,7 @@ import {
 } from '@/components/data-table';
 import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
 import { ImportWizard } from '@/components/import/import-wizard';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,6 +22,7 @@ import {
 import { useToast } from '@/components/ui/use-toast';
 import { expensesApi } from '@/lib/api';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
+import { useBulkConfirm } from '@/lib/hooks/use-bulk-confirm';
 import {
   Expense,
   formatCurrency,
@@ -89,21 +81,20 @@ function ExpensesPageContent() {
   const canDelete = hasPermission('purchases.delete');
 
   // Bulk action state
-  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
-  const [bulkApproveOpen, setBulkApproveOpen] = useState(false);
-  const [bulkSelectedRows, setBulkSelectedRows] = useState<Expense[]>([]);
 
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => expensesApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['expenses']],
     successMessage: '{count} expenses deleted',
   });
+  const bulkDelete = useBulkConfirm<Expense>(bulkDeleteAction, () => void refetch());
 
   const bulkApproveAction = useBulkAction({
     mutationFn: (ids) => expensesApi.bulkApprove(ids).then((r) => r.data),
     queryKeys: [['expenses']],
     successMessage: '{count} expenses approved',
   });
+  const bulkApprove = useBulkConfirm<Expense>(bulkApproveAction, () => void refetch());
 
   const canEdit = hasPermission('purchases.edit');
 
@@ -113,10 +104,7 @@ function ExpensesPageContent() {
           {
             label: 'Approve',
             icon: CheckCircle,
-            onClick: (rows: Expense[]) => {
-              setBulkSelectedRows(rows);
-              setBulkApproveOpen(true);
-            },
+            onClick: bulkApprove.openFor,
           },
         ]
       : []),
@@ -126,10 +114,7 @@ function ExpensesPageContent() {
             label: 'Delete',
             icon: Trash2,
             variant: 'destructive' as const,
-            onClick: (rows: Expense[]) => {
-              setBulkSelectedRows(rows);
-              setBulkDeleteOpen(true);
-            },
+            onClick: bulkDelete.openFor,
           },
         ]
       : []),
@@ -357,51 +342,27 @@ function ExpensesPageContent() {
         </CardContent>
       </Card>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('expenses.deleteTitle')}</AlertDialogTitle>
-            <AlertDialogDescription>{t('expenses.deleteConfirmation')}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              {tCommon('buttons.delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title={t('expenses.deleteTitle')}
+        description={t('expenses.deleteConfirmation')}
+        onConfirm={confirmDelete}
+      />
 
       {/* Bulk Action Dialogs */}
       <BulkActionConfirmDialog
-        open={bulkDeleteOpen}
-        onOpenChange={setBulkDeleteOpen}
+        {...bulkDelete.dialogProps}
         action="delete"
-        count={bulkSelectedRows.length}
         itemType="expenses"
         description="Selected expenses will be permanently deleted."
         destructive
-        isLoading={bulkDeleteAction.isLoading}
-        onConfirm={async () => {
-          await bulkDeleteAction.execute(bulkSelectedRows.map((r) => r.id));
-          setBulkDeleteOpen(false);
-          refetch();
-        }}
       />
       <BulkActionConfirmDialog
-        open={bulkApproveOpen}
-        onOpenChange={setBulkApproveOpen}
+        {...bulkApprove.dialogProps}
         action="approve"
-        count={bulkSelectedRows.length}
         itemType="expenses"
         description="Selected expenses will be approved."
-        isLoading={bulkApproveAction.isLoading}
-        onConfirm={async () => {
-          await bulkApproveAction.execute(bulkSelectedRows.map((r) => r.id));
-          setBulkApproveOpen(false);
-          refetch();
-        }}
       />
 
       {/* Import Wizard */}

@@ -40,13 +40,6 @@ export interface Adjustment {
   account: { id: string; name: string; code: string };
 }
 
-export interface AdjustmentParams {
-  page?: number;
-  limit?: number;
-  search?: string;
-  type?: AdjustmentType;
-}
-
 /** Exact payload of POST /inventory-adjustments. */
 export interface CreateAdjustmentData {
   date: string;
@@ -72,19 +65,6 @@ export function useAdjustmentAccountOptions() {
     queryKey: ['adjustments', 'account-options'],
     queryFn: async (): Promise<AdjustmentAccountOption[]> => {
       const response = await adjustmentsApi.accountOptions();
-      return response.data;
-    },
-  });
-}
-
-/**
- * Hook to fetch all adjustments
- */
-export function useAdjustments(params?: AdjustmentParams) {
-  return useQuery({
-    queryKey: ['adjustments', params],
-    queryFn: async () => {
-      const response = await adjustmentsApi.getAll(params);
       return response.data;
     },
   });
@@ -192,26 +172,15 @@ export const reasonOptions: Array<{ value: AdjustmentReason; label: string }> = 
   { value: 'OTHER', label: 'Other' },
 ];
 
-export function getTypeColor(type: AdjustmentType): string {
-  return type === 'INCREASE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
-}
-
-export function getTypeText(type: AdjustmentType): string {
-  return type === 'INCREASE' ? 'Increase' : 'Decrease';
-}
-
-export function getStatusText(status: AdjustmentStatus): string {
+export function getAdjustmentStatusLabel(status: AdjustmentStatus): string {
   return status === 'VOIDED' ? 'Voided' : 'Posted';
 }
 
-export function getReasonText(reason: AdjustmentReason): string {
+export function getReasonLabel(reason: AdjustmentReason): string {
   const found = reasonOptions.find((o) => o.value === reason);
   return found ? found.label : reason;
 }
 
-// Alias functions for backward compatibility
-export const getReasonLabel = getReasonText;
-export const getAdjustmentStatusLabel = getStatusText;
 export function getAdjustmentStatusColor(status: AdjustmentStatus): string {
   return status === 'VOIDED' ? 'bg-gray-100 text-gray-800' : 'bg-green-100 text-green-800';
 }

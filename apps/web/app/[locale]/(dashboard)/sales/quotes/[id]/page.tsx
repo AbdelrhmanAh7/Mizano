@@ -26,6 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { useToast } from '@/components/ui/use-toast';
 import {
   useQuote,
@@ -37,10 +38,12 @@ import {
 } from '@/lib/hooks/use-quotes';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { QuoteStatusBadge } from '@/components/sales/status-badge';
-import { formatCurrency } from '@/lib/hooks/use-customers';
 import { format } from 'date-fns';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function QuoteDetailPage() {
+  // Quote amounts: see `currency` below.
+  const formatCurrency = useMoneyFormatter();
   const params = useParams();
   const router = useRouter();
   const t = useTranslations('sales');
@@ -197,7 +200,8 @@ export default function QuoteDetailPage() {
   }
 
   const lines = quote.lines || [];
-  const currency = quote.customer?.currency || 'USD';
+  // The quote's own currency, else the org base currency; never the customer's (audit B5).
+  const currency = quote.currencyCode;
 
   return (
     <div className="space-y-6">
@@ -418,21 +422,15 @@ export default function QuoteDetailPage() {
         </div>
       )}
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('quotes.deleteQuote')}</AlertDialogTitle>
-            <AlertDialogDescription>{t('quotes.deleteConfirmation')}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title={t('quotes.deleteQuote')}
+        description={t('quotes.deleteConfirmation')}
+        onConfirm={confirmDelete}
+        cancelLabel="Cancel"
+        deleteLabel="Delete"
+      />
 
       {/* Convert to Invoice Dialog */}
       <AlertDialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>

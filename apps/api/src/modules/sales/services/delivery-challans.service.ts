@@ -16,6 +16,48 @@ import {
   ChallanQueryDto,
 } from '../dto/delivery-challan.dto';
 
+/** A challan as create and update return it: party, invoice and lines with item and warehouse. */
+const CHALLAN_WITH_LINES = Prisma.validator<Prisma.DeliveryChallanInclude>()({
+  customer: { select: { id: true, name: true } },
+  invoice: { select: { id: true, invoiceNumber: true } },
+  lines: {
+    include: {
+      item: { select: { id: true, name: true, sku: true } },
+      warehouse: { select: { id: true, name: true } },
+    },
+  },
+});
+
+/** A challan after issue, return or creation from an invoice (lines without warehouse). */
+const CHALLAN_SUMMARY = Prisma.validator<Prisma.DeliveryChallanInclude>()({
+  customer: { select: { id: true, name: true } },
+  invoice: { select: { id: true, invoiceNumber: true } },
+  lines: {
+    include: {
+      item: { select: { id: true, name: true, sku: true } },
+    },
+  },
+});
+
+/** Lines with what the stock moves need. */
+const CHALLAN_STOCK_LINES = Prisma.validator<Prisma.DeliveryChallanInclude>()({
+  lines: {
+    include: {
+      item: { select: { id: true, name: true, trackInventory: true } },
+    },
+  },
+});
+
+/** A DTO line as stored (quantity as Decimal). */
+function toChallanLine(line: CreateDeliveryChallanDto['lines'][number]) {
+  return {
+    itemId: line.itemId,
+    quantity: new Decimal(line.quantity),
+    description: line.description,
+    warehouseId: line.warehouseId,
+  };
+}
+
 @Injectable()
 export class DeliveryChallansService {
   constructor(private prisma: PrismaService) {}
@@ -38,24 +80,10 @@ export class DeliveryChallansService {
         notes: dto.notes,
         organizationId,
         lines: {
-          create: dto.lines.map((line) => ({
-            itemId: line.itemId,
-            quantity: new Decimal(line.quantity),
-            description: line.description,
-            warehouseId: line.warehouseId,
-          })),
+          create: dto.lines.map(toChallanLine),
         },
       },
-      include: {
-        customer: { select: { id: true, name: true } },
-        invoice: { select: { id: true, invoiceNumber: true } },
-        lines: {
-          include: {
-            item: { select: { id: true, name: true, sku: true } },
-            warehouse: { select: { id: true, name: true } },
-          },
-        },
-      },
+      include: CHALLAN_WITH_LINES,
     });
   }
 
@@ -178,28 +206,13 @@ export class DeliveryChallansService {
       if (dto.lines) {
         await tx.deliveryChallanLine.deleteMany({ where: { challanId: id } });
         await tx.deliveryChallanLine.createMany({
-          data: dto.lines.map((line) => ({
-            challanId: id,
-            itemId: line.itemId,
-            quantity: new Decimal(line.quantity),
-            description: line.description,
-            warehouseId: line.warehouseId,
-          })),
+          data: dto.lines.map((line) => ({ challanId: id, ...toChallanLine(line) })),
         });
       }
 
       return tx.deliveryChallan.findFirst({
         where: { id, organizationId },
-        include: {
-          customer: { select: { id: true, name: true } },
-          invoice: { select: { id: true, invoiceNumber: true } },
-          lines: {
-            include: {
-              item: { select: { id: true, name: true, sku: true } },
-              warehouse: { select: { id: true, name: true } },
-            },
-          },
-        },
+        include: CHALLAN_WITH_LINES,
       });
     });
   }
@@ -222,150 +235,119 @@ export class DeliveryChallansService {
   // ============ Issue Challan (Decreases Inventory) ============
 
   async issue(organizationId: string, id: string) {
-    return this.prisma.$transaction(async (tx) => {
-      // Atomically guard: only DRAFT challans in this org can be issued
-      const res = await tx.deliveryChallan.updateMany({
-        where: { id, organizationId, deletedAt: null, status: ChallanStatus.DRAFT },
-        data: { status: ChallanStatus.ISSUED },
-      });
-      if (res.count !== 1) {
-        await this.rejectTransition(
-          tx,
-          organizationId,
-          id,
-          ChallanStatus.DRAFT,
-          'Only draft challans can be issued',
-        );
-      }
+    return this.transitionWithStock(
+      organizationId,
+      id,
+      ChallanStatus.DRAFT,
+      ChallanStatus.ISSUED,
+      'Only draft challans can be issued',
+      async (tx, challan, tracked) => {
+        // Check inventory availability for tracked items
+        for (const line of challan.lines) {
+          if (tracked.has(line.itemId)) {
+            const warehouseId = line.warehouseId;
+            const currentStock = await this.getItemStock(
+              organizationId,
+              line.itemId,
+              warehouseId,
+              tx,
+            );
 
-      // Reload challan with lines for inventory operations
-      const challan = await tx.deliveryChallan.findFirst({
-        where: { id, organizationId },
-        include: {
-          lines: {
-            include: {
-              item: { select: { id: true, name: true, trackInventory: true } },
-            },
-          },
-        },
-      });
-      if (!challan) {
-        throw new NotFoundException('Delivery challan not found');
-      }
+            if (currentStock < parseFloat(line.quantity.toString())) {
+              throw new BadRequestException(
+                `Insufficient stock for item ${line.item?.name || line.itemId}. Available: ${currentStock}, Required: ${line.quantity}`,
+              );
+            }
+          }
+        }
 
-      const tracked = await this.trackedLineItems(organizationId, challan.lines);
-
-      // Check inventory availability for tracked items
-      for (const line of challan.lines) {
-        if (tracked.has(line.itemId)) {
-          const warehouseId = line.warehouseId;
-          const currentStock = await this.getItemStock(
-            organizationId,
-            line.itemId,
-            warehouseId,
-            tx,
-          );
-
-          if (currentStock < parseFloat(line.quantity.toString())) {
-            throw new BadRequestException(
-              `Insufficient stock for item ${line.item?.name || line.itemId}. Available: ${currentStock}, Required: ${line.quantity}`,
+        // Decrease inventory
+        for (const line of challan.lines) {
+          if (tracked.has(line.itemId)) {
+            await this.decreaseInventory(
+              organizationId,
+              line.itemId,
+              parseFloat(line.quantity.toString()),
+              line.warehouseId,
+              `Delivery Challan ${challan.challanNumber}`,
+              tx,
             );
           }
         }
-      }
-
-      // Decrease inventory
-      for (const line of challan.lines) {
-        if (tracked.has(line.itemId)) {
-          await this.decreaseInventory(
-            organizationId,
-            line.itemId,
-            parseFloat(line.quantity.toString()),
-            line.warehouseId,
-            `Delivery Challan ${challan.challanNumber}`,
-            tx,
-          );
-        }
-      }
-
-      // Return updated challan
-      return tx.deliveryChallan.findFirst({
-        where: { id, organizationId },
-        include: {
-          customer: { select: { id: true, name: true } },
-          invoice: { select: { id: true, invoiceNumber: true } },
-          lines: {
-            include: {
-              item: { select: { id: true, name: true, sku: true } },
-            },
-          },
-        },
-      });
-    });
+      },
+    );
   }
 
   // ============ Mark as Returned (Reverses Inventory) ============
 
   async markReturned(organizationId: string, id: string) {
+    return this.transitionWithStock(
+      organizationId,
+      id,
+      ChallanStatus.ISSUED,
+      ChallanStatus.RETURNED,
+      'Only issued challans can be marked as returned',
+      async (tx, challan, tracked) => {
+        // Increase inventory (reverse the decrease)
+        for (const line of challan.lines) {
+          if (tracked.has(line.itemId)) {
+            await this.increaseInventory(
+              organizationId,
+              line.itemId,
+              parseFloat(line.quantity.toString()),
+              line.warehouseId,
+              `Return from Delivery Challan ${challan.challanNumber}`,
+              tx,
+            );
+          }
+        }
+      },
+    );
+  }
+
+  /**
+   * One status transition that moves stock: guarded `from → to` update (404/400/409 through
+   * rejectTransition), reload with lines, the stock moves for tracked items, then the updated
+   * challan — all in one transaction.
+   */
+  private async transitionWithStock(
+    organizationId: string,
+    id: string,
+    from: ChallanStatus,
+    to: ChallanStatus,
+    rejectMessage: string,
+    moveStock: (
+      tx: Prisma.TransactionClient,
+      challan: Prisma.DeliveryChallanGetPayload<{ include: typeof CHALLAN_STOCK_LINES }>,
+      tracked: Set<string>,
+    ) => Promise<void>,
+  ) {
     return this.prisma.$transaction(async (tx) => {
-      // Atomically guard: only ISSUED challans in this org can be returned
+      // Atomically guard: only challans in `from` status in this org can move
       const res = await tx.deliveryChallan.updateMany({
-        where: { id, organizationId, deletedAt: null, status: ChallanStatus.ISSUED },
-        data: { status: ChallanStatus.RETURNED },
+        where: { id, organizationId, deletedAt: null, status: from },
+        data: { status: to },
       });
       if (res.count !== 1) {
-        await this.rejectTransition(
-          tx,
-          organizationId,
-          id,
-          ChallanStatus.ISSUED,
-          'Only issued challans can be marked as returned',
-        );
+        await this.rejectTransition(tx, organizationId, id, from, rejectMessage);
       }
 
       // Reload challan with lines for inventory operations
       const challan = await tx.deliveryChallan.findFirst({
         where: { id, organizationId },
-        include: {
-          lines: {
-            include: {
-              item: { select: { id: true, name: true, trackInventory: true } },
-            },
-          },
-        },
+        include: CHALLAN_STOCK_LINES,
       });
       if (!challan) {
         throw new NotFoundException('Delivery challan not found');
       }
 
       const tracked = await this.trackedLineItems(organizationId, challan.lines);
-
-      // Increase inventory (reverse the decrease)
-      for (const line of challan.lines) {
-        if (tracked.has(line.itemId)) {
-          await this.increaseInventory(
-            organizationId,
-            line.itemId,
-            parseFloat(line.quantity.toString()),
-            line.warehouseId,
-            `Return from Delivery Challan ${challan.challanNumber}`,
-            tx,
-          );
-        }
-      }
+      await moveStock(tx, challan, tracked);
 
       // Return updated challan
       return tx.deliveryChallan.findFirst({
         where: { id, organizationId },
-        include: {
-          customer: { select: { id: true, name: true } },
-          invoice: { select: { id: true, invoiceNumber: true } },
-          lines: {
-            include: {
-              item: { select: { id: true, name: true, sku: true } },
-            },
-          },
-        },
+        include: CHALLAN_SUMMARY,
       });
     });
   }
@@ -414,15 +396,7 @@ export class DeliveryChallansService {
           })),
         },
       },
-      include: {
-        customer: { select: { id: true, name: true } },
-        invoice: { select: { id: true, invoiceNumber: true } },
-        lines: {
-          include: {
-            item: { select: { id: true, name: true, sku: true } },
-          },
-        },
-      },
+      include: CHALLAN_SUMMARY,
     });
   }
 

@@ -5,20 +5,25 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { BillStatus, Prisma } from '@prisma/client';
+import { AccountType, BillStatus, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
 import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 import { runBulk } from '../../../common/utils/run-bulk';
-import { assertTotalsFit } from '../../sales/utils/sales-helpers';
+import { assertTotalsFit, startOfTodayUtc } from '../../../common/utils/sales-helpers';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
 import { BillCursorQueryDto } from '../dto/bill-cursor-query.dto';
 import { BillQueryDto } from '../dto/bill-query.dto';
 import { BillLineDto, CreateBillDto } from '../dto/create-bill.dto';
 import { UpdateBillDto } from '../dto/update-bill.dto';
+import {
+  ACCOUNT_REQUIRED,
+  assertBillLineAccounts,
+  billLineAccountWhere,
+} from '../../../common/utils/bill-line-accounts';
 
 /** Bill statuses that carry an open AP balance and can receive payments. */
 export const PAYABLE_BILL_STATUSES: BillStatus[] = [
@@ -150,28 +155,35 @@ export class BillsService {
 
   /** Draft bills only. When lines are supplied they replace the old lines and totals. */
   async update(organizationId: string, id: string, dto: UpdateBillDto) {
-    const bill = await this.prisma.bill.findFirst({
-      where: { id, organizationId, deletedAt: null },
-    });
-    if (!bill) throw new NotFoundException('Bill not found');
-    if (bill.status !== BillStatus.DRAFT) {
-      throw new BadRequestException('Only draft bills can be updated');
-    }
-
-    await this.assertReferences(this.prisma, organizationId, dto);
-
-    const data: Prisma.BillUpdateInput = {};
-    if (dto.billNumber !== undefined) data.billNumber = dto.billNumber;
-    if (dto.date !== undefined) data.date = new Date(dto.date);
-    if (dto.dueDate !== undefined) data.dueDate = new Date(dto.dueDate);
-    if (dto.reference !== undefined) data.reference = dto.reference;
-    if (dto.currencyCode !== undefined) data.currencyCode = dto.currencyCode;
-    if (dto.notes !== undefined) data.notes = dto.notes;
-    if (dto.vendorId !== undefined) data.vendor = { connect: { id: dto.vendorId } };
-    if (dto.projectId !== undefined) data.project = { connect: { id: dto.projectId } };
-
     try {
       return await this.prisma.$transaction(async (tx) => {
+        // Same row lock as approve(): an edit and an approval serialize, so a posted journal
+        // always matches the lines and totals of the bill that was approved.
+        await this.lockBills(tx, organizationId, [id]);
+        const bill = await tx.bill.findFirst({
+          where: { id, organizationId, deletedAt: null },
+        });
+        if (!bill) throw new NotFoundException('Bill not found');
+        if (bill.status !== BillStatus.DRAFT) {
+          throw new BadRequestException('Only draft bills can be updated');
+        }
+
+        await this.assertReferences(tx, organizationId, dto);
+
+        const data: Prisma.BillUpdateInput = {};
+        if (dto.billNumber !== undefined) data.billNumber = dto.billNumber;
+        if (dto.date !== undefined) data.date = new Date(dto.date);
+        if (dto.dueDate !== undefined) data.dueDate = new Date(dto.dueDate);
+        if (dto.reference !== undefined) data.reference = dto.reference;
+        if (dto.currencyCode !== undefined) data.currencyCode = dto.currencyCode;
+        if (dto.notes !== undefined) data.notes = dto.notes;
+        if (dto.vendorId !== undefined) data.vendor = { connect: { id: dto.vendorId } };
+        // The web form sends `projectId: null` for "no project"; Prisma rejects
+        // `connect: { id: null }`.
+        if (dto.projectId !== undefined) {
+          data.project = dto.projectId ? { connect: { id: dto.projectId } } : { disconnect: true };
+        }
+
         if (dto.lines) {
           const { lineData, totals } = this.buildLines(dto.lines);
           await tx.billLine.deleteMany({ where: { billId: id } });
@@ -224,7 +236,8 @@ export class BillsService {
     let status = bill.status;
     if (balance.isZero()) status = BillStatus.PAID;
     else if (paid.greaterThan(0)) status = BillStatus.PARTIALLY_PAID;
-    else if (bill.dueDate < new Date()) status = BillStatus.OVERDUE;
+    // A bill due today is not yet overdue (same rule as invoices).
+    else if (bill.dueDate < startOfTodayUtc()) status = BillStatus.OVERDUE;
     else status = BillStatus.OPEN;
 
     await tx.bill.update({ where: { id: billId }, data: { balanceDue: balance, status } });
@@ -303,6 +316,39 @@ export class BillsService {
     return { isDuplicate: false, existingBillId: null, similarity: 0, matchType: 'none' };
   }
 
+  /**
+   * Accounts the bill form may offer on a line (exactly what create/update/approve accept), plus
+   * the account of this vendor's most recent bill line that is still eligible, used as the
+   * default for a new line. Needs only purchases.create, not accounting.view.
+   */
+  async accountOptions(
+    organizationId: string,
+    vendorId?: string,
+  ): Promise<{
+    data: { id: string; code: string; name: string; type: AccountType }[];
+    vendorDefaultAccountId: string | null;
+  }> {
+    const where = await billLineAccountWhere(this.prisma, organizationId);
+    const data = await this.prisma.account.findMany({
+      where,
+      select: { id: true, code: true, name: true, type: true },
+      orderBy: { code: 'asc' },
+    });
+    let vendorDefaultAccountId: string | null = null;
+    if (vendorId && data.length > 0) {
+      const last = await this.prisma.billLine.findFirst({
+        where: {
+          accountId: { in: data.map((a) => a.id) },
+          bill: { organizationId, vendorId, deletedAt: null },
+        },
+        orderBy: [{ bill: { date: 'desc' } }, { bill: { createdAt: 'desc' } }],
+        select: { accountId: true },
+      });
+      vendorDefaultAccountId = last?.accountId ?? null;
+    }
+    return { data, vendorDefaultAccountId };
+  }
+
   /** "Open" is the same accounting event as approval: it must post to the ledger. */
   async open(organizationId: string, id: string) {
     return { data: await this.approve(organizationId, id) };
@@ -314,9 +360,14 @@ export class BillsService {
    */
   async approve(organizationId: string, id: string) {
     return this.prisma.$transaction(async (tx) => {
-      // Lock first: the currency/account checks below must see the same organization settings
-      // the journal is posted under (a base-currency change takes this lock too).
+      // Lock the bill row before reading the lines and totals that get posted: a concurrent
+      // edit waits, so the journal cannot disagree with the document. Lock order is
+      // bill -> ledger everywhere (payments made, vendor credits), so no deadlock.
+      await this.lockBills(tx, organizationId, [id]);
+      // Then the ledger: the currency/account checks below must see the same organization
+      // settings the journal is posted under (a base-currency change takes this lock too).
       await lockOrganizationLedger(tx, organizationId);
+      // Read only now, under both locks.
       const bill = await tx.bill.findFirst({
         where: { id, organizationId, deletedAt: null },
         include: { lines: true },
@@ -327,10 +378,20 @@ export class BillsService {
       }
       if (bill.lines.length === 0) throw new BadRequestException('Bill has no lines');
       if (bill.lines.some((l) => !l.accountId)) {
-        throw new BadRequestException(
-          'All bill lines must have an expense account assigned before approval',
-        );
+        throw new BadRequestException({
+          statusCode: 400,
+          code: ACCOUNT_REQUIRED,
+          message: 'All bill lines must have an expense account assigned before approval',
+          error: 'Bad Request',
+        });
       }
+      // Re-check under the ledger lock: an account may have been deactivated, retyped or made a
+      // control account after the draft was saved (#550).
+      await assertBillLineAccounts(
+        tx,
+        organizationId,
+        bill.lines.map((l) => l.accountId as string),
+      );
 
       const org = await tx.organization.findUnique({
         where: { id: organizationId },
@@ -476,7 +537,7 @@ export class BillsService {
     await this.prisma.bill.updateMany({
       where: {
         status: { in: [BillStatus.OPEN, BillStatus.PARTIALLY_PAID] },
-        dueDate: { lt: new Date() },
+        dueDate: { lt: startOfTodayUtc() },
         balanceDue: { gt: 0 },
         deletedAt: null,
       },
@@ -538,13 +599,12 @@ export class BillsService {
       if (!project) throw new BadRequestException('Project not found');
     }
     const lines = dto.lines ?? [];
-    const accountIds = [...new Set(lines.map((l) => l.accountId).filter(Boolean))] as string[];
-    if (accountIds.length) {
-      const found = await db.account.count({
-        where: { id: { in: accountIds }, organizationId, deletedAt: null, isActive: true },
-      });
-      if (found !== accountIds.length) throw new BadRequestException('Account not found');
-    }
+    // Drafts may leave a line without an account (scan review, import); approve() requires one.
+    await assertBillLineAccounts(
+      db,
+      organizationId,
+      lines.map((l) => l.accountId).filter((id): id is string => !!id),
+    );
     const itemIds = [...new Set(lines.map((l) => l.itemId).filter(Boolean))] as string[];
     if (itemIds.length) {
       const found = await db.item.count({ where: { id: { in: itemIds }, organizationId } });

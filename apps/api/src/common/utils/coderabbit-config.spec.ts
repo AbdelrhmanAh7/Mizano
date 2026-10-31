@@ -105,6 +105,9 @@ describe('CodeRabbit configuration', () => {
     expect(pathFilters).toContain('!**/node_modules/**');
     expect(pathFilters).toContain('!**/dist/**');
     expect(pathFilters).toContain('!**/build/**');
+    // Evidence run logs are never reviewed (audit C4: reviews of them fed an issue loop).
+    expect(pathFilters).toContain('!docs/evidence/**');
+    expect(pathFilters).toContain('!**/EVIDENCE.md');
   });
 
   it('should have free linters enabled', () => {

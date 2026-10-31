@@ -5,15 +5,7 @@
  * and inventory reorder-point calculation.
  */
 
-import { buildSystemPrompt, wrapJsonPrompt } from './base.prompts';
-
-// ---------------------------------------------------------------------------
-// System prompt
-// ---------------------------------------------------------------------------
-
-export const OPERATIONS_SYSTEM_PROMPT = buildSystemPrompt(
-  'financial operations, transaction analysis, bank reconciliation, and inventory management',
-);
+import { wrapJsonPrompt } from './base.prompts';
 
 // ---------------------------------------------------------------------------
 // 1. Anomaly Explanation

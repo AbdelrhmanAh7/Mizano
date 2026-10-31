@@ -1,5 +1,6 @@
 'use client';
 
+import { format } from 'date-fns';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
@@ -39,8 +40,8 @@ export default function GenerateVATReturnPage() {
   const quarterStart = new Date(currentYear, Math.floor(now.getMonth() / 3) * 3, 1);
   const quarterEnd = new Date(currentYear, Math.floor(now.getMonth() / 3) * 3 + 3, 0);
 
-  const [startDate, setStartDate] = useState(quarterStart.toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(quarterEnd.toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(format(quarterStart, 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState(format(quarterEnd, 'yyyy-MM-dd'));
 
   const handleGenerate = async () => {
     try {
@@ -66,15 +67,15 @@ export default function GenerateVATReturnPage() {
   const setQuarter = (quarter: number) => {
     const start = new Date(currentYear, (quarter - 1) * 3, 1);
     const end = new Date(currentYear, quarter * 3, 0);
-    setStartDate(start.toISOString().split('T')[0]);
-    setEndDate(end.toISOString().split('T')[0]);
+    setStartDate(format(start, 'yyyy-MM-dd'));
+    setEndDate(format(end, 'yyyy-MM-dd'));
   };
 
   const setMonth = (monthIndex: number) => {
     const start = new Date(currentYear, monthIndex, 1);
     const end = new Date(currentYear, monthIndex + 1, 0);
-    setStartDate(start.toISOString().split('T')[0]);
-    setEndDate(end.toISOString().split('T')[0]);
+    setStartDate(format(start, 'yyyy-MM-dd'));
+    setEndDate(format(end, 'yyyy-MM-dd'));
   };
 
   return (

@@ -434,5 +434,15 @@
     "filterDeals": "Deals",
     "filterQuotes": "Quotes",
     "filterExpenses": "Expenses"
+  },
+  "combobox": {
+    "search": "Search…",
+    "loading": "Loading…",
+    "empty": "No matches",
+    "error": "Couldn't load the list.",
+    "retry": "Retry",
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page {current} of {total}"
   }
 }

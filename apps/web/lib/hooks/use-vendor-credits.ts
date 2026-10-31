@@ -10,7 +10,6 @@ import type { CreateVendorCreditPayload } from '@/components/purchases/vendor-cr
 type ApiError = { response?: { data?: { message?: string } } };
 
 export type VendorCreditStatus = 'OPEN' | 'APPLIED' | 'REFUNDED';
-export type VendorCreditType = 'CREDIT' | 'REFUND';
 
 export interface VendorCreditLine {
   id: string;
@@ -276,20 +275,6 @@ export function getStatusText(status: VendorCreditStatus): string {
       return 'Refunded';
     default:
       return status;
-  }
-}
-
-/**
- * Get type display text
- */
-export function getTypeText(type: VendorCreditType): string {
-  switch (type) {
-    case 'CREDIT':
-      return 'Credit';
-    case 'REFUND':
-      return 'Refund';
-    default:
-      return type;
   }
 }
 

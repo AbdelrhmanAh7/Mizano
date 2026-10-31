@@ -17,6 +17,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **Every state change is a guarded transition:** `updateMany({ where: { id, organizationId, status: FROM } })` plus a `count` check that throws `ConflictException`. Journal idempotency is the tenant-scoped unique key `(organizationId, sourceType, sourceId)`.
 - **An idempotency key must stay the same across retries of one action.** Generating a fresh random id on the server for each request defeats it. A client UUID created once per user action and reused on every retry is fine (`idempotencyKeyFor`); so are `profileId:YYYY-MM-DD` or a sha256 of file + row. _(manual recurring execute, import retries)_
+- **Changing a dedupe key must honour what was recorded under the old key.** Moving `invoice.overdue:<inv>:<due>` to a per-endpoint key made every existing endpoint look like it had never been told, so the first scan after deploy would re-announce every open debt. Treat a legacy-key record (with a delivery to that endpoint) as sent, and give existing rows an explicit cutoff in the migration rather than a fallback that reaches back to `createdAt`. _(PR #562, overdue scanner)_
 - **Store idempotency markers where users cannot edit them.** Notes, reason and reference text get edited; use an append-only store such as AuditLog `IMPORT_ROW`. _(import markers)_
 - **Bulk operations reuse the single-record command through `runBulk`** and report `{ processed, total, failures }`. Never write a bulk `updateMany` that skips the posting logic.
 
@@ -85,6 +86,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **Never log or audit values:** no document text, amounts, tax ids, LLM output, query parameters or raw error objects. Log metadata instead (ids, counts, lengths, durations, field names, status), and use `describeError(error, { includeMessage: false })` wherever an error message could contain document or user data. `redactText` only masks credential-shaped strings, so it does not make document text safe to log.
 - **Clients can't claim trusted provenance.** HTTP log captures are forced to `FRONTEND`.
+- **Outbound requests to customer-supplied URLs are an SSRF vector.** Require HTTPS, resolve DNS and refuse loopback, link-local, private and CGNAT addresses at save time and again before every attempt, and never follow redirects. With Node's `BlockList`, do not add `::ffff:0:0/96`: it matches every plain IPv4 address; unwrap IPv4-mapped addresses instead. _(FlowLine webhooks)_
 - **Compare secrets in constant time, with no default secrets.** Re-apply file permissions on files that already exist.
 - **Never commit hard-coded sensitive credentials or plaintext passwords in e2e tests or test fixtures.** Source credentials dynamically from environment variables (`process.env.E2E_LOGIN_EMAIL`, `process.env.E2E_LOGIN_PASSWORD`) or generate throwaway credentials dynamically. Hard-coded credentials (`admin@mizano.com` / `password123`) fail repository security hygiene and automated review checks. _(#465)_
 
@@ -98,10 +100,13 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 ## 12. Caches, tests and scope
 
 - **Finite inputs do not guarantee finite arithmetic results.** Diagnostic timers must validate the elapsed difference and the accumulated safe-integer total before storing them; test subtraction overflow and repeated-stage accumulation. _(intake timings, PR #129)_
+- **Global test setup runs in every jest environment.** `jest.setup.ts` also loads for `@jest-environment node` suites, so guard DOM shims (`typeof Element !== 'undefined'`); an unguarded `Element.prototype` patch stopped the auth suites from starting. _(28569d04)_
 - **Every endpoint that posts or reverses uses one `@InvalidatesLedger(...)`,** imports included.
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.
+- **A cache key must cover every file the task reads.** Turbo `inputs` of `src/**` matched nothing in `apps/web`, which has no `src/`, so its task hashes never changed and a warm cache (hub localci, pre-push) replayed old green lint, type-check and test results for new web code. Keep turbo's default (all package files); if you narrow `inputs`, prove with `turbo run <task> --dry=json` that editing a file of that package changes its hash. _(audit C1)_
+- **Tests must not depend on today's date.** Month arithmetic from `new Date()` (`setMonth(getMonth() - i)`) turns "Sep 31" into Oct 1 on the 29th to 31st, and the demand-forecast suite failed every CI run at month end. Pin the clock (`jest.useFakeTimers().setSystemTime(...)`) or build dates from fixed days such as day 1 of each month. _(audit C2)_
 
 ## Review process
 
@@ -123,4 +128,5 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Rollback must be repeatable.** Track an active pointer in `deployments.log` (`OK`/`ROLLBACK` lines), not "the previous OK line", or the second rollback is a no-op.
 - **Check DB readiness over TCP** (`pg_isready -h 127.0.0.1`). The temporary init server listens on the unix socket only and passes a socket probe.
 - **Dedupe alerts on stable keys** (check name), never on live values like percentages; alert once on start and once on recovery.
+- **The image must carry its runtime binaries for the target architecture.** Puppeteer's downloaded Chrome is a glibc x64 build (none exists for linux-arm64) and the Alpine API image had no browser or fonts, so no PDF could render on the Pi. Install system packages (`apk add chromium font-noto-arabic`), point the library at them (`PUPPETEER_EXECUTABLE_PATH`, `PUPPETEER_SKIP_DOWNLOAD=1`) and fail the image build when they are missing. _(audit B3)_
 - **Give pdf.js a zero-offset copy.** pdf-parse can misread a pooled `Buffer` with `byteOffset > 0` on newer Node; pass `new Uint8Array(buffer)` (fresh `ArrayBuffer`, offset 0) and test with a slice from a larger pool. _(#87)_

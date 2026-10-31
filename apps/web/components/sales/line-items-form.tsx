@@ -11,7 +11,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { computeTotals } from '@/lib/money';
-import { Item, useActiveItems } from '@/lib/hooks/use-items';
+import { type Item } from '@/lib/hooks/use-items';
+import { ItemCombobox } from '@/components/shared/party-combobox';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { Plus, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import {
@@ -104,7 +106,8 @@ interface LineItemsFormProps {
   name: string;
   taxRates?: TaxRate[];
   taxRatesStatus?: { isLoading: boolean; isError: boolean };
-  currency?: string;
+  /** Document currency; empty means the organization base currency (never a guessed USD). */
+  currency?: string | null;
   showTax?: boolean;
   showDiscount?: boolean;
 }
@@ -166,15 +169,6 @@ export function calculateLineTotals(
   };
 }
 
-export function formatAmount(amount: number, currency = 'USD'): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
 export function LineItemsForm({
   control,
   watch,
@@ -182,12 +176,14 @@ export function LineItemsForm({
   name,
   taxRates = [],
   taxRatesStatus,
-  currency = 'USD',
+  currency,
   showTax = true,
   showDiscount = true,
 }: LineItemsFormProps) {
   const t = useTranslations('sales');
-  const { data: items = [] } = useActiveItems();
+  const formatMoney = useMoneyFormatter();
+  const formatAmount = (amount: number, code: string | null | undefined) =>
+    formatMoney(amount, code);
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -197,26 +193,23 @@ export function LineItemsForm({
   const lines = watch(name) || [];
   const totals = calculateLineTotals(lines, taxRates);
 
-  const handleItemSelect = (index: number, itemId: string) => {
-    if (itemId === '__custom__') {
+  const handleItemSelect = (index: number, item: Item | undefined) => {
+    if (!item) {
       setValue(`${name}.${index}.itemId`, '');
       return;
     }
-    const item = items.find((i: Item) => i.id === itemId);
-    if (item) {
-      setValue(`${name}.${index}.itemId`, itemId);
-      setValue(`${name}.${index}.description`, item.description || item.name);
-      setValue(`${name}.${index}.rate`, item.sellingPrice);
-      // item.taxRate is a percent, not an option id: map it, or keep the percent itself.
-      const taxFields = taxFieldsForPercent(item.taxRate, taxRates);
-      setValue(`${name}.${index}.taxRateId`, taxFields.taxRateId);
-      setValue(`${name}.${index}.taxPercent`, taxFields.taxPercent ?? '');
-      // Recalculate amount
-      const qty = watch(`${name}.${index}.quantity`) || '1';
-      const discount = watch(`${name}.${index}.discountPercent`) || '0';
-      const amount = calculateLineAmount(qty, item.sellingPrice, discount);
-      setValue(`${name}.${index}.amount`, amount);
-    }
+    setValue(`${name}.${index}.itemId`, item.id);
+    setValue(`${name}.${index}.description`, item.description || item.name);
+    setValue(`${name}.${index}.rate`, item.sellingPrice);
+    // item.taxRate is a percent, not an option id: map it, or keep the percent itself.
+    const taxFields = taxFieldsForPercent(item.taxRate, taxRates);
+    setValue(`${name}.${index}.taxRateId`, taxFields.taxRateId);
+    setValue(`${name}.${index}.taxPercent`, taxFields.taxPercent ?? '');
+    // Recalculate amount
+    const qty = watch(`${name}.${index}.quantity`) || '1';
+    const discount = watch(`${name}.${index}.discountPercent`) || '0';
+    const amount = calculateLineAmount(qty, item.sellingPrice, discount);
+    setValue(`${name}.${index}.amount`, amount);
   };
 
   const handleQuantityChange = (index: number, value: string) => {
@@ -271,10 +264,10 @@ export function LineItemsForm({
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">Line Items</CardTitle>
+          <CardTitle className="text-lg">{t('lineItems.title')}</CardTitle>
           <Button type="button" variant="outline" size="sm" onClick={addLine}>
-            <Plus className="h-4 w-4 mr-1" />
-            Add Line
+            <Plus className="h-4 w-4 me-1" />
+            {t('lineItems.addItem')}
           </Button>
         </div>
       </CardHeader>
@@ -294,12 +287,12 @@ export function LineItemsForm({
             gridTemplateColumns: `3fr 1fr 1fr ${showDiscount ? '1fr ' : ''}${showTax ? '1.5fr ' : ''}1fr 0.5fr`,
           }}
         >
-          <div>Item / Description</div>
-          <div className="text-right">Qty</div>
-          <div className="text-right">Rate</div>
-          {showDiscount && <div className="text-right">Disc %</div>}
-          {showTax && <div>Tax</div>}
-          <div className="text-right">Amount</div>
+          <div>{t('lineItems.itemDescription')}</div>
+          <div className="text-end">{t('lineItems.quantity')}</div>
+          <div className="text-end">{t('lineItems.rate')}</div>
+          {showDiscount && <div className="text-end">{t('lineItems.discountPercent')}</div>}
+          {showTax && <div>{t('lineItems.tax')}</div>}
+          <div className="text-end">{t('lineItems.amount')}</div>
           <div></div>
         </div>
 
@@ -315,24 +308,18 @@ export function LineItemsForm({
             >
               {/* Item/Description */}
               <div className="space-y-1">
-                <Select
-                  value={watch(`${name}.${index}.itemId`) || '__custom__'}
-                  onValueChange={(value) => handleItemSelect(index, value)}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Select item (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__custom__">Custom item</SelectItem>
-                    {items.map((item: Item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name} - {formatAmount(parseFloat(item.sellingPrice), currency)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <ItemCombobox
+                  className="h-9"
+                  ariaLabel={t('lineItems.item')}
+                  value={watch(`${name}.${index}.itemId`) || ''}
+                  onValueChange={(_id, item) => handleItemSelect(index, item)}
+                  placeholder={t('lineItems.itemPlaceholder')}
+                  noneLabel={t('lineItems.customItem')}
+                  describe={(item) => formatAmount(parseFloat(item.sellingPrice), currency)}
+                />
                 <Input
-                  placeholder="Description"
+                  placeholder={t('lineItems.description')}
+                  aria-label={t('lineItems.description')}
                   className="h-9"
                   value={watch(`${name}.${index}.description`) || ''}
                   onChange={(e) => setValue(`${name}.${index}.description`, e.target.value)}
@@ -344,7 +331,7 @@ export function LineItemsForm({
                 type="number"
                 step="0.01"
                 min="0"
-                className="text-right h-9"
+                className="text-end h-9"
                 placeholder="1"
                 value={watch(`${name}.${index}.quantity`) || ''}
                 onChange={(e) => handleQuantityChange(index, e.target.value)}
@@ -355,7 +342,7 @@ export function LineItemsForm({
                 type="number"
                 step="0.01"
                 min="0"
-                className="text-right h-9"
+                className="text-end h-9"
                 placeholder="0.00"
                 value={watch(`${name}.${index}.rate`) || ''}
                 onChange={(e) => handleRateChange(index, e.target.value)}
@@ -368,7 +355,7 @@ export function LineItemsForm({
                   step="0.01"
                   min="0"
                   max="100"
-                  className="text-right h-9"
+                  className="text-end h-9"
                   placeholder="0"
                   value={watch(`${name}.${index}.discountPercent`) || ''}
                   onChange={(e) => handleDiscountChange(index, e.target.value)}
@@ -387,10 +374,10 @@ export function LineItemsForm({
                   }}
                 >
                   <SelectTrigger className="h-9">
-                    <SelectValue placeholder="No tax" />
+                    <SelectValue placeholder={t('lineItems.noTax')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">No tax</SelectItem>
+                    <SelectItem value="__none__">{t('lineItems.noTax')}</SelectItem>
                     {taxRates.map((tax) => (
                       <SelectItem key={tax.id} value={tax.id}>
                         {tax.name} ({tax.rate}%)
@@ -401,7 +388,7 @@ export function LineItemsForm({
               )}
 
               {/* Amount */}
-              <div className="text-right font-mono text-sm font-medium h-9 flex items-center justify-end">
+              <div className="text-end font-mono text-sm font-medium h-9 flex items-center justify-end">
                 {formatAmount(parseFloat(watch(`${name}.${index}.amount`) || '0'), currency)}
               </div>
 
@@ -413,7 +400,7 @@ export function LineItemsForm({
                 onClick={() => removeLine(index)}
                 disabled={fields.length <= 1}
                 className="h-9 w-9"
-                aria-label="Remove line item"
+                aria-label={t('lineItems.removeLine')}
               >
                 <Trash2 className="h-4 w-4 text-muted-foreground hover:text-red-500" />
               </Button>
@@ -424,35 +411,70 @@ export function LineItemsForm({
         {/* Totals */}
         <div className="border-t mt-4 pt-4 space-y-2">
           <div className="flex justify-end gap-8 text-sm">
-            <span className="text-muted-foreground">Subtotal:</span>
-            <span className="font-mono w-24 text-right">
+            <span className="text-muted-foreground">{t('lineItems.subtotal')}</span>
+            <span className="font-mono w-24 text-end">
               {formatAmount(totals.subtotal, currency)}
             </span>
           </div>
           {showDiscount && totals.totalDiscount > 0 && (
             <div className="flex justify-end gap-8 text-sm">
-              <span className="text-muted-foreground">Discount:</span>
-              <span className="font-mono w-24 text-right text-red-600">
+              <span className="text-muted-foreground">{t('lineItems.discountTotal')}</span>
+              <span className="font-mono w-24 text-end text-red-600">
                 -{formatAmount(totals.totalDiscount, currency)}
               </span>
             </div>
           )}
           {showTax && totals.totalTax > 0 && (
             <div className="flex justify-end gap-8 text-sm">
-              <span className="text-muted-foreground">Tax:</span>
-              <span className="font-mono w-24 text-right">
+              <span className="text-muted-foreground">{t('lineItems.taxTotal')}</span>
+              <span className="font-mono w-24 text-end">
                 {formatAmount(totals.totalTax, currency)}
               </span>
             </div>
           )}
           <div className="flex justify-end gap-8 text-base font-semibold border-t pt-2">
-            <span>Total:</span>
-            <span className="font-mono w-24 text-right">
+            <span>{t('lineItems.total')}</span>
+            <span className="font-mono w-24 text-end">
               {formatAmount(totals.grandTotal, currency)}
             </span>
           </div>
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Field errors of the line array ("Line 2: Description is required"), translated through
+ * `translate` (the form's validation namespace). LineItemsForm itself has no error slots.
+ */
+export function LineErrors({
+  errors,
+  translate,
+}: {
+  errors: unknown;
+  translate: (message?: string) => string | undefined;
+}): JSX.Element | null {
+  const t = useTranslations('sales.lineItems');
+  if (!Array.isArray(errors)) return null;
+  const messages = errors.flatMap((lineError: unknown, index: number) =>
+    lineError && typeof lineError === 'object'
+      ? Object.values(lineError as Record<string, unknown>)
+          .map((e) =>
+            e && typeof e === 'object' && 'message' in e
+              ? (e as { message?: unknown }).message
+              : undefined,
+          )
+          .filter((m): m is string => typeof m === 'string')
+          .map((m) => t('lineError', { line: index + 1, message: translate(m) ?? m }))
+      : [],
+  );
+  if (messages.length === 0) return null;
+  return (
+    <ul className="space-y-1 text-sm text-destructive" role="alert">
+      {messages.map((message) => (
+        <li key={message}>{message}</li>
+      ))}
+    </ul>
   );
 }

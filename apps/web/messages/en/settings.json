@@ -54,6 +54,10 @@
     "auditLogs": {
       "title": "Audit Logs",
       "description": "Track all user actions and changes across the system"
+    },
+    "flowline": {
+      "title": "Connect to FlowLine",
+      "description": "API keys, signed webhooks and delivery log for FlowLine automations"
     }
   },
   "organization": {
@@ -568,5 +572,103 @@
       "system": "System"
     },
     "language": "Language"
+  },
+  "flowline": {
+    "title": "Connect to FlowLine",
+    "description": "Let FlowLine automations react to Mizano events and act in Mizano with a scoped key.",
+    "back": "Back to settings",
+    "copy": "Copy",
+    "copied": "Copied",
+    "done": "Done",
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "error": "Something went wrong",
+    "loadFailed": "Could not load this section.",
+    "name": "Name",
+    "status": "Status",
+    "encryptionMissing": "Webhook secrets cannot be stored until the server administrator sets INTEGRATIONS_ENCRYPTION_KEY on the API.",
+    "step1": {
+      "title": "1. FlowLine → Mizano (API key)",
+      "description": "Create a key and paste it, with the API address, into FlowLine's Mizano connection.",
+      "baseUrl": "Mizano API address for FlowLine",
+      "newKey": "Your new API key",
+      "newKeyWarning": "Copy it now: it will not be shown again. Anyone with this key can act with its scopes.",
+      "scopes": "Allowed actions",
+      "create": "Create API key",
+      "empty": "No API keys yet.",
+      "prefix": "Key",
+      "lastUsed": "Last used",
+      "active": "Active",
+      "revoked": "Revoked",
+      "revoke": "Revoke",
+      "revokeTitle": "Revoke this key?",
+      "revokeDescription": "FlowLine flows using it will stop working immediately. This cannot be undone.",
+      "howToUse": "FlowLine sends it as \"Authorization: Bearer <key>\". Keys act with your role's permissions."
+    },
+    "step2": {
+      "title": "2. Mizano → FlowLine (events)",
+      "description": "In FlowLine, add a Mizano trigger to a flow, then paste its webhook URL and signing secret here.",
+      "url": "FlowLine webhook URL",
+      "secret": "Signing secret (whsec_…)",
+      "events": "Events to send",
+      "add": "Add webhook",
+      "saved": "Webhook saved",
+      "empty": "No webhooks yet.",
+      "secretHint": "Secret",
+      "enabled": "Enabled",
+      "test": "Send test",
+      "testOk": "FlowLine accepted the test event (HTTP {code})",
+      "testFailed": "Test event was not accepted",
+      "backlog": "Send overdue backlog",
+      "backlogTitle": "Send reminders for old overdue invoices?",
+      "backlogDescription": "New webhooks only hear about invoices that become overdue after they were added. This sends every invoice that is overdue now on the next hourly check, so FlowLine reminder flows may contact all of these customers at once.",
+      "backlogQueued": "Overdue invoices will be sent on the next hourly check",
+      "delete": "Delete",
+      "deleteTitle": "Delete this webhook?",
+      "deleteDescription": "Mizano stops sending events to it. Queued deliveries will fail."
+    },
+    "log": {
+      "title": "Delivery log",
+      "description": "Every event sent to FlowLine, with retries. Failed deliveries can be sent again; FlowLine ignores duplicates.",
+      "empty": "Nothing sent yet.",
+      "event": "Event",
+      "endpoint": "Webhook",
+      "attempts": "Attempts",
+      "result": "Last result",
+      "time": "Time",
+      "testEvent": "Test event",
+      "redeliver": "Send again",
+      "nextAttempt": "Next try {time}",
+      "status": {
+        "PENDING": "Queued",
+        "DELIVERING": "Sending",
+        "SUCCEEDED": "Delivered",
+        "FAILED": "Failed",
+        "RETRYING": "Retrying"
+      }
+    },
+    "scopes": {
+      "customers_read": "Read customers",
+      "customers_write": "Create customers",
+      "invoices_read": "Read invoices",
+      "invoices_write": "Create draft invoices",
+      "balances_read": "Read balances",
+      "notes_write": "Add notes"
+    },
+    "events": {
+      "customer_created": "Customer created",
+      "customer_updated": "Customer updated",
+      "invoice_created": "Invoice created",
+      "invoice_updated": "Invoice updated",
+      "invoice_sent": "Invoice sent",
+      "invoice_paid": "Invoice paid",
+      "invoice_voided": "Invoice voided",
+      "payment_voided": "Payment voided",
+      "invoice_overdue": "Invoice overdue",
+      "payment_received": "Payment received"
+    },
+    "errors": {
+      "WEBHOOK_ENDPOINT_INACTIVE": "Enable the webhook before sending the overdue backlog."
+    }
   }
 }

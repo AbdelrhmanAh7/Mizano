@@ -7,9 +7,7 @@ import { CompensationBenchmarkService } from '../services/compensation-benchmark
 import { QualityPredictionService } from '../services/quality-prediction.service';
 import { PredictiveMaintenanceService } from '../services/predictive-maintenance.service';
 import { ResourceOptimizationService } from '../services/resource-optimization.service';
-import { describeError } from '../../../common/utils/redact';
-
-const BATCH_SIZE = 5;
+import { forEachOrganization } from './for-each-organization';
 
 @Injectable()
 export class AiHrOpsScheduler {
@@ -29,42 +27,17 @@ export class AiHrOpsScheduler {
    */
   @Cron('0 5 1 * *')
   async runMonthlyAttritionPrediction() {
-    this.logger.log('Starting monthly attrition prediction...');
-
-    try {
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
-
-      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
-        const batch = organizations.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map(async (org) => {
-            try {
-              const result = await this.attritionService.predictAll(org.id);
-              this.logger.log(
-                `Org ${org.name}: Attrition prediction - ${result.processed} employees (high: ${result.highRisk}, medium: ${result.mediumRisk}, low: ${result.lowRisk})`,
-              );
-            } catch (error) {
-              this.logger.error(
-                `Error predicting attrition for org ${org.id}: ${describeError(error)}`,
-              );
-            }
-          }),
+    await forEachOrganization(
+      this.prisma,
+      this.logger,
+      { name: 'monthly attrition prediction', failure: 'predicting attrition' },
+      async (org) => {
+        const result = await this.attritionService.predictAll(org.id);
+        this.logger.log(
+          `Org ${org.name}: Attrition prediction - ${result.processed} employees (high: ${result.highRisk}, medium: ${result.mediumRisk}, low: ${result.lowRisk})`,
         );
-        // Log any unexpected rejections
-        for (const r of results) {
-          if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
-          }
-        }
-      }
-
-      this.logger.log('Monthly attrition prediction completed');
-    } catch (error) {
-      this.logger.error(`Monthly attrition prediction failed: ${describeError(error)}`);
-    }
+      },
+    );
   }
 
   /**
@@ -72,42 +45,17 @@ export class AiHrOpsScheduler {
    */
   @Cron('0 4 1 * *')
   async runMonthlyCompensationBenchmark() {
-    this.logger.log('Starting monthly compensation benchmark...');
-
-    try {
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
-
-      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
-        const batch = organizations.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map(async (org) => {
-            try {
-              const departments = await this.compensationService.getDepartmentBenchmarks(org.id);
-              this.logger.log(
-                `Org ${org.name}: Compensation benchmark - ${departments.length} departments analyzed`,
-              );
-            } catch (error) {
-              this.logger.error(
-                `Error benchmarking compensation for org ${org.id}: ${describeError(error)}`,
-              );
-            }
-          }),
+    await forEachOrganization(
+      this.prisma,
+      this.logger,
+      { name: 'monthly compensation benchmark', failure: 'benchmarking compensation' },
+      async (org) => {
+        const departments = await this.compensationService.getDepartmentBenchmarks(org.id);
+        this.logger.log(
+          `Org ${org.name}: Compensation benchmark - ${departments.length} departments analyzed`,
         );
-        // Log any unexpected rejections
-        for (const r of results) {
-          if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
-          }
-        }
-      }
-
-      this.logger.log('Monthly compensation benchmark completed');
-    } catch (error) {
-      this.logger.error(`Monthly compensation benchmark failed: ${describeError(error)}`);
-    }
+      },
+    );
   }
 
   /**
@@ -115,40 +63,15 @@ export class AiHrOpsScheduler {
    */
   @Cron('0 5 * * 1')
   async runWeeklyQualityPrediction() {
-    this.logger.log('Starting weekly quality prediction...');
-
-    try {
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
-
-      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
-        const batch = organizations.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map(async (org) => {
-            try {
-              const trends = await this.qualityService.getQualityTrends(org.id);
-              this.logger.log(`Org ${org.name}: Quality trends - ${trends.length} months analyzed`);
-            } catch (error) {
-              this.logger.error(
-                `Error analyzing quality for org ${org.id}: ${describeError(error)}`,
-              );
-            }
-          }),
-        );
-        // Log any unexpected rejections
-        for (const r of results) {
-          if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
-          }
-        }
-      }
-
-      this.logger.log('Weekly quality prediction completed');
-    } catch (error) {
-      this.logger.error(`Weekly quality prediction failed: ${describeError(error)}`);
-    }
+    await forEachOrganization(
+      this.prisma,
+      this.logger,
+      { name: 'weekly quality prediction', failure: 'analyzing quality' },
+      async (org) => {
+        const trends = await this.qualityService.getQualityTrends(org.id);
+        this.logger.log(`Org ${org.name}: Quality trends - ${trends.length} months analyzed`);
+      },
+    );
   }
 
   /**
@@ -156,42 +79,17 @@ export class AiHrOpsScheduler {
    */
   @Cron('0 6 1 * *')
   async runMonthlyPredictiveMaintenance() {
-    this.logger.log('Starting monthly predictive maintenance...');
-
-    try {
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
-
-      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
-        const batch = organizations.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map(async (org) => {
-            try {
-              const result = await this.maintenanceService.predictAll(org.id);
-              this.logger.log(
-                `Org ${org.name}: Maintenance prediction - ${result.processed} assets (critical: ${result.critical}, warning: ${result.warning}, healthy: ${result.healthy})`,
-              );
-            } catch (error) {
-              this.logger.error(
-                `Error predicting maintenance for org ${org.id}: ${describeError(error)}`,
-              );
-            }
-          }),
+    await forEachOrganization(
+      this.prisma,
+      this.logger,
+      { name: 'monthly predictive maintenance', failure: 'predicting maintenance' },
+      async (org) => {
+        const result = await this.maintenanceService.predictAll(org.id);
+        this.logger.log(
+          `Org ${org.name}: Maintenance prediction - ${result.processed} assets (critical: ${result.critical}, warning: ${result.warning}, healthy: ${result.healthy})`,
         );
-        // Log any unexpected rejections
-        for (const r of results) {
-          if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
-          }
-        }
-      }
-
-      this.logger.log('Monthly predictive maintenance completed');
-    } catch (error) {
-      this.logger.error(`Monthly predictive maintenance failed: ${describeError(error)}`);
-    }
+      },
+    );
   }
 
   /**
@@ -199,42 +97,17 @@ export class AiHrOpsScheduler {
    */
   @Cron('0 7 1 * *')
   async runMonthlyResourceOptimization() {
-    this.logger.log('Starting monthly resource optimization...');
-
-    try {
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
-
-      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
-        const batch = organizations.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map(async (org) => {
-            try {
-              const opportunities = await this.resourceService.getOptimizationOpportunities(org.id);
-              this.logger.log(
-                `Org ${org.name}: Resource optimization - ${opportunities.opportunities.length} opportunities found`,
-              );
-            } catch (error) {
-              this.logger.error(
-                `Error optimizing resources for org ${org.id}: ${describeError(error)}`,
-              );
-            }
-          }),
+    await forEachOrganization(
+      this.prisma,
+      this.logger,
+      { name: 'monthly resource optimization', failure: 'optimizing resources' },
+      async (org) => {
+        const opportunities = await this.resourceService.getOptimizationOpportunities(org.id);
+        this.logger.log(
+          `Org ${org.name}: Resource optimization - ${opportunities.opportunities.length} opportunities found`,
         );
-        // Log any unexpected rejections
-        for (const r of results) {
-          if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
-          }
-        }
-      }
-
-      this.logger.log('Monthly resource optimization completed');
-    } catch (error) {
-      this.logger.error(`Monthly resource optimization failed: ${describeError(error)}`);
-    }
+      },
+    );
   }
 }
 

@@ -192,18 +192,6 @@ const documentIntakeApi = {
   },
 };
 
-// ============ Hooks ============
-
-/**
- * Legacy synchronous document intake hook.
- * Kept for backward compatibility — use useDocumentIntakeStream() instead.
- */
-export function useDocumentIntakeProcess() {
-  return useMutation({
-    mutationFn: documentIntakeApi.processDocument,
-  });
-}
-
 /** Poll interval and tolerance for the polling fallback. */
 const POLL_INTERVAL_MS = 2000;
 const MAX_CONSECUTIVE_POLL_FAILURES = 5;

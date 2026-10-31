@@ -1,17 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-
-// ============ Types ============
-
-export type DocumentType =
-  | 'INVOICE'
-  | 'QUOTE'
-  | 'CREDIT_NOTE'
-  | 'BILL'
-  | 'PAYSLIP'
-  | 'STATEMENT'
-  | 'PURCHASE_ORDER'
-  | 'DELIVERY_CHALLAN';
 
 export interface SendDocumentDto {
   to: string;
@@ -32,36 +19,20 @@ export interface StatementQueryDto {
   dateTo: string;
 }
 
-export interface SendResult {
-  success: boolean;
-  emailLogId?: string;
-  error?: string;
-}
-
-export interface BulkSendResult {
-  total: number;
-  sent: number;
-  failed: number;
-  errors: Array<{ employeeId: string; error: string }>;
-}
-
-export interface EmailLog {
-  id: string;
-  to: string;
-  subject: string;
-  entityType: string;
-  entityId: string;
-  sentAt: string;
-  status: 'sent' | 'failed' | 'bounced';
-  error?: string;
-}
-
 // ============ API Functions ============
+
+/** Language of a generated document; Arabic renders right-to-left. */
+export type DocumentLocale = 'en' | 'ar';
+
+export function documentLocaleFor(appLocale: string): DocumentLocale {
+  return appLocale === 'ar' ? 'ar' : 'en';
+}
 
 const documentsApi = {
   // Invoice PDFs
-  getInvoicePdf: async (invoiceId: string) => {
+  getInvoicePdf: async (invoiceId: string, locale?: DocumentLocale): Promise<Blob> => {
     const response = await api.get(`/documents/invoice/${invoiceId}/pdf`, {
+      params: locale ? { locale } : undefined,
       responseType: 'blob',
     });
     return response.data;
@@ -165,244 +136,49 @@ const documentsApi = {
   },
 };
 
-// ============ Hooks - Invoice ============
+// ============ Invoice PDF actions ============
 
-export function useInvoicePdf(invoiceId: string) {
-  return useQuery({
-    queryKey: ['invoice-pdf', invoiceId],
-    queryFn: () => documentsApi.getInvoicePdf(invoiceId),
-    enabled: !!invoiceId,
-    staleTime: 0, // Always fetch fresh PDF
-  });
+function pdfBlob(data: Blob): Blob {
+  return data.type === 'application/pdf' ? data : new Blob([data], { type: 'application/pdf' });
 }
 
-export function useSendInvoice() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ invoiceId, data }: { invoiceId: string; data: SendDocumentDto }) =>
-      documentsApi.sendInvoice(invoiceId, data),
-    onSuccess: (_, { invoiceId }) => {
-      queryClient.invalidateQueries({ queryKey: ['invoices', invoiceId] });
-      queryClient.invalidateQueries({ queryKey: ['email-logs'] });
-    },
-  });
-}
-
-// ============ Hooks - Quote ============
-
-export function useQuotePdf(quoteId: string) {
-  return useQuery({
-    queryKey: ['quote-pdf', quoteId],
-    queryFn: () => documentsApi.getQuotePdf(quoteId),
-    enabled: !!quoteId,
-    staleTime: 0,
-  });
-}
-
-export function useSendQuote() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ quoteId, data }: { quoteId: string; data: SendDocumentDto }) =>
-      documentsApi.sendQuote(quoteId, data),
-    onSuccess: (_, { quoteId }) => {
-      queryClient.invalidateQueries({ queryKey: ['quotes', quoteId] });
-      queryClient.invalidateQueries({ queryKey: ['email-logs'] });
-    },
-  });
-}
-
-// ============ Hooks - Credit Note ============
-
-export function useCreditNotePdf(creditNoteId: string) {
-  return useQuery({
-    queryKey: ['credit-note-pdf', creditNoteId],
-    queryFn: () => documentsApi.getCreditNotePdf(creditNoteId),
-    enabled: !!creditNoteId,
-    staleTime: 0,
-  });
-}
-
-export function useSendCreditNote() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ creditNoteId, data }: { creditNoteId: string; data: SendDocumentDto }) =>
-      documentsApi.sendCreditNote(creditNoteId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['email-logs'] });
-    },
-  });
-}
-
-// ============ Hooks - Bill ============
-
-export function useBillPdf(billId: string) {
-  return useQuery({
-    queryKey: ['bill-pdf', billId],
-    queryFn: () => documentsApi.getBillPdf(billId),
-    enabled: !!billId,
-    staleTime: 0,
-  });
-}
-
-// ============ Hooks - Payslip ============
-
-export function usePayslipPdf(payslipId: string) {
-  return useQuery({
-    queryKey: ['payslip-pdf', payslipId],
-    queryFn: () => documentsApi.getPayslipPdf(payslipId),
-    enabled: !!payslipId,
-    staleTime: 0,
-  });
-}
-
-export function useSendPayslip() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ payslipId, data }: { payslipId: string; data?: Partial<SendDocumentDto> }) =>
-      documentsApi.sendPayslip(payslipId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['email-logs'] });
-    },
-  });
-}
-
-export function useSendAllPayslips() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ payrollRunId, options }: { payrollRunId: string; options?: SendPayslipsDto }) =>
-      documentsApi.sendAllPayslips(payrollRunId, options),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['email-logs'] });
-    },
-  });
-}
-
-// ============ Hooks - Statement ============
-
-export function useStatementPdf(customerId: string, params: StatementQueryDto) {
-  return useQuery({
-    queryKey: ['statement-pdf', customerId, params],
-    queryFn: () => documentsApi.getStatementPdf(customerId, params),
-    enabled: !!customerId && !!params.dateFrom && !!params.dateTo,
-    staleTime: 0,
-  });
-}
-
-export function useSendStatement() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      customerId,
-      params,
-    }: {
-      customerId: string;
-      params: StatementQueryDto & SendDocumentDto;
-    }) => documentsApi.sendStatement(customerId, params),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['email-logs'] });
-    },
-  });
-}
-
-// ============ Hooks - Purchase Order ============
-
-export function usePurchaseOrderPdf(poId: string) {
-  return useQuery({
-    queryKey: ['purchase-order-pdf', poId],
-    queryFn: () => documentsApi.getPurchaseOrderPdf(poId),
-    enabled: !!poId,
-    staleTime: 0,
-  });
-}
-
-export function useSendPurchaseOrder() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ poId, data }: { poId: string; data: SendDocumentDto }) =>
-      documentsApi.sendPurchaseOrder(poId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['email-logs'] });
-    },
-  });
-}
-
-// ============ Hooks - Delivery Challan ============
-
-export function useDeliveryChallanPdf(challanId: string) {
-  return useQuery({
-    queryKey: ['delivery-challan-pdf', challanId],
-    queryFn: () => documentsApi.getDeliveryChallanPdf(challanId),
-    enabled: !!challanId,
-    staleTime: 0,
-  });
-}
-
-// ============ Hooks - Email Logs ============
-
-export function useEmailLogs(params?: {
-  entityType?: string;
-  entityId?: string;
-  status?: string;
-  page?: number;
-  limit?: number;
-}) {
-  return useQuery({
-    queryKey: ['email-logs', params],
-    queryFn: () => documentsApi.getEmailLogs(params),
-  });
-}
-
-// ============ Helper Functions ============
-
-export function downloadBlob(blob: Blob, filename: string) {
+/** Downloads the invoice PDF (GET /documents/invoice/:id/pdf, `sales.view`) as `<number>.pdf`. */
+export async function downloadInvoicePdf(
+  invoiceId: string,
+  invoiceNumber: string,
+  locale: DocumentLocale,
+): Promise<void> {
+  const blob = pdfBlob(await documentsApi.getInvoicePdf(invoiceId, locale));
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = filename;
+  // Keep the number readable (Arabic too); drop only characters file systems refuse.
+  link.download = `${invoiceNumber.replace(/[\\/:*?"<>|\s]+/g, '_') || 'invoice'}.pdf`;
   document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
+  link.remove();
   window.URL.revokeObjectURL(url);
 }
 
-export function openBlobInNewTab(blob: Blob) {
-  const url = window.URL.createObjectURL(blob);
-  window.open(url, '_blank');
-}
-
-export function getDocumentTypeLabel(type: DocumentType): string {
-  const labels: Record<DocumentType, string> = {
-    INVOICE: 'Invoice',
-    QUOTE: 'Quote',
-    CREDIT_NOTE: 'Credit Note',
-    BILL: 'Bill',
-    PAYSLIP: 'Payslip',
-    STATEMENT: 'Statement',
-    PURCHASE_ORDER: 'Purchase Order',
-    DELIVERY_CHALLAN: 'Delivery Challan',
-  };
-  return labels[type] || type;
-}
-
-export function getDocumentTypeIcon(type: DocumentType): string {
-  const icons: Record<DocumentType, string> = {
-    INVOICE: '📄',
-    QUOTE: '📋',
-    CREDIT_NOTE: '💰',
-    BILL: '🧾',
-    PAYSLIP: '💵',
-    STATEMENT: '📊',
-    PURCHASE_ORDER: '📦',
-    DELIVERY_CHALLAN: '🚚',
-  };
-  return icons[type] || '📄';
-}
-
-export function getEmailStatusColor(status: string): string {
-  const colors: Record<string, string> = {
-    sent: 'bg-green-100 text-green-800',
-    failed: 'bg-red-100 text-red-800',
-    bounced: 'bg-yellow-100 text-yellow-800',
-  };
-  return colors[status] || 'bg-gray-100 text-gray-800';
+/**
+ * Opens the invoice PDF in a new tab for printing. The tab must be opened synchronously in the
+ * click handler (popup blockers allow nothing later), so call this directly from onClick; it
+ * closes the tab again if the PDF cannot be generated.
+ */
+export async function openInvoicePdfForPrint(
+  invoiceId: string,
+  locale: DocumentLocale,
+): Promise<void> {
+  const tab = window.open('', '_blank');
+  try {
+    const blob = pdfBlob(await documentsApi.getInvoicePdf(invoiceId, locale));
+    const url = window.URL.createObjectURL(blob);
+    if (tab) tab.location.href = url;
+    else window.location.assign(url);
+    // The viewer has loaded the bytes long before this; keep the URL alive for its own save.
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 5 * 60_000);
+  } catch (error) {
+    tab?.close();
+    throw error;
+  }
 }

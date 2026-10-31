@@ -5,8 +5,7 @@ import { FraudDetectionService } from '../services/fraud-detection.service';
 import { ComplianceMonitoringService } from '../services/compliance-monitoring.service';
 import { AuditRiskService } from '../services/audit-risk.service';
 import { describeError } from '../../../common/utils/redact';
-
-const BATCH_SIZE = 5;
+import { forEachOrganization } from './for-each-organization';
 
 @Injectable()
 export class AiSecurityScheduler {
@@ -24,44 +23,19 @@ export class AiSecurityScheduler {
    */
   @Cron('0 1 * * *')
   async runDailyFraudScan() {
-    this.logger.log('Starting daily fraud scan...');
-
-    try {
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
-
-      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
-        const batch = organizations.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map(async (org) => {
-            try {
-              const result = await this.fraudService.dailyFraudScan(org.id);
-              if (result.alertsCreated > 0) {
-                this.logger.log(
-                  `Org ${org.name}: Fraud scan - ${result.scanned} scanned, ${result.alertsCreated} alerts created`,
-                );
-              }
-            } catch (error) {
-              this.logger.error(
-                `Error running fraud scan for org ${org.id}: ${describeError(error)}`,
-              );
-            }
-          }),
-        );
-        // Log any unexpected rejections
-        for (const r of results) {
-          if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
-          }
+    await forEachOrganization(
+      this.prisma,
+      this.logger,
+      { name: 'daily fraud scan', failure: 'running fraud scan' },
+      async (org) => {
+        const result = await this.fraudService.dailyFraudScan(org.id);
+        if (result.alertsCreated > 0) {
+          this.logger.log(
+            `Org ${org.name}: Fraud scan - ${result.scanned} scanned, ${result.alertsCreated} alerts created`,
+          );
         }
-      }
-
-      this.logger.log('Daily fraud scan completed');
-    } catch (error) {
-      this.logger.error(`Daily fraud scan failed: ${describeError(error)}`);
-    }
+      },
+    );
   }
 
   /**
@@ -69,42 +43,17 @@ export class AiSecurityScheduler {
    */
   @Cron('0 5 * * *')
   async runDailyComplianceCheck() {
-    this.logger.log('Starting daily compliance check...');
-
-    try {
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
-
-      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
-        const batch = organizations.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map(async (org) => {
-            try {
-              const report = await this.complianceService.runComplianceCheck(org.id);
-              this.logger.log(
-                `Org ${org.name}: Compliance score ${report.score.toFixed(0)}% - ${report.violations.length} violations found`,
-              );
-            } catch (error) {
-              this.logger.error(
-                `Error checking compliance for org ${org.id}: ${describeError(error)}`,
-              );
-            }
-          }),
+    await forEachOrganization(
+      this.prisma,
+      this.logger,
+      { name: 'daily compliance check', failure: 'checking compliance' },
+      async (org) => {
+        const report = await this.complianceService.runComplianceCheck(org.id);
+        this.logger.log(
+          `Org ${org.name}: Compliance score ${report.score.toFixed(0)}% - ${report.violations.length} violations found`,
         );
-        // Log any unexpected rejections
-        for (const r of results) {
-          if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
-          }
-        }
-      }
-
-      this.logger.log('Daily compliance check completed');
-    } catch (error) {
-      this.logger.error(`Daily compliance check failed: ${describeError(error)}`);
-    }
+      },
+    );
   }
 
   /**
@@ -112,46 +61,27 @@ export class AiSecurityScheduler {
    */
   @Cron('0 6 * * 0')
   async runWeeklyAuditRiskScoring() {
-    this.logger.log('Starting weekly audit risk scoring...');
-
-    try {
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
-
-      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
-        const batch = organizations.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map(async (org) => {
-            for (const entityType of ['journal', 'invoice', 'bill', 'expense']) {
-              try {
-                const result = await this.auditRiskService.batchScore(org.id, entityType);
-                if (result.highRisk > 0) {
-                  this.logger.log(
-                    `Org ${org.name}: Audit risk ${entityType} - ${result.processed} scored (high: ${result.highRisk}, medium: ${result.mediumRisk})`,
-                  );
-                }
-              } catch (error) {
-                this.logger.error(
-                  `Error scoring ${entityType} audit risk for org ${org.id}: ${describeError(error)}`,
-                );
-              }
+    await forEachOrganization(
+      this.prisma,
+      this.logger,
+      { name: 'weekly audit risk scoring', failure: 'scoring audit risk' },
+      async (org) => {
+        for (const entityType of ['journal', 'invoice', 'bill', 'expense']) {
+          try {
+            const result = await this.auditRiskService.batchScore(org.id, entityType);
+            if (result.highRisk > 0) {
+              this.logger.log(
+                `Org ${org.name}: Audit risk ${entityType} - ${result.processed} scored (high: ${result.highRisk}, medium: ${result.mediumRisk})`,
+              );
             }
-          }),
-        );
-        // Log any unexpected rejections
-        for (const r of results) {
-          if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
+          } catch (error) {
+            this.logger.error(
+              `Error scoring ${entityType} audit risk for org ${org.id}: ${describeError(error)}`,
+            );
           }
         }
-      }
-
-      this.logger.log('Weekly audit risk scoring completed');
-    } catch (error) {
-      this.logger.error(`Weekly audit risk scoring failed: ${describeError(error)}`);
-    }
+      },
+    );
   }
 
   /**

@@ -2,18 +2,13 @@
 
 import { memo } from 'react';
 import { useTranslations } from 'next-intl';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
 import { QuoteConversionItem } from '@/lib/hooks/use-dashboard-sections';
+import {
+  ChartCard,
+  CHART_AXIS,
+  CHART_TOOLTIP_STYLE,
+} from '@/components/dashboard/charts/chart-card';
 
 interface QuoteConversionChartProps {
   data: QuoteConversionItem[];
@@ -36,53 +31,21 @@ export const QuoteConversionChart = memo(function QuoteConversionChart({
   const t = useTranslations('common.dashboard.charts');
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">{t('quoteConversion')}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data}
-              layout="vertical"
-              margin={{ top: 10, right: 30, left: 80, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-              <XAxis
-                type="number"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'hsl(var(--muted-foreground))' }}
-              />
-              <YAxis
-                type="category"
-                dataKey="status"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'hsl(var(--muted-foreground))' }}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px',
-                }}
-              />
-              <Bar dataKey="count" name={t('quotes')} radius={[0, 4, 4, 0]}>
-                {data.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={
-                      STATUS_COLORS[entry.status] || FALLBACK_COLORS[index % FALLBACK_COLORS.length]
-                    }
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </CardContent>
-    </Card>
+    <ChartCard title={t('quoteConversion')}>
+      <BarChart data={data} layout="vertical" margin={{ top: 10, right: 30, left: 80, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+        <XAxis type="number" {...CHART_AXIS} />
+        <YAxis type="category" dataKey="status" {...CHART_AXIS} />
+        <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
+        <Bar dataKey="count" name={t('quotes')} radius={[0, 4, 4, 0]}>
+          {data.map((entry, index) => (
+            <Cell
+              key={`cell-${index}`}
+              fill={STATUS_COLORS[entry.status] || FALLBACK_COLORS[index % FALLBACK_COLORS.length]}
+            />
+          ))}
+        </Bar>
+      </BarChart>
+    </ChartCard>
   );
 });

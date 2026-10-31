@@ -1,4 +1,4 @@
-import { signedMovementQuantity } from '../../inventory/utils/movement-sign';
+import { signedMovementQuantity } from '../../../common/utils/movement-sign';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Item, Prisma, WorkOrderStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';

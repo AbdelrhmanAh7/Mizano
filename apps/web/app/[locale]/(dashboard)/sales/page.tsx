@@ -18,12 +18,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useCustomers, formatCurrency } from '@/lib/hooks/use-customers';
+import { useCustomers } from '@/lib/hooks/use-customers';
 import { useInvoices } from '@/lib/hooks/use-invoices';
 import { useQuotes } from '@/lib/hooks/use-quotes';
 import { differenceInDays } from 'date-fns';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function SalesPage() {
+  // Overview figures are ledger amounts, in the org base currency (audit B5).
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('sales');
   const { data: customersData, isLoading: customersLoading } = useCustomers({ limit: 100 });
   const { data: invoicesData, isLoading: invoicesLoading } = useInvoices({ limit: 100 });
@@ -150,7 +153,7 @@ export default function SalesPage() {
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold">{formatCurrency(totalOutstanding, 'USD')}</div>
+              <div className="text-2xl font-bold">{formatCurrency(totalOutstanding)}</div>
             )}
             <p className="text-xs text-muted-foreground">Across {customers.length} customers</p>
           </CardContent>
@@ -165,9 +168,7 @@ export default function SalesPage() {
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-red-600">
-                {formatCurrency(overdueAmount, 'USD')}
-              </div>
+              <div className="text-2xl font-bold text-red-600">{formatCurrency(overdueAmount)}</div>
             )}
             <p className="text-xs text-muted-foreground">
               {overdueInvoices.length} overdue invoices
@@ -184,7 +185,7 @@ export default function SalesPage() {
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold">{formatCurrency(pendingQuotesTotal, 'USD')}</div>
+              <div className="text-2xl font-bold">{formatCurrency(pendingQuotesTotal)}</div>
             )}
             <p className="text-xs text-muted-foreground">
               {pendingQuotes.length} quotes awaiting response
@@ -202,7 +203,7 @@ export default function SalesPage() {
               <Skeleton className="h-8 w-24" />
             ) : (
               <div className="text-2xl font-bold text-green-600">
-                {formatCurrency(paidThisMonth, 'USD')}
+                {formatCurrency(paidThisMonth)}
               </div>
             )}
             <p className="text-xs text-muted-foreground">From paid invoices</p>
@@ -275,9 +276,7 @@ export default function SalesPage() {
                           <Badge variant="outline" className="text-xs">
                             {inv.status}
                           </Badge>
-                          <p className="text-sm font-mono mt-1">
-                            {formatCurrency(parseFloat(inv.grandTotal || '0'), 'USD')}
-                          </p>
+                          <p className="text-sm font-mono mt-1">{formatCurrency(inv.grandTotal)}</p>
                         </div>
                       </div>
                     ),
@@ -330,7 +329,7 @@ export default function SalesPage() {
                           <div className="text-right">
                             <p className="text-xs text-red-600">{daysOverdue} days overdue</p>
                             <p className="text-sm font-mono font-semibold text-red-600">
-                              {formatCurrency(parseFloat(inv.balanceDue || '0'), 'USD')}
+                              {formatCurrency(inv.balanceDue)}
                             </p>
                           </div>
                         </div>

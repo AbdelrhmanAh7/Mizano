@@ -11,6 +11,11 @@ import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { describeError } from '../../common/utils/redact';
+import {
+  extractSocketToken,
+  rejectUnauthenticatedHandshakes,
+  SocketExpiryTimers,
+} from '../../common/utils/socket-auth';
 
 export interface EntityEvent {
   type: 'CREATED' | 'UPDATED' | 'DELETED' | 'STATUS_CHANGED';
@@ -31,9 +36,6 @@ export interface NotificationsSocketUser {
   id: string;
   organizationId: string;
 }
-
-/** Max delay for setTimeout (2^31 - 1 ms). */
-const MAX_TIMER_MS = 2_147_483_647;
 
 /** Room that carries the events/notifications of one organization. */
 export function notificationsOrgRoom(organizationId: string): string {
@@ -59,7 +61,7 @@ export class NotificationsGateway
 
   private readonly logger = new Logger(NotificationsGateway.name);
   private readonly orgRooms = new Map<string, Set<string>>();
-  private readonly expiryTimers = new Map<string, NodeJS.Timeout>();
+  private readonly expiryTimers = new SocketExpiryTimers();
 
   constructor(
     private readonly jwtService: JwtService,
@@ -68,11 +70,7 @@ export class NotificationsGateway
 
   /** Reject unauthenticated handshakes before a connection is ever established. */
   afterInit(server: Server): void {
-    server.use((socket, next) => {
-      this.authenticate(socket)
-        .then(() => next())
-        .catch(() => next(new Error('Unauthorized')));
-    });
+    rejectUnauthenticatedHandshakes(server, (socket) => this.authenticate(socket));
   }
 
   handleConnection(client: Socket): void {
@@ -89,16 +87,12 @@ export class NotificationsGateway
       this.orgRooms.set(orgId, new Set());
     }
     this.orgRooms.get(orgId)!.add(client.id);
-    this.scheduleExpiry(client);
+    this.expiryTimers.schedule(client);
     this.logger.log(`Client connected: ${client.id} (org: ${orgId})`);
   }
 
   handleDisconnect(client: Socket): void {
-    const timer = this.expiryTimers.get(client.id);
-    if (timer) {
-      clearTimeout(timer);
-      this.expiryTimers.delete(client.id);
-    }
+    this.expiryTimers.clear(client.id);
     this.logger.log(`Client disconnected: ${client.id}`);
     for (const [orgId, sockets] of this.orgRooms.entries()) {
       sockets.delete(client.id);
@@ -111,7 +105,7 @@ export class NotificationsGateway
    * Rejects (without saying why) otherwise.
    */
   async authenticate(socket: Socket): Promise<NotificationsSocketUser> {
-    const token = this.extractToken(socket);
+    const token = extractSocketToken(socket);
     if (!token) throw new Error('missing token');
 
     let payload: NotificationsJwtPayload;
@@ -217,30 +211,5 @@ export class NotificationsGateway
    */
   getOrgConnectionCount(orgId: string): number {
     return this.orgRooms.get(orgId)?.size ?? 0;
-  }
-
-  private extractToken(socket: Socket): string | undefined {
-    const auth = socket.handshake?.auth as Record<string, unknown> | undefined;
-    if (typeof auth?.token === 'string' && auth.token.length > 0) {
-      return auth.token;
-    }
-    const header = socket.handshake?.headers?.authorization;
-    if (typeof header === 'string') {
-      const match = /^Bearer\s+(\S+)$/i.exec(header);
-      if (match) return match[1];
-    }
-    return undefined;
-  }
-
-  private scheduleExpiry(client: Socket): void {
-    const expiresAt = client.data?.tokenExpiresAt as number | undefined;
-    if (!expiresAt) return;
-    const delay = Math.min(Math.max(expiresAt - Date.now(), 0), MAX_TIMER_MS);
-    const timer = setTimeout(() => {
-      this.expiryTimers.delete(client.id);
-      client.disconnect(true);
-    }, delay);
-    timer.unref?.();
-    this.expiryTimers.set(client.id, timer);
   }
 }

@@ -5,11 +5,27 @@ import enAi from '@/messages/en/ai.json';
 import arAi from '@/messages/ar/ai.json';
 
 jest.mock('next-intl', () => ({
-  useTranslations: () => (key: string, values?: Record<string, string>) =>
-    values ? `${key}|${Object.values(values).join('|')}` : key,
+  useTranslations: () => {
+    const t = (key: string, values?: Record<string, string>) =>
+      values ? `${key}|${Object.values(values).join('|')}` : key;
+    t.has = () => false;
+    return t;
+  },
 }));
-jest.mock('@/lib/hooks/use-vendors', () => ({
-  useVendors: () => ({ data: { data: [] } }),
+const mockNoVendor = { data: undefined };
+jest.mock('@/lib/hooks/use-vendors', () => ({ useVendor: () => mockNoVendor }));
+jest.mock('@/components/shared/party-combobox', () => {
+  const Closed = ({ placeholder }: { placeholder: string }) => <span>{placeholder}</span>;
+  return { VendorCombobox: Closed, ItemCombobox: Closed };
+});
+jest.mock('@/lib/hooks/use-bills', () => ({
+  useBillAccountOptions: () => ({
+    isSuccess: true,
+    isError: false,
+    isPlaceholderData: false,
+    data: { data: [], vendorDefaultAccountId: null },
+    refetch: jest.fn(),
+  }),
 }));
 
 const scanDefaults = {

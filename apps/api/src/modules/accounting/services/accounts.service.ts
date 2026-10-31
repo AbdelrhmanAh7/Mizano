@@ -15,7 +15,7 @@ import {
   naturalBalance,
   parseReportDate,
   sumPostedLinesByAccount,
-} from '../../reports/utils/report-utils';
+} from '../../../common/utils/report-utils';
 import { CreateAccountDto } from '../dto/create-account.dto';
 import { UpdateAccountDto } from '../dto/update-account.dto';
 

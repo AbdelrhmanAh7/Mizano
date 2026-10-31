@@ -34,7 +34,35 @@
       "paymentTerms": "Payment Terms",
       "priceList": "Price List",
       "billingAddress": "Billing Address",
-      "shippingAddress": "Shipping Address"
+      "shippingAddress": "Shipping Address",
+      "basicInformation": "Basic Information",
+      "displayNameHint": "How to display on documents",
+      "currencyPlaceholder": "Select currency",
+      "paymentTermsPlaceholder": "Select payment terms",
+      "taxIdHint": "Tax ID / VAT Number",
+      "notes": "Notes",
+      "notesPlaceholder": "Internal notes about this customer",
+      "street": "Street Address",
+      "streetPlaceholder": "Street address",
+      "country": "Country",
+      "city": "City",
+      "state": "State/Province",
+      "statePlaceholder": "State",
+      "postalCode": "Zip/Postal Code",
+      "postalCodePlaceholder": "Postal code",
+      "copyFromBilling": "Copy from Billing",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "updateCustomer": "Update Customer",
+      "createCustomer": "Create Customer",
+      "currencies": {
+        "USD": "USD - US Dollar",
+        "EUR": "EUR - Euro",
+        "GBP": "GBP - British Pound",
+        "EGP": "EGP - Egyptian Pound",
+        "AED": "AED - UAE Dirham",
+        "SAR": "SAR - Saudi Riyal"
+      }
     },
     "table": {
       "name": "Name",
@@ -59,7 +87,8 @@
       "deletedDescription": "The customer has been deleted.",
       "createError": "Failed to create customer.",
       "updateError": "Failed to update customer.",
-      "deleteError": "Failed to delete customer. They may have associated transactions."
+      "deleteError": "Failed to delete customer. They may have associated transactions.",
+      "genericError": "An error occurred"
     },
     "statement": {
       "title": "Statement of account",
@@ -86,6 +115,21 @@
         "Credit Note Refund": "Credit note refund",
         "Invoice Void": "Invoice voided"
       }
+    },
+    "validation": {
+      "nameRequired": "Customer name is required",
+      "emailInvalid": "Invalid email"
+    },
+    "list": {
+      "searchPlaceholder": "Search by name, email, or phone...",
+      "refresh": "Refresh customers",
+      "importLabel": "Customers"
+    },
+    "bulkDelete": {
+      "title": "Delete {count} customers?",
+      "description": "Selected customers will be deleted. Customers with transactions will be skipped.",
+      "confirm": "Delete {count} customers",
+      "success": "{count} customers deleted"
     }
   },
   "quotes": {
@@ -121,7 +165,20 @@
       "date": "Quote Date",
       "expiryDate": "Expiry Date",
       "notes": "Notes",
-      "terms": "Terms & Conditions"
+      "terms": "Terms & Conditions",
+      "details": "Quote Details",
+      "reference": "Reference Number",
+      "referencePlaceholder": "PO-001 or project reference",
+      "subject": "Subject",
+      "subjectPlaceholder": "Quote for web development project",
+      "notesAndTerms": "Notes & Terms",
+      "customerNotes": "Customer Notes",
+      "customerNotesPlaceholder": "Notes visible to the customer",
+      "termsPlaceholder": "Payment terms, warranty, etc.",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "updateQuote": "Update Quote",
+      "createQuote": "Create Quote"
     },
     "table": {
       "quoteNumber": "Quote #",
@@ -171,7 +228,20 @@
       "sendError": "Failed to send quote.",
       "acceptError": "Failed to accept quote.",
       "declineError": "Failed to decline quote.",
-      "convertError": "Failed to convert quote."
+      "convertError": "Failed to convert quote.",
+      "genericError": "An error occurred",
+      "duplicated": "Quote duplicated",
+      "duplicatedDescription": "A new draft copy has been created.",
+      "duplicateError": "Failed to duplicate quote."
+    },
+    "validation": {
+      "customerRequired": "Customer is required",
+      "dateRequired": "Quote date is required",
+      "expiryDateRequired": "Expiry date is required",
+      "descriptionRequired": "Description is required",
+      "quantityRequired": "Quantity is required",
+      "rateRequired": "Rate is required",
+      "lineItemRequired": "At least one line item is required"
     }
   },
   "invoices": {
@@ -204,7 +274,23 @@
       "notes": "Notes",
       "terms": "Terms & Conditions",
       "project": "Project",
-      "lineItemRequired": "At least one line item is required"
+      "lineItemRequired": "At least one line item is required",
+      "details": "Invoice Details",
+      "reference": "Reference Number",
+      "referencePlaceholder": "PO number or project reference",
+      "paymentTerms": "Payment Terms",
+      "paymentTermsPlaceholder": "Select payment terms",
+      "chargesAndTotals": "Additional Charges & Totals",
+      "shippingAndHandling": "Shipping & Handling",
+      "grandTotal": "Grand Total",
+      "notesAndTerms": "Notes & Terms",
+      "customerNotes": "Customer Notes",
+      "customerNotesPlaceholder": "Notes visible to the customer",
+      "termsPlaceholder": "Payment terms, late fees, etc.",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "updateInvoice": "Update Invoice",
+      "createInvoice": "Create Invoice"
     },
     "table": {
       "invoiceNumber": "Invoice #",
@@ -226,6 +312,95 @@
     "empty": {
       "title": "No invoices yet",
       "description": "Create your first invoice to start billing"
+    },
+    "toast": {
+      "created": "Invoice created",
+      "createdDescription": "The invoice has been created successfully.",
+      "createError": "Error creating invoice",
+      "updated": "Invoice updated",
+      "updatedDescription": "The invoice has been updated successfully.",
+      "updateError": "Error updating invoice",
+      "deleted": "Invoice deleted",
+      "deletedDescription": "The invoice has been deleted successfully.",
+      "deleteError": "Error deleting invoice",
+      "sent": "Invoice sent",
+      "sentDescription": "The invoice has been sent successfully.",
+      "sendError": "Error sending invoice",
+      "voided": "Invoice voided",
+      "voidedDescription": "The invoice has been voided successfully.",
+      "voidError": "Error voiding invoice",
+      "duplicated": "Invoice duplicated",
+      "duplicatedDescription": "A new draft copy has been created.",
+      "duplicateError": "Error duplicating invoice",
+      "genericError": "An error occurred"
+    },
+    "validation": {
+      "customerRequired": "Customer is required",
+      "dateRequired": "Invoice date is required",
+      "dueDateRequired": "Due date is required",
+      "descriptionRequired": "Description is required",
+      "quantityRequired": "Quantity is required",
+      "rateRequired": "Rate is required",
+      "lineItemRequired": "At least one line item is required"
+    },
+    "detail": {
+      "grandTotal": "Grand Total",
+      "amountPaid": "Amount Paid",
+      "balanceDue": "Balance Due",
+      "dueDate": "Due Date",
+      "dates": "Dates",
+      "overdue": "(Overdue)",
+      "additionalInfo": "Additional Info",
+      "noLineItems": "No line items",
+      "noCustomer": "No customer assigned",
+      "paymentHistory": "Payment History",
+      "paymentNumber": "Payment #",
+      "date": "Date",
+      "amountApplied": "Amount Applied",
+      "creditNotes": "Credit Notes",
+      "creditNoteNumber": "Credit Note #",
+      "amount": "Amount",
+      "deleteConfirm": "Are you sure you want to delete invoice \"{number}\"? This action cannot be undone.",
+      "sendConfirm": "Are you sure you want to mark invoice \"{number}\" as sent? This will create an accounting entry and you won't be able to edit it anymore.",
+      "voidConfirm": "Are you sure you want to void invoice \"{number}\"? This action cannot be undone.",
+      "exportPdf": "Export PDF",
+      "print": "Print",
+      "email": "Email",
+      "comingSoon": "Coming soon",
+      "pdfError": "Could not create the PDF",
+      "pdfErrorDescription": "Please try again in a moment."
+    },
+    "list": {
+      "searchPlaceholder": "Search by invoice number or customer...",
+      "dateRange": "Date range",
+      "refresh": "Refresh invoices",
+      "importLabel": "Invoices",
+      "markAsPaid": "Mark as Paid",
+      "void": "Void"
+    },
+    "bulkDelete": {
+      "title": "Delete {count} invoices?",
+      "description": "Only draft invoices will be deleted. Non-draft invoices will be skipped.",
+      "confirm": "Delete {count} invoices",
+      "success": "{count} invoices deleted"
+    },
+    "bulkSend": {
+      "title": "Send {count} invoices?",
+      "description": "Draft invoices will be marked as sent. This will create accounting entries.",
+      "confirm": "Send {count} invoices",
+      "success": "{count} invoices sent"
+    },
+    "bulkVoid": {
+      "title": "Void {count} invoices?",
+      "description": "Selected invoices will be voided. This action cannot be undone.",
+      "confirm": "Void {count} invoices",
+      "success": "{count} invoices voided"
+    },
+    "bulkPay": {
+      "title": "Mark {count} invoices as paid?",
+      "description": "Selected sent/overdue invoices will be marked as fully paid.",
+      "confirm": "Mark {count} invoices as paid",
+      "success": "{count} invoices marked as paid"
     }
   },
   "creditNotes": {
@@ -252,6 +427,7 @@
     "reason": "Reason",
     "form": {
       "customer": "Customer",
+      "customerPlaceholder": "Select a customer",
       "invoice": "Invoice",
       "date": "Date",
       "reason": "Reason",
@@ -318,7 +494,31 @@
       "reference": "Reference Number",
       "notes": "Notes",
       "allocations": "Invoice Allocations",
-      "allocationRequired": "Payment must be allocated to at least 1 invoice"
+      "allocationRequired": "Payment must be allocated to at least 1 invoice",
+      "details": "Payment Details",
+      "amountReceived": "Amount Received",
+      "paymentModePlaceholder": "Select payment mode",
+      "depositToPlaceholder": "Select account",
+      "referencePlaceholder": "Check number, transaction ID, etc.",
+      "applyToInvoices": "Apply to Invoices",
+      "autoDistribute": "Auto-Distribute",
+      "selectCustomerFirst": "Select a customer to see their open invoices",
+      "noOpenInvoices": "No open invoices for this customer",
+      "invoiceNumber": "Invoice #",
+      "invoiceDate": "Date",
+      "dueDate": "Due Date",
+      "total": "Total",
+      "balanceDue": "Balance Due",
+      "amountToApply": "Amount to Apply",
+      "paymentAmount": "Payment Amount: {amount}",
+      "totalAllocated": "Total Allocated: {amount}",
+      "balanced": "Balanced",
+      "difference": "Difference: {amount}",
+      "additionalNotes": "Additional Notes",
+      "notesPlaceholder": "Notes about this payment...",
+      "cancel": "Cancel",
+      "recording": "Recording...",
+      "recordPayment": "Record Payment"
     },
     "table": {
       "paymentNumber": "Payment #",
@@ -335,7 +535,35 @@
     "voidedBadge": "Voided",
     "voidPayment": "Void payment",
     "voidPaymentTitle": "Void payment",
-    "voidPaymentConfirm": "Voiding {number} voids the whole payment: every invoice it was allocated to gets its balance back, and a reversing journal entry is posted."
+    "voidPaymentConfirm": "Voiding {number} voids the whole payment: every invoice it was allocated to gets its balance back, and a reversing journal entry is posted.",
+    "toast": {
+      "recorded": "Payment recorded",
+      "recordedDescription": "The payment has been recorded successfully.",
+      "recordError": "Error recording payment",
+      "voided": "Payment voided",
+      "voidedDescription": "The invoice balances were restored and a reversal journal was posted.",
+      "voidError": "Error voiding payment",
+      "genericError": "An error occurred"
+    },
+    "validation": {
+      "customerRequired": "Customer is required",
+      "dateRequired": "Date is required",
+      "amountRequired": "Amount is required",
+      "depositAccountRequired": "Deposit account is required"
+    },
+    "list": {
+      "searchPlaceholder": "Search by payment number or customer...",
+      "filterByMode": "Filter by mode",
+      "allModes": "All Modes",
+      "refresh": "Refresh payments",
+      "importLabel": "Payments"
+    },
+    "bulkDelete": {
+      "title": "Delete {count} payments?",
+      "description": "Selected payments will be deleted. Payments linked to reconciled transactions will be skipped.",
+      "confirm": "Delete {count} payments",
+      "success": "{count} payments deleted"
+    }
   },
   "deliveryChallans": {
     "title": "Delivery Challans",
@@ -397,7 +625,18 @@
     "tax": "Tax",
     "amount": "Amount",
     "taxLoading": "Loading tax rates...",
-    "taxLoadFailed": "Tax rates could not be loaded. Reload the page before saving, otherwise lines would be saved without tax."
+    "taxLoadFailed": "Tax rates could not be loaded. Reload the page before saving, otherwise lines would be saved without tax.",
+    "itemDescription": "Item / Description",
+    "discountPercent": "Disc %",
+    "itemPlaceholder": "Select item (optional)",
+    "customItem": "Custom item",
+    "noTax": "No tax",
+    "removeLine": "Remove line item",
+    "subtotal": "Subtotal:",
+    "discountTotal": "Discount:",
+    "taxTotal": "Tax:",
+    "total": "Total:",
+    "lineError": "Line {line}: {message}"
   },
   "overview": {
     "quickActions": "Quick Actions",

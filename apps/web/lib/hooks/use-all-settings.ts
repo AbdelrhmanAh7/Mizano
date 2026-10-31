@@ -140,16 +140,8 @@ export function useUpdateInvoiceSettings() {
   return useUpdateSection<InvoiceSettings>('invoice');
 }
 
-export function useUpdateInventorySettings() {
-  return useUpdateSection<InventorySettings>('inventory');
-}
-
 export function useUpdateAISettings() {
   return useUpdateSection<AISettings>('ai');
-}
-
-export function useUpdateEmailSettings() {
-  return useUpdateSection<EmailSettings>('email');
 }
 
 export function useUpdateLocalizationSettings() {

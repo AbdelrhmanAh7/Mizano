@@ -1,13 +1,13 @@
 'use client';
 
+import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { useEffect } from 'react';
-import { useForm, Control, FieldValues, UseFormWatch, UseFormSetValue } from 'react-hook-form';
+import { useTranslations } from 'next-intl';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -16,60 +16,56 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useCustomers, Customer } from '@/lib/hooks/use-customers';
+import { useCustomer } from '@/lib/hooks/use-customers';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { Invoice } from '@/lib/hooks/use-invoices';
+import { calculateLineTotals, toApiLines } from './line-items-form';
 import {
-  LineItemsForm,
-  calculateLineTotals,
-  taxFieldsForPercent,
-  toApiLines,
-} from './line-items-form';
-
-const lineItemSchema = z.object({
-  itemId: z.string().optional(),
-  description: z.string().min(1, 'Description is required'),
-  quantity: z.string().min(1, 'Quantity is required'),
-  rate: z.string().min(1, 'Rate is required'),
-  discountPercent: z.string().optional(),
-  taxRateId: z.string().optional(),
-  taxPercent: z.string().optional(),
-  amount: z.string(),
-});
+  blankSalesLine,
+  NO_TAX_RATES,
+  RequiredDateField,
+  SalesDocumentFormProps,
+  SalesDocumentFrame,
+  salesLineSchema,
+  toSalesFormLines,
+  useFieldError,
+} from './sales-document-form';
 
 const invoiceSchema = z.object({
-  customerId: z.string().min(1, 'Customer is required'),
-  invoiceDate: z.string().min(1, 'Invoice date is required'),
-  dueDate: z.string().min(1, 'Due date is required'),
+  customerId: z.string().min(1, 'customerRequired'),
+  invoiceDate: z.string().min(1, 'dateRequired'),
+  dueDate: z.string().min(1, 'dueDateRequired'),
   reference: z.string().optional(),
   paymentTerms: z.string().optional(),
   notes: z.string().optional(),
   terms: z.string().optional(),
   shippingCharge: z.string().optional(),
-  lines: z.array(lineItemSchema).min(1, 'At least one line item is required'),
+  lines: z.array(salesLineSchema).min(1, 'lineItemRequired'),
 });
 
 type InvoiceFormData = z.infer<typeof invoiceSchema>;
 
-const NO_TAX_RATES: { id: string; name: string; rate: number }[] = [];
-
-interface InvoiceFormProps {
+interface InvoiceFormProps extends SalesDocumentFormProps {
   invoice?: Invoice | null;
-  customerId?: string;
-  taxRates?: { id: string; name: string; rate: number }[];
-  /** State of the tax-rate lookup; a failed lookup blocks saving. */
-  taxRatesStatus?: { isLoading: boolean; isError: boolean };
-  onSubmit: (data: Record<string, unknown>) => void;
-  onCancel: () => void;
-  isSubmitting?: boolean;
 }
 
+// Labels are keys under common.paymentTerms.
 const paymentTermsOptions = [
-  { value: 'DUE_ON_RECEIPT', label: 'Due on Receipt', days: 0 },
-  { value: 'NET_15', label: 'Net 15', days: 15 },
-  { value: 'NET_30', label: 'Net 30', days: 30 },
-  { value: 'NET_45', label: 'Net 45', days: 45 },
-  { value: 'NET_60', label: 'Net 60', days: 60 },
+  { value: 'DUE_ON_RECEIPT', labelKey: 'dueOnReceipt', days: 0 },
+  { value: 'NET_15', labelKey: 'net15', days: 15 },
+  { value: 'NET_30', labelKey: 'net30', days: 30 },
+  { value: 'NET_45', labelKey: 'net45', days: 45 },
+  { value: 'NET_60', labelKey: 'net60', days: 60 },
 ];
+
+/**
+ * The payment-terms option a saved invoice was issued on, derived from its two dates (the terms
+ * are not stored separately), or '' when the due date was set by hand to another number of days.
+ */
+export function paymentTermsFor(date: string, dueDate: string): string {
+  const days = differenceInCalendarDays(parseISO(dueDate), parseISO(date));
+  return paymentTermsOptions.find((term) => term.days === days)?.value ?? '';
+}
 
 export function InvoiceForm({
   invoice,
@@ -81,14 +77,19 @@ export function InvoiceForm({
   isSubmitting,
 }: InvoiceFormProps) {
   const isEditing = !!invoice;
-  const { data: customersData } = useCustomers({ limit: 100 });
-  const customers = customersData?.data || [];
+  const t = useTranslations('sales.invoices.form');
+  const tTerms = useTranslations('common.paymentTerms');
+  const fieldError = useFieldError('sales.invoices.validation');
+  // The server posts invoices in their own currency, else the org base currency: preview in the
+  // same, never the customer's default (audit B5, review-lessons §11).
+  const formatMoney = useMoneyFormatter();
+  const documentCurrencyCode = invoice?.currencyCode ?? null;
 
   // Default dates
-  const today = new Date().toISOString().split('T')[0];
+  const today = format(new Date(), 'yyyy-MM-dd');
   const defaultDue = new Date();
   defaultDue.setDate(defaultDue.getDate() + 30);
-  const dueDate = defaultDue.toISOString().split('T')[0];
+  const dueDate = format(defaultDue, 'yyyy-MM-dd');
 
   const form = useForm<InvoiceFormData>({
     resolver: zodResolver(invoiceSchema),
@@ -101,17 +102,7 @@ export function InvoiceForm({
       notes: '',
       terms: '',
       shippingCharge: '0',
-      lines: [
-        {
-          itemId: '',
-          description: '',
-          quantity: '1',
-          rate: '0',
-          discountPercent: '0',
-          taxRateId: '',
-          amount: '0',
-        },
-      ],
+      lines: [blankSalesLine()],
     },
   });
 
@@ -121,53 +112,35 @@ export function InvoiceForm({
         customerId: invoice.customerId,
         invoiceDate: invoice.date.split('T')[0],
         dueDate: invoice.dueDate.split('T')[0],
-        reference: '',
-        paymentTerms: 'NET_30',
+        reference: invoice.reference || '',
+        paymentTerms: paymentTermsFor(invoice.date.split('T')[0], invoice.dueDate.split('T')[0]),
         notes: invoice.notes || '',
         terms: invoice.terms || '',
         shippingCharge: invoice.shippingAmount || '0',
-        lines: invoice.lines?.map((line) => ({
-          itemId: line.itemId || '',
-          description: line.description,
-          quantity: line.quantity,
-          rate: line.rate,
-          discountPercent: line.discountPercent || line.discount || '0',
-          ...(line.taxRateId
-            ? { taxRateId: line.taxRateId }
-            : taxFieldsForPercent(line.taxRate, taxRates)),
-          amount: line.amount,
-        })) || [
-          {
-            itemId: '',
-            description: '',
-            quantity: '1',
-            rate: '0',
-            discountPercent: '0',
-            taxRateId: '',
-            amount: '0',
-          },
-        ],
+        lines: toSalesFormLines(invoice.lines, taxRates),
       });
     }
   }, [invoice, form, taxRates]);
 
+  // Fetched by id, so any customer works, not only the first page (audit B11).
   const selectedCustomerId = form.watch('customerId');
-  const selectedCustomer = customers.find((c: Customer) => c.id === selectedCustomerId);
+  const { data: selectedCustomer } = useCustomer(selectedCustomerId || undefined);
 
   // Update due date when payment terms change
   const handlePaymentTermsChange = (value: string) => {
     form.setValue('paymentTerms', value);
     const term = paymentTermsOptions.find((t) => t.value === value);
     if (term) {
-      const invoiceDate = new Date(form.watch('invoiceDate'));
+      const invoiceDate = parseISO(form.watch('invoiceDate'));
       invoiceDate.setDate(invoiceDate.getDate() + term.days);
-      form.setValue('dueDate', invoiceDate.toISOString().split('T')[0]);
+      form.setValue('dueDate', format(invoiceDate, 'yyyy-MM-dd'));
     }
   };
 
   // Auto-fill payment terms from customer
   useEffect(() => {
-    if (selectedCustomer?.paymentTerms && !isEditing) {
+    // 0 days is "due on receipt", not "no terms".
+    if (selectedCustomer && selectedCustomer.paymentTerms != null && !isEditing) {
       // Customer paymentTerms is a number (days), convert to form value
       const days = selectedCustomer.paymentTerms;
       if (days === 0) {
@@ -182,22 +155,22 @@ export function InvoiceForm({
         handlePaymentTermsChange('NET_60');
       } else {
         // For custom terms, just set the due date based on days
-        const invoiceDate = new Date(form.watch('invoiceDate'));
+        const invoiceDate = parseISO(form.watch('invoiceDate'));
         invoiceDate.setDate(invoiceDate.getDate() + days);
-        form.setValue('dueDate', invoiceDate.toISOString().split('T')[0]);
+        form.setValue('dueDate', format(invoiceDate, 'yyyy-MM-dd'));
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCustomer]);
 
   const handleSubmit = (data: InvoiceFormData) => {
-    // Never save lines against a tax lookup that failed or has not finished.
-    if (taxRatesStatus?.isError || taxRatesStatus?.isLoading) return;
     // Exactly the CreateInvoiceDto shape: totals are computed by the server from the lines.
     onSubmit({
       customerId: data.customerId,
       date: data.invoiceDate,
       dueDate: data.dueDate,
+      // Null clears a reference removed while editing; the API trims and stores '' as none.
+      reference: data.reference?.trim() || (isEditing ? null : undefined),
       notes: data.notes || undefined,
       terms: data.terms || undefined,
       shippingAmount: data.shippingCharge?.trim() || '0',
@@ -211,172 +184,86 @@ export function InvoiceForm({
   const grandTotal = totals.grandTotal + shipping;
 
   return (
-    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-      {/* Invoice Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Invoice Details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="customerId">Customer *</Label>
-              <Select
-                value={form.watch('customerId')}
-                onValueChange={(value) => form.setValue('customerId', value)}
-                disabled={isEditing}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a customer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map((customer: Customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.displayName || customer.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.formState.errors.customerId && (
-                <p className="text-sm text-red-500">{form.formState.errors.customerId.message}</p>
-              )}
-            </div>
+    <SalesDocumentFrame
+      form={form}
+      namespace="sales.invoices"
+      isEditing={isEditing}
+      translateError={fieldError}
+      taxRates={taxRates}
+      taxRatesStatus={taxRatesStatus}
+      currency={documentCurrencyCode}
+      referenceMaxLength={100}
+      onValidSubmit={handleSubmit}
+      onCancel={onCancel}
+      isSubmitting={isSubmitting}
+      submitLabel={isEditing ? t('updateInvoice') : t('createInvoice')}
+      details={
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <RequiredDateField
+            form={form}
+            name="invoiceDate"
+            label={t('date')}
+            translate={fieldError}
+          />
 
-            <div className="space-y-2">
-              <Label htmlFor="reference">Reference Number</Label>
-              <Input
-                id="reference"
-                placeholder="PO number or project reference"
-                {...form.register('reference')}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="paymentTerms">{t('paymentTerms')}</Label>
+            <Select
+              value={form.watch('paymentTerms') || ''}
+              onValueChange={handlePaymentTermsChange}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={t('paymentTermsPlaceholder')} />
+              </SelectTrigger>
+              <SelectContent>
+                {paymentTermsOptions.map((term) => (
+                  <SelectItem key={term.value} value={term.value}>
+                    {tTerms(term.labelKey)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="invoiceDate">Invoice Date *</Label>
-              <Input id="invoiceDate" type="date" {...form.register('invoiceDate')} />
-              {form.formState.errors.invoiceDate && (
-                <p className="text-sm text-red-500">{form.formState.errors.invoiceDate.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="paymentTerms">Payment Terms</Label>
-              <Select
-                value={form.watch('paymentTerms') || ''}
-                onValueChange={handlePaymentTermsChange}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select payment terms" />
-                </SelectTrigger>
-                <SelectContent>
-                  {paymentTermsOptions.map((term) => (
-                    <SelectItem key={term.value} value={term.value}>
-                      {term.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="dueDate">Due Date *</Label>
-              <Input id="dueDate" type="date" {...form.register('dueDate')} />
-              {form.formState.errors.dueDate && (
-                <p className="text-sm text-red-500">{form.formState.errors.dueDate.message}</p>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Line Items */}
-      <LineItemsForm
-        control={form.control as unknown as Control<FieldValues>}
-        watch={form.watch as unknown as UseFormWatch<FieldValues>}
-        setValue={form.setValue as unknown as UseFormSetValue<FieldValues>}
-        name="lines"
-        taxRates={taxRates}
-        taxRatesStatus={taxRatesStatus}
-        currency={selectedCustomer?.currency || 'USD'}
-        showTax={true}
-        showDiscount={true}
-      />
-
-      {/* Shipping & Totals */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Additional Charges & Totals</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-end gap-2">
-            <div className="flex items-center gap-4">
-              <Label htmlFor="shippingCharge" className="text-right">
-                Shipping & Handling
-              </Label>
-              <Input
-                id="shippingCharge"
-                type="number"
-                step="0.01"
-                min="0"
-                className="w-32 text-right"
-                placeholder="0.00"
-                {...form.register('shippingCharge')}
-              />
-            </div>
-            <div className="border-t pt-4 mt-2 w-64">
-              <div className="flex justify-between text-lg font-semibold">
-                <span>Grand Total</span>
-                <span className="font-mono">
-                  {new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: selectedCustomer?.currency || 'USD',
-                  }).format(grandTotal)}
-                </span>
+          <RequiredDateField
+            form={form}
+            name="dueDate"
+            label={t('dueDate')}
+            translate={fieldError}
+          />
+        </div>
+      }
+      afterLines={
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('chargesAndTotals')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex items-center gap-4">
+                <Label htmlFor="shippingCharge" className="text-end">
+                  {t('shippingAndHandling')}
+                </Label>
+                <Input
+                  id="shippingCharge"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="w-32 text-end"
+                  placeholder="0.00"
+                  {...form.register('shippingCharge')}
+                />
+              </div>
+              <div className="border-t pt-4 mt-2 w-64">
+                <div className="flex justify-between text-lg font-semibold">
+                  <span>{t('grandTotal')}</span>
+                  <span className="font-mono">{formatMoney(grandTotal, documentCurrencyCode)}</span>
+                </div>
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Notes & Terms */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Notes & Terms</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="notes">Customer Notes</Label>
-            <Textarea
-              id="notes"
-              placeholder="Notes visible to the customer"
-              {...form.register('notes')}
-              rows={3}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="terms">Terms & Conditions</Label>
-            <Textarea
-              id="terms"
-              placeholder="Payment terms, late fees, etc."
-              {...form.register('terms')}
-              rows={3}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Actions */}
-      <div className="flex justify-end gap-3">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : isEditing ? 'Update Invoice' : 'Create Invoice'}
-        </Button>
-      </div>
-    </form>
+          </CardContent>
+        </Card>
+      }
+    />
   );
 }

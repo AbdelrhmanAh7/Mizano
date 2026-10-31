@@ -1,12 +1,11 @@
 'use client';
 
-import { useToast } from '@/components/ui/use-toast';
 import { invoicesApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToastMutation } from '@/lib/hooks/use-toast-mutation';
+import { useQuery } from '@tanstack/react-query';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
 
 export type InvoiceStatus = 'DRAFT' | 'SENT' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' | 'VOID';
 
@@ -49,8 +48,12 @@ export interface Invoice {
   shippingAmount: string;
   grandTotal: string;
   balanceDue: string;
+  /** Null means the organization base currency. */
+  currencyCode?: string | null;
   notes: string | null;
   terms: string | null;
+  /** The customer's reference, such as their purchase order number. */
+  reference?: string | null;
   lines: InvoiceLine[];
   payments?: Array<{
     id: string;
@@ -72,6 +75,8 @@ export interface InvoiceParams {
   customerId?: string;
   dateFrom?: string;
   dateTo?: string;
+  /** Only posted invoices with a balance due (payment allocation, credit application). */
+  open?: boolean;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
@@ -139,33 +144,18 @@ export function useInvoice(id: string | undefined) {
   });
 }
 
+const INVOICE_TOAST = 'sales.invoices.toast';
+
 /**
  * Hook to create a new invoice
  */
 export function useCreateInvoice() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (data: CreateInvoiceData) => {
-      const response = await invoicesApi.create(data);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      toast({
-        title: 'Invoice created',
-        description: 'The invoice has been created successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error creating invoice',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: INVOICE_TOAST,
+    mutationFn: async (data: CreateInvoiceData) => (await invoicesApi.create(data)).data,
+    invalidate: () => [['invoices'], ['customers']],
+    success: 'created',
+    error: 'createError',
   });
 }
 
@@ -173,29 +163,13 @@ export function useCreateInvoice() {
  * Hook to update an existing invoice
  */
 export function useUpdateInvoice() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateInvoiceData }) => {
-      const response = await invoicesApi.update(id, data);
-      return response.data;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['invoices', variables.id] });
-      toast({
-        title: 'Invoice updated',
-        description: 'The invoice has been updated successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error updating invoice',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: INVOICE_TOAST,
+    mutationFn: async ({ id, data }: { id: string; data: UpdateInvoiceData }) =>
+      (await invoicesApi.update(id, data)).data,
+    invalidate: ({ id }) => [['invoices'], ['invoices', id]],
+    success: 'updated',
+    error: 'updateError',
   });
 }
 
@@ -203,29 +177,12 @@ export function useUpdateInvoice() {
  * Hook to delete an invoice
  */
 export function useDeleteInvoice() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await invoicesApi.delete(id);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      toast({
-        title: 'Invoice deleted',
-        description: 'The invoice has been deleted successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error deleting invoice',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: INVOICE_TOAST,
+    mutationFn: async (id: string) => (await invoicesApi.delete(id)).data,
+    invalidate: () => [['invoices'], ['customers']],
+    success: 'deleted',
+    error: 'deleteError',
   });
 }
 
@@ -233,30 +190,12 @@ export function useDeleteInvoice() {
  * Hook to send an invoice
  */
 export function useSendInvoice() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await invoicesApi.send(id);
-      return response.data;
-    },
-    onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['invoices', id] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      toast({
-        title: 'Invoice sent',
-        description: 'The invoice has been sent successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error sending invoice',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: INVOICE_TOAST,
+    mutationFn: async (id: string) => (await invoicesApi.send(id)).data,
+    invalidate: (id) => [['invoices'], ['invoices', id], ['customers']],
+    success: 'sent',
+    error: 'sendError',
   });
 }
 
@@ -264,30 +203,12 @@ export function useSendInvoice() {
  * Hook to void an invoice
  */
 export function useVoidInvoice() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await invoicesApi.void(id);
-      return response.data;
-    },
-    onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['invoices', id] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      toast({
-        title: 'Invoice voided',
-        description: 'The invoice has been voided successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error voiding invoice',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: INVOICE_TOAST,
+    mutationFn: async (id: string) => (await invoicesApi.void(id)).data,
+    invalidate: (id) => [['invoices'], ['invoices', id], ['customers']],
+    success: 'voided',
+    error: 'voidError',
   });
 }
 
@@ -295,28 +216,12 @@ export function useVoidInvoice() {
  * Hook to clone/duplicate an invoice
  */
 export function useCloneInvoice() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await invoicesApi.clone(id);
-      return response.data as Invoice;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      toast({
-        title: 'Invoice duplicated',
-        description: 'A new draft copy has been created.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error duplicating invoice',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+  return useToastMutation({
+    namespace: INVOICE_TOAST,
+    mutationFn: async (id: string) => (await invoicesApi.clone(id)).data as Invoice,
+    invalidate: () => [['invoices']],
+    success: 'duplicated',
+    error: 'duplicateError',
   });
 }
 
@@ -333,65 +238,4 @@ export function getInvoiceStatusColor(status: InvoiceStatus): string {
     VOID: 'bg-gray-100 text-gray-500',
   };
   return colorMap[status] || 'bg-gray-100 text-gray-800';
-}
-
-/**
- * Get invoice status label
- */
-export function getInvoiceStatusLabel(status: InvoiceStatus): string {
-  const labelMap: Record<InvoiceStatus, string> = {
-    DRAFT: 'Draft',
-    SENT: 'Sent',
-    PARTIALLY_PAID: 'Partially Paid',
-    PAID: 'Paid',
-    OVERDUE: 'Overdue',
-    VOID: 'Void',
-  };
-  return labelMap[status] || status;
-}
-
-/**
- * Calculate line amount
- */
-export function calculateLineAmount(
-  quantity: string,
-  rate: string,
-  discountPercent: string = '0',
-): string {
-  const qty = parseFloat(quantity) || 0;
-  const r = parseFloat(rate) || 0;
-  const discount = parseFloat(discountPercent) || 0;
-  return (qty * r * (1 - discount / 100)).toFixed(2);
-}
-
-/**
- * Calculate invoice totals
- */
-export function calculateInvoiceTotals(
-  lines: Array<{ amount: string; taxRateId?: string }>,
-  taxRates: Array<{ id: string; rate: number }>,
-  shippingAmount: string = '0',
-): { subtotal: number; taxAmount: number; grandTotal: number } {
-  const subtotal = lines.reduce((sum, line) => sum + (parseFloat(line.amount) || 0), 0);
-
-  const taxAmount = lines.reduce((sum, line) => {
-    const taxRate = taxRates.find((t) => t.id === line.taxRateId);
-    return sum + (parseFloat(line.amount) || 0) * ((taxRate?.rate || 0) / 100);
-  }, 0);
-
-  const shipping = parseFloat(shippingAmount) || 0;
-  const grandTotal = subtotal + taxAmount + shipping;
-
-  return { subtotal, taxAmount, grandTotal };
-}
-
-/**
- * Format currency amount
- */
-export function formatAmount(amount: string | number): string {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(num);
 }

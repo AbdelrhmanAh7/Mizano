@@ -10,7 +10,7 @@ import {
   postedJournalWhere,
   sumPostedLinesByAccount,
   toDecimal,
-} from '../../reports/utils/report-utils';
+} from '../../../common/utils/report-utils';
 
 export interface TrialBalanceAccountRow {
   id: string;

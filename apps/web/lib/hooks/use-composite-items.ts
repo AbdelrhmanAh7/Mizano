@@ -32,14 +32,6 @@ export interface CompositeItem {
   components: CompositeItemComponent[];
 }
 
-export interface CompositeItemParams {
-  page?: number;
-  limit?: number;
-  search?: string;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-}
-
 interface CreateCompositeItemData {
   name: string;
   sku: string;
@@ -60,16 +52,6 @@ interface AvailabilityResult {
     available: number;
     sufficient: boolean;
   }>;
-}
-
-export function useCompositeItems(params?: CompositeItemParams) {
-  return useQuery({
-    queryKey: ['composite-items', params],
-    queryFn: async () => {
-      const response = await compositeItemsApi.getAll(params);
-      return response.data;
-    },
-  });
 }
 
 export function useInfiniteCompositeItems(params?: Record<string, unknown>) {

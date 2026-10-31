@@ -44,4 +44,13 @@ export class CreateInvoiceDto {
   shippingAmount?: string;
   @ApiProperty({ required: false }) @IsString() @IsOptional() @MaxLength(2000) notes?: string;
   @ApiProperty({ required: false }) @IsString() @IsOptional() @MaxLength(2000) terms?: string;
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    description: "The customer's reference, such as their purchase order number",
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  reference?: string | null;
 }

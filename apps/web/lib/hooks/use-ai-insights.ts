@@ -48,32 +48,6 @@ export interface RevenueForcast {
   variance?: number;
 }
 
-export interface ReconciliationSuggestion {
-  id: string;
-  bankTransactionId: string;
-  suggestedEntity: {
-    type: 'invoice' | 'bill' | 'expense' | 'payment';
-    id: string;
-    description: string;
-    amount: number;
-    date: string;
-  };
-  confidence: number;
-  matchReasons: string[];
-}
-
-export interface CategorySuggestion {
-  id: string;
-  expenseId?: string;
-  transactionId?: string;
-  suggestedCategory: {
-    id: string;
-    name: string;
-  };
-  confidence: number;
-  reason: string;
-}
-
 // ============ API Functions ============
 
 const aiApi = {
@@ -191,44 +165,6 @@ export function useRevenueForecast(months: number = 6) {
   });
 }
 
-export function useReconciliationSuggestions(bankTransactionId: string) {
-  return useQuery({
-    queryKey: ['ai-reconciliation', bankTransactionId],
-    queryFn: () => aiApi.getReconciliationSuggestions(bankTransactionId),
-    enabled: !!bankTransactionId,
-  });
-}
-
-export function useApplyReconciliationSuggestion() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: aiApi.applyReconciliationSuggestion,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-reconciliation'] });
-      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
-    },
-  });
-}
-
-export function useCategorySuggestions(transactionId: string) {
-  return useQuery({
-    queryKey: ['ai-categorization', transactionId],
-    queryFn: () => aiApi.getCategorySuggestions(transactionId),
-    enabled: !!transactionId,
-  });
-}
-
-export function useApplyCategorySuggestion() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: aiApi.applyCategorySuggestion,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-categorization'] });
-      queryClient.invalidateQueries({ queryKey: ['expenses'] });
-    },
-  });
-}
-
 export function useRunAnomalyDetection() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -236,13 +172,6 @@ export function useRunAnomalyDetection() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ai-insights'] });
     },
-  });
-}
-
-export function useSpendingAnalysis(period: string = 'month') {
-  return useQuery({
-    queryKey: ['ai-analysis', 'spending', period],
-    queryFn: () => aiApi.getSpendingAnalysis(period),
   });
 }
 
@@ -265,18 +194,6 @@ export function getInsightTypeLabel(type: InsightType): string {
     OPPORTUNITY: 'Opportunity',
   };
   return labels[type] || type;
-}
-
-export function getInsightTypeIcon(type: InsightType): string {
-  const icons: Record<InsightType, string> = {
-    ANOMALY: '⚠️',
-    TREND: '📈',
-    RECOMMENDATION: '💡',
-    FORECAST: '🔮',
-    ALERT: '🔔',
-    OPPORTUNITY: '🎯',
-  };
-  return icons[type] || '📊';
 }
 
 export function getInsightTypeColor(type: InsightType): string {

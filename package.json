@@ -17,6 +17,8 @@
     "// — Code Quality —————————————————": "",
     "lint": "turbo lint",
     "lint:fix": "turbo lint:fix",
+    "lint:deadcode": "knip",
+    "lint:duplication": "jscpd",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
     "type-check": "turbo type-check",
@@ -30,7 +32,7 @@
     "test:e2e": "pnpm --filter api test:e2e",
     "// — CI ———————————————————————————": "",
     "ci": "turbo lint type-check test && pnpm format",
-    "ci:full": "turbo lint type-check test",
+    "ci:full": "turbo lint type-check test && pnpm lint:deadcode && pnpm lint:duplication",
     "// — Database (Prisma) ————————————": "",
     "db:generate": "pnpm --filter api exec prisma generate",
     "db:push": "pnpm --filter api exec prisma db push",
@@ -56,29 +58,13 @@
     "clean:full": "turbo clean && node -e \"const fs=require('fs');['node_modules','.turbo','apps/web/.next','apps/api/dist','packages/shared-types/dist','packages/validators/dist','coverage'].forEach(d=>fs.rmSync(d,{recursive:true,force:true}))\"",
     "prepare": "husky"
   },
-  "lint-staged": {
-    "apps/api/**/*.ts": [
-      "eslint --fix --cache",
-      "prettier --write"
-    ],
-    "apps/web/**/*.{ts,tsx}": [
-      "eslint --fix --cache",
-      "prettier --write"
-    ],
-    "packages/**/*.ts": [
-      "eslint --fix --cache",
-      "prettier --write"
-    ],
-    "*.{json,md,css}": [
-      "prettier --write"
-    ]
-  },
   "devDependencies": {
     "@commitlint/cli": "^20.4.1",
     "@commitlint/config-conventional": "^20.4.1",
     "@types/node": "^20.11.0",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.7",
+    "jscpd": "^4.3.0",
+    "knip": "^5.88.1",
     "prettier": "^3.2.4",
     "turbo": "^2.0.0",
     "typescript": "^5.4.0"

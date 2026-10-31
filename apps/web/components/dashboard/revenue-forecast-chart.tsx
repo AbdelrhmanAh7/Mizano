@@ -16,7 +16,7 @@ import {
   Legend,
 } from 'recharts';
 import { useRevenueForecast, type RevenueForcast } from '@/lib/hooks/use-ai-insights';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
+import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function formatMonth(dateStr: string): string {
   const d = new Date(dateStr);
@@ -24,6 +24,7 @@ function formatMonth(dateStr: string): string {
 }
 
 export const RevenueForecastChart = memo(function RevenueForecastChart() {
+  const formatCompactCurrency = useCompactMoneyFormatter();
   const { data, isLoading } = useRevenueForecast(6);
 
   const forecasts: RevenueForcast[] = Array.isArray(data?.data)

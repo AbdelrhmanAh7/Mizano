@@ -14,16 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { Badge } from '@/components/ui/badge';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import { useTableParams } from '@/lib/hooks/use-table-params';
@@ -37,7 +28,6 @@ import { useTranslations } from 'next-intl';
 
 function TimesheetsPageContent() {
   const t = useTranslations('projects');
-  const tc = useTranslations('common');
   const tableParams = useTableParams({ defaultSortBy: 'date' });
 
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -255,22 +245,13 @@ function TimesheetsPageContent() {
       </Card>
 
       {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('timesheets.confirmDelete.title')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('timesheets.confirmDelete.description')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{tc('buttons.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              {tc('buttons.delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={!!deleteId}
+        onOpenChange={() => setDeleteId(null)}
+        title={t('timesheets.confirmDelete.title')}
+        description={t('timesheets.confirmDelete.description')}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

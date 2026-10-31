@@ -30,6 +30,11 @@ concurrency:
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '8'
+  # No install-time binary downloads (audit C7): onnxruntime-node fetched CUDA providers for a CPU-only
+  # product (the dependency is gone; this keeps a transitive one from coming back) and puppeteer a
+  # Chrome the jobs never run.
+  ONNXRUNTIME_NODE_INSTALL: skip
+  PUPPETEER_SKIP_DOWNLOAD: '1'
 
 jobs:
   # ==========================================
@@ -93,6 +98,38 @@ jobs:
 
       - name: Run TypeScript type check
         run: pnpm turbo run type-check
+
+  # ==========================================
+  # Dead code & duplication: knip (knip.json) and jscpd (.jscpd.json, fails above its threshold).
+  # Separate job so Lint & Type Check keeps its 5-minute budget; neither needs the Prisma client.
+  # ==========================================
+  hygiene:
+    name: Dead Code & Duplication
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Unused files, exports and dependencies (knip)
+        run: pnpm lint:deadcode
+
+      - name: Duplicated code (jscpd)
+        run: pnpm lint:duplication
 
   # ==========================================
   # Unit Tests (mock-only: no database, no Redis)

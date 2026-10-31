@@ -1,60 +1,41 @@
 'use client';
 
+import { format } from 'date-fns';
 import { useEffect } from 'react';
-import { useForm, Control, FieldValues, UseFormWatch, UseFormSetValue } from 'react-hook-form';
+import { useTranslations } from 'next-intl';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useCustomers, Customer } from '@/lib/hooks/use-customers';
 import { Quote } from '@/lib/hooks/use-quotes';
-import { LineItemsForm, taxFieldsForPercent, toApiLines } from './line-items-form';
-
-const lineItemSchema = z.object({
-  itemId: z.string().optional(),
-  description: z.string().min(1, 'Description is required'),
-  quantity: z.string().min(1, 'Quantity is required'),
-  rate: z.string().min(1, 'Rate is required'),
-  discountPercent: z.string().optional(),
-  taxRateId: z.string().optional(),
-  taxPercent: z.string().optional(),
-  amount: z.string(),
-});
+import { toApiLines } from './line-items-form';
+import {
+  blankSalesLine,
+  NO_TAX_RATES,
+  RequiredDateField,
+  SalesDocumentFormProps,
+  SalesDocumentFrame,
+  salesLineSchema,
+  toSalesFormLines,
+  useFieldError,
+} from './sales-document-form';
 
 const quoteSchema = z.object({
-  customerId: z.string().min(1, 'Customer is required'),
-  quoteDate: z.string().min(1, 'Quote date is required'),
-  expiryDate: z.string().min(1, 'Expiry date is required'),
+  customerId: z.string().min(1, 'customerRequired'),
+  quoteDate: z.string().min(1, 'dateRequired'),
+  expiryDate: z.string().min(1, 'expiryDateRequired'),
   reference: z.string().optional(),
   subject: z.string().optional(),
   notes: z.string().optional(),
   terms: z.string().optional(),
-  lines: z.array(lineItemSchema).min(1, 'At least one line item is required'),
+  lines: z.array(salesLineSchema).min(1, 'lineItemRequired'),
 });
 
 type QuoteFormData = z.infer<typeof quoteSchema>;
 
-const NO_TAX_RATES: { id: string; name: string; rate: number }[] = [];
-
-interface QuoteFormProps {
+interface QuoteFormProps extends SalesDocumentFormProps {
   quote?: Quote | null;
-  customerId?: string;
-  taxRates?: { id: string; name: string; rate: number }[];
-  /** State of the tax-rate lookup; a failed lookup blocks saving. */
-  taxRatesStatus?: { isLoading: boolean; isError: boolean };
-  onSubmit: (data: Record<string, unknown>) => void;
-  onCancel: () => void;
-  isSubmitting?: boolean;
 }
 
 export function QuoteForm({
@@ -67,14 +48,14 @@ export function QuoteForm({
   isSubmitting,
 }: QuoteFormProps) {
   const isEditing = !!quote;
-  const { data: customersData } = useCustomers({ limit: 100 });
-  const customers = customersData?.data || [];
+  const t = useTranslations('sales.quotes.form');
+  const fieldError = useFieldError('sales.quotes.validation');
 
   // Default dates
-  const today = new Date().toISOString().split('T')[0];
+  const today = format(new Date(), 'yyyy-MM-dd');
   const defaultExpiry = new Date();
   defaultExpiry.setDate(defaultExpiry.getDate() + 30);
-  const expiryDate = defaultExpiry.toISOString().split('T')[0];
+  const expiryDate = format(defaultExpiry, 'yyyy-MM-dd');
 
   const form = useForm<QuoteFormData>({
     resolver: zodResolver(quoteSchema),
@@ -86,17 +67,7 @@ export function QuoteForm({
       subject: '',
       notes: '',
       terms: '',
-      lines: [
-        {
-          itemId: '',
-          description: '',
-          quantity: '1',
-          rate: '0',
-          discountPercent: '0',
-          taxRateId: '',
-          amount: '0',
-        },
-      ],
+      lines: [blankSalesLine()],
     },
   });
 
@@ -110,37 +81,12 @@ export function QuoteForm({
         subject: quote.subject || '',
         notes: quote.notes || '',
         terms: quote.terms || '',
-        lines: quote.lines?.map((line) => ({
-          itemId: line.itemId || '',
-          description: line.description,
-          quantity: line.quantity,
-          rate: line.rate,
-          discountPercent: line.discountPercent || line.discount || '0',
-          ...(line.taxRateId
-            ? { taxRateId: line.taxRateId }
-            : taxFieldsForPercent(line.taxRate, taxRates)),
-          amount: line.amount,
-        })) || [
-          {
-            itemId: '',
-            description: '',
-            quantity: '1',
-            rate: '0',
-            discountPercent: '0',
-            taxRateId: '',
-            amount: '0',
-          },
-        ],
+        lines: toSalesFormLines(quote.lines, taxRates),
       });
     }
   }, [quote, form, taxRates]);
 
-  const selectedCustomerId = form.watch('customerId');
-  const selectedCustomer = customers.find((c: Customer) => c.id === selectedCustomerId);
-
   const handleSubmit = (data: QuoteFormData) => {
-    // Never save lines against a tax lookup that failed or has not finished.
-    if (taxRatesStatus?.isError || taxRatesStatus?.isLoading) return;
     // Exactly the CreateQuoteDto shape: totals are computed by the server from the lines.
     onSubmit({
       customerId: data.customerId,
@@ -153,126 +99,46 @@ export function QuoteForm({
   };
 
   return (
-    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-      {/* Quote Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quote Details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <SalesDocumentFrame
+      form={form}
+      namespace="sales.quotes"
+      isEditing={isEditing}
+      translateError={fieldError}
+      taxRates={taxRates}
+      taxRatesStatus={taxRatesStatus}
+      // The quote's own currency, else the org base currency; never the customer's (B5).
+      currency={quote?.currencyCode ?? null}
+      onValidSubmit={handleSubmit}
+      onCancel={onCancel}
+      isSubmitting={isSubmitting}
+      submitLabel={isEditing ? t('updateQuote') : t('createQuote')}
+      details={
+        <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="customerId">Customer *</Label>
-              <Select
-                value={form.watch('customerId')}
-                onValueChange={(value) => form.setValue('customerId', value)}
-                disabled={isEditing}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a customer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map((customer: Customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.displayName || customer.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.formState.errors.customerId && (
-                <p className="text-sm text-red-500">{form.formState.errors.customerId.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="reference">Reference Number</Label>
-              <Input
-                id="reference"
-                placeholder="PO-001 or project reference"
-                {...form.register('reference')}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="quoteDate">Quote Date *</Label>
-              <Input id="quoteDate" type="date" {...form.register('quoteDate')} />
-              {form.formState.errors.quoteDate && (
-                <p className="text-sm text-red-500">{form.formState.errors.quoteDate.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="expiryDate">Expiry Date *</Label>
-              <Input id="expiryDate" type="date" {...form.register('expiryDate')} />
-              {form.formState.errors.expiryDate && (
-                <p className="text-sm text-red-500">{form.formState.errors.expiryDate.message}</p>
-              )}
-            </div>
+            <RequiredDateField
+              form={form}
+              name="quoteDate"
+              label={t('date')}
+              translate={fieldError}
+            />
+            <RequiredDateField
+              form={form}
+              name="expiryDate"
+              label={t('expiryDate')}
+              translate={fieldError}
+            />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="subject">Subject</Label>
+            <Label htmlFor="subject">{t('subject')}</Label>
             <Input
               id="subject"
-              placeholder="Quote for web development project"
+              placeholder={t('subjectPlaceholder')}
               {...form.register('subject')}
             />
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Line Items */}
-      <LineItemsForm
-        control={form.control as unknown as Control<FieldValues>}
-        watch={form.watch as unknown as UseFormWatch<FieldValues>}
-        setValue={form.setValue as unknown as UseFormSetValue<FieldValues>}
-        name="lines"
-        taxRates={taxRates}
-        taxRatesStatus={taxRatesStatus}
-        currency={selectedCustomer?.currency || 'USD'}
-        showTax={true}
-        showDiscount={true}
-      />
-
-      {/* Notes & Terms */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Notes & Terms</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="notes">Customer Notes</Label>
-            <Textarea
-              id="notes"
-              placeholder="Notes visible to the customer"
-              {...form.register('notes')}
-              rows={3}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="terms">Terms & Conditions</Label>
-            <Textarea
-              id="terms"
-              placeholder="Payment terms, warranty, etc."
-              {...form.register('terms')}
-              rows={3}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Actions */}
-      <div className="flex justify-end gap-3">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : isEditing ? 'Update Quote' : 'Create Quote'}
-        </Button>
-      </div>
-    </form>
+        </>
+      }
+    />
   );
 }

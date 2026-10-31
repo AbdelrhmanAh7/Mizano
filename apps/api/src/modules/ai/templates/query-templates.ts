@@ -571,7 +571,3 @@ export const queryTemplates: QueryTemplate[] = [
 export function getQueryTemplate(id: string): QueryTemplate | undefined {
   return queryTemplates.find((t) => t.id === id);
 }
-
-export function getQueryTemplatesByCategory(category: string): QueryTemplate[] {
-  return queryTemplates.filter((t) => t.category === category);
-}

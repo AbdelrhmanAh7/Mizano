@@ -1,7 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException, ValidationPipe } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BillsService } from './bills.service';
+import { CreateBillDto } from '../dto/create-bill.dto';
+import { UpdateBillDto } from '../dto/update-bill.dto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalsService } from '../../accounting/services/journals.service';
 import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
@@ -155,11 +157,67 @@ describe('BillsService', () => {
           ...validDto,
           lines: [{ accountId: 'inactive-acc', quantity: '1', rate: '1' }],
         }),
-      ).rejects.toThrow('Account not found');
+      ).rejects.toMatchObject({ response: { code: 'accountInvalidType' } });
       expect(prisma.account.count).toHaveBeenCalledWith({
         where: expect.objectContaining({ organizationId: ORG_ID, isActive: true }),
       });
       expect(prisma.bill.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a line account that is not EXPENSE/ASSET or is a control account (#550)', async () => {
+      prisma.vendor.findFirst.mockResolvedValue(createMockVendor() as any);
+      prisma.organization.findUnique.mockResolvedValue({
+        defaultApAccountId: 'ap-acc',
+        defaultArAccountId: 'ar-acc',
+        defaultVatPayableAccountId: 'vat-out',
+        defaultVatReceivableAccountId: 'vat-in',
+        defaultBankAccountId: 'bank-acc',
+        defaultCashAccountId: null,
+      } as any);
+      // The account exists in the organization but does not match the eligibility filter.
+      prisma.account.count.mockImplementation((async (args: any) =>
+        args?.where?.type ? 0 : 1) as any);
+
+      const error = await service
+        .create(ORG_ID, {
+          ...validDto,
+          lines: [{ accountId: 'ap-acc', quantity: '1', rate: '1' }],
+        })
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as BadRequestException).getResponse()).toMatchObject({
+        code: 'accountInvalidType',
+      });
+      const eligibleWhere = prisma.account.count.mock.calls[0]![0]!.where as any;
+      expect(eligibleWhere).toMatchObject({
+        organizationId: ORG_ID,
+        deletedAt: null,
+        isActive: true,
+        type: { in: ['EXPENSE', 'ASSET'] },
+        bankAccounts: { none: { organizationId: ORG_ID, deletedAt: null } },
+        id: { in: ['ap-acc'] },
+      });
+      expect(eligibleWhere.NOT.id.in.sort()).toEqual(
+        ['ap-acc', 'ar-acc', 'bank-acc', 'vat-in', 'vat-out'].sort(),
+      );
+      expect(prisma.bill.create).not.toHaveBeenCalled();
+    });
+
+    it('accepts an eligible expense account on a line', async () => {
+      prisma.vendor.findFirst.mockResolvedValue(createMockVendor() as any);
+      prisma.organization.findUnique.mockResolvedValue({ defaultApAccountId: 'ap-acc' } as any);
+      prisma.account.count.mockResolvedValue(1);
+      prisma.bill.create.mockResolvedValue(createMockBill() as any);
+
+      await service.create(ORG_ID, {
+        ...validDto,
+        lines: [{ accountId: 'rent-acc', quantity: '1', rate: '1000' }],
+      });
+
+      expect((prisma.bill.create.mock.calls[0]![0]!.data as any).lines.create[0].accountId).toBe(
+        'rent-acc',
+      );
     });
 
     it('should auto-number the bill when no bill number is given', async () => {
@@ -327,11 +385,60 @@ describe('BillsService', () => {
         service.update(ORG_ID, 'bill-1', {
           lines: [{ accountId: 'inactive-acc', quantity: '1', rate: '1' }],
         }),
-      ).rejects.toThrow('Account not found');
+      ).rejects.toMatchObject({ response: { code: 'accountInvalidType' } });
       expect(prisma.account.count).toHaveBeenCalledWith({
         where: expect.objectContaining({ organizationId: ORG_ID, isActive: true }),
       });
       expect(prisma.bill.update).not.toHaveBeenCalled();
+    });
+
+    it('disconnects the project when the web form sends projectId: null (audit B2)', async () => {
+      prisma.bill.findFirst.mockResolvedValue(createMockBill({ status: 'DRAFT' }) as any);
+      prisma.bill.updateMany.mockResolvedValue({ count: 1 });
+      prisma.bill.update.mockResolvedValue({} as any);
+
+      // The exact shape BillForm submits for a bill without a project.
+      await service.update(ORG_ID, 'bill-1', { projectId: null } as unknown as UpdateBillDto);
+
+      const data = prisma.bill.update.mock.calls[0]![0]!.data as any;
+      expect(data.project).toEqual({ disconnect: true });
+      expect(prisma.project.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('connects the project when one is chosen and leaves it alone when omitted', async () => {
+      prisma.bill.findFirst.mockResolvedValue(createMockBill({ status: 'DRAFT' }) as any);
+      prisma.project.findFirst.mockResolvedValue({ id: 'proj-1' } as any);
+      prisma.bill.updateMany.mockResolvedValue({ count: 1 });
+      prisma.bill.update.mockResolvedValue({} as any);
+
+      await service.update(ORG_ID, 'bill-1', { projectId: 'proj-1' });
+      await service.update(ORG_ID, 'bill-1', { notes: 'x' });
+
+      expect((prisma.bill.update.mock.calls[0]![0]!.data as any).project).toEqual({
+        connect: { id: 'proj-1' },
+      });
+      expect((prisma.bill.update.mock.calls[1]![0]!.data as any).project).toBeUndefined();
+    });
+
+    it('locks the bill row in its transaction before checking the status and replacing lines', async () => {
+      prisma.bill.findFirst.mockResolvedValue(createMockBill({ status: 'DRAFT' }) as any);
+      prisma.bill.updateMany.mockResolvedValue({ count: 1 });
+      prisma.bill.update.mockResolvedValue({} as any);
+
+      await service.update(ORG_ID, 'bill-1', {
+        lines: [{ description: 'x', quantity: '1', rate: '100' }],
+      });
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      const [sql, ...params] = prisma.$queryRaw.mock.calls[0] as [
+        TemplateStringsArray,
+        ...string[],
+      ];
+      expect(sql.join('?')).toContain('FOR UPDATE');
+      expect(params).toEqual(['bill-1', ORG_ID]);
+      const lockedAt = prisma.$queryRaw.mock.invocationCallOrder[0];
+      expect(lockedAt).toBeLessThan(prisma.bill.findFirst.mock.invocationCallOrder[0]);
+      expect(lockedAt).toBeLessThan(prisma.billLine.deleteMany.mock.invocationCallOrder[0]);
     });
 
     it('should reject a project from another organization', async () => {
@@ -363,6 +470,37 @@ describe('BillsService', () => {
         defaultApAccountId: 'ap-acc-1',
         defaultVatReceivableAccountId: 'vat-acc-1',
       } as any);
+      // Every line account passes the bill-line eligibility rule unless a test says otherwise.
+      prisma.account.count.mockResolvedValue(1);
+    });
+
+    it('rejects approval when a line has no account, with code accountRequired', async () => {
+      prisma.bill.findFirst.mockResolvedValue({
+        ...draftBill(),
+        lines: [{ accountId: null, amount: dec('500'), description: 'x' }],
+      } as any);
+
+      await expect(service.approve(ORG_ID, 'bill-1')).rejects.toMatchObject({
+        response: { code: 'accountRequired' },
+      });
+      expect(prisma.bill.updateMany).not.toHaveBeenCalled();
+      expect(journalsService.create).not.toHaveBeenCalled();
+    });
+
+    it('re-checks line accounts under the ledger lock and refuses an ineligible one (#550)', async () => {
+      prisma.bill.findFirst.mockResolvedValue(draftBill() as any);
+      // acc-1 was deactivated, retyped or made a control account after the draft was saved.
+      prisma.account.count.mockImplementation((async (args: any) =>
+        args?.where?.isActive ? 0 : 1) as any);
+
+      await expect(service.approve(ORG_ID, 'bill-1')).rejects.toMatchObject({
+        response: { code: 'accountInvalidType' },
+      });
+      expect(prisma.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.account.count.mock.invocationCallOrder[0],
+      );
+      expect(prisma.bill.updateMany).not.toHaveBeenCalled();
+      expect(journalsService.create).not.toHaveBeenCalled();
     });
 
     it('should transition DRAFT to OPEN and post one balanced journal in the same transaction', async () => {
@@ -441,15 +579,52 @@ describe('BillsService', () => {
       await expect(service.approve(ORG_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
 
-    it('takes the ledger lock before reading the bill and organization settings', async () => {
+    it('locks the bill row, then the ledger, before reading the bill and organization settings', async () => {
       prisma.bill.findFirst.mockResolvedValue(null);
 
       await expect(service.approve(ORG_ID, 'bill-1')).rejects.toThrow(NotFoundException);
 
-      expect(prisma.$executeRaw).toHaveBeenCalled();
+      // Document -> ledger, like payments made and vendor credits (review lessons §1).
+      const [sql, ...params] = prisma.$queryRaw.mock.calls[0] as [
+        TemplateStringsArray,
+        ...string[],
+      ];
+      expect(sql.join('?')).toMatch(
+        /FROM "bills" WHERE id = \? AND "organizationId" = \? FOR UPDATE/,
+      );
+      expect(params).toEqual(['bill-1', ORG_ID]);
+      expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.$executeRaw.mock.invocationCallOrder[0],
+      );
       expect(prisma.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
         prisma.bill.findFirst.mock.invocationCallOrder[0],
       );
+    });
+
+    it('posts the lines and totals of an edit that committed while it waited for the bill lock', async () => {
+      // The edit holds the row; approve's lock returns once it has committed.
+      let stored = draftBill();
+      prisma.$queryRaw.mockImplementation((async () => {
+        stored = createMockBill({
+          ...draftBill(),
+          subtotal: dec('800'),
+          taxAmount: dec('112'),
+          grandTotal: dec('912'),
+          lines: [{ accountId: 'acc-2', amount: dec('800'), description: 'Edited line' }],
+        });
+        return [];
+      }) as any);
+      prisma.bill.findFirst.mockImplementation((async () => stored) as any);
+      prisma.bill.updateMany.mockResolvedValue({ count: 1 });
+      prisma.bill.findUniqueOrThrow.mockResolvedValue({ ...stored, status: 'OPEN' } as any);
+
+      await service.approve(ORG_ID, 'bill-1');
+
+      expect(journalsService.create.mock.calls[0][1].lines).toEqual([
+        expect.objectContaining({ accountId: 'acc-2', debit: '800.0000' }),
+        expect.objectContaining({ accountId: 'vat-acc-1', debit: '112.0000' }),
+        expect.objectContaining({ accountId: 'ap-acc-1', credit: '912.0000' }),
+      ]);
     });
 
     it('bulkApprove should reuse approve and report per-record failures', async () => {
@@ -466,6 +641,132 @@ describe('BillsService', () => {
         { id: 'bill-2', reason: 'Only draft bills can be approved' },
       ]);
       expect(journalsService.create).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('accountOptions', () => {
+    it("lists eligible accounts and the vendor's last eligible line account", async () => {
+      prisma.organization.findUnique.mockResolvedValue({ defaultApAccountId: 'ap-acc' } as any);
+      prisma.account.findMany.mockResolvedValue([
+        { id: 'rent-acc', code: '6100', name: 'Rent', type: 'EXPENSE' },
+        { id: 'equip-acc', code: '1500', name: 'Equipment', type: 'ASSET' },
+      ] as any);
+      prisma.billLine.findFirst.mockResolvedValue({ accountId: 'rent-acc' } as any);
+
+      const result = await service.accountOptions(ORG_ID, 'vendor-1');
+
+      expect(result.vendorDefaultAccountId).toBe('rent-acc');
+      expect(result.data.map((a) => a.id)).toEqual(['rent-acc', 'equip-acc']);
+      expect(prisma.account.findMany.mock.calls[0]![0]!.where).toMatchObject({
+        organizationId: ORG_ID,
+        isActive: true,
+        type: { in: ['EXPENSE', 'ASSET'] },
+        NOT: { id: { in: ['ap-acc'] } },
+      });
+      // The vendor default is tenant-scoped and limited to accounts that are still eligible.
+      expect(prisma.billLine.findFirst.mock.calls[0]![0]!.where).toEqual({
+        accountId: { in: ['rent-acc', 'equip-acc'] },
+        bill: { organizationId: ORG_ID, vendorId: 'vendor-1', deletedAt: null },
+      });
+    });
+
+    it('returns no vendor default without a vendor', async () => {
+      prisma.organization.findUnique.mockResolvedValue(null);
+      prisma.account.findMany.mockResolvedValue([
+        { id: 'rent-acc', code: '6100', name: 'Rent', type: 'EXPENSE' },
+      ] as any);
+
+      const result = await service.accountOptions(ORG_ID);
+
+      expect(result.vendorDefaultAccountId).toBeNull();
+      expect(prisma.billLine.findFirst).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('web form payload: create, edit, then approve (audit B1/B2)', () => {
+    // Exactly what BillForm.handleSubmit sends, after the API's global ValidationPipe.
+    const pipe = new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+      transformOptions: { enableImplicitConversion: true },
+    });
+    const webPayload = {
+      vendorId: 'vendor-test-001',
+      date: '2026-10-31',
+      dueDate: '2026-11-30',
+      reference: null,
+      currencyCode: null,
+      notes: null,
+      projectId: null,
+      lines: [
+        {
+          itemId: null,
+          accountId: 'rent-acc',
+          description: 'Office rent',
+          quantity: '1',
+          rate: '1000',
+          taxRate: '14',
+        },
+      ],
+    };
+
+    it('creates a draft that can be edited and approved into one balanced journal', async () => {
+      const createDto = (await pipe.transform(webPayload, {
+        type: 'body',
+        metatype: CreateBillDto,
+      })) as CreateBillDto;
+      const updateDto = (await pipe.transform(webPayload, {
+        type: 'body',
+        metatype: UpdateBillDto,
+      })) as UpdateBillDto;
+
+      prisma.vendor.findFirst.mockResolvedValue(createMockVendor() as any);
+      prisma.organization.findUnique.mockResolvedValue({
+        defaultApAccountId: 'ap-acc',
+        defaultVatReceivableAccountId: 'vat-in',
+        baseCurrency: 'EGP',
+      } as any);
+      prisma.account.count.mockResolvedValue(1);
+      prisma.organization.update.mockResolvedValue({
+        billPrefix: 'BILL-',
+        billNextNumber: 2,
+      } as any);
+      prisma.bill.count.mockResolvedValue(0);
+      prisma.bill.create.mockImplementation((async (args: any) => args.data) as any);
+
+      // 1. Create
+      const created = (await service.create(ORG_ID, createDto)) as any;
+      expect(created.billNumber).toBe('BILL-0001');
+      const stored = {
+        ...created,
+        id: 'bill-1',
+        status: 'DRAFT',
+        date: new Date(created.date),
+        currencyCode: created.currencyCode ?? null,
+        lines: created.lines.create,
+      };
+
+      // 2. Edit the draft with the same payload (projectId: null)
+      prisma.bill.findFirst.mockResolvedValue(stored);
+      prisma.bill.updateMany.mockResolvedValue({ count: 1 });
+      prisma.bill.update.mockResolvedValue(stored);
+      await service.update(ORG_ID, 'bill-1', updateDto);
+      expect((prisma.bill.update.mock.calls[0]![0]!.data as any).project).toEqual({
+        disconnect: true,
+      });
+
+      // 3. Approve
+      prisma.bill.findUniqueOrThrow.mockResolvedValue({ ...stored, status: 'OPEN' });
+      await service.approve(ORG_ID, 'bill-1');
+
+      const [, journal] = journalsService.create.mock.calls[0]!;
+      expect(journal.date).toBe(new Date('2026-10-31').toISOString());
+      expect(journal.lines).toEqual([
+        expect.objectContaining({ accountId: 'rent-acc', debit: '1000.0000', credit: '0' }),
+        expect.objectContaining({ accountId: 'vat-in', debit: '140.0000', credit: '0' }),
+        expect.objectContaining({ accountId: 'ap-acc', debit: '0', credit: '1140.0000' }),
+      ]);
     });
   });
 
@@ -525,6 +826,36 @@ describe('BillsService', () => {
       expectDecimalEqual(data.balanceDue, '375');
     });
 
+    it('keeps a bill due today OPEN and marks a bill due yesterday OVERDUE (audit B12)', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-10-31T15:00:00Z'));
+      try {
+        setup('575', []);
+        prisma.bill.findUnique.mockResolvedValue(
+          createMockBill({
+            id: 'bill-1',
+            grandTotal: dec('575'),
+            status: 'OPEN',
+            dueDate: new Date('2026-10-31'),
+          }) as any,
+        );
+        await service.recalculateBalance(prisma as any, 'bill-1');
+        expect((prisma.bill.update.mock.calls[0]![0]!.data as any).status).toBe('OPEN');
+
+        prisma.bill.findUnique.mockResolvedValue(
+          createMockBill({
+            id: 'bill-1',
+            grandTotal: dec('575'),
+            status: 'OPEN',
+            dueDate: new Date('2026-10-30'),
+          }) as any,
+        );
+        await service.recalculateBalance(prisma as any, 'bill-1');
+        expect((prisma.bill.update.mock.calls[1]![0]!.data as any).status).toBe('OVERDUE');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it('should return to OPEN when all payments were voided', async () => {
       setup('575', []);
       await service.recalculateBalance(prisma as any, 'bill-1');
@@ -547,6 +878,20 @@ describe('BillsService', () => {
       await expect(service.recalculateBalance(prisma as any, 'x')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('markOverdueBills', () => {
+    it('only marks bills due before the start of today (UTC) as overdue (audit B12)', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-10-31T15:00:00Z'));
+      try {
+        prisma.bill.updateMany.mockResolvedValue({ count: 0 });
+        await service.markOverdueBills();
+        const where = prisma.bill.updateMany.mock.calls[0]![0]!.where as any;
+        expect(where.dueDate).toEqual({ lt: new Date('2026-10-31T00:00:00.000Z') });
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 

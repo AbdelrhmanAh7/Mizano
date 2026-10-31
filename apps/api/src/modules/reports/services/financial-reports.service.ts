@@ -21,7 +21,7 @@ import {
   splitByCurrency,
   sumPostedLinesByAccount,
   toDecimal,
-} from '../utils/report-utils';
+} from '../../../common/utils/report-utils';
 
 type AccountRow = Pick<Account, 'id' | 'code' | 'name' | 'type'>;
 

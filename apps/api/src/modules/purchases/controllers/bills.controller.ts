@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
+  AnyPermission,
   CacheResponse,
   CacheTTL,
   CurrentOrg,
@@ -23,6 +24,7 @@ import {
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
+import { BillAccountOptionsQueryDto } from '../dto/bill-account-options-query.dto';
 import { BillCursorQueryDto } from '../dto/bill-cursor-query.dto';
 import { BillQueryDto } from '../dto/bill-query.dto';
 import { CheckDuplicateBillDto } from '../dto/check-duplicate-bill.dto';
@@ -43,6 +45,16 @@ export class BillsController {
     private readonly billsService: BillsService,
     private readonly paymentsMadeService: PaymentsMadeService,
   ) {}
+
+  @Get('account-options')
+  // The bill form uses it to create (purchases.create) and to edit a draft (purchases.edit).
+  @AnyPermission('purchases.create', 'purchases.edit')
+  @ApiOperation({
+    summary: 'Accounts a bill line may use (active expense/asset, no control accounts)',
+  })
+  accountOptions(@CurrentOrg() orgId: string, @Query() query: BillAccountOptionsQueryDto) {
+    return this.billsService.accountOptions(orgId, query.vendorId);
+  }
 
   @Post('check-duplicate')
   @Permissions('purchases.create')

@@ -1,6 +1,7 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { WebhookOutboxService } from '../../integrations/services/webhook-outbox.service';
 import { AiFeature, AiFeedbackAction } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { OllamaService, DocumentExtractionResult } from './ollama.service';
@@ -15,7 +16,8 @@ import {
 import { extractTextFromPdf } from '../utils/pdf-extractor.util';
 import { levenshteinSimilarity, normalizeText } from '../utils/text-similarity.util';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
-import { assertTotalsFit } from '../../sales/utils/sales-helpers';
+import { assertTotalsFit } from '../../../common/utils/sales-helpers';
+import { assertBillLineAccounts } from '../../../common/utils/bill-line-accounts';
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -218,6 +220,8 @@ export class DocumentIntakeService {
     private entityExtractionService: EntityExtractionService,
     private feedbackService: AiFeedbackService,
     private configService: ConfigService,
+    // Outbound integration events (absent in the intake worker, which then emits nothing).
+    @Optional() private outbox?: WebhookOutboxService,
   ) {}
 
   /**
@@ -536,6 +540,10 @@ export class DocumentIntakeService {
           'accountId does not reference an active account in this organization',
         );
       }
+      if (dto.type === 'BILL') {
+        // Same rule as BillsService (expense/asset, no control accounts); approve() re-checks.
+        await assertBillLineAccounts(this.prisma, organizationId, accountIds);
+      }
     }
 
     const taxRatePercentById = new Map<string, Decimal>();
@@ -705,36 +713,41 @@ export class DocumentIntakeService {
 
     const invoiceNumber = await this.generateInvoiceNumber(organizationId);
 
-    const invoice = await this.prisma.invoice.create({
-      data: {
-        invoiceNumber,
-        customerId,
-        projectId: dto.projectId || null,
-        date: new Date(dto.date),
-        dueDate: new Date(dto.dueDate),
-        subtotal: resolved.subtotal,
-        taxAmount: resolved.taxAmount,
-        shippingAmount: new Decimal(0),
-        grandTotal: resolved.grandTotal,
-        balanceDue: resolved.grandTotal,
-        currencyCode: resolved.currencyCode,
-        notes: dto.notes || 'Created from document scan',
-        organizationId,
-        lines: {
-          // InvoiceLine has no accountId column; a supplied account is only validated.
-          create: resolved.lines.map((line) => ({
-            itemId: line.itemId,
-            taxRateId: line.taxRateId,
-            description: line.description,
-            quantity: line.quantity,
-            rate: line.rate,
-            discount: line.discountPercent,
-            taxRate: line.taxRatePercent,
-            amount: line.netAmount,
-          })),
+    // The draft and its invoice.created event commit together (audit F3).
+    const invoice = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.invoice.create({
+        data: {
+          invoiceNumber,
+          customerId,
+          projectId: dto.projectId || null,
+          date: new Date(dto.date),
+          dueDate: new Date(dto.dueDate),
+          subtotal: resolved.subtotal,
+          taxAmount: resolved.taxAmount,
+          shippingAmount: new Decimal(0),
+          grandTotal: resolved.grandTotal,
+          balanceDue: resolved.grandTotal,
+          currencyCode: resolved.currencyCode,
+          notes: dto.notes || 'Created from document scan',
+          organizationId,
+          lines: {
+            // InvoiceLine has no accountId column; a supplied account is only validated.
+            create: resolved.lines.map((line) => ({
+              itemId: line.itemId,
+              taxRateId: line.taxRateId,
+              description: line.description,
+              quantity: line.quantity,
+              rate: line.rate,
+              discount: line.discountPercent,
+              taxRate: line.taxRatePercent,
+              amount: line.netAmount,
+            })),
+          },
         },
-      },
-      select: { id: true },
+        select: { id: true },
+      });
+      await this.outbox?.invoiceEvent(tx, organizationId, 'invoice.created', created.id);
+      return created;
     });
 
     this.logger.log(

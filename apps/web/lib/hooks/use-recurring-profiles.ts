@@ -282,19 +282,6 @@ export function useRecurringProfileExecutions(id: string | undefined, limit?: nu
 }
 
 /**
- * Hook to fetch upcoming recurring profiles
- */
-export function useUpcomingProfiles(days?: number) {
-  return useQuery({
-    queryKey: ['recurring-profiles', 'upcoming', days],
-    queryFn: async () => {
-      const response = await recurringProfilesApi.getUpcoming(days);
-      return response.data;
-    },
-  });
-}
-
-/**
  * Get frequency display label
  */
 export function getFrequencyLabel(frequency: RecurringFrequency): string {
@@ -305,50 +292,4 @@ export function getFrequencyLabel(frequency: RecurringFrequency): string {
     YEARLY: 'Yearly',
   };
   return labelMap[frequency] || frequency;
-}
-
-/**
- * Get frequency badge color
- */
-export function getFrequencyColor(frequency: RecurringFrequency): string {
-  const colorMap: Record<RecurringFrequency, string> = {
-    DAILY: 'bg-blue-100 text-blue-800',
-    WEEKLY: 'bg-purple-100 text-purple-800',
-    MONTHLY: 'bg-green-100 text-green-800',
-    YEARLY: 'bg-orange-100 text-orange-800',
-  };
-  return colorMap[frequency] || 'bg-gray-100 text-gray-800';
-}
-
-/**
- * Get status badge color
- */
-export function getProfileStatusColor(isActive: boolean): string {
-  return isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
-}
-
-/**
- * Format next execution date
- */
-export function formatNextExecution(date: string): string {
-  const nextDate = new Date(date);
-  const now = new Date();
-  const diffTime = nextDate.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  if (diffDays < 0) {
-    return 'Overdue';
-  } else if (diffDays === 0) {
-    return 'Today';
-  } else if (diffDays === 1) {
-    return 'Tomorrow';
-  } else if (diffDays <= 7) {
-    return `In ${diffDays} days`;
-  } else {
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    }).format(nextDate);
-  }
 }

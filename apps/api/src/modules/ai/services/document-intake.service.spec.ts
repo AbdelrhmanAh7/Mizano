@@ -19,11 +19,12 @@ interface PrismaMock {
   customer: { findFirst: jest.Mock };
   project: { findFirst: jest.Mock };
   item: { findMany: jest.Mock };
-  account: { findMany: jest.Mock };
+  account: { findMany: jest.Mock; count: jest.Mock };
   taxRate: { findMany: jest.Mock };
   bill: { findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock };
   invoice: { findFirst: jest.Mock; create: jest.Mock };
   organization: { findUnique: jest.Mock };
+  $transaction: jest.Mock;
 }
 
 /**
@@ -36,7 +37,7 @@ function buildPrisma(): PrismaMock {
     customer: { 'customer-a': ORG_A, 'customer-b': ORG_B },
     project: { 'project-a': ORG_A, 'project-b': ORG_B },
     item: { 'item-a': ORG_A, 'item-b': ORG_B },
-    account: { 'account-a': ORG_A, 'account-b': ORG_B },
+    account: { 'account-a': ORG_A, 'account-a-ap': ORG_A, 'account-b': ORG_B },
   } as const;
   const taxRates: Record<string, { org: string; rate: string }> = {
     'tax-a-14': { org: ORG_A, rate: '14' },
@@ -54,12 +55,25 @@ function buildPrisma(): PrismaMock {
         where.id.in.filter((id) => table[id] === where.organizationId).map((id) => ({ id })),
       );
 
-  return {
+  const mock = {
     vendor: { findFirst: jest.fn(findOwned(owned.vendor)), findMany: jest.fn() },
     customer: { findFirst: jest.fn(findOwned(owned.customer)) },
     project: { findFirst: jest.fn(findOwned(owned.project)) },
     item: { findMany: jest.fn(findManyOwned(owned.item)) },
-    account: { findMany: jest.fn(findManyOwned(owned.account)) },
+    account: {
+      findMany: jest.fn(findManyOwned(owned.account)),
+      // Bill-line eligibility: 'account-a-ap' is the org's AP control account (LIABILITY).
+      count: jest.fn(
+        ({ where }: { where: { id: { in: string[] }; organizationId: string; type?: unknown } }) =>
+          Promise.resolve(
+            where.id.in.filter(
+              (id) =>
+                owned.account[id as keyof typeof owned.account] === where.organizationId &&
+                !(where.type && id === 'account-a-ap'),
+            ).length,
+          ),
+      ),
+    },
     taxRate: {
       findMany: jest.fn(({ where }: { where: { id: { in: string[] }; organizationId: string } }) =>
         Promise.resolve(
@@ -80,6 +94,10 @@ function buildPrisma(): PrismaMock {
     },
     organization: { findUnique: jest.fn().mockResolvedValue({ baseCurrency: 'EGP' }) },
   };
+  // Interactive transactions run against the same tenant-aware mock.
+  return Object.assign(mock, {
+    $transaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) => fn(mock)),
+  });
 }
 
 function baseBill(overrides: Partial<ConfirmIntakeInput> = {}): ConfirmIntakeInput {
@@ -490,6 +508,25 @@ describe('DocumentIntakeService', () => {
       ]) {
         expect(mock.mock.calls[0][0].where.organizationId).toBe(ORG_A);
       }
+    });
+
+    it('refuses a bill line on a control account with accountInvalidType (#550)', async () => {
+      const promise = service.confirmAndCreate(
+        ORG_A,
+        baseBill({
+          lines: [
+            {
+              description: 'x',
+              quantity: '1',
+              rate: '1',
+              taxRatePercent: '0',
+              accountId: 'account-a-ap',
+            },
+          ],
+        }),
+      );
+      await expect(promise).rejects.toMatchObject({ response: { code: 'accountInvalidType' } });
+      expect(prisma.bill.create).not.toHaveBeenCalled();
     });
 
     it('does not log invoice content when creating the draft', async () => {

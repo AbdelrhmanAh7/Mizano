@@ -292,7 +292,8 @@ export const createCustomerSchema = z.object({
   displayName: z.string().max(200).optional(),
   email: z.string().email().optional().or(z.literal('')),
   phone: z.string().max(20).optional(),
-  currency: z.string().length(3).default('USD'),
+  // No USD default: the API gives a customer without one the org base currency (audit B5).
+  currency: z.string().length(3).optional(),
   taxId: z.string().max(50).optional(),
   billingAddress: addressSchema.optional(),
   shippingAddress: addressSchema.optional(),
