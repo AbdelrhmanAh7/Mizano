@@ -20,11 +20,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useVendors } from '@/lib/hooks/use-vendors';
-import { useBills, formatCurrency, getStatusVariant } from '@/lib/hooks/use-bills';
+import { useBills, getStatusVariant } from '@/lib/hooks/use-bills';
 import { useExpenses } from '@/lib/hooks/use-expenses';
 import { differenceInDays } from 'date-fns';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function PurchasesPage() {
+  // Overview figures are ledger amounts, in the org base currency (audit B5).
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('purchases');
   const tCommon = useTranslations('common');
 
@@ -129,7 +132,7 @@ export default function PurchasesPage() {
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold">{formatCurrency(totalPayable, 'USD')}</div>
+              <div className="text-2xl font-bold">{formatCurrency(totalPayable)}</div>
             )}
             <p className="text-xs text-muted-foreground">Across {vendors.length} vendors</p>
           </CardContent>
@@ -144,9 +147,7 @@ export default function PurchasesPage() {
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-red-600">
-                {formatCurrency(overdueAmount, 'USD')}
-              </div>
+              <div className="text-2xl font-bold text-red-600">{formatCurrency(overdueAmount)}</div>
             )}
             <p className="text-xs text-muted-foreground">{overdueBills.length} overdue bills</p>
           </CardContent>
@@ -285,7 +286,7 @@ export default function PurchasesPage() {
                             {bill.status}
                           </Badge>
                           <p className="text-sm font-mono mt-1">
-                            {formatCurrency(parseFloat(bill.grandTotal || '0'), 'USD')}
+                            {formatCurrency(bill.grandTotal)}
                           </p>
                         </div>
                       </div>
@@ -339,7 +340,7 @@ export default function PurchasesPage() {
                           <div className="text-right">
                             <p className="text-xs text-red-600">{daysOverdue} days overdue</p>
                             <p className="text-sm font-mono font-semibold text-red-600">
-                              {formatCurrency(parseFloat(bill.balanceDue || '0'), 'USD')}
+                              {formatCurrency(bill.balanceDue)}
                             </p>
                           </div>
                         </div>

@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCustomers, Customer } from '@/lib/hooks/use-customers';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { Invoice } from '@/lib/hooks/use-invoices';
 import {
   LineErrors,
@@ -99,6 +100,10 @@ export function InvoiceForm({
   const tTerms = useTranslations('common.paymentTerms');
   const fieldError = (message?: string) =>
     message ? (tValidation.has(message) ? tValidation(message) : message) : undefined;
+  // The server posts invoices in their own currency, else the org base currency: preview in the
+  // same, never the customer's default (audit B5, review-lessons §11).
+  const formatMoney = useMoneyFormatter();
+  const documentCurrencyCode = invoice?.currencyCode ?? null;
   const { data: customersData } = useCustomers({ limit: 100 });
   const customers = customersData?.data || [];
 
@@ -332,7 +337,7 @@ export function InvoiceForm({
         name="lines"
         taxRates={taxRates}
         taxRatesStatus={taxRatesStatus}
-        currency={selectedCustomer?.currency || 'USD'}
+        currency={documentCurrencyCode}
         showTax={true}
         showDiscount={true}
       />
@@ -362,12 +367,7 @@ export function InvoiceForm({
             <div className="border-t pt-4 mt-2 w-64">
               <div className="flex justify-between text-lg font-semibold">
                 <span>{t('grandTotal')}</span>
-                <span className="font-mono">
-                  {new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: selectedCustomer?.currency || 'USD',
-                  }).format(grandTotal)}
-                </span>
+                <span className="font-mono">{formatMoney(grandTotal, documentCurrencyCode)}</span>
               </div>
             </div>
           </div>

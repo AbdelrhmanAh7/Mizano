@@ -37,10 +37,12 @@ import {
 } from '@/lib/hooks/use-quotes';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { QuoteStatusBadge } from '@/components/sales/status-badge';
-import { formatCurrency } from '@/lib/hooks/use-customers';
 import { format } from 'date-fns';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function QuoteDetailPage() {
+  // Quote amounts: see `currency` below.
+  const formatCurrency = useMoneyFormatter();
   const params = useParams();
   const router = useRouter();
   const t = useTranslations('sales');
@@ -197,7 +199,8 @@ export default function QuoteDetailPage() {
   }
 
   const lines = quote.lines || [];
-  const currency = quote.customer?.currency || 'USD';
+  // The quote's own currency, else the org base currency; never the customer's (audit B5).
+  const currency = quote.currencyCode;
 
   return (
     <div className="space-y-6">

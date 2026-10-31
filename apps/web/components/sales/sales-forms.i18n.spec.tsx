@@ -43,6 +43,10 @@ jest.mock('@/lib/hooks/use-customers', () => ({
   useCustomers: () => ({ data: { data: [{ id: 'c1', name: 'Nile Co', paymentTerms: 30 }] } }),
 }));
 jest.mock('@/lib/hooks/use-items', () => ({ useActiveItems: () => ({ data: [] }) }));
+jest.mock('@/lib/hooks/use-organization', () => ({
+  ...jest.requireActual('@/lib/hooks/use-organization'),
+  useBaseCurrency: () => 'EGP',
+}));
 jest.mock('@/lib/hooks/use-accounts', () => ({ useAccountsByType: () => ({ data: [] }) }));
 jest.mock('@/lib/hooks/use-invoices', () => ({ useInvoices: () => ({ data: { data: [] } }) }));
 

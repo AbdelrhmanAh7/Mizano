@@ -41,7 +41,6 @@ import { useToast } from '@/components/ui/use-toast';
 import {
   useCustomer,
   useDeleteCustomer,
-  formatCurrency,
   formatAddress,
   getBalanceColor,
 } from '@/lib/hooks/use-customers';
@@ -55,8 +54,12 @@ import { InvoiceStatusBadge, type InvoiceStatus } from '@/components/sales/statu
 import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function CustomerDetailPage() {
+  // Balances and documents are ledger amounts in the org base currency, not the customer's
+  // default currency (audit B5, review-lessons §11).
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
   const params = useParams();
@@ -224,7 +227,7 @@ export default function CustomerDetailPage() {
                   {t('customer360.outstandingBalance')}
                 </div>
                 <div className={cn('text-2xl font-bold font-mono', getBalanceColor(balance))}>
-                  {formatCurrency(balance, customer.currency)}
+                  {formatCurrency(balance)}
                 </div>
               </CardContent>
             </Card>
@@ -437,16 +440,10 @@ export default function CustomerDetailPage() {
                             <InvoiceStatusBadge status={invoice.status as InvoiceStatus} />
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatCurrency(
-                              parseFloat(invoice.grandTotal || '0'),
-                              customer.currency,
-                            )}
+                            {formatCurrency(parseFloat(invoice.grandTotal || '0'))}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatCurrency(
-                              parseFloat(invoice.balanceDue || '0'),
-                              customer.currency,
-                            )}
+                            {formatCurrency(parseFloat(invoice.balanceDue || '0'))}
                           </TableCell>
                         </TableRow>
                       ),
@@ -515,7 +512,7 @@ export default function CustomerDetailPage() {
                           <TableCell>{payment.paymentMode?.replace('_', ' ')}</TableCell>
                           <TableCell>{payment.reference || '-'}</TableCell>
                           <TableCell className="text-right font-mono text-green-600">
-                            {formatCurrency(parseFloat(payment.amount || '0'), customer.currency)}
+                            {formatCurrency(parseFloat(payment.amount || '0'))}
                           </TableCell>
                         </TableRow>
                       ),
@@ -588,7 +585,7 @@ export default function CustomerDetailPage() {
                             <Badge variant="outline">{quote.status}</Badge>
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatCurrency(parseFloat(quote.grandTotal || '0'), customer.currency)}
+                            {formatCurrency(parseFloat(quote.grandTotal || '0'))}
                           </TableCell>
                         </TableRow>
                       ),
@@ -654,7 +651,7 @@ export default function CustomerDetailPage() {
                             <Badge variant="outline">{cn.type.replace('_', ' ')}</Badge>
                           </TableCell>
                           <TableCell className="text-right font-mono text-orange-600">
-                            {formatCurrency(parseFloat(cn.amount || '0'), customer.currency)}
+                            {formatCurrency(parseFloat(cn.amount || '0'))}
                           </TableCell>
                         </TableRow>
                       ),
@@ -668,7 +665,7 @@ export default function CustomerDetailPage() {
 
         {/* Statement Tab */}
         <TabsContent value="statement">
-          <CustomerStatement customerId={customerId} customer={customer} />
+          <CustomerStatement customerId={customerId} />
         </TabsContent>
       </Tabs>
 

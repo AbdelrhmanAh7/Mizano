@@ -33,7 +33,6 @@ import { useToast } from '@/components/ui/use-toast';
 import { ImportWizard } from '@/components/import/import-wizard';
 import { quotesApi } from '@/lib/api';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
-import { formatCurrency } from '@/lib/hooks/use-customers';
 import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import {
@@ -65,8 +64,11 @@ import {
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function QuotesPageContent() {
+  // Quote totals in the quote's own currency, else the org base currency (audit B5).
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
   const { toast } = useToast();
@@ -334,10 +336,7 @@ function QuotesPageContent() {
       ),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
       cell: ({ row }) =>
-        formatCurrency(
-          parseFloat(row.original.grandTotal || '0'),
-          row.original.customer?.currency || 'USD',
-        ),
+        formatCurrency(parseFloat(row.original.grandTotal || '0'), row.original.currencyCode),
     },
     {
       id: 'actions',

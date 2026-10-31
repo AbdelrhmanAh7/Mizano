@@ -29,11 +29,11 @@ jest.mock('next-intl', () => {
   };
 });
 
-jest.mock('@/lib/hooks/use-customers', () => ({
-  useCustomers: () => ({
-    data: { data: [{ id: 'c1', name: 'Nile Co', paymentTerms: 30, currency: 'USD' }] },
-  }),
-}));
+// A stable result, like React Query's: the form derives the selected customer from it.
+const mockCustomers = {
+  data: { data: [{ id: 'c1', name: 'Nile Co', paymentTerms: 30, currency: 'USD' }] },
+};
+jest.mock('@/lib/hooks/use-customers', () => ({ useCustomers: () => mockCustomers }));
 jest.mock('@/lib/hooks/use-organization', () => ({
   ...jest.requireActual('@/lib/hooks/use-organization'),
   useBaseCurrency: () => 'EGP',
@@ -128,5 +128,25 @@ describe('InvoiceForm reference and payment terms (audit B9)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Update Invoice' }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     expect(onSubmit.mock.calls[0][0].reference).toBeNull();
+  });
+});
+
+describe('InvoiceForm preview currency (audit B5)', () => {
+  it("previews in the org base currency, not the customer's USD default", () => {
+    render(<InvoiceForm customerId="c1" onSubmit={jest.fn()} onCancel={jest.fn()} />);
+    expect(screen.getAllByText(/EGP/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/\$|USD/)).not.toBeInTheDocument();
+  });
+
+  it('previews a saved invoice in its own currency', async () => {
+    render(
+      <InvoiceForm
+        invoice={{ ...savedInvoice, currencyCode: 'SAR' } as Invoice}
+        onSubmit={jest.fn()}
+        onCancel={jest.fn()}
+      />,
+    );
+    expect((await screen.findAllByText(/SAR/)).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/EGP/)).not.toBeInTheDocument();
   });
 });

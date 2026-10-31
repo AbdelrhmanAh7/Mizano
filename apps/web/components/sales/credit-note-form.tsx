@@ -24,6 +24,7 @@ import { useTranslations } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import { creditNotesApi } from '@/lib/api';
 import { CreditNoteType } from '@/lib/hooks/use-credit-notes';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 const creditNoteSchema = z
   .object({
@@ -135,13 +136,10 @@ export function CreditNoteForm({
     }
   }, [selectedInvoice, form]);
 
-  const formatCurrency = (amount: string | number) => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(num);
-  };
+  // Invoice amounts in the invoice's own currency, else the org base currency (audit B5).
+  const formatMoney = useMoneyFormatter();
+  const formatCurrency = (amount: string | number) =>
+    formatMoney(amount, selectedInvoice?.currencyCode);
 
   const handleSubmit = (data: CreditNoteFormData) => {
     onSubmit(data);

@@ -52,6 +52,8 @@ export interface Quote {
   discountAmount?: string | null;
   taxAmount: string;
   grandTotal: string;
+  /** Null means the organization base currency. */
+  currencyCode?: string | null;
   notes: string | null;
   terms: string | null;
   lines: QuoteLine[];

@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Customer } from '@/lib/hooks/use-customers';
+import { useBaseCurrency } from '@/lib/hooks/use-organization';
 
 const addressSchema = z.object({
   street: z.string().optional(),
@@ -35,7 +36,8 @@ const customerSchema = z.object({
   displayName: z.string().optional(),
   email: z.string().email('emailInvalid').optional().or(z.literal('')),
   phone: z.string().optional(),
-  currency: z.string().default('USD'),
+  // Empty until the org base currency is known; the API then defaults it too (audit B5).
+  currency: z.string().optional(),
   taxId: z.string().optional(),
   paymentTerms: z.number().optional(),
   notes: z.string().optional(),
@@ -80,7 +82,7 @@ export function buildCustomerPayload(data: CustomerFormData): Record<string, unk
     displayName: optional(data.displayName),
     email: optional(data.email),
     phone: optional(data.phone),
-    currency: data.currency || 'USD',
+    currency: optional(data.currency),
     taxId: optional(data.taxId),
     paymentTerms: optionalNumber(data.paymentTerms),
     notes: optional(data.notes),
@@ -91,6 +93,15 @@ export function buildCustomerPayload(data: CustomerFormData): Record<string, unk
 
 // Labels are keys under sales.customers.form.currencies and common.paymentTerms.
 const currencies = ['USD', 'EUR', 'GBP', 'EGP', 'AED', 'SAR'] as const;
+
+/** The listed currencies plus the org base currency and the saved one, base currency first. */
+export function currencyOptions(
+  baseCurrency: string | undefined,
+  current: string | undefined,
+): string[] {
+  const codes = [baseCurrency, ...currencies, current].filter((c): c is string => !!c);
+  return Array.from(new Set(codes));
+}
 
 const paymentTermsOptions = [
   { value: 0, labelKey: 'dueOnReceipt' },
@@ -115,7 +126,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
       displayName: '',
       email: '',
       phone: '',
-      currency: 'USD',
+      currency: '',
       taxId: '',
       paymentTerms: 30,
       notes: '',
@@ -136,6 +147,14 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
     },
   });
 
+  // A new customer starts in the org base currency, never USD; a choice already made stays.
+  const baseCurrency = useBaseCurrency();
+  useEffect(() => {
+    if (!isEditing && baseCurrency && !form.getValues('currency')) {
+      form.setValue('currency', baseCurrency);
+    }
+  }, [isEditing, baseCurrency, form]);
+
   useEffect(() => {
     if (customer) {
       form.reset({
@@ -143,7 +162,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
         displayName: customer.displayName || '',
         email: customer.email || '',
         phone: customer.phone || '',
-        currency: customer.currency || 'USD',
+        currency: customer.currency || '',
         taxId: customer.taxId || '',
         paymentTerms: customer.paymentTerms ?? 30,
         notes: customer.notes || '',
@@ -243,9 +262,9 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
                   <SelectValue placeholder={t('currencyPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
-                  {currencies.map((code) => (
+                  {currencyOptions(baseCurrency, form.watch('currency')).map((code) => (
                     <SelectItem key={code} value={code}>
-                      {t(`currencies.${code}`)}
+                      {t.has(`currencies.${code}`) ? t(`currencies.${code}`) : code}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select';
 import { computeTotals } from '@/lib/money';
 import { Item, useActiveItems } from '@/lib/hooks/use-items';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { Plus, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import {
@@ -104,7 +105,8 @@ interface LineItemsFormProps {
   name: string;
   taxRates?: TaxRate[];
   taxRatesStatus?: { isLoading: boolean; isError: boolean };
-  currency?: string;
+  /** Document currency; empty means the organization base currency (never a guessed USD). */
+  currency?: string | null;
   showTax?: boolean;
   showDiscount?: boolean;
 }
@@ -166,15 +168,6 @@ export function calculateLineTotals(
   };
 }
 
-export function formatAmount(amount: number, currency = 'USD'): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
 export function LineItemsForm({
   control,
   watch,
@@ -182,11 +175,14 @@ export function LineItemsForm({
   name,
   taxRates = [],
   taxRatesStatus,
-  currency = 'USD',
+  currency,
   showTax = true,
   showDiscount = true,
 }: LineItemsFormProps) {
   const t = useTranslations('sales');
+  const formatMoney = useMoneyFormatter();
+  const formatAmount = (amount: number, code: string | null | undefined) =>
+    formatMoney(amount, code);
   const { data: items = [] } = useActiveItems();
 
   const { fields, append, remove } = useFieldArray({
