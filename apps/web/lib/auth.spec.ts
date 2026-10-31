@@ -85,7 +85,7 @@ describe('refreshAccessToken (per-session isolation)', () => {
     expect(rb).toMatchObject({ id: 'B', accessToken: 'access-B2', refreshToken: 'rt-B2' });
     expect(ra.error).toBeUndefined();
     expect(rb.error).toBeUndefined();
-    expect(tokenRefresher.size()).toEqual({ inFlight: 0, cooldowns: 0 });
+    expect(tokenRefresher.size()).toEqual({ inFlight: 0, cooldowns: 0, recent: 2 });
   });
 
   it('shares one network call for concurrent refreshes of the same session', async () => {
@@ -199,7 +199,7 @@ describe('logout clears session state', () => {
         headers: { Authorization: 'Bearer new-access-A' },
         timeout: 3_000,
       });
-      expect(tokenRefresher.size()).toEqual({ inFlight: 0, cooldowns: 0 });
+      expect(tokenRefresher.size()).toEqual({ inFlight: 0, cooldowns: 0, recent: 0 });
     } finally {
       postSpy.mockRestore();
       tokenRefresher.reset();
@@ -226,7 +226,7 @@ describe('logout clears session state', () => {
       expect(postSpy).toHaveBeenCalledTimes(1);
       expect(postSpy.mock.calls[0][0]).toMatch(/\/auth\/refresh$/);
       expect(forgetSpy).toHaveBeenCalledWith('secret-refresh-token');
-      expect(tokenRefresher.size()).toEqual({ inFlight: 0, cooldowns: 0 });
+      expect(tokenRefresher.size()).toEqual({ inFlight: 0, cooldowns: 0, recent: 0 });
       expect(errorSpy).toHaveBeenCalledWith('Failed to refresh access token: HTTP 401');
       expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('secret-refresh-token');
       expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('Bearer');
@@ -298,7 +298,7 @@ describe('logout clears session state', () => {
         },
         session: undefined as never,
       });
-      expect(tokenRefresher.size()).toEqual({ inFlight: 0, cooldowns: 0 });
+      expect(tokenRefresher.size()).toEqual({ inFlight: 0, cooldowns: 0, recent: 0 });
       expect(errorSpy).toHaveBeenCalledWith('Logout error: HTTP 503');
       const logged = JSON.stringify(errorSpy.mock.calls);
       expect(logged).not.toContain('secret-refresh-token');
@@ -333,7 +333,7 @@ describe('createTokenRefresher', () => {
 
     time += 101;
     expect(await refresher.refresh('rt')).toEqual({ accessToken: 'a', refreshToken: 'r' });
-    expect(refresher.size()).toEqual({ inFlight: 0, cooldowns: 0 });
+    expect(refresher.size()).toEqual({ inFlight: 0, cooldowns: 0, recent: 1 });
   });
 
   it('bounds the cooldown map size', async () => {
@@ -343,6 +343,36 @@ describe('createTokenRefresher', () => {
       await refresher.refresh(`rt-${i}`);
     }
     expect(refresher.size().cooldowns).toBe(3);
+  });
+
+  it('answers a late call with the replaced token from the kept result, then expires it', async () => {
+    let time = 1_000;
+    const refresh = jest
+      .fn<Promise<RefreshedTokens | null>, [string]>()
+      .mockResolvedValueOnce({ accessToken: 'a1', refreshToken: 'r1' })
+      .mockResolvedValueOnce(null);
+    const refresher = createTokenRefresher({ refresh, reuseMs: 100, now: () => time });
+
+    expect(await refresher.refresh('r0')).toEqual({ accessToken: 'a1', refreshToken: 'r1' });
+    // A request sent with the old cookie arrives after the refresh finished.
+    time += 50;
+    expect(await refresher.refresh('r0')).toEqual({ accessToken: 'a1', refreshToken: 'r1' });
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    time += 51;
+    expect(await refresher.refresh('r0')).toBeNull();
+    expect(refresh).toHaveBeenCalledTimes(2);
+  });
+
+  it('forget drops a kept result', async () => {
+    const refresh = jest
+      .fn<Promise<RefreshedTokens | null>, [string]>()
+      .mockResolvedValue({ accessToken: 'a1', refreshToken: 'r1' });
+    const refresher = createTokenRefresher({ refresh, now: () => 0 });
+    await refresher.refresh('r0');
+    expect(refresher.size().recent).toBe(1);
+    refresher.forget('r0');
+    expect(refresher.size().recent).toBe(0);
   });
 
   it('cleans up in-flight state when the refresh function throws synchronously', async () => {
