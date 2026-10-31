@@ -201,7 +201,13 @@ export const authApi = {
     lastName: string;
     organizationName: string;
   }) => publicApi.post('/auth/register', data),
-  refreshToken: (refreshToken: string) => publicApi.post('/auth/refresh', { refreshToken }),
+  // The refresh route authenticates the refresh token as a bearer token.
+  refreshToken: (refreshToken: string) =>
+    publicApi.post(
+      '/auth/refresh',
+      { refreshToken },
+      { headers: { Authorization: `Bearer ${refreshToken}` } },
+    ),
   forgotPassword: (email: string, locale: string) =>
     publicApi.post('/auth/forgot-password', { email, locale }),
   resetPassword: (token: string, password: string) =>

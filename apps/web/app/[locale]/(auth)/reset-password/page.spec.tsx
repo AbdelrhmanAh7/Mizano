@@ -51,6 +51,19 @@ describe('ResetPasswordPage', () => {
     expect(await screen.findByText('doneTitle')).toBeInTheDocument();
   });
 
+  it('keeps the token under Strict Mode, whose second effect run sees no fragment', async () => {
+    mockReset.mockResolvedValue({});
+    render(
+      <React.StrictMode>
+        <ResetPasswordPage />
+      </React.StrictMode>,
+    );
+    await screen.findByRole('button', { name: 'submit' });
+    expect(screen.queryByText('invalidTitle')).not.toBeInTheDocument();
+    submit('NewPassword1');
+    await waitFor(() => expect(mockReset).toHaveBeenCalledWith('abc123', 'NewPassword1'));
+  });
+
   it('enforces the password policy and the confirmation before calling the server', async () => {
     render(<ResetPasswordPage />);
     await screen.findByRole('button', { name: 'submit' });

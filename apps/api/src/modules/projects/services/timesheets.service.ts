@@ -109,11 +109,15 @@ export class TimesheetsService {
     const now = new Date();
     const hoursWorked = (now.getTime() - entry.timerStartedAt!.getTime()) / (1000 * 60 * 60);
 
+    // Elapsed time, not money: rounding the float hours to 2 dp is the stored precision.
+    const workedHours = new Decimal(Math.round(hoursWorked * 100) / 100);
     return this.prisma.timesheetEntry.update({
       where: { id: entryId },
       data: {
         timerEndedAt: now,
-        hours: new Decimal(Math.round(hoursWorked * 100) / 100),
+        hours: workedHours,
+        // Keep duration in step with hours, as create and update do.
+        duration: workedHours,
       },
       include: {
         project: { select: { id: true, name: true } },

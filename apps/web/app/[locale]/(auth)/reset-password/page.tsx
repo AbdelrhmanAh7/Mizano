@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { useForm } from 'react-hook-form';
@@ -37,15 +37,17 @@ export default function ResetPasswordPage() {
   const [token, setToken] = useState<string | null>(null);
   const [stage, setStage] = useState<Stage>('loading');
   const [isSaving, setIsSaving] = useState(false);
+  // Survives Strict Mode's second effect run, which sees the fragment already cleared.
+  const tokenRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const fromHash = readTokenFromHash();
-    if (fromHash) {
+    tokenRef.current ??= readTokenFromHash();
+    if (window.location.hash) {
       // Drop the token from the address bar and history.
       window.history.replaceState(null, '', window.location.pathname);
     }
-    setToken(fromHash);
-    setStage(fromHash ? 'form' : 'invalid');
+    setToken(tokenRef.current);
+    setStage(tokenRef.current ? 'form' : 'invalid');
   }, []);
 
   const {

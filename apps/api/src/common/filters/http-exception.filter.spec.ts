@@ -302,7 +302,9 @@ describe('AllExceptionsFilter (auth and validation error contract)', () => {
     });
 
     it('logs a catalog miss once, with a hash and never the text', () => {
+      // setup.ts already spies on warn: reuse that spy, but count only this test's calls.
       const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      warn.mockClear();
       try {
         const text = 'Customer secret-customer@example.com is unknown to the catalog';
         render(new BadRequestException(text), 'ar');
@@ -314,7 +316,7 @@ describe('AllExceptionsFilter (auth and validation error contract)', () => {
         expect(misses[0]).toMatch(/status=400, code=-, hash=[0-9a-f]{12}/);
         expect(JSON.stringify(warn.mock.calls)).not.toContain('secret-customer');
       } finally {
-        warn.mockRestore();
+        warn.mockClear();
       }
     });
 
