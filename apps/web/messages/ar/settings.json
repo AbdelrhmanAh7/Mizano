@@ -660,6 +660,8 @@
       "invoice_created": "إنشاء فاتورة",
       "invoice_sent": "إرسال فاتورة",
       "invoice_paid": "سداد فاتورة",
+      "invoice_voided": "إلغاء فاتورة",
+      "payment_voided": "إلغاء دفعة",
       "invoice_overdue": "فاتورة متأخرة",
       "payment_received": "استلام دفعة"
     }

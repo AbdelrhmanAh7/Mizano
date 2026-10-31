@@ -496,6 +496,7 @@ export class InvoicesService {
           source: { type: JournalSourceType.INVOICE_VOID, id },
         });
       }
+      await this.outbox?.invoiceEvent(tx, organizationId, 'invoice.voided', id);
 
       return tx.invoice.findUniqueOrThrow({ where: { id }, include: INVOICE_VIEW_INCLUDE });
     });

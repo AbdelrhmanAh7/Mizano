@@ -10,7 +10,9 @@ export const WEBHOOK_EVENT_TYPES = [
   'invoice.sent',
   'invoice.paid',
   'invoice.overdue',
+  'invoice.voided',
   'payment.received',
+  'payment.voided',
 ] as const;
 export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number];
 

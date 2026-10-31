@@ -301,6 +301,8 @@ export class PaymentsReceivedService {
         tx,
         source: { type: JournalSourceType.PAYMENT_RECEIVED_VOID, id },
       });
+      // The invoices it paid reopen; FlowLine hears it in the same transaction (audit F3).
+      await this.outbox?.paymentEvent(tx, organizationId, 'payment.voided', id);
 
       return { message: 'Payment voided successfully' };
     });

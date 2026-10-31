@@ -79,7 +79,7 @@ export class WebhookOutboxService {
     return (await this.subscribers(db, organizationId, type)).length > 0;
   }
 
-  /** invoice.created / invoice.sent / invoice.paid / invoice.overdue for one invoice. */
+  /** invoice.created / .sent / .paid / .overdue / .voided for one invoice. */
   async invoiceEvent(
     db: Db,
     organizationId: string,
@@ -117,7 +117,17 @@ export class WebhookOutboxService {
   }
 
   async paymentReceived(db: Db, organizationId: string, paymentId: string): Promise<string | null> {
-    if (!(await this.hasSubscribers(db, organizationId, 'payment.received'))) return null;
+    return this.paymentEvent(db, organizationId, 'payment.received', paymentId);
+  }
+
+  /** payment.received / payment.voided for one payment (a voided one is still readable). */
+  async paymentEvent(
+    db: Db,
+    organizationId: string,
+    type: Extract<WebhookEventType, `payment.${string}`>,
+    paymentId: string,
+  ): Promise<string | null> {
+    if (!(await this.hasSubscribers(db, organizationId, type))) return null;
     const [payment, baseCurrency] = await Promise.all([
       db.paymentReceived.findFirst({
         where: { id: paymentId, organizationId },
@@ -126,7 +136,7 @@ export class WebhookOutboxService {
       this.baseCurrency(db, organizationId),
     ]);
     if (!payment) return null;
-    return this.record(db, organizationId, 'payment.received', {
+    return this.record(db, organizationId, type, {
       payment: serializePayment(payment, baseCurrency),
     });
   }

@@ -660,6 +660,8 @@
       "invoice_created": "Invoice created",
       "invoice_sent": "Invoice sent",
       "invoice_paid": "Invoice paid",
+      "invoice_voided": "Invoice voided",
+      "payment_voided": "Payment voided",
       "invoice_overdue": "Invoice overdue",
       "payment_received": "Payment received"
     }
