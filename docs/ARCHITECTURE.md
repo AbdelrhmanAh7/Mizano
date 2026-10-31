@@ -142,10 +142,31 @@ Endpoint details: run the API locally and open Swagger at `http://localhost:6001
 - **Routing.** `app/[locale]/...` with `localePrefix: 'always'` (`/en/...`, `/ar/...`). `middleware.ts` combines next-intl routing with the NextAuth token check. `(auth)` holds public pages, `(dashboard)` protected pages with shared `layout.tsx`, `loading.tsx`, `error.tsx` and `not-found.tsx`.
 - **i18n.** next-intl with namespaces in `messages/{en,ar}/*.json`, registered in `messages/{en,ar}/index.ts`. `i18n/config.ts` maps `ar → rtl`; the locale layout sets `lang`/`dir`.
 - **Auth.** NextAuth credentials session holds the API access/refresh tokens (`lib/auth.ts`); the axios client in `lib/api.ts` attaches the bearer token and signs out on refresh failure.
-- **Server state.** TanStack Query hooks in `lib/hooks/use-{resource}.ts`; prefer `createCrudHooks` (`lib/hooks/create-crud-hooks.ts`) on top of `crud('/resource')` API objects.
+- **Server state.** TanStack Query hooks in `lib/hooks/use-{resource}.ts` on top of the API objects in `lib/api.ts` / `lib/api/`.
 - **Client state.** Zustand stores in `lib/stores/` (dashboard layout, recent items, tours, shortcuts).
 - **Forms.** React Hook Form + `zodResolver` with schemas from `@mizano/validators` or colocated Zod schemas.
 - **UI.** shadcn/ui on Radix + Tailwind + Lucide; charts with Recharts. See [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md).
+
+## Shared building blocks
+
+Use these instead of re-implementing them; `jscpd` fails CI when duplication rises.
+
+| Need                                                                              | Use                                                                                                                                                                                                                |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Scheduled AI job over every organization                                          | `modules/ai/schedulers/for-each-organization.ts` (`forEachOrganization`: batches of 5, per-org error isolation, start/complete/fail logs)                                                                          |
+| Helpers several API modules use                                                   | `apps/api/src/common/utils/` (`sales-helpers`, `movement-sign`, `report-utils`, `bill-line-accounts`, `secure-compare.util`, `decimal`, `document-totals`, `cursor-paginate`, `ledger-lock`, `run-bulk`, `redact`) |
+| Journal-shaped form lines (debit/credit, two-line minimum, totals, balance badge) | `components/accounting/journal-lines-editor.tsx` (`JournalLinesEditor`, `journalLineSchema`)                                                                                                                       |
+| Money display on the web                                                          | `useMoneyFormatter` (`lib/hooks/use-money-formatter.ts`)                                                                                                                                                           |
+| API error text in the UI                                                          | `lib/api-error.ts` (`getApiErrorMessage`, `getApiErrorCode`, `getLocalizedApiErrorMessage` for en/ar copy of known codes)                                                                                          |
+
+## Enforced rules
+
+- **Module boundaries** (`apps/api/.eslintrc.js`, `no-restricted-imports`): a Nest module uses another module only through its exported services, its module class and its DTOs. Another module's `controllers/`, `guards/`, `utils/`, `gateways/`, `*.controller` and `*.gateway` are off limits; move a helper that two modules need to `src/common`.
+- **Web and API stay apart**: web code never imports API sources and the API never imports web sources (both ESLint configs); they share `@mizano/shared-types` and `@mizano/validators`.
+- **No `console.log`** (`no-console` is an error in both apps; use the Nest `Logger` in the API).
+- **No dead code**: `knip` (`knip.json`, `pnpm lint:deadcode`) fails on unused files, exports and dependencies. Justified ignores live in `knip.json`: `e2e-army` (hub harness), extra exports of vendored shadcn primitives, enum members (validation contracts) and platform or implicitly loaded packages.
+- **No new duplication**: `jscpd` (`.jscpd.json`, `pnpm lint:duplication`) fails above its threshold (3.2 %; measured 3.15 % on 31 Oct). Lower the threshold when you remove duplication, never raise it.
+- Both run in the CI job "Dead Code & Duplication" and in `pnpm ci:full`.
 
 ## Database conventions
 
