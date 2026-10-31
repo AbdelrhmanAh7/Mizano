@@ -28,6 +28,8 @@ describe('ForgotPasswordPage', () => {
     mockForgot.mockResolvedValue({});
     const { container } = render(<ForgotPasswordPage />);
     expect(container.querySelector('form')?.getAttribute('method')).toBe('post');
+    // No mail set up: the screen tells the person to ask their organization owner (#599).
+    expect(screen.getByText('noMail')).toBeInTheDocument();
 
     fireEvent.change(document.getElementById('email')!, { target: { value: 'o@nile.test' } });
     fireEvent.click(screen.getByRole('button', { name: 'sendResetLink' }));

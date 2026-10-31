@@ -121,6 +121,8 @@ function DateButton({
         <Calendar
           mode="single"
           selected={date}
+          // Open on the chosen date's month, not today's.
+          defaultMonth={date}
           onSelect={(picked) => picked && onChange(picked)}
           {...calendarLocale}
           initialFocus

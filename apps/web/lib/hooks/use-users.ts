@@ -97,6 +97,20 @@ export function useDeleteUser() {
 }
 
 /**
+ * Hook to create a one-time password reset link for a member (shown once, to copy)
+ */
+export function useCreateResetLink() {
+  return useToastMutation({
+    namespace: 'settings.team.toast',
+    mutationFn: async ({ id, locale }: { id: string; locale: string }) =>
+      (await usersApi.createResetLink(id, locale)).data,
+    invalidate: () => [],
+    success: 'resetLinkCreated',
+    error: 'resetLinkError',
+  });
+}
+
+/**
  * Helper to get user status badge color
  */
 export function getUserStatusColor(status: string): string {

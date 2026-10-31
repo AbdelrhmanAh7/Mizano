@@ -90,6 +90,7 @@ export default function ForgotPasswordPage() {
               </Button>
             </form>
           )}
+          <p className="text-center text-xs text-muted-foreground">{t('noMail')}</p>
           <div className="text-center text-sm">
             <Link href="/login" className="text-primary hover:underline">
               {t('backToLogin')}

@@ -462,6 +462,9 @@ export const rolesApi = {
 
 export const usersApi = {
   ...crud('/users', { hasCursor: false }),
+  /** One-time password reset link for a member, to hand over when there is no mail (#599). */
+  createResetLink: (id: string, locale: string) =>
+    api.post<{ link: string; expiresAt: string }>(`/users/${id}/reset-link`, { locale }),
 };
 
 // ===========================================================================
