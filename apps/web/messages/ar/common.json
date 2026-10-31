@@ -339,6 +339,12 @@
     "description": "لا يوجد شيء هنا حتى الآن.",
     "action": "ابدأ"
   },
+  "documentPdf": {
+    "exportPdf": "تصدير PDF",
+    "print": "طباعة",
+    "error": "تعذّر إنشاء ملف PDF",
+    "errorDescription": "يُرجى المحاولة مرة أخرى بعد قليل."
+  },
   "paymentModes": {
     "cash": "نقداً",
     "bankTransfer": "تحويل بنكي",

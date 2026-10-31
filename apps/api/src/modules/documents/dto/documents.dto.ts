@@ -11,6 +11,32 @@ export class DocumentLocaleQueryDto {
   locale?: 'en' | 'ar';
 }
 
+const DOCUMENT_LOCALES = ['en', 'ar'] as const;
+type RequestedDocumentLocale = (typeof DOCUMENT_LOCALES)[number];
+
+/**
+ * The language of a generated document: an explicit `locale` (query or body), else the best
+ * `en`/`ar` match of the request's Accept-Language (q-values honoured, q=0 refused), else Arabic.
+ */
+export function resolveDocumentLocale(
+  explicit: RequestedDocumentLocale | undefined,
+  acceptLanguage: string | undefined,
+): RequestedDocumentLocale {
+  if (explicit) return explicit;
+  let best: { locale: RequestedDocumentLocale; q: number } | undefined;
+  for (const part of (acceptLanguage ?? '').split(',')) {
+    const [tag, ...params] = part.trim().split(';');
+    const primary = tag.trim().toLowerCase().split('-')[0];
+    const locale = DOCUMENT_LOCALES.find((l) => l === primary);
+    if (!locale) continue;
+    const qParam = params.map((p) => p.trim()).find((p) => p.startsWith('q='));
+    const q = qParam === undefined ? 1 : Number(qParam.slice(2));
+    if (!Number.isFinite(q) || q <= 0) continue;
+    if (!best || q > best.q) best = { locale, q };
+  }
+  return best?.locale ?? 'ar';
+}
+
 export class SendDocumentDto {
   @ApiProperty({ description: 'Recipient email address' })
   @IsEmail()
@@ -41,6 +67,15 @@ export class SendDocumentDto {
   @ApiPropertyOptional({ description: 'Whether to attach the PDF' })
   @IsOptional()
   attachPdf?: boolean = true;
+
+  @ApiPropertyOptional({
+    enum: ['en', 'ar'],
+    default: 'en',
+    description: 'Language of the attached PDF',
+  })
+  @IsOptional()
+  @IsIn(['en', 'ar'])
+  locale?: 'en' | 'ar';
 }
 
 export class SendPayslipsDto {

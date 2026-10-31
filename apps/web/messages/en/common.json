@@ -339,6 +339,12 @@
     "description": "There's nothing here yet.",
     "action": "Get started"
   },
+  "documentPdf": {
+    "exportPdf": "Export PDF",
+    "print": "Print",
+    "error": "Could not create the PDF",
+    "errorDescription": "Please try again in a moment."
+  },
   "paymentModes": {
     "cash": "Cash",
     "bankTransfer": "Bank Transfer",

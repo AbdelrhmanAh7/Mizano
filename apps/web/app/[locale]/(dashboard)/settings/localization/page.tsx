@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  DOCUMENT_DIGITS,
+  type DocumentDigits,
   useAllOrganizationSettings,
   useUpdateLocalizationSettings,
 } from '@/lib/hooks/use-all-settings';
@@ -52,10 +54,20 @@ const TIMEZONES = [
   'Africa/Nairobi',
 ];
 
+const DIGIT_LABEL_KEYS = {
+  latn: 'localization.digitsLatn',
+  arab: 'localization.digitsArab',
+} as const satisfies Record<DocumentDigits, string>;
+
+function isDocumentDigits(value: string): value is DocumentDigits {
+  return (DOCUMENT_DIGITS as readonly string[]).includes(value);
+}
+
 interface FormData {
   dateFormat: string;
   numberFormat: string;
   timezone: string;
+  documentDigits: DocumentDigits;
 }
 
 export default function LocalizationSettingsPage() {
@@ -68,6 +80,7 @@ export default function LocalizationSettingsPage() {
       dateFormat: 'MM/DD/YYYY',
       numberFormat: '1,000.00',
       timezone: 'UTC',
+      documentDigits: 'latn',
     },
   });
 
@@ -77,9 +90,16 @@ export default function LocalizationSettingsPage() {
         dateFormat: settings.localization.dateFormat || 'MM/DD/YYYY',
         numberFormat: settings.localization.numberFormat || '1,000.00',
         timezone: settings.localization.timezone || 'UTC',
+        documentDigits: settings.localization.documentDigits === 'arab' ? 'arab' : 'latn',
       });
     }
   }, [settings, form]);
+
+  // Radix Select emits '' for a value missing from its options (also while it mounts); an empty
+  // emission is never a choice, and saving it would fail the API's @IsIn for the whole form.
+  const setChoice = (field: 'dateFormat' | 'numberFormat' | 'timezone', value: string) => {
+    if (value) form.setValue(field, value, { shouldDirty: true });
+  };
 
   const onSubmit = (data: FormData) => {
     updateLocalization.mutate(data);
@@ -129,7 +149,7 @@ export default function LocalizationSettingsPage() {
                 <Label>{t('localization.dateFormat')}</Label>
                 <Select
                   value={form.watch('dateFormat')}
-                  onValueChange={(v) => form.setValue('dateFormat', v, { shouldDirty: true })}
+                  onValueChange={(v) => setChoice('dateFormat', v)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -148,7 +168,7 @@ export default function LocalizationSettingsPage() {
                 <Label>{t('localization.numberFormat')}</Label>
                 <Select
                   value={form.watch('numberFormat')}
-                  onValueChange={(v) => form.setValue('numberFormat', v, { shouldDirty: true })}
+                  onValueChange={(v) => setChoice('numberFormat', v)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -167,7 +187,7 @@ export default function LocalizationSettingsPage() {
                 <Label>{t('localization.timezone')}</Label>
                 <Select
                   value={form.watch('timezone')}
-                  onValueChange={(v) => form.setValue('timezone', v, { shouldDirty: true })}
+                  onValueChange={(v) => setChoice('timezone', v)}
                 >
                   <SelectTrigger className="max-w-md">
                     <SelectValue />
@@ -180,6 +200,31 @@ export default function LocalizationSettingsPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="documentDigits">{t('localization.documentDigits')}</Label>
+                <Select
+                  value={form.watch('documentDigits')}
+                  onValueChange={(v) => {
+                    if (isDocumentDigits(v))
+                      form.setValue('documentDigits', v, { shouldDirty: true });
+                  }}
+                >
+                  <SelectTrigger id="documentDigits" className="max-w-md">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DOCUMENT_DIGITS.map((digits) => (
+                      <SelectItem key={digits} value={digits}>
+                        {t(DIGIT_LABEL_KEYS[digits])}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  {t('localization.documentDigitsDescription')}
+                </p>
               </div>
             </div>
           </CardContent>

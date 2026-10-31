@@ -63,7 +63,11 @@ export class EmailService {
 
       let attachments: Attachment[] = [];
       if (dto.attachPdf !== false) {
-        const pdfBuffer = await this.pdfService.generateInvoicePdf(organizationId, invoiceId);
+        const pdfBuffer = await this.pdfService.generateInvoicePdf(
+          organizationId,
+          invoiceId,
+          dto.locale ?? 'ar',
+        );
         attachments = [
           {
             filename: `${invoice.invoiceNumber}.pdf`,
@@ -159,7 +163,11 @@ export class EmailService {
 
       let attachments: Attachment[] = [];
       if (dto.attachPdf !== false) {
-        const pdfBuffer = await this.pdfService.generateQuotePdf(organizationId, quoteId);
+        const pdfBuffer = await this.pdfService.generateQuotePdf(
+          organizationId,
+          quoteId,
+          dto.locale ?? 'ar',
+        );
         attachments = [
           {
             filename: `${quote.quoteNumber}.pdf`,
