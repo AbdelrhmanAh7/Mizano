@@ -60,7 +60,17 @@
       "description": "الوصف",
       "addLine": "إضافة بند",
       "minLines": "يجب أن يحتوي القيد على بندين على الأقل",
-      "mustBalance": "يجب أن يتساوى إجمالي المدين مع إجمالي الدائن"
+      "mustBalance": "يجب أن يتساوى إجمالي المدين مع إجمالي الدائن",
+      "totals": "الإجماليات",
+      "balanced": "متوازن",
+      "unbalanced": "غير متوازن (الفرق: {amount})",
+      "removeLine": "حذف سطر القيد",
+      "accountRequired": "الحساب مطلوب",
+      "dateRequired": "التاريخ مطلوب",
+      "cancel": "إلغاء",
+      "saving": "جاري الحفظ...",
+      "create": "إنشاء القيد",
+      "update": "تحديث القيد"
     },
     "table": {
       "journalNumber": "رقم القيد",

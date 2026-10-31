@@ -3,6 +3,7 @@
 import { Check, Plus, Trash2, X } from 'lucide-react';
 import { useFieldArray, type UseFormReturn } from 'react-hook-form';
 import { z } from 'zod';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -19,7 +20,8 @@ import { cn } from '@/lib/utils';
 
 /** One debit/credit line, shared by manual journals and recurring journal templates. */
 export const journalLineSchema = z.object({
-  accountId: z.string().min(1, 'Account is required'),
+  // A key of accounting.journals.form, shown translated by the editor.
+  accountId: z.string().min(1, 'accountRequired'),
   debit: z.string().default('0'),
   credit: z.string().default('0'),
   description: z.string().optional(),
@@ -65,6 +67,7 @@ export function JournalLinesEditor<T extends { lines: JournalLineValues[] }>({
 }: JournalLinesEditorProps<T>) {
   // react-hook-form cannot resolve `lines.${n}` paths on a generic T; every caller's T has them.
   const form = typedForm as unknown as UseFormReturn<{ lines: JournalLineValues[] }>;
+  const t = useTranslations('accounting.journals.form');
   const flattenedAccounts = flattenAccountsTree(accounts);
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'lines' });
   const { totalDebit, totalCredit, difference, isBalanced } = calculateJournalTotals(
@@ -84,6 +87,9 @@ export function JournalLinesEditor<T extends { lines: JournalLineValues[] }>({
   };
 
   const lineErrors = form.formState.errors.lines;
+  /** Line and form errors carry accounting.journals.form keys; other text is shown as is. */
+  const translateError = (message?: string): string | undefined =>
+    message && t.has(message) ? t(message) : message;
 
   return (
     <Card>
@@ -96,18 +102,18 @@ export function JournalLinesEditor<T extends { lines: JournalLineValues[] }>({
             size="sm"
             onClick={() => append(emptyJournalLine())}
           >
-            <Plus className="h-4 w-4 mr-1" />
-            Add Line
+            <Plus className="h-4 w-4 me-1" />
+            {t('addLine')}
           </Button>
         </div>
       </CardHeader>
       <CardContent>
         {/* Table Header */}
         <div className="grid grid-cols-12 gap-2 mb-2 text-sm font-medium text-muted-foreground">
-          <div className="col-span-4">Account</div>
-          <div className="col-span-2 text-right">Debit</div>
-          <div className="col-span-2 text-right">Credit</div>
-          <div className="col-span-3">Description</div>
+          <div className="col-span-4">{t('account')}</div>
+          <div className="col-span-2 text-end">{t('debit')}</div>
+          <div className="col-span-2 text-end">{t('credit')}</div>
+          <div className="col-span-3">{t('description')}</div>
           <div className="col-span-1"></div>
         </div>
 
@@ -121,12 +127,12 @@ export function JournalLinesEditor<T extends { lines: JournalLineValues[] }>({
                   onValueChange={(value) => form.setValue(`lines.${index}.accountId`, value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select account" />
+                    <SelectValue placeholder={t('accountPlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
                     {flattenedAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
-                        <span style={{ paddingLeft: `${account.level * 8}px` }}>
+                        <span style={{ paddingInlineStart: `${account.level * 8}px` }}>
                           {account.code} - {account.name}
                         </span>
                       </SelectItem>
@@ -141,7 +147,7 @@ export function JournalLinesEditor<T extends { lines: JournalLineValues[] }>({
                     type="number"
                     step="0.01"
                     min="0"
-                    className="text-right"
+                    className="text-end"
                     placeholder="0.00"
                     value={form.watch(`lines.${index}.${side}`)}
                     onChange={(e) => setAmount(index, side, e.target.value)}
@@ -150,7 +156,10 @@ export function JournalLinesEditor<T extends { lines: JournalLineValues[] }>({
               ))}
 
               <div className="col-span-3">
-                <Input placeholder="Description" {...form.register(`lines.${index}.description`)} />
+                <Input
+                  placeholder={t('description')}
+                  {...form.register(`lines.${index}.description`)}
+                />
               </div>
 
               <div className="col-span-1">
@@ -161,7 +170,7 @@ export function JournalLinesEditor<T extends { lines: JournalLineValues[] }>({
                   onClick={() => removeLine(index)}
                   disabled={fields.length <= 2}
                   className="h-8 w-8"
-                  aria-label="Remove journal line"
+                  aria-label={t('removeLine')}
                 >
                   <Trash2 className="h-4 w-4 text-muted-foreground hover:text-red-500" />
                 </Button>
@@ -172,18 +181,18 @@ export function JournalLinesEditor<T extends { lines: JournalLineValues[] }>({
 
         {lineErrors && (
           <p className="text-sm text-red-500 mt-2">
-            {lineErrors.message || lineErrors.root?.message}
+            {translateError(lineErrors.message || lineErrors.root?.message)}
           </p>
         )}
 
         {/* Totals */}
         <div className="border-t mt-4 pt-4">
           <div className="grid grid-cols-12 gap-2 items-center">
-            <div className="col-span-4 font-medium">Totals</div>
-            <div className="col-span-2 text-right font-mono font-medium">
+            <div className="col-span-4 font-medium">{t('totals')}</div>
+            <div className="col-span-2 text-end font-mono font-medium">
               {formatJournalAmount(totalDebit)}
             </div>
-            <div className="col-span-2 text-right font-mono font-medium">
+            <div className="col-span-2 text-end font-mono font-medium">
               {formatJournalAmount(totalCredit)}
             </div>
             <div className="col-span-3"></div>
@@ -201,12 +210,12 @@ export function JournalLinesEditor<T extends { lines: JournalLineValues[] }>({
               {isBalanced ? (
                 <>
                   <Check className="h-4 w-4" />
-                  Balanced
+                  {t('balanced')}
                 </>
               ) : (
                 <>
                   <X className="h-4 w-4" />
-                  Unbalanced (Difference: {formatJournalAmount(difference)})
+                  {t('unbalanced', { amount: formatJournalAmount(difference) })}
                 </>
               )}
             </div>

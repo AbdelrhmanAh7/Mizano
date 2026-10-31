@@ -3,6 +3,30 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { JournalForm } from './journal-form';
 import { RecurringProfileForm } from './recurring-profile-form';
 
+// Real English messages (accounting namespace) so the labels below are the shipped copy.
+jest.mock('next-intl', () => {
+  const messages = { accounting: jest.requireActual('@/messages/en/accounting.json') };
+  const lookup = (path: string): unknown =>
+    path
+      .split('.')
+      .reduce<unknown>(
+        (node, part) =>
+          node && typeof node === 'object' ? (node as Record<string, unknown>)[part] : undefined,
+        messages,
+      );
+  return {
+    useLocale: () => 'en',
+    useTranslations: (namespace: string) => {
+      const t = (key: string, values?: Record<string, string | number>) =>
+        String(lookup(`${namespace}.${key}`) ?? key).replace(/\{(\w+)\}/g, (_, name: string) =>
+          String(values?.[name] ?? ''),
+        );
+      t.has = (key: string) => typeof lookup(`${namespace}.${key}`) === 'string';
+      return t;
+    },
+  };
+});
+
 const amountInputs = () => screen.getAllByPlaceholderText('0.00') as HTMLInputElement[];
 
 describe('JournalLinesEditor (journal and recurring template forms)', () => {

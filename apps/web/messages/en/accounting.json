@@ -60,7 +60,17 @@
       "description": "Description",
       "addLine": "Add Line",
       "minLines": "Journal must have at least 2 lines",
-      "mustBalance": "Total debits must equal total credits"
+      "mustBalance": "Total debits must equal total credits",
+      "totals": "Totals",
+      "balanced": "Balanced",
+      "unbalanced": "Unbalanced (Difference: {amount})",
+      "removeLine": "Remove journal line",
+      "accountRequired": "Account is required",
+      "dateRequired": "Date is required",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "create": "Create Journal",
+      "update": "Update Journal"
     },
     "table": {
       "journalNumber": "Journal #",

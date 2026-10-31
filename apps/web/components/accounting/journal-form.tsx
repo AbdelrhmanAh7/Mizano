@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,10 +19,11 @@ import {
 } from './journal-lines-editor';
 
 const journalSchema = z.object({
-  date: z.string().min(1, 'Date is required'),
+  // Messages are keys of accounting.journals.form.
+  date: z.string().min(1, 'dateRequired'),
   reference: z.string().optional(),
   notes: z.string().optional(),
-  lines: z.array(journalLineSchema).min(2, 'At least 2 lines are required'),
+  lines: z.array(journalLineSchema).min(2, 'minLines'),
 });
 
 type JournalFormData = z.infer<typeof journalSchema>;
@@ -43,6 +45,7 @@ export function JournalForm({
 }: JournalFormProps) {
   const isEditing = !!journal;
 
+  const t = useTranslations('accounting.journals.form');
   const form = useForm<JournalFormData>({
     resolver: zodResolver(journalSchema),
     defaultValues: {
@@ -72,7 +75,7 @@ export function JournalForm({
     if (!isBalanced) {
       form.setError('lines', {
         type: 'manual',
-        message: 'Journal entry must be balanced (total debits must equal total credits)',
+        message: 'mustBalance',
       });
       return;
     }
@@ -84,33 +87,41 @@ export function JournalForm({
       {/* Header Fields */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="date">Date *</Label>
+          <Label htmlFor="date">{t('date')} *</Label>
           <Input id="date" type="date" {...form.register('date')} />
           {form.formState.errors.date && (
-            <p className="text-sm text-red-500">{form.formState.errors.date.message}</p>
+            <p className="text-sm text-red-500">
+              {t.has(form.formState.errors.date.message ?? '')
+                ? t(form.formState.errors.date.message ?? '')
+                : form.formState.errors.date.message}
+            </p>
           )}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="reference">Reference</Label>
-          <Input id="reference" placeholder="e.g., INV-001" {...form.register('reference')} />
+          <Label htmlFor="reference">{t('reference')}</Label>
+          <Input
+            id="reference"
+            placeholder={t('referencePlaceholder')}
+            {...form.register('reference')}
+          />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="notes">Notes</Label>
-          <Input id="notes" placeholder="Optional notes" {...form.register('notes')} />
+          <Label htmlFor="notes">{t('notes')}</Label>
+          <Input id="notes" placeholder={t('notesPlaceholder')} {...form.register('notes')} />
         </div>
       </div>
 
-      <JournalLinesEditor form={form} accounts={accounts} title="Journal Lines" />
+      <JournalLinesEditor form={form} accounts={accounts} title={t('lines')} />
 
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {t('cancel')}
         </Button>
         <Button type="submit" disabled={isSubmitting || !isBalanced}>
-          {isSubmitting ? 'Saving...' : isEditing ? 'Update Journal' : 'Create Journal'}
+          {isSubmitting ? t('saving') : isEditing ? t('update') : t('create')}
         </Button>
       </div>
     </form>
