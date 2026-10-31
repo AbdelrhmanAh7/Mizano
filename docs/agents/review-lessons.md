@@ -17,6 +17,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **Every state change is a guarded transition:** `updateMany({ where: { id, organizationId, status: FROM } })` plus a `count` check that throws `ConflictException`. Journal idempotency is the tenant-scoped unique key `(organizationId, sourceType, sourceId)`.
 - **An idempotency key must stay the same across retries of one action.** Generating a fresh random id on the server for each request defeats it. A client UUID created once per user action and reused on every retry is fine (`idempotencyKeyFor`); so are `profileId:YYYY-MM-DD` or a sha256 of file + row. _(manual recurring execute, import retries)_
+- **Changing a dedupe key must honour what was recorded under the old key.** Moving `invoice.overdue:<inv>:<due>` to a per-endpoint key made every existing endpoint look like it had never been told, so the first scan after deploy would re-announce every open debt. Treat a legacy-key record (with a delivery to that endpoint) as sent, and give existing rows an explicit cutoff in the migration rather than a fallback that reaches back to `createdAt`. _(PR #562, overdue scanner)_
 - **Store idempotency markers where users cannot edit them.** Notes, reason and reference text get edited; use an append-only store such as AuditLog `IMPORT_ROW`. _(import markers)_
 - **Bulk operations reuse the single-record command through `runBulk`** and report `{ processed, total, failures }`. Never write a bulk `updateMany` that skips the posting logic.
 
