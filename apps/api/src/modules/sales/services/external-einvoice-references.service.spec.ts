@@ -44,6 +44,15 @@ describe('external ETA metadata command', () => {
     expect((prisma.$queryRaw.mock.calls[0][0] as Prisma.Sql).values).toEqual(['doc', 'org-b']);
   });
 
+  it('rejects a reference already held by the other document type', async () => {
+    prisma.creditNote.count.mockResolvedValueOnce(1);
+    await expect(service.update('org-a', 'actor', 'invoice', 'doc', 'ETA')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(prisma.invoice.updateMany).not.toHaveBeenCalled();
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
   it('propagates an audit failure so the surrounding transaction rolls back', async () => {
     prisma.auditLog.create.mockRejectedValueOnce(new Error('audit unavailable'));
     await expect(service.update('org-a', 'actor', 'invoice', 'doc', 'ETA')).rejects.toThrow(

@@ -156,6 +156,8 @@ describe('external ETA reference (e2e)', () => {
     const ca = await credit(a);
     const ca2 = await credit(a);
     const cb = await credit(b);
+    expect((await reference(a, a.invoiceId, 'ETA-invoice')).status).toBe(200);
+    expect((await reference(a, ca, 'ETA-invoice', 'credit-notes')).status).toBe(409);
     expect((await reference(a, ca, 'ETA-credit', 'credit-notes')).status).toBe(200);
     expect((await reference(a, ca2, 'ETA-credit', 'credit-notes')).status).toBe(409);
     expect((await reference(b, cb, 'ETA-credit', 'credit-notes')).status).toBe(200);

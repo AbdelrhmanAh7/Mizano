@@ -28,6 +28,18 @@ export class ExternalEInvoiceReferencesService {
             kind === 'invoice' ? 'Invoice not found' : 'Credit note not found',
           );
         }
+        if (externalEInvoiceNumber) {
+          // One reference namespace across invoices and credits, serialized before checking.
+          // Hash collisions only serialize unrelated references; they never relax uniqueness.
+          await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${organizationId}), hashtext(${'eta:' + externalEInvoiceNumber}))`;
+          const duplicate =
+            kind === 'invoice'
+              ? await tx.creditNote.count({ where: { organizationId, externalEInvoiceNumber } })
+              : await tx.invoice.count({ where: { organizationId, externalEInvoiceNumber } });
+          if (duplicate > 0) {
+            throw new ConflictException('This ETA reference is already used in this organization');
+          }
+        }
         const where = { id, organizationId, deletedAt: null };
         const data = { externalEInvoiceNumber };
         if (kind === 'invoice') await tx.invoice.updateMany({ where, data });
