@@ -78,19 +78,27 @@ describe('ReconciliationService.getSuggestions (#586 matching precision)', () =>
     prisma.bankTransaction.findMany.mockResolvedValue([
       { ...deposit, reference: 'TRF INV-0007', description: 'Payment (INV-0009)' },
     ]);
-    // The strong pool holds the old exact match; the newest pool is full of unrelated documents.
+    // Each pool is queried on its own: the exact pool holds the old exact match even when the
+    // near pool and the newest pool are saturated with other documents.
+    const near = Array.from({ length: 200 }, (_, i) => invoice(`INV-N${i}`, '1000.5'));
     prisma.invoice.findMany
       .mockResolvedValueOnce([invoice('INV-OLD', '1000.0001')])
+      .mockResolvedValueOnce(near)
       .mockResolvedValueOnce([invoice('INV-NEW', '9000')]);
 
     const [row] = await service.getSuggestions(ORG, 'ba1');
 
-    const strongWhere = prisma.invoice.findMany.mock.calls[0][0].where;
-    expect(strongWhere.OR[0].balanceDue.lte.toString()).toBe('1050.000105');
-    expect(strongWhere.OR[1]).toEqual({
+    const [exactWhere, nearWhere] = prisma.invoice.findMany.mock.calls.map(
+      (c: Array<{ where: any }>) => c[0].where,
+    );
+    expect(exactWhere.OR[0].balanceDue.toString()).toBe('1000.0001');
+    expect(exactWhere.OR[1]).toEqual({
       invoiceNumber: { in: ['TRF', 'INV-0007', 'Payment', 'INV-0009'] },
     });
-    expect(row.matches.map((m) => (m.entity as { id: string }).id)).toEqual(['INV-OLD']);
+    expect(nearWhere.balanceDue.gt.toString()).toBe('1000.0001');
+    expect(nearWhere.balanceDue.lte.toString()).toBe('1050.000105');
+    expect(row.matches[0]).toMatchObject({ entity: { id: 'INV-OLD' }, confidence: 90 });
+    expect(row.matches).toHaveLength(5);
   });
 
   it('matches a withdrawal stored negative against bills by its absolute amount', async () => {

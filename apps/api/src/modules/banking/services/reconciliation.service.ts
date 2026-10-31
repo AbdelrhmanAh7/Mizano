@@ -40,15 +40,15 @@ function referenceTokens(
   return [...new Set(words)].slice(0, 20);
 }
 
-/** Candidates scored on amount (exact or near) or on a document number named on the bank line. */
-function strongMatch<F extends string>(
+/** Candidates with exactly the amount, or whose number appears on the bank line. */
+function exactOrNamed<F extends string>(
   numberField: F,
-  nearCeiling: Decimal,
+  amount: Decimal,
   tokens: string[],
-): Array<{ balanceDue: { lte: Decimal } } | Record<F, { in: string[] }>> {
-  const byAmount = { balanceDue: { lte: nearCeiling } };
-  if (tokens.length === 0) return [byAmount];
-  return [byAmount, { [numberField]: { in: tokens } } as Record<F, { in: string[] }>];
+): Array<{ balanceDue: Decimal } | Record<F, { in: string[] }>> {
+  const exact = { balanceDue: amount };
+  if (tokens.length === 0) return [exact];
+  return [exact, { [numberField]: { in: tokens } } as Record<F, { in: string[] }>];
 }
 
 function uniqueById<T extends { id: string }>(rows: T[]): T[] {
@@ -129,14 +129,19 @@ export class ReconciliationService {
         orderBy: { date: 'desc' as const },
         take: MATCH_CANDIDATE_LIMIT,
       };
-      // Amount and reference matches first, so newer documents can never crowd them out; then
-      // the newest open ones for name-only matches.
+      // Separate pools in priority order, each bounded, so weaker candidates never crowd out
+      // stronger ones: exact amount or a named number, then near amounts, then the newest open
+      // ones for name-only matches.
       const invoices = uniqueById(
         (
           await Promise.all([
             this.prisma.invoice.findMany({
               ...query,
-              where: { ...where, OR: strongMatch('invoiceNumber', nearCeiling, tokens) },
+              where: { ...where, OR: exactOrNamed('invoiceNumber', amount, tokens) },
+            }),
+            this.prisma.invoice.findMany({
+              ...query,
+              where: { ...where, balanceDue: { gt: amount, lte: nearCeiling } },
             }),
             this.prisma.invoice.findMany({ ...query, where }),
           ])
@@ -178,9 +183,10 @@ export class ReconciliationService {
       const bills = uniqueById(
         (
           await Promise.all([
+            // Bills score no near amounts: exact amount or a named number, then the newest.
             this.prisma.bill.findMany({
               ...query,
-              where: { ...where, OR: strongMatch('billNumber', nearCeiling, tokens) },
+              where: { ...where, OR: exactOrNamed('billNumber', amount, tokens) },
             }),
             this.prisma.bill.findMany({ ...query, where }),
           ])
