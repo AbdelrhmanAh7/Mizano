@@ -254,9 +254,22 @@ export class IntegrationSettingsService {
         error: 'Bad Request',
       });
     }
-    return this.prisma.webhookEndpoint.update({
-      where: { id },
+    // Conditional on the endpoint still being active and subscribed, so a disable that lands between the
+    // check above and this write can't leave a success for an opt-in that will never be sent.
+    const { count } = await this.prisma.webhookEndpoint.updateMany({
+      where: { id, organizationId, isActive: true, eventTypes: { has: OVERDUE_EVENT } },
       data: { overdueNoticesFrom: new Date(0) },
+    });
+    if (count !== 1) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: WEBHOOK_ENDPOINT_INACTIVE,
+        message: 'Enable the endpoint before sending the overdue backlog',
+        error: 'Bad Request',
+      });
+    }
+    return this.prisma.webhookEndpoint.findFirstOrThrow({
+      where: { id, organizationId },
       select: ENDPOINT_SELECT,
     });
   }

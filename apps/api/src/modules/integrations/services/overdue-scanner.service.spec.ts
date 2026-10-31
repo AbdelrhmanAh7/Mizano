@@ -119,13 +119,14 @@ describe('OverdueScannerService (audit F2)', () => {
 });
 
 describe('IntegrationSettingsService.sendOverdueBacklog (audit F2)', () => {
-  function setup(endpoint: { eventTypes: string[]; isActive: boolean }) {
+  function setup(endpoint: { eventTypes: string[]; isActive: boolean }, written = 1) {
     const prisma = {
       webhookEndpoint: {
         findFirst: jest
           .fn()
           .mockResolvedValue({ id: 'ep_1', organizationId: 'org_1', ...endpoint }),
-        update: jest.fn().mockResolvedValue({ id: 'ep_1' }),
+        updateMany: jest.fn().mockResolvedValue({ count: written }),
+        findFirstOrThrow: jest.fn().mockResolvedValue({ id: 'ep_1' }),
       },
     };
     const service = new IntegrationSettingsService(
@@ -142,9 +143,23 @@ describe('IntegrationSettingsService.sendOverdueBacklog (audit F2)', () => {
     expect(prisma.webhookEndpoint.findFirst).toHaveBeenCalledWith({
       where: { id: 'ep_1', organizationId: 'org_1', deletedAt: null },
     });
-    expect(prisma.webhookEndpoint.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'ep_1' }, data: { overdueNoticesFrom: new Date(0) } }),
-    );
+    expect(prisma.webhookEndpoint.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'ep_1',
+        organizationId: 'org_1',
+        isActive: true,
+        eventTypes: { has: 'invoice.overdue' },
+      },
+      data: { overdueNoticesFrom: new Date(0) },
+    });
+  });
+
+  it('refuses when the endpoint was disabled between the check and the write', async () => {
+    const { service } = setup({ eventTypes: ['invoice.overdue'], isActive: true }, 0);
+    const error = await service.sendOverdueBacklog('org_1', 'ep_1').catch((e: unknown) => e);
+    expect((error as BadRequestException).getResponse()).toMatchObject({
+      code: WEBHOOK_ENDPOINT_INACTIVE,
+    });
   });
 
   it('refuses an inactive endpoint with a coded error, since re-enabling resets the cutoff', async () => {
@@ -155,7 +170,7 @@ describe('IntegrationSettingsService.sendOverdueBacklog (audit F2)', () => {
       statusCode: 400,
       code: WEBHOOK_ENDPOINT_INACTIVE,
     });
-    expect(prisma.webhookEndpoint.update).not.toHaveBeenCalled();
+    expect(prisma.webhookEndpoint.updateMany).not.toHaveBeenCalled();
   });
 });
 
