@@ -44,7 +44,6 @@ import {
   useDeleteBankAccount,
   getAccountTypeLabel,
   getAccountTypeColor,
-  formatCurrency,
 } from '@/lib/hooks/use-bank-accounts';
 import {
   getStatusLabel,
@@ -52,6 +51,7 @@ import {
   type TransactionStatus,
 } from '@/lib/hooks/use-bank-transactions';
 import { useTranslations } from 'next-intl';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import {
   LineChart,
   Line,
@@ -70,6 +70,7 @@ interface BankAccountDetailPageProps {
 export default function BankAccountDetailPage({ params }: BankAccountDetailPageProps) {
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('banking');
+  const formatCurrency = useMoneyFormatter();
   const { id } = params;
   const router = useRouter();
   const { data: account, isLoading } = useBankAccount(id);

@@ -20,7 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { useBankAccount, formatCurrency } from '@/lib/hooks/use-bank-accounts';
+import { useBankAccount } from '@/lib/hooks/use-bank-accounts';
 import {
   useUnmatchedTransactions,
   useSuggestedMatches,
@@ -32,6 +32,7 @@ import {
   getConfidenceLabel,
 } from '@/lib/hooks/use-bank-transactions';
 import { useTranslations } from 'next-intl';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { useDateFnsLocale } from '@/lib/date-locale';
 
 interface ReconcileAccountPageProps {
@@ -42,6 +43,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
   const dateLocale = useDateFnsLocale();
   const { accountId } = params;
   const t = useTranslations('banking');
+  const formatCurrency = useMoneyFormatter();
   const [selectedTransaction, setSelectedTransaction] = useState<string | null>(null);
 
   const { data: account, isLoading: accountLoading } = useBankAccount(accountId);

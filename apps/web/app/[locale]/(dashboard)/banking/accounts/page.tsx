@@ -29,14 +29,16 @@ import {
   useDeleteBankAccount,
   getAccountTypeLabel,
   getAccountTypeColor,
-  formatCurrency,
   BankAccount,
   BankAccountType,
 } from '@/lib/hooks/use-bank-accounts';
 import { useTranslations } from 'next-intl';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
+import { sumDecimals } from '@/lib/decimal';
 
 function BankAccountsPageContent() {
   const t = useTranslations('banking');
+  const formatCurrency = useMoneyFormatter();
   const tableParams = useTableParams({ defaultSortBy: 'name' });
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -59,11 +61,8 @@ function BankAccountsPageContent() {
   };
 
   // Calculate totals
-  const totalBalance = accounts.reduce((sum, acc) => {
-    const balance =
-      typeof acc.systemBalance === 'string' ? parseFloat(acc.systemBalance) : acc.systemBalance;
-    return sum + (balance || 0);
-  }, 0);
+  // Ledger balances (base currency), summed exactly.
+  const totalBalance = sumDecimals(accounts.map((acc) => String(acc.systemBalance ?? 0)));
 
   const columns: ColumnDef<BankAccount>[] = [
     {
