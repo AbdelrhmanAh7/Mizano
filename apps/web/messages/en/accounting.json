@@ -58,7 +58,9 @@
       "refresh": "Refresh accounts",
       "deleteConfirm": "Are you sure you want to delete \"{name}\"? This action cannot be undone. Accounts with transactions or child accounts cannot be deleted.",
       "cancel": "Cancel",
-      "delete": "Delete"
+      "delete": "Delete",
+      "system": "System",
+      "groupTitle": "{type} Accounts"
     }
   },
   "journals": {
@@ -136,7 +138,8 @@
     "reverseTitle": "Reverse journal entry",
     "reverseConfirm": "This posts a new journal that reverses every line of {number}. The original entry stays unchanged.",
     "reversed": "Reversal posted",
-    "reverseFailed": "Failed to reverse journal"
+    "reverseFailed": "Failed to reverse journal",
+    "newJournalDescription": "Create a new manual journal entry"
   },
   "recurring": {
     "title": "Recurring Profiles",

@@ -67,7 +67,7 @@ export default function NewJournalPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('journals.newJournal')}</h1>
-          <p className="text-muted-foreground">Create a new manual journal entry</p>
+          <p className="text-muted-foreground">{t('journals.newJournalDescription')}</p>
         </div>
       </div>
 

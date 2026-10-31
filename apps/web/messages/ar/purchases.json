@@ -309,7 +309,9 @@
     "onlyDraftsEditable": "لا يمكن تعديل إلا الفواتير المسودة",
     "from": "من {name}",
     "quickActions": "إجراءات سريعة",
-    "viewVendor": "عرض المورد"
+    "viewVendor": "عرض المورد",
+    "scanBill": "مسح فاتورة",
+    "searchPlaceholder": "ابحث برقم الفاتورة أو اسم المورد..."
   },
   "credits": {
     "title": "ائتمانات الموردين",

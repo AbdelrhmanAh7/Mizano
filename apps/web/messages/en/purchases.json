@@ -309,7 +309,9 @@
     "onlyDraftsEditable": "Only draft bills can be edited",
     "from": "From {name}",
     "quickActions": "Quick Actions",
-    "viewVendor": "View Vendor"
+    "viewVendor": "View Vendor",
+    "scanBill": "Scan Bill",
+    "searchPlaceholder": "Search by bill number or vendor..."
   },
   "credits": {
     "title": "Vendor Credits",

@@ -20,7 +20,7 @@ import {
   useAccount,
   useAccountBalance,
   getAccountTypeColor,
-  getAccountTypeLabel,
+  useAccountTypeLabel,
 } from '@/lib/hooks/use-accounts';
 import { moneyToNumber } from '@/lib/money';
 import { useJournals, formatJournalAmount } from '@/lib/hooks/use-journals';
@@ -29,6 +29,7 @@ import { useDateFnsLocale } from '@/lib/date-locale';
 
 export default function AccountDetailPage() {
   const dateLocale = useDateFnsLocale();
+  const typeLabel = useAccountTypeLabel();
   const params = useParams();
   const accountId = params.id as string;
 
@@ -99,9 +100,7 @@ export default function AccountDetailPage() {
             <h1 className="text-3xl font-bold tracking-tight">
               {account.code} - {account.name}
             </h1>
-            <Badge className={getAccountTypeColor(account.type)}>
-              {getAccountTypeLabel(account.type)}
-            </Badge>
+            <Badge className={getAccountTypeColor(account.type)}>{typeLabel(account.type)}</Badge>
           </div>
           <p className="text-muted-foreground">{account.description || 'No description'}</p>
         </div>
@@ -123,7 +122,7 @@ export default function AccountDetailPage() {
                 <dt className="text-sm font-medium text-muted-foreground">Type</dt>
                 <dd>
                   <Badge className={getAccountTypeColor(account.type)}>
-                    {getAccountTypeLabel(account.type)}
+                    {typeLabel(account.type)}
                   </Badge>
                 </dd>
               </div>

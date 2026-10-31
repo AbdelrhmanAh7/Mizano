@@ -376,7 +376,7 @@ function BillsPageContent() {
               <Button asChild variant="outline">
                 <Link href="/purchases/bills/scan">
                   <Sparkles className="mr-2 h-4 w-4" />
-                  Scan Bill
+                  {t('bills.scanBill')}
                 </Link>
               </Button>
               <Button asChild>
@@ -397,7 +397,7 @@ function BillsPageContent() {
             <DataTableSearch
               value={tableParams.search}
               onChange={tableParams.setSearch}
-              placeholder="Search by bill number or vendor..."
+              placeholder={t('bills.searchPlaceholder')}
             />
             <DataTableFacetedFilter
               title={t('bills.table.status')}
@@ -420,7 +420,7 @@ function BillsPageContent() {
                   tableParams.setFilters({ startDate: undefined, endDate: undefined });
                 }
               }}
-              placeholder="Date range"
+              placeholder={tCommon('dateRange.placeholder')}
             />
             {(tableParams.activeFilterCount > 0 || tableParams.search) && (
               <Button
