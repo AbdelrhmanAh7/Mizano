@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -94,6 +94,13 @@ export class DepreciationService {
 
       if (depreciationAmount.lessThanOrEqualTo(0)) {
         continue; // Skip if no depreciation
+      }
+
+      if (!this.isScheduleRowConsistent(asset, scheduleEntry)) {
+        this.logger.error(
+          `Skipping depreciation for asset ${asset.id}: stored schedule row ${scheduleEntry.id} is inconsistent with the asset balances`,
+        );
+        continue;
       }
 
       try {
@@ -220,6 +227,12 @@ export class DepreciationService {
 
     if (scheduleEntry.executedAt) {
       throw new Error('Depreciation already executed for this period');
+    }
+
+    if (!this.isScheduleRowConsistent(asset, scheduleEntry)) {
+      throw new BadRequestException(
+        'Stored depreciation schedule row is inconsistent with the asset balances',
+      );
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -411,6 +424,21 @@ export class DepreciationService {
         },
       });
     });
+  }
+
+  /**
+   * Posting guard: the stored amount must equal both the book-value delta and the
+   * accumulated-depreciation delta against the asset's current balances.
+   * Separate from reversal, which restores the previous executed row.
+   */
+  private isScheduleRowConsistent(
+    asset: { accumulatedDepreciation: Decimal; currentBookValue: Decimal },
+    row: { amount: Decimal; accumulatedTotal: Decimal; bookValue: Decimal },
+  ): boolean {
+    return (
+      asset.currentBookValue.minus(row.bookValue).equals(row.amount) &&
+      row.accumulatedTotal.minus(asset.accumulatedDepreciation).equals(row.amount)
+    );
   }
 
   private async generateJournalNumber(
