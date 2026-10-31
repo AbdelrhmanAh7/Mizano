@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { LeadSource, LeadStatus, Prisma } from '@prisma/client';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { WebhookOutboxService } from '../../integrations/services/webhook-outbox.service';
 
 export interface CreateLeadDto {
   leadName: string;
@@ -29,7 +30,11 @@ export interface LeadQueryDto {
 
 @Injectable()
 export class LeadsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    // Outbound integration events, written in the same transaction (absent in the worker).
+    @Optional() private outbox?: WebhookOutboxService,
+  ) {}
 
   async create(organizationId: string, dto: CreateLeadDto, userId: string) {
     return this.prisma.lead.create({
@@ -189,15 +194,21 @@ export class LeadsService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
-      // Create customer
+      // Create customer, in the org base currency (not the column's USD default)
+      const org = await tx.organization.findUnique({
+        where: { id: organizationId },
+        select: { baseCurrency: true },
+      });
       const customer = await tx.customer.create({
         data: {
           name: lead.companyName || lead.leadName,
           email: lead.email,
           phone: lead.phone,
+          ...(org ? { currency: org.baseCurrency } : {}),
           organizationId,
         },
       });
+      await this.outbox?.customerCreated(tx, organizationId, customer);
 
       // Update lead
       await tx.lead.update({

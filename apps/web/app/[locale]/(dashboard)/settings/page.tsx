@@ -13,6 +13,7 @@ import {
   Receipt,
   ScrollText,
   Users,
+  Workflow,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
@@ -115,6 +116,12 @@ const settingsGroups: SettingsGroup[] = [
         descriptionKey: 'auditLogs',
         href: '/settings/audit-logs',
         icon: ScrollText,
+      },
+      {
+        titleKey: 'flowline',
+        descriptionKey: 'flowline',
+        href: '/settings/integrations/flowline',
+        icon: Workflow,
       },
     ],
   },

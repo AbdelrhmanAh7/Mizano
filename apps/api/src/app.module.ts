@@ -24,6 +24,8 @@ import { CurrencyModule } from './modules/currency/currency.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { HrModule } from './modules/hr/hr.module';
 import { ImportExportModule } from './modules/import-export/import-export.module';
+import { IntegrationOutboxModule } from './modules/integrations/integration-outbox.module';
+import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { LoggerModule } from './modules/logger/logger.module';
 import { ManufacturingModule } from './modules/manufacturing/manufacturing.module';
@@ -127,6 +129,10 @@ import { IpThrottlerGuard } from './throttler-ip.guard';
     SearchModule,
     PerformanceModule,
     BulkOperationsModule,
+
+    // External integrations (FlowLine connector)
+    IntegrationOutboxModule,
+    IntegrationsModule,
   ],
   providers: [
     {

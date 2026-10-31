@@ -8,13 +8,19 @@ const ORG_ID = 'org-1';
 
 describe('CustomersService', () => {
   let prisma: MockPrismaClient;
+  let outbox: { customerCreated: jest.Mock; customerEvent: jest.Mock };
   let service: CustomersService;
 
   beforeEach(() => {
     prisma = createMockPrisma();
+    outbox = {
+      customerCreated: jest.fn().mockResolvedValue(null),
+      customerEvent: jest.fn().mockResolvedValue('evt_1'),
+    };
     service = new CustomersService(
       prisma as unknown as PrismaService,
       {} as unknown as AgingReportsService,
+      outbox as never,
     );
     prisma.organization.findUnique.mockResolvedValue({ baseCurrency: 'EGP' } as never);
     prisma.customer.create.mockResolvedValue({ id: 'cust-1' } as never);
@@ -35,12 +41,23 @@ describe('CustomersService', () => {
       currency: 'EGP',
       organizationId: ORG_ID,
     });
+    expect(outbox.customerCreated).toHaveBeenCalledWith(prisma, ORG_ID, { id: 'cust-1' });
   });
 
   it('keeps an explicitly chosen currency', async () => {
     await service.create(ORG_ID, { name: 'Gulf Co', currency: 'SAR' });
     expect(createdData().currency).toBe('SAR');
     expect(prisma.organization.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('joins the caller transaction when one is passed (audit F1)', async () => {
+    const tx = createMockPrisma();
+    tx.customer.create.mockResolvedValue({ id: 'cust-2' } as never);
+    await service.create(ORG_ID, { name: 'Gulf Co', currency: 'SAR' }, { tx: tx as never });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect((tx.customer.create.mock.calls[0][0].data as { currency: string }).currency).toBe('SAR');
+    expect(tx.organization.findUnique).not.toHaveBeenCalled();
+    expect(outbox.customerCreated).toHaveBeenCalledWith(tx, ORG_ID, { id: 'cust-2' });
   });
 
   it('stores addresses in their columns and never passes the address objects to Prisma', async () => {
@@ -87,5 +104,28 @@ describe('CustomersService', () => {
       NotFoundException,
     );
     expect(prisma.customer.create).not.toHaveBeenCalled();
+  });
+
+  it('writes customer.updated in the transaction that changes the customer (audit F3)', async () => {
+    prisma.customer.update.mockResolvedValue({ id: 'cust-1', name: 'Nile Co 2' } as never);
+
+    await service.update(ORG_ID, 'cust-1', { name: 'Nile Co 2' });
+    expect(prisma.customer.findFirst.mock.calls[0][0]!.where).toMatchObject({
+      id: 'cust-1',
+      organizationId: ORG_ID,
+    });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(outbox.customerEvent).toHaveBeenCalledWith(prisma, ORG_ID, 'customer.updated', {
+      id: 'cust-1',
+      name: 'Nile Co 2',
+    });
+
+    // Another tenant's customer: 404 and no event.
+    outbox.customerEvent.mockClear();
+    prisma.customer.findFirst.mockResolvedValue(null);
+    await expect(service.update(ORG_ID, 'foreign', { name: 'x' })).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(outbox.customerEvent).not.toHaveBeenCalled();
   });
 });

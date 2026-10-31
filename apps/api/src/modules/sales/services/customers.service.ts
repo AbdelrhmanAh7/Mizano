@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
@@ -7,6 +7,7 @@ import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { runBulk } from '../../../common/utils/run-bulk';
 import { AgingReportsService } from '../../reports/services/aging-reports.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { WebhookOutboxService } from '../../integrations/services/webhook-outbox.service';
 import { CreateCustomerDto } from '../dto/create-customer.dto';
 import { UpdateCustomerDto } from '../dto/update-customer.dto';
 
@@ -33,27 +34,42 @@ export class CustomersService {
   constructor(
     private prisma: PrismaService,
     private agingReports: AgingReportsService,
+    @Optional() private outbox?: WebhookOutboxService,
   ) {}
 
-  async create(organizationId: string, createCustomerDto: CreateCustomerDto) {
+  /**
+   * Creates a customer and its customer.created outbox event in one transaction. Pass
+   * `options.tx` to compose it into a caller's transaction (integration idempotency, audit F1).
+   */
+  async create(
+    organizationId: string,
+    createCustomerDto: CreateCustomerDto,
+    options: { tx?: Prisma.TransactionClient } = {},
+  ) {
     // The address objects map to flat columns; Prisma rejects them as fields of their own.
     const { billingAddress, shippingAddress, ...fields } = createCustomerDto;
-    const customer = await this.prisma.customer.create({
-      data: {
-        ...fields,
-        // A customer without an explicit currency uses the org base currency, never the
-        // column's USD default (audit B5/F4).
-        currency: fields.currency ?? (await this.baseCurrency(organizationId)),
-        ...flatAddresses(billingAddress, shippingAddress),
-        organizationId,
-      },
-    });
-
-    return customer;
+    const run = async (tx: Prisma.TransactionClient) => {
+      const customer = await tx.customer.create({
+        data: {
+          ...fields,
+          // Without an explicit currency a customer uses the org base currency, never the
+          // column's USD default (FlowLine and web alike; audit B5/F4).
+          currency: fields.currency ?? (await this.baseCurrency(tx, organizationId)),
+          ...flatAddresses(billingAddress, shippingAddress),
+          organizationId,
+        },
+      });
+      await this.outbox?.customerCreated(tx, organizationId, customer);
+      return customer;
+    };
+    return options.tx ? run(options.tx) : this.prisma.$transaction(run);
   }
 
-  private async baseCurrency(organizationId: string): Promise<string> {
-    const org = await this.prisma.organization.findUnique({
+  private async baseCurrency(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+  ): Promise<string> {
+    const org = await tx.organization.findUnique({
       where: { id: organizationId },
       select: { baseCurrency: true },
     });
@@ -187,12 +203,15 @@ export class CustomersService {
     }
 
     const { billingAddress, shippingAddress, ...fields } = updateCustomerDto;
-    const updatedCustomer = await this.prisma.customer.update({
-      where: { id },
-      data: { ...fields, ...flatAddresses(billingAddress, shippingAddress) },
+    // The change and its customer.updated outbox event commit together (audit F3).
+    return this.prisma.$transaction(async (tx) => {
+      const updatedCustomer = await tx.customer.update({
+        where: { id },
+        data: { ...fields, ...flatAddresses(billingAddress, shippingAddress) },
+      });
+      await this.outbox?.customerEvent(tx, organizationId, 'customer.updated', updatedCustomer);
+      return updatedCustomer;
     });
-
-    return updatedCustomer;
   }
 
   async remove(organizationId: string, id: string) {

@@ -205,6 +205,24 @@ describe('QuotesService', () => {
       expectDecimalEqual(invoice.lines.create[0].amount, '89.99');
     });
 
+    it('announces the new draft to FlowLine in the converting transaction (audit F3)', async () => {
+      const outbox = { invoiceEvent: jest.fn().mockResolvedValue('evt_1') };
+      const withOutbox = new QuotesService(prisma as any, outbox as any);
+      await withOutbox.convertToInvoice(ORG_ID, 'q-1');
+      expect(outbox.invoiceEvent).toHaveBeenCalledWith(
+        prisma, // the transaction client ($transaction runs the callback with the mock)
+        ORG_ID,
+        'invoice.created',
+        'inv-new',
+      );
+
+      // A conversion that fails writes no event.
+      outbox.invoiceEvent.mockClear();
+      prisma.quote.updateMany.mockResolvedValue({ count: 0 });
+      await expect(withOutbox.convertToInvoice(ORG_ID, 'q-1')).rejects.toThrow();
+      expect(outbox.invoiceEvent).not.toHaveBeenCalled();
+    });
+
     it('copies the stored (accepted) amounts instead of recomputing them', async () => {
       // Stored tax differs from what the calculator would give (12.60): it must still win.
       prisma.quote.findFirst.mockResolvedValue(

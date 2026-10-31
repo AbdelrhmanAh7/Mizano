@@ -101,6 +101,9 @@ services:
       INTAKE_STORAGE_DIR: /data/originals
       # Only cloudflared may set X-Forwarded-For (login throttling keys on it); loopback is built in.
       TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-172.30.184.250/32}
+      # FlowLine connector: encrypts webhook signing secrets. Optional; without it the
+      # "Connect to FlowLine" screen warns and refuses to save webhooks (API keys still work).
+      INTEGRATIONS_ENCRYPTION_KEY: ${INTEGRATIONS_ENCRYPTION_KEY:-}
     volumes:
       - ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/originals:/data/originals
     depends_on:

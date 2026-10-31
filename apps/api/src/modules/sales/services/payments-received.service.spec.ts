@@ -470,6 +470,34 @@ describe('PaymentsReceivedService', () => {
       });
     });
 
+    it('announces payment.voided in the voiding transaction, after the reversal (audit F3)', async () => {
+      const outbox = { paymentEvent: jest.fn().mockResolvedValue('evt_1') };
+      const withOutbox = new PaymentsReceivedService(
+        prisma as any,
+        invoicesService as any,
+        journalsService as any,
+        outbox as any,
+      );
+      prisma.paymentReceived.findFirst.mockResolvedValue({
+        id: 'pmt-1',
+        allocations: [{ invoiceId: 'inv-1' }],
+      } as any);
+      prisma.paymentReceived.updateMany.mockResolvedValue({ count: 1 });
+      prisma.journal.findFirst.mockResolvedValue({ id: 'j1' } as any);
+
+      await withOutbox.void(ORG_ID, 'pmt-1');
+      expect(outbox.paymentEvent).toHaveBeenCalledWith(prisma, ORG_ID, 'payment.voided', 'pmt-1');
+      expect(journalsService.reverse.mock.invocationCallOrder[0]).toBeLessThan(
+        outbox.paymentEvent.mock.invocationCallOrder[0],
+      );
+
+      // A refused void writes no event.
+      outbox.paymentEvent.mockClear();
+      prisma.journal.findFirst.mockResolvedValue(null);
+      await expect(withOutbox.void(ORG_ID, 'pmt-1')).rejects.toThrow();
+      expect(outbox.paymentEvent).not.toHaveBeenCalled();
+    });
+
     it('treats another tenant payment, or an already voided one, as not found', async () => {
       prisma.paymentReceived.findFirst.mockResolvedValue(null);
       await expect(service.void(ORG_ID, 'pmt-x')).rejects.toThrow(NotFoundException);
