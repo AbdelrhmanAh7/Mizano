@@ -33,6 +33,12 @@ import { AccountingModule } from '../accounting/accounting.module';
     PaymentsReceivedService,
     DeliveryChallansService,
   ],
-  exports: [CustomersService, InvoicesService, PaymentsReceivedService, CreditNotesService],
+  exports: [
+    CustomersService,
+    InvoicesService,
+    PaymentsReceivedService,
+    CreditNotesService,
+    QuotesService,
+  ],
 })
 export class SalesModule {}
