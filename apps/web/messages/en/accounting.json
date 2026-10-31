@@ -1,6 +1,7 @@
 {
   "title": "Accounting",
   "description": "Manage your chart of accounts, journal entries, and recurring transactions",
+  "errorTitle": "Something went wrong in accounting",
   "accounts": {
     "title": "Chart of Accounts",
     "newAccount": "New Account",
