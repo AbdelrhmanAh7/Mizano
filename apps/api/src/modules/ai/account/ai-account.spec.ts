@@ -279,6 +279,8 @@ describe('AI gateway: monthly limit reservation', () => {
     ['an unreadable answer body', new AiProviderError('network', 200)],
     ['a timeout', new AiProviderError('timeout')],
     ['an unusable success answer', new AiProviderError('bad_response', 200)],
+    ['a 502 from a gateway', new AiProviderError('provider_down', 502)],
+    ['a 504 gateway timeout', new AiProviderError('provider_down', 504)],
   ])('never retries %s and keeps the estimate as spent', async (_case, failure) => {
     const complete = jest.fn().mockRejectedValue(failure);
     const { gateway, usage } = await connected(adapter({ complete }));

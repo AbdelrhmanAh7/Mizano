@@ -84,11 +84,13 @@ export class AiProviderError extends Error {
 
   /**
    * The outcome is unknown, so the provider may have charged: the request may have been sent
-   * (network failure, timeout, a body that could not be read) or a success answer was unusable.
-   * An error answer (4xx/5xx), a redirect or a refusal before sending costs nothing.
+   * (network failure, timeout, a body that could not be read), a success answer was unusable, or a
+   * server/gateway error (500, 502, 504…) that doesn't say whether generation ran. Only a 4xx
+   * answer, a redirect, a refusal before sending, or a definite "not now" refusal costs nothing.
    */
   get possiblyBilled(): boolean {
     if (this.kind === 'network' || this.kind === 'timeout') return true;
+    if (this.kind === 'provider_down') return !this.definiteRefusal;
     return (
       this.kind === 'bad_response' &&
       this.status !== undefined &&
@@ -97,10 +99,15 @@ export class AiProviderError extends Error {
     );
   }
 
-  /** Worth one more attempt: the provider answered 429 or 5xx, so this attempt cost nothing. */
+  /**
+   * Worth one more attempt only when the provider clearly refused before doing any work: 429 (rate
+   * limited), 503 (unavailable) or Anthropic's 529 (overloaded). Ambiguous 5xx are never retried.
+   */
   get retryable(): boolean {
-    return (
-      (this.kind === 'rate_limited' || this.kind === 'provider_down') && this.status !== undefined
-    );
+    return this.status !== undefined && (this.kind === 'rate_limited' || this.definiteRefusal);
+  }
+
+  private get definiteRefusal(): boolean {
+    return this.kind === 'provider_down' && (this.status === 503 || this.status === 529);
   }
 }

@@ -244,6 +244,13 @@ describe('AI provider adapters (fake fetch)', () => {
     expect(new AiProviderError('bad_response', 302).possiblyBilled).toBe(false);
     expect(new AiProviderError('rate_limited', 429).possiblyBilled).toBe(false);
     expect(new AiProviderError('model_unavailable').possiblyBilled).toBe(false);
+    // Ambiguous server/gateway errors may have run the model: no retry, estimate kept (CLI review).
+    for (const status of [500, 502, 504]) {
+      expect(new AiProviderError('provider_down', status).retryable).toBe(false);
+      expect(new AiProviderError('provider_down', status).possiblyBilled).toBe(true);
+    }
+    expect(new AiProviderError('provider_down', 529).retryable).toBe(true);
+    expect(new AiProviderError('provider_down', 503).possiblyBilled).toBe(false);
 
     const { fn } = fakeFetch({ status: 302, body: {} });
     await expect(
