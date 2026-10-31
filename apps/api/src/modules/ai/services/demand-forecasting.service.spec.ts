@@ -40,8 +40,9 @@ describe('DemandForecastingService', () => {
     const movements = [];
     const now = new Date();
     for (let i = 0; i < months; i++) {
-      const date = new Date(now);
-      date.setMonth(date.getMonth() - i);
+      // Day 1 of each month: setMonth() from the 29th-31st rolls "Sep 31" into Oct 1, which
+      // collapsed several months into one and failed the suite at month end.
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       // Add some variation
       const quantity = baseQuantity + Math.sin((i * Math.PI) / 6) * 10;
       movements.push({
