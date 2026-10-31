@@ -137,18 +137,18 @@ function AccountsPageContent() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('accounts.title')}</h1>
-          <p className="text-muted-foreground">Manage your organization&apos;s account structure</p>
+          <p className="text-muted-foreground">{t('accounts.page.description')}</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && accounts.length === 0 && (
             <Select onValueChange={(value) => handleSeedAccounts(value)}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Seed Accounts" />
+                <SelectValue placeholder={t('accounts.page.seed')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="services">Services Industry</SelectItem>
-                <SelectItem value="retail">Retail Industry</SelectItem>
-                <SelectItem value="construction">Construction Industry</SelectItem>
+                <SelectItem value="services">{t('accounts.page.seedServices')}</SelectItem>
+                <SelectItem value="retail">{t('accounts.page.seedRetail')}</SelectItem>
+                <SelectItem value="construction">{t('accounts.page.seedConstruction')}</SelectItem>
               </SelectContent>
             </Select>
           )}
@@ -168,27 +168,27 @@ function AccountsPageContent() {
             <DataTableSearch
               value={tableParams.search}
               onChange={tableParams.setSearch}
-              placeholder="Search accounts..."
+              placeholder={t('accounts.page.searchPlaceholder')}
             />
             <Select value={selectedType} onValueChange={setSelectedType}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by type" />
+                <SelectValue placeholder={t('accounts.page.filterByType')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="ASSET">Assets</SelectItem>
-                <SelectItem value="LIABILITY">Liabilities</SelectItem>
-                <SelectItem value="EQUITY">Equity</SelectItem>
-                <SelectItem value="INCOME">Income</SelectItem>
-                <SelectItem value="REVENUE">Revenue</SelectItem>
-                <SelectItem value="EXPENSE">Expenses</SelectItem>
+                <SelectItem value="all">{t('accounts.page.allTypes')}</SelectItem>
+                <SelectItem value="ASSET">{t('accounts.page.assets')}</SelectItem>
+                <SelectItem value="LIABILITY">{t('accounts.page.liabilities')}</SelectItem>
+                <SelectItem value="EQUITY">{t('accounts.page.equity')}</SelectItem>
+                <SelectItem value="INCOME">{t('accounts.page.income')}</SelectItem>
+                <SelectItem value="REVENUE">{t('accounts.page.revenue')}</SelectItem>
+                <SelectItem value="EXPENSE">{t('accounts.page.expenses')}</SelectItem>
               </SelectContent>
             </Select>
             <Button
               variant="outline"
               size="icon"
               onClick={() => refetch()}
-              aria-label="Refresh accounts"
+              aria-label={t('accounts.page.refresh')}
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
@@ -199,7 +199,7 @@ function AccountsPageContent() {
       {/* Account Tree */}
       <Card>
         <CardHeader>
-          <CardTitle>Accounts</CardTitle>
+          <CardTitle>{t('accounts.page.listTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
           <AccountTree
@@ -227,15 +227,10 @@ function AccountsPageContent() {
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         title={t('accounts.deleteAccount')}
-        description={
-          <>
-            Are you sure you want to delete &quot;{accountToDelete?.name}&quot;? This action cannot
-            be undone. Accounts with transactions or child accounts cannot be deleted.
-          </>
-        }
+        description={t('accounts.page.deleteConfirm', { name: accountToDelete?.name ?? '' })}
         onConfirm={confirmDelete}
-        cancelLabel="Cancel"
-        deleteLabel="Delete"
+        cancelLabel={t('accounts.page.cancel')}
+        deleteLabel={t('accounts.page.delete')}
       />
     </div>
   );

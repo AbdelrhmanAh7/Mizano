@@ -38,6 +38,27 @@
     "empty": {
       "title": "No accounts yet",
       "description": "Set up your chart of accounts to start"
+    },
+    "page": {
+      "description": "Manage your organization's account structure",
+      "seed": "Seed Accounts",
+      "seedServices": "Services Industry",
+      "seedRetail": "Retail Industry",
+      "seedConstruction": "Construction Industry",
+      "searchPlaceholder": "Search accounts...",
+      "filterByType": "Filter by type",
+      "allTypes": "All Types",
+      "assets": "Assets",
+      "liabilities": "Liabilities",
+      "equity": "Equity",
+      "income": "Income",
+      "revenue": "Revenue",
+      "expenses": "Expenses",
+      "listTitle": "Accounts",
+      "refresh": "Refresh accounts",
+      "deleteConfirm": "Are you sure you want to delete \"{name}\"? This action cannot be undone. Accounts with transactions or child accounts cannot be deleted.",
+      "cancel": "Cancel",
+      "delete": "Delete"
     }
   },
   "journals": {

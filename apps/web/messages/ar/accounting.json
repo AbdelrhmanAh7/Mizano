@@ -38,6 +38,27 @@
     "empty": {
       "title": "لا توجد حسابات بعد",
       "description": "أعد دليل الحسابات للبدء"
+    },
+    "page": {
+      "description": "إدارة هيكل حسابات مؤسستك",
+      "seed": "إنشاء دليل حسابات",
+      "seedServices": "قطاع الخدمات",
+      "seedRetail": "قطاع التجزئة",
+      "seedConstruction": "قطاع المقاولات",
+      "searchPlaceholder": "ابحث في الحسابات...",
+      "filterByType": "تصفية حسب النوع",
+      "allTypes": "كل الأنواع",
+      "assets": "الأصول",
+      "liabilities": "الالتزامات",
+      "equity": "حقوق الملكية",
+      "income": "الدخل",
+      "revenue": "الإيرادات",
+      "expenses": "المصروفات",
+      "listTitle": "الحسابات",
+      "refresh": "تحديث الحسابات",
+      "deleteConfirm": "هل تريد حذف \"{name}\"؟ لا يمكن التراجع عن هذا الإجراء. لا يمكن حذف الحسابات التي لها حركات أو حسابات فرعية.",
+      "cancel": "إلغاء",
+      "delete": "حذف"
     }
   },
   "journals": {
