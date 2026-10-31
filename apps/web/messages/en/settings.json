@@ -33,7 +33,7 @@
     },
     "ai": {
       "title": "AI",
-      "description": "Optional AI through your own AI account: read bills, suggest accounts, monthly summary"
+      "description": "Connect your Claude, ChatGPT, Codex or Gemini app, or use your own AI account for features inside Mizano"
     },
     "notifications": {
       "title": "Notifications",
@@ -199,7 +199,7 @@
   },
   "ai": {
     "title": "AI",
-    "description": "Optional AI through your own AI account. Mizano works fully without it.",
+    "description": "Optional AI through your own AI app or account. Mizano works fully without it.",
     "back": "Back to settings",
     "retry": "Retry",
     "cancel": "Cancel",
@@ -220,16 +220,16 @@
       "none": "None"
     },
     "connection": {
-      "title": "Connect your AI account",
+      "title": "Use an API key for features inside Mizano",
       "connectedTitle": "Your AI account",
-      "description": "Mizano uses AI only through your own account. Your key is checked with the provider before it is saved, stored encrypted and never shown again.",
+      "description": "Only needed for the features that run inside Mizano. Your key is checked with the provider before it is saved, stored encrypted and never shown again.",
       "provider": "Provider",
       "apiKey": "API key",
       "apiKeyPlaceholder": "Paste the API key",
       "connect": "Check and connect",
       "verifying": "Checking…",
       "getKey": "Get an API key from {provider}",
-      "subscriptionNote": "A personal Claude or ChatGPT subscription cannot be used by other apps under Anthropic's and OpenAI's terms. Create an API key in the provider's developer console (it bills you directly).",
+      "subscriptionNote": "Have a Claude, ChatGPT, Codex or Gemini subscription? Use \"Connect your AI app\" above: it needs no key. An API key here is only for the features that run inside Mizano: reading bills and receipts, account suggestions and the monthly summary.",
       "openRouterHint": "Have an OpenRouter account? Connect it without copying a key.",
       "openRouterConnect": "Connect your OpenRouter account",
       "viaOpenRouter": "Connected through OpenRouter",
@@ -293,6 +293,88 @@
     "AI_INPUT_UNSUPPORTED": "The connected provider cannot read this kind of file.",
     "AI_OAUTH_STATE_INVALID": "The OpenRouter sign-in expired or was already used. Start again.",
     "AI_SETTINGS_CHANGED": "The AI settings changed while this was starting. Nothing was sent; try again."
+  },
+  "aiApp": {
+    "title": "Connect your AI app",
+    "description": "Use your own Claude, ChatGPT, Codex or Gemini subscription with Mizano. No key is needed. Your AI app can read your books and prepare drafts; a person in Mizano reviews and posts them.",
+    "address": "Mizano address for your AI app",
+    "addressHint": "Paste this address in your AI app, then sign in to Mizano and allow the connection.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "loadFailed": "Could not load the connected AI apps.",
+    "genericError": "Something went wrong. Please try again.",
+    "notConfigured": "Connecting an AI app is not turned on for this Mizano server yet. Ask whoever runs Mizano for your business to turn it on.",
+    "safety": "Your AI app never posts, sends, pays or deletes anything. It can only read, and prepare drafts if you allow it.",
+    "apps": {
+      "claude": "Claude",
+      "claudeCode": "Claude Code",
+      "chatgpt": "ChatGPT",
+      "codex": "Codex",
+      "gemini": "Gemini"
+    },
+    "steps": {
+      "claude1": "In claude.ai or the Claude Desktop app, open Settings → Connectors and choose Add custom connector.",
+      "claude2": "Paste the Mizano address above, then choose Connect.",
+      "claude3": "Sign in to Mizano and allow the connection. Claude Desktop uses the same connectors as claude.ai.",
+      "claudeCode1": "In a terminal, run the first command below.",
+      "claudeCode2": "In Claude Code, type /mcp, choose Mizano, then sign in to Mizano and allow the connection.",
+      "chatgpt1": "In ChatGPT, open Settings → Apps & Connectors → Advanced settings and turn on Developer mode (paid ChatGPT plans; the menu names can move).",
+      "chatgpt2": "Choose Create, paste the Mizano address above and choose OAuth for sign-in.",
+      "chatgpt3": "Sign in to Mizano and allow the connection.",
+      "codex1": "In a terminal, run the first command below to add Mizano.",
+      "codex2": "Run the second command, then sign in to Mizano in the browser and allow the connection.",
+      "gemini1": "With Gemini CLI, run the first command below in a terminal.",
+      "gemini2": "In Gemini CLI, run /mcp auth mizano, then sign in to Mizano and allow the connection.",
+      "gemini3": "If your Gemini app shows Settings → Connected apps → Add a custom app, you can paste the Mizano address there instead."
+    },
+    "access": {
+      "read": "Read only",
+      "drafts": "Read and prepare drafts"
+    },
+    "connected": {
+      "title": "Connected AI apps",
+      "empty": "No AI app connected yet.",
+      "you": "you",
+      "by": "Connected by {name} on {date}",
+      "lastUsed": "last used {date}",
+      "notUsed": "not used yet",
+      "disconnect": "Disconnect",
+      "disconnectTitle": "Disconnect {app}?",
+      "disconnectBody": "The app loses access to Mizano right away. You can connect it again later from the app."
+    }
+  },
+  "mcpConsent": {
+    "title": "{app} wants to connect to Mizano",
+    "description": "Allow it to work with your books in Mizano for you.",
+    "organization": "Organization",
+    "organizationHint": "The connection works only with the organization you are signed into. To connect another organization, sign into it and start again from your AI app.",
+    "signedInAs": "Signed in as",
+    "returnsTo": "You will go back to",
+    "accessQuestion": "What may the AI app do?",
+    "access": {
+      "read": "Read only",
+      "readDescription": "Look at customers, vendors, items, invoices, bills and reports.",
+      "drafts": "Read and prepare drafts",
+      "draftsDescription": "Also prepare quotes, invoices, bills and expenses as drafts that a person reviews and posts in Mizano."
+    },
+    "safety": "The AI app never posts, sends, pays or deletes anything. You can disconnect it any time in Settings → AI.",
+    "allow": "Allow",
+    "allowing": "Allowing…",
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "loadFailed": "Could not load this connection request.",
+    "genericError": "Something went wrong. Please try again.",
+    "goneTitle": "This connection request has ended",
+    "goneBody": "It expired or was already used. Go back to your AI app and start connecting again."
+  },
+  "mcpErrors": {
+    "MCP_REQUEST_NOT_FOUND": "This connection request has ended. Start again from your AI app.",
+    "MCP_REQUEST_EXPIRED": "This connection request expired. Start again from your AI app.",
+    "MCP_NOT_CONFIGURED": "Connecting an AI app is not turned on for this Mizano server.",
+    "MCP_CONNECTION_NOT_FOUND": "This connection no longer exists.",
+    "MCP_FORBIDDEN": "You cannot change this connection."
   },
   "notifications": {
     "title": "Notifications",
