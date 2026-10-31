@@ -4,7 +4,7 @@ import { locales } from '@/i18n/config';
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mizano.app';
 
-  const publicRoutes = ['', '/login', '/register'];
+  const publicRoutes = ['', '/login', '/register', '/demo'];
 
   const entries: MetadataRoute.Sitemap = [];
 

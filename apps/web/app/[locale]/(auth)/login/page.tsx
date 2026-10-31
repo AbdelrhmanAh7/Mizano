@@ -224,13 +224,20 @@ function LoginForm() {
               </Link>
             </div>
 
-            <div className="text-center">
-              <Link
-                href="/onboarding"
-                className="text-xs text-muted-foreground hover:text-primary transition-colors"
-              >
-                {t('learnMore')}
-              </Link>
+            <div className="text-center space-y-1">
+              <div>
+                <Link href="/demo" className="text-xs text-primary font-medium hover:underline">
+                  {locale === 'ar' ? 'احجز عرضًا مدته 15 دقيقة' : 'Book a 15-minute demo'}
+                </Link>
+              </div>
+              <div>
+                <Link
+                  href="/onboarding"
+                  className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                >
+                  {t('learnMore')}
+                </Link>
+              </div>
             </div>
           </div>
         </div>
