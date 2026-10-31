@@ -476,5 +476,8 @@
     "lastQuarter": "Last quarter",
     "thisYear": "This year",
     "last12Months": "Last 12 months"
+  },
+  "apiErrors": {
+    "VALIDATION_ERROR": "Some fields are missing or invalid. Check the form and try again."
   }
 }
