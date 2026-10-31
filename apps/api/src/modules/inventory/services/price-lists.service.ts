@@ -52,6 +52,7 @@ export class PriceListsService {
     return this.prisma.priceList.findMany({
       where: { organizationId, ...(activeOnly ? { isActive: true } : {}) },
       orderBy: { name: 'asc' },
+      include: { _count: { select: { items: true } } },
     });
   }
 

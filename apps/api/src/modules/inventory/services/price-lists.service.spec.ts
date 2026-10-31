@@ -18,6 +18,13 @@ describe('PriceListsService.findAll', () => {
     );
   });
 
+  it('returns each list with its item count for the index page', async () => {
+    await service.findAll('org-1');
+    expect(prisma.priceList.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ include: { _count: { select: { items: true } } } }),
+    );
+  });
+
   it('keeps the active-only filter when activeOnly is true', async () => {
     await service.findAll('org-1', true);
     expect(prisma.priceList.findMany).toHaveBeenCalledWith(

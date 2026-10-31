@@ -88,7 +88,7 @@ export default function PriceListsPage() {
                     name: string;
                     type: string;
                     isActive: boolean;
-                    items?: unknown[];
+                    _count?: { items: number };
                   }) => (
                     <TableRow key={pl.id}>
                       <TableCell>
@@ -107,7 +107,7 @@ export default function PriceListsPage() {
                           {pl.isActive ? t('common.active') : t('common.inactive')}
                         </Badge>
                       </TableCell>
-                      <TableCell>{pl.items?.length || 0} items</TableCell>
+                      <TableCell>{pl._count?.items ?? 0}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button size="sm" variant="ghost" asChild>
