@@ -4,7 +4,7 @@ import { WebhookDeliveryStatus } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { describeError } from '../../../common/utils/redact';
 import { signedFlowlineHeaders } from '../utils/flowline-signature';
-import { openSecret } from '../utils/secret-box';
+import { openSecret } from '../../../common/utils/secret-box';
 import { request as httpRequest } from 'http';
 import { request as httpsRequest } from 'https';
 import { parseWebhookUrl, publicOnlyLookup } from '../utils/url-safety';

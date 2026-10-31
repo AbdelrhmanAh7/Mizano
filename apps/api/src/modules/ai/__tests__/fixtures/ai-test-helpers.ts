@@ -6,49 +6,8 @@ import { createMockPrisma, MockPrismaClient } from '../../../../test/mocks/prism
 
 export { createMockPrisma, MockPrismaClient };
 
-/** Creates a mock EventEmitter2 */
-export function createMockEventEmitter(): {
-  emit: jest.Mock;
-  on: jest.Mock;
-  once: jest.Mock;
-  removeListener: jest.Mock;
-} {
-  return {
-    emit: jest.fn(),
-    on: jest.fn(),
-    once: jest.fn(),
-    removeListener: jest.fn(),
-  };
-}
-
-/** Creates a mock AiFeedbackService */
-export function createMockAiFeedback() {
-  return {
-    processFeedback: jest.fn().mockResolvedValue({ id: 'fb-001' }),
-    getFeedbackStats: jest.fn().mockResolvedValue({
-      total: 0,
-      accepted: 0,
-      rejected: 0,
-      corrected: 0,
-      acceptanceRate: 0,
-      rejectionRate: 0,
-      correctionRate: 0,
-    }),
-    getRecentFeedback: jest.fn().mockResolvedValue([]),
-    getFeedbackForPrediction: jest.fn().mockResolvedValue(null),
-    getFeedbackTrends: jest.fn().mockResolvedValue([]),
-    storePrediction: jest.fn().mockResolvedValue({ id: 'pred-001', inputHash: 'hash' }),
-    getCachedPrediction: jest.fn().mockResolvedValue(null),
-    invalidatePredictionCache: jest.fn().mockResolvedValue({ deleted: 0 }),
-    deleteOldPredictions: jest.fn().mockResolvedValue({ deleted: 0 }),
-  };
-}
-
 /** Standard test org ID */
 export const TEST_ORG_ID = 'org-test-001';
-
-/** Standard test user ID */
-export const TEST_USER_ID = 'user-test-001';
 
 interface DecimalLike {
   toNumber(): number;

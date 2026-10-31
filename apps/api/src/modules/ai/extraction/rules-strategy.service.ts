@@ -3,7 +3,7 @@ import Decimal from 'decimal.js';
 import { accessSync, constants } from 'fs';
 import { resolve } from 'path';
 import { describeError } from '../../../common/utils/redact';
-import { DocumentExtractionResult } from '../services/ollama.service';
+import { DocumentExtractionResult } from './extraction-result';
 import { preprocessForOcr } from '../utils/image-preprocessor.util';
 import {
   ExtractionContext,

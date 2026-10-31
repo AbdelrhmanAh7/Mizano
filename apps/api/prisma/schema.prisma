@@ -475,6 +475,11 @@ model Organization {
   intakeJobs            IntakeJob[]
   roles                 Role[]
 
+  // AI through the organization's own account: settings, usage log, OpenRouter PKCE states
+  aiSettings    AiSettings?
+  aiUsage       AiUsage[]
+  aiOAuthStates AiOAuthState[]
+
   // External integrations (FlowLine): API keys, outbound webhooks, delivery log, notes
   integrationApiKeys         IntegrationApiKey[]
   webhookEndpoints           WebhookEndpoint[]
@@ -3237,4 +3242,90 @@ model IntegrationIdempotencyKey {
   @@unique([apiKeyId, key])
   @@index([createdAt])
   @@map("integration_idempotency_keys")
+}
+
+// ============================================
+// AI THROUGH THE ORGANIZATION'S OWN ACCOUNT
+// ============================================
+
+/// The organization's own AI connection. Nothing is sent to a provider without one, an admin's
+/// consent naming that provider, and the feature enabled.
+model AiSettings {
+  id              String    @id @default(cuid())
+  organizationId  String    @unique
+  /// none | anthropic | openai | gemini | openrouter | ollama
+  provider        String    @default("none")
+  model           String?
+  /// AES-256-GCM ciphertext of the API key (additional data "ai-key:<organizationId>"). Never returned.
+  keyCiphertext   String?
+  /// "sk-…ab12": recognisable, useless to an attacker.
+  keyHint         String?
+  /// api_key | openrouter_oauth
+  keySource       String?
+  /// USD per 1M tokens published by the provider for the chosen model (OpenRouter); null = price table.
+  priceInPerMtok  Decimal?  @db.Decimal(12, 6)
+  priceOutPerMtok Decimal?  @db.Decimal(12, 6)
+  monthlyLimitUsd Decimal   @default(5) @db.Decimal(12, 4)
+  /// Enabled features: documents | categorization | summary
+  features        String[]  @default([])
+  consentAt       DateTime?
+  consentById     String?
+  /// The provider the consent named; another provider needs a new consent.
+  consentProvider String?
+  connectedAt     DateTime?
+  connectedById   String?
+  verifiedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([provider])
+  @@map("ai_settings")
+}
+
+/// One AI call: reserved (estimate) before the call, settled (actual) or released (0) after.
+/// Never stores prompts, answers or document values.
+model AiUsage {
+  id               String    @id @default(cuid())
+  organizationId   String
+  userId           String?
+  feature          String
+  provider         String
+  model            String
+  /// RESERVED | SETTLED | RELEASED
+  status           String    @default("RESERVED")
+  success          Boolean   @default(false)
+  errorCode        String?
+  inputTokens      Int?
+  outputTokens     Int?
+  estimatedCostUsd Decimal   @db.Decimal(12, 6)
+  /// Counts toward the monthly limit: the estimate while reserved, the actual cost once settled.
+  costUsd          Decimal   @db.Decimal(12, 6)
+  createdAt        DateTime  @default(now())
+  settledAt        DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@map("ai_usage")
+}
+
+/// Single-use OpenRouter PKCE state, bound to the organization and the user who started it.
+model AiOAuthState {
+  id                 String    @id @default(cuid())
+  organizationId     String
+  userId             String
+  /// sha256 hex of the state token that travels through the browser.
+  stateHash          String    @unique
+  /// Sealed PKCE code verifier (additional data "ai-oauth:<organizationId>:<userId>").
+  verifierCiphertext String
+  expiresAt          DateTime
+  usedAt             DateTime?
+  createdAt          DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, userId])
+  @@map("ai_oauth_states")
 }

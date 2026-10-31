@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EntityExtractionService } from './entity-extraction.service';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import {
   createMockPrisma,
   MockPrismaClient,
@@ -18,18 +17,7 @@ describe('EntityExtractionService', () => {
     prisma = createMockPrisma();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        EntityExtractionService,
-        { provide: PrismaService, useValue: prisma },
-        {
-          provide: OllamaInferenceGateway,
-          useValue: {
-            generateCompletion: jest.fn().mockResolvedValue(''),
-            generateStructuredOutput: jest.fn().mockResolvedValue({}),
-            isAvailable: jest.fn().mockResolvedValue(false),
-          },
-        },
-      ],
+      providers: [EntityExtractionService, { provide: PrismaService, useValue: prisma }],
     }).compile();
 
     service = module.get<EntityExtractionService>(EntityExtractionService);
