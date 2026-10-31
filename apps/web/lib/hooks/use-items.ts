@@ -206,21 +206,20 @@ export function getItemTypeColor(type: ItemType): string {
 }
 
 /**
- * Get stock status
+ * Stock status of an item (`inventory.items.stockStatus.<status>` is its label).
  */
 export function getStockStatus(item: Item): {
   status: 'ok' | 'low' | 'out';
-  label: string;
   color: string;
 } {
   if (!item.trackInventory) {
-    return { status: 'ok', label: 'N/A', color: 'text-gray-500' };
+    return { status: 'ok', color: 'text-gray-500' };
   }
   if (item.currentStock <= 0) {
-    return { status: 'out', label: 'Out of Stock', color: 'text-red-600' };
+    return { status: 'out', color: 'text-red-600' };
   }
   if (item.reorderPoint && item.currentStock <= item.reorderPoint) {
-    return { status: 'low', label: 'Low Stock', color: 'text-yellow-600' };
+    return { status: 'low', color: 'text-yellow-600' };
   }
-  return { status: 'ok', label: 'In Stock', color: 'text-green-600' };
+  return { status: 'ok', color: 'text-green-600' };
 }

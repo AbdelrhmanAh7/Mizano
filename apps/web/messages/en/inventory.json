@@ -100,6 +100,18 @@
       "deletedDescription": "The item has been deleted successfully.",
       "deleteError": "Could not delete the item",
       "genericError": "An error occurred"
+    },
+    "detail": {
+      "taxRate": "Tax Rate",
+      "inventorySettings": "Inventory Settings",
+      "currentStock": "Current Stock",
+      "reorderLevel": "Reorder Level"
+    },
+    "stockStatus": {
+      "ok": "In Stock",
+      "low": "Low Stock",
+      "out": "Out of Stock",
+      "notTracked": "Not tracked"
     }
   },
   "warehouses": {

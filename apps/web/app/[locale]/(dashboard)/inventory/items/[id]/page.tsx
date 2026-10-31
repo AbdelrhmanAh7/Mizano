@@ -84,6 +84,8 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   }
 
   const stockStatus = getStockStatus(item);
+  const unitKey = `items.form.units.${item.unit || 'pcs'}`;
+  const unitLabel = t.has(unitKey) ? t(unitKey) : item.unit || '';
 
   return (
     <div className="space-y-6">
@@ -92,7 +94,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
             <Link href="/inventory/items">
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
             </Link>
           </Button>
           <div>
@@ -181,10 +183,12 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                 <p className="text-sm text-muted-foreground">{t('items.table.stock')}</p>
                 {item.trackInventory ? (
                   <p className={cn('text-2xl font-bold font-mono', stockStatus.color)}>
-                    {item.currentStock} {item.unit || 'units'}
+                    {item.currentStock} {unitLabel}
                   </p>
                 ) : (
-                  <p className="text-2xl font-bold text-muted-foreground">N/A</p>
+                  <p className="text-2xl font-bold text-muted-foreground">
+                    {t('items.stockStatus.notTracked')}
+                  </p>
                 )}
               </div>
             </div>
@@ -218,7 +222,9 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               <div>
                 <p className="text-sm text-muted-foreground">{t('items.table.status')}</p>
                 <p className={cn('text-lg font-semibold', stockStatus.color)}>
-                  {stockStatus.label}
+                  {item.trackInventory
+                    ? t(`items.stockStatus.${stockStatus.status}`)
+                    : t('items.stockStatus.notTracked')}
                 </p>
               </div>
             </div>
@@ -234,7 +240,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Type</span>
+              <span className="text-muted-foreground">{t('items.form.type')}</span>
               <span
                 className={cn(
                   'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
@@ -245,18 +251,18 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Unit</span>
-              <span>{item.unit || '-'}</span>
+              <span className="text-muted-foreground">{t('items.form.unit')}</span>
+              <span>{item.unit ? unitLabel : '-'}</span>
             </div>
             {item.taxRate && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Tax Rate</span>
+                <span className="text-muted-foreground">{t('items.detail.taxRate')}</span>
                 <span>{item.taxRate}%</span>
               </div>
             )}
             {item.description && (
               <div className="pt-2 border-t">
-                <p className="text-sm text-muted-foreground mb-1">Description</p>
+                <p className="text-sm text-muted-foreground mb-1">{t('items.form.description')}</p>
                 <p className="text-sm">{item.description}</p>
               </div>
             )}
@@ -266,25 +272,25 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         {item.trackInventory && (
           <Card>
             <CardHeader>
-              <CardTitle>Inventory Settings</CardTitle>
+              <CardTitle>{t('items.detail.inventorySettings')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Current Stock</span>
+                <span className="text-muted-foreground">{t('items.detail.currentStock')}</span>
                 <span className="font-mono font-medium">
-                  {item.currentStock} {item.unit || 'units'}
+                  {item.currentStock} {unitLabel}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Reorder Point</span>
+                <span className="text-muted-foreground">{t('items.form.reorderPoint')}</span>
                 <span className="font-mono">
-                  {item.reorderPoint ?? '-'} {item.reorderPoint ? item.unit || 'units' : ''}
+                  {item.reorderPoint ?? '-'} {item.reorderPoint ? unitLabel : ''}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Reorder Level</span>
+                <span className="text-muted-foreground">{t('items.detail.reorderLevel')}</span>
                 <span className="font-mono">
-                  {item.reorderLevel ?? '-'} {item.reorderLevel ? item.unit || 'units' : ''}
+                  {item.reorderLevel ?? '-'} {item.reorderLevel ? unitLabel : ''}
                 </span>
               </div>
             </CardContent>
@@ -293,17 +299,17 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle>Accounting</CardTitle>
+            <CardTitle>{t('items.form.accounting')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Income Account</span>
+              <span className="text-muted-foreground">{t('items.form.salesAccount')}</span>
               <span>
                 {item.salesAccount ? `${item.salesAccount.code} - ${item.salesAccount.name}` : '-'}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Expense Account</span>
+              <span className="text-muted-foreground">{t('items.form.purchaseAccount')}</span>
               <span>
                 {item.purchaseAccount
                   ? `${item.purchaseAccount.code} - ${item.purchaseAccount.name}`
@@ -312,7 +318,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
             </div>
             {item.trackInventory && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Inventory Account</span>
+                <span className="text-muted-foreground">{t('items.form.inventoryAccount')}</span>
                 <span>
                   {item.inventoryAccount
                     ? `${item.inventoryAccount.code} - ${item.inventoryAccount.name}`

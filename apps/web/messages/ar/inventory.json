@@ -100,6 +100,18 @@
       "deletedDescription": "تم حذف الصنف بنجاح.",
       "deleteError": "تعذر حذف الصنف",
       "genericError": "حدث خطأ"
+    },
+    "detail": {
+      "taxRate": "نسبة الضريبة",
+      "inventorySettings": "إعدادات المخزون",
+      "currentStock": "المخزون الحالي",
+      "reorderLevel": "مستوى إعادة الطلب"
+    },
+    "stockStatus": {
+      "ok": "متوفر",
+      "low": "مخزون منخفض",
+      "out": "نفد المخزون",
+      "notTracked": "غير متتبع"
     }
   },
   "warehouses": {
