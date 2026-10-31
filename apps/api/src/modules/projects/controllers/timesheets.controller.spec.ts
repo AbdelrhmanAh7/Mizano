@@ -1,6 +1,6 @@
 import { BadRequestException, ExecutionContext, INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import * as request from 'supertest';
+import request = require('supertest');
 import { AllExceptionsFilter } from '../../../common/filters/http-exception.filter';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
