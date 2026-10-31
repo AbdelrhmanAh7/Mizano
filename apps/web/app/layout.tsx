@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, Noto_Sans_Arabic } from 'next/font/google';
+import { getLocale } from 'next-intl/server';
+import { defaultLocale, localeDirections, locales, type Locale } from '@/i18n/config';
 import './globals.css';
 
 const inter = Inter({
@@ -65,11 +67,22 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-// Root layout - must have html/body tags
-// Locale layout dynamically sets lang/dir via script injection
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+// Root layout - must have html/body tags.
+// The middleware tags every page request with its locale (next-intl), so the first HTML byte
+// already carries lang/dir: no LTR flash on /ar, and screen readers, print and no-JS get RTL.
+// LocaleDirectionProvider keeps them in sync after a client-side locale switch.
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}): Promise<JSX.Element> {
+  const requested = await getLocale();
+  const locale: Locale = (locales as readonly string[]).includes(requested)
+    ? (requested as Locale)
+    : defaultLocale;
+
   return (
-    <html suppressHydrationWarning>
+    <html lang={locale} dir={localeDirections[locale]} suppressHydrationWarning>
       <body className={`${inter.variable} ${notoArabic.variable} font-sans antialiased`}>
         {children}
       </body>
