@@ -68,6 +68,20 @@ export class PermissionsGuard implements CanActivate {
     return true;
   }
 
+  /**
+   * The same role rule outside a route: whether `roleId` holds every permission (Admin holds
+   * all). MCP tools call it for the permission the equivalent web route requires.
+   */
+  async roleHolds(roleId: string, permissions: string[]): Promise<boolean> {
+    const role = await this.getCachedRole(roleId);
+    if (!role) return false;
+    if (role.name === 'Admin') return true;
+    return permissions.every((permission) => {
+      const [module, action] = permission.split('.');
+      return role.permissions.some((p) => p.module === module && p.actions.includes(action));
+    });
+  }
+
   private async getCachedRole(roleId: string): Promise<CachedRole | null> {
     const cached = this.roleCache.get(roleId);
     if (cached && Date.now() - cached.cachedAt < this.CACHE_TTL) {

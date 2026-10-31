@@ -29,6 +29,7 @@ import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { LoggerModule } from './modules/logger/logger.module';
 import { ManufacturingModule } from './modules/manufacturing/manufacturing.module';
+import { McpModule } from './modules/mcp/mcp.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { PerformanceModule } from './modules/performance/performance.module';
@@ -133,6 +134,7 @@ import { IpThrottlerGuard } from './throttler-ip.guard';
     // External integrations (FlowLine connector)
     IntegrationOutboxModule,
     IntegrationsModule,
+    McpModule,
   ],
   providers: [
     {

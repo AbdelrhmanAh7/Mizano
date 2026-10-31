@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe, Logger, RequestMethod } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
@@ -85,7 +85,14 @@ async function bootstrap() {
   );
 
   // All routes prefixed with /api (e.g., /api/invoices, /api/auth/login)
-  app.setGlobalPrefix('api');
+  // MCP and its OAuth discovery live at the origin root, where AI apps look for them.
+  app.setGlobalPrefix('api', {
+    exclude: [
+      { path: 'mcp', method: RequestMethod.ALL },
+      { path: 'oauth/(.*)', method: RequestMethod.ALL },
+      { path: '.well-known/(.*)', method: RequestMethod.ALL },
+    ],
+  });
 
   // Swagger/OpenAPI docs at /api/docs (disabled in production for security)
   if (!isProduction) {
