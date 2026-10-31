@@ -69,6 +69,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **Normalize error response contracts across all validation exceptions.** Enforce `message: 'Validation Failed'` (Title Case) and `code: 'VALIDATION_ERROR'` for all validation failures (class-validator, direct validation exceptions, and database validation), not just class-validator string arrays, and consistently return `error: 'Unauthorized'` for 401 status codes. Never leak raw internal error objects into response details on non-validation errors. _(#280)_
 
+- **A request body type must be a class with class-validator decorators, never an interface.** An interface has no runtime metatype, so `ValidationPipe` (whitelist, forbidNonWhitelisted) never runs: bad input becomes a 500 and spreading the body into Prisma lets a caller set `organizationId` or connect another tenant's rows. Write updates as an explicit field list. _(manual QA, price lists)_
+- **Check every foreign id in a body against the organization,** including optional links such as a customer's `priceListId` or a price list's `itemId`s. _(manual QA)_
 - **Use concrete DTO classes for `@Query()` parameters.** Intersections erase the runtime metatype, bypassing ValidationPipe transformation and leaving Prisma pagination values as strings. Decorate all service and existing client filters, preserve service defaults, and test through the real pipe options.
 
 ## 8. Voided and deleted records
@@ -82,6 +84,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Ledger figures come only from posted, non-deleted journal lines.** Never add `Account.openingBalance`; opening balances are journals.
 - **Scope every component of a report to the same period** (bills and credits alike).
 - **Use grouped aggregates, not one query per account.**
+- **Never show a stored balance column that postings do not maintain.** A bank account's balance is its linked ledger account's posted balance (`sumPostedLinesByAccount`), on every endpoint that returns it, so the list, detail and dashboard agree. _(manual QA, bank accounts showed 0.00)_
 
 ## 10. Logging, audit and secrets
 
@@ -99,6 +102,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Payment-wide effects get payment-wide warnings.** Voiding a payment affects every allocated bill.
 - **A form emits the final API payload once; the page passes it through.** The payment form mapped ticked rows to `{ invoiceId, amount }` and the page filtered them again on the form-only `selected` flag, so every payment was sent with `allocations: []`. _(manual QA, payments received)_
 - **Send `null`, not `''`, for an emptied optional field, and use the API's enum values as option values.** `@IsOptional()` skips only `null`/`undefined`, so `''` failed `@IsEmail()`/`@IsIn()` and the whole settings save was refused; Radix Select also emits `''` for a value missing from its options, so ignore empty emissions. _(manual QA, organization settings)_
+- **A form's field names are the DTO's field names, and money travels as a decimal string.** The item form posted `salesPrice`/`purchasePrice` numbers and fields the API never stores, and its edit used PUT against a PATCH route, so neither create nor edit ever worked. Cover the payload with a spec that submits the form. _(manual QA, items, price lists)_
 - **Pickers search the server.** An unparameterised `useVendors()` list holds the API's first page (20 rows); use `CustomerCombobox`/`VendorCombobox`/`ItemCombobox`. _(manual QA, payments made, vendor credits)_
 - **A control that reflects a value derives its state from it.** The report period selector kept its own preset state and said "This Month" over a year-to-date report. _(manual QA, reports)_
 - **Credential forms use `method="post"`.** A submit before hydration posts the form natively; with the default GET the password lands in the URL, history and server logs. _(manual QA, login/register)_
