@@ -34,4 +34,10 @@ describe('useMoneyFormatter (PR #560 review)', () => {
     expect(format()('1140.5')).toBe('1,140.50');
     expect(format()('not a number')).toBe('0.00');
   });
+
+  it('keeps two decimals in every currency and survives a code Intl does not know', () => {
+    expect(format()('10.49', 'JPY')).toContain('10.49');
+    expect(() => format()('5', 'US$')).not.toThrow();
+    expect(format()('5', 'US$')).toBe('5.00 US$');
+  });
 });

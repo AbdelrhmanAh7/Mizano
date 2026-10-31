@@ -23,12 +23,22 @@ export function useMoneyFormatter(): (
       const num = typeof amount === 'string' ? parseFloat(amount) : (amount ?? 0);
       const value = Number.isFinite(num) ? num : 0;
       const currency = documentCurrency(currencyCode, baseCurrency);
-      return new Intl.NumberFormat(
-        numberLocale,
-        currency
-          ? { style: 'currency', currency }
-          : { minimumFractionDigits: 2, maximumFractionDigits: 2 },
-      ).format(value);
+      // Documents are calculated to two decimals in every currency (the PDFs show the same), so the screen
+      // never rounds them differently (JPY 10.49 stays 10.49).
+      const digits = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+      if (currency) {
+        try {
+          return new Intl.NumberFormat(numberLocale, {
+            style: 'currency',
+            currency,
+            ...digits,
+          }).format(value);
+        } catch {
+          // A saved code Intl doesn't know (e.g. "US$") must not break the page: show it as text.
+          return `${new Intl.NumberFormat(numberLocale, digits).format(value)} ${currency}`;
+        }
+      }
+      return new Intl.NumberFormat(numberLocale, digits).format(value);
     },
     [numberLocale, baseCurrency],
   );
