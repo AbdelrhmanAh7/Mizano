@@ -2,18 +2,13 @@
 
 import { memo } from 'react';
 import { useTranslations } from 'next-intl';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
 import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
+import {
+  ChartCard,
+  CHART_AXIS,
+  CHART_TOOLTIP_STYLE,
+} from '@/components/dashboard/charts/chart-card';
 
 interface TopCustomer {
   id: string;
@@ -37,52 +32,26 @@ export const TopCustomersChart = memo(function TopCustomersChart({
   const t = useTranslations('common.dashboard.charts');
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">{t('topCustomers')}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data}
-              layout="vertical"
-              margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-              <XAxis
-                type="number"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                tickFormatter={(value) => formatCompactCurrency(value, currency)}
-              />
-              <YAxis
-                type="category"
-                dataKey="name"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                width={90}
-              />
-              <Tooltip
-                formatter={(value: number) => formatCompactCurrency(value, currency)}
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px',
-                }}
-                cursor={{ fill: 'hsl(var(--muted))' }}
-              />
-              <Bar dataKey="totalRevenue" name={t('revenue')} radius={[0, 4, 4, 0]}>
-                {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </CardContent>
-    </Card>
+    <ChartCard title={t('topCustomers')}>
+      <BarChart data={data} layout="vertical" margin={{ top: 5, right: 30, left: 100, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+        <XAxis
+          type="number"
+          {...CHART_AXIS}
+          tickFormatter={(value) => formatCompactCurrency(value, currency)}
+        />
+        <YAxis type="category" dataKey="name" {...CHART_AXIS} width={90} />
+        <Tooltip
+          formatter={(value: number) => formatCompactCurrency(value, currency)}
+          contentStyle={CHART_TOOLTIP_STYLE}
+          cursor={{ fill: 'hsl(var(--muted))' }}
+        />
+        <Bar dataKey="totalRevenue" name={t('revenue')} radius={[0, 4, 4, 0]}>
+          {data.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ChartCard>
   );
 });

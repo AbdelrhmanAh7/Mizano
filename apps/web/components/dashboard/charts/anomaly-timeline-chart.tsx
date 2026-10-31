@@ -14,6 +14,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { AnomalyTimelineItem } from '@/lib/hooks/use-dashboard-sections';
+import { CHART_AXIS, CHART_TOOLTIP_STYLE } from '@/components/dashboard/charts/chart-card';
 
 interface AnomalyTimelineChartProps {
   data: AnomalyTimelineItem[];
@@ -41,24 +42,10 @@ export const AnomalyTimelineChart = memo(function AnomalyTimelineChart({
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-                dataKey="date"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'hsl(var(--muted-foreground))' }}
-              />
-              <YAxis
-                dataKey="value"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'hsl(var(--muted-foreground))' }}
-              />
+              <XAxis dataKey="date" {...CHART_AXIS} />
+              <YAxis dataKey="value" {...CHART_AXIS} />
               <Tooltip
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px',
-                }}
+                contentStyle={CHART_TOOLTIP_STYLE}
                 formatter={(value: number, name: string) => {
                   if (name === 'value') return [value, t('amount')];
                   return [value, name];

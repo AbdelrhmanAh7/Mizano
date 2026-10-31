@@ -2,19 +2,14 @@
 
 import { memo } from 'react';
 import { useTranslations } from 'next-intl';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Cell,
-  ResponsiveContainer,
-} from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
 import { DealPipelineItem } from '@/lib/hooks/use-dashboard-sections';
 import { useCompactMoneyFormatter } from '@/lib/hooks/use-money-formatter';
+import {
+  ChartCard,
+  CHART_AXIS,
+  CHART_TOOLTIP_STYLE,
+} from '@/components/dashboard/charts/chart-card';
 
 interface DealPipelineChartProps {
   data: DealPipelineItem[];
@@ -52,51 +47,29 @@ export const DealPipelineChart = memo(function DealPipelineChart({
   }));
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">{t('dealPipeline')}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={chartData}
-              layout="vertical"
-              margin={{ top: 5, right: 30, left: 120, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-              <XAxis
-                type="number"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                tickFormatter={(value) => formatCompactCurrency(value, currency)}
-              />
-              <YAxis
-                type="category"
-                dataKey="label"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                width={110}
-              />
-              <Tooltip
-                formatter={(value: number) => formatCompactCurrency(value, currency)}
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px',
-                }}
-              />
-              <Bar dataKey="value" name={t('amount')} radius={[0, 4, 4, 0]}>
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={STAGE_COLORS[entry.stage] ?? '#94a3b8'} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </CardContent>
-    </Card>
+    <ChartCard title={t('dealPipeline')}>
+      <BarChart
+        data={chartData}
+        layout="vertical"
+        margin={{ top: 5, right: 30, left: 120, bottom: 5 }}
+      >
+        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+        <XAxis
+          type="number"
+          {...CHART_AXIS}
+          tickFormatter={(value) => formatCompactCurrency(value, currency)}
+        />
+        <YAxis type="category" dataKey="label" {...CHART_AXIS} width={110} />
+        <Tooltip
+          formatter={(value: number) => formatCompactCurrency(value, currency)}
+          contentStyle={CHART_TOOLTIP_STYLE}
+        />
+        <Bar dataKey="value" name={t('amount')} radius={[0, 4, 4, 0]}>
+          {chartData.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={STAGE_COLORS[entry.stage] ?? '#94a3b8'} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ChartCard>
   );
 });
