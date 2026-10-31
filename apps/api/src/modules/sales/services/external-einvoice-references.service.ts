@@ -31,7 +31,7 @@ export class ExternalEInvoiceReferencesService {
         if (externalEInvoiceNumber) {
           // One reference namespace across invoices and credits, serialized before checking.
           // Hash collisions only serialize unrelated references; they never relax uniqueness.
-          await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${organizationId}), hashtext(${'eta:' + externalEInvoiceNumber}))`;
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${organizationId}), hashtext(${'eta:' + externalEInvoiceNumber}))`;
           const duplicate =
             kind === 'invoice'
               ? await tx.creditNote.count({ where: { organizationId, externalEInvoiceNumber } })
