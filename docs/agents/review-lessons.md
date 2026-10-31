@@ -35,6 +35,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **"Current" figures exclude future-dated entries.** Cash today means lines dated ≤ end of today.
 - **Side records carry the document date.** Inventory movements are dated on the adjustment date, not on `createdAt` = now.
 - **Historical reports keep later-voided documents in their original period** and show the reversal on the void date. Filtering on today's status rewrites history. _(customer statement)_
+- **Compare due dates as calendar dates.** A due date is stored at UTC midnight, so `new Date(dueDate) < new Date()` flags a bill overdue all day on its due date; compare its `yyyy-MM-dd` with today's local date (`lib/due-date.ts`). _(manual QA, bills)_
 
 ## 5. Single-currency ledger and data
 
@@ -96,6 +97,11 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Keep error, loading and empty distinct.** Never collapse a failed query into `[]` ("no accounts"). Show an error with Retry, and block submit while a required lookup is loading or failed.
 - **Show the currency of the document**, falling back to the org base currency, never the counterparty's default. The API must actually return the fields the UI relies on (for example `baseCurrency`).
 - **Payment-wide effects get payment-wide warnings.** Voiding a payment affects every allocated bill.
+- **A form emits the final API payload once; the page passes it through.** The payment form mapped ticked rows to `{ invoiceId, amount }` and the page filtered them again on the form-only `selected` flag, so every payment was sent with `allocations: []`. _(manual QA, payments received)_
+- **Send `null`, not `''`, for an emptied optional field, and use the API's enum values as option values.** `@IsOptional()` skips only `null`/`undefined`, so `''` failed `@IsEmail()`/`@IsIn()` and the whole settings save was refused; Radix Select also emits `''` for a value missing from its options, so ignore empty emissions. _(manual QA, organization settings)_
+- **Pickers search the server.** An unparameterised `useVendors()` list holds the API's first page (20 rows); use `CustomerCombobox`/`VendorCombobox`/`ItemCombobox`. _(manual QA, payments made, vendor credits)_
+- **A control that reflects a value derives its state from it.** The report period selector kept its own preset state and said "This Month" over a year-to-date report. _(manual QA, reports)_
+- **Credential forms use `method="post"`.** A submit before hydration posts the form natively; with the default GET the password lands in the URL, history and server logs. _(manual QA, login/register)_
 
 ## 12. Caches, tests and scope
 
@@ -107,6 +113,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.
 - **A cache key must cover every file the task reads.** Turbo `inputs` of `src/**` matched nothing in `apps/web`, which has no `src/`, so its task hashes never changed and a warm cache (hub localci, pre-push) replayed old green lint, type-check and test results for new web code. Keep turbo's default (all package files); if you narrow `inputs`, prove with `turbo run <task> --dry=json` that editing a file of that package changes its hash. _(audit C1)_
 - **Tests must not depend on today's date.** Month arithmetic from `new Date()` (`setMonth(getMonth() - i)`) turns "Sep 31" into Oct 1 on the 29th to 31st, and the demand-forecast suite failed every CI run at month end. Pin the clock (`jest.useFakeTimers().setSystemTime(...)`) or build dates from fixed days such as day 1 of each month. _(audit C2)_
+- **Never let the browser or a shared cache answer for mutable tenant data.** `Cache-Control: public, max-age=3600` on roles/accounts/tax rates kept a new role invisible for an hour (React Query's refetch was served from the HTTP cache) and offered tenant data to shared caches; use `private, no-cache` and let ETags make revalidation cheap. _(manual QA, settings team)_
+- **Mock the hooks a component calls with stable objects.** A mock that returns a new object per render re-runs effects keyed on it (`form.reset`) and hangs the test. _(manual QA specs)_
 
 ## Review process
 
