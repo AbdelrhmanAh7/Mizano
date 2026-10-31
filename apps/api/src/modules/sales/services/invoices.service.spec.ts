@@ -580,6 +580,22 @@ describe('InvoicesService', () => {
       });
     });
 
+    it('announces invoice.voided in the voiding transaction, after the reversal (audit F3)', async () => {
+      const outbox = { invoiceEvent: jest.fn().mockResolvedValue('evt_1') };
+      service = new InvoicesService(prisma as any, journalsService as any, outbox as any);
+      await service.voidInvoice(ORG_ID, 'inv-1');
+      expect(outbox.invoiceEvent).toHaveBeenCalledWith(prisma, ORG_ID, 'invoice.voided', 'inv-1');
+      expect(journalsService.reverse.mock.invocationCallOrder[0]).toBeLessThan(
+        outbox.invoiceEvent.mock.invocationCallOrder[0],
+      );
+
+      // A refused void (live payments) writes no event.
+      outbox.invoiceEvent.mockClear();
+      prisma.paymentAllocation.count.mockResolvedValue(1);
+      await expect(service.voidInvoice(ORG_ID, 'inv-1')).rejects.toThrow();
+      expect(outbox.invoiceEvent).not.toHaveBeenCalled();
+    });
+
     it('locks the invoice row for the transaction', async () => {
       await service.voidInvoice(ORG_ID, 'inv-1');
       expect(prisma.$queryRaw).toHaveBeenCalled();
