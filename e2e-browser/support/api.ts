@@ -20,6 +20,71 @@ async function call<T>(account: Account, method: string, path: string, body?: un
 
 type Row = { id: string; [key: string]: unknown };
 
+export type Line = {
+  description: string;
+  quantity: string;
+  rate: string;
+  taxRate?: string;
+  discount?: string;
+};
+export async function createInvoice(
+  a: Account,
+  customerId: string,
+  lines: Line[],
+  send = true,
+  date = today(),
+): Promise<Row> {
+  const invoice = await call<Row>(a, 'POST', '/invoices', {
+    customerId,
+    date,
+    dueDate: inDays(30),
+    lines,
+  });
+  if (send) await call(a, 'PATCH', `/invoices/${invoice.id}/send`);
+  return invoice;
+}
+export async function expenseAccountId(a: Account): Promise<string> {
+  const accounts = await call<Row[] | { items?: Row[] }>(a, 'GET', '/accounts?limit=500');
+  const list = Array.isArray(accounts) ? accounts : (accounts.items ?? []);
+  const found = list.find((x) => x['code'] === '6999') ?? list.find((x) => x['type'] === 'EXPENSE');
+  if (!found) throw new Error('no expense account');
+  return found.id;
+}
+export async function bankAccountId(a: Account): Promise<string> {
+  const accounts = await call<Row[] | { items?: Row[] }>(a, 'GET', '/accounts?limit=500');
+  const list = Array.isArray(accounts) ? accounts : (accounts.items ?? []);
+  const found = list.find((x) => x['code'] === '1010');
+  if (!found) throw new Error('no bank account');
+  return found.id;
+}
+export async function createBill(a: Account, vendorId: string, lines: Line[]): Promise<Row> {
+  const accountId = await expenseAccountId(a);
+  const bill = await call<Row>(a, 'POST', '/bills', {
+    vendorId,
+    date: today(),
+    dueDate: inDays(30),
+    lines: lines.map((l) => ({ ...l, accountId })),
+  });
+  await call(a, 'PATCH', `/bills/${bill.id}/open`);
+  return bill;
+}
+export const payBill = async (
+  a: Account,
+  vendorId: string,
+  billId: string,
+  amount: string,
+): Promise<Row> =>
+  call<Row>(a, 'POST', '/payments-made', {
+    vendorId,
+    date: today(),
+    amount,
+    paymentMode: 'CASH',
+    paidFromAccountId: await bankAccountId(a),
+    allocations: [{ billId, amount }],
+  });
+export const read = <T = Record<string, unknown>>(a: Account, path: string) =>
+  call<T>(a, 'GET', path);
+
 export const createCustomer = (a: Account, name = 'Nile Traders') =>
   call<Row>(a, 'POST', '/customers', {
     name,
@@ -82,3 +147,24 @@ export const createOpenBill = async (a: Account, vendorId: string, rate = '300')
   await call(a, 'PATCH', `/bills/${bill.id}/open`);
   return bill;
 };
+
+/** Like the helpers above, but returns the status and body instead of throwing, for tests about refusals. */
+export async function attempt(
+  a: Account,
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<{ status: number; body: Record<string, unknown> }> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${a.accessToken}` },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  const text = await res.text();
+  const parsed = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+  return {
+    status: res.status,
+    body: (parsed['data'] as Record<string, unknown> | undefined) ?? parsed,
+  };
+}
+export const todayIso = today;

@@ -32,12 +32,12 @@ free certificate also covers it if you ever turn the orange proxy on.
 Jarda needs about 4 GB of memory to run and 6–8 GB while it builds a new version. Prices checked
 1 Nov 2026, excluding VAT.
 
-| Provider | Plan | Size | Price | Notes |
-| --- | --- | --- | --- | --- |
-| **AWS Lightsail** (recommended) | Linux, 8 GB | 2 vCPU, 8 GB, 160 GB SSD, 5 TB transfer | **$44 / month** (IPv4 included) | Region Frankfurt (`eu-central-1`) is closest to Egypt and the Gulf among Lightsail regions. [Pricing](https://aws.amazon.com/lightsail/pricing/) |
-| AWS Lightsail, both products | Linux, 16 GB | 4 vCPU, 16 GB, 320 GB SSD | $84 / month | When FlowLine production runs on the same server (section 9). |
-| Contabo | Cloud VPS 20 | 6 vCPU, 12 GB | ≈ €6.00 / month first term, then €7.50 | Cheapest; weaker support and network. [Pricing](https://contabo.com/en/vps/) |
-| Hetzner | Cloud CPX32 | 4 vCPU, 8 GB, 160 GB | ≈ €35.49 / month | Better network than Contabo. [Pricing](https://www.hetzner.com/cloud/) |
+| Provider                        | Plan         | Size                                    | Price                                  | Notes                                                                                                                                            |
+| ------------------------------- | ------------ | --------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **AWS Lightsail** (recommended) | Linux, 8 GB  | 2 vCPU, 8 GB, 160 GB SSD, 5 TB transfer | **$44 / month** (IPv4 included)        | Region Frankfurt (`eu-central-1`) is closest to Egypt and the Gulf among Lightsail regions. [Pricing](https://aws.amazon.com/lightsail/pricing/) |
+| AWS Lightsail, both products    | Linux, 16 GB | 4 vCPU, 16 GB, 320 GB SSD               | $84 / month                            | When FlowLine production runs on the same server (section 9).                                                                                    |
+| Contabo                         | Cloud VPS 20 | 6 vCPU, 12 GB                           | ≈ €6.00 / month first term, then €7.50 | Cheapest; weaker support and network. [Pricing](https://contabo.com/en/vps/)                                                                     |
+| Hetzner                         | Cloud CPX32  | 4 vCPU, 8 GB, 160 GB                    | ≈ €35.49 / month                       | Better network than Contabo. [Pricing](https://www.hetzner.com/cloud/)                                                                           |
 
 Smaller than 8 GB works for running but the on-server build may run out of memory; the script adds
 4 GB of swap to help.
@@ -70,10 +70,10 @@ key" under Login). Log in as `root`. Hetzner's optional Cloud Firewall should al
 
 At your DNS provider (Cloudflare recommended) add two **A** records to the server's IP:
 
-| Name | Type | Value | Cloudflare proxy |
-| --- | --- | --- | --- |
-| `jarda` | A | `<server-ip>` | **DNS only** (grey cloud) |
-| `jarda-api` | A | `<server-ip>` | **DNS only** (grey cloud) |
+| Name        | Type | Value         | Cloudflare proxy          |
+| ----------- | ---- | ------------- | ------------------------- |
+| `jarda`     | A    | `<server-ip>` | **DNS only** (grey cloud) |
+| `jarda-api` | A    | `<server-ip>` | **DNS only** (grey cloud) |
 
 Keep the proxy off: Caddy then gets its own certificates, and the API sees each visitor's real
 address for sign-in throttling. Wait until `dig +short jarda.<domain>` shows the IP.
@@ -96,14 +96,14 @@ Check from your computer: `https://jarda.<domain>` opens the sign-in page and
 
 Files on the server:
 
-| Path | What |
-| --- | --- |
-| `/opt/jarda` | the code (a git checkout; the install updates it) |
-| `/etc/jarda/jarda.env` | settings and generated secrets (mode 600; never share) |
+| Path                         | What                                                             |
+| ---------------------------- | ---------------------------------------------------------------- |
+| `/opt/jarda`                 | the code (a git checkout; the install updates it)                |
+| `/etc/jarda/jarda.env`       | settings and generated secrets (mode 600; never share)           |
 | `/etc/jarda/restic-password` | backup password (mode 600; keep a copy in your password manager) |
-| `/etc/jarda/r2.env` | off-site backup settings (Cloudflare R2), off by default |
-| `/srv/jarda/` | database, uploaded documents, Redis, certificates, local backups |
-| `/var/log/jarda-build.log` | the last image build |
+| `/etc/jarda/r2.env`          | off-site backup settings (Cloudflare R2), off by default         |
+| `/srv/jarda/`                | database, uploaded documents, Redis, certificates, local backups |
+| `/var/log/jarda-build.log`   | the last image build                                             |
 
 ## 5. Email (optional)
 
@@ -211,11 +211,11 @@ The server is shared: Caddy is the only door (80/443) and every product sits on 
 Docker network. A product plugs in with three files, without changing this kit; `install.sh`
 creates the folders and keeps their contents on every update.
 
-| Slot | Picked up by | Example |
-| --- | --- | --- |
-| `/etc/jarda/compose.d/<name>.yml` | `scripts/compose.sh` and `jarda-stack.service` (same project, network `internal`) | [examples/flowline.compose.yml](examples/flowline.compose.yml) |
-| `/etc/jarda/caddy-sites/<name>.caddy` | Caddy (`import /etc/caddy/sites/*.caddy`); HTTPS certificate on its own | [examples/flowline.caddy](examples/flowline.caddy) |
-| `/etc/jarda/backup.d/<NN-name>` (executable) | the nightly `backup.sh`, after Jarda's snapshot, before the R2 copy | [examples/flowline.backup.sh](examples/flowline.backup.sh) |
+| Slot                                         | Picked up by                                                                      | Example                                                        |
+| -------------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `/etc/jarda/compose.d/<name>.yml`            | `scripts/compose.sh` and `jarda-stack.service` (same project, network `internal`) | [examples/flowline.compose.yml](examples/flowline.compose.yml) |
+| `/etc/jarda/caddy-sites/<name>.caddy`        | Caddy (`import /etc/caddy/sites/*.caddy`); HTTPS certificate on its own           | [examples/flowline.caddy](examples/flowline.caddy)             |
+| `/etc/jarda/backup.d/<NN-name>` (executable) | the nightly `backup.sh`, after Jarda's snapshot, before the R2 copy               | [examples/flowline.backup.sh](examples/flowline.backup.sh)     |
 
 Rules: publish no ports, never redefine a Jarda service name, keep data under `/srv/<name>`,
 secrets in `/etc/jarda/<name>.env` (mode 600). After adding or changing a file:

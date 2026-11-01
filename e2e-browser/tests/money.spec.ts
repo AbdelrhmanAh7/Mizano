@@ -18,7 +18,7 @@ async function seeded(): Promise<{
 }
 
 test.describe('money flows', () => {
-  test('create a customer in the form: it is listed', async ({ page }) => {
+  test('create a customer in the form: it is listed @happy', async ({ page }) => {
     const account = await registerAccount('customer');
     await signIn(page, account);
     await page.goto('/en/sales/customers/new');
@@ -31,7 +31,7 @@ test.describe('money flows', () => {
     await expect(page.getByRole('row', { name: /Nile Traders.*nile@example\.test/ })).toBeVisible();
   });
 
-  test('create an invoice in the form: it is listed as a draft with its total', async ({
+  test('create an invoice in the form: it is listed as a draft with its total @happy', async ({
     page,
   }) => {
     const account = await registerAccount('invoice');
@@ -52,7 +52,7 @@ test.describe('money flows', () => {
     await expect(page.getByText('Draft', { exact: true }).first()).toBeVisible();
   });
 
-  test('a part payment leaves the right balance and shows in the payment history', async ({
+  test('a part payment leaves the right balance and shows in the payment history @happy', async ({
     page,
   }) => {
     const { account, invoice } = await seeded();
@@ -60,10 +60,14 @@ test.describe('money flows', () => {
     await page.goto(`/en/sales/invoices/${invoice.id}`);
     await expect(page.getByText('Partially Paid').first()).toBeVisible();
     await expect(page.getByText('Balance Due').locator('..')).toContainText('EGP 500.00');
-    await expect(page.getByText('PMT-001')).toBeVisible();
+    await expect(page.getByRole('row', { name: /PMT-001/ })).toContainText('EGP 400.00');
+    // 1,000 - 400 payment - 100 credit applied = 500 balance; the page counts the credit as paid.
+    await expect(page.getByText('Amount Paid').locator('..')).toContainText('EGP 500.00');
   });
 
-  test('a credit note is posted and shows the customer balance after it', async ({ page }) => {
+  test('a credit note is posted and shows the customer balance after it @happy', async ({
+    page,
+  }) => {
     const { account, creditNote } = await seeded();
     await signIn(page, account);
     await page.goto(`/en/sales/credit-notes/${creditNote.id}`);
@@ -81,18 +85,19 @@ test.describe('money flows', () => {
     await expect(page.getByRole('row', { name: /CN-001/ })).toContainText('EGP 100.00');
   });
 
-  test('a vendor bill opens and is listed with its balance', async ({ page }) => {
+  test('a vendor bill opens and is listed with its balance @happy', async ({ page }) => {
     const account = await registerAccount('bill');
     const vendor = await api.createVendor(account);
     await api.createOpenBill(account, vendor.id);
     await signIn(page, account);
     await page.goto('/en/purchases/bills');
     const row = page.getByRole('row', { name: /Delta Supplies/ });
-    await expect(row).toContainText('Open');
-    await expect(row).toContainText('EGP 300.00');
+    // Status, total and balance cells, each exactly (a new bill: balance = total).
+    await expect(row.getByRole('cell', { name: 'Open', exact: true })).toBeVisible();
+    await expect(row.getByRole('cell', { name: 'EGP 300.00', exact: true })).toHaveCount(2);
   });
 
-  test('the trial balance balances after invoice, payment, credit note and bill', async ({
+  test('the trial balance balances after invoice, payment, credit note and bill @happy', async ({
     page,
   }) => {
     const { account } = await seeded();
@@ -118,15 +123,20 @@ test.describe('money flows', () => {
     await expect(total).toContainText('1,300.00');
   });
 
-  test('bank reconciliation opens for a new organization', async ({ page }) => {
+  test('the reconciliation start page shows its title and asks for a bank account @happy', async ({
+    page,
+  }) => {
     await signIn(page, await registerAccount('bank'));
     await page.goto('/en/banking/reconcile');
-    await expect(page.getByText('Page Not Found')).toHaveCount(0);
-    await expect(page.getByRole('heading', { name: /reconcil/i }).first()).toBeVisible();
-    await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
+    await expect(
+      page.getByRole('heading', { name: 'Bank Reconciliation', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Select a bank account to reconcile transactions', { exact: true }),
+    ).toBeVisible();
   });
 
-  test('on a 390 px phone the menu opens and Customers opens without sideways scrolling', async ({
+  test('on a 390 px phone the menu opens and Customers opens without sideways scrolling @happy', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -136,7 +146,7 @@ test.describe('money flows', () => {
     await page.getByRole('link', { name: 'Customers' }).click();
     await expect(page).toHaveURL(/\/en\/sales\/customers/);
     await expect(page.getByRole('heading', { name: 'Customers', level: 1 })).toBeVisible();
-    await expect(page.getByText('No customers yet').or(page.getByRole('table'))).toBeVisible();
+    await expect(page.getByText('No customers yet')).toBeVisible();
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );

@@ -22,3 +22,12 @@ pnpm e2e:down   # stops the stack; its data lives in memory and is gone
 
 Rules: every test creates its own account; never weaken an assertion to hide a product bug: a real bug becomes a GitHub issue
 labelled `bug` and the test is `test.fixme` with the issue number until it is fixed.
+
+## Tags, output rule and running against a deployed copy
+
+- `@happy` journeys run on every pull request (`pnpm e2e:happy`); `@edge` failure cases run nightly (`.github/workflows/e2e-nightly.yml`, `pnpm e2e:edge`).
+- A happy test passes only when the **output** is what was expected: exact totals, VAT, statuses, balances and report figures, written in the test from a
+  hand calculation (see `e2e-browser/tests/golden.spec.ts`, which reuses the exact cases of `docs/strategy/demo-acceptance.md`). A 200 or a page that loads is never a pass.
+- Same suite against a deployed copy: `E2E_BASE_URL=https://app.example E2E_API_URL=https://app.example/api pnpm e2e:happy`. No servers are started and the
+  seed is never run: each account registers its own organization named **QA Production Check <id>** with `*@example.test` addresses.
+  Removing those organizations afterwards is not automated yet: see the status file (NEEDS-ORCHESTRATOR).

@@ -251,7 +251,7 @@ jobs:
       - name: Journeys
         env:
           CI: 'true'
-        run: pnpm e2e
+        run: pnpm e2e:happy
 
       - name: Upload the report when something fails
         if: failure()

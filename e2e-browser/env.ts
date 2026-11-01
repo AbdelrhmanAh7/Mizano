@@ -1,9 +1,16 @@
 /** One place for the throwaway stack's settings (no real secrets: every value only works against the local stack). */
+/** Set E2E_BASE_URL (and E2E_API_URL) to run the same journeys against a deployed copy, e.g. production after a deploy. */
+export const REMOTE_WEB_URL = process.env.E2E_BASE_URL?.replace(/\/+$/, '');
+export const REMOTE_API_URL = process.env.E2E_API_URL?.replace(/\/+$/, '');
+export const isRemote = Boolean(REMOTE_WEB_URL);
+/** Organizations created on a deployed copy carry this name so they can be found and removed afterwards. */
+export const QA_ORGANIZATION = 'QA Production Check';
+
 export const WEB_PORT = Number(process.env.E2E_WEB_PORT ?? 5101);
 export const API_PORT = Number(process.env.E2E_API_PORT ?? 6101);
 // "localhost", not 127.0.0.1: the web app redirects between locale paths using the host name "localhost".
-export const WEB_URL = `http://localhost:${WEB_PORT}`;
-export const API_URL = `http://127.0.0.1:${API_PORT}/api`;
+export const WEB_URL = REMOTE_WEB_URL ?? `http://localhost:${WEB_PORT}`;
+export const API_URL = REMOTE_API_URL ?? `http://127.0.0.1:${API_PORT}/api`;
 
 export const apiEnv = {
   APP_ENV: 'e2e',
