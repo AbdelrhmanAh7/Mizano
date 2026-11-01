@@ -1,5 +1,5 @@
 import type { Locale } from './request-locale';
-import { SYSTEM_NAMES_AR } from './system-names';
+import { SYSTEM_DESCRIPTIONS_AR, SYSTEM_NAMES_AR } from './system-names';
 
 /** A row of system data: `name` as stored, plus both languages when Mizano wrote it. */
 export interface BilingualName {
@@ -16,7 +16,14 @@ export function localize<T extends BilingualName>(row: T, locale: Locale): T {
   const asked = locale === 'ar' ? row.nameAr : row.nameEn;
   const other = locale === 'ar' ? row.nameEn : row.nameAr;
   const name = asked || other || row.name;
-  return name === row.name ? row : { ...row, name };
+  // The text Mizano wrote on a system row (a role) is answered in Arabic too; typed text never matches.
+  const { description } = row as { description?: unknown };
+  const descriptionAr =
+    locale === 'ar' && typeof description === 'string' && (row.nameEn || row.nameAr)
+      ? SYSTEM_DESCRIPTIONS_AR[description]
+      : undefined;
+  if (name === row.name && descriptionAr === undefined) return row;
+  return { ...row, name, ...(descriptionAr === undefined ? {} : { description: descriptionAr }) };
 }
 
 /** The fields a seed writes for a system row: English as `name`, plus both languages. */

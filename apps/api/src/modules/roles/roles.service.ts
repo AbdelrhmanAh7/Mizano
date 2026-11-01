@@ -7,8 +7,9 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateRoleDto, UpdateRoleDto, AssignRoleDto } from './dto';
-import { DEFAULT_ROLES } from './constants/default-roles.constant';
-import { renameFields, systemName } from '../../common/i18n/localize';
+import { renameFields } from '../../common/i18n/localize';
+import { SYSTEM_DESCRIPTIONS_AR } from '../../common/i18n/system-names';
+import { createMissingDefaultRoles } from './default-roles.seed';
 
 interface PaginationParams {
   page?: number;
@@ -173,7 +174,10 @@ export class RolesService {
         data: {
           // The edit form shows the localized name: saving it back keeps 'Admin' as 'Admin'.
           ...rename,
-          description: updateRoleDto.description,
+          // The form shows the Arabic text of a system description: saving it back keeps the stored English.
+          description: keepsStoredDescription(existingRole.description, updateRoleDto.description)
+            ? existingRole.description
+            : updateRoleDto.description,
         },
         include: {
           permissions: true,
@@ -223,43 +227,11 @@ export class RolesService {
    * Seed default roles for an organization
    */
   async seedDefaultRoles(organizationId: string) {
-    const createdRoles: Record<string, unknown>[] = [];
-
-    for (const roleData of DEFAULT_ROLES) {
-      // Check if role already exists
-      const existingRole = await this.prisma.role.findFirst({
-        where: { name: roleData.name, organizationId },
-      });
-
-      if (existingRole) {
-        // Update existing role's permissions if needed
-        createdRoles.push({ ...existingRole, status: 'existing' });
-        continue;
-      }
-
-      // Create new role with permissions
-      const role = await this.prisma.role.create({
-        data: {
-          ...systemName(roleData.name),
-          description: roleData.description,
-          isDefault: roleData.isDefault || false,
-          organizationId,
-          permissions: {
-            create: roleData.permissions.map((p) => ({
-              module: p.module,
-              actions: p.actions,
-            })),
-          },
-        },
-        include: { permissions: true },
-      });
-
-      createdRoles.push({ ...role, status: 'created' });
-    }
-
+    const roles = await createMissingDefaultRoles(this.prisma, organizationId);
+    const created = roles.filter((r) => r.created).length;
     return {
-      message: `Seeded ${createdRoles.filter((r) => r.status === 'created').length} new roles`,
-      roles: createdRoles,
+      message: `Seeded ${created} new roles`,
+      roles: roles.map((r) => ({ ...r, status: r.created ? 'created' : 'existing' })),
     };
   }
 
@@ -320,4 +292,9 @@ export class RolesService {
       include: { permissions: true },
     });
   }
+}
+
+/** True when `incoming` is just the Arabic translation of the stored system description. */
+function keepsStoredDescription(stored: string | null, incoming: string | undefined): boolean {
+  return !!stored && !!incoming && SYSTEM_DESCRIPTIONS_AR[stored] === incoming;
 }

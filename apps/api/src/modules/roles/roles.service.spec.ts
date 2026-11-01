@@ -199,6 +199,28 @@ describe('RolesService', () => {
       expect(update.mock.calls[0][0].data).not.toHaveProperty('name');
     });
 
+    it('keeps the stored English description when its Arabic text is saved back (#630)', async () => {
+      const admin = {
+        ...mockRole,
+        name: 'Admin',
+        nameEn: 'Admin',
+        nameAr: 'مدير النظام',
+        description: 'Full system access',
+      };
+      mockPrisma.role.findFirst.mockReset().mockResolvedValueOnce(admin);
+      const update = jest.fn().mockResolvedValue(admin);
+      mockPrisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) =>
+        fn({ permission: { deleteMany: jest.fn(), createMany: jest.fn() }, role: { update } }),
+      );
+
+      await service.update(ORG_ID, 'role-1', { description: 'صلاحيات كاملة على النظام' });
+      expect(update.mock.calls[0][0].data.description).toBe('Full system access');
+
+      mockPrisma.role.findFirst.mockReset().mockResolvedValueOnce(admin);
+      await service.update(ORG_ID, 'role-1', { description: 'My own words' });
+      expect(update.mock.calls[1][0].data.description).toBe('My own words');
+    });
+
     it('throws ConflictException if new name conflicts', async () => {
       mockPrisma.role.findFirst
         .mockResolvedValueOnce(mockRole) // exists

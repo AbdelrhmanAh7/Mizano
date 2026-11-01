@@ -208,7 +208,7 @@ again afterwards.
 
 1. **Settings → Team & Roles → Add Member:** name, email, a starting **Password** and a **Role**, then **Save**. There is no
    invitation email: give the person their password privately and ask them to change it.
-2. Roles: **Admin**, **Manager**, **Accountant**, **SalesRep**, **StoreKeeper** (press **Seed Defaults** if the list is empty).
+2. Roles: **Admin**, **Manager**, **Accountant**, **SalesRep**, **StoreKeeper** (they are there from sign-up; press **Add standard roles** if one is missing).
    Each role has **View / Create / Edit / Delete / Export** per area. **Add Role** or **Edit Role** to change what a role can do.
 3. Check what the accountant must do: for example, to scan and create bills their role needs **Create** on purchases.
 4. Forgotten password and no email? Press **Create a password reset link for {name}**, copy the link and send it privately

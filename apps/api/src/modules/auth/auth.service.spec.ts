@@ -19,7 +19,10 @@ const USER = {
 function setup() {
   const tx = {
     organization: { create: jest.fn().mockResolvedValue(ORG) },
-    role: { create: jest.fn().mockResolvedValue({ id: 'role-1' }) },
+    role: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({ id: 'role-1' }),
+    },
     user: { create: jest.fn().mockResolvedValue(USER) },
   };
   const prisma = {
@@ -70,6 +73,20 @@ describe('AuthService.register', () => {
       },
     });
     expect(accounts.seedDefaultAccounts).toHaveBeenCalledWith(ORG.id);
+  });
+
+  it('gives a new organization all five standard roles, so the accountant can have her own (#630)', async () => {
+    const { service, tx } = setup();
+
+    await service.register({ ...dto, country: 'EG' });
+
+    const names = tx.role.create.mock.calls.map(
+      ([arg]: [{ data: { name: string } }]) => arg.data.name,
+    );
+    expect(names).toEqual(['Admin', 'Manager', 'Accountant', 'SalesRep', 'StoreKeeper']);
+    expect(tx.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ roleId: 'role-1' }) }),
+    );
   });
 
   it('keeps the USD start and the default time zone without a country', async () => {

@@ -36,11 +36,11 @@ export function DataTablePagination({
   const endItem = Math.min(page * limit, total);
 
   return (
-    <div className="flex items-center justify-between px-2">
+    <div className="flex flex-col gap-3 px-2 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex-1 text-sm text-muted-foreground">
         {total > 0 ? tPage('showing', { from: startItem, to: endItem, total }) : t('noResults')}
       </div>
-      <div className="flex items-center gap-6 lg:gap-8">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 lg:gap-8">
         {onLimitChange && (
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium">{t('rowsPerPage')}</p>
@@ -58,7 +58,7 @@ export function DataTablePagination({
             </Select>
           </div>
         )}
-        <div className="flex w-[100px] items-center justify-center text-sm font-medium">
+        <div className="flex min-w-[100px] items-center justify-center text-sm font-medium">
           {tPage('page', { current: page, total: totalPages })}
         </div>
         <div className="flex items-center gap-2">

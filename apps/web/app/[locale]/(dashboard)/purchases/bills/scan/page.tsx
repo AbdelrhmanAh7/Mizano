@@ -333,29 +333,29 @@ export default function ScanBillPage() {
         </div>
       </div>
 
-      {/* Step Indicator */}
-      <div className="flex items-center gap-2">
+      {/* Step Indicator: on a phone only the current step shows its name */}
+      <div className="flex flex-wrap items-center gap-2">
         <StepBadge
           step={1}
           label={ts('steps.upload')}
           active={step === 'upload'}
           done={step !== 'upload'}
         />
-        <Separator className="w-8" />
+        <Separator className="w-4 sm:w-8" />
         <StepBadge
           step={2}
           label={ts('steps.processing')}
           active={step === 'processing'}
           done={step === 'review' || step === 'confirmed'}
         />
-        <Separator className="w-8" />
+        <Separator className="w-4 sm:w-8" />
         <StepBadge
           step={3}
           label={ts('steps.review')}
           active={step === 'review'}
           done={step === 'confirmed'}
         />
-        <Separator className="w-8" />
+        <Separator className="w-4 sm:w-8" />
         <StepBadge step={4} label={ts('steps.done')} active={step === 'confirmed'} done={false} />
       </div>
 
@@ -898,6 +898,7 @@ function StepBadge({
       <span
         className={cn(
           'text-sm',
+          !active && 'hidden sm:inline',
           active && 'font-medium',
           !active && !done && 'text-muted-foreground',
         )}

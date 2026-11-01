@@ -2,7 +2,8 @@ import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { Decimal } from '@prisma/client/runtime/library';
 import { localize, localizeDeep, renameFields, systemName } from './localize';
-import { SYSTEM_NAMES_AR } from './system-names';
+import { SYSTEM_DESCRIPTIONS_AR, SYSTEM_NAMES_AR } from './system-names';
+import { DEFAULT_ROLES } from '../../modules/roles/constants/default-roles.constant';
 
 const seeded = {
   name: 'Accounts Receivable',
@@ -120,5 +121,15 @@ describe('system names catalog', () => {
 
   it('writes both languages for a seeded name', () => {
     expect(systemName('Cash')).toEqual({ name: 'Cash', nameEn: 'Cash', nameAr: 'النقدية' });
+  });
+
+  it('answers the text written on system roles in Arabic, and leaves typed text alone (#630)', () => {
+    for (const role of DEFAULT_ROLES) expect(SYSTEM_DESCRIPTIONS_AR[role.description]).toBeTruthy();
+    expect(SYSTEM_DESCRIPTIONS_AR['Full system access']).toBeTruthy();
+    const admin = { ...systemName('Admin'), description: 'Full system access' };
+    expect(localize(admin, 'ar').description).toBe(SYSTEM_DESCRIPTIONS_AR['Full system access']);
+    expect(localize(admin, 'en').description).toBe('Full system access');
+    const typed = { ...systemName('Admin'), description: 'My own words' };
+    expect(localize(typed, 'ar').description).toBe('My own words');
   });
 });

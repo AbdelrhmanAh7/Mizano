@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { isMissingDefaultRoles } from '@/lib/default-roles';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { ArrowLeft, Edit2, Plus, Shield, Trash2, Users } from 'lucide-react';
@@ -92,6 +93,7 @@ interface Permission {
 interface Role {
   id: string;
   name: string;
+  nameEn?: string | null;
   description: string | null;
   isDefault: boolean;
   permissions: Permission[];
@@ -411,7 +413,7 @@ export default function TeamSettingsPage() {
             <CardDescription>{t('team.rolesDescription')}</CardDescription>
           </div>
           <div className="flex gap-2">
-            {roles.length === 0 && (
+            {isMissingDefaultRoles(roles) && (
               <Button
                 variant="outline"
                 size="sm"
