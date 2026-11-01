@@ -466,7 +466,7 @@ export class VatReturnsService {
   ): Promise<{ id: string; code: string; name: string }[]> {
     return this.prisma.account.findMany({
       where: await bankCashAccountWhere(this.prisma, organizationId),
-      select: { id: true, code: true, name: true },
+      select: { id: true, code: true, name: true, nameAr: true, nameEn: true },
       orderBy: { code: 'asc' },
     });
   }

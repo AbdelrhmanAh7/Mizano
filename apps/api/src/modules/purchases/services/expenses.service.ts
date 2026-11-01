@@ -27,6 +27,9 @@ export interface LookupAccount {
   id: string;
   code: string;
   name: string;
+  /** Both languages of a seeded account; LocalizeNamesInterceptor answers in the asked one. */
+  nameAr?: string | null;
+  nameEn?: string | null;
 }
 
 const EXPENSE_VIEW_INCLUDE = {
@@ -274,7 +277,7 @@ export class ExpensesService {
   async expenseAccounts(organizationId: string): Promise<LookupAccount[]> {
     return this.prisma.account.findMany({
       where: { organizationId, deletedAt: null, isActive: true, type: AccountType.EXPENSE },
-      select: { id: true, code: true, name: true },
+      select: { id: true, code: true, name: true, nameAr: true, nameEn: true },
       orderBy: { code: 'asc' },
     });
   }
@@ -283,7 +286,7 @@ export class ExpensesService {
   async paidThroughAccounts(organizationId: string): Promise<LookupAccount[]> {
     return this.prisma.account.findMany({
       where: await bankCashAccountWhere(this.prisma, organizationId),
-      select: { id: true, code: true, name: true },
+      select: { id: true, code: true, name: true, nameAr: true, nameEn: true },
       orderBy: { code: 'asc' },
     });
   }

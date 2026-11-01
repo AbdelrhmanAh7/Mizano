@@ -211,18 +211,18 @@ export class VendorCreditsService {
     if (ids.length === 0) return [];
     const accounts = await this.prisma.account.findMany({
       where: { id: { in: ids }, organizationId, deletedAt: null },
-      select: { id: true, code: true, name: true },
+      select: { id: true, code: true, name: true, nameAr: true, nameEn: true },
     });
     return ids
       .map((id) => accounts.find((a) => a.id === id))
-      .filter((a): a is LookupAccount => !!a);
+      .filter((a): a is NonNullable<typeof a> => !!a);
   }
 
   /** Accounts a refund can be received into (same rule refund() enforces). */
   async refundAccounts(organizationId: string): Promise<LookupAccount[]> {
     return this.prisma.account.findMany({
       where: await bankCashAccountWhere(this.prisma, organizationId),
-      select: { id: true, code: true, name: true },
+      select: { id: true, code: true, name: true, nameAr: true, nameEn: true },
       orderBy: { code: 'asc' },
     });
   }

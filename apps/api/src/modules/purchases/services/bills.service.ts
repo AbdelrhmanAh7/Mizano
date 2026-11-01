@@ -331,7 +331,7 @@ export class BillsService {
     const where = await billLineAccountWhere(this.prisma, organizationId);
     const data = await this.prisma.account.findMany({
       where,
-      select: { id: true, code: true, name: true, type: true },
+      select: { id: true, code: true, name: true, nameAr: true, nameEn: true, type: true },
       orderBy: { code: 'asc' },
     });
     let vendorDefaultAccountId: string | null = null;

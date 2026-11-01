@@ -406,7 +406,7 @@ export class PaymentsReceivedService {
     // No schema relation: resolve the deposit account inside the tenant for the detail page.
     const depositToAccount = await this.prisma.account.findFirst({
       where: { id: payment.depositToAccountId, organizationId },
-      select: { id: true, code: true, name: true },
+      select: { id: true, code: true, name: true, nameAr: true, nameEn: true },
     });
     return { ...payment, depositToAccount };
   }
