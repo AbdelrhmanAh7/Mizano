@@ -22,10 +22,9 @@ const DESCRIPTION =
   'Accounting in Arabic and English for businesses in Egypt, Saudi Arabia and the UAE: invoices, bills, journals and reports. AI is optional.';
 
 export const metadata: Metadata = {
-  title: {
-    default: BRAND.tagline.en,
-    template: `%s | ${BRAND.name.en}`,
-  },
+  // A plain title: a template here would wrap the [locale] layout's own default title, adding
+  // the English name to every Arabic tab. The localized template lives in app/[locale]/layout.tsx.
+  title: BRAND.tagline.en,
   description: DESCRIPTION,
   applicationName: BRAND.name.en,
   keywords: [
