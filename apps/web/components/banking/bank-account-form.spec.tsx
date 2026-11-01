@@ -43,6 +43,8 @@ jest.mock('next-intl', () => {
 });
 
 // Mock the use-bank-accounts hook exports
+jest.mock('@/lib/hooks/use-organization', () => ({ useBaseCurrency: () => 'EGP' }));
+
 jest.mock('@/lib/hooks/use-bank-accounts', () => ({
   accountTypeOptions: [
     { value: 'BANK', labelKey: 'accounts.types.bank' },
@@ -114,6 +116,14 @@ describe('BankAccountForm', () => {
     // (validation runs async so we just verify onSubmit wasn't called immediately)
     // The form uses zodResolver which returns async errors
     expect(defaultProps.onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('starts a new account in the organization base currency, never USD (#83)', () => {
+    render(<BankAccountForm {...defaultProps} />);
+    const currency = Array.from(document.querySelectorAll('select')).find((el) =>
+      Array.from(el.options).some((o) => o.value === 'EGP'),
+    ) as HTMLSelectElement;
+    expect(currency.value).toBe('EGP');
   });
 
   it('shows edit mode when account prop is provided', () => {

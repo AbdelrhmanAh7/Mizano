@@ -37,7 +37,10 @@ jest.mock('next-intl', () => {
   };
 });
 
-jest.mock('@/lib/hooks/use-organization', () => ({ useBaseCurrency: () => 'EGP' }));
+jest.mock('@/lib/hooks/use-organization', () => ({
+  useBaseCurrency: () => 'EGP',
+  useMoneyFormat: () => ({ data: { baseCurrency: 'EGP', documentDigits: 'latn' } }),
+}));
 
 const renderDialog = (onSubmit = jest.fn()) =>
   render(<AccountFormDialog open onOpenChange={jest.fn()} accounts={[]} onSubmit={onSubmit} />);

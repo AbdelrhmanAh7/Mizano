@@ -17,14 +17,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  useVATReturns,
-  formatCurrency,
-  normalizeVATReturn,
-  VATReturn,
-  VATPayment,
-} from '@/lib/hooks/use-tax';
+import { useVATReturns, normalizeVATReturn, VATReturn, VATPayment } from '@/lib/hooks/use-tax';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface PaymentRow {
   payment: VATPayment;
@@ -32,6 +27,7 @@ interface PaymentRow {
 }
 
 export default function VATPaymentsPage() {
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('tax');
 

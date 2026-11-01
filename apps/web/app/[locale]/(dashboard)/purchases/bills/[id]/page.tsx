@@ -31,7 +31,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { paymentsMadeApi } from '@/lib/api';
-import { getApiErrorMessage, getLocalizedApiErrorMessage } from '@/lib/api-error';
+import { getApiErrorMessage, getLocalizedApiErrorMessage, isNotFoundError } from '@/lib/api-error';
+import { ErrorState } from '@/components/shared/error-state';
 import {
   compareDecimals,
   isPositiveDecimal,
@@ -41,7 +42,6 @@ import {
 import {
   useBill,
   useApproveBill,
-  formatCurrency,
   getStatusVariant,
   useBillStatusLabel,
 } from '@/lib/hooks/use-bills';
@@ -52,6 +52,7 @@ import { cn } from '@/lib/utils';
 import { isPastDue } from '@/lib/due-date';
 import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 const PAYABLE_STATUSES = ['OPEN', 'OVERDUE', 'PARTIALLY_PAID'];
 
@@ -69,6 +70,7 @@ interface BillDetailPageProps {
 }
 
 export default function BillDetailPage({ params }: BillDetailPageProps) {
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const { id } = params;
   const t = useTranslations('purchases');
@@ -79,7 +81,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
   const { hasPermission } = usePermissions();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data: bill, isLoading } = useBill(id);
+  const { data: bill, isLoading, isError, error, refetch } = useBill(id);
   const approveBill = useApproveBill();
   const [paymentToVoid, setPaymentToVoid] = useState<BillPaymentRow | null>(null);
   const [isVoiding, setIsVoiding] = useState(false);
@@ -137,6 +139,12 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
         <Skeleton className="h-64" />
       </div>
     );
+  }
+
+  // A failed request is not a missing bill: offer Retry, keep "not found" for a real 404 (#83).
+  // A failed background refresh keeps the bill already on screen.
+  if (isError && !bill && !isNotFoundError(error)) {
+    return <ErrorState onRetry={() => void refetch()} />;
   }
 
   if (!bill) {

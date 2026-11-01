@@ -408,12 +408,3 @@ export function getWorkOrderStatusColor(status: WorkOrderStatus): string {
   };
   return colors[status] || '';
 }
-
-export function formatCurrency(amount: number | string | undefined): string {
-  if (amount === undefined || amount === null) return '$0.00';
-  const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(numAmount);
-}
