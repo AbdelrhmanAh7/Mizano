@@ -1,6 +1,9 @@
-# Mizano — accounting automation for accountants
+# Jarda / جردة — accounting automation for accountants
 
-Mizano helps accountants and finance teams turn business documents into traceable accounting records with less manual entry. Egypt is the first pilot market, followed by distinct Saudi Arabia and UAE integrations. Arabic/English and RTL are core requirements.
+> **Jarda: clear books, a faster month-end.** / **جردة: حساباتك واضحة، وإقفال الشهر أسرع.**
+> The product was renamed from Mizano to Jarda on 1 November 2026 ([why](docs/brand/naming.md)). The repository, the `@mizano/*` packages, env variables, database and Docker service names keep the old name on purpose. Everything a person reads (screens, emails, PDFs, AI-app texts) takes the name from one constant, `packages/shared-types/src/brand.ts`; message catalogs write `{brand}`. A test fails if the old name appears in them.
+
+Jarda helps accountants and finance teams turn business documents into traceable accounting records with less manual entry. Egypt is the first pilot market, followed by distinct Saudi Arabia and UAE integrations. Arabic/English and RTL are core requirements.
 
 **Current goal:** a tiny live deployment on a **Raspberry Pi 5 (8GB, arm64)**, tracked by epic **#45**, with the full accountant flow (AP/AR, reports, Arabic/English): Telegram/web → original document → extraction → validated draft → one batch approval → ledger → payments and reconciled reports.
 

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
+import { BRAND } from '@mizano/shared-types';
 import { Suspense } from 'react';
 import { locales, localeDirections, type Locale } from '@/i18n/config';
 import { LocaleDirectionProvider } from '@/components/locale-direction-provider';
@@ -51,7 +52,7 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
-    name: 'Mizano',
+    name: BRAND.name.en,
     applicationCategory: 'BusinessApplication',
     operatingSystem: 'Web',
     description: 'AI-Powered ERP - Autonomous Accounting Platform for zero-touch accounting.',

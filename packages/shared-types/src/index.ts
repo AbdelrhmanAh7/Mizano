@@ -23,6 +23,9 @@ export * from './entities';
 // --- Logger Types ---
 export * from './logger.types';
 
+// --- Brand (the product's public name, one place) ---
+export * from './brand';
+
 // ============================================
 // Backward Compatibility Aliases
 // ============================================

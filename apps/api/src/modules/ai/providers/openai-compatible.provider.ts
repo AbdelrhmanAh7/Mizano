@@ -1,3 +1,4 @@
+import { BRAND } from '@mizano/shared-types';
 import Decimal from 'decimal.js';
 import {
   AiCompletion,
@@ -63,7 +64,7 @@ export class OpenAiCompatibleProvider implements AiProviderAdapter {
 
   private headers(credential: AiCredential): Record<string, string> {
     const headers: Record<string, string> = { authorization: `Bearer ${credential.apiKey ?? ''}` };
-    if (this.id === 'openrouter') headers['x-title'] = 'Mizano';
+    if (this.id === 'openrouter') headers['x-title'] = BRAND.name.en;
     return headers;
   }
 

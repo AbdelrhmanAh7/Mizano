@@ -1,4 +1,5 @@
 import { getRequestConfig } from 'next-intl/server';
+import { brandMessages } from './brand-messages';
 import { locales, type Locale } from './config';
 
 export default getRequestConfig(async ({ requestLocale }) => {
@@ -11,6 +12,6 @@ export default getRequestConfig(async ({ requestLocale }) => {
 
   return {
     locale,
-    messages: (await import(`../messages/${locale}`)).default,
+    messages: brandMessages((await import(`../messages/${locale}`)).default, locale),
   };
 });

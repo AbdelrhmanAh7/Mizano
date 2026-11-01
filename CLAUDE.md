@@ -1,4 +1,6 @@
-# CLAUDE.md — Mizano ERP
+# CLAUDE.md — Jarda (code name Mizano)
+
+The product is called **Jarda / جردة** (renamed 1 Nov 2026); the repo, `@mizano/*` packages, env vars, database and Docker names keep "Mizano". Never type the product name in user-facing text: read `BRAND` from `@mizano/shared-types` (`packages/shared-types/src/brand.ts`) in code and write `{brand}` / `{brandSlug}` in `apps/web/messages/**`. `apps/web/lib/brand.spec.ts` and `apps/api/src/common/brand.spec.ts` enforce it.
 
 Accountant-first accounting ERP for Egypt, Saudi Arabia and the UAE. Current goal: a tiny live deployment on a Raspberry Pi 5 (8GB, arm64) with the full accountant flow (ledger, invoice intake, Telegram ingestion). Read [AGENTS.md](AGENTS.md), [agent operations](docs/agents/README.md) and [review lessons](docs/agents/review-lessons.md) first; these supersede historical product/deployment assumptions below.
 
@@ -239,11 +241,11 @@ Owner decision (31 Oct 2026); design and feature inventory: [docs/plans/ai-own-a
 
 ## Docs Reference
 
-| File                                                                   | Contents                                                            |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)                         | System design, modules, domain rules, folder structure, adding code |
-| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)                           | Setup, 4-env system, database, testing, CI, hooks, deployment       |
-| [`docs/DESIGN-SYSTEM.md`](docs/DESIGN-SYSTEM.md)                       | Tokens, components, UI patterns, RTL, money display                 |
-| [`docs/roadmap.md`](docs/roadmap.md)                                   | Raspberry Pi live plan (older milestones P1–P4, closed; now "First client ready" and "First month")                           |
-| [`docs/strategy/demo-acceptance.md`](docs/strategy/demo-acceptance.md) | Demo go/no-go contract                                              |
-| [`docs/strategy/`](docs/strategy/)                                     | Vision, repository review, extraction and regional research         |
+| File                                                                   | Contents                                                                                            |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)                         | System design, modules, domain rules, folder structure, adding code                                 |
+| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)                           | Setup, 4-env system, database, testing, CI, hooks, deployment                                       |
+| [`docs/DESIGN-SYSTEM.md`](docs/DESIGN-SYSTEM.md)                       | Tokens, components, UI patterns, RTL, money display                                                 |
+| [`docs/roadmap.md`](docs/roadmap.md)                                   | Raspberry Pi live plan (older milestones P1–P4, closed; now "First client ready" and "First month") |
+| [`docs/strategy/demo-acceptance.md`](docs/strategy/demo-acceptance.md) | Demo go/no-go contract                                                                              |
+| [`docs/strategy/`](docs/strategy/)                                     | Vision, repository review, extraction and regional research                                         |

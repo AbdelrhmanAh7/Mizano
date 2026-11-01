@@ -1,3 +1,4 @@
+import { BRAND } from '@mizano/shared-types';
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { McpClient, Prisma, UserStatus } from '@prisma/client';
@@ -121,7 +122,7 @@ export class McpOAuthService {
       authorization_servers: [issuer],
       scopes_supported: ACCESS_SCOPES.drafts,
       bearer_methods_supported: ['header'],
-      resource_name: 'Mizano',
+      resource_name: BRAND.name.en,
     };
   }
 
