@@ -48,11 +48,11 @@ describe('VendorsService.create currency (#83)', () => {
   beforeEach(() => {
     prisma = createMockPrisma();
     service = new VendorsService(prisma as unknown as PrismaService);
-    prisma.vendor.create.mockResolvedValue({ id: 'v-1' });
+    prisma.vendor.create.mockResolvedValue({ id: 'v-1' } as never);
   });
 
   it('uses the organization base currency when none is sent, never the USD default', async () => {
-    prisma.organization.findUnique.mockResolvedValue({ baseCurrency: 'EGP' });
+    prisma.organization.findUnique.mockResolvedValue({ baseCurrency: 'EGP' } as never);
 
     await service.create('org-1', { name: 'Nile Supplies' });
 
