@@ -196,31 +196,44 @@ export class ReconciliationService {
       return Math.min(99, confidence);
     };
 
+    // Separate bounded pools, strongest first, so newer weaker candidates never crowd out a payment
+    // named on the line or one of the payee: named (whatever its date), payee, then the date window.
+    const party = payee ? { name: { contains: payee, mode: 'insensitive' as const } } : null;
     if (transaction.type === BankTransactionType.DEPOSIT) {
-      const payments = await this.prisma.paymentReceived.findMany({
-        ...query,
-        where: {
-          ...base,
-          depositToAccountId: linkedAccountId,
-          OR: [{ date: dated }, ...named],
-        },
-        include: { customer: { select: { id: true, name: true } } },
-      });
+      const where = { ...base, depositToAccountId: linkedAccountId };
+      const include = { customer: { select: { id: true, name: true } } };
+      const pools = [
+        { ...where, OR: named },
+        ...(party ? [{ ...where, date: dated, customer: party }] : []),
+        { ...where, date: dated },
+      ];
+      const payments = uniqueById(
+        (
+          await Promise.all(
+            pools.map((w) => this.prisma.paymentReceived.findMany({ ...query, where: w, include })),
+          )
+        ).flat(),
+      );
       return payments.map((payment) => ({
         type: 'payment_received' as const,
         entity: payment,
         confidence: score({ ...payment, partyName: payment.customer.name }),
       }));
     }
-    const payments = await this.prisma.paymentMade.findMany({
-      ...query,
-      where: {
-        ...base,
-        paidFromAccountId: linkedAccountId,
-        OR: [{ date: dated }, ...named],
-      },
-      include: { vendor: { select: { id: true, name: true } } },
-    });
+    const where = { ...base, paidFromAccountId: linkedAccountId };
+    const include = { vendor: { select: { id: true, name: true } } };
+    const pools = [
+      { ...where, OR: named },
+      ...(party ? [{ ...where, date: dated, vendor: party }] : []),
+      { ...where, date: dated },
+    ];
+    const payments = uniqueById(
+      (
+        await Promise.all(
+          pools.map((w) => this.prisma.paymentMade.findMany({ ...query, where: w, include })),
+        )
+      ).flat(),
+    );
     return payments.map((payment) => ({
       type: 'payment_made' as const,
       entity: payment,

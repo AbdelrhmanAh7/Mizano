@@ -89,6 +89,46 @@ describe('Reconciliation of payments already in the books (#635)', () => {
       expect(where.OR).toContainEqual({
         paymentNumber: { in: ['PMT-001', 'QA', 'Customer', 'receipt'] },
       });
+      // The named pool has no date window: a payment named on the line is offered whatever its age.
+      expect(where.date).toBeUndefined();
+    });
+
+    it('keeps a payment named on the line when 200 newer payments of the same amount exist', async () => {
+      prisma.bankTransaction.findMany.mockResolvedValue([deposit]);
+      const newer = Array.from({ length: 200 }, (_, i) => ({
+        ...receipt,
+        id: `newer-${i}`,
+        paymentNumber: `PMT-${1000 + i}`,
+        date: new Date('2026-10-20T00:00:00.000Z'),
+      }));
+      const old = { ...receipt, date: new Date('2025-01-01T00:00:00.000Z') };
+      // Pools in order: named, then the date window (no payee on this line).
+      prisma.paymentReceived.findMany.mockResolvedValueOnce([old]).mockResolvedValueOnce(newer);
+
+      const [row] = await service.getSuggestions(ORG, 'ba1');
+
+      expect(prisma.paymentReceived.findMany).toHaveBeenCalledTimes(2);
+      const windowWhere = prisma.paymentReceived.findMany.mock.calls[1][0].where;
+      expect(windowWhere.date.gte.toISOString()).toBe('2026-09-17T00:00:00.000Z');
+      expect(windowWhere.OR).toBeUndefined();
+      expect(row.matches[0]).toMatchObject({ entity: { id: 'pr1' }, confidence: 100 });
+      expect(row.matches).toHaveLength(5);
+    });
+
+    it('fetches the payee pool on its own when the line names one', async () => {
+      prisma.bankTransaction.findMany.mockResolvedValue([{ ...deposit, payee: 'qa customer' }]);
+      prisma.paymentReceived.findMany.mockResolvedValue([]);
+
+      await service.getSuggestions(ORG, 'ba1');
+
+      const wheres = prisma.paymentReceived.findMany.mock.calls.map((c: any[]) => c[0].where);
+      expect(wheres).toHaveLength(3);
+      expect(wheres[1].customer).toEqual({
+        name: { contains: 'qa customer', mode: 'insensitive' },
+      });
+      for (const w of wheres) {
+        expect(w).toMatchObject({ organizationId: ORG, deletedAt: null, bankTransactionId: null });
+      }
     });
 
     it('offers recorded supplier payments for a withdrawal by its absolute amount', async () => {
