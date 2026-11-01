@@ -59,6 +59,13 @@ interface UpdateAccountData {
 }
 
 /**
+ * Parameters for an account picker: the whole chart in code order. The list endpoint returns 20
+ * rows by default, which cut the 35-account starter chart off before tax, bank and equity
+ * accounts (500 is the endpoint's maximum).
+ */
+export const ACCOUNT_PICKER_PARAMS = { limit: 500, sortBy: 'code', sortOrder: 'asc' } as const;
+
+/**
  * Hook to fetch all accounts with pagination
  */
 export function useAccounts(params?: AccountParams) {

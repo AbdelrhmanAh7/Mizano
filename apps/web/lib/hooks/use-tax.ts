@@ -4,7 +4,8 @@ import api from '@/lib/api';
 
 // ============ Types ============
 
-export type TaxRateType = 'OUTPUT' | 'INPUT' | 'BOTH';
+/** Same values as the API's TaxType enum. */
+export type TaxRateType = 'SALES' | 'PURCHASES' | 'BOTH';
 export type VATReturnStatus = 'DRAFT' | 'CALCULATED' | 'SUBMITTED' | 'FILED';
 
 export interface TaxRate {
@@ -13,8 +14,9 @@ export interface TaxRate {
   description?: string;
   rate: number | string;
   type: TaxRateType;
-  accountId: string;
-  account?: {
+  /** The ledger account the tax posts to (API field names). */
+  linkedAccountId: string;
+  linkedAccount?: {
     id: string;
     name: string;
     code: string;
@@ -29,6 +31,16 @@ export interface TaxRate {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Body of POST/PUT /tax-rates: the rate is a decimal string (at most 2 decimals). */
+export interface TaxRateInput {
+  name: string;
+  rate: string;
+  type: TaxRateType;
+  linkedAccountId: string;
+  isDefault: boolean;
+  isActive: boolean;
 }
 
 export interface VATReturn {
@@ -88,11 +100,11 @@ const taxRatesApi = {
     const response = await api.get(`/tax-rates/${id}`);
     return response.data;
   },
-  create: async (data: Partial<TaxRate>) => {
+  create: async (data: TaxRateInput) => {
     const response = await api.post('/tax-rates', data);
     return response.data;
   },
-  update: async ({ id, data }: { id: string; data: Partial<TaxRate> }) => {
+  update: async ({ id, data }: { id: string; data: Partial<TaxRateInput> }) => {
     const response = await api.put(`/tax-rates/${id}`, data);
     return response.data;
   },

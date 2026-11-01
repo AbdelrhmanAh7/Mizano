@@ -114,6 +114,22 @@ describe('AccountingReportsService', () => {
       expect(result.isBalanced).toBe(false);
     });
 
+    it('carries both languages of each account so Arabic screens show Arabic names (#598)', async () => {
+      prisma.account.findMany.mockResolvedValue([
+        { ...ACCOUNTS[0], nameAr: 'النقدية', nameEn: 'Cash' },
+      ] as never);
+      prisma.journalLine.groupBy.mockResolvedValue([
+        { accountId: 'cash', _sum: { debit: D('10'), credit: D('0') } },
+      ] as never);
+
+      const result = await service.getTrialBalance(ORG_ID);
+
+      expect(prisma.account.findMany.mock.calls[0][0]?.select).toEqual(
+        expect.objectContaining({ nameAr: true, nameEn: true }),
+      );
+      expect(result.accounts[0]).toMatchObject({ nameAr: 'النقدية', nameEn: 'Cash' });
+    });
+
     it('omits zero-balance accounts', async () => {
       ledger([{ accountId: 'cash', debit: '10', credit: '10' }]);
       expect((await service.getTrialBalance(ORG_ID)).accounts).toEqual([]);

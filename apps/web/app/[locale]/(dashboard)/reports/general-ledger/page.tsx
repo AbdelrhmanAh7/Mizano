@@ -29,7 +29,7 @@ import {
 } from '@/components/reports/report-page';
 import { useGeneralLedgerReport } from '@/lib/hooks/use-reports';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
-import { useAccounts } from '@/lib/hooks/use-accounts';
+import { useAccounts, ACCOUNT_PICKER_PARAMS } from '@/lib/hooks/use-accounts';
 import { useDateFnsLocale } from '@/lib/date-locale';
 
 export default function GeneralLedgerPage() {
@@ -44,7 +44,7 @@ export default function GeneralLedgerPage() {
   });
   const [accountId, setAccountId] = useState('');
 
-  const { data: accounts } = useAccounts();
+  const { data: accounts } = useAccounts(ACCOUNT_PICKER_PARAMS);
   const { data: ledger, isLoading } = useGeneralLedgerReport(accountId, {
     startDate: format(dateRange.startDate, 'yyyy-MM-dd'),
     endDate: format(dateRange.endDate, 'yyyy-MM-dd'),

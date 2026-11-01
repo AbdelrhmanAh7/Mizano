@@ -77,6 +77,23 @@ describe('recording a payment received', () => {
     expect(mockPush).toHaveBeenCalledWith('/sales/payments/pay-1');
   });
 
+  it('a double click or retry on one screen sends the same key, a new screen a new one (#598 C03)', async () => {
+    mockMutateAsync.mockRejectedValueOnce(new Error('network')).mockResolvedValue({ id: 'pay-1' });
+    const { unmount } = render(<NewPaymentReceivedPage />);
+    fireEvent.click(screen.getByText('submit'));
+    fireEvent.click(screen.getByText('submit'));
+    await waitFor(() => expect(mockMutateAsync).toHaveBeenCalledTimes(2));
+    const [first, retry] = mockMutateAsync.mock.calls.map((call) => call[0].idempotencyKey);
+    expect(first).toEqual(expect.any(String));
+    expect(retry).toBe(first);
+    unmount();
+
+    render(<NewPaymentReceivedPage />);
+    fireEvent.click(screen.getByText('submit'));
+    await waitFor(() => expect(mockMutateAsync).toHaveBeenCalledTimes(3));
+    expect(mockMutateAsync.mock.calls[2][0].idempotencyKey).not.toBe(first);
+  });
+
   it('allocations balance only when they equal the payment exactly, like the API', () => {
     expect(
       validateAllocations('531.87', [{ amount: '331.87' }, { amount: '200.00' }]).isValid,

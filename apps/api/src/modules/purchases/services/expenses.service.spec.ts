@@ -85,3 +85,22 @@ describe('ExpensesService.findAll', () => {
     });
   });
 });
+
+describe('ExpensesService account pickers (#598 C04: seeded accounts showed in English)', () => {
+  it('selects both languages so seeded accounts are answered in the request language', async () => {
+    const accountFindMany = jest.fn().mockResolvedValue([]);
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ExpensesService,
+        { provide: PrismaService, useValue: { account: { findMany: accountFindMany } } },
+        { provide: JournalsService, useValue: {} },
+      ],
+    }).compile();
+
+    await module.get(ExpensesService).expenseAccounts('org-1');
+
+    expect(accountFindMany.mock.calls[0][0].select).toEqual(
+      expect.objectContaining({ nameAr: true, nameEn: true }),
+    );
+  });
+});

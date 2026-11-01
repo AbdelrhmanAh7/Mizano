@@ -122,14 +122,15 @@ export function useCreateCreditNote() {
 }
 
 /**
- * Get credit note type label
+ * Message key (namespace `sales`) of a credit note type label, so every screen shows it in the
+ * request language.
  */
-export function getCreditNoteTypeLabel(type: CreditNoteType): string {
-  const labelMap: Record<CreditNoteType, string> = {
-    REFUND: 'Refund',
-    APPLY_TO_INVOICE: 'Apply to Invoice',
-  };
-  return labelMap[type] || type;
+export function creditNoteTypeKey(
+  type: CreditNoteType,
+): 'creditNotes.types.refund' | 'creditNotes.types.applyToInvoice' {
+  return type === 'APPLY_TO_INVOICE'
+    ? 'creditNotes.types.applyToInvoice'
+    : 'creditNotes.types.refund';
 }
 
 /**

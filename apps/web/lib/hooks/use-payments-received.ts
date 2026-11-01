@@ -74,6 +74,8 @@ export interface PaymentReceivedParams {
 }
 
 export interface CreatePaymentReceivedData {
+  /** Same key on every retry of one "record payment" action: the server records it once. */
+  idempotencyKey?: string;
   customerId: string;
   date: string;
   amount: string;

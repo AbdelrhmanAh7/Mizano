@@ -66,6 +66,12 @@ export default function TrialBalancePage() {
   const [asOfDate, setAsOfDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const { data, isLoading, isError, refetch } = useTrialBalance(asOfDate);
 
+  /** ASSET → "أصول": the API sends the enum value, the label comes from the catalog. */
+  const accountTypeLabel = (type: string): string => {
+    const key = `accounts.types.${type.toLowerCase()}`;
+    return t.has(key) ? t(key) : type;
+  };
+
   const response = (data ?? {}) as TrialBalanceResponse;
   const rows: TrialBalanceRow[] = (response.accounts ?? []).map((a) => ({
     accountId: a.id ?? a.accountId ?? '',
@@ -180,7 +186,7 @@ export default function TrialBalancePage() {
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{row.accountType}</Badge>
+                      <Badge variant="outline">{accountTypeLabel(row.accountType)}</Badge>
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {formatAmount(row.debit)}

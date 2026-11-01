@@ -1125,6 +1125,9 @@ model PaymentReceived {
   depositToAccountId String
   reference          String?
   notes              String?
+  /// Sent by the client once per "record payment" action; a retry with the same key returns
+  /// this payment instead of settling the invoices twice.
+  idempotencyKey     String?
   organizationId     String
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
@@ -1136,6 +1139,7 @@ model PaymentReceived {
   allocations  PaymentAllocation[]
 
   @@unique([paymentNumber, organizationId])
+  @@unique([organizationId, idempotencyKey])
   @@index([organizationId])
   @@index([customerId])
   @@index([organizationId, deletedAt])
@@ -1337,6 +1341,8 @@ model PaymentMade {
   paidFromAccountId String
   reference         String?
   notes             String?
+  /// Same retry protection as PaymentReceived.idempotencyKey.
+  idempotencyKey    String?
   organizationId    String
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
@@ -1348,6 +1354,7 @@ model PaymentMade {
   allocations  BillAllocation[]
 
   @@unique([paymentNumber, organizationId])
+  @@unique([organizationId, idempotencyKey])
   @@index([organizationId])
   @@index([vendorId])
   @@index([organizationId, deletedAt])

@@ -7,9 +7,19 @@ import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { runBulk } from '../../../common/utils/run-bulk';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
+import {
+  assertSamePaymentRetry,
+  isIdempotencyKeyConflict,
+} from '../../../common/utils/payment-idempotency';
 import { CreatePaymentMadeDto } from '../dto/create-payment-made.dto';
 import { PaymentMadeQueryDto } from '../dto/payment-made-query.dto';
 import { BillsService, PAYABLE_BILL_STATUSES } from './bills.service';
+
+/** What create returns for a new payment and for a retry of it. */
+const PAYMENT_MADE_INCLUDE = {
+  vendor: { select: { id: true, name: true } },
+  allocations: true,
+} satisfies Prisma.PaymentMadeInclude;
 
 export interface PayInFullOptions {
   paidFromAccountId?: string;
@@ -41,6 +51,8 @@ export class PaymentsMadeService {
   /**
    * Records a vendor payment: allocations, bill balances and the Dr AP / Cr bank journal
    * commit in one transaction. Bills are row-locked so concurrent payments cannot overpay.
+   * A retry carrying the same `idempotencyKey` returns the payment already recorded (see
+   * common/utils/payment-idempotency.ts) instead of paying the bills twice.
    */
   async create(
     organizationId: string,
@@ -63,6 +75,35 @@ export class PaymentsMadeService {
 
     const date = new Date(dto.date);
     if (Number.isNaN(date.getTime())) throw new BadRequestException('Invalid payment date');
+    const idempotencyKey = dto.idempotencyKey;
+    /** The payment an earlier request with this key recorded, if any. */
+    const recorded = async (client: Prisma.TransactionClient) => {
+      if (!idempotencyKey) return null;
+      const prior = await client.paymentMade.findFirst({
+        where: { organizationId, idempotencyKey },
+        include: PAYMENT_MADE_INCLUDE,
+      });
+      if (!prior) return null;
+      assertSamePaymentRetry(
+        {
+          partyId: prior.vendorId,
+          amount: prior.amount,
+          date: prior.date,
+          paymentMode: prior.paymentMode,
+          accountId: prior.paidFromAccountId,
+          allocations: prior.allocations.map((a) => ({ documentId: a.billId, amount: a.amount })),
+        },
+        {
+          partyId: dto.vendorId,
+          amount,
+          date,
+          paymentMode: dto.paymentMode,
+          accountId: dto.paidFromAccountId,
+          allocations: allocations.map((a) => ({ documentId: a.billId, amount: a.amount })),
+        },
+      );
+      return prior;
+    };
 
     const run = async (tx: Prisma.TransactionClient) => {
       const vendor = await tx.vendor.findFirst({
@@ -88,6 +129,9 @@ export class PaymentsMadeService {
       }
 
       await this.billsService.lockBills(tx, organizationId, billIds);
+      // After the bill locks: a concurrent request with this key has committed by now.
+      const prior = await recorded(tx);
+      if (prior) return prior;
       const bills = await tx.bill.findMany({
         where: { id: { in: billIds }, organizationId, deletedAt: null },
       });
@@ -118,12 +162,13 @@ export class PaymentsMadeService {
           paidFromAccountId: dto.paidFromAccountId,
           reference: dto.reference,
           notes: dto.notes,
+          idempotencyKey,
           organizationId,
           allocations: {
             create: allocations.map((a) => ({ billId: a.billId, amount: a.amount })),
           },
         },
-        include: { vendor: { select: { id: true, name: true } }, allocations: true },
+        include: PAYMENT_MADE_INCLUDE,
       });
 
       for (const billId of billIds) {
@@ -157,7 +202,17 @@ export class PaymentsMadeService {
       return payment;
     };
 
-    return options.tx ? run(options.tx) : this.prisma.$transaction(run);
+    if (options.tx) return run(options.tx);
+    try {
+      return await this.prisma.$transaction(run);
+    } catch (error) {
+      // A retry that raced past the lookup lost on the unique key: answer with the winner.
+      if (idempotencyKey && isIdempotencyKeyConflict(error)) {
+        const prior = await recorded(this.prisma);
+        if (prior) return prior;
+      }
+      throw error;
+    }
   }
 
   /** Pays the full remaining balance of one bill (used by bulk pay). */

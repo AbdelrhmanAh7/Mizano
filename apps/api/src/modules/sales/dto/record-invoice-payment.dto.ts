@@ -1,7 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PaymentMode } from '@prisma/client';
-import { IsDateString, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsDateString, IsEnum, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import { IsDecimalString } from '../../../common/dto/decimal-string';
+import { PAYMENT_IDEMPOTENCY_KEY_PATTERN } from '../../../common/utils/payment-idempotency';
 
 /** Body of POST /invoices/:id/record-payment: one payment allocated to that single invoice. */
 export class RecordInvoicePaymentDto {
@@ -31,4 +32,13 @@ export class RecordInvoicePaymentDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) reference?: string;
 
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) notes?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'One key per "record payment" action, resent unchanged on retries: a retry returns the payment already recorded instead of recording it twice',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(PAYMENT_IDEMPOTENCY_KEY_PATTERN)
+  idempotencyKey?: string;
 }

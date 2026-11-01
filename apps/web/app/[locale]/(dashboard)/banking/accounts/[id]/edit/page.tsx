@@ -9,6 +9,7 @@ import { BankAccountForm } from '@/components/banking/bank-account-form';
 import { useBankAccount, useUpdateBankAccount } from '@/lib/hooks/use-bank-accounts';
 import { useQuery } from '@tanstack/react-query';
 import { accountsApi } from '@/lib/api';
+import { ACCOUNT_PICKER_PARAMS } from '@/lib/hooks/use-accounts';
 import { useTranslations } from 'next-intl';
 
 interface EditBankAccountPageProps {
@@ -36,7 +37,7 @@ export default function EditBankAccountPage({ params }: EditBankAccountPageProps
   } = useQuery({
     queryKey: ['accounts', { type: 'ASSET' }],
     queryFn: async () => {
-      const response = await accountsApi.getAll({ type: 'ASSET' });
+      const response = await accountsApi.getAll({ ...ACCOUNT_PICKER_PARAMS, type: 'ASSET' });
       return response.data;
     },
   });
