@@ -2,6 +2,9 @@ import type { MetadataRoute } from 'next';
 import { locales } from '@/i18n/config';
 import { siteUrl } from '@/lib/site-url';
 
+// Rendered per request so the address comes from the running deployment, not the build machine.
+export const dynamic = 'force-dynamic';
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = siteUrl();
 
