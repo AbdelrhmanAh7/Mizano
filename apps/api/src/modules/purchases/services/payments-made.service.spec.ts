@@ -132,6 +132,24 @@ describe('PaymentsMadeService (posting)', () => {
     ]);
   });
 
+  it('returns the recorded payment on a retry with the same key without paying again', async () => {
+    const keyed = { ...dto, idempotencyKey: 'vpay-key-1' };
+    prisma.paymentMade.findFirst.mockResolvedValueOnce(null);
+    await service.create(ORG, keyed);
+    expect(prisma.paymentMade.create.mock.calls[0][0].data.idempotencyKey).toBe('vpay-key-1');
+
+    const stored = { id: 'p1', vendorId: 'v1', amount: dec('100') };
+    prisma.paymentMade.findFirst.mockResolvedValueOnce(stored);
+    await expect(service.create(ORG, keyed)).resolves.toBe(stored);
+
+    expect(prisma.paymentMade.create).toHaveBeenCalledTimes(1);
+    expect(bills.recalculateBalance).toHaveBeenCalledTimes(1);
+    expect(journals.create).toHaveBeenCalledTimes(1);
+
+    prisma.paymentMade.findFirst.mockResolvedValueOnce({ ...stored, vendorId: 'other' });
+    await expect(service.create(ORG, keyed)).rejects.toThrow('different details');
+  });
+
   it('rejects an allocation above the bill balance without writing anything', async () => {
     await expect(
       service.create(ORG, {

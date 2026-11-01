@@ -6,7 +6,8 @@
  */
 const pending = new Map<string, string>();
 
-function randomKey(): string {
+/** A fresh key, e.g. one per opened "record payment" screen (kept for its retries). */
+export function newIdempotencyKey(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
@@ -21,7 +22,7 @@ function randomKey(): string {
 export function idempotencyKeyFor(scope: string): string {
   const existing = pending.get(scope);
   if (existing) return existing;
-  const key = randomKey();
+  const key = newIdempotencyKey();
   pending.set(scope, key);
   return key;
 }

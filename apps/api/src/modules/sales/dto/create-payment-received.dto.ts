@@ -6,12 +6,14 @@ import {
   ValidateNested,
   ArrayMinSize,
   IsOptional,
+  Matches,
   MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PaymentMode } from '@prisma/client';
 import { IsDecimalString } from '../../../common/dto/decimal-string';
+import { PAYMENT_IDEMPOTENCY_KEY_PATTERN } from '../../../common/utils/payment-idempotency';
 
 export class PaymentAllocationDto {
   @IsString() invoiceId: string;
@@ -37,4 +39,13 @@ export class CreatePaymentReceivedDto {
   @ArrayMinSize(1)
   @Type(() => PaymentAllocationDto)
   allocations: PaymentAllocationDto[];
+
+  @ApiPropertyOptional({
+    description:
+      'One key per "record payment" action, resent unchanged on retries: a retry returns the payment already recorded instead of recording it twice',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(PAYMENT_IDEMPOTENCY_KEY_PATTERN)
+  idempotencyKey?: string;
 }

@@ -98,6 +98,65 @@ describe('PaymentsReceivedService', () => {
       ]);
     });
 
+    describe('retry protection (#598 C03: a double click recorded the receipt twice)', () => {
+      const keyed = { ...validDto, idempotencyKey: 'pay-key-1' };
+      const stored = { id: 'pmt-1', customerId: 'cust-test-001', amount: dec('400') };
+
+      it('stores the key and returns the recorded payment on a retry without settling again', async () => {
+        prisma.paymentReceived.findFirst.mockResolvedValueOnce(null);
+        const first = await service.create(ORG_ID, keyed);
+        expect((prisma.paymentReceived.create.mock.calls[0][0].data as any).idempotencyKey).toBe(
+          'pay-key-1',
+        );
+
+        prisma.paymentReceived.findFirst.mockResolvedValueOnce(stored as any);
+        const retry = await service.create(ORG_ID, keyed);
+
+        expect(retry).toBe(stored);
+        expect(first).toMatchObject({ id: 'pmt-1' });
+        expect(prisma.paymentReceived.create).toHaveBeenCalledTimes(1);
+        expect(invoicesService.recalculateBalance).toHaveBeenCalledTimes(1);
+        expect(journalsService.create).toHaveBeenCalledTimes(1);
+        expect(prisma.paymentReceived.findFirst).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            where: { organizationId: ORG_ID, idempotencyKey: 'pay-key-1' },
+          }),
+        );
+      });
+
+      it('refuses a key reused for a different amount', async () => {
+        prisma.paymentReceived.findFirst.mockResolvedValueOnce({
+          ...stored,
+          amount: dec('300'),
+        } as any);
+
+        await expect(service.create(ORG_ID, keyed)).rejects.toThrow(
+          'This payment was already recorded with different details',
+        );
+        expect(prisma.paymentReceived.create).not.toHaveBeenCalled();
+        expect(journalsService.create).not.toHaveBeenCalled();
+      });
+
+      it('answers a concurrent retry that lost on the unique key with the first payment', async () => {
+        const { Prisma } = jest.requireActual('@prisma/client');
+        (prisma.$transaction as jest.Mock).mockRejectedValueOnce(
+          new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+            code: 'P2002',
+            clientVersion: 'test',
+            meta: { target: ['organizationId', 'idempotencyKey'] },
+          }),
+        );
+        prisma.paymentReceived.findFirst.mockResolvedValueOnce(stored as any);
+
+        await expect(service.create(ORG_ID, keyed)).resolves.toBe(stored);
+      });
+
+      it('leaves payments without a key unchanged (no lookup)', async () => {
+        await service.create(ORG_ID, validDto);
+        expect(prisma.paymentReceived.findFirst).not.toHaveBeenCalled();
+      });
+    });
+
     it('stores the payment amount and allocations as Decimal', async () => {
       await service.create(ORG_ID, validDto);
 

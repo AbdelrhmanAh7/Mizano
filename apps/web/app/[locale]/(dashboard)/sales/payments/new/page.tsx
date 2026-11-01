@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -10,6 +11,7 @@ import {
   useCreatePaymentReceived,
   type CreatePaymentReceivedData,
 } from '@/lib/hooks/use-payments-received';
+import { newIdempotencyKey } from '@/lib/utils/idempotency';
 
 export default function NewPaymentReceivedPage() {
   const router = useRouter();
@@ -19,11 +21,13 @@ export default function NewPaymentReceivedPage() {
   const invoiceId = searchParams.get('invoiceId') || undefined;
 
   const createPayment = useCreatePaymentReceived();
+  // One key for this screen: a double click or a retry after an error is recorded only once.
+  const [idempotencyKey] = useState(newIdempotencyKey);
 
   // The form sends the API payload (ticked invoices only); pass it through unchanged.
   const handleSubmit = async (payload: CreatePaymentReceivedData) => {
     try {
-      const result = await createPayment.mutateAsync(payload);
+      const result = await createPayment.mutateAsync({ ...payload, idempotencyKey });
       router.push(`/sales/payments/${result.id}`);
     } catch {
       // Error is handled by the mutation

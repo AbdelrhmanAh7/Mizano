@@ -65,6 +65,8 @@ export interface PaymentMadeParams {
 }
 
 export interface CreatePaymentMadeData {
+  /** Same key on every retry of one "record payment" action: the server records it once. */
+  idempotencyKey?: string;
   vendorId: string;
   date: string;
   /** Decimal string; money never travels as a JS number (#83). */

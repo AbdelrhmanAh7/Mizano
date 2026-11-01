@@ -8,6 +8,10 @@ import { runBulk } from '../../../common/utils/run-bulk';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
 import { WebhookOutboxService } from '../../integrations/services/webhook-outbox.service';
+import {
+  assertSamePaymentRetry,
+  isIdempotencyKeyConflict,
+} from '../../../common/utils/payment-idempotency';
 import { CreatePaymentReceivedDto } from '../dto/create-payment-received.dto';
 import { PaymentReceivedQueryDto } from '../dto/payment-received-query.dto';
 import { RecordInvoicePaymentDto } from '../dto/record-invoice-payment.dto';
@@ -42,6 +46,8 @@ export class PaymentsReceivedService {
   /**
    * Records a customer payment: allocations, invoice balances and the Dr bank / Cr AR journal
    * commit in one transaction. Invoices are row-locked so concurrent payments cannot overpay.
+   * A retry carrying the same `idempotencyKey` returns the payment already recorded (see
+   * common/utils/payment-idempotency.ts) instead of settling the invoices twice.
    */
   async create(
     organizationId: string,
@@ -62,6 +68,21 @@ export class PaymentsReceivedService {
       throw new BadRequestException('Allocation must equal payment');
     }
     const date = parseDocumentDate(dto.date, 'payment date');
+    const idempotencyKey = dto.idempotencyKey;
+    /** The payment an earlier request with this key recorded, if any. */
+    const recorded = async (client: Prisma.TransactionClient) => {
+      if (!idempotencyKey) return null;
+      const prior = await client.paymentReceived.findFirst({
+        where: { organizationId, idempotencyKey },
+        include: PAYMENT_VIEW_INCLUDE,
+      });
+      if (!prior) return null;
+      assertSamePaymentRetry(
+        { amount: prior.amount, partyId: prior.customerId },
+        { amount, partyId: dto.customerId },
+      );
+      return prior;
+    };
 
     const run = async (tx: Prisma.TransactionClient) => {
       const customer = await tx.customer.findFirst({
@@ -87,6 +108,9 @@ export class PaymentsReceivedService {
       }
 
       await this.invoicesService.lockInvoices(tx, organizationId, invoiceIds);
+      // After the invoice locks: a concurrent request with this key has committed by now.
+      const prior = await recorded(tx);
+      if (prior) return prior;
       const invoices = await tx.invoice.findMany({
         where: { id: { in: invoiceIds }, organizationId, deletedAt: null },
       });
@@ -119,6 +143,7 @@ export class PaymentsReceivedService {
           depositToAccountId: dto.depositToAccountId,
           reference: dto.reference,
           notes: dto.notes,
+          idempotencyKey,
           organizationId,
           allocations: {
             create: allocations.map((a) => ({ invoiceId: a.invoiceId, amount: a.amount })),
@@ -162,6 +187,11 @@ export class PaymentsReceivedService {
     try {
       return await (options.tx ? run(options.tx) : this.prisma.$transaction(run));
     } catch (error) {
+      // A retry that raced past the lookup lost on the unique key: answer with the winner.
+      if (!options.tx && idempotencyKey && isIdempotencyKeyConflict(error)) {
+        const prior = await recorded(this.prisma);
+        if (prior) return prior;
+      }
       throw mapDocumentNumberConflict(error, 'Payment');
     }
   }
@@ -190,6 +220,7 @@ export class PaymentsReceivedService {
       depositToAccountId,
       reference: dto.reference,
       notes: dto.notes,
+      idempotencyKey: dto.idempotencyKey,
       allocations: [{ invoiceId: invoice.id, amount: dto.amount }],
     });
   }

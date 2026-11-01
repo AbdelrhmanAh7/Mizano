@@ -972,6 +972,11 @@ const SALES_ERRORS: ErrorCatalogEntry[] = [
     ar: 'الفاتورة {number} غير مفتوحة لإصدار إشعار دائن.',
   },
   {
+    code: 'PAYMENT_RETRY_MISMATCH',
+    en: 'This payment was already recorded with different details',
+    ar: 'سُجِّلت هذه الدفعة من قبل ببيانات مختلفة. افتح قائمة المدفوعات للتأكد قبل تسجيلها مرة أخرى.',
+  },
+  {
     code: 'INVOICE_ALLOCATION_EXCEEDS_BALANCE',
     en: 'Allocation exceeds the balance due on invoice {number}',
     ar: 'المبلغ المخصّص أكبر من الرصيد المستحق على الفاتورة {number}.',

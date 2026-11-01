@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -9,12 +10,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { PaymentMadeForm } from '@/components/purchases/payment-made-form';
 import { useCreatePaymentMade, type CreatePaymentMadeData } from '@/lib/hooks/use-payments-made';
 import { useBankAccounts } from '@/lib/hooks/use-bank-accounts';
+import { newIdempotencyKey } from '@/lib/utils/idempotency';
 
 export default function NewPaymentMadePage() {
   const router = useRouter();
   const t = useTranslations('purchases');
   const searchParams = useSearchParams();
   const createPayment = useCreatePaymentMade();
+  // One key for this screen: a double click or a retry after an error is recorded only once.
+  const [idempotencyKey] = useState(newIdempotencyKey);
 
   // Get preselected vendor and bill from query params
   const preselectedVendorId = searchParams.get('vendorId') || undefined;
@@ -29,7 +33,7 @@ export default function NewPaymentMadePage() {
 
   const handleSubmit = async (data: CreatePaymentMadeData) => {
     try {
-      await createPayment.mutateAsync(data);
+      await createPayment.mutateAsync({ ...data, idempotencyKey });
       router.push('/purchases/payments');
     } catch (error) {
       // Error is handled in the hook
