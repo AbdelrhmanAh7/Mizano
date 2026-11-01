@@ -185,6 +185,20 @@ describe('RolesService', () => {
       await expect(service.update(ORG_ID, 'bad-id', updateDto)).rejects.toThrow(NotFoundException);
     });
 
+    it('keeps Admin as Admin when its Arabic name is saved back from the form', async () => {
+      const admin = { ...mockRole, name: 'Admin', nameEn: 'Admin', nameAr: 'مدير النظام' };
+      mockPrisma.role.findFirst.mockReset().mockResolvedValueOnce(admin);
+      const update = jest.fn().mockResolvedValue(admin);
+      mockPrisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) =>
+        fn({ permission: { deleteMany: jest.fn(), createMany: jest.fn() }, role: { update } }),
+      );
+
+      await service.update(ORG_ID, 'role-1', { name: 'مدير النظام' });
+      // No duplicate lookup for an unchanged name, and the stored name is not touched.
+      expect(mockPrisma.role.findFirst).toHaveBeenCalledTimes(1);
+      expect(update.mock.calls[0][0].data).not.toHaveProperty('name');
+    });
+
     it('throws ConflictException if new name conflicts', async () => {
       mockPrisma.role.findFirst
         .mockResolvedValueOnce(mockRole) // exists

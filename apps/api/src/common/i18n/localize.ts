@@ -57,13 +57,13 @@ function isBilingual(
 export function localizeDeep<T>(value: T, locale: Locale, depth = 0): T {
   if (depth > 12) return value;
   if (Array.isArray(value)) {
-    let changed = false;
-    const out = value.map((item: unknown) => {
+    // Copy only once something changes: most responses carry no system names.
+    let out: unknown[] | null = null;
+    value.forEach((item: unknown, index) => {
       const next = localizeDeep(item, locale, depth + 1);
-      if (next !== item) changed = true;
-      return next;
+      if (next !== item) (out ??= value.slice())[index] = next;
     });
-    return (changed ? out : value) as T;
+    return (out ?? value) as T;
   }
   if (!isPlainObject(value)) return value;
   let out: Record<string, unknown> = value;

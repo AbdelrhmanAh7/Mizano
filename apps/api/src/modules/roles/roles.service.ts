@@ -134,11 +134,12 @@ export class RolesService {
       throw new NotFoundException(`Role not found`);
     }
 
-    // Check for duplicate name if name is being changed
-    if (updateRoleDto.name && updateRoleDto.name !== existingRole.name) {
+    // Check for duplicate name if name is being changed (a localized name saved back is not).
+    const rename = renameFields(existingRole, updateRoleDto.name);
+    if (rename.name) {
       const duplicateRole = await this.prisma.role.findFirst({
         where: {
-          name: updateRoleDto.name,
+          name: rename.name,
           organizationId,
           id: { not: id },
         },
@@ -171,7 +172,7 @@ export class RolesService {
         where: { id },
         data: {
           // The edit form shows the localized name: saving it back keeps 'Admin' as 'Admin'.
-          ...renameFields(existingRole, updateRoleDto.name),
+          ...rename,
           description: updateRoleDto.description,
         },
         include: {

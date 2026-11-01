@@ -2117,8 +2117,8 @@ model TaxRate {
   id               String   @id @default(cuid())
   name             String
   /// Both languages of a system name Mizano seeded; null once a person renames the row.
-  nameAr         String?
-  nameEn         String?
+  nameAr           String?
+  nameEn           String?
   code             String?
   description      String?
   rate             Decimal  @db.Decimal(5, 2)

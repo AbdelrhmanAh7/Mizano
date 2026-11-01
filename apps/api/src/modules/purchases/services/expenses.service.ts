@@ -30,7 +30,7 @@ export interface LookupAccount {
 }
 
 const EXPENSE_VIEW_INCLUDE = {
-  account: { select: { id: true, code: true, name: true } },
+  account: { select: { id: true, code: true, name: true, nameAr: true, nameEn: true } },
   vendor: { select: { id: true, name: true } },
 } satisfies Prisma.ExpenseInclude;
 
