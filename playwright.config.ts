@@ -7,6 +7,7 @@ import { API_PORT, WEB_PORT, WEB_URL, apiEnv, webEnv } from './e2e-browser/env';
  */
 export default defineConfig({
   testDir: './e2e-browser/tests',
+  globalSetup: './e2e-browser/global-setup.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

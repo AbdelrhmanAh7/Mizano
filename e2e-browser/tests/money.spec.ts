@@ -101,12 +101,19 @@ test.describe('money flows', () => {
     await signIn(page, account);
     await page.goto('/en/accounting/trial-balance');
     await expect(page.getByText('Balanced', { exact: true })).toBeVisible();
-    await expect(page.getByRole('row', { name: /Accounts Receivable/ })).toContainText(
-      /(^|\s)500\.00/,
-    );
-    await expect(page.getByRole('row', { name: /Accounts Payable/ })).toContainText(
-      /(^|\s)300\.00/,
-    );
+    // Debit is the fourth column, credit the fifth: exact cells, so 1,500.00 can never satisfy 500.00.
+    await expect(
+      page
+        .getByRole('row', { name: /Accounts Receivable/ })
+        .getByRole('cell')
+        .nth(3),
+    ).toHaveText('500.00');
+    await expect(
+      page
+        .getByRole('row', { name: /Accounts Payable/ })
+        .getByRole('cell')
+        .nth(4),
+    ).toHaveText('300.00');
     const total = page.getByRole('row', { name: /^Total/ });
     await expect(total).toContainText('1,300.00');
   });
