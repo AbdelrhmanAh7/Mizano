@@ -20,7 +20,7 @@ import {
   CreditNote,
   CreditNoteType,
   getCreditNoteTypeColor,
-  getCreditNoteTypeLabel,
+  creditNoteTypeKey,
   useInfiniteCreditNotes,
 } from '@/lib/hooks/use-credit-notes';
 import { usePermissions } from '@/lib/hooks/use-permissions';
@@ -161,7 +161,7 @@ function CreditNotesPageContent() {
       header: t('creditNotes.form.type'),
       cell: ({ row }) => (
         <Badge className={getCreditNoteTypeColor(row.original.type)}>
-          {getCreditNoteTypeLabel(row.original.type)}
+          {t(creditNoteTypeKey(row.original.type))}
         </Badge>
       ),
     },

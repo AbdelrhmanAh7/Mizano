@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   useCreditNote,
   getCreditNoteTypeColor,
-  getCreditNoteTypeLabel,
+  creditNoteTypeKey,
 } from '@/lib/hooks/use-credit-notes';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { format } from 'date-fns';
@@ -90,7 +90,7 @@ export default function CreditNoteDetailPage() {
                 {creditNote.creditNoteNumber}
               </h1>
               <Badge className={getCreditNoteTypeColor(creditNote.type)}>
-                {getCreditNoteTypeLabel(creditNote.type)}
+                {t(creditNoteTypeKey(creditNote.type))}
               </Badge>
             </div>
             {creditNote.customer && (
@@ -144,7 +144,7 @@ export default function CreditNoteDetailPage() {
               <FileText className="h-4 w-4" />
               {t('creditNotes.type')}
             </div>
-            <div className="text-xl font-bold">{getCreditNoteTypeLabel(creditNote.type)}</div>
+            <div className="text-xl font-bold">{t(creditNoteTypeKey(creditNote.type))}</div>
           </CardContent>
         </Card>
       </div>
