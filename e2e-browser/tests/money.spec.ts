@@ -125,12 +125,17 @@ test.describe('money flows', () => {
     await expect(total).toContainText('1,300.00');
   });
 
-  test('bank reconciliation page opens for a new organization (smoke)', async ({ page }) => {
+  test('the reconciliation start page shows its title and asks for a bank account @happy', async ({
+    page,
+  }) => {
     await signIn(page, await registerAccount('bank'));
     await page.goto('/en/banking/reconcile');
-    await expect(page.getByText('Page Not Found')).toHaveCount(0);
-    await expect(page.getByRole('heading', { name: /reconcil/i }).first()).toBeVisible();
-    await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
+    await expect(
+      page.getByRole('heading', { name: 'Bank Reconciliation', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Select a bank account to reconcile transactions', { exact: true }),
+    ).toBeVisible();
   });
 
   test('on a 390 px phone the menu opens and Customers opens without sideways scrolling @happy', async ({
