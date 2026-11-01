@@ -38,7 +38,8 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen bg-background" dir={isRtl ? 'rtl' : 'ltr'}>
       {/* Nav */}
-      <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm">
+      {/* Solid, not see-through: content scrolling under a translucent header showed through it (#676). */}
+      <header className="sticky top-0 z-50 border-b bg-background">
         <div className="container mx-auto flex items-center justify-between h-16 px-4">
           <BrandLogo height={32} alt={brand} priority />
           <div className="flex items-center gap-3">
@@ -61,7 +62,7 @@ export default function OnboardingPage() {
           <div className="absolute bottom-10 end-10 w-96 h-96 bg-amber-400 rounded-full blur-3xl" />
         </div>
         <div className="container mx-auto px-4 py-24 md:py-32 text-center relative z-10">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-foreground text-sm font-medium mb-6">
             <BrandLogo variant="icon" height={20} alt="" />
             {brand}
           </div>
@@ -144,7 +145,9 @@ export default function OnboardingPage() {
             <Button
               size="lg"
               variant="outline"
-              className="border-white/30 text-white hover:bg-white/10"
+              // The outline variant's own background is white: without bg-transparent the white
+              // label sat on white and the button looked empty (#676).
+              className="border-white/60 bg-transparent text-white hover:bg-white/10 hover:text-white"
               asChild
             >
               <Link href="/login">{t('cta.login')}</Link>
