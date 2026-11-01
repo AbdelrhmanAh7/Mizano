@@ -341,7 +341,7 @@
     "AI_INVALID_OUTPUT": "The AI answer could not be used. Nothing was changed.",
     "AI_INPUT_UNSUPPORTED": "The connected provider cannot read this kind of file.",
     "AI_OAUTH_STATE_INVALID": "The OpenRouter sign-in expired or was already used. Start again.",
-    "AI_SETTINGS_CHANGED": "The AI settings changed while this was starting. Nothing was sent; try again.",
+    "AI_SETTINGS_CHANGED": "The AI settings changed while this was running, so your change was not saved. Try again.",
     "AI_FORBIDDEN": "The provider refused the request. Check that the account has credit, the key is active, and its privacy or data settings allow this model (for OpenRouter: openrouter.ai/settings/privacy and openrouter.ai/credits)."
   },
   "aiApp": {
