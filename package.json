@@ -65,6 +65,7 @@
     "e2e:edge": "playwright test --grep @edge"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@commitlint/cli": "^20.4.1",
     "@commitlint/config-conventional": "^20.4.1",
     "@playwright/test": "^1.64.1",
