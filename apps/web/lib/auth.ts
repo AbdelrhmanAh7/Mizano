@@ -18,6 +18,20 @@ const ACCESS_TOKEN_LIFETIME_MS = 14 * 60 * 1000;
 const REFRESH_COOLDOWN_MS = 30_000;
 
 /** Secret-free description of an auth API failure, safe to log. */
+/**
+ * The browser's X-Forwarded-For as this server received it (from cloudflared), passed on when the
+ * server signs in for the browser. The API keys its login rate limit on the client address it reads
+ * from this header (it trusts only its proxies and this web server); without it every sign-in of
+ * every user shared the web server's own address and one limit (TestSprite theme 1).
+ */
+export function forwardedForHeader(
+  headers: Record<string, unknown> | undefined,
+): string | undefined {
+  const value = headers?.['x-forwarded-for'];
+  const first = Array.isArray(value) ? value[0] : value;
+  return typeof first === 'string' && first.trim() ? first.trim() : undefined;
+}
+
 function describeAuthError(error: unknown): string {
   if (axios.isAxiosError(error)) {
     return error.response ? `HTTP ${error.response.status}` : (error.code ?? 'network error');
@@ -84,16 +98,18 @@ export const authOptions: NextAuthOptions = {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           return null;
         }
 
         try {
-          const response = await axios.post(`${API_BASE_URL}/auth/login`, {
-            email: credentials.email,
-            password: credentials.password,
-          });
+          const forwardedFor = forwardedForHeader(req?.headers);
+          const response = await axios.post(
+            `${API_BASE_URL}/auth/login`,
+            { email: credentials.email, password: credentials.password },
+            forwardedFor ? { headers: { 'X-Forwarded-For': forwardedFor } } : undefined,
+          );
           const { user, organization, tokens } = response.data;
 
           return {

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { Controller, useForm } from 'react-hook-form';
@@ -86,11 +87,23 @@ export default function RegisterPage() {
         country: data.country,
       });
 
+      // Straight in: sign in with the new account and start on the dashboard, where the first-use
+      // tour begins. Only if that sign-in fails is the person sent to Sign In (TestSprite theme 1).
+      const signedIn = await signIn('credentials', {
+        email: data.email,
+        password: data.password,
+        redirect: false,
+      }).catch(() => undefined);
+      if (signedIn?.ok && !signedIn.error) {
+        toast({ title: t('accountCreated') });
+        router.push(`/${locale}/dashboard`);
+        router.refresh();
+        return;
+      }
       toast({
         title: t('accountCreated'),
         description: t('accountCreatedDescription'),
       });
-
       router.push(`/${locale}/login`);
     } catch (error: unknown) {
       const status = (error as { response?: { status?: number } }).response?.status;

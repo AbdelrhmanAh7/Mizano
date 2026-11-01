@@ -92,18 +92,25 @@ function firstHeader(headers: Record<string, unknown> | undefined, name: string)
  * client-supplied and rotating it would give a fresh bucket per attempt. Otherwise the socket
  * address, so requests without proxy headers never share one bucket.
  */
+export function clientAddressOf(
+  req: Record<string, unknown>,
+  proxies: TrustedProxies = trustedProxies(),
+): string {
+  const socket = req.socket as { remoteAddress?: string } | undefined;
+  const peer = normalizeIp(socket?.remoteAddress);
+  if (proxies.isTrusted(peer)) {
+    const headers = req.headers as Record<string, unknown> | undefined;
+    const client = clientFromForwardedFor(firstHeader(headers, 'x-forwarded-for'), proxies);
+    if (client) return client;
+  }
+  return peer ?? normalizeIp(req.ip) ?? 'unknown';
+}
+
 @Injectable()
 export class IpThrottlerGuard extends ThrottlerGuard {
   protected readonly proxies: TrustedProxies = trustedProxies();
 
   protected async getTracker(req: Record<string, unknown>): Promise<string> {
-    const socket = req.socket as { remoteAddress?: string } | undefined;
-    const peer = normalizeIp(socket?.remoteAddress);
-    if (this.proxies.isTrusted(peer)) {
-      const headers = req.headers as Record<string, unknown> | undefined;
-      const client = clientFromForwardedFor(firstHeader(headers, 'x-forwarded-for'), this.proxies);
-      if (client) return client;
-    }
-    return peer ?? normalizeIp(req.ip) ?? 'unknown';
+    return clientAddressOf(req, this.proxies);
   }
 }

@@ -113,3 +113,52 @@ describe('AuthService.register', () => {
     expect(String(warn.mock.calls[0][0])).not.toContain('secret detail');
   });
 });
+
+describe('AuthService.login failed-attempt cap (#639)', () => {
+  it('refuses an account at one address after 10 failed sign-ins without reading the database again', async () => {
+    const { service } = setup();
+    const prisma = (service as unknown as { prisma: { user: { findFirst: jest.Mock } } }).prisma;
+    for (let i = 0; i < 10; i++) {
+      await expect(
+        service.login({ email: 'Guess@Nile.test', password: 'x' }),
+      ).rejects.toMatchObject({
+        status: 401,
+      });
+    }
+    prisma.user.findFirst.mockClear();
+    await expect(service.login({ email: 'guess@nile.test', password: 'x' })).rejects.toMatchObject({
+      status: 429,
+    });
+    expect(prisma.user.findFirst).not.toHaveBeenCalled();
+    // Another account is not affected, and neither is the same account from another address.
+    await expect(service.login({ email: 'other@nile.test', password: 'x' })).rejects.toMatchObject({
+      status: 401,
+    });
+    await expect(
+      service.login({ email: 'guess@nile.test', password: 'x' }, '198.51.100.9'),
+    ).rejects.toMatchObject({ status: 401 });
+  });
+});
+
+describe('AuthService.login concurrent guesses (#639)', () => {
+  it('lets at most 10 of many simultaneous guesses reach the password check', async () => {
+    const { service } = setup();
+    const prisma = (service as unknown as { prisma: { user: { findFirst: jest.Mock } } }).prisma;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    prisma.user.findFirst.mockImplementation(async () => {
+      await gate;
+      return null;
+    });
+    const attempts = Array.from({ length: 25 }, () =>
+      service
+        .login({ email: 'race@nile.test', password: 'x' })
+        .catch((e: { status: number }) => e.status),
+    );
+    release();
+    const statuses = await Promise.all(attempts);
+    expect(statuses.filter((s) => s === 401)).toHaveLength(10);
+    expect(statuses.filter((s) => s === 429)).toHaveLength(15);
+    expect(prisma.user.findFirst).toHaveBeenCalledTimes(10);
+  });
+});

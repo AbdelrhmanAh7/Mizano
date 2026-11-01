@@ -1,4 +1,11 @@
-import { Injectable, Logger, UnauthorizedException, ConflictException } from '@nestjs/common';
+import {
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AccountsService } from '../accounting/services/accounts.service';
@@ -6,12 +13,15 @@ import { describeError } from '../../common/utils/redact';
 import { organizationRegion } from './organization-region';
 import { AuthSessionsService } from './auth-sessions.service';
 import { LoginDto } from './dto/login.dto';
+import { LoginFailures } from './login-failures';
 import { RegisterDto } from './dto/register.dto';
 import { createMissingDefaultRoles } from '../roles/default-roles.seed';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+  /** Failed sign-ins per account; one instance per API process (#639). */
+  private readonly loginFailures = new LoginFailures();
 
   constructor(
     private prisma: PrismaService,
@@ -96,8 +106,16 @@ export class AuthService {
     };
   }
 
-  async login(loginDto: LoginDto) {
+  async login(loginDto: LoginDto, clientAddress = 'unknown') {
     const { email, password } = loginDto;
+    // Reserved before the password check (and before any await), so concurrent guesses cannot all
+    // slip past the cap, and a blocked account gives no hint whether a guess was right.
+    if (!this.loginFailures.tryAttempt(email, clientAddress)) {
+      throw new HttpException(
+        'Too many failed sign-ins for this account. Try again in 15 minutes.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
 
     // Find user
     const user = await this.prisma.user.findFirst({
@@ -123,6 +141,7 @@ export class AuthService {
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid email or password');
     }
+    this.loginFailures.succeeded(email, clientAddress);
 
     // A new session per sign-in: other devices stay signed in.
     const tokens = await this.sessions.start(user);

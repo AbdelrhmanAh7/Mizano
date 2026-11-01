@@ -1,4 +1,6 @@
-import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus, Req } from '@nestjs/common';
+import type { Request } from 'express';
+import { clientAddressOf } from '../../throttler-ip.guard';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
@@ -12,9 +14,20 @@ import { Public } from '../../common/decorators';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { CurrentUser, CurrentUserData } from '../../common/decorators';
 
+/**
+ * Sign-ins and sign-ups per client address per minute. 5 by default (brute-force guard); a test
+ * copy that many automated browsers reach from one address may raise it (AUTH_RATE_LIMIT_PER_MIN).
+ */
+export function authRateLimitPerMinute(
+  raw: string | undefined = process.env.AUTH_RATE_LIMIT_PER_MIN,
+): number {
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 1 && n <= 1000 ? n : 5;
+}
+
 @ApiTags('Authentication')
 @Controller('auth')
-@Throttle({ short: { ttl: 60000, limit: 5 } })
+@Throttle({ short: { ttl: 60000, limit: authRateLimitPerMinute() } })
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
@@ -32,8 +45,12 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login with email and password' })
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(@Body() loginDto: LoginDto, @Req() req: Request) {
+    // The same client address the rate limit uses (the browser's, through the trusted proxies).
+    return this.authService.login(
+      loginDto,
+      clientAddressOf(req as unknown as Record<string, unknown>),
+    );
   }
 
   @Public()

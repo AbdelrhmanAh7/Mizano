@@ -165,6 +165,23 @@ describe('IpThrottlerGuard.getTracker', () => {
     }
   });
 
+  it('the web server signing in for two browsers gives each its own tracker (TestSprite theme 1)', async () => {
+    // deploy/pi: cloudflared at .250 and the web server at .251 are the trusted peers.
+    const pi = guardTrusting('172.30.184.250/32,172.30.184.251/32');
+    const web = '172.30.184.251';
+    const a = await pi.tracker(req({ 'x-forwarded-for': '203.0.113.7' }, web));
+    const b = await pi.tracker(req({ 'x-forwarded-for': '198.51.100.2' }, web));
+    expect([a, b]).toEqual(['203.0.113.7', '198.51.100.2']);
+    // A browser prefixing its own address cannot pick a fresh bucket: Cloudflare appends the real one.
+    expect(await pi.tracker(req({ 'x-forwarded-for': '10.0.0.1, 203.0.113.7' }, web))).toBe(
+      '203.0.113.7',
+    );
+    // Any other container on the network is keyed on its own address, whatever it claims.
+    expect(await pi.tracker(req({ 'x-forwarded-for': '203.0.113.7' }, '172.30.184.20'))).toBe(
+      '172.30.184.20',
+    );
+  });
+
   it('returns the peer, not the client-chosen left-most entry, when every hop is trusted', async () => {
     const tracker = await guardTrusting('10.0.0.0/8').tracker(
       req({ 'x-forwarded-for': '10.0.0.9, 127.0.0.1' }, '127.0.0.1'),
