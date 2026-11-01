@@ -140,6 +140,7 @@ Endpoint details: run the API locally and open Swagger at `http://localhost:6001
 
 - **Routing.** `app/[locale]/...` with `localePrefix: 'always'` (`/en/...`, `/ar/...`). `middleware.ts` combines next-intl routing with the NextAuth token check. `(auth)` holds public pages, `(dashboard)` protected pages with shared `layout.tsx`, `loading.tsx`, `error.tsx` and `not-found.tsx`.
 - **i18n.** next-intl with namespaces in `messages/{en,ar}/*.json`, registered in `messages/{en,ar}/index.ts`. `i18n/config.ts` maps `ar → rtl`; the locale layout sets `lang`/`dir`.
+- **System data in two languages.** Seeded accounts, tax rates and roles store `nameEn`/`nameAr` next to `name` (Arabic list: `apps/api/src/common/i18n/system-names.ts`). `LocalizeNamesInterceptor` (outermost, after the response cache) answers `name` in the `Accept-Language` language through `localize(row, locale)`; a row a person renames keeps their name in every language (`renameFields`). Never compare a seeded name in English in the web: use `nameEn` or the account code.
 - **Auth.** NextAuth credentials session holds the API access/refresh tokens (`lib/auth.ts`); the axios client in `lib/api.ts` attaches the bearer token and signs out on refresh failure.
 - **Server state.** TanStack Query hooks in `lib/hooks/use-{resource}.ts` on top of the API objects in `lib/api.ts` / `lib/api/`.
 - **Client state.** Zustand stores in `lib/stores/` (dashboard layout, recent items, tours, shortcuts).

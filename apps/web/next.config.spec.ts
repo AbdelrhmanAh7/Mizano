@@ -45,6 +45,22 @@ describe('next.config.js', () => {
   });
 });
 
+describe('API proxy rewrites (Codespaces)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { apiProxyRewrites } = require('./api-proxy');
+
+  it('adds no rewrite unless a proxy target is set', () => {
+    expect(apiProxyRewrites(undefined)).toEqual([]);
+    expect(apiProxyRewrites('')).toEqual([]);
+  });
+
+  it('forwards /api/backend/* to the API without touching /api/auth', () => {
+    expect(apiProxyRewrites('http://localhost:6001')).toEqual([
+      { source: '/api/backend/:path*', destination: 'http://localhost:6001/api/:path*' },
+    ]);
+  });
+});
+
 describe('dashboard-client.tsx', () => {
   it('must NOT use dynamic() + ssr:false for recharts chart components', () => {
     const fs = require('fs');

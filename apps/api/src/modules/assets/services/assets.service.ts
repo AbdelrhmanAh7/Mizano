@@ -179,9 +179,13 @@ export class AssetsService {
         deletedAt: null,
       },
       include: {
-        assetAccount: { select: { id: true, name: true, code: true } },
-        depreciationAccount: { select: { id: true, name: true, code: true } },
-        accumulatedDeprAccount: { select: { id: true, name: true, code: true } },
+        assetAccount: { select: { id: true, name: true, code: true, nameAr: true, nameEn: true } },
+        depreciationAccount: {
+          select: { id: true, name: true, code: true, nameAr: true, nameEn: true },
+        },
+        accumulatedDeprAccount: {
+          select: { id: true, name: true, code: true, nameAr: true, nameEn: true },
+        },
         depreciationSchedule: {
           orderBy: [{ year: 'asc' }, { month: 'asc' }],
         },
@@ -224,9 +228,15 @@ export class AssetsService {
           usefulLifeYears: dto.usefulLifeYears,
         },
         include: {
-          assetAccount: { select: { id: true, name: true, code: true } },
-          depreciationAccount: { select: { id: true, name: true, code: true } },
-          accumulatedDeprAccount: { select: { id: true, name: true, code: true } },
+          assetAccount: {
+            select: { id: true, name: true, code: true, nameAr: true, nameEn: true },
+          },
+          depreciationAccount: {
+            select: { id: true, name: true, code: true, nameAr: true, nameEn: true },
+          },
+          accumulatedDeprAccount: {
+            select: { id: true, name: true, code: true, nameAr: true, nameEn: true },
+          },
         },
       });
 

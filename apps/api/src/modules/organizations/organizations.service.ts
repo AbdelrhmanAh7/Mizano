@@ -25,6 +25,7 @@ import {
   OnboardingStatusResponse,
   CoaTemplatePreview,
 } from './dto/onboarding.dto';
+import { systemName } from '../../common/i18n/localize';
 
 @Injectable()
 export class OrganizationsService {
@@ -824,7 +825,7 @@ export class OrganizationsService {
     // For now, return base accounts - can be extended per template
     return baseAccounts.map((acc) => ({
       code: acc.code,
-      name: acc.name,
+      ...systemName(acc.name),
       type: acc.type as import('@prisma/client').AccountType,
       isActive: true,
     }));

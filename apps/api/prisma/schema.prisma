@@ -731,6 +731,9 @@ model UserPreferences {
 model Role {
   id             String   @id @default(cuid())
   name           String
+  /// Both languages of a system name Mizano seeded; null once a person renames the row.
+  nameAr         String?
+  nameEn         String?
   description    String?
   isDefault      Boolean  @default(false)
   organizationId String
@@ -768,6 +771,9 @@ model Account {
   id             String      @id @default(cuid())
   code           String
   name           String
+  /// Both languages of a system name Mizano seeded; null once a person renames the row.
+  nameAr         String?
+  nameEn         String?
   type           AccountType
   subType        String?
   parentId       String?
@@ -2110,6 +2116,9 @@ model TimesheetEntry {
 model TaxRate {
   id               String   @id @default(cuid())
   name             String
+  /// Both languages of a system name Mizano seeded; null once a person renames the row.
+  nameAr           String?
+  nameEn           String?
   code             String?
   description      String?
   rate             Decimal  @db.Decimal(5, 2)

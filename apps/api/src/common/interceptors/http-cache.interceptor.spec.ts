@@ -31,7 +31,7 @@ describe('HttpCacheInterceptor', () => {
       const headers = await run(profile);
       expect(headers['Cache-Control']).toMatch(/^private, no-cache/);
       expect(headers['Cache-Control']).not.toMatch(/public|max-age=[1-9]/);
-      expect(headers.Vary).toBe('Authorization');
+      expect(headers.Vary).toBe('Authorization, Accept-Language');
     },
   );
 

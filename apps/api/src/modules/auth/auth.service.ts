@@ -7,6 +7,7 @@ import { organizationRegion } from './organization-region';
 import { AuthSessionsService } from './auth-sessions.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { systemName } from '../../common/i18n/localize';
 
 @Injectable()
 export class AuthService {
@@ -52,7 +53,7 @@ export class AuthService {
       // Create default admin role
       const adminRole = await tx.role.create({
         data: {
-          name: 'Admin',
+          ...systemName('Admin'),
           description: 'Full system access',
           isDefault: true,
           organizationId: organization.id,

@@ -27,7 +27,7 @@ export interface AdjustmentLedgerView {
 const ADJUSTMENT_INCLUDE = {
   item: { select: { id: true, name: true, sku: true, unit: true } },
   warehouse: { select: { id: true, name: true, code: true } },
-  account: { select: { id: true, name: true, code: true } },
+  account: { select: { id: true, name: true, code: true, nameAr: true, nameEn: true } },
 } satisfies Prisma.InventoryAdjustmentInclude;
 
 type AdjustmentWithRelations = Prisma.InventoryAdjustmentGetPayload<{

@@ -55,6 +55,8 @@ export class UsersService {
           select: {
             id: true,
             name: true,
+            nameAr: true,
+            nameEn: true,
           },
         },
         createdAt: true,
@@ -90,6 +92,8 @@ export class UsersService {
             select: {
               id: true,
               name: true,
+              nameAr: true,
+              nameEn: true,
             },
           },
           createdAt: true,
@@ -125,6 +129,8 @@ export class UsersService {
           select: {
             id: true,
             name: true,
+            nameAr: true,
+            nameEn: true,
             permissions: true,
           },
         },
@@ -184,6 +190,8 @@ export class UsersService {
           select: {
             id: true,
             name: true,
+            nameAr: true,
+            nameEn: true,
           },
         },
         updatedAt: true,

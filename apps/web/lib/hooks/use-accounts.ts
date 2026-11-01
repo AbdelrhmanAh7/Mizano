@@ -13,7 +13,10 @@ export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'INCOME
 export interface Account {
   id: string;
   code: string;
+  /** In the UI language for accounts Mizano seeded; as typed for the organization's own. */
   name: string;
+  nameAr?: string | null;
+  nameEn?: string | null;
   type: AccountType;
   parentId: string | null;
   currency: string;
