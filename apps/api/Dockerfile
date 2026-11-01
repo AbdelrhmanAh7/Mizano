@@ -1,30 +1,19 @@
 # ============================================
 # NestJS API Dockerfile
-# Multi-stage build for production
+# Two stages: build with every dependency, then ship only production dependencies.
+# The same image runs the API, the intake worker and the one-shot `prisma migrate deploy`.
 # ============================================
 
-# Single-stage build (avoids pnpm symlink issues across stages)
-FROM node:20-alpine
+# ---------- Stage 1: build ----------
+FROM node:20-alpine AS build
 
-# OpenSSL is required by Prisma engine (Alpine ships OpenSSL 3.x).
-# Invoice/statement PDFs are rendered by Puppeteer with Alpine's own Chromium: Chrome for
-# Testing is a glibc x64 build with no linux-arm64 release, so it can run neither here nor on
-# the Raspberry Pi. The renderer has no network, so it needs system fonts: Noto Arabic shapes
-# Arabic text, DejaVu covers Latin and symbols.
-RUN apk add --no-cache openssl \
-    chromium nss freetype harfbuzz ca-certificates \
-    fontconfig font-noto-arabic font-dejavu
-
-# Skip Puppeteer's Chrome download at install time and use the system Chromium at runtime.
-ENV PUPPETEER_SKIP_DOWNLOAD=1 \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
-# Fail the build, not the first PDF, if the browser or the Arabic font is missing.
-RUN test -x "$PUPPETEER_EXECUTABLE_PATH" && fc-list | grep -qi "noto.*arabic"
+# OpenSSL is required by the Prisma engine (Alpine ships OpenSSL 3.x).
+RUN apk add --no-cache openssl
+# Skip Puppeteer's Chrome download; the runtime stage uses Alpine's own Chromium.
+ENV PUPPETEER_SKIP_DOWNLOAD=1 HUSKY=0
 
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
-
-ENV PORT=6001
 
 WORKDIR /app
 
@@ -34,32 +23,60 @@ COPY apps/api/package.json ./apps/api/
 COPY packages/shared-types/package.json ./packages/shared-types/
 COPY packages/validators/package.json ./packages/validators/
 
-# Install dependencies (HUSKY=0 disables the husky prepare hook)
-ENV HUSKY=0
 RUN pnpm install --frozen-lockfile
 
 # Copy source code
 COPY apps/api ./apps/api
 COPY packages ./packages
 
-# Generate Prisma client
+# Generate Prisma client, build shared packages, then the application
 RUN cd apps/api && pnpm exec prisma generate
-
-# Build shared packages first
 RUN pnpm --filter @mizano/shared-types build && pnpm --filter @mizano/validators build
-
-# Build the application
 RUN pnpm --filter api build
 
-# Set production environment after build
-ENV NODE_ENV=production
+# Keep production dependencies only (about 1 GB less). Two things from the full install stay:
+# the Prisma CLI (a dev dependency) for the one-shot `prisma migrate deploy`, and the generated
+# Prisma client. The reinstall uses the store this stage already filled (--offline). The root
+# `prepare` script runs husky, a dev dependency, so it is dropped from this stage first.
+RUN npm pkg delete scripts.prepare \
+  && mkdir /keep \
+  && cp -a node_modules/prisma node_modules/@prisma node_modules/.prisma /keep/ \
+  && rm -rf node_modules apps/*/node_modules packages/*/node_modules \
+  && pnpm install --frozen-lockfile --prod --offline --filter 'api...' \
+  && rm -rf node_modules/prisma node_modules/@prisma node_modules/.prisma \
+  && cp -a /keep/prisma /keep/@prisma /keep/.prisma node_modules/ \
+  && mkdir -p node_modules/.bin \
+  && ln -sf ../prisma/build/index.js node_modules/.bin/prisma \
+  && rm -rf /keep \
+  # The hoisted install also keeps the web app's packages; Next.js alone is about 350 MB.
+  && rm -rf node_modules/next node_modules/@next \
+  && node apps/api/scripts/check-runtime-deps.js
+
+# ---------- Stage 2: runtime ----------
+FROM node:20-alpine
+
+# Invoice/statement PDFs are rendered by Puppeteer with Alpine's own Chromium: Chrome for
+# Testing is a glibc x64 build with no linux-arm64 release, so it can run neither here nor on
+# the Raspberry Pi. The renderer has no network, so it needs system fonts: Noto Arabic shapes
+# Arabic text, DejaVu covers Latin and symbols.
+RUN apk add --no-cache openssl \
+    chromium nss freetype harfbuzz ca-certificates \
+    fontconfig font-noto-arabic font-dejavu
+
+ENV PUPPETEER_SKIP_DOWNLOAD=1 \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+# Fail the build, not the first PDF, if the browser or the Arabic font is missing.
+RUN test -x "$PUPPETEER_EXECUTABLE_PATH" && fc-list | grep -qi "noto.*arabic"
+
+ENV PORT=6001 NODE_ENV=production
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nestjs
 
-# Change ownership
-RUN chown -R nestjs:nodejs /app
+WORKDIR /app
+# --chown on the copy: a separate `chown -R` layer would store node_modules a second time.
+COPY --from=build --chown=nestjs:nodejs /app /app
 
 USER nestjs
 

@@ -1,0 +1,37 @@
+# Example for /etc/jarda/compose.d/flowline.yml: FlowLine on the same server as Jarda.
+# The FlowLine repository owns the real file (session fl-exit); this shows the contract.
+# Rules: join the `internal` network, publish no ports (Caddy is the only door), keep data in
+# /srv/flowline, never redefine a Jarda service (postgres, redis, migrate, api, worker, web, caddy).
+services:
+  flowline:
+    image: ${FLOWLINE_IMAGE:-flowline:current}
+    restart: unless-stopped
+    mem_limit: 1g
+    env_file: /etc/jarda/flowline.env # FlowLine's own secrets, mode 600
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:3000/']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options: { max-size: '10m', max-file: '5' }
+    networks: [internal]
+  # The scheduler tick: Lovable Jobs / the Cloudflare cron Worker are replaced by this loop
+  # (FLOWLINE_SCHEDULER_ID=vps on the app; CRON_SECRET in flowline.env).
+  flowline-tick:
+    image: curlimages/curl:8.10.1
+    restart: unless-stopped
+    mem_limit: 32m
+    env_file: /etc/jarda/flowline.env
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - 'while :; do curl -fsS -m 50 -X POST -H "Authorization: Bearer $$CRON_SECRET" http://flowline:3000/api/public/jobs/tick >/dev/null || true; sleep 60; done'
+    depends_on:
+      flowline:
+        condition: service_healthy
+    networks: [internal]

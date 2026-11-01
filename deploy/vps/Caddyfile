@@ -1,0 +1,42 @@
+# Two hostnames (see deploy/vps/README.md): the web app and the API cannot share one origin,
+# because NextAuth (web) and the Nest API both serve /api/auth/*.
+# CADDY_TLS is the Let's Encrypt contact email on a real server, `internal` for the local drill.
+{
+	# No admin endpoint: config changes only by restarting the container.
+	admin off
+}
+
+(common) {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+	log {
+		output stdout
+		format console
+	}
+}
+
+{$JARDA_WEB_HOST} {
+	tls {$CADDY_TLS}
+	import common
+	header X-Frame-Options "DENY"
+	reverse_proxy web:5001
+}
+
+{$JARDA_API_HOST} {
+	tls {$CADDY_TLS}
+	import common
+	# Uploads (bills, receipts) are capped by the API itself; this is only a hard ceiling.
+	request_body {
+		max_size 30MB
+	}
+	reverse_proxy api:6001
+}
+
+# Other products on the same server (FlowLine): one site file each in /etc/jarda/caddy-sites/.
+# An empty folder is fine.
+import /etc/caddy/sites/*.caddy

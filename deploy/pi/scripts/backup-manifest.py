@@ -153,10 +153,10 @@ def unpack(archive, work):
     verify_files(work, manifest)
 
 
-def verify_database(container, work):
+def verify_database(container, work, user='postgres', database='drill'):
     manifest = json.loads((work / 'manifest.json').read_text())
     actual = subprocess.check_output(['docker', 'exec', '-i', container, 'psql', '-XqAt',
-                                     '-v', 'ON_ERROR_STOP=1', '-U', 'postgres', '-d', 'drill'],
+                                     '-v', 'ON_ERROR_STOP=1', '-U', user, '-d', database],
                                     input=STATE_SQL, text=True, timeout=120)
     state = json.loads(actual)
     if state != manifest['state']:
@@ -175,7 +175,8 @@ def main():
         elif command == 'unpack':
             unpack(Path(sys.argv[2]), Path(sys.argv[3]))
         elif command == 'verify-db':
-            verify_database(sys.argv[2], Path(sys.argv[3]))
+            # Optional user and database: the VPS restore checks the live database it replaced.
+            verify_database(sys.argv[2], Path(sys.argv[3]), *sys.argv[4:6])
         else:
             raise CheckFailed('unknown manifest command')
     except CheckFailed as error:
