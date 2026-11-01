@@ -23,7 +23,7 @@ interface BrandLogoProps {
   priority?: boolean;
 }
 
-/** The Jarda logo with its light/dark artwork swapped by the theme. */
+/** The Jarda logo with its light/dark artwork swapped by the theme (the hidden one is display:none). */
 export function BrandLogo({
   variant = 'full',
   height,
@@ -49,8 +49,7 @@ export function BrandLogo({
       />
       <Image
         src={art.dark}
-        alt=""
-        aria-hidden
+        alt={alt}
         className={cn('hidden shrink-0 dark:block', className)}
         {...common}
       />

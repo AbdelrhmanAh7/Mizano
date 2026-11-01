@@ -1,8 +1,9 @@
 import type { MetadataRoute } from 'next';
 import { locales } from '@/i18n/config';
+import { siteUrl } from '@/lib/site-url';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5001';
+  const baseUrl = siteUrl();
 
   const publicRoutes = ['', '/login', '/register'];
 

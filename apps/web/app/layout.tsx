@@ -4,6 +4,7 @@ import { getLocale } from 'next-intl/server';
 import { BRAND } from '@mizano/shared-types';
 import { defaultLocale, localeDirections, locales, type Locale } from '@/i18n/config';
 import './globals.css';
+import { siteUrl } from '@/lib/site-url';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -36,7 +37,7 @@ export const metadata: Metadata = {
     'financial management',
   ],
   authors: [{ name: BRAND.name.en }],
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5001'),
+  metadataBase: new URL(siteUrl()),
   openGraph: {
     type: 'website',
     siteName: BRAND.name.en,

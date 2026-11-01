@@ -8,8 +8,9 @@ import { locales, localeDirections, type Locale } from '@/i18n/config';
 import { LocaleDirectionProvider } from '@/components/locale-direction-provider';
 import { Providers } from '@/components/providers';
 import { NavigationProgress } from '@/components/navigation-progress';
+import { siteUrl } from '@/lib/site-url';
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5001';
+const BASE_URL = siteUrl();
 
 const DESCRIPTION: Record<'ar' | 'en', string> = {
   en: 'Accounting in Arabic and English for businesses in Egypt, Saudi Arabia and the UAE: invoices, bills, journals and reports. AI is optional.',
