@@ -45,10 +45,10 @@ _1 November 2026 · Ready to paste. The orchestrator generates them in the brows
 > Vertical 9:16 poster. Top third: empty space with a pale blue gradient (for a headline). Middle: a vertical flow made of three round white nodes stacked top to bottom, linked by one smooth green curve: a document page icon, a magnifying glass icon (review), a ledger book icon with a check mark. Bottom third: empty clean space for a call to action. Flat vector, soft shadows, minimal, safe margins of 10% on all sides.
 **On-image text (exact, Arabic, large, centered):** top «من المستند إلى الدفتر»; bottom «مجاني خلال الفترة التجريبية».
 
-### A6. Story, 9:16: "Arabic first"
+### A6. Story, 9:16: "Arabic and English"
 **Prompt (background only):**
 > Vertical 9:16 soft gradient background from #FFFFFF at the top to #EFF6FF at the bottom, a few thin flowing blue curves in the corners, large empty center for a screenshot, no text, no devices, no people.
-**On-image text (add in editing):** «عربي أولًا».
+**On-image text (add in editing):** «عربي وإنجليزي».
 
 ### A7. English variants
 Repeat A2, A3, A4 and A5 with the English text: "From bill to books" · "The accountant approves" · "Free during the pilot" · "Source to ledger". English is left-to-right and aligned left.

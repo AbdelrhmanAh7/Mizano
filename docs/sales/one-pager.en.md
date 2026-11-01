@@ -20,7 +20,7 @@ nobody is sure the numbers match.
 - **Approve and post:** draft bills are posted to the books only when a person approves them, one by one or several at once.
 - **Bank:** import a bank statement (CSV, Excel, OFX/QFX) and match it to your records.
 - **Reports:** profit and loss, balance sheet, cash flow, trial balance, general ledger, receivables and payables aging,
-  sales and purchases by customer, item and vendor, VAT report.
+  sales and purchases by customer, item and vendor, and VAT returns.
 - **Close the month:** lock the previous month so nobody changes it by mistake. Posted entries are never edited: a mistake is
   corrected by a linked reversal.
 - **Your own AI, optional:** connect your Claude, ChatGPT, Codex or Gemini subscription with no key. It can read your books
@@ -41,7 +41,7 @@ nobody is sure the numbers match.
 - **Bill reading without an AI account.** Mizano reads bills on its own server; an AI account is optional and off by default.
   Daftra and Wafeq advertise AI document scanners; we did not trial them.
 - **Free during the pilot.** For comparison, Wafeq listed its Egypt Starter plan at EGP 966 a month (positioned as invoicing
-  only) and Zoho Books lists a free plan; these are dated snapshots, not offers.
+  only) and Zoho Books' global page lists a free plan (not verified for Egypt); these are dated snapshots, not offers.
 - **Not an e-invoicing issuer.** Daftra advertises both Egyptian ETA systems; Mizano does not issue e-invoices today (see limits).
 
 ## Honest limits today
@@ -50,8 +50,8 @@ nobody is sure the numbers match.
 - **Bills come in by upload only**, one file at a time (images and PDF, up to 15 MB). Telegram intake is planned; WhatsApp and
   email intake are not.
 - **"View source document"** on a journal entry opens the bill or invoice that created it, not the scanned picture.
-- **Report pages have no export button yet.** Lists (invoices, bills, customers, vendors, expenses, journals) export to CSV or
-  Excel, and invoices and quotes export to PDF.
+- **Most report pages have no export button yet** (sales and purchases by customer, item and vendor export to CSV). Lists
+  (invoices, bills, customers, vendors, expenses, journals) export to CSV or Excel, and invoices and quotes export to PDF.
 - **No setup wizard:** setup is done in Settings, with us beside you during onboarding.
 - Inventory, HR, CRM, projects and manufacturing screens exist but are **not part of the pilot**.
 

@@ -60,7 +60,8 @@ in **Settings**, and we do it with you in the first week.
 4. **Accounting → Chart of Accounts:** press **Seed Accounts** and choose **Services Industry**, **Retail Industry** or
    **Construction Industry**. Add or rename accounts as you need.
 5. **Tax → Tax Rates:** check the rates you charge and pay.
-6. **Banking → Bank Accounts → New Bank Account** for each bank account (and your cash box if you track it).
+6. **Banking → Bank Accounts → New Bank Account** for each bank account (and your cash box if you track it). Leave
+   **Opening Balance** at 0: opening balances go in the journal entry of step 7.
 7. **Opening balances:** **Accounting → Journal Entries → New Journal Entry**, dated the day before you start, with each
    balance from the signed trial balance. Press **Create Journal** when it shows **Balanced**.
 
@@ -97,12 +98,14 @@ in **Settings**, and we do it with you in the first week.
 3. **Sales → Payments** lists every payment received. Voiding a payment reopens what it paid and posts a linked reversal.
 
 ### 4.5 Credit notes
-**Sales → Credit Notes → New Credit Note** for a return or a discount after the invoice, then apply it to the invoice.
+**Sales → Credit Notes → New Credit Note** for a return or a discount after the invoice. To set it against an invoice, choose **Apply to Invoice** and pick the invoice
+while you create the credit note; it cannot be applied later.
 
 **What you should see:** the invoice status changes as it is sent and paid; the customer's balance updates.
 
 **If it does not work:** a mistake on a sent invoice is fixed with **Void Invoice** (Mizano posts the reversal) or a credit
-note, never by editing the posted entry.
+note, never by editing the posted entry. An invoice that already has payments or credit notes cannot be voided until those
+are voided first.
 
 **Needs approval:** sending the invoice is the approval; nothing is sent to a tax authority.
 
@@ -113,13 +116,14 @@ note, never by editing the posted entry.
 **Who:** the accountant, the owner, or a user whose role can create bills.
 
 1. **Purchases → Vendors → New Vendor** (a scanned bill can also create the vendor for you).
-2. **Purchases → Bills → New Bill** to type a bill, or **Scan Bill** to read it from a file (section 6). Either way it is a
+2. **Purchases → Bills → New Bill** to type a bill, or **Scan Bill** (a button on the same page) to read it from a file (section 6). Either way it is a
    **draft**.
 3. **Approve & post** a bill to write it into the books (expense, VAT and payables). To approve several drafts at once, select
    them in the list and confirm **Approve & post {count} bills**.
 4. **Record Payment** on a posted bill: all or part. **Purchases → Payments** lists **Payments Made**; voiding a payment
    reopens every bill it paid and posts a linked reversal.
-5. **Purchases → Expenses → New Expense** for spending without a supplier bill, then **Post expense**.
+5. **Purchases → Expenses → New Expense** for spending without a supplier bill. Saving it posts it to the books straight
+   away, so check it before you save.
 6. **Purchases → Credits → New Vendor Credit** for a supplier refund or credit, then **Apply to Bill**.
 
 **What you should see:** the bill moves from draft to open to paid; **Reports → AP Aging** shows what you still owe.
@@ -135,7 +139,7 @@ note, never by editing the posted entry.
 
 **Who:** a user who can create bills. **Before you start:** the bill as a photo (JPEG, PNG, WebP, HEIC) or a PDF, up to 15 MB.
 
-1. **Purchases → Scan Bill.** Drop the file or click to choose it (one file at a time).
+1. **Purchases → Bills → Scan Bill** (the page is called **Scan Bill**). Drop the file or click to choose it (one file at a time).
 2. Press **Read document**. You see the steps **Upload → Processing → Review → Done**. Mizano reads the file on its own server;
    if you connected your own AI account and turned on **Read bills and receipts**, it reads with that instead (section 10).
 3. Check what it found: the vendor (matched, or **Create "…" as a new vendor**), the date, the lines and the totals. Fields it
@@ -144,7 +148,8 @@ note, never by editing the posted entry.
 4. If you see **Possible duplicate detected**, check whether this bill was already entered before you continue. If the same file was uploaded before, Mizano shows the existing scan instead.
 5. Press **Create Bill**. You see **Bill created successfully!** The bill is a draft: approve it as in section 5.
 
-**What you should see:** the draft bill, with the original file kept with it.
+**What you should see:** the draft bill. Mizano keeps the uploaded file with the scan, but no screen opens it from the bill
+yet: keep your own copy too.
 
 **If it does not work:** if a field is empty, the reader did not find it: type it. It never invents a number. Word files are
 not accepted: save the bill as PDF first.
@@ -158,13 +163,14 @@ not accepted: save the bill as PDF first.
 **Who:** anyone whose role can view reports.
 
 Open **Reports** and choose: **Profit & Loss**, **Balance Sheet**, **Cash Flow Statement**, **Trial Balance**,
-**General Ledger**, **AR Aging**, **AP Aging**, **Sales by Customer**, **Sales by Item**, **Purchases by Vendor**,
-**VAT Report**. Choose the dates at the top. Switch the language to read the same report in Arabic or English.
+**General Ledger**, **AR Aging**, **AP Aging**, **Sales by Customer**, **Sales by Item**, **Purchases by Vendor**.
+For VAT, open **Tax → VAT Returns**. Choose the dates at the top. Switch the language to read the same report in Arabic or English.
 
 From a journal entry, **View source document** opens the invoice, bill, payment or expense that created it.
 
 **To take data out:** lists (invoices, bills, customers, vendors, expenses, journal entries, items) have **Export All** (CSV or
-Excel). The report pages have no export button yet.
+Excel). **Sales by Customer**, **Sales by Item** and **Purchases by Vendor** have a CSV **Export**; the other report pages
+(P&L, balance sheet, trial balance, general ledger, aging, cash flow) have no export button yet.
 
 ---
 
@@ -172,15 +178,14 @@ Excel). The report pages have no export button yet.
 
 **Who:** the accountant, then the owner.
 
-1. **Banking → Transactions → Import Statement:** upload the month's statement (CSV, Excel, OFX or QFX). Lines already
+1. **Banking**, then **Bank Transactions**, then **Import Statement**: upload the month's statement (CSV, Excel, OFX or QFX). Lines already
    imported are skipped.
 2. **Banking → Reconciliation:** for each bank line, **Match** it with the payment or expense Mizano suggests, or record what
    is missing (for example a bank charge as an expense). **Bank Rules** help with lines that repeat every month.
 3. Check that every bill and expense of the month is posted and every payment recorded.
 4. Read **Trial Balance** and **Profit & Loss** for the month. Fix mistakes now: void or correct the document, or, for a manual
    journal entry, press **Reverse**.
-5. **Settings → Financial Settings → Lock Previous Month.** From now on nobody can create or edit a transaction dated on or
-   before the lock date. **Remove Lock** reopens it; only someone allowed to change settings can do it.
+5. **Settings → Financial Settings → Lock Previous Month.** From now on nothing dated on or before the lock date can be posted, changed or reversed in the books (drafts can still be prepared; they are stopped when sent or approved). **Remove Lock** reopens it; only someone allowed to change settings can do it.
 
 **What you should see:** "Locked through {date}" in Financial Settings.
 
@@ -236,9 +241,10 @@ connecting an AI app is not turned on for this server, ask us: it is switched on
 
 ## 11. Connect to FlowLine (optional)
 
-FlowLine, our automation product, can react to Mizano events (for example a paid invoice) and prepare drafts in Mizano.
-**Settings → Integrations → Connect to FlowLine** gives the connection details to paste into FlowLine. Drafts from FlowLine wait
-for a person in Mizano like any other draft.
+FlowLine, our automation product, can react to Mizano events (for example a paid invoice) and act in Mizano with a key limited
+to what you allow: create customers and notes, and prepare draft invoices. The **Connect to FlowLine** card on the **Settings**
+page gives the connection details to paste into FlowLine. Draft invoices from FlowLine wait for a person in Mizano like any
+other draft.
 
 ---
 

@@ -65,7 +65,7 @@ for you.
 **العربية.** نعم، وهذا اختياري. في **الإعدادات ← الذكاء الاصطناعي ← اربط تطبيق الذكاء الاصطناعي** تنسخ عنوان ميزانو وتلصقه في
 Claude أو ChatGPT أو Codex أو Gemini، ثم تسجّل الدخول إلى ميزانو وتختار **قراءة فقط** أو **قراءة وإعداد مسودات**. لا تحتاج أي
 مفتاح. تطبيقك لا يرحّل ولا يرسل ولا يدفع ولا يحذف أبدًا، وتفصله متى شئت. (في ChatGPT يحتاج هذا خطة مدفوعة ووضع المطوّر.) هذا
-الربط يُفعَّل على كل خادم ميزانو؛ وإن ظهر «غير مفعّل» فنحن نفعّله لك. ولم نجرّبه بعد مع كل خطة اشتراك.
+الربط يُفعَّل لكل خادم ميزانو على حدة؛ وإن ظهر «غير مفعّل» فنحن نفعّله لك. ولم نجرّبه بعد مع كل خطة اشتراك.
 
 **English.** Yes, and it is optional. In **Settings → AI → Connect your AI app** you copy Mizano's address into Claude, ChatGPT,
 Codex or Gemini, then sign in to Mizano and choose **Read only** or **Read and prepare drafts**. No key is needed. Your app never
@@ -93,12 +93,12 @@ reviews before anything is posted.
 ## 7. Partial payments, the bank and closing the month? / الدفعات الجزئية والبنك وإقفال الشهر؟
 
 **العربية.** سجّل دفعة جزئية أو كاملة على الفاتورة، والباقي يبقى مفتوحًا ويظهر في تقرير أعمار الذمم. استورد كشف البنك (CSV أو
-Excel أو OFX/QFX) وطابق كل حركة مع سجلاتك. ثم من **الإعدادات ← الإعدادات المالية** اضغط **إقفال الشهر السابق**: لا يستطيع أحد
-بعدها إنشاء أو تعديل معاملة بتاريخ قبل الإقفال. لا يوجد اتصال مباشر بالبنك؛ الكشف يُستورَد ملفًا.
+Excel أو OFX/QFX) وطابق كل حركة مع سجلاتك. ثم من **الإعدادات ← الإعدادات المالية** اضغط **إقفال الشهر السابق**: بعدها
+لا يمكن ترحيل أو تعديل أو عكس أي شيء في الدفاتر بتاريخ الإقفال أو قبله (يمكن تجهيز المسودات، لكنها تتوقف عند الإرسال أو الاعتماد). لا يوجد اتصال مباشر بالبنك؛ الكشف يُستورَد ملفًا.
 
 **English.** Record a partial or full payment on the invoice; the rest stays open and shows in the aging report. Import the bank
 statement (CSV, Excel, OFX/QFX) and match each line to your records. Then in **Settings → Financial Settings** press
-**Lock Previous Month**: after that nobody can create or edit a transaction dated before the lock. There is no direct bank
+**Lock Previous Month**: after that nothing dated on or before the lock date can be posted, changed or reversed in the books (drafts can still be prepared; they are stopped when sent or approved). There is no direct bank
 connection; the statement is imported as a file.
 
 ---
@@ -123,12 +123,12 @@ without ever posting or paying, and a small team that sets up your organization 
 ## 9. What if I stop using it? / ماذا لو توقفت عن استخدامه؟
 
 **العربية.** بياناتك ملكك. من كل قائمة (الفواتير، فواتير الموردين، العملاء، الموردون، المصروفات، القيود، الأصناف) اضغط
-**تصدير الكل** لتنزيل CSV أو Excel، والفواتير وعروض الأسعار تُصدَّر PDF. صفحات التقارير نفسها ليس فيها زر تصدير بعد. وإن احتجت
+**تصدير الكل** لتنزيل CSV أو Excel، والفواتير وعروض الأسعار تُصدَّر PDF. ومعظم صفحات التقارير ليس فيها زر تصدير بعد (المبيعات والمشتريات حسب العميل والصنف والمورد تُصدَّر CSV). وإن احتجت
 نسخة كاملة من قاعدة البيانات والمستندات الأصلية فنسلّمها لك من النسخة الاحتياطية.
 
 **English.** Your data is yours. From each list (invoices, bills, customers, vendors, expenses, journals, items) press
-**Export All** to download CSV or Excel, and invoices and quotes export to PDF. The report pages themselves have no export
-button yet. If you need a full copy of the database and the original files, we hand it to you from the backup.
+**Export All** to download CSV or Excel, and invoices and quotes export to PDF. Most report pages have no export
+button yet (sales and purchases by customer, item and vendor export to CSV). If you need a full copy of the database and the original files, we hand it to you from the backup.
 
 ---
 
