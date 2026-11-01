@@ -107,6 +107,11 @@
     "empty": {
       "title": "No vendors yet",
       "description": "Get started by adding your first vendor"
+    },
+    "bulkDelete": {
+      "title": "Delete {count} vendors?",
+      "description": "Selected vendors will be deleted. Vendors with transactions will be skipped.",
+      "confirm": "Delete {count} vendors"
     }
   },
   "expenses": {
@@ -212,7 +217,8 @@
       "title": "Approve {count, plural, one {{count} expense} other {{count} expenses}}?",
       "description": "Selected expenses will be approved.",
       "confirm": "Approve {count, plural, one {{count} expense} other {{count} expenses}}"
-    }
+    },
+    "plusTax": "+ {amount} tax"
   },
   "bills": {
     "title": "Bills",
@@ -342,14 +348,33 @@
       "duplicated": "Bill duplicated",
       "duplicatedDescription": "A new draft copy has been created.",
       "duplicateFailed": "Error duplicating bill",
-      "genericError": "An error occurred"
+      "genericError": "An error occurred",
+      "deleted": "Bill deleted",
+      "deletedDescription": "Bill {number} has been deleted.",
+      "deleteFailed": "Failed to delete bill."
     },
     "onlyDraftsEditable": "Only draft bills can be edited",
     "from": "From {name}",
     "quickActions": "Quick Actions",
     "viewVendor": "View Vendor",
     "scanBill": "Scan Bill",
-    "searchPlaceholder": "Search by bill number or vendor..."
+    "searchPlaceholder": "Search by bill number or vendor...",
+    "sku": "SKU: {sku}",
+    "noLineItems": "No line items",
+    "viewProject": "View Project",
+    "duplicate": "Duplicate",
+    "markAsPaid": "Mark as Paid",
+    "refreshBills": "Refresh bills",
+    "bulkDelete": {
+      "title": "Delete {count} bills?",
+      "description": "Only draft bills will be deleted. Non-draft bills will be skipped.",
+      "confirm": "Delete {count} bills"
+    },
+    "bulkPay": {
+      "title": "Mark {count} bills as paid?",
+      "description": "A payment for the full remaining balance will be recorded for each bill from the default bank account and posted to the ledger.",
+      "confirm": "Mark {count} bills as paid"
+    }
   },
   "credits": {
     "title": "Vendor Credits",
@@ -454,6 +479,16 @@
       "voidedDescription": "The vendor credit was voided and its journal reversed.",
       "voidError": "Error voiding credit",
       "genericError": "Something went wrong. Please try again."
+    },
+    "bulkDelete": {
+      "title": "Delete {count} vendor credits?",
+      "description": "Selected vendor credits will be deleted. Credits that have been applied will be skipped.",
+      "confirm": "Delete {count} vendor credits"
+    },
+    "statusLabels": {
+      "open": "Open",
+      "applied": "Applied",
+      "refunded": "Refunded"
     }
   },
   "payments": {
@@ -579,7 +614,33 @@
     "totalPayable": "Total Payable",
     "overdueAmount": "Overdue Amount",
     "unpaidBills": "Unpaid Bills",
-    "paidThisMonth": "Paid This Month"
+    "paidThisMonth": "Paid This Month",
+    "acrossVendors": "Across {count, plural, one {# vendor} other {# vendors}}",
+    "overdueBillsCount": "{count, plural, one {# overdue bill} other {# overdue bills}}",
+    "unpaidHint": "Open, overdue, or partially paid",
+    "paidThisMonthHint": "Bills paid this month",
+    "modules": {
+      "vendors": {
+        "description": "Manage your vendor contacts, payment terms, and purchase history.",
+        "stats": "{count} total"
+      },
+      "expenses": {
+        "description": "Record and categorize business expenses for accurate tracking.",
+        "stats": "{count} recorded"
+      },
+      "bills": {
+        "description": "Track vendor bills, schedule payments, and manage accounts payable.",
+        "stats": "{count} unpaid"
+      },
+      "payments": {
+        "description": "Record payments made to vendors and suppliers.",
+        "stats": "Track payments"
+      },
+      "credits": {
+        "description": "Manage vendor credits and apply them to outstanding bills.",
+        "stats": "Manage credits"
+      }
+    }
   },
   "vendor360": {
     "billsTab": "Bills",

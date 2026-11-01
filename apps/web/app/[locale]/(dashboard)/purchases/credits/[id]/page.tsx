@@ -173,7 +173,11 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                 <Badge variant="destructive">{t('credits.voided')}</Badge>
               ) : (
                 <Badge variant={credit.appliedToBillId ? 'secondary' : 'default'}>
-                  {credit.appliedToBillId ? 'Applied' : credit.refundedAt ? 'Refunded' : 'Open'}
+                  {credit.appliedToBillId
+                    ? t('credits.statusLabels.applied')
+                    : credit.refundedAt
+                      ? t('credits.statusLabels.refunded')
+                      : t('credits.statusLabels.open')}
                 </Badge>
               )}
             </div>
@@ -232,7 +236,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setApplyDialogOpen(false)}>
-                      Cancel
+                      {t('credits.cancel')}
                     </Button>
                     <Button
                       onClick={handleApplyToBill}
@@ -305,7 +309,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setRefundDialogOpen(false)}>
-                      Cancel
+                      {t('credits.cancel')}
                     </Button>
                     <Button
                       onClick={handleRefund}
@@ -417,7 +421,11 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t('credits.status')}</span>
               <Badge variant={credit.appliedToBillId ? 'secondary' : 'default'}>
-                {credit.appliedToBillId ? 'Applied' : credit.refundedAt ? 'Refunded' : 'Open'}
+                {credit.appliedToBillId
+                  ? t('credits.statusLabels.applied')
+                  : credit.refundedAt
+                    ? t('credits.statusLabels.refunded')
+                    : t('credits.statusLabels.open')}
               </Badge>
             </div>
             {credit.bill && (

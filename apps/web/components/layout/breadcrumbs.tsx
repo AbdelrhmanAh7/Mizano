@@ -44,7 +44,7 @@ export function Breadcrumbs() {
 
   return (
     <nav
-      aria-label="Breadcrumb"
+      aria-label={t('label')}
       className="flex items-center gap-1 text-sm text-muted-foreground mb-4"
     >
       <Link href="/dashboard" className="flex items-center hover:text-foreground transition-colors">

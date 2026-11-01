@@ -579,5 +579,9 @@
     "selectCountryFirst": "Select a country first",
     "toastsRegion": "Notifications",
     "closeToast": "Close"
+  },
+  "commandDialog": {
+    "title": "Command",
+    "description": "Search and run commands"
   }
 }

@@ -579,5 +579,9 @@
     "selectCountryFirst": "اختر الدولة أولًا",
     "toastsRegion": "الإشعارات",
     "closeToast": "إغلاق"
+  },
+  "commandDialog": {
+    "title": "الأوامر",
+    "description": "ابحث عن أمر ونفّذه"
   }
 }

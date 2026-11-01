@@ -107,6 +107,11 @@
     "empty": {
       "title": "لا يوجد موردون بعد",
       "description": "ابدأ بإضافة أول مورد"
+    },
+    "bulkDelete": {
+      "title": "حذف {count} مورد؟",
+      "description": "سيتم حذف الموردين المحددين، وسيتم تخطي الموردين الذين لديهم معاملات.",
+      "confirm": "حذف {count} مورد"
     }
   },
   "expenses": {
@@ -212,7 +217,8 @@
       "title": "اعتماد {count} من المصروفات؟",
       "description": "ستُعتمد المصروفات المحددة.",
       "confirm": "اعتماد {count} من المصروفات"
-    }
+    },
+    "plusTax": "+ {amount} ضريبة"
   },
   "bills": {
     "title": "الفواتير",
@@ -342,14 +348,33 @@
       "duplicated": "تم نسخ الفاتورة",
       "duplicatedDescription": "أُنشئت نسخة جديدة كمسودة.",
       "duplicateFailed": "تعذّر نسخ الفاتورة",
-      "genericError": "حدث خطأ"
+      "genericError": "حدث خطأ",
+      "deleted": "تم حذف الفاتورة",
+      "deletedDescription": "تم حذف الفاتورة {number}.",
+      "deleteFailed": "تعذّر حذف الفاتورة."
     },
     "onlyDraftsEditable": "لا يمكن تعديل إلا الفواتير المسودة",
     "from": "من {name}",
     "quickActions": "إجراءات سريعة",
     "viewVendor": "عرض المورد",
     "scanBill": "مسح فاتورة",
-    "searchPlaceholder": "ابحث برقم الفاتورة أو اسم المورد..."
+    "searchPlaceholder": "ابحث برقم الفاتورة أو اسم المورد...",
+    "sku": "رمز الصنف: {sku}",
+    "noLineItems": "لا توجد بنود",
+    "viewProject": "عرض المشروع",
+    "duplicate": "نسخ",
+    "markAsPaid": "تحديد كمدفوعة",
+    "refreshBills": "تحديث الفواتير",
+    "bulkDelete": {
+      "title": "حذف {count} فاتورة؟",
+      "description": "ستُحذف فواتير المسودة فقط، وسيتم تخطي الفواتير الأخرى.",
+      "confirm": "حذف {count} فاتورة"
+    },
+    "bulkPay": {
+      "title": "تحديد {count} فاتورة كمدفوعة؟",
+      "description": "ستُسجَّل دفعة بكامل الرصيد المتبقي لكل فاتورة من الحساب البنكي الافتراضي وتُرحَّل إلى دفتر الأستاذ.",
+      "confirm": "تحديد {count} فاتورة كمدفوعة"
+    }
   },
   "credits": {
     "title": "ائتمانات الموردين",
@@ -454,6 +479,16 @@
       "voidedDescription": "تم إلغاء ائتمان المورد وعكس قيد اليومية الخاص به.",
       "voidError": "تعذّر إلغاء ائتمان المورد",
       "genericError": "حدث خطأ ما. حاول مرة أخرى."
+    },
+    "bulkDelete": {
+      "title": "حذف {count} ائتمان للموردين؟",
+      "description": "سيتم حذف ائتمانات الموردين المحددة، وسيتم تخطي الائتمانات التي طُبّقت على فاتورة.",
+      "confirm": "حذف {count} ائتمان للموردين"
+    },
+    "statusLabels": {
+      "open": "مفتوح",
+      "applied": "مطبّق",
+      "refunded": "مُسترد"
     }
   },
   "payments": {
@@ -579,7 +614,33 @@
     "totalPayable": "إجمالي المستحقات",
     "overdueAmount": "المبلغ المتأخر",
     "unpaidBills": "فواتير غير مدفوعة",
-    "paidThisMonth": "مدفوع هذا الشهر"
+    "paidThisMonth": "مدفوع هذا الشهر",
+    "acrossVendors": "موزعة على {count, plural, zero {لا موردين} one {مورد واحد} two {موردَين} few {# موردين} many {# مورداً} other {# مورد}}",
+    "overdueBillsCount": "{count, plural, zero {لا توجد فواتير متأخرة} one {فاتورة متأخرة واحدة} two {فاتورتان متأخرتان} few {# فواتير متأخرة} many {# فاتورة متأخرة} other {# فاتورة متأخرة}}",
+    "unpaidHint": "مفتوحة أو متأخرة أو مدفوعة جزئياً",
+    "paidThisMonthHint": "الفواتير المدفوعة هذا الشهر",
+    "modules": {
+      "vendors": {
+        "description": "إدارة جهات اتصال الموردين وشروط الدفع وسجل المشتريات.",
+        "stats": "{count} إجمالاً"
+      },
+      "expenses": {
+        "description": "تسجيل المصروفات وتصنيفها لمتابعة دقيقة.",
+        "stats": "{count} مسجّلة"
+      },
+      "bills": {
+        "description": "متابعة فواتير الموردين وجدولة المدفوعات وإدارة الحسابات الدائنة.",
+        "stats": "{count} غير مدفوعة"
+      },
+      "payments": {
+        "description": "تسجيل المدفوعات للموردين والمورّدين.",
+        "stats": "متابعة المدفوعات"
+      },
+      "credits": {
+        "description": "إدارة ائتمانات الموردين وتطبيقها على الفواتير المستحقة.",
+        "stats": "إدارة الائتمانات"
+      }
+    }
   },
   "vendor360": {
     "billsTab": "الفواتير",

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -64,6 +64,7 @@ function toConfirmDecimal(value: unknown, field: ConfirmLineField, lineNumber: n
 
 export default function ScanBillPage() {
   const router = useRouter();
+  const locale = useLocale();
   const t = useTranslations('ai.intake');
   const ts = useTranslations('ai.intake.scan');
 
@@ -456,7 +457,12 @@ export default function ScanBillPage() {
                   <div>
                     <p className="font-medium">{selectedFile.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                      {/* Intl names the unit in the UI language (MB / ميغابايت). */}
+                      {new Intl.NumberFormat(locale === 'ar' ? 'ar-u-nu-latn' : 'en', {
+                        style: 'unit',
+                        unit: 'megabyte',
+                        maximumFractionDigits: 2,
+                      }).format(selectedFile.size / 1024 / 1024)}
                     </p>
                   </div>
                   <Button

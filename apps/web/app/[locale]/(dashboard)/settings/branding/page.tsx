@@ -124,7 +124,7 @@ export default function BrandingSettingsPage() {
               <Textarea
                 id="footerText"
                 {...form.register('footerText')}
-                placeholder="Thank you for your business! Please contact us with any questions."
+                placeholder={t('branding.footerTextPlaceholder')}
                 rows={3}
               />
               <p className="text-xs text-muted-foreground">{t('branding.footerTextHint')}</p>

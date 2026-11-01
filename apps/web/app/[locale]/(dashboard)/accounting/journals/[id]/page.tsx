@@ -73,13 +73,13 @@ export default function JournalDetailPage() {
     try {
       await postJournal.mutateAsync(journalId);
       toast({
-        title: 'Journal posted',
-        description: 'The journal entry has been posted successfully.',
+        title: t('journals.toast.posted'),
+        description: t('journals.toast.postedDescription'),
       });
     } catch (error) {
       toast({
-        title: 'Error',
-        description: getApiErrorMessage(error, 'Failed to post journal.'),
+        title: t('journals.toast.error'),
+        description: getApiErrorMessage(error, t('journals.toast.postError')),
         variant: 'destructive',
       });
     }
@@ -89,14 +89,14 @@ export default function JournalDetailPage() {
     try {
       await deleteJournal.mutateAsync(journalId);
       toast({
-        title: 'Journal deleted',
-        description: 'The journal entry has been deleted.',
+        title: t('journals.toast.deleted'),
+        description: t('journals.toast.deletedDescription'),
       });
       router.push('/accounting/journals');
     } catch (error) {
       toast({
-        title: 'Error',
-        description: getApiErrorMessage(error, 'Failed to delete journal.'),
+        title: t('journals.toast.error'),
+        description: getApiErrorMessage(error, t('journals.toast.deleteError')),
         variant: 'destructive',
       });
     }
@@ -135,22 +135,20 @@ export default function JournalDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/accounting/journals">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Journal Not Found</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{t('journals.notFoundTitle')}</h1>
           </div>
         </div>
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              The journal entry you&apos;re looking for doesn&apos;t exist.
-            </p>
+            <p className="text-muted-foreground">{t('journals.notFoundDescription')}</p>
             <Button asChild className="mt-4">
-              <Link href="/accounting/journals">Back to Journals</Link>
+              <Link href="/accounting/journals">{t('journals.backToJournals')}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -172,7 +170,7 @@ export default function JournalDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/accounting/journals">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -180,7 +178,9 @@ export default function JournalDetailPage() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight">{journal.journalNumber}</h1>
-              <Badge className={getStatusColor(journal.status)}>{journal.status}</Badge>
+              <Badge className={getStatusColor(journal.status)}>
+                {t(`journals.status.${journal.status}`)}
+              </Badge>
             </div>
             <p className="text-muted-foreground">{formatLongDate(new Date(journal.entryDate))}</p>
           </div>
@@ -196,7 +196,7 @@ export default function JournalDetailPage() {
               </Button>
               <Button onClick={handlePost} disabled={postJournal.isPending}>
                 <CheckCircle className="mr-2 h-4 w-4" />
-                Post
+                {t('journals.post')}
               </Button>
             </>
           )}
@@ -275,7 +275,9 @@ export default function JournalDetailPage() {
                 {t('recurring.table.status')}
               </dt>
               <dd>
-                <Badge className={getStatusColor(journal.status)}>{journal.status}</Badge>
+                <Badge className={getStatusColor(journal.status)}>
+                  {t(`journals.status.${journal.status}`)}
+                </Badge>
               </dd>
             </div>
             {journal.description && (
@@ -334,7 +336,7 @@ export default function JournalDetailPage() {
               ))}
               {/* Totals Row */}
               <TableRow className="border-t-2 font-semibold">
-                <TableCell colSpan={2}>Total</TableCell>
+                <TableCell colSpan={2}>{tCommon('total')}</TableCell>
                 <TableCell className="text-right font-mono">
                   {formatJournalAmount(totals.totalDebit)}
                 </TableCell>
@@ -352,9 +354,7 @@ export default function JournalDetailPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('journals.deleteJournal')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this journal entry? This action cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogDescription>{t('journals.deleteConfirmThis')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
@@ -362,7 +362,7 @@ export default function JournalDetailPage() {
               onClick={confirmDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {tCommon('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

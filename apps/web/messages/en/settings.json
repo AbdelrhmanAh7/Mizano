@@ -125,7 +125,13 @@
     "documentDigits": "Digits in Arabic",
     "documentDigitsDescription": "Amounts on Arabic screens and invoices, quotes and bills printed in Arabic use these digits. English always uses 0123.",
     "digitsLatn": "Western (0123)",
-    "digitsArab": "Arabic-Indic (٠١٢٣)"
+    "digitsArab": "Arabic-Indic (٠١٢٣)",
+    "dateUs": "MM/DD/YYYY (US)",
+    "dateInternational": "DD/MM/YYYY (International)",
+    "dateIso": "YYYY-MM-DD (ISO)",
+    "numberUs": "1,000.00 (US/UK)",
+    "numberEuropean": "1.000,00 (European)",
+    "numberFrench": "1 000,00 (French/International)"
   },
   "branding": {
     "title": "Branding",
@@ -638,7 +644,11 @@
       "patternDeleted": "Pattern deleted",
       "patternDeletedDescription": "Cleared {count, plural, one {{count} cached copy} other {{count} cached copies}} matching \"{pattern}\". Your data is unchanged.",
       "patternDeleteError": "Failed to delete cache pattern. Please try again."
-    }
+    },
+    "noExpiry": "No expiry",
+    "expired": "Expired",
+    "deleteKey": "Delete this key",
+    "deleteKeyLabel": "Delete cache key"
   },
   "auditLogs": {
     "title": "Audit Logs",

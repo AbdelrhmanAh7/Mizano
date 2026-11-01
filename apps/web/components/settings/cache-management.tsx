@@ -58,9 +58,9 @@ function formatUptime(seconds: number): string {
   return `${m}m`;
 }
 
-function formatTTL(ttl: number): string {
-  if (ttl === -1) return 'No expiry';
-  if (ttl === -2) return 'Expired';
+function formatTTL(ttl: number, labels: { noExpiry: string; expired: string }): string {
+  if (ttl === -1) return labels.noExpiry;
+  if (ttl === -2) return labels.expired;
   if (ttl <= 0) return '—';
   if (ttl >= 3600) return `${Math.floor(ttl / 3600)}h ${Math.floor((ttl % 3600) / 60)}m`;
   if (ttl >= 60) return `${Math.floor(ttl / 60)}m ${ttl % 60}s`;
@@ -359,7 +359,10 @@ export function CacheManagement() {
                           </TableCell>
                           <TableCell>
                             <span className="text-sm text-muted-foreground">
-                              {formatTTL(keyInfo.ttl)}
+                              {formatTTL(keyInfo.ttl, {
+                                noExpiry: t('cache.noExpiry'),
+                                expired: t('cache.expired'),
+                              })}
                             </span>
                           </TableCell>
                           <TableCell className="text-right">
@@ -369,8 +372,8 @@ export function CacheManagement() {
                               className="h-8 w-8 text-destructive hover:text-destructive"
                               onClick={() => deletePatternMutation.mutate(label)}
                               disabled={deletePatternMutation.isPending}
-                              title="Delete this key"
-                              aria-label="Delete cache key"
+                              title={t('cache.deleteKey')}
+                              aria-label={t('cache.deleteKeyLabel')}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>

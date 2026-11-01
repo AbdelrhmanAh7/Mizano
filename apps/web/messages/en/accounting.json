@@ -232,7 +232,43 @@
       "updated": "Journal updated",
       "updatedDescription": "The journal entry has been updated successfully.",
       "updateError": "Error updating journal",
-      "genericError": "Something went wrong. Please try again."
+      "genericError": "Something went wrong. Please try again.",
+      "error": "Error",
+      "deleted": "Journal deleted",
+      "deletedNumber": "Journal {number} has been deleted.",
+      "deletedDescription": "The journal entry has been deleted.",
+      "deleteError": "Failed to delete journal.",
+      "posted": "Journal posted",
+      "postedNumber": "Journal {number} has been posted.",
+      "postedDescription": "The journal entry has been posted successfully.",
+      "postError": "Failed to post journal."
+    },
+    "description": "Create and manage manual journal entries",
+    "editDescription": "Update the journal entry details",
+    "post": "Post",
+    "searchPlaceholder": "Search by journal number or description...",
+    "dateRange": "Date range",
+    "refresh": "Refresh journals",
+    "listTitle": "Journals",
+    "createFirst": "Create Your First Journal",
+    "deleteConfirm": "Are you sure you want to delete \"{number}\"? This action cannot be undone.",
+    "deleteConfirmThis": "Are you sure you want to delete this journal entry? This action cannot be undone.",
+    "bulkDeleteDescription": "Only unposted journals will be deleted. Posted journals will be skipped.",
+    "bulkPostDescription": "Selected unposted journals will be posted. This will create accounting entries.",
+    "bulkDeleteTitle": "Delete {count, plural, one {{count} journal} other {{count} journals}}?",
+    "bulkDeleteConfirm": "Delete {count, plural, one {{count} journal} other {{count} journals}}",
+    "bulkPostTitle": "Post {count, plural, one {{count} journal} other {{count} journals}}?",
+    "bulkPostConfirm": "Post {count, plural, one {{count} journal} other {{count} journals}}",
+    "notFoundTitle": "Journal Not Found",
+    "notFoundDescription": "The journal entry you're looking for doesn't exist.",
+    "backToJournals": "Back to Journals",
+    "backToJournal": "Back to Journal",
+    "cannotEditTitle": "Cannot Edit Journal",
+    "cannotEditDescription": "Only draft journals can be edited. This journal is {status}.",
+    "status": {
+      "DRAFT": "Draft",
+      "POSTED": "Posted",
+      "VOIDED": "Voided"
     }
   },
   "recurring": {
@@ -358,5 +394,41 @@
       "toggleError": "Error changing the profile status",
       "genericError": "Something went wrong. Please try again."
     }
+  },
+  "goBack": "Go back",
+  "hub": {
+    "description": "Manage your chart of accounts, journal entries, and financial reports",
+    "open": "Open {title}",
+    "modules": {
+      "accounts": "Manage your accounts hierarchy, types, and balances",
+      "journals": "Create and manage double-entry journal entries",
+      "recurring": "Automate recurring journal entries on a schedule",
+      "trialBalance": "View debit and credit balances for all accounts",
+      "generalLedger": "View detailed transaction history by account"
+    }
+  },
+  "trialBalance": {
+    "title": "Trial Balance",
+    "description": "View debit and credit balances for all accounts",
+    "asOfDate": "As of Date",
+    "balanced": "Balanced",
+    "outOfBalance": "Out of Balance: {debit} / {credit}",
+    "asOfTitle": "Trial Balance as of {date}",
+    "empty": "No trial balance data available. Create and post journal entries to see data here.",
+    "accountCode": "Account Code",
+    "accountName": "Account Name",
+    "type": "Type"
+  },
+  "generalLedger": {
+    "title": "General Ledger",
+    "description": "View detailed transaction history by account",
+    "account": "Account",
+    "selectAccount": "Select an account",
+    "from": "From",
+    "to": "To",
+    "selectPrompt": "Select an account to view its general ledger.",
+    "openingBalance": "Opening Balance",
+    "closingBalance": "Closing Balance",
+    "noTransactions": "No transactions found for the selected period."
   }
 }
