@@ -21,6 +21,21 @@ describe('localizeError', () => {
     });
   });
 
+  it('names the bank account that already uses a ledger account, in Arabic (#663)', () => {
+    expect(
+      localizeError({
+        message:
+          'This ledger account is already linked to the bank account "Test Bank". Each bank account needs its own ledger account.',
+        status: HttpStatus.CONFLICT,
+        locale: 'ar',
+      }),
+    ).toEqual({
+      code: 'BANK_LEDGER_ACCOUNT_TAKEN',
+      message:
+        'حساب دفتر الأستاذ هذا مرتبط بالفعل بالحساب البنكي "Test Bank". يحتاج كل حساب بنكي إلى حساب خاص به في دفتر الأستاذ.',
+    });
+  });
+
   it('answers an unknown route as not found', () => {
     expect(
       localizeError({ message: 'Cannot GET /nowhere', status: HttpStatus.NOT_FOUND, locale: 'ar' }),

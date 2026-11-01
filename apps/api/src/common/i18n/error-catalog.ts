@@ -1491,6 +1491,11 @@ const BANKING_ERRORS: ErrorCatalogEntry[] = [
     ar: 'سجّل الأرصدة الافتتاحية للبنوك من شاشة الأرصدة الافتتاحية (المحاسبة ← الأرصدة الافتتاحية).',
   },
   {
+    code: 'BANK_LEDGER_ACCOUNT_TAKEN',
+    en: 'This ledger account is already linked to the bank account "{name}". Each bank account needs its own ledger account.',
+    ar: 'حساب دفتر الأستاذ هذا مرتبط بالفعل بالحساب البنكي "{name}". يحتاج كل حساب بنكي إلى حساب خاص به في دفتر الأستاذ.',
+  },
+  {
     code: 'LINKED_LEDGER_ACCOUNT_NOT_FOUND',
     en: 'Linked ledger account not found',
     ar: 'حساب دفتر الأستاذ المرتبط غير موجود.',
