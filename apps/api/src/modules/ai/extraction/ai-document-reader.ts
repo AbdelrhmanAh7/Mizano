@@ -111,8 +111,9 @@ function warningsFor(out: ReadOutput): string[] {
 
 /**
  * Reads a document with the organization's own AI provider when its `documents` feature is
- * active. Returns null whenever AI is off, cannot read this input, is over the limit or answers
- * badly: the caller then runs the CPU rules reader. Never logs document content.
+ * active. Returns null when the feature is off; throws the typed AiError when AI is on but cannot
+ * read this input, is over the limit, is refused or answers badly: the caller then runs the CPU
+ * rules reader and records why. Never logs document content.
  */
 @Injectable()
 export class AiDocumentReader {
@@ -146,7 +147,7 @@ export class AiDocumentReader {
       : await prepareImageForAi(context.fileBuffer, context.mimeType);
     const instructions = `${accountsBlock(accounts)}\nRead the attached document.`;
     try {
-      const { data } = await this.gateway.run({
+      const { data, provider, model } = await this.gateway.run({
         organizationId,
         feature: 'documents',
         system: SYSTEM,
@@ -178,14 +179,17 @@ export class AiDocumentReader {
       return {
         extraction: this.toExtraction(data, documentText, Date.now() - started, byCode),
         strategyUsed: 'ai',
+        provider,
+        model,
         totalTimeMs: Date.now() - started,
       };
     } catch (error) {
-      // Metadata only: the reason code, never the answer or the document.
+      // Metadata only: the reason code, never the answer or the document. The resolver runs
+      // the rules reader and keeps this reason so the result can say why.
       this.logger.warn(
-        `AI reading skipped for org ${organizationId}: ${error instanceof AiError ? error.code : 'error'}; using the rules reader`,
+        `AI reading failed for org ${organizationId}: ${error instanceof AiError ? error.code : 'error'}`,
       );
-      return null;
+      throw error;
     }
   }
 

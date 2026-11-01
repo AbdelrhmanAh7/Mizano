@@ -130,6 +130,14 @@
       "method": {
         "ai": "Read by AI",
         "rules": "Read on this server"
+      },
+      "reader": {
+        "ai": "Read by AI ({provider}, {model}).",
+        "rules": "Read without AI (basic reader).",
+        "reasonAiOff": "Why: AI reading is turned off for this organization.",
+        "reasonRulesOnly": "Why: this installation is set to use the basic reader only.",
+        "reasonError": "Why the AI did not read it: {reason}",
+        "settings": "Open AI settings"
       }
     }
   }

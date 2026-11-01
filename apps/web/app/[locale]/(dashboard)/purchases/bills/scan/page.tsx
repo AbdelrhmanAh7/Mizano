@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ReaderNote } from '@/components/ai/reader-note';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -602,6 +603,7 @@ export default function ScanBillPage() {
                 </div>
               </div>
               <CardDescription>{ts('reviewHint')}</CardDescription>
+              <ReaderNote result={result} />
             </CardHeader>
           </Card>
 

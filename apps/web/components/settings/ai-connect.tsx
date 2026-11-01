@@ -2,6 +2,7 @@
 
 import { AiAppConnect } from '@/components/settings/ai-app-connect';
 import { Badge } from '@/components/ui/badge';
+import { AiModelPicker } from '@/components/settings/ai-model-picker';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -214,6 +215,9 @@ export function AiConnect() {
               <span className="text-muted-foreground">
                 {t('connection.model')}: {view.model}
               </span>
+              <Badge variant={view.verifiedAt ? 'secondary' : 'outline'} data-testid="ai-verified">
+                {view.verifiedAt ? t('connection.verified') : t('connection.notVerified')}
+              </Badge>
               <div className="ms-auto flex gap-2">
                 <Button
                   variant="outline"
@@ -224,7 +228,11 @@ export function AiConnect() {
                     test.mutate(undefined, { onError: fail });
                   }}
                 >
-                  {test.isPending ? t('connection.testing') : t('connection.test')}
+                  {test.isPending
+                    ? t('connection.testing')
+                    : !view.verifiedAt || view.lastError
+                      ? t('connection.testAgain')
+                      : t('connection.test')}
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -248,6 +256,25 @@ export function AiConnect() {
                   </AlertDialogContent>
                 </AlertDialog>
               </div>
+              {view.lastError && (
+                <div
+                  className="w-full rounded-md border border-destructive p-3 text-sm"
+                  role="alert"
+                  data-testid="ai-last-error"
+                >
+                  <p className="font-medium text-destructive">{t('connection.lastErrorTitle')}</p>
+                  <p>
+                    {tErrors.has(view.lastError.code)
+                      ? tErrors(view.lastError.code)
+                      : tErrors('AI_PROVIDER_ERROR')}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {t('connection.lastErrorAt', {
+                      date: new Date(view.lastError.at).toLocaleString(locale),
+                    })}
+                  </p>
+                </div>
+              )}
               {test.data && (
                 <p className="w-full text-xs text-muted-foreground">
                   {t('connection.testOk', { ms: test.data.latencyMs })}
@@ -418,22 +445,11 @@ export function AiConnect() {
                   {models.isError ? (
                     <p className="text-sm text-destructive">{t('spend.modelsFailed')}</p>
                   ) : (
-                    <Select
-                      value={view.model ?? undefined}
-                      disabled={!canEdit || models.isLoading || update.isPending}
-                      onValueChange={(model) => update.mutate({ model }, { onError: fail })}
-                    >
-                      <SelectTrigger id="ai-model" dir="ltr">
-                        <SelectValue placeholder={t('spend.loadingModels')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(models.data ?? []).map((m) => (
-                          <SelectItem key={m.id} value={m.id}>
-                            {m.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <AiModelPicker
+                      models={models.data ?? []}
+                      current={view.model}
+                      disabled={!canEdit || models.isLoading}
+                    />
                   )}
                 </div>
                 <div className="space-y-2">

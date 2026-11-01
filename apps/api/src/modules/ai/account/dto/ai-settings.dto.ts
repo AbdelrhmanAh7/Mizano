@@ -80,3 +80,9 @@ export class OpenRouterCompleteDto {
   @Matches(/^[A-Za-z0-9._~-]+$/)
   code!: string;
 }
+
+export class ChooseAiModelDto {
+  @IsString()
+  @Matches(MODEL_ID)
+  model!: string;
+}

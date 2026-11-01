@@ -1,7 +1,11 @@
+import { AiErrorCode } from '../account/ai-features';
 import { DocumentExtractionResult } from './extraction-result';
 
 /** Readers: the CPU rules reader, or the organization's own AI provider. */
 export type ExtractionStrategyName = 'ai' | 'rules';
+
+/** Why the CPU reader ran: an AI error code, or one of these two. */
+export type ReaderFallbackReason = AiErrorCode | 'AI_OFF' | 'RULES_ONLY';
 
 /** Context passed to every reader. */
 export interface ExtractionContext {
@@ -22,6 +26,11 @@ export interface ExtractionContext {
 export interface StrategyExtractionResult {
   extraction: DocumentExtractionResult;
   strategyUsed: ExtractionStrategyName;
+  /** AI reading: which provider and model read the document. */
+  provider?: string;
+  model?: string;
+  /** Rules reading: why the AI did not read it (an AiErrorCode, or a reason below). */
+  fallbackReason?: ReaderFallbackReason;
   /** OCR confidence (0-100), if OCR was used */
   ocrRawConfidence?: number;
   /** Total wall-clock time for the reader */

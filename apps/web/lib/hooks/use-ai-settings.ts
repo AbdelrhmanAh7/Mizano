@@ -64,6 +64,18 @@ export function useUpdateAi() {
   return useSettingsMutation(aiSettingsApi.update);
 }
 
+/** Choosing a model runs a real test call; only a passing model is saved. */
+export function useChooseAiModel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (model: string) => aiSettingsApi.chooseModel(model),
+    onSuccess: (result) => {
+      if (result.ok) qc.setQueryData(KEYS.settings, result.settings);
+      void qc.invalidateQueries({ queryKey: KEYS.settings });
+    },
+  });
+}
+
 export function useConsentAi() {
   return useSettingsMutation(aiSettingsApi.consent);
 }
@@ -84,7 +96,8 @@ export function useTestAi() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => aiSettingsApi.test(),
-    onSettled: () => void qc.invalidateQueries({ queryKey: KEYS.usage }),
+    // A test changes whether the connection is verified and what the last error is.
+    onSettled: () => void qc.invalidateQueries({ queryKey: KEYS.settings }),
   });
 }
 

@@ -17,7 +17,7 @@ import {
   isAiProviderId,
 } from '../providers/ai-provider';
 import { AiProviderRegistry } from '../providers/ai-provider.registry';
-import { AI_FEATURES, AiError, AiFeatureKey } from './ai-features';
+import { AI_FEATURES, AiError, AiErrorCode, AiFeatureKey, aiCodeForFailure } from './ai-features';
 import { StoredPrice } from './ai-pricing';
 
 const LIST_TIMEOUT_MS = 15_000;
@@ -37,7 +37,10 @@ export interface AiSettingsView {
   spentThisMonthUsd: string;
   consent: { at: string; byId: string | null; provider: string } | null;
   connectedAt: string | null;
+  /** Set only while the last connection test succeeded; cleared when a test fails. */
   verifiedAt: string | null;
+  /** The newest AI call since connecting when it failed (code → plain text in the web). */
+  lastError: { code: AiErrorCode; feature: string; at: string } | null;
   availableProviders: AiProviderId[];
   encryptionConfigured: boolean;
 }
@@ -148,13 +151,59 @@ export function recommendedModel(provider: AiProviderId, models: AiModelInfo[]):
   }
 }
 
+/**
+ * Cheap models that read documents well, best first: a few ids, never forced on anyone. Only
+ * models that read images (when the provider says so) are offered.
+ */
+export function recommendedModels(provider: AiProviderId, models: AiModelInfo[]): string[] {
+  const usable = models.filter((m) => m.vision !== false);
+  const ids = usable.map((m) => m.id);
+  const pick = (re: RegExp, not?: RegExp): string | undefined =>
+    newestFirst(ids.filter((id) => re.test(id) && !(not && not.test(id))))[0];
+  let picks: Array<string | undefined>;
+  switch (provider) {
+    case 'openrouter':
+      picks = [
+        pick(/^google\/gemini-[\d.]+-flash$/),
+        pick(/^anthropic\/claude-.*haiku/),
+        pick(/^openai\/gpt-[\d.]+-mini$/),
+      ];
+      break;
+    case 'anthropic':
+      picks = [pick(/haiku/), pick(/sonnet/)];
+      break;
+    case 'openai':
+      picks = [pick(/^gpt-[\d.]+-mini$/), pick(/mini/, /nano/)];
+      break;
+    case 'gemini':
+      picks = [pick(/flash/, /lite|preview|exp|latest/), pick(/flash-lite/)];
+      break;
+    default:
+      picks = [];
+  }
+  const found = [...new Set(picks.filter((id): id is string => !!id))];
+  const fallback = recommendedModel(provider, models);
+  return found.length > 0 ? found : fallback ? [fallback] : [];
+}
+
+/** The provider's list with recommended picks first and flagged. */
+export function withRecommendations(provider: AiProviderId, models: AiModelInfo[]): AiModelInfo[] {
+  const top = recommendedModels(provider, models);
+  const flagged = models.map((m) => (top.includes(m.id) ? { ...m, recommended: true } : m));
+  return [
+    ...top.flatMap((id) => flagged.filter((m) => m.id === id)),
+    ...flagged.filter((m) => !m.recommended),
+  ];
+}
+
 function failureCode(error: unknown): AiError {
   if (error instanceof AiError) return error;
   if (error instanceof AiProviderError) {
     switch (error.kind) {
       case 'invalid_key':
-      case 'forbidden':
         return new AiError('AI_KEY_INVALID', 'The provider refused this key');
+      case 'forbidden':
+        return new AiError('AI_FORBIDDEN', 'The provider refused the request');
       case 'no_credit':
         return new AiError('AI_KEY_NO_CREDIT', 'The provider account has no credit');
       case 'rate_limited':
@@ -210,11 +259,48 @@ export class AiSettingsService {
     return new Decimal(sum._sum.costUsd?.toString() ?? '0');
   }
 
+  /** The newest finished AI call since the key was connected, when it failed. */
+  private async lastError(
+    organizationId: string,
+    since: Date | null | undefined,
+    model: string | null,
+  ): Promise<AiSettingsView['lastError']> {
+    const last = await this.prisma.aiUsage.findFirst({
+      where: {
+        organizationId,
+        // A refused trial of another model is not the saved model's error.
+        ...(model ? { model } : {}),
+        status: { not: 'RESERVED' },
+        ...(since ? { createdAt: { gte: since } } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { success: true, errorCode: true, feature: true, createdAt: true },
+    });
+    if (!last || last.success) return null;
+    return {
+      code: aiCodeForFailure(last.errorCode),
+      feature: last.feature,
+      at: last.createdAt.toISOString(),
+    };
+  }
+
+  /**
+   * Records the outcome of a connection test: a passing test marks the connection verified, a
+   * failing one clears it, so a refused connection never shows as verified.
+   */
+  async markVerified(organizationId: string, ok: boolean): Promise<void> {
+    await this.prisma.aiSettings.updateMany({
+      where: { organizationId },
+      data: { verifiedAt: ok ? new Date() : null },
+    });
+  }
+
   async view(organizationId: string): Promise<AiSettingsView> {
     const [s, spent] = await Promise.all([
       this.row(organizationId),
       this.spentThisMonth(organizationId),
     ]);
+    const lastError = s ? await this.lastError(organizationId, s.connectedAt, s.model) : null;
     const provider = s && isAiProviderId(s.provider) ? s.provider : 'none';
     return {
       provider,
@@ -233,6 +319,7 @@ export class AiSettingsService {
           : null,
       connectedAt: s?.connectedAt?.toISOString() ?? null,
       verifiedAt: s?.verifiedAt?.toISOString() ?? null,
+      lastError,
       availableProviders: this.registry.available(),
       encryptionConfigured: integrationsEncryptionConfigured(),
     };
@@ -268,7 +355,11 @@ export class AiSettingsService {
   }
 
   /** For the gateway: the opened connection when `feature` may run, else a typed refusal. */
-  async connection(organizationId: string, feature: AiFeatureKey | 'test'): Promise<AiConnection> {
+  async connection(
+    organizationId: string,
+    feature: AiFeatureKey | 'test',
+    trial?: { model: string; price: StoredPrice },
+  ): Promise<AiConnection> {
     const s = await this.row(organizationId);
     if (!s || !isAiProviderId(s.provider) || !s.model) {
       throw new AiError('AI_NOT_ENABLED', 'AI is not connected for this organization');
@@ -279,10 +370,11 @@ export class AiSettingsService {
     return {
       provider: s.provider,
       adapter: this.adapter(s.provider),
-      model: s.model,
+      model: trial?.model ?? s.model,
       apiKey: this.openKey(s),
-      price:
-        s.priceInPerMtok !== null && s.priceOutPerMtok !== null
+      price: trial
+        ? trial.price
+        : s.priceInPerMtok !== null && s.priceOutPerMtok !== null
           ? [s.priceInPerMtok.toString(), s.priceOutPerMtok.toString()]
           : null,
       fingerprint: connectionFingerprint(s),
@@ -312,7 +404,7 @@ export class AiSettingsService {
   }
 
   /**
-   * Verifies the key by listing the provider's models, then saves it sealed. A different
+   * Checks the key by listing the provider's models, then saves it sealed (not yet verified). A different
    * provider than before clears consent and features: consent names one provider.
    */
   async connect(
@@ -345,7 +437,8 @@ export class AiSettingsService {
       ...this.priceOf(models, model),
       connectedAt: now,
       connectedById: userId,
-      verifiedAt: now,
+      // Listing models proves the key exists, not that a call works: a test call verifies it.
+      verifiedAt: null,
       ...(sameProvider
         ? {}
         : { features: [], consentAt: null, consentById: null, consentProvider: null }),
@@ -365,7 +458,46 @@ export class AiSettingsService {
     const s = await this.row(organizationId);
     if (!s || !isAiProviderId(s.provider))
       throw new AiError('AI_NOT_ENABLED', 'AI is not connected');
-    return this.fetchModels(s.provider, this.openKey(s));
+    return withRecommendations(s.provider, await this.fetchModels(s.provider, this.openKey(s)));
+  }
+
+  /**
+   * What a model change needs before it may be saved: the model is on the provider's list for
+   * this key; `next` are the other recommended picks to suggest when it fails.
+   */
+  async planModelChange(
+    organizationId: string,
+    model: string,
+  ): Promise<{ price: StoredPrice; next: AiModelInfo[] }> {
+    const s = await this.row(organizationId);
+    if (!s || !isAiProviderId(s.provider))
+      throw new AiError('AI_NOT_ENABLED', 'AI is not connected');
+    const models = await this.fetchModels(s.provider, this.openKey(s));
+    const chosen = models.find((m) => m.id === model);
+    if (!chosen)
+      throw new AiError('AI_MODEL_UNAVAILABLE', 'The model is not available for this key');
+    const next = withRecommendations(s.provider, models).filter(
+      (m) => m.recommended && m.id !== model && m.id !== s.model,
+    );
+    return { price: chosen.pricePerMtok ?? null, next };
+  }
+
+  /** Saves a model that passed a test call, and marks the connection verified. */
+  async saveTestedModel(
+    organizationId: string,
+    model: string,
+    price: StoredPrice,
+  ): Promise<AiSettingsView> {
+    await this.prisma.aiSettings.updateMany({
+      where: { organizationId },
+      data: {
+        model,
+        priceInPerMtok: price ? String(price[0]) : null,
+        priceOutPerMtok: price ? String(price[1]) : null,
+        verifiedAt: new Date(),
+      },
+    });
+    return this.view(organizationId);
   }
 
   async update(

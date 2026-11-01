@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AiError } from '../account/ai-features';
 import { ExtractionStrategyResolver } from './extraction-strategy-resolver.service';
 import { ExtractionContext, StrategyExtractionResult } from './extraction-strategy.interface';
 
@@ -34,13 +35,45 @@ describe('ExtractionStrategyResolver', () => {
 
   it('uses the rules reader when AI is off for the organization (reader returns null)', async () => {
     const { resolver, rules } = build(undefined, async () => null);
-    expect((await resolver.resolve('org-1', context))?.strategyUsed).toBe('rules');
+    const read = await resolver.resolve('org-1', context);
+    expect(read?.strategyUsed).toBe('rules');
+    expect(read?.fallbackReason).toBe('AI_OFF');
     expect(rules.extract).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the provider and model of an AI reading', async () => {
+    const { resolver } = build(undefined, async () => ({
+      ...result('ai'),
+      provider: 'openrouter',
+      model: 'google/gemini-3.8-flash',
+    }));
+    expect(await resolver.resolve('org-1', context)).toMatchObject({
+      strategyUsed: 'ai',
+      provider: 'openrouter',
+      model: 'google/gemini-3.8-flash',
+    });
+  });
+
+  it('says why the rules reader ran when the provider refused (issue #658)', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    try {
+      const { resolver } = build(undefined, () =>
+        Promise.reject(new AiError('AI_FORBIDDEN', 'refused')),
+      );
+      expect(await resolver.resolve('org-1', context)).toMatchObject({
+        strategyUsed: 'rules',
+        fallbackReason: 'AI_FORBIDDEN',
+      });
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('never asks the AI reader when INTAKE_EXTRACTION_STRATEGY=rules', async () => {
     const { resolver, reader } = build('rules', async () => result('ai'));
-    expect((await resolver.resolve('org-1', context))?.strategyUsed).toBe('rules');
+    const read = await resolver.resolve('org-1', context);
+    expect(read?.strategyUsed).toBe('rules');
+    expect(read?.fallbackReason).toBe('RULES_ONLY');
     expect(reader.read).not.toHaveBeenCalled();
   });
 

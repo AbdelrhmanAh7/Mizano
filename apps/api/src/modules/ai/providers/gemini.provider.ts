@@ -35,7 +35,7 @@ export class GeminiProvider implements AiProviderAdapter {
       .filter((m) => (m.supportedGenerationMethods as unknown[]).includes('generateContent'))
       .map((m) => {
         const id = (asString(m.name) ?? '').replace(/^models\//, '');
-        return { id, name: asString(m.displayName) ?? id };
+        return { id, name: asString(m.displayName) ?? id, vision: true };
       })
       .filter((m) => m.id.startsWith('gemini') && !EXCLUDE.test(m.id) && MODEL_ID.test(m.id));
   }

@@ -4,10 +4,13 @@ import { z } from 'zod';
 import { AnyPermission, CurrentOrg, CurrentUser, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { AiError } from './ai-features';
+import { StoredPrice } from './ai-pricing';
 import { AiGatewayService } from './ai-gateway.service';
 import { AiSettingsService } from './ai-settings.service';
 import {
   AiConsentDto,
+  ChooseAiModelDto,
   ConnectAiDto,
   OpenRouterCompleteDto,
   OpenRouterStartDto,
@@ -59,42 +62,120 @@ export class AiSettingsController {
 
   @Post('connect')
   @Permissions('settings.edit')
-  @ApiOperation({ summary: 'Verify a provider key by listing its models, then save it sealed' })
-  connect(
+  @ApiOperation({ summary: 'Check a provider key, save it sealed, then test it with one call' })
+  async connect(
     @CurrentOrg() orgId: string,
     @CurrentUser('id') userId: string,
     @Body() dto: ConnectAiDto,
   ) {
-    return this.settings.connect(orgId, userId, dto);
+    const { models } = await this.settings.connect(orgId, userId, dto);
+    return { settings: await this.testAfterConnect(orgId, userId), models };
   }
 
   @Post('test')
   @HttpCode(200)
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'One tiny call through the connected provider (counts as usage)' })
-  async test(@CurrentOrg() orgId: string, @CurrentUser('id') userId: string) {
+  test(@CurrentOrg() orgId: string, @CurrentUser('id') userId: string) {
+    return this.runTest(orgId, userId);
+  }
+
+  /**
+   * One tiny call. A pass marks the connection verified; a provider refusal clears it and is
+   * rethrown (the settings screen shows its reason). A change of settings mid-call proves nothing.
+   */
+  private async runTest(
+    orgId: string,
+    userId: string,
+    trial?: { model: string; price: StoredPrice },
+  ) {
     const started = Date.now();
-    const result = await this.gateway.run({
-      organizationId: orgId,
-      userId,
-      feature: 'test',
-      system: 'You check that an API connection works. Answer with JSON only.',
-      parts: () => [{ type: 'text', text: 'Return exactly {"ok": true}' }],
-      maxOutputTokens: 200,
-      schema: PING_SCHEMA,
-    });
+    try {
+      const result = await this.gateway.run({
+        organizationId: orgId,
+        userId,
+        feature: 'test',
+        trial,
+        system: 'You check that an API connection works. Answer with JSON only.',
+        parts: () => [{ type: 'text', text: 'Return exactly {"ok": true}' }],
+        maxOutputTokens: 200,
+        schema: PING_SCHEMA,
+      });
+      if (!trial) await this.settings.markVerified(orgId, true);
+      return {
+        ok: true,
+        provider: result.provider,
+        model: result.model,
+        latencyMs: Date.now() - started,
+      };
+    } catch (error) {
+      const unrelated =
+        error instanceof AiError &&
+        (error.code === 'AI_SETTINGS_CHANGED' || error.code === 'AI_NOT_ENABLED');
+      // A refused trial of another model says nothing about the saved one.
+      if (!unrelated && !trial) await this.settings.markVerified(orgId, false);
+      throw error;
+    }
+  }
+
+  /** The test that follows connecting: a failure is not thrown, the view carries its reason. */
+  private async testAfterConnect(orgId: string, userId: string) {
+    try {
+      await this.runTest(orgId, userId);
+    } catch {
+      // Recorded as the last AI error and an unverified connection; the screen shows both.
+    }
+    return this.settings.view(orgId);
+  }
+
+  @Post('model')
+  @HttpCode(200)
+  @Permissions('settings.edit')
+  @ApiOperation({ summary: 'Choose a model: saved only after a real test call with it passes' })
+  chooseModel(
+    @CurrentOrg() orgId: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: ChooseAiModelDto,
+  ) {
+    return this.tryModel(orgId, userId, dto.model);
+  }
+
+  /**
+   * A failed trial keeps the old choice and returns the provider's reason (an error code the
+   * screen translates) with the next recommended models to try; nothing is saved.
+   */
+  private async tryModel(orgId: string, userId: string, model: string) {
+    const { price, next } = await this.settings.planModelChange(orgId, model);
+    try {
+      await this.runTest(orgId, userId, { model, price });
+    } catch (error) {
+      if (error instanceof AiError && error.code !== 'AI_SETTINGS_CHANGED') {
+        return { ok: false as const, code: error.code, suggestions: next.slice(0, 2) };
+      }
+      throw error;
+    }
     return {
-      ok: true,
-      provider: result.provider,
-      model: result.model,
-      latencyMs: Date.now() - started,
+      ok: true as const,
+      settings: await this.settings.saveTestedModel(orgId, model, price),
     };
   }
 
   @Patch()
   @Permissions('settings.edit')
-  update(@CurrentOrg() orgId: string, @Body() dto: UpdateAiSettingsDto) {
-    return this.settings.update(orgId, dto);
+  async update(
+    @CurrentOrg() orgId: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateAiSettingsDto,
+  ) {
+    const { model, ...rest } = dto;
+    if (model !== undefined) {
+      // The model only changes after it answered a real call.
+      const tried = await this.tryModel(orgId, userId, model);
+      if (!tried.ok) throw new AiError(tried.code, 'The model did not pass the test');
+    }
+    return Object.keys(rest).length > 0
+      ? this.settings.update(orgId, rest)
+      : this.settings.view(orgId);
   }
 
   @Post('consent')
@@ -130,11 +211,12 @@ export class AiSettingsController {
   @Post('openrouter/complete')
   @HttpCode(200)
   @Permissions('settings.edit')
-  completeOpenRouter(
+  async completeOpenRouter(
     @CurrentOrg() orgId: string,
     @CurrentUser('id') userId: string,
     @Body() dto: OpenRouterCompleteDto,
   ) {
-    return this.openRouter.complete(orgId, userId, dto.state, dto.code);
+    await this.openRouter.complete(orgId, userId, dto.state, dto.code);
+    return this.testAfterConnect(orgId, userId);
   }
 }

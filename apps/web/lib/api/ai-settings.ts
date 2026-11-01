@@ -18,7 +18,10 @@ export interface AiSettingsView {
   spentThisMonthUsd: string;
   consent: { at: string; byId: string | null; provider: string } | null;
   connectedAt: string | null;
+  /** Set only while the last connection test passed. */
   verifiedAt: string | null;
+  /** The newest AI call since connecting, when it failed (code is a settings.aiErrors key). */
+  lastError: { code: string; feature: string; at: string } | null;
   availableProviders: AiProvider[];
   encryptionConfigured: boolean;
 }
@@ -27,7 +30,16 @@ export interface AiModel {
   id: string;
   name: string;
   pricePerMtok?: [string, string];
+  /** Reads images or PDFs; undefined when the provider does not say. */
+  vision?: boolean;
+  /** A cheap pick that reads documents well (listed first). */
+  recommended?: boolean;
 }
+
+/** The result of choosing a model: saved only when a real call with it passed. */
+export type ChooseModelResult =
+  | { ok: true; settings: AiSettingsView }
+  | { ok: false; code: string; suggestions: AiModel[] };
 
 export interface AiUsage {
   since: string;
@@ -65,6 +77,8 @@ export const aiSettingsApi = {
   update: async (
     input: Partial<{ model: string; monthlyLimitUsd: string; features: AiFeature[] }>,
   ): Promise<AiSettingsView> => unwrap((await api.patch(base, input)).data),
+  chooseModel: async (model: string): Promise<ChooseModelResult> =>
+    unwrap((await api.post(`${base}/model`, { model })).data),
   consent: async (provider: AiProvider): Promise<AiSettingsView> =>
     unwrap((await api.post(`${base}/consent`, { provider, accepted: true })).data),
   revoke: async (): Promise<AiSettingsView> => unwrap((await api.post(`${base}/revoke`)).data),

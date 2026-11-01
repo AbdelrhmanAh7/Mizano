@@ -19,7 +19,11 @@ import { DocumentClassificationService, DocumentCategory } from './document-clas
 import { EntityExtractionService } from './entity-extraction.service';
 import { AiFeedbackService } from './ai-feedback.service';
 import { ExtractionStrategyResolver } from '../extraction/extraction-strategy-resolver.service';
-import { ExtractionContext } from '../extraction/extraction-strategy.interface';
+import {
+  ExtractionContext,
+  ReaderFallbackReason,
+  StrategyExtractionResult,
+} from '../extraction/extraction-strategy.interface';
 import { extractTextFromPdf } from '../utils/pdf-extractor.util';
 import { levenshteinSimilarity, normalizeText } from '../utils/text-similarity.util';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
@@ -130,6 +134,11 @@ export interface DocumentIntakeResult {
 
   /** Which reader extracted the data: the organization's own AI provider or the CPU rules. */
   extractionMethod: 'ai' | 'rules';
+  /** When read by AI: the provider and model that read it. */
+  extractionProvider: string | null;
+  extractionModel: string | null;
+  /** When read without AI: why the AI did not read it (an AI error code, AI_OFF or RULES_ONLY). */
+  aiFallbackReason: ReaderFallbackReason | null;
 }
 
 /**
@@ -266,6 +275,7 @@ export class DocumentIntakeService {
     let rawText = '';
     let extraction: DocumentExtractionResult | null = null;
     let extractionMethod: DocumentIntakeResult['extractionMethod'] = 'rules';
+    let reader: Pick<StrategyExtractionResult, 'provider' | 'model' | 'fallbackReason'> = {};
     const isPdf = mimeType === 'application/pdf';
 
     // Step 1: Build extraction context
@@ -307,6 +317,7 @@ export class DocumentIntakeService {
       extraction = strategyResult.extraction;
       rawText = (extraction.rawText || rawText).slice(0, PDF_TEXT_TRUNCATION_LIMIT);
       extractionMethod = strategyResult.strategyUsed;
+      reader = strategyResult;
       this.logger.log(
         `Reader ${strategyResult.strategyUsed} succeeded: ` +
           `confidence=${extraction.ocrConfidence.toFixed(2)}, time=${strategyResult.totalTimeMs}ms`,
@@ -447,6 +458,9 @@ export class DocumentIntakeService {
       accountingEntry: extraction.accountingEntry,
       suggestCreateVendor,
       extractionMethod,
+      extractionProvider: extractionMethod === 'ai' ? (reader.provider ?? null) : null,
+      extractionModel: extractionMethod === 'ai' ? (reader.model ?? null) : null,
+      aiFallbackReason: extractionMethod === 'rules' ? (reader.fallbackReason ?? null) : null,
     };
   }
 
