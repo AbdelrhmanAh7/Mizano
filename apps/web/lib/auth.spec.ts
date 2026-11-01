@@ -4,7 +4,7 @@
 import axios from 'axios';
 import type { Session } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
-import { refreshAccessToken, tokenRefresher } from './auth';
+import { forwardedForHeader, refreshAccessToken, tokenRefresher } from './auth';
 import { createTokenRefresher, sessionRefreshKey, type RefreshedTokens } from './auth-refresh';
 
 interface Deferred<T> {
@@ -481,5 +481,20 @@ describe('authOptions session callback', () => {
     expect(result?.error).toBe('RefreshAccessTokenError');
     expect(result?.['refreshToken']).toBeUndefined();
     expect(Object.keys(result as object)).not.toContain('refreshToken');
+  });
+});
+
+describe('forwardedForHeader (sign-in rate limit per browser, TestSprite theme 1)', () => {
+  it("passes on the browser's forwarded address chain as received", () => {
+    expect(forwardedForHeader({ 'x-forwarded-for': ' 203.0.113.7, 198.51.100.2 ' })).toBe(
+      '203.0.113.7, 198.51.100.2',
+    );
+    expect(forwardedForHeader({ 'x-forwarded-for': ['203.0.113.7'] })).toBe('203.0.113.7');
+  });
+
+  it('sends nothing when the request carried no address', () => {
+    expect(forwardedForHeader(undefined)).toBeUndefined();
+    expect(forwardedForHeader({})).toBeUndefined();
+    expect(forwardedForHeader({ 'x-forwarded-for': '  ' })).toBeUndefined();
   });
 });

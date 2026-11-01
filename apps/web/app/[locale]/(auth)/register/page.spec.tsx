@@ -12,9 +12,13 @@ jest.mock('next-intl', () => ({
   useLocale: () => 'en',
 }));
 
+const mockPush = jest.fn();
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: jest.fn() }),
+  useRouter: () => ({ push: mockPush, refresh: jest.fn() }),
 }));
+
+const mockSignIn = jest.fn();
+jest.mock('next-auth/react', () => ({ signIn: (...a: unknown[]) => mockSignIn(...a) }));
 
 jest.mock('@/i18n/routing', () => ({
   Link: ({ href, children }: { href: string; children: React.ReactNode }) => (
@@ -43,7 +47,10 @@ function fill(password: string) {
 }
 
 describe('RegisterPage', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSignIn.mockResolvedValue({ ok: true, error: undefined });
+  });
 
   it('posts natively (never GET) so credentials cannot reach the URL', () => {
     const { container } = render(<RegisterPage />);
@@ -69,7 +76,9 @@ describe('RegisterPage', () => {
     render(<RegisterPage />);
     fill('Password1');
     await waitFor(() => expect(mockRegister).toHaveBeenCalledTimes(1));
-    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'accountCreated' }));
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'accountCreated' })),
+    );
   });
 
   it('starts the organization in Egypt unless another country is chosen', async () => {
@@ -93,5 +102,43 @@ describe('RegisterPage', () => {
         expect.objectContaining({ description: 'emailExists' }),
       ),
     );
+  });
+
+  describe('after the account is created (TestSprite theme 1)', () => {
+    const strong = 'Password123';
+
+    it('signs in with the new account and lands on the dashboard (first-use tour)', async () => {
+      mockRegister.mockResolvedValue({ data: {} });
+      mockSignIn.mockResolvedValue({ ok: true, error: undefined });
+      render(<RegisterPage />);
+      fill(strong);
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/en/dashboard'));
+      expect(mockSignIn).toHaveBeenCalledWith('credentials', {
+        email: 'o@nile.test',
+        password: strong,
+        redirect: false,
+      });
+    });
+
+    it('sends the person to Sign In when that sign-in is refused or fails', async () => {
+      mockRegister.mockResolvedValue({ data: {} });
+      const outcomes = [
+        () => Promise.resolve({ ok: false, error: 'CredentialsSignin' }),
+        () => Promise.reject(new Error('network')),
+      ];
+      for (const outcome of outcomes) {
+        mockPush.mockClear();
+        mockToast.mockClear();
+        mockSignIn.mockImplementationOnce(outcome);
+        const { unmount } = render(<RegisterPage />);
+        fill(strong);
+        await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/en/login'));
+        // The account exists, so no error toast is shown.
+        expect(mockToast).not.toHaveBeenCalledWith(
+          expect.objectContaining({ variant: 'destructive' }),
+        );
+        unmount();
+      }
+    });
   });
 });

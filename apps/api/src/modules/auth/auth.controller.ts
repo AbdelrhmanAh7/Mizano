@@ -12,9 +12,20 @@ import { Public } from '../../common/decorators';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { CurrentUser, CurrentUserData } from '../../common/decorators';
 
+/**
+ * Sign-ins and sign-ups per client address per minute. 5 by default (brute-force guard); a test
+ * copy that many automated browsers reach from one address may raise it (AUTH_RATE_LIMIT_PER_MIN).
+ */
+export function authRateLimitPerMinute(
+  raw: string | undefined = process.env.AUTH_RATE_LIMIT_PER_MIN,
+): number {
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 1 && n <= 1000 ? n : 5;
+}
+
 @ApiTags('Authentication')
 @Controller('auth')
-@Throttle({ short: { ttl: 60000, limit: 5 } })
+@Throttle({ short: { ttl: 60000, limit: authRateLimitPerMinute() } })
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
