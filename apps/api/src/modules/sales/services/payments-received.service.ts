@@ -78,8 +78,25 @@ export class PaymentsReceivedService {
       });
       if (!prior) return null;
       assertSamePaymentRetry(
-        { amount: prior.amount, partyId: prior.customerId },
-        { amount, partyId: dto.customerId },
+        {
+          partyId: prior.customerId,
+          amount: prior.amount,
+          date: prior.date,
+          paymentMode: prior.paymentMode,
+          accountId: prior.depositToAccountId,
+          allocations: prior.allocations.map((a) => ({
+            documentId: a.invoiceId,
+            amount: a.amount,
+          })),
+        },
+        {
+          partyId: dto.customerId,
+          amount,
+          date,
+          paymentMode: dto.paymentMode,
+          accountId: dto.depositToAccountId,
+          allocations: allocations.map((a) => ({ documentId: a.invoiceId, amount: a.amount })),
+        },
       );
       return prior;
     };

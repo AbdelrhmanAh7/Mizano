@@ -138,7 +138,15 @@ describe('PaymentsMadeService (posting)', () => {
     await service.create(ORG, keyed);
     expect(prisma.paymentMade.create.mock.calls[0][0].data.idempotencyKey).toBe('vpay-key-1');
 
-    const stored = { id: 'p1', vendorId: 'v1', amount: dec('100') };
+    const stored = {
+      id: 'p1',
+      vendorId: 'v1',
+      amount: dec('100'),
+      date: new Date('2024-07-01'),
+      paymentMode: 'BANK_TRANSFER',
+      paidFromAccountId: 'bank-acc',
+      allocations: [{ billId: 'b1', amount: dec('100') }],
+    };
     prisma.paymentMade.findFirst.mockResolvedValueOnce(stored);
     await expect(service.create(ORG, keyed)).resolves.toBe(stored);
 
@@ -148,6 +156,58 @@ describe('PaymentsMadeService (posting)', () => {
 
     prisma.paymentMade.findFirst.mockResolvedValueOnce({ ...stored, vendorId: 'other' });
     await expect(service.create(ORG, keyed)).rejects.toThrow('different details');
+  });
+
+  // A lost response, then the form changed and was resubmitted with the same screen key.
+  it.each([
+    ['another bill', { allocations: [{ billId: 'b2', amount: '100.00' }] }],
+    ['another paid-from account', { paidFromAccountId: 'cash-acc' }],
+    ['another date', { date: '2024-07-02' }],
+    ['another payment mode', { paymentMode: 'CASH' as const }],
+  ])('refuses a key reused with %s', async (_label, change) => {
+    prisma.paymentMade.findFirst.mockResolvedValueOnce({
+      id: 'p1',
+      vendorId: 'v1',
+      amount: dec('100'),
+      date: new Date('2024-07-01'),
+      paymentMode: 'BANK_TRANSFER',
+      paidFromAccountId: 'bank-acc',
+      allocations: [{ billId: 'b1', amount: dec('100') }],
+    });
+
+    await expect(
+      service.create(ORG, { ...dto, idempotencyKey: 'vpay-key-1', ...change }),
+    ).rejects.toThrow('different details');
+    expect(prisma.paymentMade.create).not.toHaveBeenCalled();
+    expect(bills.recalculateBalance).not.toHaveBeenCalled();
+  });
+
+  it('refuses a changed payment that lost on the unique key', async () => {
+    const { Prisma } = jest.requireActual('@prisma/client');
+    prisma.$transaction.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: 'test',
+        meta: { target: ['organizationId', 'idempotencyKey'] },
+      }),
+    );
+    prisma.paymentMade.findFirst.mockResolvedValueOnce({
+      id: 'p1',
+      vendorId: 'v1',
+      amount: dec('100'),
+      date: new Date('2024-07-01'),
+      paymentMode: 'BANK_TRANSFER',
+      paidFromAccountId: 'bank-acc',
+      allocations: [{ billId: 'b1', amount: dec('100') }],
+    });
+
+    await expect(
+      service.create(ORG, {
+        ...dto,
+        idempotencyKey: 'vpay-key-1',
+        allocations: [{ billId: 'b2', amount: '100.00' }],
+      }),
+    ).rejects.toThrow('different details');
   });
 
   it('rejects an allocation above the bill balance without writing anything', async () => {

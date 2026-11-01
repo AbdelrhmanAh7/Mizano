@@ -85,8 +85,22 @@ export class PaymentsMadeService {
       });
       if (!prior) return null;
       assertSamePaymentRetry(
-        { amount: prior.amount, partyId: prior.vendorId },
-        { amount, partyId: dto.vendorId },
+        {
+          partyId: prior.vendorId,
+          amount: prior.amount,
+          date: prior.date,
+          paymentMode: prior.paymentMode,
+          accountId: prior.paidFromAccountId,
+          allocations: prior.allocations.map((a) => ({ documentId: a.billId, amount: a.amount })),
+        },
+        {
+          partyId: dto.vendorId,
+          amount,
+          date,
+          paymentMode: dto.paymentMode,
+          accountId: dto.paidFromAccountId,
+          allocations: allocations.map((a) => ({ documentId: a.billId, amount: a.amount })),
+        },
       );
       return prior;
     };
