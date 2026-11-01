@@ -191,7 +191,11 @@ Rules: publish no ports, never redefine a Jarda service name, keep data under `/
 secrets in `/etc/jarda/<name>.env` (mode 600). After adding or changing a file:
 `sudo systemctl restart jarda-stack`. The R2 copy takes every snapshot of this server, so a hook
 that backs up into the same restic repository (its own tag) goes off-site too. FlowLine's own
-files and steps live in the FlowLine repository (session fl-exit).
+files and steps live in the FlowLine repository: its installer
+(`sudo bash /opt/flowline/deploy/vps/install-flowline.sh --host flowline.<domain>`) writes all three
+slots, and the guide is [FlowLine docs/DEPLOY-VPS.md](https://github.com/AbdelrhmanAh7/flowline/blob/main/docs/DEPLOY-VPS.md)
+(private repository). FlowLine's health address is `https://flowline.<domain>/api/public/health`.
+The files in `examples/` only show the shape of each slot.
 
 ## Security notes
 
