@@ -1,0 +1,46 @@
+# Nightly failure-case journeys (@edge) on a throwaway stack (docs/E2E-BROWSER.md). The @happy journeys run on every pull request.
+name: Browser journeys nightly
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '8'
+  ONNXRUNTIME_NODE_INSTALL: skip
+  PUPPETEER_SKIP_DOWNLOAD: '1'
+
+jobs:
+  edge:
+    name: Edge journeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm e2e:up
+      - run: pnpm e2e:edge
+        env:
+          CI: 'true'
+      - name: Upload the report when something fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

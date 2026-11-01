@@ -22,7 +22,14 @@ documents it needs are created through the API in setup so the test stays fast a
 12. **390 px phone**: menu, Sales → Customers, no sideways scrolling (`money.spec.ts`)
 13. _Skipped with a bug link:_ the invoice page lists its credit note with the right amount (issue #656)
 
+## Added after the scope change (1 Nov 22:30-22:40)
+
+- **Golden scenario** (`golden.spec.ts`, @happy): 3 invoices (14 % VAT), 2 receipts, a credit note, 2 bills, 2 payments; every figure hand-calculated in the file: totals to the piastre, statuses, balances, AR and AP aging, P&L, VAT payable and input, trial balance accounts and both totals (1,919.7193), and the same numbers on the screens.
+- **Exact arithmetic** (@happy): the cases of `docs/strategy/demo-acceptance.md` (2 x 100 at 14 % = 200 / 28 / 228, a 10 % discount, mixed tax, decimals).
+- **@edge** (`edge.spec.ts`): C07 the same payment sent twice posts once; C10 a locked month refuses posting and works again after unlocking; wrong password.
+- Tags and `E2E_BASE_URL` for a deployed copy (docs/E2E-BROWSER.md).
+
 ## Backlog
 
-Forgot-password mail, onboarding wizard, Arabic accounting screens, vendor payment, reports pages, bank statement import and matching,
+C03 quote to invoice, PDF contents; C04 expense, vendor credit; C06 bill reading (needs the intake worker and the sample bill fixture `e2e-browser/fixtures/sample-bill.pdf`, total 114 EGP); C08 bank import and matching; C11 team; C12 settings; C05 Arabic on every screen; forgot-password mail, onboarding wizard, Arabic accounting screens, vendor payment, reports pages, bank statement import and matching,
 role permissions, tenant isolation in the browser (covered by the API suites in `e2e-army/`).

@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { expect, type Page } from '@playwright/test';
-import { API_URL } from '../env';
+import { API_URL, QA_ORGANIZATION, isRemote } from '../env';
 
 export type Account = {
   email: string;
@@ -17,7 +17,8 @@ export async function registerAccount(
   const id = `${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
   const email = `e2e-${label}-${id}@example.test`;
   const password = `Pw1-${randomBytes(9).toString('base64url')}`;
-  const organizationName = `Journey ${label} ${id}`;
+  // On a deployed copy every organization is named so that it can be found and removed afterwards.
+  const organizationName = isRemote ? `${QA_ORGANIZATION} ${id}` : `Journey ${label} ${id}`;
   const res = await fetch(`${API_URL}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

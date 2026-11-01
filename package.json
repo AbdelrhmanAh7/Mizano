@@ -60,7 +60,9 @@
     "prepare": "husky",
     "e2e": "playwright test",
     "e2e:up": "e2e-browser/up.sh",
-    "e2e:down": "e2e-browser/down.sh"
+    "e2e:down": "e2e-browser/down.sh",
+    "e2e:happy": "playwright test --grep @happy",
+    "e2e:edge": "playwright test --grep @edge"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.4.1",

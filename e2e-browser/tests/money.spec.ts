@@ -18,7 +18,7 @@ async function seeded(): Promise<{
 }
 
 test.describe('money flows', () => {
-  test('create a customer in the form: it is listed', async ({ page }) => {
+  test('create a customer in the form: it is listed @happy', async ({ page }) => {
     const account = await registerAccount('customer');
     await signIn(page, account);
     await page.goto('/en/sales/customers/new');
@@ -31,7 +31,7 @@ test.describe('money flows', () => {
     await expect(page.getByRole('row', { name: /Nile Traders.*nile@example\.test/ })).toBeVisible();
   });
 
-  test('create an invoice in the form: it is listed as a draft with its total', async ({
+  test('create an invoice in the form: it is listed as a draft with its total @happy', async ({
     page,
   }) => {
     const account = await registerAccount('invoice');
@@ -52,7 +52,7 @@ test.describe('money flows', () => {
     await expect(page.getByText('Draft', { exact: true }).first()).toBeVisible();
   });
 
-  test('a part payment leaves the right balance and shows in the payment history', async ({
+  test('a part payment leaves the right balance and shows in the payment history @happy', async ({
     page,
   }) => {
     const { account, invoice } = await seeded();
@@ -63,7 +63,9 @@ test.describe('money flows', () => {
     await expect(page.getByText('PMT-001')).toBeVisible();
   });
 
-  test('a credit note is posted and shows the customer balance after it', async ({ page }) => {
+  test('a credit note is posted and shows the customer balance after it @happy', async ({
+    page,
+  }) => {
     const { account, creditNote } = await seeded();
     await signIn(page, account);
     await page.goto(`/en/sales/credit-notes/${creditNote.id}`);
@@ -74,14 +76,16 @@ test.describe('money flows', () => {
   });
 
   // Issue #656: the invoice's Credit Notes table renders `total` (null) instead of `amount`, so it shows EGP 0.00.
-  test.fixme('the invoice page lists its credit note with the right amount', async ({ page }) => {
+  test.fixme('the invoice page lists its credit note with the right amount @happy', async ({
+    page,
+  }) => {
     const { account, invoice } = await seeded();
     await signIn(page, account);
     await page.goto(`/en/sales/invoices/${invoice.id}`);
     await expect(page.getByRole('row', { name: /CN-001/ })).toContainText('EGP 100.00');
   });
 
-  test('a vendor bill opens and is listed with its balance', async ({ page }) => {
+  test('a vendor bill opens and is listed with its balance @happy', async ({ page }) => {
     const account = await registerAccount('bill');
     const vendor = await api.createVendor(account);
     await api.createOpenBill(account, vendor.id);
@@ -92,7 +96,7 @@ test.describe('money flows', () => {
     await expect(row).toContainText('EGP 300.00');
   });
 
-  test('the trial balance balances after invoice, payment, credit note and bill', async ({
+  test('the trial balance balances after invoice, payment, credit note and bill @happy', async ({
     page,
   }) => {
     const { account } = await seeded();
@@ -118,7 +122,7 @@ test.describe('money flows', () => {
     await expect(total).toContainText('1,300.00');
   });
 
-  test('bank reconciliation opens for a new organization', async ({ page }) => {
+  test('bank reconciliation opens for a new organization @happy', async ({ page }) => {
     await signIn(page, await registerAccount('bank'));
     await page.goto('/en/banking/reconcile');
     await expect(page.getByText('Page Not Found')).toHaveCount(0);
@@ -126,7 +130,7 @@ test.describe('money flows', () => {
     await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
   });
 
-  test('on a 390 px phone the menu opens and Customers opens without sideways scrolling', async ({
+  test('on a 390 px phone the menu opens and Customers opens without sideways scrolling @happy', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
