@@ -114,7 +114,7 @@ export function useCreateVendor() {
         displayName: data.displayName || null,
         email: data.email || null,
         phone: data.phone || null,
-        currency: data.currency || 'USD',
+        currency: data.currency || undefined,
         taxId: data.taxId || null,
         paymentTerms: data.paymentTerms || 0,
         billingAddress: data.billingAddress,
@@ -213,15 +213,4 @@ export function getBalanceColor(balance: string | number | undefined): string {
   if (value > 0) return 'text-red-600 font-semibold';
   if (value < 0) return 'text-green-600';
   return 'text-gray-600';
-}
-
-/**
- * Format currency amount
- */
-export function formatCurrency(amount: string | number, currency: string = 'USD'): string {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(num);
 }

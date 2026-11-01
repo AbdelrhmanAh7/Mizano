@@ -20,21 +20,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import {
-  useExpense,
-  useDeleteExpense,
-  usePostExpense,
-  formatCurrency,
-} from '@/lib/hooks/use-expenses';
+import { useExpense, useDeleteExpense, usePostExpense } from '@/lib/hooks/use-expenses';
 import { sumDecimals } from '@/lib/decimal';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useDateFormatter } from '@/lib/hooks/use-date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface ExpenseDetailPageProps {
   params: { id: string };
 }
 
 export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
+  const formatCurrency = useMoneyFormatter();
   const formatLongDate = useDateFormatter('long');
   const { id } = params;
   const t = useTranslations('purchases');

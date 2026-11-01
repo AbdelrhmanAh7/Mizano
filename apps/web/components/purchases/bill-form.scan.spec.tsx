@@ -83,6 +83,24 @@ describe('BillForm scan review totals', () => {
     }
   });
 
+  it('offers "default currency" only when the scan read a currency (#587)', () => {
+    const options = (): string[] =>
+      Array.from(document.querySelectorAll<HTMLOptionElement>('select option')).map((o) => o.value);
+    const { unmount } = renderForm(undefined);
+    expect(options()).toContain('default');
+    unmount();
+    render(
+      <BillForm
+        scanDefaults={scanDefaults}
+        requireCurrency
+        onSubmit={jest.fn()}
+        onCancel={jest.fn()}
+      />,
+    );
+    expect(options()).toEqual(expect.arrayContaining(['EGP', 'SAR', 'AED']));
+    expect(options()).not.toContain('default');
+  });
+
   it('has the discrepancy copy in English and Arabic', () => {
     for (const intake of [enAi.intake, arAi.intake]) {
       for (const key of [

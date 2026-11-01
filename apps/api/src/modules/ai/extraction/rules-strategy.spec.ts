@@ -2,7 +2,7 @@ import { resolve } from 'path';
 import { accessSync } from 'fs';
 
 jest.mock('fs', () => ({ accessSync: jest.fn(), constants: { R_OK: 4 } }));
-import { RulesStrategy } from './rules-strategy.service';
+import { OcrEngineError, RulesStrategy } from './rules-strategy.service';
 import { ExtractionContext } from './extraction-strategy.interface';
 
 jest.mock('tesseract.js', () => ({ createWorker: jest.fn() }));
@@ -69,7 +69,8 @@ describe('RulesStrategy worker cache', () => {
   it('retries after failed creation', async () => {
     createWorker.mockRejectedValueOnce(new Error('unavailable')).mockResolvedValueOnce(worker());
     const strategy = new RulesStrategy();
-    expect(await strategy.extract(context)).toBeNull();
+    // An engine failure is not "no text": it propagates so the job retries (#587).
+    await expect(strategy.extract(context)).rejects.toBeInstanceOf(OcrEngineError);
     expect(await strategy.extract(context)).not.toBeNull();
     expect(createWorker).toHaveBeenCalledTimes(2);
   });
@@ -78,7 +79,7 @@ describe('RulesStrategy worker cache', () => {
     jest.mocked(accessSync).mockImplementation(() => {
       throw new Error('missing');
     });
-    expect(await new RulesStrategy().extract(context)).toBeNull();
+    await expect(new RulesStrategy().extract(context)).rejects.toBeInstanceOf(OcrEngineError);
     expect(createWorker).not.toHaveBeenCalled();
   });
   it('checks every requested language and uses read-only local assets', async () => {
@@ -103,7 +104,7 @@ describe('RulesStrategy worker cache', () => {
       })
       .mockResolvedValueOnce(worker());
     const strategy = new RulesStrategy();
-    expect(await strategy.extract(context)).toBeNull();
+    await expect(strategy.extract(context)).rejects.toBeInstanceOf(OcrEngineError);
     expect(await strategy.extract(context)).not.toBeNull();
   });
   it('bounds pending initialization and terminates a worker arriving after timeout', async () => {
@@ -119,9 +120,9 @@ describe('RulesStrategy worker cache', () => {
       )
       .mockResolvedValueOnce(worker());
     const strategy = new RulesStrategy();
-    const first = strategy.extract(context);
+    const first = strategy.extract(context).catch((error: unknown) => error);
     await jest.advanceTimersByTimeAsync(30_000);
-    expect(await first).toBeNull();
+    expect(await first).toBeInstanceOf(OcrEngineError);
     expect(await strategy.extract(context)).not.toBeNull();
     finish(late);
     await jest.advanceTimersByTimeAsync(0);

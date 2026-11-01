@@ -26,15 +26,16 @@ import {
   getBOMStatusLabel,
   getWorkOrderStatusColor,
   getWorkOrderStatusLabel,
-  formatCurrency,
   BOMComponent,
   useWorkOrdersByBom,
   type WorkOrderStatus,
 } from '@/lib/hooks/use-manufacturing';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { BOMForm } from '@/components/manufacturing/bom-form';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function BOMDetailPage() {
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('manufacturing');
   const tCommon = useTranslations('common');
   const params = useParams();

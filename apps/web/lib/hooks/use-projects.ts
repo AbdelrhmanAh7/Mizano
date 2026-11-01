@@ -443,15 +443,6 @@ export function getTaskStatusColor(status: TaskStatus): string {
   return colors[status] || colors.TODO;
 }
 
-export function formatCurrency(amount: string | number | null | undefined): string {
-  if (amount === null || amount === undefined) return '$0.00';
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(num);
-}
-
 export function formatHours(hours: string | number | null | undefined): string {
   if (hours === null || hours === undefined) return '0h';
   const num = typeof hours === 'string' ? parseFloat(hours) : hours;

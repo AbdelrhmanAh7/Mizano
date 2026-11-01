@@ -173,7 +173,7 @@ const form = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema) });
 
 - Money arrives from the API as decimal **strings**. Keep it as a string in state and forms (`MoneyInput` stores strings) and send strings back.
 - Never add, subtract or round money in the browser with `number`. Totals, taxes and balances come from the API, which computes them with Decimal. A client-side preview must be labelled as a preview and the server value wins.
-- Formatting is display-only: `useFormatters().formatCurrency(Number(value), currency)` (locale-aware via next-intl). Always pass the document's explicit currency; never assume a default.
+- Formatting is display-only: `const formatMoney = useMoneyFormatter(); formatMoney(value, document.currencyCode)`. It shows the document's own currency, else the organization base currency (`GET /organization/money-format`, readable by every member), never USD or the counterparty's default; Arabic screens use the organization's digit setting. There is no other money formatter: no module hook or page defines its own.
 - Show tax percentage and tax amount as separate values.
 - Negative amounts use a leading minus (or the locale's accounting format); do not encode sign with color alone.
 

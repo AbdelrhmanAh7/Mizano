@@ -59,7 +59,7 @@ describe('LocalizationSettingsPage document digits', () => {
 
   it('labels the setting in Arabic and starts from the stored value', () => {
     render(<LocalizationSettingsPage />);
-    expect(screen.getByText('الأرقام في ملفات PDF العربية')).toBeInTheDocument();
+    expect(screen.getByText('الأرقام بالعربية')).toBeInTheDocument();
     expect(digitsSelect().value).toBe('latn');
   });
 

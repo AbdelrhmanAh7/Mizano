@@ -26,7 +26,6 @@ import { billsApi } from '@/lib/api';
 import {
   Bill,
   BillStatus,
-  formatCurrency,
   useBillStatusLabel,
   getStatusVariant,
   useCloneBill,
@@ -63,8 +62,10 @@ import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function BillsPageContent() {
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('purchases');
   const statusLabel = useBillStatusLabel();

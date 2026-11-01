@@ -28,20 +28,18 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import {
-  usePaymentMade,
-  useDeletePaymentMade,
-  formatCurrency,
-} from '@/lib/hooks/use-payments-made';
+import { usePaymentMade, useDeletePaymentMade } from '@/lib/hooks/use-payments-made';
 import { PaymentModeText, type PaymentMode } from '@/components/sales/status-badge';
 import { useBaseCurrency } from '@/lib/hooks/use-organization';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface PaymentDetailPageProps {
   params: { id: string };
 }
 
 export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const { id } = params;
   const t = useTranslations('purchases');

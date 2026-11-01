@@ -24,7 +24,6 @@ import { projectsApi } from '@/lib/api';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import {
-  formatCurrency,
   formatHours,
   getBillingMethodLabel,
   getProjectStatusColor,
@@ -54,8 +53,10 @@ import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function ProjectsPageContent() {
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('projects');
   const tableParams = useTableParams({ defaultSortBy: 'createdAt' });

@@ -41,14 +41,15 @@ import {
   getAssetStatusColor,
   getAssetStatusLabel,
   getDepreciationMethodLabel,
-  formatCurrency,
   AssetStatus,
   AssetType,
   DepreciationMethod,
 } from '@/lib/hooks/use-assets';
 import { useTranslations } from 'next-intl';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function AssetsPage() {
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('assets');
   const tc = useTranslations('common');
   const [statusFilter, setStatusFilter] = useState<AssetStatus | 'all'>('all');

@@ -20,14 +20,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   useTaxDashboardStats,
-  formatCurrency,
   getVATReturnStatusColor,
   getVATReturnStatusLabel,
   type VATReturnStatus,
 } from '@/lib/hooks/use-tax';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function TaxPage() {
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('tax');
   const { data: stats, isLoading } = useTaxDashboardStats();

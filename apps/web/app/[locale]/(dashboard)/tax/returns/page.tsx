@@ -35,7 +35,6 @@ import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import {
-  formatCurrency,
   getVATReturnStatusColor,
   getVATReturnStatusLabel,
   normalizeVATReturn,
@@ -61,8 +60,10 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Suspense, useMemo, useState } from 'react';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function VATReturnsPageContent() {
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('tax');
   const tCommon = useTranslations('common');

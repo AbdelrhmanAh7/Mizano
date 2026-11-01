@@ -1,13 +1,20 @@
-import { ConflictException, HttpException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IntakeJobStatus } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { IntakeJobsService, stageFor } from './intake-jobs.service';
+import { INTAKE_DRAFT_ENTITY } from './intake-draft-marker';
+import { INTAKE_APPROVAL_INTERRUPTED, IntakeJobsService, stageFor } from './intake-jobs.service';
 import { IntakeQueueService } from './intake-queue.service';
 import { FakeIntakeJobTable, MemoryIntakeStorage } from './intake-test-utils';
 
 const ORG_A = 'org-a';
 const ORG_B = 'org-b';
+const BILL = { type: 'BILL' } as const;
 
 describe('IntakeJobsService', () => {
   let table: FakeIntakeJobTable;
@@ -19,6 +26,7 @@ describe('IntakeJobsService', () => {
     isAvailable: jest.Mock;
   };
   let config: { get: jest.Mock };
+  let auditLog: { findFirst: jest.Mock };
   let service: IntakeJobsService;
 
   beforeEach(() => {
@@ -31,8 +39,9 @@ describe('IntakeJobsService', () => {
       isAvailable: jest.fn().mockReturnValue(true),
     };
     config = { get: jest.fn() };
+    auditLog = { findFirst: jest.fn().mockResolvedValue(null) };
     service = new IntakeJobsService(
-      { intakeJob: table.delegate } as unknown as PrismaService,
+      { intakeJob: table.delegate, auditLog } as unknown as PrismaService,
       storage,
       queue as unknown as IntakeQueueService,
       config as unknown as ConfigService,
@@ -190,20 +199,42 @@ describe('IntakeJobsService', () => {
     it('moves EXTRACTED to APPROVED once and refuses a replay', async () => {
       const { job } = await upload(ORG_A);
       table.rows[0].status = IntakeJobStatus.EXTRACTED;
-      await expect(service.claimForApproval(job.id, ORG_A)).resolves.toBe(
+      table.rows[0].result = { extractedFields: { currency: 'EGP' } };
+      await expect(service.claimForApproval(job.id, ORG_A, BILL)).resolves.toBe(
         IntakeJobStatus.EXTRACTED,
       );
-      await expect(service.claimForApproval(job.id, ORG_A)).rejects.toBeInstanceOf(
+      await expect(service.claimForApproval(job.id, ORG_A, BILL)).rejects.toBeInstanceOf(
         ConflictException,
       );
+      expect(table.rows[0].draftDocumentType).toBe('bill');
       await service.releaseApproval(job.id, ORG_A, IntakeJobStatus.EXTRACTED);
-      expect(table.rows[0].status).toBe(IntakeJobStatus.EXTRACTED);
+      expect(table.rows[0]).toMatchObject({
+        status: IntakeJobStatus.EXTRACTED,
+        draftDocumentType: null,
+      });
+    });
+
+    it('refuses approval while an unread currency has not been chosen (#587)', async () => {
+      const { job } = await upload(ORG_A);
+      table.rows[0].status = IntakeJobStatus.NEEDS_REVIEW;
+      table.rows[0].result = { extractedFields: { currency: null } };
+      await expect(service.claimForApproval(job.id, ORG_A, BILL)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      await expect(
+        service.claimForApproval(job.id, ORG_A, { type: 'BILL', currencyCode: '  ' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(table.rows[0].status).toBe(IntakeJobStatus.NEEDS_REVIEW);
+      await expect(
+        service.claimForApproval(job.id, ORG_A, { type: 'BILL', currencyCode: 'EGP' }),
+      ).resolves.toBe(IntakeJobStatus.NEEDS_REVIEW);
+      expect(table.rows[0].status).toBe(IntakeJobStatus.APPROVED);
     });
 
     it('does not let another tenant claim', async () => {
       const { job } = await upload(ORG_A);
       table.rows[0].status = IntakeJobStatus.EXTRACTED;
-      await expect(service.claimForApproval(job.id, ORG_B)).rejects.toBeInstanceOf(
+      await expect(service.claimForApproval(job.id, ORG_B, BILL)).rejects.toBeInstanceOf(
         NotFoundException,
       );
     });
@@ -328,8 +359,94 @@ describe('IntakeJobsService', () => {
     const { job } = await upload(ORG_A);
     table.rows[0].status = IntakeJobStatus.APPROVED;
     table.rows[0].draftDocumentId = 'bill-9';
-    await expect(service.claimForApproval(job.id, ORG_A)).rejects.toMatchObject({
+    await expect(service.claimForApproval(job.id, ORG_A, BILL)).rejects.toMatchObject({
       response: { draftDocumentId: 'bill-9' },
+    });
+  });
+
+  describe('recoverApprovals (crash between the approval claim and the draft, #587)', () => {
+    const GRACE_MS = 10 * 60 * 1000;
+    const later = (): Date => new Date(Date.now() + GRACE_MS + 1000);
+
+    /** The confirm request claimed the job, then the process died before the draft committed. */
+    async function crashedApproval(org = ORG_A, body = 'pdf-bytes'): Promise<string> {
+      const { job } = await upload(org, body);
+      const row = table.rows.find((r) => r.id === job.id);
+      if (!row) throw new Error('missing row');
+      row.status = IntakeJobStatus.NEEDS_REVIEW;
+      row.result = { extractedFields: { currency: 'EGP' } };
+      await service.claimForApproval(job.id, org, BILL);
+      return job.id;
+    }
+
+    it('reopens a stalled approval with no draft for review, with a stable code', async () => {
+      const id = await crashedApproval();
+      expect(await service.recoverApprovals(later())).toEqual({ linked: 0, reopened: 1 });
+      expect(table.rows[0]).toMatchObject({
+        id,
+        status: IntakeJobStatus.NEEDS_REVIEW,
+        lastError: INTAKE_APPROVAL_INTERRUPTED,
+        draftDocumentType: null,
+        draftDocumentId: null,
+      });
+      expect(auditLog.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { organizationId: ORG_A, entityType: INTAKE_DRAFT_ENTITY, entityId: id },
+        }),
+      );
+      // The reopened job can be approved again.
+      await expect(service.claimForApproval(id, ORG_A, BILL)).resolves.toBe(
+        IntakeJobStatus.NEEDS_REVIEW,
+      );
+    });
+
+    it('links the draft named by the job marker instead of reopening it', async () => {
+      const id = await crashedApproval();
+      auditLog.findFirst.mockResolvedValue({
+        newValues: { draftDocumentType: 'bill', draftDocumentId: 'bill-7' },
+      });
+      expect(await service.recoverApprovals(later())).toEqual({ linked: 1, reopened: 0 });
+      expect(table.rows[0]).toMatchObject({
+        id,
+        status: IntakeJobStatus.APPROVED,
+        draftDocumentType: 'bill',
+        draftDocumentId: 'bill-7',
+      });
+      // A replayed confirm is refused and points at that draft.
+      await expect(service.claimForApproval(id, ORG_A, BILL)).rejects.toMatchObject({
+        response: { draftDocumentId: 'bill-7' },
+      });
+    });
+
+    it('leaves an approval inside the grace period, a linked job and other states alone', async () => {
+      await crashedApproval(ORG_A, 'one');
+      await crashedApproval(ORG_B, 'two');
+      table.rows[1].draftDocumentId = 'bill-1';
+      expect(await service.recoverApprovals(new Date())).toEqual({ linked: 0, reopened: 0 });
+      expect(await service.recoverApprovals(later())).toEqual({ linked: 0, reopened: 1 });
+      expect(table.rows[1]).toMatchObject({
+        status: IntakeJobStatus.APPROVED,
+        draftDocumentId: 'bill-1',
+        lastError: null,
+      });
+    });
+
+    it('leaves an older unlinked approval alone: its draft may exist with no marker', async () => {
+      // Claimed by the earlier code, which recorded no draft type and linked in a separate step.
+      const id = await crashedApproval();
+      table.rows[0].draftDocumentType = null;
+      expect(await service.recoverApprovals(later())).toEqual({ linked: 0, reopened: 0 });
+      expect(table.rows[0]).toMatchObject({
+        id,
+        status: IntakeJobStatus.APPROVED,
+        lastError: null,
+      });
+    });
+
+    it('never throws out of the sweep', async () => {
+      await crashedApproval();
+      auditLog.findFirst.mockRejectedValue(new Error('db down'));
+      await expect(service.recoverApprovals(later())).resolves.toEqual({ linked: 0, reopened: 0 });
     });
   });
 });

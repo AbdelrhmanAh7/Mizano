@@ -165,14 +165,3 @@ export function useDeleteExpense() {
     error: 'voidError',
   });
 }
-
-/**
- * Format currency amount
- */
-export function formatCurrency(amount: string | number, currency: string = 'USD'): string {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(num);
-}

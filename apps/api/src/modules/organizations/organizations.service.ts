@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { lockOrganizationLedger } from '../../common/utils/ledger-lock';
 import { PrismaService } from '../../prisma/prisma.service';
 import { timingSafeStringEqual } from '../../common/utils/secure-compare.util';
-import { documentDigitsFrom } from '../../common/utils/document-digits';
+import { type DocumentDigits, documentDigitsFrom } from '../../common/utils/document-digits';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { UpdateAccountSettingsDto } from './dto/update-account-settings.dto';
 import {
@@ -58,6 +58,29 @@ export class OrganizationsService {
     }
 
     return organization;
+  }
+
+  /**
+   * What every member needs to display money: the base (ledger) currency and the digits Arabic
+   * amounts use. Readable without `settings.view` (accountants and sales reps lack it), so screens
+   * never fall back to a guessed currency (#83).
+   */
+  async getMoneyFormat(
+    id: string,
+  ): Promise<{ baseCurrency: string; documentDigits: DocumentDigits }> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id },
+      select: { baseCurrency: true, documentDigits: true },
+    });
+
+    if (!organization) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    return {
+      baseCurrency: organization.baseCurrency,
+      documentDigits: documentDigitsFrom(organization.documentDigits),
+    };
   }
 
   async update(id: string, updateOrganizationDto: UpdateOrganizationDto) {

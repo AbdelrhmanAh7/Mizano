@@ -47,13 +47,14 @@ import {
   getEmployeeStatusColor,
   getPayrollStatusLabel,
   type PayrollStatus,
-  formatCurrency,
 } from '@/lib/hooks/use-hr';
 import { useTranslations } from 'next-intl';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function EmployeeDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('hr');
   const tCommon = useTranslations('common');
   const dateLocale = useDateFnsLocale();

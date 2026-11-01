@@ -1,4 +1,4 @@
-import { ConflictException, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { IntakeJob, IntakeJobStatus } from '@prisma/client';
@@ -58,7 +58,6 @@ describe('DocumentIntakeController', () => {
     readOriginal: jest.Mock;
     retry: jest.Mock;
     claimForApproval: jest.Mock;
-    linkDraft: jest.Mock;
     releaseApproval: jest.Mock;
     toView: jest.Mock;
   };
@@ -85,7 +84,6 @@ describe('DocumentIntakeController', () => {
       }),
       retry: jest.fn().mockResolvedValue(job),
       claimForApproval: jest.fn().mockResolvedValue(IntakeJobStatus.EXTRACTED),
-      linkDraft: jest.fn().mockResolvedValue(undefined),
       releaseApproval: jest.fn().mockResolvedValue(undefined),
       toView: jest.fn((j: IntakeJob) => ({ id: j.id, status: j.status })),
     };
@@ -206,50 +204,44 @@ describe('DocumentIntakeController', () => {
     } as ConfirmIntakeDto;
 
     it('passes the current organization to the service', async () => {
-      const res = await controller.confirmDocument(ORG_A, dto);
+      const res = await controller.confirmDocument(ORG_A, 'user-1', dto);
       expect(service.confirmAndCreate).toHaveBeenCalledWith(ORG_A, dto);
       expect(res.data.id).toBe('b1');
       expect(jobs.claimForApproval).not.toHaveBeenCalled();
     });
 
-    it('claims the job once, creates the draft and links it', async () => {
-      await controller.confirmDocument(ORG_A, { ...dto, jobId: 'job-1' });
-      expect(jobs.claimForApproval).toHaveBeenCalledWith('job-1', ORG_A);
-      expect(service.confirmAndCreate).toHaveBeenCalledWith(ORG_A, dto);
-      expect(jobs.linkDraft).toHaveBeenCalledWith('job-1', ORG_A, { type: 'bill', id: 'b1' });
+    it('claims the job once, then creates and links the draft in one service call', async () => {
+      await controller.confirmDocument(ORG_A, 'user-1', {
+        ...dto,
+        currencyCode: 'EGP',
+        jobId: 'job-1',
+      });
+      expect(jobs.claimForApproval).toHaveBeenCalledWith('job-1', ORG_A, {
+        type: 'BILL',
+        currencyCode: 'EGP',
+      });
+      expect(service.confirmAndCreate).toHaveBeenCalledWith(
+        ORG_A,
+        { ...dto, currencyCode: 'EGP' },
+        { jobId: 'job-1', userId: 'user-1' },
+      );
     });
 
     it('creates no draft when the job cannot be claimed (replay)', async () => {
       jobs.claimForApproval.mockRejectedValue(new ConflictException());
-      await expect(controller.confirmDocument(ORG_A, { ...dto, jobId: 'job-1' })).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(
+        controller.confirmDocument(ORG_A, 'user-1', { ...dto, jobId: 'job-1' }),
+      ).rejects.toThrow(ConflictException);
       expect(service.confirmAndCreate).not.toHaveBeenCalled();
     });
 
     it('releases the claim when draft creation fails', async () => {
       service.confirmAndCreate.mockRejectedValue(new Error('invalid'));
-      await expect(controller.confirmDocument(ORG_A, { ...dto, jobId: 'job-1' })).rejects.toThrow(
-        'invalid',
-      );
+      await expect(
+        controller.confirmDocument(ORG_A, 'user-1', { ...dto, jobId: 'job-1' }),
+      ).rejects.toThrow('invalid');
       expect(jobs.releaseApproval).toHaveBeenCalledWith('job-1', ORG_A, IntakeJobStatus.EXTRACTED);
     });
-  });
-
-  it('keeps the job APPROVED (never reopens it) when linking a committed draft fails', async () => {
-    jobs.linkDraft.mockRejectedValue(new Error('db down'));
-    const dto = {
-      type: 'BILL',
-      vendorId: 'v1',
-      date: '2026-09-01',
-      dueDate: '2026-10-01',
-      lines: [{ description: 'CPU', quantity: '2', rate: '100', taxRatePercent: '14' }],
-      jobId: 'job-1',
-    } as ConfirmIntakeDto;
-    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
-    const res = await controller.confirmDocument(ORG_A, dto);
-    expect(res.data.id).toBe('b1');
-    expect(jobs.releaseApproval).not.toHaveBeenCalled();
   });
 
   it('retry delegates to the org-scoped service', async () => {

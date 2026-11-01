@@ -64,7 +64,6 @@ import {
   getVATReturnStatusColor,
   getVATReturnStatusLabel,
   getVATReturnStatusStep,
-  formatCurrency,
   normalizeVATReturn,
   VATReturnStatus,
 } from '@/lib/hooks/use-tax';
@@ -72,6 +71,7 @@ import { usePermissions } from '@/lib/hooks/use-permissions';
 import { cn } from '@/lib/utils';
 import { useDateFnsLocale } from '@/lib/date-locale';
 import { useDateFormatter } from '@/lib/hooks/use-date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 const STATUS_STEPS: { key: VATReturnStatus; icon: typeof Circle }[] = [
   { key: 'DRAFT', icon: Circle },
@@ -89,6 +89,7 @@ function toDecimalString(value: number | string): string {
 }
 
 export default function VATReturnDetailPage() {
+  const formatCurrency = useMoneyFormatter();
   const formatLongDate = useDateFormatter('long');
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('tax');

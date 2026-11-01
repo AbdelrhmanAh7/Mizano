@@ -1,4 +1,4 @@
-import { formatCurrency, formatDate, formatNumber, formatPercent, cn } from './utils';
+import { formatDate, formatNumber, formatPercent, cn } from './utils';
 
 describe('cn (className utility)', () => {
   it('merges class names', () => {
@@ -23,42 +23,6 @@ describe('cn (className utility)', () => {
     const result = cn('base', undefined, null, 'extra');
     expect(result).toContain('base');
     expect(result).toContain('extra');
-  });
-});
-
-describe('formatCurrency', () => {
-  it('formats USD amount with default locale', () => {
-    const result = formatCurrency(1234.56, 'USD');
-    expect(result).toBe('$1,234.56');
-  });
-
-  it('formats EUR amount', () => {
-    const result = formatCurrency(1234.56, 'EUR', 'en');
-    // Intl may use narrow or standard euro symbol depending on environment
-    expect(result).toContain('1,234.56');
-  });
-
-  it('formats zero amount', () => {
-    const result = formatCurrency(0, 'USD');
-    expect(result).toBe('$0.00');
-  });
-
-  it('formats negative amount', () => {
-    const result = formatCurrency(-500.25, 'USD');
-    expect(result).toContain('500.25');
-    // Should contain a minus sign or be wrapped in parentheses
-    expect(result).toMatch(/[-\u2212(]/);
-  });
-
-  it('formats large amounts with commas', () => {
-    const result = formatCurrency(1000000, 'USD');
-    expect(result).toBe('$1,000,000.00');
-  });
-
-  it('uses the provided locale for formatting', () => {
-    const result = formatCurrency(1234.56, 'USD', 'de');
-    // German locale uses period as thousands separator and comma as decimal
-    expect(result).toContain('1.234,56');
   });
 });
 

@@ -55,7 +55,7 @@ export interface EmailSettings {
   isConfigured: boolean;
 }
 
-/** Digits of Arabic PDFs (API enum); English PDFs always print Western digits. */
+/** Digits of Arabic amounts, on screens and PDFs (API enum); English always uses Western digits. */
 export const DOCUMENT_DIGITS = ['latn', 'arab'] as const;
 export type DocumentDigits = (typeof DOCUMENT_DIGITS)[number];
 
