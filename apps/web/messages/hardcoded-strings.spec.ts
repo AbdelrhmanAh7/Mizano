@@ -68,19 +68,25 @@ function hardCodedStrings(file: string): string[] {
     ts.ScriptKind.TSX,
   );
   const found: string[] = [];
+  const isCopy = (text: string): boolean => HAS_WORD.test(text) && !ALLOWED.has(text);
+  /** `"text"`, `{'text'}` and `` {`text`} `` all count as a literal. */
+  const literal = (node: ts.Node | undefined): string | undefined => {
+    if (node && ts.isJsxExpression(node)) node = node.expression;
+    if (node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))) {
+      return node.text;
+    }
+    return undefined;
+  };
   const visit = (node: ts.Node): void => {
     if (ts.isJsxText(node)) {
       const text = node.text.replace(/\s+/g, ' ').trim();
-      if (HAS_WORD.test(text) && !ALLOWED.has(text)) found.push(text);
-    } else if (
-      ts.isJsxAttribute(node) &&
-      TEXT_PROPS.has(node.name.getText(source)) &&
-      node.initializer &&
-      ts.isStringLiteral(node.initializer) &&
-      HAS_WORD.test(node.initializer.text) &&
-      !ALLOWED.has(node.initializer.text)
-    ) {
-      found.push(`${node.name.getText(source)}="${node.initializer.text}"`);
+      if (isCopy(text)) found.push(text);
+    } else if (ts.isJsxExpression(node) && !ts.isJsxAttribute(node.parent)) {
+      const text = literal(node);
+      if (text !== undefined && isCopy(text)) found.push(`{'${text}'}`);
+    } else if (ts.isJsxAttribute(node) && TEXT_PROPS.has(node.name.getText(source))) {
+      const text = literal(node.initializer);
+      if (text !== undefined && isCopy(text)) found.push(`${node.name.getText(source)}="${text}"`);
     }
     ts.forEachChild(node, visit);
   };

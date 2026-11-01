@@ -460,7 +460,10 @@ function JournalsPageContent() {
         action="delete"
         count={bulkSelectedRows.length}
         itemType="journals"
+        title={t('journals.bulkDeleteTitle', { count: bulkSelectedRows.length })}
         description={t('journals.bulkDeleteDescription')}
+        confirmLabel={t('journals.bulkDeleteConfirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         destructive
         isLoading={bulkDeleteAction.isLoading}
         onConfirm={async () => {
@@ -475,7 +478,10 @@ function JournalsPageContent() {
         action="post"
         count={bulkSelectedRows.length}
         itemType="journals"
+        title={t('journals.bulkPostTitle', { count: bulkSelectedRows.length })}
         description={t('journals.bulkPostDescription')}
+        confirmLabel={t('journals.bulkPostConfirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         isLoading={bulkPostAction.isLoading}
         onConfirm={async () => {
           await bulkPostAction.execute(bulkSelectedRows.map((r) => r.id));
