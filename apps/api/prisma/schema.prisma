@@ -1129,7 +1129,8 @@ model PaymentReceived {
   /// this payment instead of settling the invoices twice.
   idempotencyKey     String?
   /// The bank statement line this payment is reconciled with; one line per payment, set by
-  /// reconciliation and cleared when the payment is voided.
+  /// reconciliation and cleared when the payment is voided. 'unresolved:<payment id>' marks a
+  /// payment an earlier reconciliation may have recorded (migration 20261101060000): never offered.
   bankTransactionId  String?     @unique
   organizationId     String
   createdAt          DateTime    @default(now())
