@@ -32,6 +32,10 @@ jest.mock('next-intl', () => {
   };
 });
 
+jest.mock('@/lib/hooks/use-permissions', () => ({
+  usePermissions: () => ({ hasPermission: () => true }),
+}));
+
 jest.mock('@/lib/hooks/use-date-locale', () => ({
   useDateFormatter: () => (value: string) => value,
 }));
