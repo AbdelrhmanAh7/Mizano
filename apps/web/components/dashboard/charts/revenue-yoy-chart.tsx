@@ -10,6 +10,7 @@ import {
   CHART_AXIS,
   CHART_TOOLTIP_STYLE,
 } from '@/components/dashboard/charts/chart-card';
+import { monthLabel } from '@/lib/month-label';
 
 interface RevenueYoYChartProps {
   data: RevenueYoYPoint[];
@@ -27,9 +28,9 @@ export const RevenueYoYChart = memo(function RevenueYoYChart({
     <ChartCard title={t('revenueYoY')}>
       <BarChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
-        <XAxis dataKey="month" {...CHART_AXIS} />
+        <XAxis dataKey="month" tickFormatter={monthLabel} {...CHART_AXIS} />
         <YAxis {...CHART_AXIS} tickFormatter={(v) => formatCompactCurrency(v, currency)} />
-        <Tooltip
+        <Tooltip labelFormatter={monthLabel}
           formatter={(value: number) => formatCompactCurrency(value, currency)}
           contentStyle={CHART_TOOLTIP_STYLE}
         />

@@ -10,6 +10,7 @@ import {
   CHART_AXIS,
   CHART_TOOLTIP_STYLE,
 } from '@/components/dashboard/charts/chart-card';
+import { monthLabel } from '@/lib/month-label';
 
 interface CashFlowChartProps {
   data: CashFlowPoint[];
@@ -24,9 +25,9 @@ export const CashFlowChart = memo(function CashFlowChart({ data, currency }: Cas
     <ChartCard title={t('cashFlowTrend')}>
       <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
-        <XAxis dataKey="month" {...CHART_AXIS} />
+        <XAxis dataKey="month" tickFormatter={monthLabel} {...CHART_AXIS} />
         <YAxis {...CHART_AXIS} tickFormatter={(value) => formatCompactCurrency(value, currency)} />
-        <Tooltip
+        <Tooltip labelFormatter={monthLabel}
           formatter={(value: number) => formatCompactCurrency(value, currency)}
           contentStyle={CHART_TOOLTIP_STYLE}
         />

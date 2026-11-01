@@ -10,6 +10,7 @@ import {
   CHART_AXIS,
   CHART_TOOLTIP_STYLE,
 } from '@/components/dashboard/charts/chart-card';
+import { monthLabel } from '@/lib/month-label';
 
 interface PurchasesTrendChartProps {
   data: PurchaseTrendPoint[];
@@ -33,9 +34,9 @@ export const PurchasesTrendChart = memo(function PurchasesTrendChart({
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
-        <XAxis dataKey="month" {...CHART_AXIS} />
+        <XAxis dataKey="month" tickFormatter={monthLabel} {...CHART_AXIS} />
         <YAxis {...CHART_AXIS} tickFormatter={(value) => formatCompactCurrency(value, currency)} />
-        <Tooltip
+        <Tooltip labelFormatter={monthLabel}
           formatter={(value: number) => formatCompactCurrency(value, currency)}
           contentStyle={CHART_TOOLTIP_STYLE}
         />
