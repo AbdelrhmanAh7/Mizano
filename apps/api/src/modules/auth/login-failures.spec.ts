@@ -52,12 +52,15 @@ describe('LoginFailures (per account and address cap on password guessing, #639)
     expect(allowed).toBe(LOGIN_FAILURE_LIMIT);
   });
 
-  it('when full of live counts a new account is refused, and admitted again once windows expire', () => {
-    const f = failures(2);
-    f.tryAttempt('a@x.test', IP);
-    f.tryAttempt('b@x.test', IP);
-    expect(f.tryAttempt('new@x.test', IP)).toBe(false);
-    now += LOGIN_FAILURE_WINDOW_MS;
-    expect(f.tryAttempt('new@x.test', IP)).toBe(true);
+  it('when full of live counts nobody else is refused, and live counts still hold', () => {
+    const f = failures(3);
+    for (let i = 0; i < LOGIN_FAILURE_LIMIT; i++) f.tryAttempt('target@nile.test', IP);
+    f.tryAttempt('flood-1@x.test', '2001:db8::1');
+    f.tryAttempt('flood-2@x.test', '2001:db8::2');
+    // Full: the owner from another address and an unrelated person still get through.
+    expect(f.tryAttempt('target@nile.test', '198.51.100.9')).toBe(true);
+    expect(f.tryAttempt('someone@nile.test', '198.51.100.10')).toBe(true);
+    // The pair that used up its guesses stays capped.
+    expect(f.tryAttempt('target@nile.test', IP)).toBe(false);
   });
 });

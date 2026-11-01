@@ -8,7 +8,7 @@ const MAX_TRACKED = 20_000;
 /**
  * Sign-in attempts per account and client address (one API process; in memory), on top of the
  * per-address rate limit: at most LOGIN_FAILURE_LIMIT guesses at one account from one address per
- * window. Keyed with the address so nobody can lock the real owner out from elsewhere (#639). The
+ * window. Keyed with the address so guesses from elsewhere never lock the real owner out (#639). The
  * address is the one the rate limit uses: from the internet it is what Cloudflare appended and
  * cannot be forged; only something already inside the server's private network could claim
  * another. Emails and addresses are kept only as hashes.
@@ -39,7 +39,7 @@ export class LoginFailures {
       return true;
     }
     if (entry) this.entries.delete(key);
-    if (this.entries.size >= this.maxTracked && !this.makeRoom(now)) return false; // see makeRoom
+    if (this.entries.size >= this.maxTracked && !this.makeRoom(now)) return true; // see makeRoom
     this.entries.set(key, { count: 1, resetAt: now + LOGIN_FAILURE_WINDOW_MS });
     return true;
   }
@@ -51,9 +51,9 @@ export class LoginFailures {
 
   /**
    * Frees room by dropping expired windows only. A live count is never dropped, so flooding other
-   * emails cannot reset an account's count. If the tracker is still full (20,000 accounts with
-   * live failures: an attack, not normal use) a new account is refused until windows expire:
-   * refusing is the safe side, the alternative would be unlimited guesses.
+   * pairs cannot reset one that is already counting. If the tracker is still full, a new pair is
+   * let through untracked: it is still held to the per-address rate limit, and refusing it instead
+   * would let anyone with enough addresses lock every other person out.
    */
   private makeRoom(now: number): boolean {
     for (const [key, entry] of this.entries) if (entry.resetAt <= now) this.entries.delete(key);
