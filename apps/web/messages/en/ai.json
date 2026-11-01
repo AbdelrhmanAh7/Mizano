@@ -5,6 +5,23 @@
     "retry": "Retry scan",
     "duplicate": "This file was already uploaded. Showing the existing scan.",
     "needsReviewNotice": "Some values are missing or uncertain. Review every field before creating the draft.",
+    "code": {
+      "INTAKE_NO_TEXT": "No text could be read from this document. Upload a clearer photo or a PDF, or enter the bill by hand.",
+      "INTAKE_NOTHING_READ": "No bill details were found in this document. Check that it is a bill or receipt, or enter it by hand.",
+      "INTAKE_APPROVAL_INTERRUPTED": "Approving this document was interrupted before a draft was created. Check your bills for a draft from this document before approving it again."
+    },
+    "reviewReason": {
+      "LOW_CONFIDENCE": "The document was hard to read. Compare every value with the original.",
+      "NOT_A_BILL": "This may not be a bill or receipt.",
+      "VENDOR_MISSING": "No existing vendor matched. Choose or add the vendor.",
+      "DATE_MISSING": "The bill date was not found. Enter it.",
+      "TOTAL_MISSING": "The total was not found. Check the lines against the original.",
+      "CURRENCY_MISSING": "The currency was not found. Choose the currency before creating the bill.",
+      "LINES_MISSING": "No lines were read. Enter the bill lines.",
+      "VALUES_INCONSISTENT": "Some values on the document do not add up. Check the totals and tax.",
+      "DUE_DATE_DERIVED": "The due date is not on the document; it was set to the bill date plus 30 days. Check it.",
+      "POSSIBLE_DUPLICATE": "This may be a bill you already entered."
+    },
     "status": {
       "QUEUED": "Queued",
       "PROCESSING": "Processing",
@@ -46,6 +63,7 @@
       "heicFailed": "Failed to convert HEIC image. Please convert it manually to JPEG or PNG.",
       "taxNotReviewed": "Some tax rates could not be determined from the document. Review the tax % on the flagged lines and tick the confirmation before creating the bill.",
       "currencyMismatch": "The document currency differs from your organization's base currency. Foreign-currency documents are not supported yet.",
+      "currencyRequired": "The currency could not be read from the document. Choose the currency before creating the bill.",
       "createFailed": "Failed to create the bill. Please try again.",
       "lineValueInvalid": "Line {line}: {field} must be a non-negative number",
       "fields": {

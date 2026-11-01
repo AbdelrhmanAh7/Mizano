@@ -24,6 +24,7 @@ import {
   useDocumentIntakeStream,
   useDocumentIntakeConfirm,
   type DocumentIntakeResult,
+  knownReviewReasons,
 } from '@/lib/hooks/use-ai-document-intake';
 import { useCreateVendor } from '@/lib/hooks/use-vendors';
 import { resolveScanLineTaxes, toDecimalString } from '@/lib/document-intake-tax';
@@ -223,6 +224,11 @@ export default function ScanBillPage() {
     setLocalError(null);
     if (unresolvedTaxLines.length > 0 && !taxReviewed) {
       setLocalError(ts('taxNotReviewed'));
+      return;
+    }
+    // A currency the document did not show is never assumed: the person picks one.
+    if (localResult && !localResult.extractedFields.currency && !formData.currencyCode) {
+      setLocalError(ts('currencyRequired'));
       return;
     }
     try {
@@ -548,9 +554,23 @@ export default function ScanBillPage() {
           {/* AI Context Panel */}
           {intake.jobStatus === 'NEEDS_REVIEW' && (
             <Card className="border-yellow-500" role="status">
-              <CardContent className="flex items-center gap-2 pt-6 text-yellow-700">
-                <AlertTriangle className="h-4 w-4" />
-                <p>{t('needsReviewNotice')}</p>
+              <CardContent className="space-y-2 pt-6 text-yellow-700">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <p>{t('needsReviewNotice')}</p>
+                </div>
+                {intake.jobCode === 'INTAKE_APPROVAL_INTERRUPTED' && (
+                  <p className="text-sm font-medium" data-testid="intake-approval-interrupted">
+                    {t('code.INTAKE_APPROVAL_INTERRUPTED')}
+                  </p>
+                )}
+                {knownReviewReasons(result).length > 0 && (
+                  <ul className="list-disc ps-6 text-sm" data-testid="intake-review-reasons">
+                    {knownReviewReasons(result).map((reason) => (
+                      <li key={reason}>{t(`reviewReason.${reason}`)}</li>
+                    ))}
+                  </ul>
+                )}
               </CardContent>
             </Card>
           )}

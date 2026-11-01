@@ -1,10 +1,20 @@
-import { Injectable, Logger, BadRequestException, Optional } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  Optional,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { WebhookOutboxService } from '../../integrations/services/webhook-outbox.service';
-import { AiFeature, AiFeedbackAction } from '@prisma/client';
+import { AiFeature, AiFeedbackAction, IntakeJobStatus, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import { DocumentExtractionResult, emptyExtraction } from '../extraction/extraction-result';
+import {
+  DocumentExtractionResult,
+  IntakeReadError,
+  isEmptyExtraction,
+} from '../extraction/extraction-result';
 import { DocumentClassificationService, DocumentCategory } from './document-classification.service';
 import { EntityExtractionService } from './entity-extraction.service';
 import { AiFeedbackService } from './ai-feedback.service';
@@ -15,6 +25,7 @@ import { levenshteinSimilarity, normalizeText } from '../utils/text-similarity.u
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
 import { assertTotalsFit } from '../../../common/utils/sales-helpers';
 import { assertBillLineAccounts } from '../../../common/utils/bill-line-accounts';
+import { INTAKE_DRAFT_ENTITY } from '../intake/intake-draft-marker';
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -76,6 +87,10 @@ export interface DocumentIntakeResult {
   fieldEvidence?: Record<string, { text: string; lineIndex: number }>;
   /** Rules strategy only: failed consistency checks as machine codes. */
   extractionWarnings?: string[];
+  /** Fields the document did not show and Mizano filled in (e.g. `dueDate` = date + 30 days). */
+  derivedFields?: string[];
+  /** Why a person must check this reading before approval (stable codes; empty when none). */
+  reviewReasons?: string[];
   ocrConfidence: number;
 
   /** Vendor matching */
@@ -162,6 +177,12 @@ interface ResolvedIntakeLine {
   taxAmount: Decimal;
 }
 
+/** The intake job a confirmed draft comes from, and who approved it. */
+export interface IntakeDraftSource {
+  jobId: string;
+  userId: string;
+}
+
 interface ResolvedIntakeDocument {
   currencyCode: string;
   lines: ResolvedIntakeLine[];
@@ -188,6 +209,8 @@ export interface IntakeProgressEvent {
   message?: string;
   result?: DocumentIntakeResult;
   error?: string;
+  /** The job's stable `lastError` code, e.g. INTAKE_NO_TEXT or INTAKE_APPROVAL_INTERRUPTED. */
+  code?: string;
 }
 
 /** PDF text kept with the result (review screen); the AI reader may see up to READER_TEXT_LIMIT. */
@@ -290,10 +313,15 @@ export class DocumentIntakeService {
       );
     }
 
-    // Step 2b: Fallback — empty result if no reader produced anything
+    // A reading with no text, or with text but no bill value in it, is a failure with a stable
+    // code: it must never show as a complete (100%) result for a person to approve.
     if (!extraction) {
-      this.logger.warn('No reader produced a result — returning empty result');
-      extraction = emptyExtraction(rawText);
+      this.logger.warn('No reader produced a result');
+      throw new IntakeReadError('INTAKE_NO_TEXT');
+    }
+    if (isEmptyExtraction(extraction)) {
+      this.logger.warn('The reader found no bill value in the text');
+      throw new IntakeReadError('INTAKE_NOTHING_READ');
     }
 
     // Step 2: Classify document — use embedded category from extraction, or fall back to classifier
@@ -351,17 +379,17 @@ export class DocumentIntakeService {
       );
     }
 
-    // Step 6: Use extracted dueDate, fall back to +30 days from invoice date
+    // Step 6: Use the extracted due date; otherwise derive invoice date + 30 days and say so,
+    // so the review screen can tell the person it was not on the document.
     let dueDate: string | null = extraction.dueDate;
+    const derivedFields: string[] = [];
     if (!dueDate && extraction.date) {
-      try {
-        const dateObj = new Date(extraction.date);
-        if (!isNaN(dateObj.getTime())) {
-          dateObj.setDate(dateObj.getDate() + 30);
-          dueDate = dateObj.toISOString().split('T')[0];
-        }
-      } catch {
-        // Ignore date parse errors
+      const dateObj = new Date(`${extraction.date.slice(0, 10)}T00:00:00Z`);
+      if (!isNaN(dateObj.getTime())) {
+        // UTC calendar arithmetic: a local-time setDate can cross a DST change and lose a day.
+        dateObj.setUTCDate(dateObj.getUTCDate() + 30);
+        dueDate = dateObj.toISOString().slice(0, 10);
+        derivedFields.push('dueDate');
       }
     }
 
@@ -408,6 +436,7 @@ export class DocumentIntakeService {
       fieldConfidence: extraction.fieldConfidence,
       fieldEvidence: extraction.fieldEvidence,
       extractionWarnings: extraction.extractionWarnings,
+      derivedFields,
       ocrConfidence: extraction.ocrConfidence,
       matchedVendor,
       vendorCandidates,
@@ -428,19 +457,24 @@ export class DocumentIntakeService {
    * belong to `organizationId` before anything is written; a foreign or unknown
    * id is rejected with 400 and no mutation. Totals come from the shared Decimal
    * calculator: `taxRatePercent` is a percentage, line `amount` is the net.
+   *
+   * With a `source` job (already claimed APPROVED by the caller), the draft, its INTAKE_DRAFT
+   * marker and the job's draft link commit in one transaction, so a crash can never leave a
+   * draft that its job does not point to.
    */
   async confirmAndCreate(
     organizationId: string,
     dto: ConfirmIntakeInput,
+    source?: IntakeDraftSource,
   ): Promise<{ type: 'bill' | 'invoice'; id: string; number: string }> {
     if (!organizationId) {
       throw new BadRequestException('Organization context is required');
     }
     if (dto.type === 'BILL') {
-      return this.createDraftBill(organizationId, dto);
+      return this.createDraftBill(organizationId, dto, source);
     }
     if (dto.type === 'INVOICE') {
-      return this.createDraftInvoice(organizationId, dto);
+      return this.createDraftInvoice(organizationId, dto, source);
     }
     throw new BadRequestException('type must be BILL or INVOICE');
   }
@@ -632,44 +666,84 @@ export class DocumentIntakeService {
     };
   }
 
+  /** Marker and job link for a draft made from an intake job; runs in the draft's transaction. */
+  private async recordIntakeDraft(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    source: IntakeDraftSource,
+    draft: { type: 'bill' | 'invoice'; id: string },
+  ): Promise<void> {
+    await tx.auditLog.create({
+      data: {
+        organizationId,
+        userId: source.userId,
+        action: 'CREATE',
+        entityType: INTAKE_DRAFT_ENTITY,
+        entityId: source.jobId,
+        newValues: { draftDocumentType: draft.type, draftDocumentId: draft.id },
+      },
+    });
+    const linked = await tx.intakeJob.updateMany({
+      where: {
+        id: source.jobId,
+        organizationId,
+        deletedAt: null,
+        status: IntakeJobStatus.APPROVED,
+        draftDocumentId: null,
+      },
+      data: { draftDocumentType: draft.type, draftDocumentId: draft.id, lastError: null },
+    });
+    // The recovery sweep may have reopened a long-stalled approval: roll the draft back.
+    if (linked.count !== 1) {
+      throw new ConflictException('This intake job cannot be approved in its current state');
+    }
+  }
+
   private async createDraftBill(
     organizationId: string,
     dto: ConfirmIntakeInput,
+    source?: IntakeDraftSource,
   ): Promise<{ type: 'bill'; id: string; number: string }> {
     const resolved = await this.resolveConfirmation(organizationId, dto);
     const vendorId = dto.vendorId as string;
 
     const billNumber = dto.documentNumber || (await this.generateBillNumber(organizationId));
 
-    const bill = await this.prisma.bill.create({
-      data: {
-        billNumber,
-        vendorId,
-        date: new Date(dto.date),
-        dueDate: new Date(dto.dueDate),
-        subtotal: resolved.subtotal,
-        taxAmount: resolved.taxAmount,
-        grandTotal: resolved.grandTotal,
-        balanceDue: resolved.grandTotal,
-        reference: dto.reference,
-        currencyCode: resolved.currencyCode,
-        notes: dto.notes || 'Created from document scan',
-        projectId: dto.projectId || null,
-        organizationId,
-        lines: {
-          create: resolved.lines.map((line) => ({
-            itemId: line.itemId,
-            accountId: line.accountId,
-            taxRateId: line.taxRateId,
-            description: line.description,
-            quantity: line.quantity,
-            rate: line.rate,
-            taxRate: line.taxRatePercent,
-            amount: line.netAmount,
-          })),
+    const bill = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.bill.create({
+        data: {
+          billNumber,
+          vendorId,
+          date: new Date(dto.date),
+          dueDate: new Date(dto.dueDate),
+          subtotal: resolved.subtotal,
+          taxAmount: resolved.taxAmount,
+          grandTotal: resolved.grandTotal,
+          balanceDue: resolved.grandTotal,
+          reference: dto.reference,
+          currencyCode: resolved.currencyCode,
+          notes: dto.notes || 'Created from document scan',
+          projectId: dto.projectId || null,
+          organizationId,
+          lines: {
+            create: resolved.lines.map((line) => ({
+              itemId: line.itemId,
+              accountId: line.accountId,
+              taxRateId: line.taxRateId,
+              description: line.description,
+              quantity: line.quantity,
+              rate: line.rate,
+              taxRate: line.taxRatePercent,
+              amount: line.netAmount,
+            })),
+          },
         },
-      },
-      select: { id: true },
+        select: { id: true },
+      });
+      if (source) {
+        await this.recordIntakeDraft(tx, organizationId, source, { type: 'bill', id: created.id });
+      }
+      return created;
     });
 
     // Log feedback for AI improvement
@@ -697,6 +771,7 @@ export class DocumentIntakeService {
   private async createDraftInvoice(
     organizationId: string,
     dto: ConfirmIntakeInput,
+    source?: IntakeDraftSource,
   ): Promise<{ type: 'invoice'; id: string; number: string }> {
     const resolved = await this.resolveConfirmation(organizationId, dto);
     const customerId = dto.customerId as string;
@@ -737,6 +812,12 @@ export class DocumentIntakeService {
         select: { id: true },
       });
       await this.outbox?.invoiceEvent(tx, organizationId, 'invoice.created', created.id);
+      if (source) {
+        await this.recordIntakeDraft(tx, organizationId, source, {
+          type: 'invoice',
+          id: created.id,
+        });
+      }
       return created;
     });
 

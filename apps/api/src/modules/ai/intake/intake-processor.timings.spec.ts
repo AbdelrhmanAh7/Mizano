@@ -16,12 +16,20 @@ const ORG = 'org-a';
 const SECRET_TEXT = 'ACME Corp invoice 123456';
 type OnProgress = (stage: IntakeStage, progress: number, message: string) => void;
 
+/** A complete reading (vendor, date, total, currency, a line), so the job ends EXTRACTED. */
 const result = {
   documentType: 'BILL',
   ocrConfidence: 0.9,
   duplicateWarning: null,
+  matchedVendor: { id: 'v1', name: 'ACME Corp', similarity: 0.95 },
   rawText: SECRET_TEXT,
-  extractedFields: { total: 10, date: '2026-09-01', vendorName: 'ACME Corp' },
+  extractedFields: {
+    total: 10,
+    date: '2026-09-01',
+    vendorName: 'ACME Corp',
+    currency: 'EGP',
+    lineItems: [{ description: 'x', quantity: 1, unitPrice: 10, taxAmount: 0, total: 10 }],
+  },
 } as unknown as DocumentIntakeResult;
 
 describe('@issue-126 IntakeProcessorService stage timings', () => {

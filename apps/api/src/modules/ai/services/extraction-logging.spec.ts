@@ -137,7 +137,28 @@ describe('AI intake logging never contains document content or the key', () => {
     } as unknown as AiSettingsService;
     const prisma = buildPrisma();
     const gateway = new AiGatewayService(prisma, settings);
-    rules = { extract: jest.fn().mockResolvedValue(null) };
+    // The rules fallback reads a total, so the fallback paths still produce a result.
+    rules = {
+      extract: jest.fn().mockResolvedValue({
+        extraction: {
+          vendorName: null,
+          invoiceNumber: null,
+          date: null,
+          dueDate: null,
+          total: 1,
+          subtotal: null,
+          tax: null,
+          currency: null,
+          lineItems: [],
+          rawText: '',
+          ocrConfidence: 0.5,
+          fieldConfidence: {},
+          documentCategory: 'INVOICE',
+        },
+        strategyUsed: 'rules',
+        totalTimeMs: 1,
+      }),
+    };
     const resolver = new ExtractionStrategyResolver(
       { get: () => undefined } as unknown as ConfigService,
       rules as unknown as RulesStrategy,

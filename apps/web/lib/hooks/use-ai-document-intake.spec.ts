@@ -15,6 +15,7 @@ jest.mock('next-intl', () => ({
         streamLostConnection: 'Lost connection while processing the document. Please try again.',
         streamUploading: 'Uploading document...',
         streamProcessFailed: 'Failed to process document',
+        'code.INTAKE_NO_TEXT': 'No text could be read from this document.',
       }) as Record<string, string>
     )[key],
 }));
@@ -176,6 +177,45 @@ describe('useDocumentIntakeStream', () => {
     expect(result.current.canRetry).toBe(false);
   });
 
+  it('explains a failed reading by its stable code, never as complete (#587)', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      body: fakeBody([
+        `data: ${JSON.stringify({ stage: 'error', status: 'DEAD_LETTER', progress: 0, error: 'INTAKE_NO_TEXT', code: 'INTAKE_NO_TEXT' })}
+
+`,
+      ]),
+    });
+    const { result } = renderHook(() => useDocumentIntakeStream());
+    await act(async () => {
+      await result.current.processDocument(new FormData());
+    });
+    expect(result.current.stage).toBe('error');
+    expect(result.current.result).toBeNull();
+    expect(result.current.error).toBe('No text could be read from this document.');
+    expect(result.current.jobCode).toBe('INTAKE_NO_TEXT');
+    expect(result.current.canRetry).toBe(true);
+  });
+
+  it('exposes an interrupted approval on a reopened job', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      body: fakeBody([
+        `data: ${JSON.stringify({ stage: 'complete', status: 'NEEDS_REVIEW', progress: 100, result: RESULT, code: 'INTAKE_APPROVAL_INTERRUPTED' })}
+
+`,
+      ]),
+    });
+    const { result } = renderHook(() => useDocumentIntakeStream());
+    await act(async () => {
+      await result.current.processDocument(new FormData());
+    });
+    expect(result.current.result).toEqual(RESULT);
+    expect(result.current.jobCode).toBe('INTAKE_APPROVAL_INTERRUPTED');
+  });
+
   it('offers retry for a dead-lettered job and re-follows it after POST /retry', async () => {
     fetchMock
       .mockResolvedValueOnce({
@@ -201,7 +241,8 @@ describe('useDocumentIntakeStream', () => {
     await act(async () => {
       await result.current.processDocument(new FormData());
     });
-    expect(result.current.error).toBe('Error');
+    // A raw error name is never shown to the person.
+    expect(result.current.error).toBe('Processing failed');
     expect(result.current.jobStatus).toBe('DEAD_LETTER');
     expect(result.current.canRetry).toBe(true);
 

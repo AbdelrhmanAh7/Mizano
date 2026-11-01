@@ -22,6 +22,7 @@ import { IntakeStorage, sha256Hex } from '../src/modules/ai/intake/intake-storag
 process.env.INTAKE_RETRY_BASE_MS = '50';
 process.env.INTAKE_LEASE_MS = '1000';
 
+// The stub reads no lines and no due date, so a finished job is NEEDS_REVIEW (#587).
 const stubResolver = {
   resolve: async () => ({
     strategyUsed: 'rules',
@@ -130,7 +131,7 @@ describe('@e2e @flow:intake-worker @issue-141 Intake worker entrypoint', () => {
         const row = await prisma.intakeJob.findFirstOrThrow({
           where: { id: queued.id, organizationId: tenant.organizationId },
         });
-        expect(row.status).toBe(IntakeJobStatus.EXTRACTED);
+        expect(row.status).toBe(IntakeJobStatus.NEEDS_REVIEW);
         return row;
       }, 20000);
       expect(done.attempts).toBe(1);

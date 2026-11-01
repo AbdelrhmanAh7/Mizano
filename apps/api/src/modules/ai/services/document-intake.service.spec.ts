@@ -1,4 +1,4 @@
-import { BadRequestException, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -9,6 +9,8 @@ import { AiFeedbackService } from './ai-feedback.service';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
 import { BillsService } from '../../purchases/services/bills.service';
 import { ExtractionStrategyResolver } from '../extraction/extraction-strategy-resolver.service';
+import { DocumentExtractionResult, IntakeReadError } from '../extraction/extraction-result';
+import { INTAKE_DRAFT_ENTITY } from '../intake/intake-draft-marker';
 
 const ORG_A = 'org-a';
 const ORG_B = 'org-b';
@@ -23,6 +25,8 @@ interface PrismaMock {
   bill: { findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock };
   invoice: { findFirst: jest.Mock; create: jest.Mock };
   organization: { findUnique: jest.Mock };
+  auditLog: { create: jest.Mock };
+  intakeJob: { updateMany: jest.Mock };
   $transaction: jest.Mock;
 }
 
@@ -92,6 +96,8 @@ function buildPrisma(): PrismaMock {
       create: jest.fn().mockResolvedValue({ id: 'invoice-1' }),
     },
     organization: { findUnique: jest.fn().mockResolvedValue({ baseCurrency: 'EGP' }) },
+    auditLog: { create: jest.fn().mockResolvedValue({ id: 'audit-1' }) },
+    intakeJob: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
   };
   // Interactive transactions run against the same tenant-aware mock.
   return Object.assign(mock, {
@@ -538,6 +544,139 @@ describe('DocumentIntakeService', () => {
       );
       const logged = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
       expect(logged).not.toContain('SECRET');
+    });
+  });
+
+  describe('confirmAndCreate — draft from an intake job (#587)', () => {
+    const source = { jobId: 'job-1', userId: 'user-1' };
+
+    it.each([
+      ['bill', baseBill(), 'bill-1'],
+      [
+        'invoice',
+        baseBill({ type: 'INVOICE', vendorId: undefined, customerId: 'customer-a' }),
+        'invoice-1',
+      ],
+    ] as const)(
+      'writes the %s, its marker and the job link in one transaction',
+      async (type, dto, id) => {
+        await service.confirmAndCreate(ORG_A, dto, source);
+        expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+        expect(prisma.auditLog.create).toHaveBeenCalledWith({
+          data: {
+            organizationId: ORG_A,
+            userId: 'user-1',
+            action: 'CREATE',
+            entityType: INTAKE_DRAFT_ENTITY,
+            entityId: 'job-1',
+            newValues: { draftDocumentType: type, draftDocumentId: id },
+          },
+        });
+        expect(prisma.intakeJob.updateMany).toHaveBeenCalledWith({
+          where: {
+            id: 'job-1',
+            organizationId: ORG_A,
+            deletedAt: null,
+            status: 'APPROVED',
+            draftDocumentId: null,
+          },
+          data: { draftDocumentType: type, draftDocumentId: id, lastError: null },
+        });
+      },
+    );
+
+    it('fails the transaction when the job is no longer waiting for its draft', async () => {
+      prisma.intakeJob.updateMany.mockResolvedValue({ count: 0 });
+      await expect(service.confirmAndCreate(ORG_A, baseBill(), source)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it('writes no marker for a confirm without a job', async () => {
+      await service.confirmAndCreate(ORG_A, baseBill());
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
+      expect(prisma.intakeJob.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('processDocument — failed, empty and derived readings (#587)', () => {
+    function reading(fields: Partial<DocumentExtractionResult>): DocumentExtractionResult {
+      return {
+        vendorName: null,
+        vendorAddress: null,
+        vendorPhone: null,
+        vendorEmail: null,
+        vendorTaxId: null,
+        invoiceNumber: null,
+        date: null,
+        dueDate: null,
+        total: null,
+        subtotal: null,
+        tax: null,
+        discount: null,
+        currency: null,
+        paymentTerms: null,
+        notes: null,
+        lineItems: [],
+        rawText: 'text',
+        ocrConfidence: 0.9,
+        fieldConfidence: {},
+        documentCategory: 'INVOICE',
+        accountingEntry: null,
+        processingTimeMs: 1,
+        ...fields,
+      };
+    }
+
+    function serviceReading(extraction: DocumentExtractionResult | null): DocumentIntakeService {
+      prisma.vendor.findMany.mockResolvedValue([]);
+      return new DocumentIntakeService(
+        prisma as unknown as PrismaService,
+        {
+          resolve: jest
+            .fn()
+            .mockResolvedValue(
+              extraction ? { extraction, strategyUsed: 'rules', totalTimeMs: 1 } : null,
+            ),
+        } as unknown as ExtractionStrategyResolver,
+        {} as DocumentClassificationService,
+        {
+          extractAndMatch: jest.fn().mockResolvedValue({ matches: [] }),
+        } as unknown as EntityExtractionService,
+        feedback as unknown as AiFeedbackService,
+        {} as ConfigService,
+      );
+    }
+
+    const run = (svc: DocumentIntakeService) =>
+      svc.processDocument(ORG_A, Buffer.from('x'), 'image/png');
+
+    it('a reading with no text fails with INTAKE_NO_TEXT instead of an empty result', async () => {
+      await expect(run(serviceReading(null))).rejects.toEqual(
+        new IntakeReadError('INTAKE_NO_TEXT'),
+      );
+    });
+
+    it('text with no bill value in it fails with INTAKE_NOTHING_READ', async () => {
+      await expect(run(serviceReading(reading({})))).rejects.toMatchObject({
+        name: 'IntakeReadError',
+        code: 'INTAKE_NOTHING_READ',
+      });
+    });
+
+    it('marks the +30-day due date as derived, on the calendar date', async () => {
+      // 2026-03-15 + 30 days crosses the spring clock change in many zones.
+      const result = await run(serviceReading(reading({ date: '2026-03-15', total: 100 })));
+      expect(result.extractedFields.dueDate).toBe('2026-04-14');
+      expect(result.derivedFields).toEqual(['dueDate']);
+    });
+
+    it('keeps a due date read from the document and marks nothing derived', async () => {
+      const result = await run(
+        serviceReading(reading({ date: '2026-03-15', dueDate: '2026-03-31', total: 100 })),
+      );
+      expect(result.extractedFields.dueDate).toBe('2026-03-31');
+      expect(result.derivedFields).toEqual([]);
     });
   });
 });

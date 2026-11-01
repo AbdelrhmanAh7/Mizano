@@ -16,6 +16,7 @@ process.env.INTAKE_LEASE_MS = '1000';
 const SECRET = 'TIMING-SECRET-VENDOR';
 const stub = { mode: 'ok' as 'ok' | 'fail', clock: 'real' as 'real' | 'throw' };
 
+// The stub reads no lines and no due date, so a finished job is NEEDS_REVIEW (#587).
 const stubResolver = {
   resolve: async () => {
     if (stub.mode === 'fail') throw new Error(`stub extraction failure ${SECRET}`);
@@ -124,8 +125,8 @@ describe('@e2e @flow:intake-timings @issue-126 intake stage timings', () => {
   });
 
   it('@issue-126 AC1: a completed job exposes a non-negative integer ms for every stage that ran', async () => {
-    const { jobId, view } = await uploadAndWait('OK', IntakeJobStatus.EXTRACTED);
-    expect(view.status).toBe('EXTRACTED');
+    const { jobId, view } = await uploadAndWait('OK', IntakeJobStatus.NEEDS_REVIEW);
+    expect(view.status).toBe('NEEDS_REVIEW');
     expectMillis(view.stageTimingsMs, STAGES);
 
     // The list read model carries the same timings for the benchmark script.
@@ -142,13 +143,13 @@ describe('@e2e @flow:intake-timings @issue-126 intake stage timings', () => {
 
   it('@issue-126 AC3: a timer failure never fails the job', async () => {
     stub.clock = 'throw';
-    const { view } = await uploadAndWait('CLOCK', IntakeJobStatus.EXTRACTED);
-    expect(view.status).toBe('EXTRACTED');
+    const { view } = await uploadAndWait('CLOCK', IntakeJobStatus.NEEDS_REVIEW);
+    expect(view.status).toBe('NEEDS_REVIEW');
     expect(view.stageTimingsMs).toEqual({});
   });
 
   it('@issue-126 timings carry stage names and numbers only, never document content', async () => {
-    const { view } = await uploadAndWait('PII', IntakeJobStatus.EXTRACTED);
+    const { view } = await uploadAndWait('PII', IntakeJobStatus.NEEDS_REVIEW);
     expect(view.result.extractedFields.vendorName).toBe(SECRET);
     expect(JSON.stringify(view.stageTimingsMs)).not.toContain(SECRET);
     expectMillis(view.stageTimingsMs, STAGES);
