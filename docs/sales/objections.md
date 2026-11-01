@@ -94,11 +94,11 @@ reviews before anything is posted.
 
 **العربية.** سجّل دفعة جزئية أو كاملة على الفاتورة، والباقي يبقى مفتوحًا ويظهر في تقرير أعمار الذمم. استورد كشف البنك (CSV أو
 Excel أو OFX/QFX) وطابق كل حركة مع سجلاتك. ثم من **الإعدادات ← الإعدادات المالية** اضغط **إقفال الشهر السابق**: بعدها
-لا يمكن ترحيل أو تعديل أو عكس أي شيء في الدفاتر بتاريخ الإقفال أو قبله (يمكن تجهيز المسودات، لكنها تتوقف عند الإرسال أو الاعتماد). لا يوجد اتصال مباشر بالبنك؛ الكشف يُستورَد ملفًا.
+لا يمكن ترحيل أو تعديل أو حذف أي شيء في الدفاتر بتاريخ الإقفال أو قبله. والخطأ هناك يُصحَّح بقيد عكسي بتاريخ بعد الإقفال. ويمكن تجهيز مسودات الفواتير وفواتير الموردين، لكنها تتوقف عند الإرسال أو الاعتماد. لا يوجد اتصال مباشر بالبنك؛ الكشف يُستورَد ملفًا.
 
 **English.** Record a partial or full payment on the invoice; the rest stays open and shows in the aging report. Import the bank
 statement (CSV, Excel, OFX/QFX) and match each line to your records. Then in **Settings → Financial Settings** press
-**Lock Previous Month**: after that nothing dated on or before the lock date can be posted, changed or reversed in the books (drafts can still be prepared; they are stopped when sent or approved). There is no direct bank
+**Lock Previous Month**: after that nothing dated on or before the lock date can be posted, changed or deleted in the books. A mistake there is corrected by a reversal dated after the lock. Invoice and bill drafts can still be prepared, but they are stopped when sent or approved. There is no direct bank
 connection; the statement is imported as a file.
 
 ---

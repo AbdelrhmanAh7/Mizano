@@ -169,7 +169,7 @@ For VAT, open **Tax → VAT Returns**. Choose the dates at the top. Switch the l
 From a journal entry, **View source document** opens the invoice, bill, payment or expense that created it.
 
 **To take data out:** lists (invoices, bills, customers, vendors, expenses, journal entries, items) have **Export All** (CSV or
-Excel). **Sales by Customer**, **Sales by Item** and **Purchases by Vendor** have a CSV **Export**; the other report pages
+Excel). **Sales by Customer**, **Sales by Item** and **Purchases by Vendor** have **Export CSV**; the other report pages
 (P&L, balance sheet, trial balance, general ledger, aging, cash flow) have no export button yet.
 
 ---
@@ -185,7 +185,7 @@ Excel). **Sales by Customer**, **Sales by Item** and **Purchases by Vendor** hav
 3. Check that every bill and expense of the month is posted and every payment recorded.
 4. Read **Trial Balance** and **Profit & Loss** for the month. Fix mistakes now: void or correct the document, or, for a manual
    journal entry, press **Reverse**.
-5. **Settings → Financial Settings → Lock Previous Month.** From now on nothing dated on or before the lock date can be posted, changed or reversed in the books (drafts can still be prepared; they are stopped when sent or approved). **Remove Lock** reopens it; only someone allowed to change settings can do it.
+5. **Settings → Financial Settings → Lock Previous Month.** From now on nothing dated on or before the lock date can be posted, changed or deleted in the books. A mistake there is corrected by a reversal dated after the lock. Invoice and bill drafts can still be prepared, but they are stopped when sent or approved. **Remove Lock** reopens it; only someone allowed to change settings can do it.
 
 **What you should see:** "Locked through {date}" in Financial Settings.
 
