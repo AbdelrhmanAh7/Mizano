@@ -63,15 +63,20 @@ jest.mock('@/components/purchases/bill-form', () => ({
 
 const fileInput = (): HTMLInputElement => screen.getByTestId('scan-file-input');
 
+// jsdom has no object URLs; the page previews images only. Restored after this file.
+const realCreateObjectURL = URL.createObjectURL;
+beforeAll(() => {
+  URL.createObjectURL = jest.fn(() => 'blob:preview');
+});
+afterAll(() => {
+  URL.createObjectURL = realCreateObjectURL;
+});
+afterEach(() => {
+  mockIntake.result = null;
+  jest.clearAllMocks();
+});
+
 describe('ScanBillPage create the read vendor (issue #671)', () => {
-  beforeAll(() => {
-    URL.createObjectURL = jest.fn(() => 'blob:preview');
-  });
-
-  afterEach(() => {
-    mockIntake.result = null;
-  });
-
   it('puts the vendor it just created into the draft bill', async () => {
     // The sample bill: QA Vendor, QA-SCAN-001, 100.00 + 14.00 = 114.00, vendor not on file.
     mockIntake.result = {
@@ -131,11 +136,6 @@ describe('ScanBillPage create the read vendor (issue #671)', () => {
 });
 
 describe('ScanBillPage document picker (issue #646)', () => {
-  beforeAll(() => {
-    // jsdom has no object URLs; the page previews images only.
-    URL.createObjectURL = jest.fn(() => 'blob:preview');
-  });
-
   it('is a named button the keyboard reaches and opens the file input with Enter and Space', async () => {
     const user = userEvent.setup();
     render(<ScanBillPage />);

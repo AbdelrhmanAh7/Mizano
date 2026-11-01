@@ -718,8 +718,8 @@ export default function ScanBillPage() {
                       phone: suggestion.phone ?? undefined,
                       taxId: suggestion.taxId ?? undefined,
                     });
-                    // POST /vendors answers the vendor itself, not { data } (#671).
-                    const vendorId = (created as { id?: string } | undefined)?.id;
+                    // The vendor itself, not { data } (#671).
+                    const vendorId = created?.id;
                     if (vendorId) {
                       setScanDefaults((prev) => (prev ? { ...prev, vendorId } : prev));
                     }
