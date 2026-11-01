@@ -37,7 +37,7 @@ export class LoginFailures {
       return true;
     }
     if (entry) this.entries.delete(key);
-    if (this.entries.size >= this.maxTracked && !this.makeRoom(now)) return true; // see makeRoom
+    if (this.entries.size >= this.maxTracked && !this.makeRoom(now)) return false; // see makeRoom
     this.entries.set(key, { count: 1, resetAt: now + LOGIN_FAILURE_WINDOW_MS });
     return true;
   }
@@ -48,19 +48,13 @@ export class LoginFailures {
   }
 
   /**
-   * Frees one slot: expired windows first, then the oldest account that is not locked. A locked
-   * account is never dropped, so flooding other emails cannot lift a lockout. When every tracked
-   * account is locked the new account is simply not tracked (the per-address limit still applies).
+   * Frees room by dropping expired windows only. A live count is never dropped, so flooding other
+   * emails cannot reset an account's count. If the tracker is still full (20,000 accounts with
+   * live failures: an attack, not normal use) a new account is refused until windows expire:
+   * refusing is the safe side, the alternative would be unlimited guesses.
    */
   private makeRoom(now: number): boolean {
     for (const [key, entry] of this.entries) if (entry.resetAt <= now) this.entries.delete(key);
-    if (this.entries.size < this.maxTracked) return true;
-    for (const [key, entry] of this.entries) {
-      if (entry.count < LOGIN_FAILURE_LIMIT) {
-        this.entries.delete(key);
-        return true;
-      }
-    }
-    return false;
+    return this.entries.size < this.maxTracked;
   }
 }

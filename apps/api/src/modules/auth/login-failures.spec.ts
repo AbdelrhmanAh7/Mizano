@@ -32,12 +32,23 @@ describe('LoginFailures (per-account cap on password guessing, #639)', () => {
     expect(f.tryAttempt('target@nile.test')).toBe(false);
   });
 
-  it('when every tracked account is locked, a new account is not tracked but not refused', () => {
+  it('interleaving fresh emails with guesses never resets the target count', () => {
     const f = failures(2);
-    for (const e of ['a@x.test', 'b@x.test'])
-      for (let i = 0; i < LOGIN_FAILURE_LIMIT; i++) f.tryAttempt(e);
+    let allowed = 0;
+    for (let i = 0; i < 25; i++) {
+      if (f.tryAttempt('target@nile.test')) allowed++;
+      f.tryAttempt(`fresh-a-${i}@x.test`);
+      f.tryAttempt(`fresh-b-${i}@x.test`);
+    }
+    expect(allowed).toBe(LOGIN_FAILURE_LIMIT);
+  });
+
+  it('when full of live counts a new account is refused, and admitted again once windows expire', () => {
+    const f = failures(2);
+    f.tryAttempt('a@x.test');
+    f.tryAttempt('b@x.test');
+    expect(f.tryAttempt('new@x.test')).toBe(false);
+    now += LOGIN_FAILURE_WINDOW_MS;
     expect(f.tryAttempt('new@x.test')).toBe(true);
-    expect(f.tryAttempt('a@x.test')).toBe(false);
-    expect(f.tryAttempt('b@x.test')).toBe(false);
   });
 });
