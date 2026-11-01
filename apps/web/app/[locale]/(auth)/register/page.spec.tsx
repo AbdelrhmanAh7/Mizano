@@ -8,7 +8,17 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 jest.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
+  useTranslations: () =>
+    Object.assign((key: string) => key, {
+      // Renders every tag callback, so the agreement's links reach the DOM.
+      rich: (key: string, tags: Record<string, (chunks: string) => React.ReactNode>) =>
+        jest.requireActual<typeof import('react')>('react').createElement(
+          'span',
+          null,
+          key,
+          ...Object.entries(tags).map(([tag, render]) => render(tag)),
+        ),
+    }),
   useLocale: () => 'en',
 }));
 
@@ -50,6 +60,12 @@ describe('RegisterPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSignIn.mockResolvedValue({ ok: true, error: undefined });
+  });
+
+  it('links the terms of use and the privacy policy next to the sign-up button', () => {
+    render(<RegisterPage />);
+    expect(screen.getByText('terms').closest('a')).toHaveAttribute('href', '/terms');
+    expect(screen.getByText('privacy').closest('a')).toHaveAttribute('href', '/privacy');
   });
 
   it('posts natively (never GET) so credentials cannot reach the URL', () => {

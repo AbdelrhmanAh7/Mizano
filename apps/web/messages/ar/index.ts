@@ -18,6 +18,7 @@ import onboarding from './onboarding.json';
 import ai from './ai.json';
 import assets from './assets.json';
 import tax from './tax.json';
+import legal from './legal.json';
 
 export default {
   common,
@@ -40,4 +41,5 @@ export default {
   ai,
   assets,
   tax,
+  legal,
 } as const;

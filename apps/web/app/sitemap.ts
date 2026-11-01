@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = siteUrl();
 
-  const publicRoutes = ['', '/login', '/register'];
+  const publicRoutes = ['', '/login', '/register', '/terms', '/privacy'];
 
   const entries: MetadataRoute.Sitemap = [];
 

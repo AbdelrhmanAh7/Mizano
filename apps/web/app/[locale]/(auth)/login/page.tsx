@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { LanguageSwitcher } from '@/components/layout/language-switcher';
 import { BrandLogo } from '@/components/brand/brand-logo';
+import { LegalLinks } from '@/components/legal/legal-links';
 import { Brain, BarChart3, Shield, Zap, Eye, EyeOff } from 'lucide-react';
 
 const loginSchema = z.object({
@@ -237,6 +238,7 @@ function LoginForm() {
                 {t('learnMore')}
               </Link>
             </div>
+            <LegalLinks className="py-0" />
           </div>
         </div>
       </div>
