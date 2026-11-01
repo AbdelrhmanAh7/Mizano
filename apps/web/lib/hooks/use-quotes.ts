@@ -53,6 +53,8 @@ export interface Quote {
   notes: string | null;
   terms: string | null;
   lines: QuoteLine[];
+  /** The invoice(s) created from this quote (detail view only). */
+  invoices?: Array<{ id: string; invoiceNumber: string }>;
   organizationId: string;
   createdAt: string;
   updatedAt: string;
@@ -216,7 +218,8 @@ export function useDeclineQuote() {
 export function useConvertToInvoice() {
   return useToastMutation({
     namespace: 'sales.quotes.toast',
-    mutationFn: async (id: string) => (await quotesApi.convertToInvoice(id)).data,
+    mutationFn: async (id: string) =>
+      (await quotesApi.convertToInvoice(id)).data as { id: string; invoiceNumber: string },
     invalidate: (id) => [['quotes'], ['quotes', id], ['invoices']],
     success: 'invoiceCreated',
     error: 'convertError',
