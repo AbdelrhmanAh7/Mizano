@@ -21,7 +21,6 @@ import {
 import { useExportAll } from '@/lib/hooks/use-export-all';
 import {
   Employee,
-  formatCurrency,
   getEmployeeStatusColor,
   getEmployeeStatusLabel,
   useDeleteEmployee,
@@ -35,8 +34,10 @@ import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function EmployeesPageContent() {
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('hr');
   const tCommon = useTranslations('common');
   const dateLocale = useDateFnsLocale();

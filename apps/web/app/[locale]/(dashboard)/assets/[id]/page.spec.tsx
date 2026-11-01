@@ -3,6 +3,11 @@ import { render, screen } from '@testing-library/react';
 import AssetDetailPage from './page';
 
 // Mock next/navigation
+// Amounts come from the shared formatter (org base currency, never USD; #83).
+jest.mock('@/lib/hooks/use-money-formatter', () => ({
+  useMoneyFormatter: () => (v: unknown) => `EGP ${String(v ?? 0)}`,
+}));
+
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
 }));
@@ -56,7 +61,6 @@ jest.mock('@/lib/hooks/use-assets', () => ({
   getAssetStatusColor: () => '',
   getAssetStatusLabel: (s: string) => s,
   getDepreciationMethodLabel: (m: string) => m,
-  formatCurrency: (v: number) => `$${v}`,
   calculateRemainingLife: () => 48,
 }));
 

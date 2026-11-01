@@ -22,13 +22,15 @@ import {
   getAccountTypeColor,
   useAccountTypeLabel,
 } from '@/lib/hooks/use-accounts';
-import { moneyToNumber } from '@/lib/money';
 import { useJournals, formatJournalAmount } from '@/lib/hooks/use-journals';
 import { format } from 'date-fns';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function AccountDetailPage() {
   const dateLocale = useDateFnsLocale();
+  // The balance sums journal lines, which are in the organization base currency (#83).
+  const formatMoney = useMoneyFormatter();
   const typeLabel = useAccountTypeLabel();
   const params = useParams();
   const accountId = params.id as string;
@@ -179,10 +181,7 @@ export default function AccountDetailPage() {
                     {td('currentBalance')}
                   </p>
                   <p className="text-3xl font-bold" dir="ltr">
-                    {new Intl.NumberFormat('en-US', {
-                      style: 'currency',
-                      currency: account.currency || 'USD',
-                    }).format(moneyToNumber(balance.balance))}
+                    {formatMoney(balance.balance)}
                   </p>
                 </div>
                 {balance.totalDebits !== undefined && (

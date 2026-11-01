@@ -15,6 +15,11 @@ import { render, screen } from '@testing-library/react';
 
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
+// Amounts come from the shared formatter (org base currency, never USD; #83).
+jest.mock('@/lib/hooks/use-money-formatter', () => ({
+  useMoneyFormatter: () => (v: unknown) => `EGP ${String(v ?? 0)}`,
+}));
+
 jest.mock('next-intl', () => ({
   useLocale: () => 'en',
   useTranslations: () => (key: string, opts?: Record<string, unknown>) =>
@@ -43,7 +48,6 @@ jest.mock('@/lib/hooks/use-hr', () => ({
   useEmployees: (...args: unknown[]) => mockUseEmployees(...args),
   usePayrollRuns: (...args: unknown[]) => mockUsePayrollRuns(...args),
   useDepartmentSummary: () => mockUseDepartmentSummary(),
-  formatCurrency: (v: number | string) => `$${v}`,
   getPayrollStatusLabel: (s: string) => s,
   getPayrollStatusColor: () => '',
   getMonthName: (m: number) => ['', 'January', 'February', 'March'][m] ?? `Month${m}`,

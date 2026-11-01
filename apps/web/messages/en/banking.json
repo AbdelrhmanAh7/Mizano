@@ -25,6 +25,7 @@
       "typePlaceholder": "Select type",
       "accountNumberHint": "Last 4 digits or full number",
       "currencyPlaceholder": "Select currency",
+      "currencyRequired": "Currency is required",
       "glAccount": "GL Account",
       "glAccountPlaceholder": "Link to GL account",
       "glAccountSelect": "Select a GL account",

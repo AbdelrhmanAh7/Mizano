@@ -25,6 +25,7 @@
       "typePlaceholder": "اختر النوع",
       "accountNumberHint": "آخر 4 أرقام أو الرقم كاملًا",
       "currencyPlaceholder": "اختر العملة",
+      "currencyRequired": "العملة مطلوبة",
       "glAccount": "حساب دفتر الأستاذ",
       "glAccountPlaceholder": "اربطه بحساب في دفتر الأستاذ",
       "glAccountSelect": "اختر حسابًا من دفتر الأستاذ",

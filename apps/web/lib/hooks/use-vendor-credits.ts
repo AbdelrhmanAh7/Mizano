@@ -277,22 +277,3 @@ export function getStatusText(status: VendorCreditStatus): string {
       return status;
   }
 }
-
-/**
- * Format currency amount — null/undefined/NaN-safe
- */
-export function formatCurrency(
-  amount: string | number | null | undefined,
-  currency: string = 'USD',
-): string {
-  const num =
-    amount === null || amount === undefined
-      ? 0
-      : typeof amount === 'string'
-        ? parseFloat(amount)
-        : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(isNaN(num) ? 0 : num);
-}

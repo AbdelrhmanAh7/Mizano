@@ -25,7 +25,6 @@ import {
 import { warehousesApi } from '@/lib/api';
 import {
   CreateCompositeItemData,
-  formatCurrency,
   useAssembleCompositeItem,
   useCheckAvailability,
   useCompositeItem,
@@ -38,8 +37,10 @@ import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function CompositeItemDetailContent() {
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const params = useParams();
   const searchParams = useSearchParams();

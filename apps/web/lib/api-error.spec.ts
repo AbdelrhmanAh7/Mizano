@@ -1,4 +1,4 @@
-import { getApiErrorCode, getLocalizedApiErrorMessage } from './api-error';
+import { getApiErrorCode, getLocalizedApiErrorMessage, isNotFoundError } from './api-error';
 
 const t = Object.assign((key: string) => `ar:${key}`, {
   has: (key: string) => key === 'accountInvalidType',
@@ -15,5 +15,14 @@ describe('API error codes', () => {
     expect(getApiErrorCode(uncoded)).toBeUndefined();
     expect(getLocalizedApiErrorMessage(uncoded, 'fallback', t)).toBe('Period is locked');
     expect(getLocalizedApiErrorMessage(apiError({}), 'fallback', t)).toBe('fallback');
+  });
+});
+
+describe('isNotFoundError (#83)', () => {
+  it('is true only for a 404 answer, not for a failed request', () => {
+    expect(isNotFoundError({ response: { status: 404 } })).toBe(true);
+    expect(isNotFoundError({ response: { status: 500 } })).toBe(false);
+    expect(isNotFoundError(new Error('Network Error'))).toBe(false);
+    expect(isNotFoundError(null)).toBe(false);
   });
 });

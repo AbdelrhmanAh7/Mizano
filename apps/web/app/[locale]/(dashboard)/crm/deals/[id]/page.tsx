@@ -54,7 +54,6 @@ import {
   DealStage,
   getDealStageColor,
   getDealStageLabel,
-  formatCurrency,
 } from '@/lib/hooks/use-crm';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { ActivityLog } from '@/components/crm/activity-log';
@@ -62,6 +61,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 const STAGE_ORDER: DealStage[] = [
   'NEW',
@@ -83,6 +83,7 @@ const LOST_REASONS = [
 ];
 
 export default function DealDetailPage() {
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('crm');
   const params = useParams();

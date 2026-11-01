@@ -9,18 +9,15 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
-import {
-  usePayslip,
-  getPayrollStatusLabel,
-  getPayrollStatusColor,
-  formatCurrency,
-} from '@/lib/hooks/use-hr';
+import { usePayslip, getPayrollStatusLabel, getPayrollStatusColor } from '@/lib/hooks/use-hr';
 import { useOrganization } from '@/lib/hooks/use-organization';
 import { useTranslations } from 'next-intl';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function PayslipDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('hr');
   const dateLocale = useDateFnsLocale();
   const { data: payslip, isLoading, isError, refetch } = usePayslip(id);

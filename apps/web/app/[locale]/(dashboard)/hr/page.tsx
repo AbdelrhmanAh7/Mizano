@@ -22,13 +22,14 @@ import {
   useEmployees,
   usePayrollRuns,
   useDepartmentSummary,
-  formatCurrency,
   getPayrollStatusLabel,
   getPayrollStatusColor,
   getMonthName,
 } from '@/lib/hooks/use-hr';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function HRPage() {
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('hr');
   const tCommon = useTranslations('common');
   const locale = useLocale();

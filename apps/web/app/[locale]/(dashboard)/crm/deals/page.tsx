@@ -8,7 +8,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import {
   Deal,
   DealStage,
-  formatCurrency,
   getDealStageColor,
   getDealStageLabel,
   useInfiniteDeals,
@@ -23,8 +22,10 @@ import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function DealsPageContent() {
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('crm');
   const tCommon = useTranslations('common');

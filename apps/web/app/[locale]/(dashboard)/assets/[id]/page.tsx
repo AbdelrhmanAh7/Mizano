@@ -49,17 +49,18 @@ import {
   getAssetStatusColor,
   getAssetStatusLabel,
   getDepreciationMethodLabel,
-  formatCurrency,
   calculateRemainingLife,
 } from '@/lib/hooks/use-assets';
 import { useTranslations } from 'next-intl';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface AssetDetailPageProps {
   params: { id: string };
 }
 
 export default function AssetDetailPage({ params }: AssetDetailPageProps) {
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const { id } = params;
   const t = useTranslations('assets');

@@ -114,8 +114,8 @@
     "dateFormat": "Date Format",
     "numberFormat": "Number Format",
     "timezone": "Timezone",
-    "documentDigits": "Digits in Arabic PDFs",
-    "documentDigitsDescription": "Invoices, quotes and bills printed in Arabic use these digits. English PDFs always use 0123.",
+    "documentDigits": "Digits in Arabic",
+    "documentDigitsDescription": "Amounts on Arabic screens and invoices, quotes and bills printed in Arabic use these digits. English always uses 0123.",
     "digitsLatn": "Western (0123)",
     "digitsArab": "Arabic-Indic (٠١٢٣)"
   },

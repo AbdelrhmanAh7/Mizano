@@ -53,6 +53,12 @@ export class OrganizationsController {
     return this.organizationsService.findOne(orgId);
   }
 
+  @Get('money-format')
+  @ApiOperation({ summary: 'Base currency and Arabic digits for displaying money (any member)' })
+  getMoneyFormat(@CurrentOrg() orgId: string) {
+    return this.organizationsService.getMoneyFormat(orgId);
+  }
+
   @Patch()
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'Update organization details' })

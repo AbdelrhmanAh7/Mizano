@@ -409,15 +409,6 @@ export function getPayrollStatusColor(status: PayrollStatus): string {
   return colors[status] || colors.DRAFT;
 }
 
-export function formatCurrency(amount: string | number | null | undefined): string {
-  if (amount === null || amount === undefined) return '$0.00';
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(num);
-}
-
 /** The month name (1-12) in the page language, e.g. "October" or "أكتوبر". */
 export function getMonthName(month: number, locale: string): string {
   if (month < 1 || month > 12) return '';
