@@ -77,10 +77,8 @@ test.describe('money flows', () => {
     );
   });
 
-  // Issue #656: the invoice's Credit Notes table renders `total` (null) instead of `amount`, so it shows EGP 0.00.
-  test.fixme('the invoice page lists its credit note with the right amount @happy', async ({
-    page,
-  }) => {
+  // Issue #656: the invoice's Credit Notes table once rendered `total` (null) and showed EGP 0.00.
+  test('the invoice page lists its credit note with the right amount', async ({ page }) => {
     const { account, invoice } = await seeded();
     await signIn(page, account);
     await page.goto(`/en/sales/invoices/${invoice.id}`);

@@ -63,7 +63,16 @@ else
   grep -q '^OK' "$bstatus" || problems+=("backup-failed|last backup failed")
 fi
 
+# Optional extra checks (sourced, may append to problems), e.g. the VPS kit's HTTPS expiry check.
+if [ -n "${HEALTHCHECK_EXTRA:-}" ] && [ -r "$HEALTHCHECK_EXTRA" ]; then
+  # shellcheck disable=SC1090
+  . "$HEALTHCHECK_EXTRA"
+fi
+
 notify() {
+  logger -t jarda-alert -- "$1" 2>/dev/null || true
+  # Optional extra channel (e.g. email on the VPS); it must never break the check.
+  if [ -n "${ALERT_HOOK:-}" ] && [ -x "$ALERT_HOOK" ]; then "$ALERT_HOOK" "$1" >/dev/null 2>&1 || true; fi
   if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_ALERT_CHAT_ID:-}" ]; then return 0; fi
   curl -fsS --max-time 15 -o /dev/null \
     --data-urlencode "chat_id=$TELEGRAM_ALERT_CHAT_ID" \
