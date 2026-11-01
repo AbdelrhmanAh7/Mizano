@@ -215,3 +215,50 @@ jobs:
         run: pnpm build
         env:
           NEXT_PUBLIC_API_URL: https://api.example.com
+
+  # ==========================================
+  # Browser Journeys (docs/E2E-BROWSER.md): real Chromium against the API and web app on a throwaway
+  # Postgres and Redis. Not one of the required checks; runs in parallel with the others.
+  # ==========================================
+  browser-journeys:
+    name: Browser Journeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start the stack and apply migrations
+        run: pnpm e2e:up
+
+      - name: Journeys
+        env:
+          CI: 'true'
+        run: pnpm e2e
+
+      - name: Upload the report when something fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

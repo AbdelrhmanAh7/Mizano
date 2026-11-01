@@ -3,7 +3,8 @@
   "workspaces": {
     ".": {
       "entry": ["_lint_staged.js", "commitlint.config.js"],
-      "project": ["*.js"]
+      "project": ["*.js", "e2e-browser/**/*.ts"],
+      "ignoreBinaries": ["e2e-browser/up.sh", "e2e-browser/down.sh"]
     },
     "apps/api": {
       "entry": [

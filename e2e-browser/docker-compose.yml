@@ -1,0 +1,23 @@
+# Throwaway database and queue for the browser journeys (docs/E2E-BROWSER.md). Own ports and volume-less:
+# nothing here touches the development stack on 5435/6380 or any shared database.
+name: jarda-e2e
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: e2e
+      POSTGRES_PASSWORD: e2e
+      POSTGRES_DB: jarda_e2e
+    ports: ['5499:5432']
+    tmpfs: ['/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U e2e -d jarda_e2e']
+      interval: 2s
+      retries: 30
+  redis:
+    image: redis:7-alpine
+    ports: ['6499:6379']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 2s
+      retries: 30
