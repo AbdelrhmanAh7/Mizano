@@ -32,7 +32,7 @@ export class AnthropicProvider implements AiProviderAdapter {
     return asArray(asRecord(body).data)
       .map((m) => ({ id: asString(m.id) ?? '', name: asString(m.display_name) ?? '' }))
       .filter((m) => m.id.startsWith('claude'))
-      .map((m) => ({ id: m.id, name: m.name || m.id }));
+      .map((m) => ({ id: m.id, name: m.name || m.id, vision: true }));
   }
 
   async complete(

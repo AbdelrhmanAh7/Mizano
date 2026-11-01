@@ -265,7 +265,12 @@
       "revoke": "Disconnect",
       "revokeTitle": "Disconnect the AI account?",
       "revokeBody": "The stored key is deleted and every AI feature turns off. Accounting keeps working without AI.",
-      "encryptionMissing": "The server has no encryption key (INTEGRATIONS_ENCRYPTION_KEY), so an API key cannot be stored yet."
+      "encryptionMissing": "The server has no encryption key (INTEGRATIONS_ENCRYPTION_KEY), so an API key cannot be stored yet.",
+      "testAgain": "Test again",
+      "verified": "Verified",
+      "notVerified": "Not verified",
+      "lastErrorTitle": "The last AI call failed",
+      "lastErrorAt": "{date}. Until a test passes, documents may be read without AI."
     },
     "consent": {
       "title": "Permission to send data",
@@ -300,6 +305,26 @@
       "categorization": "Account suggestions",
       "summary": "Summaries",
       "test": "Tests"
+    },
+    "picker": {
+      "search": "Search models",
+      "billsOnly": "Only models that can read bills (images or PDF)",
+      "testing": "Testing this model with a real request…",
+      "none": "No model matches.",
+      "recommended": "Recommended",
+      "free": "Free",
+      "visionYes": "Reads images",
+      "visionNo": "Text only",
+      "visionUnknown": "Images: unknown",
+      "price": "${input} in / ${output} out per 1M tokens, about ${bill} per bill",
+      "priceUnknown": "Price not published",
+      "use": "Use",
+      "selected": "In use",
+      "more": "{count} more: refine the search.",
+      "failedTitle": "{model} did not work",
+      "failedGeneric": "Could not test this model. Please try again.",
+      "kept": "Your previous choice ({model}) is unchanged.",
+      "tryNext": "Try instead:"
     }
   },
   "aiErrors": {
@@ -316,7 +341,8 @@
     "AI_INVALID_OUTPUT": "The AI answer could not be used. Nothing was changed.",
     "AI_INPUT_UNSUPPORTED": "The connected provider cannot read this kind of file.",
     "AI_OAUTH_STATE_INVALID": "The OpenRouter sign-in expired or was already used. Start again.",
-    "AI_SETTINGS_CHANGED": "The AI settings changed while this was starting. Nothing was sent; try again."
+    "AI_SETTINGS_CHANGED": "The AI settings changed while this was running, so your change was not saved. Try again.",
+    "AI_FORBIDDEN": "The provider refused the request. Check that the account has credit, the key is active, and its privacy or data settings allow this model (for OpenRouter: openrouter.ai/settings/privacy and openrouter.ai/credits)."
   },
   "aiApp": {
     "title": "Connect your AI app",

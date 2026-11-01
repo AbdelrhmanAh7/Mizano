@@ -8,6 +8,7 @@ import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AiProviderAdapter, AiProviderError } from '../providers/ai-provider';
 import { AiProviderRegistry } from '../providers/ai-provider.registry';
+import { AiError } from './ai-features';
 import { AiGatewayService } from './ai-gateway.service';
 import { AiSettingsController } from './ai-settings.controller';
 import { AiSettingsService, keyAad } from './ai-settings.service';
@@ -81,9 +82,20 @@ function memoryPrisma() {
         _sum: { costUsd: usage.reduce((s, u) => s.plus(String(u.costUsd)), new Decimal(0)) },
       })),
       create: jest.fn(async ({ data }) => {
-        const row = { id: `u${usage.length + 1}`, ...data };
+        const row = { id: `u${usage.length + 1}`, createdAt: new Date(), ...data };
         usage.push(row);
         return row;
+      }),
+      findFirst: jest.fn(async ({ where }) => {
+        const since = (where.createdAt as { gte?: Date } | undefined)?.gte;
+        const rows = usage.filter(
+          (u) =>
+            u.organizationId === where.organizationId &&
+            u.status !== 'RESERVED' &&
+            (!where.model || u.model === where.model) &&
+            (!since || (u.createdAt as Date) >= since),
+        );
+        return rows[rows.length - 1] ?? null;
       }),
       updateMany: jest.fn(async ({ where, data }) => {
         const row = usage.find((u) => u.id === where.id && u.status === where.status);
@@ -420,6 +432,167 @@ describe('OpenRouter PKCE', () => {
   });
 });
 
+describe('AI connection test: verified only when a real call passes (issue #658)', () => {
+  const forbidden = () =>
+    adapter({ complete: jest.fn().mockRejectedValue(new AiProviderError('forbidden', 403)) });
+
+  function controllerFor(ctx: ReturnType<typeof build>) {
+    return new AiSettingsController(
+      ctx.service,
+      ctx.gateway,
+      {} as unknown as OpenRouterOAuthService,
+    );
+  }
+
+  it('connecting runs a test call and marks the connection verified when it passes', async () => {
+    const ctx = build();
+    const controller = controllerFor(ctx);
+    const { settings } = await controller.connect(ORG, 'u', { provider: 'anthropic', apiKey: KEY });
+    expect(settings.verifiedAt).not.toBeNull();
+    expect(settings.lastError).toBeNull();
+    expect(ctx.usage[0]).toMatchObject({ feature: 'test', success: true });
+  });
+
+  it('a refused test (OpenRouter 403) is not saved as verified and keeps the provider reason', async () => {
+    const ctx = build(forbidden());
+    const controller = controllerFor(ctx);
+
+    const { settings } = await controller.connect(ORG, 'u', { provider: 'anthropic', apiKey: KEY });
+
+    expect(settings.verifiedAt).toBeNull();
+    expect(settings.lastError).toMatchObject({ code: 'AI_FORBIDDEN', feature: 'test' });
+    expect(JSON.stringify(settings)).not.toContain(KEY);
+    await expect(controller.test(ORG, 'u')).rejects.toMatchObject({ code: 'AI_FORBIDDEN' });
+    expect((await ctx.service.view(ORG)).verifiedAt).toBeNull();
+  });
+
+  it('Test again clears the error and verifies once the provider accepts', async () => {
+    const complete = jest
+      .fn()
+      .mockRejectedValueOnce(new AiProviderError('no_credit', 402))
+      .mockResolvedValue({
+        text: '{"ok":true}',
+        inputTokens: 5,
+        outputTokens: 5,
+        reportedCostUsd: null,
+      });
+    const ctx = build(adapter({ complete }));
+    const controller = controllerFor(ctx);
+    const { settings } = await controller.connect(ORG, 'u', { provider: 'anthropic', apiKey: KEY });
+    expect(settings.lastError?.code).toBe('AI_KEY_NO_CREDIT');
+
+    await expect(controller.test(ORG, 'u')).resolves.toMatchObject({ ok: true });
+
+    const after = await ctx.service.view(ORG);
+    expect(after.verifiedAt).not.toBeNull();
+    expect(after.lastError).toBeNull();
+  });
+
+  it('shows a failed reading call as the last error until the next call passes', async () => {
+    const ctx = build(
+      adapter({ complete: jest.fn().mockRejectedValue(new AiProviderError('forbidden', 403)) }),
+    );
+    await ctx.service.connect(ORG, 'u', { provider: 'anthropic', apiKey: KEY });
+    await ctx.service.consent(ORG, 'u', 'anthropic');
+    await ctx.service.update(ORG, { features: ['documents'] });
+
+    await expect(
+      ctx.gateway.run({
+        organizationId: ORG,
+        feature: 'documents',
+        system: 'x',
+        parts: () => [{ type: 'text', text: 'hi' }],
+        maxOutputTokens: 100,
+        schema: z.object({ ok: z.literal(true) }),
+      }),
+    ).rejects.toBeInstanceOf(AiError);
+
+    expect((await ctx.service.view(ORG)).lastError).toMatchObject({
+      code: 'AI_FORBIDDEN',
+      feature: 'documents',
+    });
+  });
+});
+
+describe('Choosing a model: saved only after a real call with it passes', () => {
+  const MODELS = [
+    { id: 'anthropic/claude-3.5-sonnet', name: 'Sonnet', vision: true },
+    { id: 'google/gemini-3.8-flash', name: 'Gemini Flash', vision: true },
+    { id: 'anthropic/claude-haiku-4-5', name: 'Haiku', vision: true },
+    { id: 'meta/text-only', name: 'Text only', vision: false },
+  ];
+  const ok = { text: '{"ok":true}', inputTokens: 5, outputTokens: 5, reportedCostUsd: null };
+
+  async function connectedController(complete: jest.Mock) {
+    const ctx = build(adapter({ listModels: jest.fn().mockResolvedValue(MODELS), complete }));
+    const controller = new AiSettingsController(
+      ctx.service,
+      ctx.gateway,
+      {} as unknown as OpenRouterOAuthService,
+    );
+    await controller.connect(ORG, 'u', { provider: 'anthropic', apiKey: KEY });
+    return { ...ctx, controller, complete };
+  }
+
+  it('lists recommended cheap document readers first and flags them', async () => {
+    const { service } = await connectedController(jest.fn().mockResolvedValue(ok));
+    const list = await service.listModels(ORG);
+    expect(list.slice(0, 2).map((m) => m.id)).toEqual([
+      'anthropic/claude-haiku-4-5',
+      'anthropic/claude-3.5-sonnet',
+    ]);
+    expect(list[0]).toMatchObject({ recommended: true });
+    expect(list.find((m) => m.id === 'meta/text-only')?.recommended).toBeUndefined();
+  });
+
+  it('tests the chosen model with a real call, then saves it', async () => {
+    const complete = jest.fn().mockResolvedValue(ok);
+    const { controller, service } = await connectedController(complete);
+
+    const result = await controller.chooseModel(ORG, 'u', { model: 'google/gemini-3.8-flash' });
+
+    expect(result).toMatchObject({ ok: true, settings: { model: 'google/gemini-3.8-flash' } });
+    expect(complete).toHaveBeenLastCalledWith(
+      expect.anything(),
+      'google/gemini-3.8-flash',
+      expect.anything(),
+      expect.anything(),
+    );
+    expect((await service.view(ORG)).model).toBe('google/gemini-3.8-flash');
+  });
+
+  it('keeps the old model, gives the reason and suggests other picks when the model fails', async () => {
+    const complete = jest
+      .fn()
+      .mockResolvedValueOnce(ok)
+      .mockRejectedValueOnce(new AiProviderError('forbidden', 403));
+    const { controller, service } = await connectedController(complete);
+    const before = (await service.view(ORG)).model;
+
+    const result = await controller.chooseModel(ORG, 'u', { model: 'anthropic/claude-3.5-sonnet' });
+
+    expect(result).toMatchObject({ ok: false, code: 'AI_FORBIDDEN' });
+    const view = await service.view(ORG);
+    expect(view.model).toBe(before);
+    expect(view.verifiedAt).not.toBeNull();
+    expect(view.lastError).toBeNull();
+    await expect(
+      controller.update(ORG, 'u', { model: 'anthropic/claude-3.5-sonnet' }),
+    ).rejects.toBeDefined();
+    expect((await service.view(ORG)).model).toBe(before);
+  });
+
+  it("refuses a model that is not on the key's list without calling the provider", async () => {
+    const complete = jest.fn().mockResolvedValue(ok);
+    const { controller } = await connectedController(complete);
+    complete.mockClear();
+    await expect(controller.chooseModel(ORG, 'u', { model: 'made/up' })).rejects.toMatchObject({
+      code: 'AI_MODEL_UNAVAILABLE',
+    });
+    expect(complete).not.toHaveBeenCalled();
+  });
+});
+
 describe('AI settings permissions', () => {
   function guardFor(
     handler: keyof AiSettingsController,
@@ -443,6 +616,7 @@ describe('AI settings permissions', () => {
     for (const write of [
       'connect',
       'update',
+      'chooseModel',
       'consent',
       'revoke',
       'test',

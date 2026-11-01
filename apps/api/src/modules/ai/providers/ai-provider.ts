@@ -36,6 +36,10 @@ export interface AiModelInfo {
   name: string;
   /** USD per 1M tokens [input, output] when the provider publishes prices (OpenRouter). */
   pricePerMtok?: [string, string];
+  /** Whether the model reads images or PDFs (what bill reading needs); undefined = unknown. */
+  vision?: boolean;
+  /** Set by Mizano, not the provider: a cheap pick that reads documents well. */
+  recommended?: boolean;
 }
 
 /** The organization's secret for the provider; Ollama needs none. */

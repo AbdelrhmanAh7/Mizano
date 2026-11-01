@@ -15,6 +15,7 @@ export type AiErrorCode =
   | 'AI_CONSENT_REQUIRED'
   | 'AI_LIMIT_REACHED'
   | 'AI_KEY_INVALID'
+  | 'AI_FORBIDDEN'
   | 'AI_KEY_NO_CREDIT'
   | 'AI_RATE_LIMITED'
   | 'AI_MODEL_UNAVAILABLE'
@@ -31,6 +32,7 @@ const STATUS: Record<AiErrorCode, HttpStatus> = {
   AI_CONSENT_REQUIRED: HttpStatus.CONFLICT,
   AI_LIMIT_REACHED: HttpStatus.PAYMENT_REQUIRED,
   AI_KEY_INVALID: HttpStatus.BAD_REQUEST,
+  AI_FORBIDDEN: HttpStatus.BAD_GATEWAY,
   AI_KEY_NO_CREDIT: HttpStatus.PAYMENT_REQUIRED,
   AI_RATE_LIMITED: HttpStatus.TOO_MANY_REQUESTS,
   AI_MODEL_UNAVAILABLE: HttpStatus.BAD_REQUEST,
@@ -49,5 +51,27 @@ export class AiError extends HttpException {
     message: string,
   ) {
     super({ statusCode: STATUS[code], code, message, error: code }, STATUS[code]);
+  }
+}
+
+/** The AiError code for a provider failure kind (what the usage row stores as `errorCode`). */
+export function aiCodeForFailure(kind: string | null | undefined): AiErrorCode {
+  switch (kind) {
+    case 'invalid_key':
+      return 'AI_KEY_INVALID';
+    case 'forbidden':
+      return 'AI_FORBIDDEN';
+    case 'no_credit':
+      return 'AI_KEY_NO_CREDIT';
+    case 'rate_limited':
+      return 'AI_RATE_LIMITED';
+    case 'model_unavailable':
+      return 'AI_MODEL_UNAVAILABLE';
+    case 'timeout':
+      return 'AI_TIMEOUT';
+    case 'invalid_output':
+      return 'AI_INVALID_OUTPUT';
+    default:
+      return 'AI_PROVIDER_ERROR';
   }
 }

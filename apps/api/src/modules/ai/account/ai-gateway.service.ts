@@ -3,8 +3,8 @@ import Decimal from 'decimal.js';
 import { ZodType, ZodTypeDef } from 'zod';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AiCompletion, AiPart, AiProviderError } from '../providers/ai-provider';
-import { AiError, AiFeatureKey } from './ai-features';
-import { costUsd, estimateInputTokens } from './ai-pricing';
+import { AiError, AiFeatureKey, aiCodeForFailure } from './ai-features';
+import { costUsd, estimateInputTokens, StoredPrice } from './ai-pricing';
 import {
   AiConnection,
   AiSettingsService,
@@ -21,6 +21,8 @@ export interface AiRunInput<T> {
   organizationId: string;
   userId?: string | null;
   feature: AiFeatureKey | 'test';
+  /** A connection test only: try this model of the connected account without saving it. */
+  trial?: { model: string; price: StoredPrice };
   system: string;
   /** Builds the user parts for what this provider accepts; null = this input cannot be sent. */
   parts: (accepts: { images: boolean; pdf: boolean }) => AiPart[] | null;
@@ -48,18 +50,20 @@ export function firstJsonObject(text: string): unknown {
 }
 
 function toAiError(error: AiProviderError): AiError {
-  switch (error.kind) {
-    case 'invalid_key':
-    case 'forbidden':
-      return new AiError('AI_KEY_INVALID', 'The provider refused the key');
-    case 'no_credit':
-      return new AiError('AI_KEY_NO_CREDIT', 'The provider account has no credit');
-    case 'rate_limited':
-      return new AiError('AI_RATE_LIMITED', 'The provider is rate limiting this key');
-    case 'model_unavailable':
-      return new AiError('AI_MODEL_UNAVAILABLE', 'The model is not available');
-    case 'timeout':
-      return new AiError('AI_TIMEOUT', 'The provider did not answer in time');
+  const code = aiCodeForFailure(error.kind);
+  switch (code) {
+    case 'AI_KEY_INVALID':
+      return new AiError(code, 'The provider refused the key');
+    case 'AI_FORBIDDEN':
+      return new AiError(code, 'The provider refused the request');
+    case 'AI_KEY_NO_CREDIT':
+      return new AiError(code, 'The provider account has no credit');
+    case 'AI_RATE_LIMITED':
+      return new AiError(code, 'The provider is rate limiting this key');
+    case 'AI_MODEL_UNAVAILABLE':
+      return new AiError(code, 'The model is not available');
+    case 'AI_TIMEOUT':
+      return new AiError(code, 'The provider did not answer in time');
     default:
       return new AiError('AI_PROVIDER_ERROR', 'The provider call failed');
   }
@@ -81,7 +85,11 @@ export class AiGatewayService {
   ) {}
 
   async run<T>(input: AiRunInput<T>): Promise<AiRunResult<T>> {
-    const connection = await this.settings.connection(input.organizationId, input.feature);
+    const connection = await this.settings.connection(
+      input.organizationId,
+      input.feature,
+      input.feature === 'test' ? input.trial : undefined,
+    );
     const parts = input.parts({
       images: connection.adapter.acceptsImages,
       pdf: connection.adapter.acceptsPdf,

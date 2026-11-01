@@ -133,6 +133,11 @@ export interface DocumentIntakeResult {
 
   /** Who read the document: the organization's own AI provider, or the CPU rules reader */
   extractionMethod?: 'ai' | 'rules';
+  /** When read by AI: the provider and model that read it */
+  extractionProvider?: string | null;
+  extractionModel?: string | null;
+  /** When read without AI: an AI error code, `AI_OFF` or `RULES_ONLY` */
+  aiFallbackReason?: string | null;
 
   /** Suggested vendor creation when no existing vendor matched */
   suggestCreateVendor?: {

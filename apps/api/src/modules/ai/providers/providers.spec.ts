@@ -157,7 +157,7 @@ describe('AI provider adapters (fake fetch)', () => {
     expect(calls[0].init.headers).toMatchObject({ authorization: 'Bearer sk-or-k' });
     expect(calls[1].init.headers).toEqual({});
     expect(models).toEqual([
-      { id: 'google/gemini-2.5-flash', name: 'Flash', pricePerMtok: ['0.3', '2.5'] },
+      { id: 'google/gemini-2.5-flash', name: 'Flash', pricePerMtok: ['0.3', '2.5'], vision: false },
     ]);
     expect(calls[2].body).toMatchObject({ max_tokens: 900, usage: { include: true } });
     expect(out.reportedCostUsd).toBe('0.00042');

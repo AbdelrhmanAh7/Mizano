@@ -81,7 +81,7 @@ export class OpenAiCompatibleProvider implements AiProviderAdapter {
         .filter(
           (id) => /^(gpt-|o\d|chatgpt-)/.test(id) && !OPENAI_EXCLUDE.test(id) && !DATED.test(id),
         )
-        .map((id) => ({ id, name: id }));
+        .map((id) => ({ id, name: id, vision: !/^gpt-3/.test(id) }));
     }
     // OpenRouter's model list is public, so prove the key first.
     await requestJson(
@@ -102,10 +102,13 @@ export class OpenAiCompatibleProvider implements AiProviderAdapter {
       const pricing = asRecord(m.pricing);
       const input = perMillion(pricing.prompt);
       const output = perMillion(pricing.completion);
+      const modalities = asRecord(m.architecture).input_modalities;
+      const inputs = Array.isArray(modalities) ? modalities.map((x) => String(x)) : [];
       return [
         {
           id,
           name: asString(m.name) ?? id,
+          vision: inputs.includes('image') || inputs.includes('file'),
           ...(input !== undefined && output !== undefined
             ? { pricePerMtok: [input, output] as [string, string] }
             : {}),

@@ -1,8 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AiError } from '../account/ai-features';
 import { describeError } from '../../../common/utils/redact';
 import { AiDocumentReader } from './ai-document-reader';
-import { ExtractionContext, StrategyExtractionResult } from './extraction-strategy.interface';
+import {
+  ExtractionContext,
+  ReaderFallbackReason,
+  StrategyExtractionResult,
+} from './extraction-strategy.interface';
 import { RulesStrategy } from './rules-strategy.service';
 
 /**
@@ -25,16 +30,20 @@ export class ExtractionStrategyResolver {
     organizationId: string,
     context: ExtractionContext,
   ): Promise<StrategyExtractionResult | null> {
+    let fallbackReason: ReaderFallbackReason = 'RULES_ONLY';
     if (this.config.get<string>('INTAKE_EXTRACTION_STRATEGY') !== 'rules') {
+      fallbackReason = 'AI_OFF';
       try {
         const read = await this.aiReader.read(organizationId, context);
         if (read) return read;
       } catch (error) {
+        fallbackReason = error instanceof AiError ? error.code : 'AI_PROVIDER_ERROR';
         this.logger.warn(
           `AI reading failed (${describeError(error, { includeMessage: false })}); using the rules reader`,
         );
       }
     }
-    return this.rulesStrategy.extract(context);
+    const rules = await this.rulesStrategy.extract(context);
+    return rules && { ...rules, fallbackReason };
   }
 }
