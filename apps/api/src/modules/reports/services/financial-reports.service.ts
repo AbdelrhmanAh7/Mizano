@@ -735,6 +735,14 @@ export class FinancialReportsService {
 
   // === Sales & Purchases Reports (document based; draft/pending/void/deleted excluded) ===
 
+  /**
+   * Sales per customer for the period (#666), on the same basis as the P&L:
+   * - `totalAmount` is net sales: posted invoices dated in the period, excluding VAT
+   *   (grandTotal - taxAmount), less the net (excluding VAT) of credit notes dated in the period.
+   * - `paidAmount` is money received against those invoices (payment allocations); a credit
+   *   note settles a balance but is not a payment.
+   * - `balanceDue` is what those invoices still owe today.
+   */
   async getSalesByCustomer(
     organizationId: string,
     startDate?: string,
@@ -745,60 +753,127 @@ export class FinancialReportsService {
     const base = await getBaseCurrency(this.prisma, organizationId);
     const reportCurrency = normalizeCurrencyParam(currency, base);
 
-    const invoices = await this.prisma.invoice.findMany({
-      where: {
-        organizationId,
-        deletedAt: null,
-        status: { in: POSTED_INVOICE_STATUSES },
-        date: { gte: period.start, lte: period.end },
-      },
-      select: {
-        customerId: true,
-        grandTotal: true,
-        balanceDue: true,
-        currencyCode: true,
-        customer: { select: { id: true, name: true } },
-      },
-    });
-    const { included, otherCurrencies } = splitByCurrency(
+    const [invoices, creditNotes] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where: {
+          organizationId,
+          deletedAt: null,
+          status: { in: POSTED_INVOICE_STATUSES },
+          date: { gte: period.start, lte: period.end },
+        },
+        select: {
+          id: true,
+          customerId: true,
+          grandTotal: true,
+          taxAmount: true,
+          balanceDue: true,
+          currencyCode: true,
+          customer: { select: { id: true, name: true } },
+        },
+      }),
+      this.prisma.creditNote.findMany({
+        where: {
+          organizationId,
+          deletedAt: null,
+          date: { gte: period.start, lte: period.end },
+          invoice: { organizationId, deletedAt: null, status: { in: POSTED_INVOICE_STATUSES } },
+        },
+        select: {
+          id: true,
+          customerId: true,
+          invoiceId: true,
+          amount: true,
+          customer: { select: { id: true, name: true } },
+          invoice: { select: { currencyCode: true, grandTotal: true, taxAmount: true } },
+        },
+      }),
+    ]);
+    const { included, otherCurrencies: invoiceCurrencies } = splitByCurrency(
       invoices,
       (i) => documentCurrency(i.currencyCode, base),
       reportCurrency,
     );
+    const { included: credits, otherCurrencies: creditCurrencies } = splitByCurrency(
+      creditNotes,
+      (c) => documentCurrency(c.invoice.currencyCode, base),
+      reportCurrency,
+    );
+    const otherCurrencies = [...new Set([...invoiceCurrencies, ...creditCurrencies])].sort();
 
-    const byCustomer = new Map<
-      string,
-      { name: string; count: number; total: Decimal; balance: Decimal }
-    >();
-    for (const inv of included) {
-      const row = byCustomer.get(inv.customerId) ?? {
-        name: inv.customer.name,
+    const creditInvoiceIds = [...new Set(credits.map((c) => c.invoiceId))];
+    const [allocations, notesOnCreditedInvoices] = await Promise.all([
+      included.length > 0
+        ? this.prisma.paymentAllocation.findMany({
+            where: {
+              invoiceId: { in: included.map((i) => i.id) },
+              invoice: { organizationId },
+              payment: { organizationId, deletedAt: null },
+            },
+            select: { invoiceId: true, amount: true },
+          })
+        : Promise.resolve([]),
+      // Every live note on those invoices, in posting order: a note's VAT depends on the ones before.
+      creditInvoiceIds.length > 0
+        ? this.prisma.creditNote.findMany({
+            where: { organizationId, deletedAt: null, invoiceId: { in: creditInvoiceIds } },
+            select: { id: true, invoiceId: true, amount: true },
+            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          })
+        : Promise.resolve([]),
+    ]);
+    const paidByInvoice = new Map<string, Decimal>();
+    for (const a of allocations) {
+      paidByInvoice.set(
+        a.invoiceId,
+        (paidByInvoice.get(a.invoiceId) ?? ZERO).add(toDecimal(a.amount)),
+      );
+    }
+    const vatByCredit = creditNoteVat(
+      new Map(credits.map((c) => [c.invoiceId, c.invoice])),
+      notesOnCreditedInvoices,
+    );
+
+    type Row = { name: string; count: number; net: Decimal; paid: Decimal; balance: Decimal };
+    const byCustomer = new Map<string, Row>();
+    const rowOf = (customerId: string, name: string): Row => {
+      const row = byCustomer.get(customerId) ?? {
+        name,
         count: 0,
-        total: ZERO,
+        net: ZERO,
+        paid: ZERO,
         balance: ZERO,
       };
+      byCustomer.set(customerId, row);
+      return row;
+    };
+    for (const inv of included) {
+      const row = rowOf(inv.customerId, inv.customer.name);
       row.count += 1;
-      row.total = row.total.add(toDecimal(inv.grandTotal));
+      row.net = row.net.add(toDecimal(inv.grandTotal).sub(toDecimal(inv.taxAmount)));
+      row.paid = row.paid.add(paidByInvoice.get(inv.id) ?? ZERO);
       row.balance = row.balance.add(toDecimal(inv.balanceDue));
-      byCustomer.set(inv.customerId, row);
+    }
+    for (const c of credits) {
+      const row = rowOf(c.customerId, c.customer.name);
+      row.net = row.net.sub(toDecimal(c.amount).sub(vatByCredit.get(c.id) ?? ZERO));
     }
 
-    const rows = [...byCustomer.entries()].sort((a, b) => b[1].total.comparedTo(a[1].total));
-    const totalAmount = rows.reduce((s, [, r]) => s.add(r.total), ZERO);
-    const totalBalance = rows.reduce((s, [, r]) => s.add(r.balance), ZERO);
+    const rows = [...byCustomer.entries()].sort((a, b) => b[1].net.comparedTo(a[1].net));
+    const sum = (pick: (r: Row) => Decimal): Decimal =>
+      rows.reduce((s, [, r]) => s.add(pick(r)), ZERO);
     return {
       entries: rows.map(([customerId, r]) => ({
         customerId,
         customerName: r.name,
         invoiceCount: r.count,
-        totalAmount: money(r.total),
-        paidAmount: money(r.total.sub(r.balance)),
+        totalAmount: money(r.net),
+        paidAmount: money(r.paid),
         balanceDue: money(r.balance),
         currencyCode: reportCurrency,
       })),
-      totalAmount: money(totalAmount),
-      totalPaid: money(totalAmount.sub(totalBalance)),
-      totalBalance: money(totalBalance),
+      totalAmount: money(sum((r) => r.net)),
+      totalPaid: money(sum((r) => r.paid)),
+      totalBalance: money(sum((r) => r.balance)),
       currencyCode: reportCurrency,
       otherCurrencies,
       period: { startDate: period.startDate, endDate: period.endDate },
@@ -983,4 +1058,36 @@ export class FinancialReportsService {
       period: { startDate: period.startDate, endDate: period.endDate },
     };
   }
+}
+
+/**
+ * The VAT share of each credit note, in the invoice's own currency, by the rule credit notes are
+ * posted with (CreditNotesService.cumulativeCreditTax): the notes on one invoice always sum to the
+ * invoice VAT, round4(invoiceVat x credited-so-far / grandTotal) minus the VAT of the notes before,
+ * and a note that exhausts the invoice takes exactly what is left. `notes` must be in posting order.
+ */
+function creditNoteVat(
+  invoices: Map<string, { grandTotal: Decimal; taxAmount: Decimal }>,
+  notes: Array<{ id: string; invoiceId: string; amount: Decimal }>,
+): Map<string, Decimal> {
+  const vat = new Map<string, Decimal>();
+  const progress = new Map<string, { credited: Decimal; vat: Decimal }>();
+  for (const note of notes) {
+    const invoice = invoices.get(note.invoiceId);
+    if (!invoice) continue;
+    const tax = toDecimal(invoice.taxAmount);
+    const grand = toDecimal(invoice.grandTotal);
+    const before = progress.get(note.invoiceId) ?? { credited: ZERO, vat: ZERO };
+    const credited = before.credited.add(toDecimal(note.amount));
+    let share = ZERO;
+    if (tax.greaterThan(0) && grand.greaterThan(0)) {
+      const cumulative = credited.greaterThanOrEqualTo(grand)
+        ? tax
+        : tax.mul(credited).div(grand).toDecimalPlaces(4, Decimal.ROUND_HALF_UP);
+      share = Decimal.max(cumulative.sub(before.vat), ZERO);
+    }
+    vat.set(note.id, share);
+    progress.set(note.invoiceId, { credited, vat: before.vat.add(share) });
+  }
+  return vat;
 }

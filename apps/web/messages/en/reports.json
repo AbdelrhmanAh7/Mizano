@@ -147,16 +147,16 @@
   },
   "salesByCustomer": {
     "title": "Sales by Customer",
-    "description": "Sales breakdown by customer",
+    "description": "Sales per customer after credit notes, excluding VAT",
     "columns": {
       "customer": "Customer",
       "invoices": "Invoices",
-      "totalAmount": "Total Amount",
-      "paid": "Paid",
+      "totalAmount": "Net Sales (excl. VAT)",
+      "paid": "Received",
       "balanceDue": "Balance Due"
     },
-    "totalSales": "Total Sales",
-    "totalPaid": "Total Paid",
+    "totalSales": "Net Sales (excl. VAT)",
+    "totalPaid": "Total Received",
     "outstanding": "Outstanding",
     "customers": "Customers",
     "noData": "No sales data found for the selected period."
