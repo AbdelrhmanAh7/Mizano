@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { BillStatus, Prisma } from '@prisma/client';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
@@ -59,7 +59,10 @@ export class VendorsService {
       }),
       this.prisma.vendor.count({ where }),
     ]);
-    return { data: vendors, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    return {
+      data: await this.withOutstandingBalances(organizationId, vendors),
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   async findAllCursor(organizationId: string, query: CursorPaginationDto) {
@@ -72,7 +75,7 @@ export class VendorsService {
         { email: { contains: search, mode: 'insensitive' } },
       ];
     }
-    return cursorPaginate(
+    const page = await cursorPaginate(
       this.prisma.vendor,
       where,
       { [sortBy]: sortOrder },
@@ -81,6 +84,7 @@ export class VendorsService {
         take,
       },
     );
+    return { ...page, data: await this.withOutstandingBalances(organizationId, page.data) };
   }
 
   async findOne(organizationId: string, id: string) {
@@ -88,7 +92,39 @@ export class VendorsService {
       where: { id, organizationId, deletedAt: null },
     });
     if (!vendor) throw new NotFoundException('Vendor not found');
-    return vendor;
+    const [withBalance] = await this.withOutstandingBalances(organizationId, [vendor]);
+    return withBalance;
+  }
+
+  /**
+   * What the organization still owes each vendor: the balance due of its open bills (posted, not
+   * paid or void), in one groupBy for the whole page. The vendor page and list read it (#672).
+   */
+  private async withOutstandingBalances<T extends { id: string }>(
+    organizationId: string,
+    vendors: T[],
+  ): Promise<Array<T & { outstandingBalance: string }>> {
+    const vendorIds = vendors.map((v) => v.id);
+    const balances =
+      vendorIds.length > 0
+        ? await this.prisma.bill.groupBy({
+            by: ['vendorId'],
+            where: {
+              organizationId,
+              vendorId: { in: vendorIds },
+              deletedAt: null,
+              status: { in: [BillStatus.OPEN, BillStatus.PARTIALLY_PAID, BillStatus.OVERDUE] },
+            },
+            _sum: { balanceDue: true },
+          })
+        : [];
+    const balanceMap = new Map(
+      balances.map((b) => [b.vendorId, b._sum.balanceDue?.toFixed(4) ?? '0.0000']),
+    );
+    return vendors.map((vendor) => ({
+      ...vendor,
+      outstandingBalance: balanceMap.get(vendor.id) ?? '0.0000',
+    }));
   }
 
   async update(organizationId: string, id: string, dto: UpdateVendorDto) {

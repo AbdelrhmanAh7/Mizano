@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { VendorsService } from './vendors.service';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -71,5 +72,57 @@ describe('VendorsService.create currency (#83)', () => {
 
     expect(prisma.organization.findUnique).not.toHaveBeenCalled();
     expect(prisma.vendor.create.mock.calls[0][0].data).toMatchObject({ currency: 'SAR' });
+  });
+});
+
+describe('VendorsService outstanding balance (#672)', () => {
+  let prisma: MockPrismaClient;
+  let service: VendorsService;
+  const ORG = 'org-1';
+
+  beforeEach(() => {
+    prisma = createMockPrisma();
+    service = new VendorsService(prisma as unknown as PrismaService);
+    // Golden scenario C04: bill 3 x 50 + 14 % = 171.00, posted and unpaid.
+    prisma.bill.groupBy.mockResolvedValue([
+      { vendorId: 'ven-cairo', _sum: { balanceDue: new Prisma.Decimal('171') } },
+    ] as never);
+  });
+
+  it('shows what is owed to the vendor on its page', async () => {
+    prisma.vendor.findFirst.mockResolvedValue({
+      id: 'ven-cairo',
+      name: 'Cairo Office Supplies',
+    } as never);
+
+    const vendor = await service.findOne(ORG, 'ven-cairo');
+
+    expect(vendor.outstandingBalance).toBe('171.0000');
+    expect(prisma.bill.groupBy.mock.calls[0][0]).toMatchObject({
+      where: {
+        organizationId: ORG,
+        vendorId: { in: ['ven-cairo'] },
+        deletedAt: null,
+        status: { in: ['OPEN', 'PARTIALLY_PAID', 'OVERDUE'] },
+      },
+    });
+  });
+
+  it('gives every row of the vendor list its balance, 0.0000 when nothing is owed', async () => {
+    prisma.vendor.findMany.mockResolvedValue([
+      { id: 'ven-cairo', name: 'Cairo Office Supplies' },
+      { id: 'ven-delta', name: 'Delta Supplies' },
+    ] as never);
+    prisma.vendor.count.mockResolvedValue(2 as never);
+
+    const cursorPage = await service.findAllCursor(ORG, {});
+    const offsetPage = await service.findAll(ORG, {});
+
+    for (const page of [cursorPage, offsetPage]) {
+      expect(page.data.map((v) => [v.name, v.outstandingBalance])).toEqual([
+        ['Cairo Office Supplies', '171.0000'],
+        ['Delta Supplies', '0.0000'],
+      ]);
+    }
   });
 });
