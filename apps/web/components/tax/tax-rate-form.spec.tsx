@@ -51,7 +51,7 @@ describe('TaxRateForm', () => {
           id: 'rate-1',
           name: '',
           rate: '0',
-          type: 'OUTPUT',
+          type: 'SALES',
           linkedAccountId: vatAccount.id,
           isDefault: false,
           isActive: true,
@@ -72,7 +72,7 @@ describe('TaxRateForm', () => {
     await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
     const { id, data: body } = mockUpdate.mock.calls[0][0];
     expect(id).toBe('rate-1');
-    expect(body).toMatchObject({ linkedAccountId: vatAccount.id, rate: '14', type: 'OUTPUT' });
+    expect(body).toMatchObject({ linkedAccountId: vatAccount.id, rate: '14', type: 'SALES' });
     expect(body).not.toHaveProperty('accountId');
   });
 });

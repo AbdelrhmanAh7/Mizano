@@ -4,7 +4,8 @@ import api from '@/lib/api';
 
 // ============ Types ============
 
-export type TaxRateType = 'OUTPUT' | 'INPUT' | 'BOTH';
+/** Same values as the API's TaxType enum. */
+export type TaxRateType = 'SALES' | 'PURCHASES' | 'BOTH';
 export type VATReturnStatus = 'DRAFT' | 'CALCULATED' | 'SUBMITTED' | 'FILED';
 
 export interface TaxRate {
@@ -347,8 +348,8 @@ export function useRecordVATPayment() {
 
 export function getTaxRateTypeLabel(type: TaxRateType): string {
   const labels: Record<TaxRateType, string> = {
-    OUTPUT: 'Output (Sales)',
-    INPUT: 'Input (Purchases)',
+    SALES: 'Output (Sales)',
+    PURCHASES: 'Input (Purchases)',
     BOTH: 'Both',
   };
   return labels[type] || type;

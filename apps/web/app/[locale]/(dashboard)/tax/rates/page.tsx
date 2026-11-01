@@ -44,8 +44,8 @@ export default function TaxRatesPage() {
   const tableParams = useTableParams({ defaultSortBy: 'name' });
 
   const TYPE_OPTIONS = [
-    { value: 'OUTPUT', label: 'Output (Sales)' },
-    { value: 'INPUT', label: 'Input (Purchases)' },
+    { value: 'SALES', label: 'Output (Sales)' },
+    { value: 'PURCHASES', label: 'Input (Purchases)' },
     { value: 'BOTH', label: 'Both' },
   ];
 

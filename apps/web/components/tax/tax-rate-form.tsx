@@ -21,7 +21,7 @@ import { useToast } from '@/components/ui/use-toast';
 const taxRateSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   rate: z.number().min(0, 'Rate must be 0 or higher').max(100, 'Rate cannot exceed 100'),
-  type: z.enum(['OUTPUT', 'INPUT', 'BOTH']),
+  type: z.enum(['SALES', 'PURCHASES', 'BOTH']),
   linkedAccountId: z.string().min(1, 'Linked account is required'),
   isDefault: z.boolean().default(false),
   isActive: z.boolean().default(true),
@@ -123,8 +123,8 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
               <SelectValue placeholder="Select type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="OUTPUT">Output (Sales)</SelectItem>
-              <SelectItem value="INPUT">Input (Purchases)</SelectItem>
+              <SelectItem value="SALES">Output (Sales)</SelectItem>
+              <SelectItem value="PURCHASES">Input (Purchases)</SelectItem>
               <SelectItem value="BOTH">Both</SelectItem>
             </SelectContent>
           </Select>
