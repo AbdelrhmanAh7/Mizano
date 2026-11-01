@@ -45,19 +45,20 @@ Steps per run:
 
 ## Results
 
-| Run          | Steps passed | Notes                                                                      |
-| ------------ | ------------ | -------------------------------------------------------------------------- |
-| English 1440 | 9 / 9        | Double-click sent 2 save requests; one payment recorded (idempotency key). |
-| English 390  | 9 / 9        | Same.                                                                      |
-| Arabic 1440  | 9 / 9        | Same; base currency reads "EGP - جنيه مصري".                               |
-| Arabic 390   | 9 / 9        | Same.                                                                      |
+| Run          | Steps passed | Notes                                                     |
+| ------------ | ------------ | --------------------------------------------------------- |
+| English 1440 | 9 / 9        | Double-click: 2 save requests counted, 1 payment visible. |
+| English 390  | 9 / 9        | Same.                                                     |
+| Arabic 1440  | 9 / 9        | Same; base currency reads "EGP - جنيه مصري".              |
+| Arabic 390   | 9 / 9        | Same.                                                     |
 
-**Verdict: PASS.** The full accountant flow works over a public HTTPS address in both languages and
-both widths.
+**Verdict: PASS.** The tested journey (sign-up, base currency, customer, invoice, partial payment,
+trial balance, language switch) passed in both languages and both widths over a public HTTPS address.
 
-Observation (not a defect): the save button does not block a fast second click in the browser, so a
-double-click sends two requests; the server's idempotency key (PR #623) returns the first payment for the
-second request, so the books stay right.
+Observation (not a defect): the test counted two save requests leaving the browser on each double-click,
+and afterwards exactly one payment was visible (invoice 400 paid / 600 due, one row in the payments
+list). This is consistent with the duplicate-payment guard added in PR #623; the test did not inspect
+the requests' keys or the server's replies.
 
 ## Screenshots in this folder
 
