@@ -59,14 +59,19 @@ if [ "$backup" -eq 1 ]; then
 fi
 
 log "rollback from=${current:0:12} to=${target:0:12}"
+old_api="${MIZANO_API_IMAGE:-}" old_web="${MIZANO_WEB_IMAGE:-}"
 persist_deployment "$target" "jarda-api:$target" "jarda-web:$target"
 # env.sh exported the old values, and docker compose prefers the shell's over --env-file.
 unset MIZANO_API_IMAGE MIZANO_WEB_IMAGE MIZANO_DEPLOYED_SHA
 
 # Recreates only the containers whose image changed (migrate, api, worker, web).
-"$here/compose.sh" up -d >/dev/null
-wait_healthy 240 || {
-  echo "ROLLBACK FAILED: version ${target:0:12} is not healthy. Back to ${current:0:12}: $0 --to ${current:0:12}" >&2
+if ! { "$here/compose.sh" up -d >/dev/null && wait_healthy 240; }; then
+  echo "ROLLBACK FAILED: version ${target:0:12} is not healthy; switching back to ${current:0:12}" >&2
+  if [ -n "$old_api" ] && [ -n "$old_web" ]; then
+    persist_deployment "$current" "$old_api" "$old_web"
+    "$here/compose.sh" up -d >/dev/null || true
+    wait_healthy 240 && echo "back on ${current:0:12} and healthy" >&2 || echo "still unhealthy: see compose.sh logs" >&2
+  fi
   exit 1
-}
+fi
 log "rollback OK running=${target:0:12} seconds=$((SECONDS - started))"
