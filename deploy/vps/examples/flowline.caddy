@@ -1,0 +1,13 @@
+# Example for /etc/jarda/caddy-sites/flowline.caddy (Caddy picks up every *.caddy file there).
+# Point a DNS A record flowline.<domain> at the server first ("DNS only" in Cloudflare).
+flowline.example.com {
+	tls {$CADDY_TLS}
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+	reverse_proxy flowline:3000
+}

@@ -1,0 +1,17 @@
+[Unit]
+Description=Jarda server stack (web, API, worker, Postgres, Redis, Caddy, and /etc/jarda/compose.d)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+# A restore that stopped halfway leaves this file; never start the app on half-restored data.
+ConditionPathExists=!/etc/jarda/restore-in-progress
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/jarda/deploy/vps/scripts/compose.sh up -d --remove-orphans
+ExecStop=/opt/jarda/deploy/vps/scripts/compose.sh stop
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target
