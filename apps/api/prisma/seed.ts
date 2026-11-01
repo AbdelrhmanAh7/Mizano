@@ -1,4 +1,5 @@
 /* eslint-disable no-console */
+import { BRAND } from '@mizano/shared-types';
 import {
   PrismaClient,
   UserStatus,
@@ -78,7 +79,7 @@ async function main() {
     update: {},
     create: {
       id: 'seed-org-001',
-      name: 'Mizano Demo Company',
+      name: `${BRAND.name.en} Demo Company`,
       email: 'demo@mizano.com',
       phone: '+201234567890',
       address: '123 Tahrir Square, Downtown',
@@ -2825,7 +2826,7 @@ async function main() {
     create: {
       id: 'email-001',
       to: 'hello@niletech.eg',
-      subject: 'Invoice INV-001 from Mizano Demo Company',
+      subject: `Invoice INV-001 from ${BRAND.name.en} Demo Company`,
       entityType: 'invoice',
       entityId: invMap['inv-INV-001'],
       status: 'sent',
@@ -2838,7 +2839,7 @@ async function main() {
     create: {
       id: 'email-002',
       to: 'info@delta.eg',
-      subject: 'Quote QT-002 from Mizano Demo Company',
+      subject: `Quote QT-002 from ${BRAND.name.en} Demo Company`,
       entityType: 'quote',
       entityId: quote2.id,
       status: 'sent',
