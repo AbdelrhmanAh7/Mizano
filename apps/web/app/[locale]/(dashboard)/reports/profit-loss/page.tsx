@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
 import {
   ReportAccountRow,
+  ledgerHref,
   ReportPageHeader,
   ReportPageSkeleton,
   useReportDateLabels,
@@ -31,6 +32,10 @@ export default function ProfitLossReportPage() {
     startDate: format(dateRange.startDate, 'yyyy-MM-dd'),
     endDate: format(dateRange.endDate, 'yyyy-MM-dd'),
   });
+
+  // Each figure opens its account's ledger for the same period (#669).
+  const hrefOf = (account: ReportAccount) =>
+    account.id ? ledgerHref(account.id, dateRange.startDate, dateRange.endDate) : undefined;
 
   if (isLoading) {
     return <ReportPageSkeleton />;
@@ -103,7 +108,7 @@ export default function ProfitLossReportPage() {
             </CardHeader>
             <CardContent>
               {income.map((account: ReportAccount) => (
-                <ReportAccountRow key={account.id} account={account} />
+                <ReportAccountRow key={account.id} account={account} hrefOf={hrefOf} />
               ))}
               <div className="flex justify-between py-3 border-t-2 font-bold">
                 <span>{t('profitLoss.revenue')}</span>
@@ -118,7 +123,7 @@ export default function ProfitLossReportPage() {
             </CardHeader>
             <CardContent>
               {expenses.map((account: ReportAccount) => (
-                <ReportAccountRow key={account.id} account={account} />
+                <ReportAccountRow key={account.id} account={account} hrefOf={hrefOf} />
               ))}
               <div className="flex justify-between py-3 border-t-2 font-bold">
                 <span>{t('profitLoss.operatingExpenses')}</span>

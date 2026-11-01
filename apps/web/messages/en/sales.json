@@ -148,6 +148,7 @@
     "accept": "Accept",
     "decline": "Decline",
     "convertToInvoice": "Convert to Invoice",
+    "openInvoice": "Open invoice {number}",
     "convertDescription": "This will create a new invoice from this quote. The quote will be marked as invoiced. Do you want to proceed?",
     "cannotEdit": "Cannot Edit Quote",
     "cannotEditMessage": "Only draft quotes can be edited. This quote has status: {status}",

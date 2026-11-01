@@ -151,9 +151,9 @@ export default function QuoteDetailPage() {
         description: t('quotes.toast.invoiceCreatedDescription'),
       });
       setConvertDialogOpen(false);
-      // Navigate to the new invoice
-      if (result.data?.id) {
-        router.push(`/sales/invoices/${result.data.id}`);
+      // The hook already returns the response body: the new invoice itself (#667).
+      if (result?.id) {
+        router.push(`/sales/invoices/${result.id}`);
       }
     } catch (error: unknown) {
       toast({
@@ -207,6 +207,7 @@ export default function QuoteDetailPage() {
   const lines = quote.lines || [];
   // The quote's own currency, else the org base currency; never the customer's (audit B5).
   const currency = quote.currencyCode;
+  const invoice = quote.invoices?.[0];
 
   return (
     <div className="space-y-6">
@@ -268,6 +269,14 @@ export default function QuoteDetailPage() {
             <Button onClick={() => setConvertDialogOpen(true)}>
               <FileText className="mr-2 h-4 w-4" />
               {t('quotes.convertToInvoice')}
+            </Button>
+          )}
+          {quote.status === 'INVOICED' && invoice && (
+            <Button asChild>
+              <Link href={`/sales/invoices/${invoice.id}`}>
+                <FileText className="mr-2 h-4 w-4" />
+                {t('quotes.openInvoice', { number: invoice.invoiceNumber })}
+              </Link>
             </Button>
           )}
           {canDelete && quote.status === 'DRAFT' && (

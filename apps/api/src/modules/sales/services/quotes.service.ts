@@ -137,7 +137,16 @@ export class QuotesService {
   async findOne(organizationId: string, id: string) {
     const quote = await this.prisma.quote.findFirst({
       where: { id, organizationId, deletedAt: null },
-      include: { customer: true, lines: { include: { item: true } } },
+      include: {
+        customer: true,
+        lines: { include: { item: true } },
+        // The invoice this quote became, so the quote page can link to it (#667).
+        invoices: {
+          where: { organizationId, deletedAt: null },
+          select: { id: true, invoiceNumber: true },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
     });
     if (!quote) throw new NotFoundException('Quote not found');
     return quote;
