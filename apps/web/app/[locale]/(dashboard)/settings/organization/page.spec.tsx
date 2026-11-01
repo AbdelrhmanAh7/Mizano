@@ -61,6 +61,22 @@ describe('OrganizationSettingsPage', () => {
     );
   });
 
+  it('shows an error with retry instead of a USD form when the settings fail to load', () => {
+    const refetch = jest.fn();
+    const failed = { isLoading: false, isError: true, data: undefined, refetch };
+    const spy = jest
+      .spyOn(jest.requireMock('@/lib/hooks/use-all-settings'), 'useAllOrganizationSettings')
+      .mockReturnValue(failed);
+    try {
+      render(<OrganizationSettingsPage />);
+      expect(screen.queryByRole('button', { name: /common.saveChanges/ })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'tryAgain' }));
+      expect(refetch).toHaveBeenCalledTimes(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('offers the API industry values', () => {
     render(<OrganizationSettingsPage />);
     const values = Array.from(document.querySelectorAll('select option')).map(

@@ -1,10 +1,8 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToastMutation } from './use-toast-mutation';
+import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { useToast } from '@/components/ui/use-toast';
-import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 
 // Types
 export interface AccountSettings {
@@ -46,29 +44,14 @@ export function useAccountSettings() {
  * Hook to update organization account settings
  */
 export function useUpdateAccountSettings() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const t = useTranslations('settings.accountSettings.toast');
-  const tApiErrors = useTranslations('common.apiErrors');
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'settings.accountSettings.toast',
     mutationFn: async (data: UpdateAccountSettingsData) => {
       const response = await api.patch('/organization/account-settings', data);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['organization', 'account-settings'] });
-      toast({
-        title: t('saved'),
-        description: t('savedDescription'),
-      });
-    },
-    onError: (error: unknown) => {
-      toast({
-        variant: 'destructive',
-        title: t('saveError'),
-        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
-      });
-    },
+    invalidate: () => [['organization', 'account-settings']],
+    success: 'saved',
+    error: 'saveError',
   });
 }

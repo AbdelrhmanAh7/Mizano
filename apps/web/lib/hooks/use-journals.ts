@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { useToastMutation } from './use-toast-mutation';
 import { useToast } from '@/components/ui/use-toast';
 import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 import { journalsApi } from '@/lib/api';
@@ -211,31 +212,15 @@ export function useCreateJournal() {
  * Hook to update an existing journal (manual drafts only; the API rejects posted/system ones)
  */
 export function useUpdateJournal() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const t = useTranslations('accounting.journals.toast');
-  const tApiErrors = useTranslations('common.apiErrors');
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'accounting.journals.toast',
     mutationFn: async ({ id, data }: { id: string; data: UpdateJournalData }) => {
       const response = await journalsApi.update(id, data);
       return response.data;
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['journals'] });
-      queryClient.invalidateQueries({ queryKey: ['journals', variables.id] });
-      toast({
-        title: t('updated'),
-        description: t('updatedDescription'),
-      });
-    },
-    onError: (error: unknown) => {
-      toast({
-        variant: 'destructive',
-        title: t('updateError'),
-        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
-      });
-    },
+    invalidate: (variables) => [['journals'], ['journals', variables.id]],
+    success: 'updated',
+    error: 'updateError',
   });
 }
 

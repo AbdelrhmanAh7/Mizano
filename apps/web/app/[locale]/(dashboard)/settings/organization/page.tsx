@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ErrorState } from '@/components/shared/error-state';
 import { Textarea } from '@/components/ui/textarea';
 import { useAllOrganizationSettings, useUpdateGeneralSettings } from '@/lib/hooks/use-all-settings';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -52,7 +53,7 @@ type FormData = z.infer<typeof schema>;
 
 export default function OrganizationSettingsPage() {
   const t = useTranslations('settings');
-  const { data: settings, isLoading } = useAllOrganizationSettings();
+  const { data: settings, isLoading, isError, refetch } = useAllOrganizationSettings();
   const updateGeneral = useUpdateGeneralSettings();
 
   const form = useForm<FormData>({
@@ -121,6 +122,11 @@ export default function OrganizationSettingsPage() {
         ))}
       </div>
     );
+  }
+
+  // Never show the form without the saved settings: its defaults (USD) would be saved over them.
+  if (isError || !settings?.general) {
+    return <ErrorState onRetry={() => void refetch()} />;
   }
 
   return (

@@ -1,10 +1,8 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToastMutation } from './use-toast-mutation';
+import { useQuery } from '@tanstack/react-query';
 import { warehousesApi } from '@/lib/api';
-import { useToast } from '@/components/ui/use-toast';
-import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 
 // Types
 export interface Warehouse {
@@ -105,30 +103,15 @@ export function useWarehouseStock(id: string | undefined) {
  * Hook to create a new warehouse
  */
 export function useCreateWarehouse() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const t = useTranslations('inventory.warehouses.toast');
-  const tApiErrors = useTranslations('common.apiErrors');
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'inventory.warehouses.toast',
     mutationFn: async (data: CreateWarehouseData) => {
       const response = await warehousesApi.create(data);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['warehouses'] });
-      toast({
-        title: t('created'),
-        description: t('createdDescription'),
-      });
-    },
-    onError: (error: unknown) => {
-      toast({
-        variant: 'destructive',
-        title: t('createError'),
-        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
-      });
-    },
+    invalidate: () => [['warehouses']],
+    success: 'created',
+    error: 'createError',
   });
 }
 
@@ -136,31 +119,15 @@ export function useCreateWarehouse() {
  * Hook to update an existing warehouse
  */
 export function useUpdateWarehouse() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const t = useTranslations('inventory.warehouses.toast');
-  const tApiErrors = useTranslations('common.apiErrors');
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'inventory.warehouses.toast',
     mutationFn: async ({ id, data }: { id: string; data: UpdateWarehouseData }) => {
       const response = await warehousesApi.update(id, data);
       return response.data;
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['warehouses'] });
-      queryClient.invalidateQueries({ queryKey: ['warehouses', variables.id] });
-      toast({
-        title: t('updated'),
-        description: t('updatedDescription'),
-      });
-    },
-    onError: (error: unknown) => {
-      toast({
-        variant: 'destructive',
-        title: t('updateError'),
-        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
-      });
-    },
+    invalidate: (variables) => [['warehouses'], ['warehouses', variables.id]],
+    success: 'updated',
+    error: 'updateError',
   });
 }
 
@@ -168,30 +135,15 @@ export function useUpdateWarehouse() {
  * Hook to delete a warehouse
  */
 export function useDeleteWarehouse() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const t = useTranslations('inventory.warehouses.toast');
-  const tApiErrors = useTranslations('common.apiErrors');
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'inventory.warehouses.toast',
     mutationFn: async (id: string) => {
       const response = await warehousesApi.delete(id);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['warehouses'] });
-      toast({
-        title: t('deleted'),
-        description: t('deletedDescription'),
-      });
-    },
-    onError: (error: unknown) => {
-      toast({
-        variant: 'destructive',
-        title: t('deleteError'),
-        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
-      });
-    },
+    invalidate: () => [['warehouses']],
+    success: 'deleted',
+    error: 'deleteError',
   });
 }
 

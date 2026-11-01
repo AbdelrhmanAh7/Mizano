@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { useToastMutation } from './use-toast-mutation';
 import { useToast } from '@/components/ui/use-toast';
 import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 import { expensesApi } from '@/lib/api';
@@ -109,30 +110,15 @@ export function useExpense(id: string | undefined) {
  * Hook to create a new expense
  */
 export function useCreateExpense() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const t = useTranslations('purchases.expenses.toast');
-  const tApiErrors = useTranslations('common.apiErrors');
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'purchases.expenses.toast',
     mutationFn: async (data: CreateExpenseData) => {
       const response = await expensesApi.create(data);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      toast({
-        title: t('recorded'),
-        description: t('recordedDescription'),
-      });
-    },
-    onError: (error: unknown) => {
-      toast({
-        variant: 'destructive',
-        title: t('recordError'),
-        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
-      });
-    },
+    invalidate: () => [['expenses']],
+    success: 'recorded',
+    error: 'recordError',
   });
 }
 
@@ -168,30 +154,15 @@ export function usePostExpense() {
  * Hook to delete an expense
  */
 export function useDeleteExpense() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const t = useTranslations('purchases.expenses.toast');
-  const tApiErrors = useTranslations('common.apiErrors');
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'purchases.expenses.toast',
     mutationFn: async (id: string) => {
       const response = await expensesApi.delete(id);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      toast({
-        title: t('voided'),
-        description: t('voidedDescription'),
-      });
-    },
-    onError: (error: unknown) => {
-      toast({
-        variant: 'destructive',
-        title: t('voidError'),
-        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
-      });
-    },
+    invalidate: () => [['expenses']],
+    success: 'voided',
+    error: 'voidError',
   });
 }
 

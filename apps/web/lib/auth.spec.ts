@@ -364,6 +364,17 @@ describe('createTokenRefresher', () => {
     expect(refresh).toHaveBeenCalledTimes(2);
   });
 
+  it('forget also drops the result kept for the token it replaced', async () => {
+    const refresh = jest
+      .fn<Promise<RefreshedTokens | null>, [string]>()
+      .mockResolvedValue({ accessToken: 'a1', refreshToken: 'r1' });
+    const refresher = createTokenRefresher({ refresh, now: () => 0 });
+    await refresher.refresh('r0');
+    // Signing out with the current token r1 must not leave r0 answering with r1.
+    refresher.forget('r1');
+    expect(refresher.size().recent).toBe(0);
+  });
+
   it('forget drops a kept result', async () => {
     const refresh = jest
       .fn<Promise<RefreshedTokens | null>, [string]>()

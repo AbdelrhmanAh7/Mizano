@@ -1,11 +1,9 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
-import { useToast } from '@/components/ui/use-toast';
-import { getLocalizedApiErrorMessage } from '@/lib/api-error';
+import { useToastMutation } from './use-toast-mutation';
 import { creditNotesApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 // Types
 export type CreditNoteType = 'REFUND' | 'APPLY_TO_INVOICE';
@@ -111,32 +109,15 @@ export function useCreditNote(id: string | undefined) {
  * Hook to create a new credit note
  */
 export function useCreateCreditNote() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const t = useTranslations('sales.creditNotes.toast');
-  const tApiErrors = useTranslations('common.apiErrors');
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'sales.creditNotes.toast',
     mutationFn: async (data: CreateCreditNoteData) => {
       const response = await creditNotesApi.create(data);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['credit-notes'] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      toast({
-        title: t('created'),
-        description: t('createdDescription'),
-      });
-    },
-    onError: (error: unknown) => {
-      toast({
-        variant: 'destructive',
-        title: t('createError'),
-        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
-      });
-    },
+    invalidate: () => [['credit-notes'], ['invoices'], ['customers']],
+    success: 'created',
+    error: 'createError',
   });
 }
 

@@ -224,7 +224,7 @@ describe('OrganizationsService', () => {
       expect(data).toMatchObject({ baseCurrency: 'EGP', currency: 'EGP' });
     });
 
-    it('moves accounts kept in the old base currency to the new one before posting', async () => {
+    it('moves the seeded system accounts to the new base currency before posting', async () => {
       mockPrisma.organization.findUnique.mockResolvedValue({ baseCurrency: 'USD' });
       mockPrisma.journal.count.mockResolvedValue(0);
       mockPrisma.organization.update.mockResolvedValue({
@@ -236,7 +236,7 @@ describe('OrganizationsService', () => {
       await service.updateGeneralSettings(ORG_ID, { name: 'X', baseCurrency: 'EGP' });
 
       expect(mockPrisma.account.updateMany).toHaveBeenCalledWith({
-        where: { organizationId: ORG_ID, currency: 'USD' },
+        where: { organizationId: ORG_ID, isSystem: true, currency: 'USD' },
         data: { currency: 'EGP' },
       });
     });

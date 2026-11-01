@@ -555,8 +555,8 @@
     "earlier": "أقدم"
   },
   "phoneInput": {
-    "placeholder": "{count} أرقام",
-    "invalid": "رقم الهاتف في {country} يتكون من {lengths} أرقام",
+    "placeholder": "{count, plural, zero {# رقم} one {رقم واحد} two {رقمان} few {# أرقام} many {# رقمًا} other {# رقم}}",
+    "invalid": "عدد أرقام الهاتف في {country}: {lengths}",
     "select": "اختر"
   },
   "exportAll": {

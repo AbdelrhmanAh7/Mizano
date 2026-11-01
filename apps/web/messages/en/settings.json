@@ -633,10 +633,10 @@
     "toast": {
       "errorTitle": "Error",
       "flushed": "Cache flushed",
-      "flushedDescription": "Removed {count} cached items.",
+      "flushedDescription": "Removed {count, plural, one {# saved item} other {# saved items}}.",
       "flushError": "Failed to flush cache. Please try again.",
       "patternDeleted": "Pattern deleted",
-      "patternDeletedDescription": "Deleted {count} keys matching \"{pattern}\".",
+      "patternDeletedDescription": "Removed {count, plural, one {# saved item} other {# saved items}} matching \"{pattern}\".",
       "patternDeleteError": "Failed to delete cache pattern. Please try again."
     }
   },

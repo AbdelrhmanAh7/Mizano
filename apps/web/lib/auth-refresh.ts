@@ -166,6 +166,13 @@ export function createTokenRefresher(options: TokenRefresherOptions): TokenRefre
       inFlight.delete(key);
       cooldownUntil.delete(key);
       recent.delete(key);
+      // A result kept for the token this one replaced would hand the ended session back to a
+      // late request that still carries the older cookie.
+      const replaced: string[] = [];
+      recent.forEach((entry, entryKey) => {
+        if (entry.tokens.refreshToken === refreshToken) replaced.push(entryKey);
+      });
+      replaced.forEach((entryKey) => recent.delete(entryKey));
     },
     size() {
       return { inFlight: inFlight.size, cooldowns: cooldownUntil.size, recent: recent.size };

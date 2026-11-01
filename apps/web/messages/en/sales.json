@@ -261,19 +261,19 @@
       "importLabel": "Quotes"
     },
     "bulkDelete": {
-      "title": "Delete {count} quotes?",
+      "title": "Delete {count, plural, one {# quote} other {# quotes}}?",
       "description": "Only draft quotes will be deleted. Non-draft quotes will be skipped.",
-      "confirm": "Delete {count} quotes"
+      "confirm": "Delete {count, plural, one {# quote} other {# quotes}}"
     },
     "bulkSend": {
-      "title": "Send {count} quotes?",
+      "title": "Send {count, plural, one {# quote} other {# quotes}}?",
       "description": "Draft quotes will be marked as sent.",
-      "confirm": "Send {count} quotes"
+      "confirm": "Send {count, plural, one {# quote} other {# quotes}}"
     },
     "bulkDecline": {
-      "title": "Decline {count} quotes?",
+      "title": "Decline {count, plural, one {# quote} other {# quotes}}?",
       "description": "Sent quotes will be marked as declined.",
-      "confirm": "Decline {count} quotes"
+      "confirm": "Decline {count, plural, one {# quote} other {# quotes}}"
     }
   },
   "invoices": {
@@ -529,9 +529,9 @@
       "refresh": "Refresh credit notes"
     },
     "bulkDelete": {
-      "title": "Delete {count} credit notes?",
+      "title": "Delete {count, plural, one {# credit note} other {# credit notes}}?",
       "description": "Selected credit notes will be deleted. Credit notes that have been applied will be skipped.",
-      "confirm": "Delete {count} credit notes"
+      "confirm": "Delete {count, plural, one {# credit note} other {# credit notes}}"
     }
   },
   "payments": {
@@ -733,9 +733,9 @@
     "noOverdue": "No overdue invoices",
     "noRecentActivity": "No recent activity",
     "viewAll": "View All",
-    "acrossCustomers": "Across {count} customers",
-    "overdueCount": "{count} overdue invoices",
-    "quotesAwaiting": "{count} quotes awaiting response",
+    "acrossCustomers": "Across {count, plural, one {# customer} other {# customers}}",
+    "overdueCount": "{count, plural, one {# overdue invoice} other {# overdue invoices}}",
+    "quotesAwaiting": "{count, plural, one {# quote awaiting response} other {# quotes awaiting response}}",
     "fromPaidInvoices": "From paid invoices",
     "openModule": "Open {name}",
     "modules": {

@@ -274,7 +274,8 @@ export class OrganizationsService {
   /**
    * The ledger stores amounts in the base currency without conversion, so the base currency is
    * frozen once anything is posted; changing it would relabel every historical amount. Before
-   * that, accounts kept in the old base currency (the seeded chart) move to the new one.
+   * that, the seeded chart (system accounts still in the old base currency) moves with it;
+   * accounts someone created themselves keep the currency they chose.
    */
   private async prepareBaseCurrencyChange(
     tx: Prisma.TransactionClient,
@@ -298,7 +299,7 @@ export class OrganizationsService {
       );
     }
     await tx.account.updateMany({
-      where: { organizationId, currency: org.baseCurrency },
+      where: { organizationId, isSystem: true, currency: org.baseCurrency },
       data: { currency: baseCurrency },
     });
   }

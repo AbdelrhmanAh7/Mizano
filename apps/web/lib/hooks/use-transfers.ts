@@ -1,11 +1,9 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
-import { useToast } from '@/components/ui/use-toast';
-import { getLocalizedApiErrorMessage } from '@/lib/api-error';
+import { useToastMutation } from './use-toast-mutation';
 import { transfersApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 // Types
 export type TransferStatus = 'PENDING' | 'IN_TRANSIT' | 'COMPLETED' | 'CANCELLED';
@@ -91,32 +89,15 @@ export function useTransfer(id: string | undefined) {
  * Hook to create a new transfer
  */
 export function useCreateTransfer() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const t = useTranslations('inventory.transfers.toast');
-  const tApiErrors = useTranslations('common.apiErrors');
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'inventory.transfers.toast',
     mutationFn: async (data: CreateTransferData) => {
       const response = await transfersApi.create(data);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transfers'] });
-      queryClient.invalidateQueries({ queryKey: ['warehouses'] });
-      queryClient.invalidateQueries({ queryKey: ['items'] });
-      toast({
-        title: t('created'),
-        description: t('createdDescription'),
-      });
-    },
-    onError: (error: unknown) => {
-      toast({
-        variant: 'destructive',
-        title: t('createError'),
-        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
-      });
-    },
+    invalidate: () => [['transfers'], ['warehouses'], ['items']],
+    success: 'created',
+    error: 'createError',
   });
 }
 
@@ -124,32 +105,15 @@ export function useCreateTransfer() {
  * Hook to complete a transfer
  */
 export function useCompleteTransfer() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const t = useTranslations('inventory.transfers.toast');
-  const tApiErrors = useTranslations('common.apiErrors');
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'inventory.transfers.toast',
     mutationFn: async (id: string) => {
       const response = await transfersApi.complete(id);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transfers'] });
-      queryClient.invalidateQueries({ queryKey: ['warehouses'] });
-      queryClient.invalidateQueries({ queryKey: ['items'] });
-      toast({
-        title: t('completed'),
-        description: t('completedDescription'),
-      });
-    },
-    onError: (error: unknown) => {
-      toast({
-        variant: 'destructive',
-        title: t('completeError'),
-        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
-      });
-    },
+    invalidate: () => [['transfers'], ['warehouses'], ['items']],
+    success: 'completed',
+    error: 'completeError',
   });
 }
 
@@ -157,30 +121,15 @@ export function useCompleteTransfer() {
  * Hook to cancel a transfer
  */
 export function useCancelTransfer() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const t = useTranslations('inventory.transfers.toast');
-  const tApiErrors = useTranslations('common.apiErrors');
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'inventory.transfers.toast',
     mutationFn: async (id: string) => {
       const response = await transfersApi.cancel(id);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transfers'] });
-      toast({
-        title: t('cancelled'),
-        description: t('cancelledDescription'),
-      });
-    },
-    onError: (error: unknown) => {
-      toast({
-        variant: 'destructive',
-        title: t('cancelError'),
-        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
-      });
-    },
+    invalidate: () => [['transfers']],
+    success: 'cancelled',
+    error: 'cancelError',
   });
 }
 
