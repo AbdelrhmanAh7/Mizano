@@ -130,6 +130,9 @@ say "Firewall: only 22, 80 and 443 open"
 ufw default deny incoming >/dev/null
 ufw default allow outgoing >/dev/null
 ufw allow 22/tcp >/dev/null
+# Never lock out a server whose SSH listens on another port too.
+ssh_port="$(sshd -T 2>/dev/null | sed -n 's/^port //p' | head -n 1)"
+if [[ "$ssh_port" =~ ^[0-9]+$ ]] && [ "$ssh_port" != 22 ]; then ufw allow "$ssh_port/tcp" >/dev/null; fi
 ufw allow 80/tcp >/dev/null
 ufw allow 443/tcp >/dev/null
 ufw allow 443/udp >/dev/null
@@ -247,10 +250,11 @@ if [ ! -f "$CONF_DIR/r2.env" ]; then
 # 1. Cloudflare dashboard -> R2 -> Create bucket "jarda-backups".
 # 2. R2 -> Manage API tokens -> Create token with "Object Read & Write" on that bucket only.
 # 3. Fill these three lines, set R2_ENABLED=1, then test: sudo /opt/jarda/deploy/vps/scripts/backup.sh
+# Keep the double quotes around the keys (they may contain symbols).
 R2_ENABLED=0
-R2_REPOSITORY=s3:https://<ACCOUNT_ID>.r2.cloudflarestorage.com/jarda-backups/restic
-R2_ACCESS_KEY_ID=
-R2_SECRET_ACCESS_KEY=
+R2_REPOSITORY="s3:https://<ACCOUNT_ID>.r2.cloudflarestorage.com/jarda-backups/restic"
+R2_ACCESS_KEY_ID=""
+R2_SECRET_ACCESS_KEY=""
 R2_RETENTION_DAYS=30
 R2
   )
@@ -306,7 +310,11 @@ for _ in $(seq 1 60); do
   sleep 5
 done
 [ "$ok" -eq 1 ] || die "the app did not become healthy; see: sudo $APP_DIR/deploy/vps/scripts/compose.sh logs --tail 100"
-# Old images of earlier versions (keeps the two running tags and the build cache).
+# Keep this version and the one before it (for a quick rollback); remove older Jarda images.
+for repo in jarda-api jarda-web; do
+  docker image ls "$repo" --format '{{.CreatedAt}}\t{{.Repository}}:{{.Tag}}' | sort -r | tail -n +3 |
+    cut -f2 | xargs -r docker image rm >/dev/null 2>&1 || true
+done
 docker image prune -f >/dev/null || true
 
 public_ip="$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null || echo '<server-ip>')"
@@ -325,7 +333,7 @@ cat <<SUMMARY
             off-site copy to Cloudflare R2: fill $CONF_DIR/r2.env (off until then)
   Restore:  sudo $APP_DIR/deploy/vps/scripts/restore.sh --list
   Update:   run this same command again
-  SSH:      key login only; user '$ADMIN_USER' (sudo) and root with your key
+  SSH:      key login only (no passwords); user '$ADMIN_USER' has sudo
 SUMMARY
 if [ -f /var/run/reboot-required ]; then
   echo "  Reboot:   a system update needs a restart; run 'sudo reboot' when convenient (Jarda starts by itself)."

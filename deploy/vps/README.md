@@ -8,7 +8,8 @@ first**; Contabo and Hetzner are listed as alternatives.
 What `install.sh` does, in one command:
 
 - updates Ubuntu, turns on automatic security updates, adds swap if there is none;
-- **SSH keys only**: password login off, a sudo user `jarda` with your key, root by key only;
+- **SSH keys only**: password login off for every user, a sudo user `jarda` with your key (root
+  can never log in with a password);
 - **firewall** (ufw): only 22, 80 and 443 open;
 - installs **Docker** from Docker's own repository, with **log rotation** (10 MB × 5 per container,
   journal capped at 500 MB);
@@ -142,11 +143,13 @@ sudo /opt/jarda/deploy/vps/scripts/restore.sh --yes                    # latest 
 sudo /opt/jarda/deploy/vps/scripts/restore.sh --snapshot <id> --yes    # a given one
 ```
 
-It verifies the snapshot's checksums, takes a **safety backup** of the current data, stops the app,
+It verifies the snapshot's checksums, takes a **safety backup** of the current data, stops the app
+(and blocks `jarda-stack` from starting it at boot until the restore succeeds),
 replaces the database and the documents folder (the old folder is kept as
 `originals.before-restore-<time>`), checks per-organization record counts, ledger balance and
 document links against the snapshot, and starts the app again. If a check fails the app stays
-stopped and nothing is deleted.
+stopped and nothing is deleted; after fixing the cause, run the restore again (or delete
+`/etc/jarda/restore-in-progress` to start the app on the data as it is).
 
 **New server after losing the old one:** install as in section 4 with the same domain, copy the
 old `/etc/jarda/restic-password` and `/etc/jarda/r2.env`, set `BACKUP_HOST=jarda-vps` (the default)
@@ -194,7 +197,8 @@ that backs up into the same restic repository (its own tag) goes off-site too. F
 files and steps live in the FlowLine repository: its installer
 (`sudo bash /opt/flowline/deploy/vps/install-flowline.sh --host flowline.<domain>`) writes all three
 slots, and the guide is [FlowLine docs/DEPLOY-VPS.md](https://github.com/AbdelrhmanAh7/flowline/blob/main/docs/DEPLOY-VPS.md)
-(private repository). FlowLine's health address is `https://flowline.<domain>/api/public/health`.
+(private repository). FlowLine's health address is `https://flowline.<domain>/api/health` (200 when its database
+answers and its scheduler ticked in the last 15 minutes, else 503).
 The files in `examples/` only show the shape of each slot.
 
 ## Security notes

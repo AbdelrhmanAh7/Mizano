@@ -91,6 +91,9 @@ if [ "$safety" -eq 1 ]; then
 fi
 
 log "restore stage=stop-app"
+# Until the restore succeeds, jarda-stack.service refuses to start the app (e.g. after a reboot).
+restore_flag="${JARDA_RESTORE_FLAG:-/etc/jarda/restore-in-progress}"
+date -u +%Y-%m-%dT%H:%M:%SZ >"$restore_flag"
 dc stop caddy web worker api >/dev/null 2>&1 || true
 
 log "restore stage=database"
@@ -113,11 +116,16 @@ chmod 700 "$originals"
 log "restore stage=verify"
 container="$(dc ps -q postgres)"
 python3 "$PI_DIR/scripts/backup-manifest.py" verify-db "$container" "$work" "$user" "$db" || {
-  echo "RESTORE FAILED: restored data does not match the snapshot (app left stopped)" >&2
+  echo "RESTORE FAILED: restored data does not match the snapshot (app left stopped; see README section 7)" >&2
   exit 1
 }
 
 log "restore stage=start-app"
-dc up -d >/dev/null
+rm -f "$restore_flag"
+if systemctl cat jarda-stack.service >/dev/null 2>&1; then
+  systemctl restart jarda-stack.service
+else
+  dc up -d >/dev/null
+fi
 wait_healthy 300 || { echo "RESTORE WARNING: data restored, but the app is not healthy yet" >&2; exit 1; }
 log "restore OK snapshot=${snapshot:0:8}"

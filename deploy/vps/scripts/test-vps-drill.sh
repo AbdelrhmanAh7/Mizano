@@ -21,7 +21,7 @@ hex() { python3 -c "import secrets,sys; print(secrets.token_hex(int(sys.argv[1])
 project="jarda-vps-drill-$(hex 4)"
 s3_name="$project-s3"
 export COMPOSE_PROJECT_NAME="$project" ENV_FILE="$work/jarda.env" R2_ENV_FILE="$work/r2.env"
-export COMPOSE_FILE="$vps/docker-compose.vps.yml"
+export COMPOSE_FILE="$vps/docker-compose.vps.yml" JARDA_RESTORE_FLAG="$work/restore-in-progress"
 web=jarda.localhost api=jarda-api.localhost port=18443
 step() { printf '%s stage=%s\n' "$(date -u +%H:%M:%S)" "$1"; }
 die() { echo "VPS DRILL FAILED: $*" >&2; exit 1; }

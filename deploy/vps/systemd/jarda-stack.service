@@ -3,6 +3,8 @@ Description=Jarda server stack (web, API, worker, Postgres, Redis, Caddy, and /e
 Requires=docker.service
 After=docker.service network-online.target
 Wants=network-online.target
+# A restore that stopped halfway leaves this file; never start the app on half-restored data.
+ConditionPathExists=!/etc/jarda/restore-in-progress
 
 [Service]
 Type=oneshot
