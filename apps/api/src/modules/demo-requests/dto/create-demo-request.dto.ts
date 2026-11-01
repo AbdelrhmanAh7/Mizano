@@ -44,5 +44,6 @@ export class CreateDemoRequestDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   website?: string;
 }
