@@ -395,7 +395,7 @@ export function CommandPalette() {
             <div className="flex flex-col items-center gap-2 py-4">
               <AlertCircle className="h-8 w-8 text-destructive" />
               <p className="text-sm text-destructive">{tc('errors.generic')}</p>
-              <p className="text-xs text-muted-foreground">Please try again later</p>
+              <p className="text-xs text-muted-foreground">{tc('errors.tryLater')}</p>
             </div>
           ) : hasSearchQuery ? (
             <div className="flex flex-col items-center gap-2 py-4">

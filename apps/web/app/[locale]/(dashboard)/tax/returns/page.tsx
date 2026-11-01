@@ -421,7 +421,7 @@ function VATReturnsPageContent() {
                 )}
               >
                 {formatCurrency(Math.abs(netPosition))}
-                <span className="text-xs font-normal text-muted-foreground ml-2">
+                <span className="ms-2 font-sans text-xs font-normal text-muted-foreground">
                   {netPosition > 0 ? t('returns.netPayable') : t('returns.netRefundable')}
                 </span>
               </div>

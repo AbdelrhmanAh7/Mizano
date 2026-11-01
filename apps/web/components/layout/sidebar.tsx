@@ -366,7 +366,7 @@ export function Sidebar() {
             <Button
               variant="ghost"
               size="icon"
-              className={cn('fixed top-4 z-40', isRtl ? 'end-4' : 'start-4')}
+              className="fixed top-4 start-4 z-40"
               aria-label={t('openMenu')}
             >
               <Menu className="h-6 w-6" />

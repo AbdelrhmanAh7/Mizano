@@ -50,8 +50,8 @@ export function Header({ sessionUser }: HeaderProps) {
   return (
     <header role="banner" className="bg-card border-b border-border px-6 py-4 ps-14 lg:ps-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">
+        <div className="min-w-0 flex-1 pe-2">
+          <h1 className="truncate text-base font-semibold text-foreground sm:text-lg">
             {t('welcomeBack', { name: sessionUser?.firstName || '' })}
           </h1>
         </div>

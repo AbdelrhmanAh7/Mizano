@@ -251,6 +251,17 @@ describe('Sidebar', () => {
     expect(menuBtn).toBeInTheDocument();
   });
 
+  it.each(['en', 'ar'])(
+    'keeps the %s menu button on the start side, where the header leaves room',
+    (locale) => {
+      mockLocale = locale;
+      render(<Sidebar />);
+      // Logical `start-4` flips with the page direction; `end-4` covered the header icons in Arabic.
+      expect(screen.getByLabelText('openMenu')).toHaveClass('start-4');
+      mockLocale = 'en';
+    },
+  );
+
   it('renders Settings navigation item for users with settings permission', () => {
     render(<Sidebar />);
     const settingsItems = screen.getAllByText('settings');

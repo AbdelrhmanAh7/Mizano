@@ -190,14 +190,14 @@ function AdjustmentsPageContent() {
         <DataTableSearch
           value={tableParams.search}
           onChange={tableParams.setSearch}
-          placeholder="Search adjustments..."
+          placeholder={t('common.searchAdjustments')}
         />
         <Select value={typeFilter} onValueChange={setTypeFilter}>
           <SelectTrigger className="w-36">
-            <SelectValue placeholder="Type" />
+            <SelectValue placeholder={t('items.table.type')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="all">{t('common.allTypes')}</SelectItem>
             <SelectItem value="INCREASE">{t('adjustments.types.increase')}</SelectItem>
             <SelectItem value="DECREASE">{t('adjustments.types.decrease')}</SelectItem>
           </SelectContent>

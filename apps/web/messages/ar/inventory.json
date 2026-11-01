@@ -312,7 +312,11 @@
     "notFound": "غير موجود",
     "backTo": "العودة إلى",
     "confirmDelete": "هل أنت متأكد من حذف هذا العنصر؟ لا يمكن التراجع عن هذا الإجراء.",
-    "noData": "لا تتوفر بيانات"
+    "noData": "لا تتوفر بيانات",
+    "allTypes": "كل الأنواع",
+    "allStock": "كل المخزون",
+    "searchItems": "ابحث في الأصناف…",
+    "searchAdjustments": "ابحث في التسويات…"
   },
   "compositeItems": {
     "toast": {

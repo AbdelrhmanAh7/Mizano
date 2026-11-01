@@ -54,10 +54,10 @@ export default function OnboardingPage() {
 
       {/* Hero */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 via-indigo-600/5 to-violet-700/5" />
+        <div className="absolute inset-0 bg-gradient-to-br from-teal-600/5 via-teal-700/5 to-emerald-800/5" />
         <div className="absolute inset-0 opacity-[0.03]">
-          <div className="absolute top-20 start-10 w-72 h-72 bg-blue-500 rounded-full blur-3xl" />
-          <div className="absolute bottom-10 end-10 w-96 h-96 bg-violet-500 rounded-full blur-3xl" />
+          <div className="absolute top-20 start-10 w-72 h-72 bg-teal-500 rounded-full blur-3xl" />
+          <div className="absolute bottom-10 end-10 w-96 h-96 bg-amber-400 rounded-full blur-3xl" />
         </div>
         <div className="container mx-auto px-4 py-24 md:py-32 text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
@@ -129,23 +129,13 @@ export default function OnboardingPage() {
             <p className="text-sm font-medium">{t('technology.techStack')}</p>
           </div>
         </div>
-        <div className="flex items-center justify-center gap-4 mt-10 flex-wrap">
-          {['Next.js', 'NestJS', 'PostgreSQL', 'Redis', 'Prisma', 'TypeScript'].map((tech) => (
-            <span
-              key={tech}
-              className="px-3 py-1.5 rounded-full border text-xs font-medium text-muted-foreground"
-            >
-              {tech}
-            </span>
-          ))}
-        </div>
       </section>
 
       {/* CTA Footer */}
-      <section className="bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white">
+      <section className="bg-gradient-to-br from-[#0D9488] via-[#0B6E64] to-[#063A33] text-white">
         <div className="container mx-auto px-4 py-20 text-center">
           <h2 className="text-3xl font-bold">{t('cta.title')}</h2>
-          <p className="mt-3 text-blue-100 text-lg">{t('cta.subtitle')}</p>
+          <p className="mt-3 text-teal-50 text-lg">{t('cta.subtitle')}</p>
           <div className="mt-8 flex items-center justify-center gap-4">
             <Button size="lg" variant="secondary" asChild>
               <Link href="/register">{t('cta.getStarted')}</Link>
