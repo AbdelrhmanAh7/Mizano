@@ -5,12 +5,17 @@ import enAi from '@/messages/en/ai.json';
 import arAi from '@/messages/ar/ai.json';
 
 jest.mock('next-intl', () => ({
+  useLocale: () => 'en',
   useTranslations: () => {
     const t = (key: string, values?: Record<string, string>) =>
       values ? `${key}|${Object.values(values).join('|')}` : key;
     t.has = () => false;
     return t;
   },
+}));
+jest.mock('@/lib/hooks/use-organization', () => ({
+  useMoneyFormat: () => ({ data: { baseCurrency: 'EGP', documentDigits: 'latn' } }),
+  documentCurrency: (code: string | null | undefined, base: string | undefined) => code || base,
 }));
 const mockNoVendor = { data: undefined };
 jest.mock('@/lib/hooks/use-vendors', () => ({ useVendor: () => mockNoVendor }));
@@ -52,9 +57,9 @@ function renderForm(extractedTotals: React.ComponentProps<typeof BillForm>['extr
 describe('BillForm scan review totals', () => {
   it('shows computed subtotal, tax and total from the percentage', () => {
     renderForm({ subtotal: 200, tax: 28, total: 228 });
-    expect(screen.getAllByText('200.00').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('28.00').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('228.00').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('bill-subtotal')).toHaveTextContent('EGP 200.00');
+    expect(screen.getByTestId('bill-taxAmount')).toHaveTextContent('EGP 28.00');
+    expect(screen.getByTestId('bill-grandTotal')).toHaveTextContent('EGP 228.00');
     expect(screen.queryByTestId('totals-discrepancy')).not.toBeInTheDocument();
   });
 
@@ -113,5 +118,32 @@ describe('BillForm scan review totals', () => {
       }
       expect(Object.keys(intake.discrepancyField)).toEqual(['subtotal', 'tax', 'total']);
     }
+  });
+});
+
+describe('BillForm scan review currency (issue #645)', () => {
+  it('names no currency until the person picks one when the scan read none', () => {
+    render(
+      <BillForm
+        scanDefaults={scanDefaults}
+        requireCurrency
+        onSubmit={jest.fn()}
+        onCancel={jest.fn()}
+      />,
+    );
+    expect(screen.queryByTestId('bill-amounts-currency')).not.toBeInTheDocument();
+    expect(screen.getByTestId('bill-grandTotal')).toHaveTextContent(/^228\.00$/);
+  });
+
+  it('shows the scanned currency beside the totals', () => {
+    render(
+      <BillForm
+        scanDefaults={{ ...scanDefaults, currencyCode: 'SAR' }}
+        onSubmit={jest.fn()}
+        onCancel={jest.fn()}
+      />,
+    );
+    expect(screen.getByTestId('bill-amounts-currency')).toHaveTextContent('amountsIn|SAR');
+    expect(screen.getByTestId('bill-grandTotal')).toHaveTextContent('SAR 228.00');
   });
 });

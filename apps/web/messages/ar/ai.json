@@ -85,6 +85,8 @@
       "previewAlt": "معاينة المستند",
       "remove": "إزالة",
       "dropHint": "أفلت المستند هنا أو انقر للاختيار",
+      "chooseDocument": "اختر مستندًا",
+      "chooseAnother": "اختر مستندًا آخر",
       "supportsHint": "يدعم الصور (JPEG وPNG وWebP وHEIC) وملفات PDF — بحد أقصى 15 ميجابايت",
       "processWithAi": "اقرأ المستند",
       "processingHint": "جارٍ قراءة المستند. يظهر التقدم أدناه.",
