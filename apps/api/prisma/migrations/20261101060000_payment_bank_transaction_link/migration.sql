@@ -7,66 +7,48 @@ CREATE UNIQUE INDEX "payments_received_bankTransactionId_key" ON "payments_recei
 CREATE UNIQUE INDEX "payments_made_bankTransactionId_key" ON "payments_made"("bankTransactionId");
 
 -- Bank lines reconciled before this release settled an open invoice or bill by recording a new
--- payment for exactly that line: same document, the line's absolute amount, its day, its reference,
--- the bank's ledger account, by bank transfer, allocated in full. Link those payments now so they
--- are never offered for another line. Identical lines and payments (same key) pair one to one in
--- creation order; anything without such evidence stays unlinked.
-WITH line AS (
-  SELECT bt.id, bt."organizationId", bt."matchedEntityId" AS doc, abs(bt.amount) AS amount,
-         bt.date::date AS day, bt.reference, ba."linkedAccountId" AS account,
-         row_number() OVER (
-           PARTITION BY bt."organizationId", bt."matchedEntityId", abs(bt.amount), bt.date::date,
-                        bt.reference, ba."linkedAccountId"
-           ORDER BY bt."updatedAt", bt.id) AS n
+-- payment for exactly that line, in the same database transaction that marked the line MATCHED.
+-- Link those payments now so they are never offered for another line. The evidence: the same
+-- document, the line's absolute amount, its day and reference, the bank's ledger account, a bank
+-- transfer allocated in full, AND created within a minute of the line being marked matched (a
+-- payment recorded by hand earlier or later fails this). Only one-to-one candidates are linked;
+-- an ambiguous pair (two identical lines matched within the same minute) is left unlinked.
+WITH cand AS (
+  SELECT bt.id AS line_id, p.id AS pay_id
   FROM "bank_transactions" bt
   JOIN "bank_accounts" ba ON ba.id = bt."bankAccountId" AND ba."organizationId" = bt."organizationId"
+  JOIN "payment_allocations" a ON a."invoiceId" = bt."matchedEntityId"
+  JOIN "payments_received" p ON p.id = a."paymentId" AND a.amount = p.amount
   WHERE bt.status = 'MATCHED' AND bt."matchedEntityType" = 'invoice' AND bt.type = 'DEPOSIT'
+    AND p."organizationId" = bt."organizationId" AND p."deletedAt" IS NULL
+    AND p."bankTransactionId" IS NULL AND p."paymentMode" = 'BANK_TRANSFER'
+    AND p.amount = abs(bt.amount) AND p.date::date = bt.date::date
+    AND p.reference IS NOT DISTINCT FROM bt.reference AND p."depositToAccountId" = ba."linkedAccountId"
+    AND abs(extract(epoch FROM (p."createdAt" - bt."updatedAt"))) <= 60
 ),
-pay AS (
-  SELECT p.id, p."organizationId", a."invoiceId" AS doc, p.amount, p.date::date AS day, p.reference,
-         p."depositToAccountId" AS account,
-         row_number() OVER (
-           PARTITION BY p."organizationId", a."invoiceId", p.amount, p.date::date, p.reference,
-                        p."depositToAccountId"
-           ORDER BY p."createdAt", p.id) AS n
-  FROM "payments_received" p
-  JOIN "payment_allocations" a ON a."paymentId" = p.id AND a.amount = p.amount
-  WHERE p."deletedAt" IS NULL AND p."bankTransactionId" IS NULL AND p."paymentMode" = 'BANK_TRANSFER'
+uniq AS (
+  SELECT c.line_id, c.pay_id FROM cand c
+  WHERE (SELECT count(*) FROM cand x WHERE x.line_id = c.line_id) = 1
+    AND (SELECT count(*) FROM cand y WHERE y.pay_id = c.pay_id) = 1
 )
-UPDATE "payments_received" p SET "bankTransactionId" = line.id
-FROM line
-JOIN pay ON pay."organizationId" = line."organizationId" AND pay.doc = line.doc
-        AND pay.amount = line.amount AND pay.day = line.day
-        AND pay.reference IS NOT DISTINCT FROM line.reference
-        AND pay.account = line.account AND pay.n = line.n
-WHERE p.id = pay.id;
+UPDATE "payments_received" p SET "bankTransactionId" = uniq.line_id FROM uniq WHERE p.id = uniq.pay_id;
 
-WITH line AS (
-  SELECT bt.id, bt."organizationId", bt."matchedEntityId" AS doc, abs(bt.amount) AS amount,
-         bt.date::date AS day, bt.reference, ba."linkedAccountId" AS account,
-         row_number() OVER (
-           PARTITION BY bt."organizationId", bt."matchedEntityId", abs(bt.amount), bt.date::date,
-                        bt.reference, ba."linkedAccountId"
-           ORDER BY bt."updatedAt", bt.id) AS n
+WITH cand AS (
+  SELECT bt.id AS line_id, p.id AS pay_id
   FROM "bank_transactions" bt
   JOIN "bank_accounts" ba ON ba.id = bt."bankAccountId" AND ba."organizationId" = bt."organizationId"
+  JOIN "bill_allocations" a ON a."billId" = bt."matchedEntityId"
+  JOIN "payments_made" p ON p.id = a."paymentId" AND a.amount = p.amount
   WHERE bt.status = 'MATCHED' AND bt."matchedEntityType" = 'bill' AND bt.type = 'WITHDRAWAL'
+    AND p."organizationId" = bt."organizationId" AND p."deletedAt" IS NULL
+    AND p."bankTransactionId" IS NULL AND p."paymentMode" = 'BANK_TRANSFER'
+    AND p.amount = abs(bt.amount) AND p.date::date = bt.date::date
+    AND p.reference IS NOT DISTINCT FROM bt.reference AND p."paidFromAccountId" = ba."linkedAccountId"
+    AND abs(extract(epoch FROM (p."createdAt" - bt."updatedAt"))) <= 60
 ),
-pay AS (
-  SELECT p.id, p."organizationId", a."billId" AS doc, p.amount, p.date::date AS day, p.reference,
-         p."paidFromAccountId" AS account,
-         row_number() OVER (
-           PARTITION BY p."organizationId", a."billId", p.amount, p.date::date, p.reference,
-                        p."paidFromAccountId"
-           ORDER BY p."createdAt", p.id) AS n
-  FROM "payments_made" p
-  JOIN "bill_allocations" a ON a."paymentId" = p.id AND a.amount = p.amount
-  WHERE p."deletedAt" IS NULL AND p."bankTransactionId" IS NULL AND p."paymentMode" = 'BANK_TRANSFER'
+uniq AS (
+  SELECT c.line_id, c.pay_id FROM cand c
+  WHERE (SELECT count(*) FROM cand x WHERE x.line_id = c.line_id) = 1
+    AND (SELECT count(*) FROM cand y WHERE y.pay_id = c.pay_id) = 1
 )
-UPDATE "payments_made" p SET "bankTransactionId" = line.id
-FROM line
-JOIN pay ON pay."organizationId" = line."organizationId" AND pay.doc = line.doc
-        AND pay.amount = line.amount AND pay.day = line.day
-        AND pay.reference IS NOT DISTINCT FROM line.reference
-        AND pay.account = line.account AND pay.n = line.n
-WHERE p.id = pay.id;
+UPDATE "payments_made" p SET "bankTransactionId" = uniq.line_id FROM uniq WHERE p.id = uniq.pay_id;
