@@ -108,8 +108,9 @@ export class AuthService {
 
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
-    // Checked before the password, so a blocked account gives no hint whether a guess was right.
-    if (this.loginFailures.isBlocked(email)) {
+    // Reserved before the password check (and before any await), so concurrent guesses cannot all
+    // slip past the cap, and a blocked account gives no hint whether a guess was right.
+    if (!this.loginFailures.tryAttempt(email)) {
       throw new HttpException(
         'Too many failed sign-ins for this account. Try again in 15 minutes.',
         HttpStatus.TOO_MANY_REQUESTS,
@@ -128,7 +129,6 @@ export class AuthService {
     });
 
     if (!user) {
-      this.loginFailures.recordFailure(email);
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -139,10 +139,9 @@ export class AuthService {
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
-      this.loginFailures.recordFailure(email);
       throw new UnauthorizedException('Invalid email or password');
     }
-    this.loginFailures.clear(email);
+    this.loginFailures.succeeded(email);
 
     // A new session per sign-in: other devices stay signed in.
     const tokens = await this.sessions.start(user);

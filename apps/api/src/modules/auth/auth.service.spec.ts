@@ -136,3 +136,26 @@ describe('AuthService.login failed-attempt cap (#639)', () => {
     });
   });
 });
+
+describe('AuthService.login concurrent guesses (#639)', () => {
+  it('lets at most 10 of many simultaneous guesses reach the password check', async () => {
+    const { service } = setup();
+    const prisma = (service as unknown as { prisma: { user: { findFirst: jest.Mock } } }).prisma;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    prisma.user.findFirst.mockImplementation(async () => {
+      await gate;
+      return null;
+    });
+    const attempts = Array.from({ length: 25 }, () =>
+      service
+        .login({ email: 'race@nile.test', password: 'x' })
+        .catch((e: { status: number }) => e.status),
+    );
+    release();
+    const statuses = await Promise.all(attempts);
+    expect(statuses.filter((s) => s === 401)).toHaveLength(10);
+    expect(statuses.filter((s) => s === 429)).toHaveLength(15);
+    expect(prisma.user.findFirst).toHaveBeenCalledTimes(10);
+  });
+});
