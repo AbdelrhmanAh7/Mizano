@@ -158,16 +158,16 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      {/* Header: the actions wrap under the title on a phone (#637). */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
           <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/purchases/credits">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <div>
-            <div className="flex items-center gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight font-mono">{credit.creditNumber}</h1>
               {isVoided ? (
                 <Badge variant="destructive">{t('credits.voided')}</Badge>
@@ -181,7 +181,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                 </Badge>
               )}
             </div>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground break-words">
               {t('credits.creditFrom', { name: credit.vendor?.name || '' })}
             </p>
           </div>
@@ -189,7 +189,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
 
         {/* Actions */}
         {!isVoided && !credit.appliedToBillId && !credit.refundedAt && (canEdit || canDelete) && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {canEdit && (
               <Dialog open={applyDialogOpen} onOpenChange={setApplyDialogOpen}>
                 <DialogTrigger asChild>

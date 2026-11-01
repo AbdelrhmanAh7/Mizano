@@ -31,7 +31,8 @@ export interface BankTransaction {
 
 export interface SuggestedMatch {
   id: string;
-  type: 'INVOICE' | 'BILL' | 'EXPENSE';
+  /** An open document to settle, or a payment already recorded (matching it posts nothing). */
+  type: 'INVOICE' | 'BILL' | 'PAYMENT_RECEIVED' | 'PAYMENT_MADE';
   number: string;
   date: string;
   amount: string | number;
@@ -86,27 +87,56 @@ export function useUnmatchedTransactions(bankAccountId: string) {
 }
 
 /** One line of `GET /reconciliation/suggestions/:bankAccountId`: a pending bank line and its candidates. */
+type MatchEntityType = 'invoice' | 'bill' | 'payment_received' | 'payment_made';
+
 interface SuggestionRow {
   transaction: { id: string };
-  matches: Array<{ type: 'invoice' | 'bill'; entity: Record<string, unknown>; confidence: number }>;
+  matches: Array<{ type: MatchEntityType; entity: Record<string, unknown>; confidence: number }>;
 }
+
+const MATCH_TYPES: Record<MatchEntityType, SuggestedMatch['type']> = {
+  invoice: 'INVOICE',
+  bill: 'BILL',
+  payment_received: 'PAYMENT_RECEIVED',
+  payment_made: 'PAYMENT_MADE',
+};
+
+/** The API's entity type for a candidate (the inverse of MATCH_TYPES). */
+const ENTITY_TYPES = Object.fromEntries(
+  Object.entries(MATCH_TYPES).map(([entity, type]) => [type, entity]),
+) as Record<SuggestedMatch['type'], MatchEntityType>;
+
+/** A recorded payment is already in the books: matching it links the bank line, posts nothing. */
+export const isRecordedPayment = (type: SuggestedMatch['type']): boolean =>
+  type === 'PAYMENT_RECEIVED' || type === 'PAYMENT_MADE';
 
 const asText = (value: unknown): string => (typeof value === 'string' ? value : '');
 const nameOf = (party: unknown): string =>
   party && typeof party === 'object' ? asText((party as { name?: unknown }).name) : '';
 
-/** Turns the server's candidate (an invoice or bill with its customer or vendor) into a row of the list. */
+/**
+ * Turns the server's candidate (an invoice, bill or recorded payment with its customer or vendor)
+ * into a row of the list. A payment has nothing left to settle, so its balance due is 0.
+ */
 function toSuggestedMatch(match: SuggestionRow['matches'][number]): SuggestedMatch {
   const { entity } = match;
-  const isInvoice = match.type === 'invoice';
+  const type = MATCH_TYPES[match.type];
+  const payment = isRecordedPayment(type);
+  const number =
+    match.type === 'invoice'
+      ? entity.invoiceNumber
+      : match.type === 'bill'
+        ? entity.billNumber
+        : entity.paymentNumber;
+  const incoming = match.type === 'invoice' || match.type === 'payment_received';
   return {
     id: asText(entity.id),
-    type: isInvoice ? 'INVOICE' : 'BILL',
-    number: asText(isInvoice ? entity.invoiceNumber : entity.billNumber),
+    type,
+    number: asText(number),
     date: asText(entity.date),
-    amount: asText(entity.total) || '0',
-    balanceDue: asText(entity.balanceDue) || '0',
-    counterpartyName: nameOf(isInvoice ? entity.customer : entity.vendor),
+    amount: asText(payment ? entity.amount : entity.total) || '0',
+    balanceDue: payment ? '0' : asText(entity.balanceDue) || '0',
+    counterpartyName: nameOf(incoming ? entity.customer : entity.vendor),
     confidence: match.confidence,
   };
 }
@@ -152,7 +182,7 @@ export function useMatchTransaction() {
     }) =>
       reconciliationApi.confirm({
         transactionId: id,
-        entityType: documentType === 'INVOICE' ? 'invoice' : 'bill',
+        entityType: ENTITY_TYPES[documentType],
         entityId: documentId,
       }),
     onSuccess: () => {
@@ -160,6 +190,8 @@ export function useMatchTransaction() {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['bills'] });
+      queryClient.invalidateQueries({ queryKey: ['payments-received'] });
+      queryClient.invalidateQueries({ queryKey: ['payments-made'] });
       toast.success(t('transactionMatched'));
     },
     onError: (error: unknown) => {

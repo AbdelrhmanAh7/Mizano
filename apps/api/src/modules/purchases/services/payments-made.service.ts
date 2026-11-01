@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { PaymentMode, Prisma } from '@prisma/client';
+import { PaymentMode, Prisma, ReconciliationStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
@@ -274,11 +274,27 @@ export class PaymentsMadeService {
       const billIds = payment.allocations.map((a) => a.billId);
       await this.billsService.lockBills(tx, organizationId, billIds);
 
+      // A reconciled payment frees its bank line: the money on the statement waits to be
+      // reconciled again (#635). The link is read under the payment's row lock (the order
+      // reconciliation also takes: payment, then bank line), so a concurrent match is never missed.
+      const [locked] = await tx.$queryRaw<
+        Array<{ bankTransactionId: string | null }>
+      >`SELECT "bankTransactionId" FROM "payments_made" WHERE id = ${id} AND "organizationId" = ${organizationId} FOR UPDATE`;
       const { count } = await tx.paymentMade.updateMany({
         where: { id, organizationId, deletedAt: null },
-        data: { deletedAt: new Date() },
+        data: { deletedAt: new Date(), bankTransactionId: null },
       });
       if (count === 0) throw new NotFoundException('Payment not found');
+      if (locked?.bankTransactionId) {
+        await tx.bankTransaction.updateMany({
+          where: { id: locked.bankTransactionId, organizationId },
+          data: {
+            status: ReconciliationStatus.PENDING,
+            matchedEntityType: null,
+            matchedEntityId: null,
+          },
+        });
+      }
 
       for (const billId of billIds) {
         await this.billsService.recalculateBalance(tx, billId);

@@ -502,6 +502,7 @@ describe('PaymentsReceivedService', () => {
 
   describe('void', () => {
     beforeEach(() => {
+      prisma.$queryRaw.mockResolvedValue([] as any); // the payment's row lock: no link by default
       prisma.paymentAllocation.findMany.mockResolvedValue([]);
       prisma.creditNote.aggregate.mockResolvedValue({ _sum: { amount: null } } as any);
     });
@@ -542,6 +543,28 @@ describe('PaymentsReceivedService', () => {
 
       await expect(service.void(ORG_ID, 'pmt-1')).resolves.toMatchObject({
         message: 'Payment voided successfully',
+      });
+    });
+
+    it('frees the bank line a reconciled receipt was matched to (#635)', async () => {
+      // The link is read under the row lock, not from the earlier unlocked read.
+      prisma.paymentReceived.findFirst.mockResolvedValue({
+        id: 'pmt-1',
+        allocations: [{ invoiceId: 'inv-1' }],
+      } as any);
+      prisma.$queryRaw.mockResolvedValue([{ bankTransactionId: 't1' }] as any);
+      prisma.paymentReceived.updateMany.mockResolvedValue({ count: 1 });
+      prisma.journal.findFirst.mockResolvedValue({ id: 'j1' } as any);
+
+      await service.void(ORG_ID, 'pmt-1');
+
+      expect(prisma.paymentReceived.updateMany.mock.calls[0][0]!.data).toEqual({
+        deletedAt: expect.any(Date),
+        bankTransactionId: null,
+      });
+      expect(prisma.bankTransaction.updateMany).toHaveBeenCalledWith({
+        where: { id: 't1', organizationId: ORG_ID },
+        data: { status: 'PENDING', matchedEntityType: null, matchedEntityId: null },
       });
     });
 

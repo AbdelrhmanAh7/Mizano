@@ -517,8 +517,12 @@ export const bankAccountsApi = {
 export const reconciliationApi = {
   getSuggestions: (bankAccountId: string) =>
     api.get(`/reconciliation/suggestions/${bankAccountId}`),
-  confirm: (data: { transactionId: string; entityType: 'invoice' | 'bill'; entityId: string }) =>
-    api.post('/reconciliation/confirm', data),
+  /** Settles an open invoice/bill, or links a payment already recorded (nothing posted again). */
+  confirm: (data: {
+    transactionId: string;
+    entityType: 'invoice' | 'bill' | 'payment_received' | 'payment_made';
+    entityId: string;
+  }) => api.post('/reconciliation/confirm', data),
 };
 
 export const bankTransactionsApi = {

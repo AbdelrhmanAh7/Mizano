@@ -96,6 +96,7 @@ describe('PaymentsMadeService (posting)', () => {
 
   beforeEach(async () => {
     prisma = createMockPrisma();
+    prisma.$queryRaw.mockResolvedValue([]); // the payment's row lock (void) answers no link by default
     bills = { lockBills: jest.fn(), recalculateBalance: jest.fn() };
     journals = { create: jest.fn().mockResolvedValue({}), reverse: jest.fn() };
     const module: TestingModule = await Test.createTestingModule({
@@ -260,6 +261,25 @@ describe('PaymentsMadeService (posting)', () => {
     expect(journals.reverse).toHaveBeenCalledWith(ORG, 'j1', undefined, {
       tx: prisma,
       source: { type: 'PAYMENT_MADE_VOID', id: 'p1' },
+    });
+  });
+
+  it('void of a reconciled payment sends its bank line back to be reconciled (#635)', async () => {
+    // The link is read under the row lock, not from the earlier unlocked read.
+    prisma.paymentMade.findFirst.mockResolvedValue({ id: 'p1', allocations: [{ billId: 'b1' }] });
+    prisma.$queryRaw.mockResolvedValue([{ bankTransactionId: 't1' }]);
+    prisma.paymentMade.updateMany.mockResolvedValue({ count: 1 });
+    prisma.journal.findFirst.mockResolvedValue({ id: 'j1' });
+
+    await service.void(ORG, 'p1');
+
+    expect(prisma.paymentMade.updateMany.mock.calls[0][0].data).toEqual({
+      deletedAt: expect.any(Date),
+      bankTransactionId: null,
+    });
+    expect(prisma.bankTransaction.updateMany).toHaveBeenCalledWith({
+      where: { id: 't1', organizationId: ORG },
+      data: { status: 'PENDING', matchedEntityType: null, matchedEntityId: null },
     });
   });
 

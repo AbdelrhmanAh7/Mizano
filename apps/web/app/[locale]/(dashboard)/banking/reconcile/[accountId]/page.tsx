@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   ArrowUpRight,
   ArrowDownRight,
+  Banknote,
   Check,
   Plus,
   FileText,
@@ -26,6 +27,7 @@ import {
   useMatchTransaction,
   BankTransaction,
   SuggestedMatch,
+  isRecordedPayment,
   getConfidenceColor,
   getConfidenceLabel,
 } from '@/lib/hooks/use-bank-transactions';
@@ -308,7 +310,9 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2">
-                                  {match.type === 'INVOICE' ? (
+                                  {isRecordedPayment(match.type) ? (
+                                    <Banknote className="h-4 w-4 text-green-600" />
+                                  ) : match.type === 'INVOICE' ? (
                                     <FileText className="h-4 w-4 text-blue-600" />
                                   ) : (
                                     <Receipt className="h-4 w-4 text-orange-600" />
@@ -325,11 +329,24 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                                   {match.counterpartyName} •{' '}
                                   {format(new Date(match.date), 'PP', { locale: dateLocale })}
                                 </p>
-                                <p className="text-sm font-mono mt-1">
-                                  {t('reconciliation.balanceDue', {
-                                    amount: formatCurrency(match.balanceDue),
-                                  })}
-                                </p>
+                                {isRecordedPayment(match.type) ? (
+                                  <>
+                                    <p className="text-sm font-mono mt-1">
+                                      {t('reconciliation.recordedPayment', {
+                                        amount: formatCurrency(match.amount),
+                                      })}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {t('reconciliation.recordedPaymentHint')}
+                                    </p>
+                                  </>
+                                ) : (
+                                  <p className="text-sm font-mono mt-1">
+                                    {t('reconciliation.balanceDue', {
+                                      amount: formatCurrency(match.balanceDue),
+                                    })}
+                                  </p>
+                                )}
                               </div>
                               <Button
                                 size="sm"

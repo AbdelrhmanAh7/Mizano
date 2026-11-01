@@ -1512,8 +1512,8 @@ const BANKING_ERRORS: ErrorCatalogEntry[] = [
   },
   {
     code: 'RECONCILE_ENTITY_TYPE_INVALID',
-    en: 'entityType must be invoice or bill',
-    ar: 'يجب أن تكون المطابقة مع فاتورة مبيعات أو فاتورة مورد.',
+    en: 'entityType must be invoice, bill, payment_received or payment_made',
+    ar: 'يجب أن تكون المطابقة مع فاتورة أو فاتورة مورد أو دفعة مسجلة.',
   },
   {
     code: 'EXPENSE_NEEDS_WITHDRAWAL',
@@ -1522,13 +1522,28 @@ const BANKING_ERRORS: ErrorCatalogEntry[] = [
   },
   {
     code: 'INVOICE_MATCH_NEEDS_DEPOSIT',
-    en: 'Only deposits can be matched to an invoice payment',
-    ar: 'يمكن مطابقة الإيداعات فقط مع دفعات الفواتير.',
+    en: 'Only deposits can be matched to a customer payment',
+    ar: 'يمكن مطابقة الإيداعات فقط مع دفعات العملاء.',
   },
   {
     code: 'BILL_MATCH_NEEDS_WITHDRAWAL',
-    en: 'Only withdrawals can be matched to a bill payment',
-    ar: 'يمكن مطابقة السحوبات فقط مع دفعات فواتير الموردين.',
+    en: 'Only withdrawals can be matched to a vendor payment',
+    ar: 'يمكن مطابقة السحوبات فقط مع دفعات الموردين.',
+  },
+  {
+    code: 'MATCH_PAYMENT_OTHER_BANK',
+    en: 'This payment was recorded to a different bank account',
+    ar: 'هذه الدفعة مسجلة على حساب بنكي آخر.',
+  },
+  {
+    code: 'MATCH_PAYMENT_AMOUNT_DIFFERS',
+    en: 'The payment amount differs from the bank line',
+    ar: 'مبلغ الدفعة يختلف عن مبلغ سطر البنك.',
+  },
+  {
+    code: 'MATCH_PAYMENT_ALREADY_MATCHED',
+    en: 'This payment is already matched to another bank line',
+    ar: 'هذه الدفعة مطابقة بالفعل مع سطر بنكي آخر.',
   },
   {
     code: 'BANK_ACCOUNT_NOT_FOUND_FOR_BALANCE',

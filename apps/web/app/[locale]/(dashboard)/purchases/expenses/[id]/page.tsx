@@ -91,7 +91,8 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* The actions wrap under the title on a phone (#637). */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/purchases/expenses">

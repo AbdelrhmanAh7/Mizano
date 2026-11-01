@@ -35,7 +35,13 @@ export class PaymentsReceivedController {
 
   @Post()
   @Permissions('sales.create')
-  @InvalidatesLedger('payments-received:*', 'invoices:*', 'customers:*')
+  @InvalidatesLedger(
+    'payments-received:*',
+    'invoices:*',
+    'customers:*',
+    'bank-transactions:*',
+    'reconciliation:*',
+  )
   @ApiOperation({ summary: 'Record a payment received (allocations + journal)' })
   create(@CurrentOrg() orgId: string, @Body() createPaymentReceivedDto: CreatePaymentReceivedDto) {
     return this.paymentsReceivedService.create(orgId, createPaymentReceivedDto);
@@ -59,7 +65,13 @@ export class PaymentsReceivedController {
   // Bulk Operations
   @Post('bulk-delete')
   @Permissions('sales.delete')
-  @InvalidatesLedger('payments-received:*', 'invoices:*', 'customers:*')
+  @InvalidatesLedger(
+    'payments-received:*',
+    'invoices:*',
+    'customers:*',
+    'bank-transactions:*',
+    'reconciliation:*',
+  )
   @ApiOperation({
     summary: 'Bulk void payments received (restores invoice balances, reverses journals)',
   })
@@ -75,7 +87,13 @@ export class PaymentsReceivedController {
 
   @Post(':id/void')
   @Permissions('sales.delete')
-  @InvalidatesLedger('payments-received:*', 'invoices:*', 'customers:*')
+  @InvalidatesLedger(
+    'payments-received:*',
+    'invoices:*',
+    'customers:*',
+    'bank-transactions:*',
+    'reconciliation:*',
+  )
   @ApiOperation({ summary: 'Void a payment (restores invoice balances, reverses journal)' })
   void(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.paymentsReceivedService.void(orgId, id);
