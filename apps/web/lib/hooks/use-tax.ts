@@ -373,15 +373,6 @@ export function getVATReturnStatusStep(status: VATReturnStatus): number {
   return steps[status] ?? 0;
 }
 
-export function formatCurrency(amount: number | string | undefined): string {
-  if (amount === undefined || amount === null) return '$0.00';
-  const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(numAmount);
-}
-
 export function formatPercentage(rate: number | string | undefined): string {
   if (rate === undefined || rate === null) return '0%';
   const numRate = typeof rate === 'string' ? parseFloat(rate) : rate;

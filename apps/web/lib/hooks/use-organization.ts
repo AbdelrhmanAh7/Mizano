@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import type {
+  DocumentDigits,
   GeneralSettings,
   InvoiceSettings,
   InventorySettings,
@@ -72,12 +73,24 @@ export interface CoaTemplatePreview {
   accounts: Array<{ code: string; name: string; type: string }>;
 }
 
+/** How this organization displays money: its base (ledger) currency and the digits of Arabic amounts. */
+export interface MoneyFormat {
+  baseCurrency: string;
+  documentDigits: DocumentDigits;
+}
+
 // ============ API Functions ============
 
 const organizationApi = {
   // Organization
   getOrganization: async () => {
     const response = await api.get('/organization');
+    return response.data;
+  },
+
+  // Base currency and Arabic digits; readable by every member (GET /organization needs settings.view)
+  getMoneyFormat: async (): Promise<MoneyFormat> => {
+    const response = await api.get('/organization/money-format');
     return response.data;
   },
 
@@ -224,7 +237,19 @@ export function useOrganization() {
  * posted in it, so they must be displayed in it too, never in the counterparty's default.
  */
 export function useBaseCurrency(): string | undefined {
-  return useOrganization().data?.baseCurrency;
+  return useMoneyFormat().data?.baseCurrency;
+}
+
+/**
+ * The organization's money display settings. Under the settings key, so saving any settings
+ * section refreshes it; it changes rarely, hence the long stale time.
+ */
+export function useMoneyFormat() {
+  return useQuery({
+    queryKey: ['organization', 'settings', 'money-format'],
+    queryFn: organizationApi.getMoneyFormat,
+    staleTime: 5 * 60 * 1000,
+  });
 }
 
 /** Display currency of a document: its own currency, else the organization base currency. */

@@ -47,6 +47,7 @@ jest.mock('@/components/shared/party-combobox', () => ({
 jest.mock('@/lib/hooks/use-organization', () => ({
   ...jest.requireActual('@/lib/hooks/use-organization'),
   useBaseCurrency: () => 'EGP',
+  useMoneyFormat: () => ({ data: { baseCurrency: 'EGP', documentDigits: 'latn' } }),
 }));
 
 // Radix Select does not open in jsdom: render each option as a button wired to onValueChange.

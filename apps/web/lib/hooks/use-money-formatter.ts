@@ -2,11 +2,23 @@
 
 import { useCallback } from 'react';
 import { useLocale } from 'next-intl';
-import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
+import { documentCurrency, useMoneyFormat } from '@/lib/hooks/use-organization';
+
+/** The Intl locale for amounts (with the organization's Arabic digits) and the base currency. */
+function useMoneyLocale(): { numberLocale: string; baseCurrency: string | undefined } {
+  const locale = useLocale();
+  const { data } = useMoneyFormat();
+  const digits = data?.documentDigits === 'arab' ? 'arab' : 'latn';
+  return {
+    numberLocale: locale === 'ar' ? `ar-u-nu-${digits}` : 'en',
+    baseCurrency: data?.baseCurrency,
+  };
+}
 
 /**
  * Formats a money amount for display in the document's own currency, else the organization base
- * currency (never a guessed USD; review-lessons §11). Arabic uses Western digits, like the PDFs.
+ * currency (never a guessed USD; review-lessons §11). Arabic uses the organization's digits
+ * (Western 0123 or Arabic-Indic ٠١٢٣, the same setting as the Arabic PDFs); English always 0123.
  * Until the base currency has loaded, amounts show as plain numbers rather than a wrong currency.
  * Display only: the value itself stays a decimal string everywhere else.
  */
@@ -14,9 +26,7 @@ export function useMoneyFormatter(): (
   amount: string | number | null | undefined,
   currencyCode?: string | null,
 ) => string {
-  const locale = useLocale();
-  const baseCurrency = useBaseCurrency();
-  const numberLocale = locale === 'ar' ? 'ar-u-nu-latn' : 'en';
+  const { numberLocale, baseCurrency } = useMoneyLocale();
 
   return useCallback(
     (amount, currencyCode) => {
@@ -52,9 +62,7 @@ export function useCompactMoneyFormatter(): (
   amount: string | number | null | undefined,
   currencyCode?: string | null,
 ) => string {
-  const locale = useLocale();
-  const baseCurrency = useBaseCurrency();
-  const numberLocale = locale === 'ar' ? 'ar-u-nu-latn' : 'en';
+  const { numberLocale, baseCurrency } = useMoneyLocale();
 
   return useCallback(
     (amount, currencyCode) => {

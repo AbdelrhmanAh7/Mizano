@@ -28,11 +28,7 @@ import { getApiErrorMessage } from '@/lib/api-error';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import { LEDGER_QUERY_KEYS, invalidateLedgerQueries } from '@/lib/hooks/use-journals';
 import type { ImportEntityType } from '@/lib/hooks/use-import-export';
-import {
-  formatCurrency,
-  PaymentMade,
-  useInfinitePaymentsMade,
-} from '@/lib/hooks/use-payments-made';
+import { PaymentMade, useInfinitePaymentsMade } from '@/lib/hooks/use-payments-made';
 import { PaymentModeText, type PaymentMode } from '@/components/sales/status-badge';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
@@ -44,8 +40,10 @@ import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useBaseCurrency } from '@/lib/hooks/use-organization';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function PaymentsMadePageContent() {
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('purchases');
   const baseCurrency = useBaseCurrency();

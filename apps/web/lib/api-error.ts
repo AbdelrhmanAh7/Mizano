@@ -23,6 +23,14 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+/** True when the API answered 404: the record is gone, as opposed to a failed request. */
+export function isNotFoundError(error: unknown): boolean {
+  if (error && typeof error === 'object') {
+    return (error as { response?: { status?: unknown } }).response?.status === 404;
+  }
+  return false;
+}
+
 /** The API's machine-readable error `code` (for example `accountInvalidType`), if it sent one. */
 export function getApiErrorCode(error: unknown): string | undefined {
   if (error && typeof error === 'object') {

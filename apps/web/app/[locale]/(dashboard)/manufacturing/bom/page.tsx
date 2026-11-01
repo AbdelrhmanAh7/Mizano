@@ -32,9 +32,9 @@ import {
   BOM,
   getBOMStatusColor,
   getBOMStatusLabel,
-  formatCurrency,
 } from '@/lib/hooks/use-manufacturing';
 import { usePermissions } from '@/lib/hooks/use-permissions';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
@@ -43,6 +43,7 @@ const STATUS_OPTIONS = [
 ];
 
 function BOMListPageContent() {
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('manufacturing');
   const tCommon = useTranslations('common');
   const { toast } = useToast();

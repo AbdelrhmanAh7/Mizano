@@ -35,14 +35,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  useEmployees,
-  useRunPayroll,
-  useConfirmPayroll,
-  formatCurrency,
-  getMonthName,
-} from '@/lib/hooks/use-hr';
+import { useEmployees, useRunPayroll, useConfirmPayroll, getMonthName } from '@/lib/hooks/use-hr';
 import { useLocale, useTranslations } from 'next-intl';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface PayslipPreview {
   employeeId: string;
@@ -58,6 +53,7 @@ interface PayslipPreview {
 }
 
 export default function RunPayrollPage() {
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('hr');
   const tCommon = useTranslations('common');
   const locale = useLocale();

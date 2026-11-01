@@ -18,13 +18,14 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BankAccount, accountTypeOptions } from '@/lib/hooks/use-bank-accounts';
+import { useBaseCurrency } from '@/lib/hooks/use-organization';
 
 const bankAccountSchema = z.object({
   // Messages are keys of banking.accounts.form.
   name: z.string().min(1, 'nameRequired').max(100, 'nameMax'),
   accountNumber: z.string().optional(),
   type: z.enum(['BANK', 'CREDIT_CARD', 'PETTY_CASH']),
-  currency: z.string().default('USD'),
+  currency: z.string().min(1, 'currencyRequired'),
   openingBalance: z.number().optional(),
   linkedAccountId: z.string().min(1, 'linkedAccountRequired'),
   isActive: z.boolean().default(true),
@@ -33,7 +34,7 @@ const bankAccountSchema = z.object({
 type BankAccountFormData = z.infer<typeof bankAccountSchema>;
 
 /** Currencies offered for a bank account; names come from Intl in the page language. */
-const CURRENCY_CODES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'EGP'];
+const CURRENCY_CODES = ['EGP', 'SAR', 'AED', 'USD', 'EUR', 'GBP'];
 
 interface BankAccountFormProps {
   account?: BankAccount | null;
@@ -59,18 +60,29 @@ export function BankAccountForm({
   const errorText = (message?: string): string | undefined =>
     message && tForm.has(message) ? tForm(message) : message;
 
+  const baseCurrency = useBaseCurrency();
   const form = useForm<BankAccountFormData>({
     resolver: zodResolver(bankAccountSchema),
     defaultValues: {
       name: '',
       accountNumber: '',
       type: 'BANK',
-      currency: 'USD',
+      currency: '',
       openingBalance: 0,
       linkedAccountId: '',
       isActive: true,
     },
   });
+
+  // A new account starts in the org base currency, never USD; a choice already made stays.
+  useEffect(() => {
+    if (!isEditing && baseCurrency && !form.getValues('currency')) {
+      form.setValue('currency', baseCurrency);
+    }
+  }, [isEditing, baseCurrency, form]);
+  const currencyCodes = [baseCurrency, account?.currency, ...CURRENCY_CODES].filter(
+    (code, i, all): code is string => !!code && all.indexOf(code) === i,
+  );
 
   useEffect(() => {
     if (account) {
@@ -78,12 +90,12 @@ export function BankAccountForm({
         name: account.name || '',
         accountNumber: account.accountNumber || '',
         type: account.type || 'BANK',
-        currency: account.currency || 'USD',
+        currency: account.currency || baseCurrency || '',
         linkedAccountId: account.linkedAccountId || '',
         isActive: account.isActive ?? true,
       });
     }
-  }, [account, form]);
+  }, [account, baseCurrency, form]);
 
   const handleSubmit = (data: BankAccountFormData) => {
     onSubmit(data);
@@ -149,13 +161,18 @@ export function BankAccountForm({
                   <SelectValue placeholder={tForm('currencyPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
-                  {CURRENCY_CODES.map((code) => (
+                  {currencyCodes.map((code) => (
                     <SelectItem key={code} value={code}>
                       {code} - {currencyNames.of(code) ?? code}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {form.formState.errors.currency && (
+                <p className="text-sm text-red-500">
+                  {errorText(form.formState.errors.currency.message)}
+                </p>
+              )}
             </div>
           </div>
 

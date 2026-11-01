@@ -31,6 +31,14 @@ import {
 } from '@/components/ui/table';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
+import {
+  compareDecimals,
+  isPositiveDecimal,
+  normalizeDecimal,
+  parseDecimal,
+  subtractDecimals,
+  sumDecimals,
+} from '@/lib/decimal';
 import { useUnpaidBills, paymentModeOptions } from '@/lib/hooks/use-payments-made';
 import { useDateFnsLocale } from '@/lib/date-locale';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
@@ -49,7 +57,8 @@ const PAYMENT_MODE_KEYS: Record<string, string> = {
 const paymentMadeSchema = z.object({
   vendorId: z.string().min(1, 'vendorRequired'),
   date: z.date({ required_error: 'dateRequired' }),
-  amount: z.number({ invalid_type_error: 'amountPositive' }).positive('amountPositive'),
+  // A decimal string end to end, like the payment-received form (no float money, #83).
+  amount: z.string().refine(isPositiveDecimal, 'amountPositive'),
   paymentMode: z.string().min(1, 'modeRequired'),
   /** Id of the bank register (BankAccount) paid from; its GL account is sent to the API. */
   paidFromAccountId: z.string().min(1, 'accountRequired'),
@@ -64,9 +73,11 @@ interface BillAllocation {
   billNumber: string;
   date: string;
   dueDate: string;
-  grandTotal: number;
-  balanceDue: number;
-  allocated: number;
+  /** The bill's own currency; empty means the organization base currency. */
+  currencyCode: string | null;
+  grandTotal: string;
+  balanceDue: string;
+  allocated: string;
   selected: boolean;
 }
 
@@ -99,7 +110,7 @@ export function PaymentMadeForm({
     defaultValues: {
       vendorId: preselectedVendorId || '',
       date: new Date(),
-      amount: 0,
+      amount: '',
       paymentMode: 'BANK_TRANSFER',
       paidFromAccountId: '',
       reference: '',
@@ -124,6 +135,7 @@ export function PaymentMadeForm({
           billNumber: string;
           date: string;
           dueDate: string;
+          currencyCode?: string | null;
           grandTotal?: string;
           balanceDue?: string;
         }) => ({
@@ -131,9 +143,10 @@ export function PaymentMadeForm({
           billNumber: bill.billNumber,
           date: bill.date,
           dueDate: bill.dueDate,
-          grandTotal: parseFloat(bill.grandTotal || '0'),
-          balanceDue: parseFloat(bill.balanceDue || '0'),
-          allocated: 0,
+          currencyCode: bill.currencyCode ?? null,
+          grandTotal: normalizeDecimal(bill.grandTotal),
+          balanceDue: normalizeDecimal(bill.balanceDue),
+          allocated: '0',
           selected: preselectedBillId === bill.id,
         }),
       );
@@ -158,9 +171,9 @@ export function PaymentMadeForm({
 
   // Calculate totals
   const totals = useMemo(() => {
-    const totalAllocated = allocations.reduce((sum, a) => sum + a.allocated, 0);
-    const totalBalanceDue = allocations.reduce((sum, a) => sum + a.balanceDue, 0);
-    const unallocated = paymentAmount - totalAllocated;
+    const totalAllocated = sumDecimals(allocations.map((a) => a.allocated));
+    const totalBalanceDue = sumDecimals(allocations.map((a) => a.balanceDue));
+    const unallocated = subtractDecimals(paymentAmount, totalAllocated);
     return { totalAllocated, totalBalanceDue, unallocated };
   }, [allocations, paymentAmount]);
 
@@ -173,7 +186,7 @@ export function PaymentMadeForm({
           return {
             ...a,
             selected: newSelected,
-            allocated: newSelected ? a.balanceDue : 0,
+            allocated: newSelected ? a.balanceDue : '0',
           };
         }
         return a;
@@ -181,16 +194,22 @@ export function PaymentMadeForm({
     );
   };
 
-  // Update allocation amount
-  const updateAllocation = (billId: string, amount: number) => {
+  // Update allocation amount: kept as typed while between zero and the bill's balance due.
+  const updateAllocation = (billId: string, typed: string) => {
     setAllocations((prev) =>
       prev.map((a) => {
         if (a.billId === billId) {
-          const validAmount = Math.min(Math.max(0, amount), a.balanceDue);
+          const parsed = parseDecimal(typed);
+          const validAmount =
+            parsed === null || compareDecimals(typed, '0') < 0
+              ? '0'
+              : compareDecimals(typed, a.balanceDue) > 0
+                ? a.balanceDue
+                : typed.trim();
           return {
             ...a,
             allocated: validAmount,
-            selected: validAmount > 0,
+            selected: isPositiveDecimal(validAmount),
           };
         }
         return a;
@@ -200,16 +219,16 @@ export function PaymentMadeForm({
 
   // Auto-allocate payment amount across selected bills
   const autoAllocate = () => {
-    let remaining = paymentAmount;
+    let remaining = normalizeDecimal(paymentAmount);
     setAllocations((prev) =>
       prev.map((a) => {
-        if (remaining <= 0) return { ...a, allocated: 0, selected: false };
-        const toAllocate = Math.min(remaining, a.balanceDue);
-        remaining -= toAllocate;
+        if (!isPositiveDecimal(remaining)) return { ...a, allocated: '0', selected: false };
+        const toAllocate = compareDecimals(remaining, a.balanceDue) < 0 ? remaining : a.balanceDue;
+        remaining = subtractDecimals(remaining, toAllocate);
         return {
           ...a,
           allocated: toAllocate,
-          selected: toAllocate > 0,
+          selected: isPositiveDecimal(toAllocate),
         };
       }),
     );
@@ -217,27 +236,22 @@ export function PaymentMadeForm({
 
   // Clear all allocations
   const clearAllocations = () => {
-    setAllocations((prev) => prev.map((a) => ({ ...a, allocated: 0, selected: false })));
+    setAllocations((prev) => prev.map((a) => ({ ...a, allocated: '0', selected: false })));
   };
 
   const handleSubmit = (data: PaymentMadeFormData) => {
-    // Money crosses the API as 2-dp decimal strings; compare in integer cents (no float drift).
-    const toCents = (n: number): number => Math.round(n * 100);
-    const centsToString = (c: number): string => (c / 100).toFixed(2);
+    // Money crosses the API as exact decimal strings (the API keeps 4 decimals); no float math.
     const selectedAllocations = allocations
-      .filter((a) => toCents(a.allocated) > 0)
-      .map((a) => ({ billId: a.billId, amount: centsToString(toCents(a.allocated)) }));
+      .filter((a) => isPositiveDecimal(a.allocated))
+      .map((a) => ({ billId: a.billId, amount: normalizeDecimal(a.allocated) }));
 
-    const amountCents = toCents(data.amount);
-    const allocatedCents = selectedAllocations.reduce(
-      (sum, a) => sum + toCents(Number(a.amount)),
-      0,
-    );
-    if (selectedAllocations.length === 0 || allocatedCents !== amountCents) {
+    const amount = normalizeDecimal(data.amount);
+    const allocated = sumDecimals(selectedAllocations.map((a) => a.amount));
+    if (selectedAllocations.length === 0 || compareDecimals(allocated, amount) !== 0) {
       form.setError('amount', {
         message: t('allocationMismatch', {
-          allocated: formatMoney(centsToString(allocatedCents)),
-          amount: formatMoney(centsToString(amountCents)),
+          allocated: formatMoney(allocated),
+          amount: formatMoney(amount),
         }),
       });
       return;
@@ -248,7 +262,7 @@ export function PaymentMadeForm({
     onSubmit({
       ...data,
       paidFromAccountId: register?.linkedAccountId ?? '',
-      amount: centsToString(amountCents),
+      amount,
       date: format(data.date, 'yyyy-MM-dd'),
       allocations: selectedAllocations,
     });
@@ -331,7 +345,8 @@ export function PaymentMadeForm({
                 step="0.01"
                 min="0"
                 placeholder="0.00"
-                {...form.register('amount', { valueAsNumber: true })}
+                inputMode="decimal"
+                {...form.register('amount')}
               />
               {form.formState.errors.amount && (
                 <p className="text-sm text-red-500">
@@ -426,7 +441,7 @@ export function PaymentMadeForm({
                   variant="outline"
                   size="sm"
                   onClick={autoAllocate}
-                  disabled={paymentAmount <= 0}
+                  disabled={!isPositiveDecimal(paymentAmount)}
                 >
                   {t('autoAllocate')}
                 </Button>
@@ -472,10 +487,10 @@ export function PaymentMadeForm({
                           {format(new Date(allocation.dueDate), 'PP', { locale: dateLocale })}
                         </TableCell>
                         <TableCell className="text-end font-mono">
-                          {formatMoney(allocation.grandTotal)}
+                          {formatMoney(allocation.grandTotal, allocation.currencyCode)}
                         </TableCell>
                         <TableCell className="text-end font-mono">
-                          {formatMoney(allocation.balanceDue)}
+                          {formatMoney(allocation.balanceDue, allocation.currencyCode)}
                         </TableCell>
                         <TableCell className="text-end">
                           <Input
@@ -483,10 +498,8 @@ export function PaymentMadeForm({
                             step="0.01"
                             min="0"
                             max={allocation.balanceDue}
-                            value={allocation.allocated || ''}
-                            onChange={(e) =>
-                              updateAllocation(allocation.billId, parseFloat(e.target.value) || 0)
-                            }
+                            value={allocation.allocated === '0' ? '' : allocation.allocated}
+                            onChange={(e) => updateAllocation(allocation.billId, e.target.value)}
                             className="w-32 text-end ms-auto"
                           />
                         </TableCell>
@@ -513,7 +526,7 @@ export function PaymentMadeForm({
                       <span
                         className={cn(
                           'font-mono font-medium',
-                          totals.unallocated !== 0 && 'text-yellow-600',
+                          compareDecimals(totals.unallocated, '0') !== 0 && 'text-yellow-600',
                         )}
                       >
                         {formatMoney(totals.unallocated)}

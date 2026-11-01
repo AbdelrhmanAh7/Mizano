@@ -23,12 +23,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { expensesApi } from '@/lib/api';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import { useBulkConfirm } from '@/lib/hooks/use-bulk-confirm';
-import {
-  Expense,
-  formatCurrency,
-  useDeleteExpense,
-  useInfiniteExpenses,
-} from '@/lib/hooks/use-expenses';
+import { Expense, useDeleteExpense, useInfiniteExpenses } from '@/lib/hooks/use-expenses';
 import { useExportAll } from '@/lib/hooks/use-export-all';
 import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { usePermissions } from '@/lib/hooks/use-permissions';
@@ -41,8 +36,10 @@ import { CheckCircle, Eye, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function ExpensesPageContent() {
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('purchases');
   const tCommon = useTranslations('common');

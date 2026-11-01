@@ -45,6 +45,7 @@ jest.mock('next-intl', () => {
 jest.mock('@/lib/hooks/use-organization', () => ({
   ...jest.requireActual('@/lib/hooks/use-organization'),
   useBaseCurrency: () => 'EGP',
+  useMoneyFormat: () => ({ data: { baseCurrency: 'EGP', documentDigits: 'latn' } }),
 }));
 
 // The real picker searches the server; vendor 150 is beyond any first page.
@@ -57,7 +58,10 @@ jest.mock('@/components/shared/party-combobox', () => ({
 }));
 
 // Stable results, like React Query's: a new object per render would re-run the form's effect.
-const mockUnpaid = {
+const mockUnpaid: {
+  isLoading: boolean;
+  data: { data: Array<Record<string, string | null>> };
+} = {
   isLoading: false,
   data: {
     data: [
@@ -84,8 +88,10 @@ const registers = [
 ];
 
 describe('PaymentMadeForm', () => {
+  const originalBills = mockUnpaid.data.data;
   beforeEach(() => {
     mockLocale = 'en';
+    mockUnpaid.data.data = originalBills;
   });
 
   it('pays a bill of a vendor beyond the first page, from the chosen register GL account', async () => {
@@ -119,6 +125,52 @@ describe('PaymentMadeForm', () => {
         paidFromAccountId: 'gl-1010',
         amount: '500.00',
         allocations: [{ billId: 'bill-1', amount: '500.00' }],
+      }),
+    );
+  });
+
+  it('allocates with exact decimal strings and shows each bill in its own currency (#83)', async () => {
+    const onSubmit = jest.fn();
+    mockUnpaid.data.data = [
+      {
+        ...mockUnpaid.data.data[0],
+        id: 'bill-a',
+        billNumber: 'A',
+        balanceDue: '0.1',
+        grandTotal: '0.1',
+      },
+      {
+        ...mockUnpaid.data.data[0],
+        id: 'bill-b',
+        billNumber: 'B',
+        balanceDue: '0.2',
+        grandTotal: '0.2',
+        currencyCode: 'SAR',
+      },
+    ];
+    render(<PaymentMadeForm bankAccounts={registers} onSubmit={onSubmit} onCancel={jest.fn()} />);
+
+    fireEvent.click(screen.getByText('pick vendor 150'));
+    expect(await screen.findByText('B')).toBeInTheDocument();
+    expect(screen.getAllByText(/SAR/).length).toBeGreaterThan(0);
+    const paidFrom = Array.from(document.querySelectorAll('select')).find((el) =>
+      Array.from(el.options).some((o) => o.value === 'reg-main'),
+    ) as HTMLSelectElement;
+    fireEvent.change(paidFrom, { target: { value: 'reg-main' } });
+
+    // 0.1 + 0.2 is 0.30000000000000004 in floats; the form must still see them as 0.3.
+    fireEvent.change(screen.getByLabelText(/Amount/), { target: { value: '0.3' } });
+    fireEvent.click(screen.getByText('Auto-Allocate'));
+    fireEvent.click(screen.getByText('Record Payment'));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        amount: '0.30',
+        allocations: [
+          { billId: 'bill-a', amount: '0.10' },
+          { billId: 'bill-b', amount: '0.20' },
+        ],
       }),
     );
   });

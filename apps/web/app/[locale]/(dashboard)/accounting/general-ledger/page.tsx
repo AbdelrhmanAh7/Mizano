@@ -26,6 +26,7 @@ import {
 import { useAccountsTree, flattenAccountsTree } from '@/lib/hooks/use-accounts';
 import { useGeneralLedger } from '@/lib/hooks/use-accounting-reports';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface LedgerEntry {
   date: string;
@@ -46,15 +47,9 @@ const formatAmount = (amount: number | string): string => {
   }).format(num);
 };
 
-const formatCurrency = (amount: number | string, currency = 'USD'): string => {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(num);
-};
-
 export default function GeneralLedgerPage() {
+  // Ledger balances are in the organization base currency (#83).
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [dateFrom, setDateFrom] = useState(format(subMonths(new Date(), 3), 'yyyy-MM-dd'));

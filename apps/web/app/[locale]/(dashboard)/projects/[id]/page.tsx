@@ -56,7 +56,6 @@ import {
   getBillingMethodLabel,
   getTaskStatusLabel,
   getTaskStatusColor,
-  formatCurrency,
   formatHours,
   type Task,
   type TaskStatus,
@@ -66,12 +65,14 @@ import { KanbanBoard } from '@/components/projects/kanban-board';
 import { BudgetProgressCard } from '@/components/projects/budget-progress-card';
 import { useTranslations } from 'next-intl';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface ProjectDetailPageProps {
   params: { id: string };
 }
 
 export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const { id } = params;
   const t = useTranslations('projects');

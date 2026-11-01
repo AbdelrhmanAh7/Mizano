@@ -6,7 +6,6 @@ import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { Button } from '@/components/ui/button';
 import {
   CompositeItem,
-  formatCurrency,
   useDeleteCompositeItem,
   useInfiniteCompositeItems,
 } from '@/lib/hooks/use-composite-items';
@@ -15,8 +14,10 @@ import { type ColumnDef } from '@tanstack/react-table';
 import { Layers, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function CompositeItemsPageContent() {
+  const formatCurrency = useMoneyFormatter();
   const tableParams = useTableParams({ defaultSortBy: 'name', mode: 'virtual' });
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
