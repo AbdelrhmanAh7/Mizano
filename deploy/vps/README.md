@@ -141,7 +141,11 @@ and run `sudo systemctl restart jarda-stack`.
 sudo /opt/jarda/deploy/vps/scripts/restore.sh --list                   # what is there
 sudo /opt/jarda/deploy/vps/scripts/restore.sh --yes                    # latest local snapshot
 sudo /opt/jarda/deploy/vps/scripts/restore.sh --snapshot <id> --yes    # a given one
+sudo /opt/jarda/deploy/vps/scripts/restore.sh --check                  # test a backup, app keeps running
 ```
+
+`--check` restores the latest (or `--snapshot`) backup into a scratch database next to the live one,
+runs the same checks and drops it: a safe way to prove the backups at any time.
 
 It verifies the snapshot's checksums, takes a **safety backup** of the current data, stops the app
 (and blocks `jarda-stack` from starting it at boot until the restore succeeds),
@@ -164,7 +168,9 @@ A full disaster drill (sign-up over HTTPS, synthetic ledger with documents, back
 stand-in for R2, total loss, restore from the bucket, same counts and the same user signs in) is
 `deploy/vps/scripts/test-vps-drill.sh`. Run it on a spare machine or a throwaway server, never on
 the production server (it uses the same network range) and not on the owner's laptop (memory).
-Evidence of the backup and restore on the real server goes in `docs/evidence/vps-kit/`.
+The go-live scenarios proven on the real server (reboot, crash, backup and restore, rollback, alerts,
+HTTPS renewal, browser suite) are in [docs/GO-LIVE.md](../../docs/GO-LIVE.md), evidence in
+`docs/evidence/go-live/`.
 
 ## 8. Everyday commands
 
@@ -173,10 +179,31 @@ sudo /opt/jarda/deploy/vps/scripts/compose.sh ps                      # every co
 sudo /opt/jarda/deploy/vps/scripts/compose.sh logs --tail 100 api
 sudo systemctl restart jarda-stack          # restart everything (Jarda and compose.d)
 sudo /opt/jarda/deploy/vps/scripts/healthcheck.sh
+sudo /opt/jarda/deploy/vps/scripts/go-live-check.sh flowline.<domain>  # read-only PASS/FAIL list
 ```
 
 Update to a new version: run the install command from section 4 again. To deploy a tag instead of
 `master`, add `--ref <tag>`.
+
+**Roll back** (about a minute, nothing is built): the server keeps the running version and the one
+before it.
+
+```bash
+sudo /opt/jarda/deploy/vps/scripts/rollback.sh --list
+sudo /opt/jarda/deploy/vps/scripts/rollback.sh              # back to the previous version
+sudo /opt/jarda/deploy/vps/scripts/rollback.sh --to <sha>   # or forward again
+```
+
+It backs up first and does not change the database (database updates are forward-only and must keep
+working with the version before).
+
+**Alerts:** every 5 minutes the health check looks at the app containers, disk (above 80%), memory
+(below 300 MB free), the last backup and the HTTPS certificates (less than 14 days left means renewal
+is failing; Caddy renews at about 30). One alert when a check starts failing and one when it recovers:
+always in the system log (`journalctl -t jarda-alert`), by email to `ALERT_EMAIL` (else the
+certificate email) once the mail server of section 5 is set, and on Telegram when
+`TELEGRAM_BOT_TOKEN` and `TELEGRAM_ALERT_CHAT_ID` are set. Test the email:
+`sudo /opt/jarda/deploy/vps/scripts/alert.sh "test"`.
 
 ## 9. Other products on the same server (FlowLine)
 

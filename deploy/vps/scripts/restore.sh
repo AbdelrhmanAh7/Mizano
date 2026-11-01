@@ -5,6 +5,10 @@
 #   sudo /opt/jarda/deploy/vps/scripts/restore.sh --yes                    # latest local snapshot
 #   sudo /opt/jarda/deploy/vps/scripts/restore.sh --snapshot 1a2b3c4d --yes
 #   sudo /opt/jarda/deploy/vps/scripts/restore.sh --from-r2 --yes          # new server, bucket only
+#   sudo /opt/jarda/deploy/vps/scripts/restore.sh --check                  # test only, app keeps running
+#
+# --check restores the snapshot into a scratch database next to the live one, verifies it the
+# same way, then drops it. It changes nothing the app uses: run it any time to prove a backup.
 #
 # Steps: verify the snapshot's checksums -> safety backup of the current data (unless the
 # database is gone) -> stop the app -> replace the database and the originals folder -> check
@@ -16,7 +20,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$here/env.sh"
 umask 077
 
-snapshot="" confirm=0 list=0 from_r2=0 safety=1
+snapshot="" confirm=0 list=0 from_r2=0 safety=1 check=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --snapshot) snapshot="${2:-}"; shift 2 ;;
@@ -24,6 +28,7 @@ while [ $# -gt 0 ]; do
     --list) list=1; shift ;;
     --from-r2) from_r2=1; shift ;;
     --skip-safety-backup) safety=0; shift ;;
+    --check) check=1; shift ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
 done
@@ -46,7 +51,7 @@ if [ "$list" -eq 1 ]; then
   restic snapshots --host "$backup_host" --tag "mizano,$set_name"
   exit 0
 fi
-if [ "$confirm" -ne 1 ]; then
+if [ "$confirm" -ne 1 ] && [ "$check" -ne 1 ]; then
   echo "This REPLACES the live database and documents. Re-run with --yes (see --list first)." >&2
   exit 2
 fi
@@ -80,6 +85,29 @@ for _ in $(seq 1 60); do
 done
 dc exec -T postgres pg_isready -h 127.0.0.1 -U "$user" -d postgres >/dev/null 2>&1 \
   || { echo "RESTORE FAILED: database container not ready" >&2; exit 1; }
+
+if [ "$check" -eq 1 ]; then
+  scratch="${db}_restore_check"
+  container="$(dc ps -q postgres)"
+  drop_scratch() {
+    dc exec -T postgres psql -XqAt -U "$user" -d postgres \
+      -c "DROP DATABASE IF EXISTS \"$scratch\" WITH (FORCE)" >/dev/null 2>&1 || true
+  }
+  trap 'drop_scratch; rm -rf "$work"' EXIT
+  log "restore-check snapshot=${snapshot:0:8} stage=scratch-database db=$scratch"
+  drop_scratch
+  dc exec -T postgres psql -XqAt -v ON_ERROR_STOP=1 -U "$user" -d postgres \
+    -c "CREATE DATABASE \"$scratch\" OWNER \"$user\"" >/dev/null
+  dc exec -T postgres pg_restore -U "$user" -d "$scratch" --no-owner --no-privileges --exit-on-error \
+    <"$work/db.dump" >/dev/null 2>&1 || { echo "RESTORE CHECK FAILED: the database did not restore" >&2; exit 1; }
+  python3 "$PI_DIR/scripts/backup-manifest.py" verify-db "$container" "$work" "$user" "$scratch" || {
+    echo "RESTORE CHECK FAILED: restored data does not match the snapshot" >&2
+    exit 1
+  }
+  drop_scratch
+  log "restore-check OK snapshot=${snapshot:0:8} originals=verified scratch=dropped"
+  exit 0
+fi
 
 if [ "$safety" -eq 1 ]; then
   log "restore stage=safety-backup"
