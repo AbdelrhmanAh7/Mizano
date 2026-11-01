@@ -151,12 +151,12 @@
     "columns": {
       "customer": "Customer",
       "invoices": "Invoices",
-      "totalAmount": "Net sales (excl. VAT)",
+      "totalAmount": "Net Sales (excl. VAT)",
       "paid": "Received",
       "balanceDue": "Balance Due"
     },
-    "totalSales": "Net sales (excl. VAT)",
-    "totalPaid": "Total received",
+    "totalSales": "Net Sales (excl. VAT)",
+    "totalPaid": "Total Received",
     "outstanding": "Outstanding",
     "customers": "Customers",
     "noData": "No sales data found for the selected period."

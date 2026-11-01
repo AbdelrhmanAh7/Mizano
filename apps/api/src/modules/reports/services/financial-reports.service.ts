@@ -2,7 +2,6 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Account, AccountType } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { ReadReplicaService } from '../../../prisma/read-replica.service';
-import { JournalSourceType } from '../../accounting/services/journals.service';
 import {
   documentCurrency,
   getBaseCurrency,
@@ -754,7 +753,7 @@ export class FinancialReportsService {
     const base = await getBaseCurrency(this.prisma, organizationId);
     const reportCurrency = normalizeCurrencyParam(currency, base);
 
-    const [invoices, creditNotes, org] = await Promise.all([
+    const [invoices, creditNotes] = await Promise.all([
       this.prisma.invoice.findMany({
         where: {
           organizationId,
@@ -782,26 +781,27 @@ export class FinancialReportsService {
         select: {
           id: true,
           customerId: true,
+          invoiceId: true,
           amount: true,
           customer: { select: { id: true, name: true } },
-          invoice: { select: { currencyCode: true } },
+          invoice: { select: { currencyCode: true, grandTotal: true, taxAmount: true } },
         },
       }),
-      this.prisma.organization.findUnique({
-        where: { id: organizationId },
-        select: { defaultVatPayableAccountId: true },
-      }),
     ]);
-    const { included, otherCurrencies } = splitByCurrency(
+    const { included, otherCurrencies: invoiceCurrencies } = splitByCurrency(
       invoices,
       (i) => documentCurrency(i.currencyCode, base),
       reportCurrency,
     );
-    const credits = creditNotes.filter(
-      (c) => documentCurrency(c.invoice.currencyCode, base) === reportCurrency,
+    const { included: credits, otherCurrencies: creditCurrencies } = splitByCurrency(
+      creditNotes,
+      (c) => documentCurrency(c.invoice.currencyCode, base),
+      reportCurrency,
     );
+    const otherCurrencies = [...new Set([...invoiceCurrencies, ...creditCurrencies])].sort();
 
-    const [allocations, creditVat] = await Promise.all([
+    const creditInvoiceIds = [...new Set(credits.map((c) => c.invoiceId))];
+    const [allocations, notesOnCreditedInvoices] = await Promise.all([
       included.length > 0
         ? this.prisma.paymentAllocation.findMany({
             where: {
@@ -812,19 +812,12 @@ export class FinancialReportsService {
             select: { invoiceId: true, amount: true },
           })
         : Promise.resolve([]),
-      // A credit note's VAT is what its journal debited to VAT Payable (the posting rule).
-      credits.length > 0 && org?.defaultVatPayableAccountId
-        ? this.prisma.journalLine.findMany({
-            where: {
-              accountId: org.defaultVatPayableAccountId,
-              journal: {
-                organizationId,
-                deletedAt: null,
-                sourceType: JournalSourceType.CREDIT_NOTE,
-                sourceId: { in: credits.map((c) => c.id) },
-              },
-            },
-            select: { debit: true, journal: { select: { sourceId: true } } },
+      // Every live note on those invoices, in posting order: a note's VAT depends on the ones before.
+      creditInvoiceIds.length > 0
+        ? this.prisma.creditNote.findMany({
+            where: { organizationId, deletedAt: null, invoiceId: { in: creditInvoiceIds } },
+            select: { id: true, invoiceId: true, amount: true },
+            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
           })
         : Promise.resolve([]),
     ]);
@@ -835,11 +828,10 @@ export class FinancialReportsService {
         (paidByInvoice.get(a.invoiceId) ?? ZERO).add(toDecimal(a.amount)),
       );
     }
-    const vatByCredit = new Map<string, Decimal>();
-    for (const line of creditVat) {
-      const id = line.journal.sourceId;
-      if (id) vatByCredit.set(id, (vatByCredit.get(id) ?? ZERO).add(toDecimal(line.debit)));
-    }
+    const vatByCredit = creditNoteVat(
+      new Map(credits.map((c) => [c.invoiceId, c.invoice])),
+      notesOnCreditedInvoices,
+    );
 
     type Row = { name: string; count: number; net: Decimal; paid: Decimal; balance: Decimal };
     const byCustomer = new Map<string, Row>();
@@ -1066,4 +1058,36 @@ export class FinancialReportsService {
       period: { startDate: period.startDate, endDate: period.endDate },
     };
   }
+}
+
+/**
+ * The VAT share of each credit note, in the invoice's own currency, by the rule credit notes are
+ * posted with (CreditNotesService.cumulativeCreditTax): the notes on one invoice always sum to the
+ * invoice VAT, round4(invoiceVat x credited-so-far / grandTotal) minus the VAT of the notes before,
+ * and a note that exhausts the invoice takes exactly what is left. `notes` must be in posting order.
+ */
+function creditNoteVat(
+  invoices: Map<string, { grandTotal: Decimal; taxAmount: Decimal }>,
+  notes: Array<{ id: string; invoiceId: string; amount: Decimal }>,
+): Map<string, Decimal> {
+  const vat = new Map<string, Decimal>();
+  const progress = new Map<string, { credited: Decimal; vat: Decimal }>();
+  for (const note of notes) {
+    const invoice = invoices.get(note.invoiceId);
+    if (!invoice) continue;
+    const tax = toDecimal(invoice.taxAmount);
+    const grand = toDecimal(invoice.grandTotal);
+    const before = progress.get(note.invoiceId) ?? { credited: ZERO, vat: ZERO };
+    const credited = before.credited.add(toDecimal(note.amount));
+    let share = ZERO;
+    if (tax.greaterThan(0) && grand.greaterThan(0)) {
+      const cumulative = credited.greaterThanOrEqualTo(grand)
+        ? tax
+        : tax.mul(credited).div(grand).toDecimalPlaces(4, Decimal.ROUND_HALF_UP);
+      share = Decimal.max(cumulative.sub(before.vat), ZERO);
+    }
+    vat.set(note.id, share);
+    progress.set(note.invoiceId, { credited, vat: before.vat.add(share) });
+  }
+  return vat;
 }

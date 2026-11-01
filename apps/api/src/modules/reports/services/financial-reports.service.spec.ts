@@ -129,11 +129,19 @@ describe('FinancialReportsService', () => {
   describe('getSalesByCustomer (#666)', () => {
     // Golden scenario C03 + C09: INV-0001 2 x 100 + 14% VAT = 228.00 paid 100 + 128; INV-0002
     // 500 + 14% VAT = 570.00 with CN-001 114.00 (100 + 14 VAT) applied to it.
+    const nile = { id: 'cust-nile', name: 'Nile Dental Clinic' };
+    const inv2 = {
+      currencyCode: 'EGP',
+      grandTotal: new Decimal('570'),
+      taxAmount: new Decimal('70'),
+    };
+    let periodNotes: unknown[];
+    let invoiceNotes: unknown[];
+
     beforeEach(() => {
       prisma.organization.findUnique.mockResolvedValue({
         baseCurrency: 'EGP',
         currency: 'EGP',
-        defaultVatPayableAccountId: 'acc-vat',
       } as never);
       prisma.invoice.findMany.mockResolvedValue([
         {
@@ -143,7 +151,7 @@ describe('FinancialReportsService', () => {
           taxAmount: new Decimal('28'),
           balanceDue: new Decimal('0'),
           currencyCode: 'EGP',
-          customer: { id: 'cust-nile', name: 'Nile Dental Clinic' },
+          customer: nile,
         },
         {
           id: 'inv-2',
@@ -152,24 +160,27 @@ describe('FinancialReportsService', () => {
           taxAmount: new Decimal('70'),
           balanceDue: new Decimal('456'),
           currencyCode: 'EGP',
-          customer: { id: 'cust-nile', name: 'Nile Dental Clinic' },
+          customer: nile,
         },
       ] as never);
-      prisma.creditNote.findMany.mockResolvedValue([
+      periodNotes = [
         {
           id: 'cn-1',
           customerId: 'cust-nile',
+          invoiceId: 'inv-2',
           amount: new Decimal('114'),
-          customer: { id: 'cust-nile', name: 'Nile Dental Clinic' },
-          invoice: { currencyCode: 'EGP' },
+          customer: nile,
+          invoice: inv2,
         },
-      ] as never);
+      ];
+      invoiceNotes = [{ id: 'cn-1', invoiceId: 'inv-2', amount: new Decimal('114') }];
+      // The period query filters by date; the posting-order query by invoice.
+      prisma.creditNote.findMany.mockImplementation((async (args: {
+        where: { invoiceId?: unknown };
+      }) => (args.where.invoiceId ? invoiceNotes : periodNotes)) as never);
       prisma.paymentAllocation.findMany.mockResolvedValue([
         { invoiceId: 'inv-1', amount: new Decimal('100') },
         { invoiceId: 'inv-1', amount: new Decimal('128') },
-      ] as never);
-      prisma.journalLine.findMany.mockResolvedValue([
-        { debit: new Decimal('14'), journal: { sourceId: 'cn-1' } },
       ] as never);
     });
 
@@ -190,24 +201,64 @@ describe('FinancialReportsService', () => {
       expect(report.totalAmount).toBe('600.0000');
       expect(report.totalPaid).toBe('228.0000');
       expect(report.totalBalance).toBe('456.0000');
+      expect(report.otherCurrencies).toEqual([]);
     });
 
-    it('reads only this organization and the credit notes posted VAT', async () => {
+    it('takes each partial credit note VAT as the posting did, cumulatively', async () => {
+      // Two notes of 100 on INV-0002 (570 incl. 70 VAT): VAT round4(70 x 100/570) = 12.2807,
+      // then round4(70 x 200/570) - 12.2807 = 12.2807; net 87.7193 each.
+      invoiceNotes = [
+        { id: 'cn-0', invoiceId: 'inv-2', amount: new Decimal('100') },
+        { id: 'cn-1', invoiceId: 'inv-2', amount: new Decimal('100') },
+      ];
+      periodNotes = [{ ...(periodNotes[0] as object), amount: new Decimal('100') }];
+
+      const report = await service.getSalesByCustomer(ORG_ID, '2026-01-01', '2026-11-30');
+
+      // 700 - (100 - 12.2807): only CN-001 is dated in the period.
+      expect(report.totalAmount).toBe('612.2807');
+    });
+
+    it('leaves a credit note in another currency out and names that currency', async () => {
+      periodNotes = [
+        {
+          id: 'cn-usd',
+          customerId: 'cust-nile',
+          invoiceId: 'inv-usd',
+          amount: new Decimal('57'),
+          customer: nile,
+          invoice: {
+            currencyCode: 'USD',
+            grandTotal: new Decimal('570'),
+            taxAmount: new Decimal('70'),
+          },
+        },
+      ];
+
+      const report = await service.getSalesByCustomer(ORG_ID, '2026-01-01', '2026-11-30');
+
+      expect(report.totalAmount).toBe('700.0000');
+      expect(report.otherCurrencies).toEqual(['USD']);
+    });
+
+    it('reads only this organization', async () => {
       await service.getSalesByCustomer(ORG_ID, '2026-01-01', '2026-11-30');
 
-      expect(prisma.creditNote.findMany.mock.calls[0][0]?.where).toMatchObject({
+      const [period, posting] = prisma.creditNote.findMany.mock.calls.map((c) => c[0]?.where);
+      expect(period).toMatchObject({
         organizationId: ORG_ID,
         deletedAt: null,
         invoice: { organizationId: ORG_ID },
+      });
+      expect(posting).toEqual({
+        organizationId: ORG_ID,
+        deletedAt: null,
+        invoiceId: { in: ['inv-2'] },
       });
       expect(prisma.paymentAllocation.findMany.mock.calls[0][0]?.where).toMatchObject({
         invoiceId: { in: ['inv-1', 'inv-2'] },
         invoice: { organizationId: ORG_ID },
         payment: { organizationId: ORG_ID, deletedAt: null },
-      });
-      expect(prisma.journalLine.findMany.mock.calls[0][0]?.where).toMatchObject({
-        accountId: 'acc-vat',
-        journal: { organizationId: ORG_ID, sourceType: 'CREDIT_NOTE', sourceId: { in: ['cn-1'] } },
       });
     });
   });
