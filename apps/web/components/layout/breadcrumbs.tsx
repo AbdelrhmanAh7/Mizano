@@ -4,6 +4,7 @@ import { Fragment, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
+import { CRUMBS_WITHOUT_PAGE } from '@/lib/breadcrumb-paths';
 import { ChevronRight, Home } from 'lucide-react';
 
 /** Title-cases an unknown path segment ("some-page" → "Some Page"). */
@@ -34,7 +35,12 @@ export function Breadcrumbs() {
       } else {
         label = labelOf(segment);
       }
-      return { label, href, isLast: index === segments.length - 1 };
+      return {
+        label,
+        href,
+        isLast: index === segments.length - 1,
+        noPage: CRUMBS_WITHOUT_PAGE.includes(href),
+      };
     });
 
     return crumbs;
@@ -57,6 +63,8 @@ export function Breadcrumbs() {
             <span className="font-medium text-foreground truncate max-w-[200px]">
               {crumb.label}
             </span>
+          ) : crumb.noPage ? (
+            <span className="truncate max-w-[200px]">{crumb.label}</span>
           ) : (
             <Link
               href={crumb.href}

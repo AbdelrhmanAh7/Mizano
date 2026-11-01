@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import type { Driver } from 'driver.js';
+import { usePathname } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useTourStore } from '@/lib/stores/use-tour-store';
 import { useUpdateTourProgress, useDismissTour } from '@/lib/hooks/use-user-preferences';
@@ -15,6 +16,20 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const dismissTourMutation = useDismissTour();
   const driverRef = useRef<Driver | null>(null);
   const isDestroyingRef = useRef(false);
+  const pathname = usePathname();
+  const startedOnRef = useRef<string | null>(null);
+
+  // A tour belongs to the page it started on (#633). Leaving that page ends it without
+  // marking it done or dismissed, so it can show again on its own page.
+  useEffect(() => {
+    if (!isActive) {
+      startedOnRef.current = null;
+    } else if (startedOnRef.current === null) {
+      startedOnRef.current = pathname;
+    } else if (startedOnRef.current !== pathname) {
+      endTour();
+    }
+  }, [isActive, pathname, endTour]);
 
   const handleTourComplete = useCallback(
     (tourId: string, step: number, completed: boolean) => {

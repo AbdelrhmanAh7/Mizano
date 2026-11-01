@@ -7,7 +7,7 @@ import { organizationRegion } from './organization-region';
 import { AuthSessionsService } from './auth-sessions.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-import { systemName } from '../../common/i18n/localize';
+import { createMissingDefaultRoles } from '../roles/default-roles.seed';
 
 @Injectable()
 export class AuthService {
@@ -50,31 +50,10 @@ export class AuthService {
         },
       });
 
-      // Create default admin role
-      const adminRole = await tx.role.create({
-        data: {
-          ...systemName('Admin'),
-          description: 'Full system access',
-          isDefault: true,
-          organizationId: organization.id,
-          permissions: {
-            create: [
-              { module: 'accounting', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-              { module: 'sales', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-              { module: 'purchases', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-              { module: 'inventory', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-              { module: 'banking', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-              { module: 'hr', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-              { module: 'manufacturing', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-              { module: 'projects', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-              { module: 'tax', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-              { module: 'reports', actions: ['view', 'export'] },
-              { module: 'crm', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-              { module: 'settings', actions: ['view', 'create', 'edit', 'delete'] },
-            ],
-          },
-        },
-      });
+      // The five standard roles, so the owner can give the accountant the Accountant role at once.
+      const roles = await createMissingDefaultRoles(tx, organization.id);
+      const adminRole = roles.find((r) => r.name === 'Admin');
+      if (!adminRole) throw new Error('The Admin role was not created');
 
       // Create user
       const user = await tx.user.create({

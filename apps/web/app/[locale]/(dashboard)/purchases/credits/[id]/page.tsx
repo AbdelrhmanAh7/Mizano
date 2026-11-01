@@ -206,17 +206,18 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
                       <Label>{t('credits.selectBill')}</Label>
-                      <Select value={selectedBillId} onValueChange={setSelectedBillId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t('credits.selectBillPlaceholder')} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {unpaidBills.length === 0 ? (
-                            <SelectItem value="" disabled>
-                              {t('credits.noUnpaidBills')}
-                            </SelectItem>
-                          ) : (
-                            unpaidBills.map(
+                      {unpaidBills.length === 0 ? (
+                        // Radix Select refuses an item with an empty value, so say it in plain text.
+                        <p className="text-sm text-muted-foreground">
+                          {t('credits.noUnpaidBills')}
+                        </p>
+                      ) : (
+                        <Select value={selectedBillId} onValueChange={setSelectedBillId}>
+                          <SelectTrigger>
+                            <SelectValue placeholder={t('credits.selectBillPlaceholder')} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {unpaidBills.map(
                               (bill: {
                                 id: string;
                                 billNumber: string;
@@ -228,10 +229,10 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                                   {formatCurrency(bill.balanceDue, bill.currencyCode)}
                                 </SelectItem>
                               ),
-                            )
-                          )}
-                        </SelectContent>
-                      </Select>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      )}
                     </div>
                   </div>
                   <DialogFooter>

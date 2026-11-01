@@ -144,6 +144,8 @@ services:
       DATABASE_POOL_SIZE: '3'
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       AI_OLLAMA_BASE_URL: ${AI_OLLAMA_BASE_URL:-}
+      # The intake worker opens the organization's sealed AI key to read a bill with its own account.
+      INTEGRATIONS_ENCRYPTION_KEY: ${INTEGRATIONS_ENCRYPTION_KEY:-}
       INTAKE_STORAGE_DIR: /data/originals
       INTAKE_CONCURRENCY: ${INTAKE_CONCURRENCY:-1}
     volumes:

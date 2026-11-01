@@ -185,3 +185,20 @@ export const SYSTEM_NAMES_AR: Readonly<Record<string, string>> = {
   'Interest Expense': 'مصروف الفوائد',
   'Foreign Exchange Gain/Loss': 'أرباح وخسائر فروق العملة',
 };
+
+/**
+ * Arabic text of the descriptions Mizano writes on the system roles (keyed by the exact English
+ * text). A description a person typed is never in this list, so it is shown as typed.
+ */
+export const SYSTEM_DESCRIPTIONS_AR: Readonly<Record<string, string>> = {
+  'Full system access': 'صلاحيات كاملة على النظام',
+  'Full system access - can manage all modules and settings':
+    'صلاحيات كاملة على النظام: إدارة كل الأقسام والإعدادات',
+  'Can manage most modules except system settings and user deletion':
+    'يدير معظم الأقسام عدا إعدادات النظام وحذف المستخدمين',
+  'Full access to accounting, banking, tax, and reports':
+    'صلاحيات كاملة على المحاسبة والبنوك والضرائب والتقارير',
+  'Manage customers, quotes, invoices, and CRM activities':
+    'يدير العملاء وعروض الأسعار والفواتير وأنشطة علاقات العملاء',
+  'Manage inventory, warehouses, and stock movements': 'يدير المخزون والمستودعات وحركات المخزون',
+};
