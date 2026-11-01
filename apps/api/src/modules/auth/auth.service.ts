@@ -1,4 +1,11 @@
-import { Injectable, Logger, UnauthorizedException, ConflictException } from '@nestjs/common';
+import {
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AccountsService } from '../accounting/services/accounts.service';
@@ -6,12 +13,15 @@ import { describeError } from '../../common/utils/redact';
 import { organizationRegion } from './organization-region';
 import { AuthSessionsService } from './auth-sessions.service';
 import { LoginDto } from './dto/login.dto';
+import { LoginFailures } from './login-failures';
 import { RegisterDto } from './dto/register.dto';
 import { createMissingDefaultRoles } from '../roles/default-roles.seed';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+  /** Failed sign-ins per account; one instance per API process (#639). */
+  private readonly loginFailures = new LoginFailures();
 
   constructor(
     private prisma: PrismaService,
@@ -98,6 +108,13 @@ export class AuthService {
 
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
+    // Checked before the password, so a blocked account gives no hint whether a guess was right.
+    if (this.loginFailures.isBlocked(email)) {
+      throw new HttpException(
+        'Too many failed sign-ins for this account. Try again in 15 minutes.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
 
     // Find user
     const user = await this.prisma.user.findFirst({
@@ -111,6 +128,7 @@ export class AuthService {
     });
 
     if (!user) {
+      this.loginFailures.recordFailure(email);
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -121,8 +139,10 @@ export class AuthService {
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
+      this.loginFailures.recordFailure(email);
       throw new UnauthorizedException('Invalid email or password');
     }
+    this.loginFailures.clear(email);
 
     // A new session per sign-in: other devices stay signed in.
     const tokens = await this.sessions.start(user);

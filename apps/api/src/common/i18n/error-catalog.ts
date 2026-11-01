@@ -82,6 +82,12 @@ export const GENERIC_ERRORS: ErrorCatalogEntry[] = [
     aliases: ['Too Many Requests', 'ThrottlerException: Too Many Requests'],
   },
   {
+    code: 'LOGIN_ACCOUNT_LOCKED',
+    en: 'Too many failed sign-ins for this account. Try again in 15 minutes.',
+    ar: 'محاولات دخول فاشلة كثيرة لهذا الحساب. حاول مرة أخرى بعد 15 دقيقة.',
+  },
+
+  {
     code: 'INTERNAL_ERROR',
     en: 'An unexpected error occurred',
     ar: 'حدث خطأ غير متوقع. حاول مرة أخرى لاحقًا.',
