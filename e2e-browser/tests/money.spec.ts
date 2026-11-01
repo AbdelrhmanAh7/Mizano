@@ -60,7 +60,9 @@ test.describe('money flows', () => {
     await page.goto(`/en/sales/invoices/${invoice.id}`);
     await expect(page.getByText('Partially Paid').first()).toBeVisible();
     await expect(page.getByText('Balance Due').locator('..')).toContainText('EGP 500.00');
-    await expect(page.getByText('PMT-001')).toBeVisible();
+    await expect(page.getByRole('row', { name: /PMT-001/ })).toContainText('EGP 400.00');
+    // 1,000 - 400 payment - 100 credit applied = 500 balance; the page counts the credit as paid.
+    await expect(page.getByText('Amount Paid').locator('..')).toContainText('EGP 500.00');
   });
 
   test('a credit note is posted and shows the customer balance after it @happy', async ({
@@ -92,8 +94,9 @@ test.describe('money flows', () => {
     await signIn(page, account);
     await page.goto('/en/purchases/bills');
     const row = page.getByRole('row', { name: /Delta Supplies/ });
-    await expect(row).toContainText('Open');
-    await expect(row).toContainText('EGP 300.00');
+    // Status, total and balance cells, each exactly (a new bill: balance = total).
+    await expect(row.getByRole('cell', { name: 'Open', exact: true })).toBeVisible();
+    await expect(row.getByRole('cell', { name: 'EGP 300.00', exact: true })).toHaveCount(2);
   });
 
   test('the trial balance balances after invoice, payment, credit note and bill @happy', async ({
@@ -122,7 +125,7 @@ test.describe('money flows', () => {
     await expect(total).toContainText('1,300.00');
   });
 
-  test('bank reconciliation opens for a new organization @happy', async ({ page }) => {
+  test('bank reconciliation page opens for a new organization (smoke)', async ({ page }) => {
     await signIn(page, await registerAccount('bank'));
     await page.goto('/en/banking/reconcile');
     await expect(page.getByText('Page Not Found')).toHaveCount(0);
@@ -140,7 +143,7 @@ test.describe('money flows', () => {
     await page.getByRole('link', { name: 'Customers' }).click();
     await expect(page).toHaveURL(/\/en\/sales\/customers/);
     await expect(page.getByRole('heading', { name: 'Customers', level: 1 })).toBeVisible();
-    await expect(page.getByText('No customers yet').or(page.getByRole('table'))).toBeVisible();
+    await expect(page.getByText('No customers yet')).toBeVisible();
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );

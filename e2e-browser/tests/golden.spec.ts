@@ -48,7 +48,7 @@ test.describe('golden scenario @happy', () => {
     const b2 = await api.createBill(a, vendor.id, [
       { description: 'Stationery', quantity: '2', rate: '150' },
     ]);
-    expect([b1['subtotal'], b1['taxAmount'], b1['total'] ?? b1['grandTotal']].map(String)).toEqual([
+    expect([b1['subtotal'], b1['taxAmount'], b1['grandTotal']].map(String)).toEqual([
       '400',
       '56',
       '456',
@@ -62,8 +62,8 @@ test.describe('golden scenario @happy', () => {
     expect(await inv(i2.id)).toMatchObject({ status: 'PAID', balanceDue: '0' });
     expect(await inv(i3.id)).toMatchObject({ status: 'PARTIALLY_PAID', balanceDue: '242' });
     const bill = async (id: string) => api.read<Record<string, string>>(a, `/bills/${id}`);
-    expect(await bill(b1.id)).toMatchObject({ status: 'PAID' });
-    expect(await bill(b2.id)).toMatchObject({ status: 'PARTIALLY_PAID' });
+    expect(await bill(b1.id)).toMatchObject({ status: 'PAID', balanceDue: '0' });
+    expect(await bill(b2.id)).toMatchObject({ status: 'PARTIALLY_PAID', balanceDue: '200' });
 
     // Aging: only the two unpaid invoices and the one unpaid bill, all current.
     const ar = await api.read<{
@@ -98,24 +98,32 @@ test.describe('golden scenario @happy', () => {
       a,
       '/reports/trial-balance',
     );
-    const line = (code: string) => tb.accounts.find((x) => x.code === code);
-    expect(line('1010')).toMatchObject({ debit: '294.0000', credit: '0.0000' });
-    expect(line('1200')).toMatchObject({ debit: '782.0000' });
-    expect(line('2000')).toMatchObject({ credit: '200.0000' });
-    expect(line('2200')).toMatchObject({ credit: '169.7193' }); // VAT payable: 182 - 12.2807
-    expect(line('2210')).toMatchObject({ debit: '56.0000' }); // VAT input
-    expect(line('4000')).toMatchObject({ credit: '1550.0000' });
-    expect(line('6999')).toMatchObject({ debit: '700.0000' });
-    const sum = (k: 'debit' | 'credit') =>
-      tb.accounts.reduce((s, x) => s + Number(x[k]), 0).toFixed(4);
-    expect(sum('debit')).toBe('1919.7193');
-    expect(sum('credit')).toBe('1919.7193');
+    // Every account of the hand calculation, both sides, and nothing else.
+    expect(tb.accounts.map((x) => [x.code, x.debit, x.credit]).sort()).toEqual(
+      [
+        ['1010', '294.0000', '0.0000'], // bank: 600 + 250 - 456 - 100
+        ['1200', '782.0000', '0.0000'], // receivable: 540 + 242
+        ['2000', '0.0000', '200.0000'], // payable
+        ['2200', '0.0000', '169.7193'], // VAT payable: 182 - 12.2807
+        ['2210', '56.0000', '0.0000'], // VAT input
+        ['4000', '0.0000', '1550.0000'], // revenue
+        ['4400', '87.7193', '0.0000'], // sales returns: 100 / 1.14
+        ['6999', '700.0000', '0.0000'], // expenses
+      ].sort(),
+    );
+    // Totals in whole ten-thousandths, so no floating point is involved.
+    const units = (k: 'debit' | 'credit') =>
+      tb.accounts.reduce((s, x) => s + Math.round(Number(x[k]) * 10_000), 0);
+    expect(units('debit')).toBe(19_197_193);
+    expect(units('credit')).toBe(19_197_193);
 
     // And the screens show the same figures.
     await signIn(page, a);
     await page.goto('/en/accounting/trial-balance');
     await expect(page.getByText('Balanced', { exact: true })).toBeVisible();
-    await expect(page.getByRole('row', { name: /^Total/ })).toContainText('1,919.72');
+    const totals = page.getByRole('row', { name: /^Total/ }).getByRole('cell');
+    await expect(totals.nth(1)).toHaveText('1,919.72');
+    await expect(totals.nth(2)).toHaveText('1,919.72');
     await page.goto(`/en/sales/invoices/${i1.id}`);
     await expect(page.getByText('Partially Paid').first()).toBeVisible();
     await expect(page.getByText('Balance Due').locator('..')).toContainText('EGP 540.00');

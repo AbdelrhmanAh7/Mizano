@@ -19,16 +19,17 @@ test.describe('failure cases @edge', () => {
       api.attempt(a, 'POST', `/invoices/${invoice.id}/record-payment`, body),
       api.attempt(a, 'POST', `/invoices/${invoice.id}/record-payment`, body),
     ]);
-    expect([first.status, second.status].every((s) => s === 200 || s === 201 || s === 409)).toBe(
-      true,
-    );
+    // At least one call created the payment; any other was refused or answered with the same payment.
+    const created = [first, second].filter((r) => r.status === 200 || r.status === 201);
+    expect(created.length).toBeGreaterThanOrEqual(1);
+    expect(new Set(created.map((r) => (r.body as Record<string, unknown>)['id'])).size).toBe(1);
     // Whatever the second answer was, only one payment of 400 exists and the balance moved once.
     const after = await api.read<Record<string, string>>(a, `/invoices/${invoice.id}`);
     expect(after).toMatchObject({ status: 'PARTIALLY_PAID', balanceDue: '600' });
     const bank = (
       await api.read<{ accounts: { code: string; debit: string }[] }>(a, '/reports/trial-balance')
     ).accounts.find((x) => x.code === '1010');
-    expect(bank).toMatchObject({ debit: '400.0000' });
+    expect(bank).toMatchObject({ debit: '400.0000', credit: '0.0000' });
   });
 
   test('C10: a locked month refuses new postings, and works again after unlocking', async () => {
@@ -50,6 +51,9 @@ test.describe('failure cases @edge', () => {
     // Nothing was posted: the receivable is still zero.
     const tb = await api.read<{ accounts: { code: string }[] }>(a, '/reports/trial-balance');
     expect(tb.accounts.find((x) => x.code === '1200')).toBeUndefined();
+    expect(await api.read<Record<string, string>>(a, `/invoices/${draft.id}`)).toMatchObject({
+      status: 'DRAFT',
+    });
     expect(
       (await api.attempt(a, 'PATCH', '/organization/lock-date', { lockDate: null })).status,
     ).toBe(200);
