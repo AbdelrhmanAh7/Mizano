@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ScanBillPage from './page';
 import enAi from '@/messages/en/ai.json';
@@ -29,7 +29,13 @@ jest.mock('@/lib/hooks/use-ai-settings', () => ({
   useAiFeature: () => ({ active: false, isLoading: false }),
 }));
 
-const mockIntake = {
+const mockIntake: {
+  processDocument: jest.Mock;
+  progress: number;
+  result: unknown;
+  error: null;
+  existingDraft: null;
+} = {
   processDocument: jest.fn(),
   progress: 0,
   result: null,
@@ -42,13 +48,87 @@ jest.mock('@/lib/hooks/use-ai-document-intake', () => ({
   knownReviewReasons: () => [],
 }));
 
+const mockCreateVendor = jest.fn();
 jest.mock('@/lib/hooks/use-vendors', () => ({
-  useCreateVendor: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useCreateVendor: () => ({ mutateAsync: mockCreateVendor, isPending: false }),
 }));
 
-jest.mock('@/components/purchases/bill-form', () => ({ BillForm: () => null }));
+const mockBillForm = jest.fn();
+jest.mock('@/components/purchases/bill-form', () => ({
+  BillForm: (props: unknown) => {
+    mockBillForm(props);
+    return null;
+  },
+}));
 
 const fileInput = (): HTMLInputElement => screen.getByTestId('scan-file-input');
+
+describe('ScanBillPage create the read vendor (issue #671)', () => {
+  beforeAll(() => {
+    URL.createObjectURL = jest.fn(() => 'blob:preview');
+  });
+
+  afterEach(() => {
+    mockIntake.result = null;
+  });
+
+  it('puts the vendor it just created into the draft bill', async () => {
+    // The sample bill: QA Vendor, QA-SCAN-001, 100.00 + 14.00 = 114.00, vendor not on file.
+    mockIntake.result = {
+      documentType: 'BILL',
+      classificationConfidence: 1,
+      extractedFields: {
+        date: '2026-11-01',
+        dueDate: null,
+        total: 114,
+        subtotal: 100,
+        tax: 14,
+        discount: null,
+        documentNumber: 'QA-SCAN-001',
+        vendorName: 'QA Vendor',
+        vendorTaxId: null,
+        currency: 'EGP',
+        paymentTerms: null,
+        customerName: null,
+        lineItems: [],
+      },
+      fieldConfidence: {},
+      ocrConfidence: 1,
+      matchedVendor: null,
+      vendorCandidates: [],
+      matchedCustomer: null,
+      customerCandidates: [],
+      duplicateWarning: null,
+      rawText: '',
+      suggestCreateVendor: { name: 'QA Vendor', email: null, phone: null, taxId: null },
+    };
+    // POST /vendors answers the vendor itself.
+    mockCreateVendor.mockResolvedValue({ id: 'vendor-qa', name: 'QA Vendor' });
+    render(<ScanBillPage />);
+    fireEvent.change(fileInput(), {
+      target: { files: [new File(['%PDF-1.4'], 'sample-bill.pdf', { type: 'application/pdf' })] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'processWithAi' }));
+    await screen.findByRole('button', { name: 'createVendor' });
+    expect(mockBillForm).toHaveBeenLastCalledWith(
+      expect.objectContaining({ scanDefaults: expect.objectContaining({ vendorId: '' }) }),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'createVendor' }));
+
+    await waitFor(() =>
+      expect(mockBillForm).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          scanDefaults: expect.objectContaining({
+            vendorId: 'vendor-qa',
+            reference: 'QA-SCAN-001',
+          }),
+        }),
+      ),
+    );
+    expect(mockCreateVendor).toHaveBeenCalledWith(expect.objectContaining({ name: 'QA Vendor' }));
+  });
+});
 
 describe('ScanBillPage document picker (issue #646)', () => {
   beforeAll(() => {
