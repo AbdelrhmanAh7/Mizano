@@ -81,10 +81,22 @@ function sameCurrency(accountCurrency: string | null, baseCurrency: string | nul
   return accountCurrency.trim().toUpperCase() === baseCurrency.trim().toUpperCase();
 }
 
+/** A recorded payment within this many days of the bank line can be the same money (#635). */
+const PAYMENT_WINDOW_DAYS = 45;
+
+/** What a bank line can be matched to: an open document to settle, or a payment already booked. */
+export const MATCH_ENTITY_TYPES = ['invoice', 'bill', 'payment_received', 'payment_made'] as const;
+export type MatchEntityType = (typeof MATCH_ENTITY_TYPES)[number];
+
 export interface ReconciliationMatch {
-  type: 'invoice' | 'bill';
+  type: MatchEntityType;
   entity: unknown;
   confidence: number;
+}
+
+/** Days between two dates, ignoring the time of day. */
+function daysApart(a: Date, b: Date): number {
+  return Math.abs(Math.round((a.getTime() - b.getTime()) / DAY_MS));
 }
 
 @Injectable()
@@ -113,12 +125,107 @@ export class ReconciliationService {
       pendingTransactions.length > 0 &&
       (await this.isBaseCurrencyAccount(organizationId, bankAccountId));
 
+    const linkedAccountId = postable
+      ? await this.linkedLedgerAccount(organizationId, bankAccountId)
+      : null;
+
     const suggestions = [];
     for (const transaction of pendingTransactions) {
-      const matches = postable ? await this.findMatches(organizationId, transaction) : [];
+      const matches = postable
+        ? [
+            // A payment already booked to this bank comes first: matching it posts nothing (#635).
+            ...(linkedAccountId
+              ? await this.findRecordedPayments(organizationId, transaction, linkedAccountId)
+              : []),
+            ...(await this.findMatches(organizationId, transaction)),
+          ]
+            .sort((a, b) => b.confidence - a.confidence)
+            .slice(0, 5)
+        : [];
       suggestions.push({ transaction, matches });
     }
     return suggestions;
+  }
+
+  private async linkedLedgerAccount(
+    organizationId: string,
+    bankAccountId: string,
+  ): Promise<string | null> {
+    const bankAccount = await this.prisma.bankAccount.findFirst({
+      where: { id: bankAccountId, organizationId },
+      select: { linkedAccountId: true },
+    });
+    return bankAccount?.linkedAccountId ?? null;
+  }
+
+  /**
+   * Payments already in the books that this bank line may be (#635): same direction, booked to
+   * this bank's ledger account, the exact amount, not voided and not yet linked to another line,
+   * dated within PAYMENT_WINDOW_DAYS (or named on the line). Matching one posts nothing.
+   */
+  private async findRecordedPayments(
+    organizationId: string,
+    transaction: BankTransaction,
+    linkedAccountId: string,
+  ): Promise<ReconciliationMatch[]> {
+    const amount = transaction.amount.abs();
+    if (amount.isZero()) return [];
+    const tokens = referenceTokens(transaction);
+    const window = PAYMENT_WINDOW_DAYS * DAY_MS;
+    const dated = {
+      gte: new Date(transaction.date.getTime() - window),
+      lte: new Date(transaction.date.getTime() + window),
+    };
+    const named = [{ paymentNumber: { in: tokens } }, { reference: { in: tokens } }];
+    const base = { organizationId, deletedAt: null, bankTransactionId: null, amount };
+    const query = { orderBy: { date: 'desc' as const }, take: MATCH_CANDIDATE_LIMIT };
+    const payee = transaction.payee?.toLowerCase() ?? '';
+
+    /** The number or reference named on the line is certain; otherwise the exact amount, nearer is better. */
+    const score = (p: {
+      paymentNumber: string;
+      reference: string | null;
+      date: Date;
+      partyName: string;
+    }): number => {
+      if (tokens.includes(p.paymentNumber) || (p.reference && tokens.includes(p.reference))) {
+        return 100;
+      }
+      let confidence = 90 - Math.min(20, Math.floor(daysApart(p.date, transaction.date) / 3));
+      if (payee && p.partyName.toLowerCase().includes(payee)) confidence += 30;
+      return Math.min(99, confidence);
+    };
+
+    if (transaction.type === BankTransactionType.DEPOSIT) {
+      const payments = await this.prisma.paymentReceived.findMany({
+        ...query,
+        where: {
+          ...base,
+          depositToAccountId: linkedAccountId,
+          OR: [{ date: dated }, ...named],
+        },
+        include: { customer: { select: { id: true, name: true } } },
+      });
+      return payments.map((payment) => ({
+        type: 'payment_received' as const,
+        entity: payment,
+        confidence: score({ ...payment, partyName: payment.customer.name }),
+      }));
+    }
+    const payments = await this.prisma.paymentMade.findMany({
+      ...query,
+      where: {
+        ...base,
+        paidFromAccountId: linkedAccountId,
+        OR: [{ date: dated }, ...named],
+      },
+      include: { vendor: { select: { id: true, name: true } } },
+    });
+    return payments.map((payment) => ({
+      type: 'payment_made' as const,
+      entity: payment,
+      confidence: score({ ...payment, partyName: payment.vendor.name }),
+    }));
   }
 
   private async findMatches(organizationId: string, transaction: BankTransaction) {
@@ -242,7 +349,7 @@ export class ReconciliationService {
       }
     }
 
-    return matches.sort((a, b) => b.confidence - a.confidence).slice(0, 5);
+    return matches;
   }
 
   async confirmMatch(
@@ -258,22 +365,30 @@ export class ReconciliationService {
     if (transaction.status !== ReconciliationStatus.PENDING)
       throw new BadRequestException('Already reconciled');
 
-    if (entityType !== 'invoice' && entityType !== 'bill') {
-      throw new BadRequestException('entityType must be invoice or bill');
+    if (!(MATCH_ENTITY_TYPES as readonly string[]).includes(entityType)) {
+      throw new BadRequestException(
+        'entityType must be invoice, bill, payment_received or payment_made',
+      );
     }
 
-    // Money direction must agree with the entity: a deposit settles an invoice, a withdrawal pays
-    // a bill. A mismatch would post the opposite entry, so it is rejected before anything is posted.
-    const expected =
-      entityType === 'invoice' ? BankTransactionType.DEPOSIT : BankTransactionType.WITHDRAWAL;
+    // Money direction must agree with the entity: a deposit settles an invoice or is a received
+    // payment, a withdrawal pays a bill or is a payment made. A mismatch would post (or link) the
+    // opposite entry, so it is rejected before anything is written.
+    const incoming = entityType === 'invoice' || entityType === 'payment_received';
+    const expected = incoming ? BankTransactionType.DEPOSIT : BankTransactionType.WITHDRAWAL;
     if (transaction.type !== expected) {
       throw new BadRequestException(
-        entityType === 'invoice'
-          ? 'Only deposits can be matched to an invoice payment'
-          : 'Only withdrawals can be matched to a bill payment',
+        incoming
+          ? 'Only deposits can be matched to a customer payment'
+          : 'Only withdrawals can be matched to a vendor payment',
       );
     }
     await this.assertBaseCurrencyAccount(organizationId, transaction.bankAccountId);
+
+    if (entityType === 'payment_received' || entityType === 'payment_made') {
+      await this.linkRecordedPayment(organizationId, transaction, entityType, entityId);
+      return { message: 'Reconciliation confirmed' };
+    }
 
     // One transaction: the guarded PENDING -> MATCHED transition happens first, so a retried or
     // concurrent confirmation cannot create a second payment; any failure rolls both back.
@@ -289,14 +404,113 @@ export class ReconciliationService {
       });
       if (count === 0) throw new BadRequestException('Already reconciled');
 
+      // The new payment is this line's money, so it is linked to it and never offered again.
       if (entityType === 'invoice') {
-        await this.createPaymentForInvoice(tx, organizationId, entityId, amount, transaction);
+        const payment = await this.createPaymentForInvoice(
+          tx,
+          organizationId,
+          entityId,
+          amount,
+          transaction,
+        );
+        await tx.paymentReceived.updateMany({
+          where: { id: payment.id, organizationId },
+          data: { bankTransactionId: transactionId },
+        });
       } else {
-        await this.createPaymentForBill(tx, organizationId, entityId, amount, transaction);
+        const payment = await this.createPaymentForBill(
+          tx,
+          organizationId,
+          entityId,
+          amount,
+          transaction,
+        );
+        await tx.paymentMade.updateMany({
+          where: { id: payment.id, organizationId },
+          data: { bankTransactionId: transactionId },
+        });
       }
     });
 
     return { message: 'Reconciliation confirmed' };
+  }
+
+  /**
+   * Reconciles a bank line with a payment that is already in the books (#635): both are marked as
+   * reconciled with each other and nothing is posted. The payment must be the same money: same
+   * direction (checked by the caller), booked to this bank's ledger account, the exact amount, not
+   * voided and not linked to another line. Both guarded updates run in one transaction, so a
+   * retried or concurrent confirmation cannot link a line or a payment twice.
+   */
+  private async linkRecordedPayment(
+    organizationId: string,
+    transaction: BankTransaction,
+    entityType: 'payment_received' | 'payment_made',
+    paymentId: string,
+  ): Promise<void> {
+    const amount = transaction.amount.abs();
+    await this.prisma.$transaction(async (tx) => {
+      const bankAccount = await tx.bankAccount.findFirst({
+        where: { id: transaction.bankAccountId, organizationId },
+        select: { linkedAccountId: true },
+      });
+      if (!bankAccount) throw new NotFoundException('Bank account not found');
+
+      const payment =
+        entityType === 'payment_received'
+          ? await tx.paymentReceived
+              .findFirst({
+                where: { id: paymentId, organizationId, deletedAt: null },
+                select: { amount: true, depositToAccountId: true, bankTransactionId: true },
+              })
+              .then((p) => p && { ...p, accountId: p.depositToAccountId })
+          : await tx.paymentMade
+              .findFirst({
+                where: { id: paymentId, organizationId, deletedAt: null },
+                select: { amount: true, paidFromAccountId: true, bankTransactionId: true },
+              })
+              .then((p) => p && { ...p, accountId: p.paidFromAccountId });
+      if (!payment) throw new NotFoundException('Payment not found');
+      if (payment.accountId !== bankAccount.linkedAccountId) {
+        throw new BadRequestException('This payment was recorded to a different bank account');
+      }
+      if (!payment.amount.equals(amount)) {
+        throw new BadRequestException('The payment amount differs from the bank line');
+      }
+      if (payment.bankTransactionId) {
+        throw new BadRequestException('This payment is already matched to another bank line');
+      }
+
+      const { count } = await tx.bankTransaction.updateMany({
+        where: { id: transaction.id, organizationId, status: ReconciliationStatus.PENDING },
+        data: {
+          status: ReconciliationStatus.MATCHED,
+          matchedEntityType: entityType,
+          matchedEntityId: paymentId,
+        },
+      });
+      if (count === 0) throw new BadRequestException('Already reconciled');
+
+      const paymentWhere = {
+        id: paymentId,
+        organizationId,
+        deletedAt: null,
+        bankTransactionId: null,
+      };
+      const linked =
+        entityType === 'payment_received'
+          ? await tx.paymentReceived.updateMany({
+              where: paymentWhere,
+              data: { bankTransactionId: transaction.id },
+            })
+          : await tx.paymentMade.updateMany({
+              where: paymentWhere,
+              data: { bankTransactionId: transaction.id },
+            });
+      if (linked.count === 0) {
+        throw new BadRequestException('This payment is already matched to another bank line');
+      }
+    });
   }
 
   private async createPaymentForInvoice(
@@ -320,7 +534,7 @@ export class ReconciliationService {
 
     // Goes through the standard customer-payment command (locks the invoice, allocates,
     // recalculates the balance and posts Dr bank / Cr AR) inside the caller's transaction.
-    await this.paymentsReceivedService.create(
+    return this.paymentsReceivedService.create(
       organizationId,
       {
         customerId: invoice.customerId,
@@ -354,7 +568,7 @@ export class ReconciliationService {
     });
     if (!bankAccount) throw new NotFoundException('Bank account not found');
 
-    await this.paymentsMadeService.create(
+    return this.paymentsMadeService.create(
       organizationId,
       {
         vendorId: bill.vendorId,

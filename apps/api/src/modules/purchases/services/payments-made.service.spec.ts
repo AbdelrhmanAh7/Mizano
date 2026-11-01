@@ -263,6 +263,27 @@ describe('PaymentsMadeService (posting)', () => {
     });
   });
 
+  it('void of a reconciled payment sends its bank line back to be reconciled (#635)', async () => {
+    prisma.paymentMade.findFirst.mockResolvedValue({
+      id: 'p1',
+      bankTransactionId: 't1',
+      allocations: [{ billId: 'b1' }],
+    });
+    prisma.paymentMade.updateMany.mockResolvedValue({ count: 1 });
+    prisma.journal.findFirst.mockResolvedValue({ id: 'j1' });
+
+    await service.void(ORG, 'p1');
+
+    expect(prisma.paymentMade.updateMany.mock.calls[0][0].data).toEqual({
+      deletedAt: expect.any(Date),
+      bankTransactionId: null,
+    });
+    expect(prisma.bankTransaction.updateMany).toHaveBeenCalledWith({
+      where: { id: 't1', organizationId: ORG },
+      data: { status: 'PENDING', matchedEntityType: null, matchedEntityId: null },
+    });
+  });
+
   it('refuses to void a legacy payment with no linked journal (ledger would not reverse)', async () => {
     prisma.paymentMade.findFirst.mockResolvedValue({ id: 'p1', allocations: [{ billId: 'b1' }] });
     prisma.paymentMade.updateMany.mockResolvedValue({ count: 1 });

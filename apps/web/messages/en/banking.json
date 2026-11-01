@@ -254,6 +254,8 @@
     "match": "Match",
     "matchPercent": "{value}% match",
     "balanceDue": "Balance due: {amount}",
+    "recordedPayment": "Recorded payment: {amount}",
+    "recordedPaymentHint": "Already in your books. Matching links this bank line to it; nothing is recorded twice.",
     "createExpense": "Create Expense",
     "accountNotFound": "Bank account not found",
     "backToReconciliation": "Back to Reconciliation",

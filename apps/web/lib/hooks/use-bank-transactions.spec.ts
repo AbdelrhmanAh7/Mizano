@@ -6,9 +6,9 @@
 jest.mock('@/lib/api', () => ({ bankTransactionsApi: {}, reconciliationApi: {} }));
 jest.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
 
-import { pickSuggestedMatches } from './use-bank-transactions';
+import { isRecordedPayment, pickSuggestedMatches } from './use-bank-transactions';
 
-const only = (match: typeof invoiceMatch | typeof billMatch) =>
+const only = (match: Parameters<typeof pickSuggestedMatches>[0][number]['matches'][number]) =>
   pickSuggestedMatches([{ transaction: { id: 't' }, matches: [match] }], 't')[0];
 
 const invoiceMatch = {
@@ -57,6 +57,49 @@ describe('suggested matches from the reconciliation endpoint', () => {
       number: 'BILL-0007',
       counterpartyName: 'Paper Co',
     });
+  });
+
+  it('reads a recorded receipt (#635): its amount, nothing left due, the customer', () => {
+    expect(
+      only({
+        type: 'payment_received',
+        confidence: 100,
+        entity: {
+          id: 'pr-1',
+          paymentNumber: 'PMT-001',
+          date: '2026-11-01T00:00:00.000Z',
+          amount: '400.0000',
+          customer: { id: 'c1', name: 'QA Customer' },
+        },
+      }),
+    ).toEqual({
+      id: 'pr-1',
+      type: 'PAYMENT_RECEIVED',
+      number: 'PMT-001',
+      date: '2026-11-01T00:00:00.000Z',
+      amount: '400.0000',
+      balanceDue: '0',
+      counterpartyName: 'QA Customer',
+      confidence: 100,
+    });
+    expect(isRecordedPayment('PAYMENT_RECEIVED')).toBe(true);
+    expect(isRecordedPayment('INVOICE')).toBe(false);
+  });
+
+  it('reads a recorded supplier payment with its vendor', () => {
+    expect(
+      only({
+        type: 'payment_made',
+        confidence: 90,
+        entity: {
+          id: 'pm-1',
+          paymentNumber: 'PAY-001',
+          amount: '114',
+          vendor: { name: 'QA Vendor' },
+        },
+      }),
+    ).toMatchObject({ type: 'PAYMENT_MADE', number: 'PAY-001', counterpartyName: 'QA Vendor' });
+    expect(isRecordedPayment('PAYMENT_MADE')).toBe(true);
   });
 
   it('picks only the chosen bank line, and none for an unknown one', () => {

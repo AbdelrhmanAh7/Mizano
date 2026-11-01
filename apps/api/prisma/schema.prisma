@@ -1128,6 +1128,9 @@ model PaymentReceived {
   /// Sent by the client once per "record payment" action; a retry with the same key returns
   /// this payment instead of settling the invoices twice.
   idempotencyKey     String?
+  /// The bank statement line this payment is reconciled with; one line per payment, set by
+  /// reconciliation and cleared when the payment is voided.
+  bankTransactionId  String?     @unique
   organizationId     String
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
@@ -1343,6 +1346,8 @@ model PaymentMade {
   notes             String?
   /// Same retry protection as PaymentReceived.idempotencyKey.
   idempotencyKey    String?
+  /// Same as PaymentReceived.bankTransactionId.
+  bankTransactionId String?     @unique
   organizationId    String
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt

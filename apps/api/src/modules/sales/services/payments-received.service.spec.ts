@@ -545,6 +545,27 @@ describe('PaymentsReceivedService', () => {
       });
     });
 
+    it('frees the bank line a reconciled receipt was matched to (#635)', async () => {
+      prisma.paymentReceived.findFirst.mockResolvedValue({
+        id: 'pmt-1',
+        bankTransactionId: 't1',
+        allocations: [{ invoiceId: 'inv-1' }],
+      } as any);
+      prisma.paymentReceived.updateMany.mockResolvedValue({ count: 1 });
+      prisma.journal.findFirst.mockResolvedValue({ id: 'j1' } as any);
+
+      await service.void(ORG_ID, 'pmt-1');
+
+      expect(prisma.paymentReceived.updateMany.mock.calls[0][0]!.data).toEqual({
+        deletedAt: expect.any(Date),
+        bankTransactionId: null,
+      });
+      expect(prisma.bankTransaction.updateMany).toHaveBeenCalledWith({
+        where: { id: 't1', organizationId: ORG_ID },
+        data: { status: 'PENDING', matchedEntityType: null, matchedEntityId: null },
+      });
+    });
+
     it('restores balances, soft-deletes and posts a linked PAYMENT_RECEIVED_VOID reversal', async () => {
       prisma.paymentReceived.findFirst.mockResolvedValue({
         id: 'pmt-1',

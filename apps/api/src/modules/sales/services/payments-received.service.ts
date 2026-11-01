@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
-import { CreditNoteType, PaymentMode, Prisma } from '@prisma/client';
+import { CreditNoteType, PaymentMode, Prisma, ReconciliationStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
@@ -319,11 +319,23 @@ export class PaymentsReceivedService {
         }
       }
 
+      // A reconciled payment frees its bank line: the money on the statement waits to be
+      // reconciled again (#635).
       const { count } = await tx.paymentReceived.updateMany({
         where: { id, organizationId, deletedAt: null },
-        data: { deletedAt: new Date() },
+        data: { deletedAt: new Date(), bankTransactionId: null },
       });
       if (count === 0) throw new NotFoundException('Payment not found');
+      if (payment.bankTransactionId) {
+        await tx.bankTransaction.updateMany({
+          where: { id: payment.bankTransactionId, organizationId },
+          data: {
+            status: ReconciliationStatus.PENDING,
+            matchedEntityType: null,
+            matchedEntityId: null,
+          },
+        });
+      }
 
       for (const invoiceId of invoiceIds) {
         await this.invoicesService.recalculateBalance(tx, invoiceId);

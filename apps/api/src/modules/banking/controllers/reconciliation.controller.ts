@@ -4,6 +4,7 @@ import { CurrentOrg, InvalidatesLedger, Permissions } from '../../../common/deco
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
+import { ConfirmMatchDto } from '../dto/confirm-match.dto';
 import { ReconciliationService } from '../services/reconciliation.service';
 
 @ApiTags('Reconciliation')
@@ -38,11 +39,10 @@ export class ReconciliationController {
     'invoices:*',
     'payments-received:*',
   )
-  @ApiOperation({ summary: 'Confirm reconciliation match' })
-  confirmMatch(
-    @CurrentOrg() orgId: string,
-    @Body() dto: { transactionId: string; entityType: string; entityId: string },
-  ) {
+  @ApiOperation({
+    summary: 'Confirm a match: settle an open invoice/bill, or link a payment already recorded',
+  })
+  confirmMatch(@CurrentOrg() orgId: string, @Body() dto: ConfirmMatchDto) {
     return this.reconciliationService.confirmMatch(
       orgId,
       dto.transactionId,
