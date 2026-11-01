@@ -1,11 +1,11 @@
 {
   "common": {
     "updated": "Last updated:",
-    "draftBadge": "Draft: not yet reviewed by a lawyer",
+    "draftBadge": "Draft — pending legal review",
     "draftNote": "This page is a plain-language draft for the free pilot. A lawyer will review it before we charge anything. Until then, where this page and the law differ, the law applies.",
     "provider": "On this page, “we” means {brand}, provided by Abdelrhman Ahmed Farag Mohamed (Giza, Egypt).",
     "contactHeading": "Contact us",
-    "contactBody": "For any question about this page or your data, write to us through the support contact we gave you when you joined the pilot (WhatsApp or email). We reply within two working days.",
+    "contactBody": "For any question about this page or your data, write to us at support@<domain>. We reply within two working days.",
     "nav": "Legal",
     "terms": "Terms of use",
     "privacy": "Privacy policy",
@@ -82,7 +82,7 @@
       },
       "where": {
         "heading": "Where it is kept",
-        "p1": "Your data is stored in a database on a cloud server that we rent and run, and an encrypted backup is made every night. When the off-site copy is turned on, that encrypted backup is also kept in Cloudflare R2 storage. We will name the hosting company and the country of the server on this page before the first paid plan."
+        "p1": "Your data is stored in a database on secure cloud servers located in the European Union that we rent and run, and an encrypted backup is made every night. When the off-site copy is turned on, that encrypted backup is also kept in Cloudflare R2 storage in the European Union."
       },
       "sharing": {
         "heading": "Who else handles it",
