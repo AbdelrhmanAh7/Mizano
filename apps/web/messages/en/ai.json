@@ -85,6 +85,8 @@
       "previewAlt": "Document preview",
       "remove": "Remove",
       "dropHint": "Drop your document here or click to browse",
+      "chooseDocument": "Choose a document",
+      "chooseAnother": "Choose another document",
       "supportsHint": "Supports images (JPEG, PNG, WebP, HEIC) and PDF — max 15MB",
       "processWithAi": "Read document",
       "processingHint": "Reading your document. Progress is shown below.",

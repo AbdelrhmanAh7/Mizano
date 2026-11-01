@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -198,6 +198,12 @@ export default function ScanBillPage() {
     },
     [ts],
   );
+
+  // A real file input in the page, opened by a named button, so the keyboard reaches it too (#646).
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const openFilePicker = useCallback(() => {
+    if (!converting) fileInputRef.current?.click();
+  }, [converting]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -423,18 +429,23 @@ export default function ScanBillPage() {
               }}
               onDragLeave={() => setDragOver(false)}
               onDrop={converting ? undefined : handleDrop}
-              onClick={() => {
-                if (converting) return;
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = '*/*';
-                input.onchange = (e) => {
-                  const file = (e.target as HTMLInputElement).files?.[0];
-                  if (file) handleFileSelect(file);
-                };
-                input.click();
-              }}
+              onClick={openFilePicker}
             >
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                tabIndex={-1}
+                aria-hidden="true"
+                data-testid="scan-file-input"
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  // Cleared so choosing the same file again still fires a change.
+                  e.target.value = '';
+                  if (file) void handleFileSelect(file);
+                }}
+              />
               {converting ? (
                 <div className="space-y-3">
                   <Loader2 className="h-12 w-12 mx-auto animate-spin text-primary" />
@@ -478,6 +489,17 @@ export default function ScanBillPage() {
                     <X className="mr-1 h-3 w-3" />
                     {ts('remove')}
                   </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openFilePicker();
+                    }}
+                  >
+                    {ts('chooseAnother')}
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -486,6 +508,16 @@ export default function ScanBillPage() {
                     <p className="font-medium">{ts('dropHint')}</p>
                     <p className="text-sm text-muted-foreground">{ts('supportsHint')}</p>
                   </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openFilePicker();
+                    }}
+                  >
+                    {ts('chooseDocument')}
+                  </Button>
                 </div>
               )}
             </div>
