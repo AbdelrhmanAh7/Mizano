@@ -2,7 +2,7 @@
 
 Written with the Playwright planner on 1 Nov 2026 against the local stack (`pnpm e2e:up`), from the TestSprite journey names
 (sign-up → onboarding, sign-in, language switch AR/EN, 390 px phone, customer, invoice, payment, credit note, vendor bill, bank
-reconciliation, trial balance). Scope was cut on 1 Nov (production goes live on 2 Nov) to the journeys that protect the first client.
+reconciliation, trial balance). Scope was cut on 1 Nov 2026 (the first-client launch) to the journeys that protect the first client.
 Every test registers its own organization (`*@example.test`, random password); where a journey is about what a screen shows, the
 documents it needs are created through the API in setup so the test stays fast and stable.
 
@@ -15,7 +15,7 @@ documents it needs are created through the API in setup so the test stays fast a
 5. **Create a customer in the form**: it appears in the list (`money.spec.ts`)
 6. **Create an invoice in the form**: draft with the right total (`money.spec.ts`)
 7. **Part payment**: status Partially Paid, balance due, payment history (`money.spec.ts`)
-8. **Credit note**: Posted, customer balance after it (`money.spec.ts`; TestSprite AIO-010 passes)
+8. **Credit note**: Posted, customer balance after it (`money.spec.ts`; TestSprite AIO-010: the Posted status and customer balance are there)
 9. **Vendor bill**: opened, listed with its balance (`money.spec.ts`)
 10. **Trial balance**: Balanced, receivable 500, payable 300, totals 1,300 = 1,300 (`money.spec.ts`; RPT-015)
 11. **Bank reconciliation page opens** for a new organization (`money.spec.ts`)

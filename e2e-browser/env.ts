@@ -18,6 +18,12 @@ export const apiEnv = {
   CORS_ORIGIN: WEB_URL,
   FRONTEND_URL: WEB_URL,
   INTAKE_EXTRACTION_STRATEGY: 'rules',
+  // A local run must not inherit real services from the developer's .env: no mail, no AI server, no Telegram.
+  MAIL_SMTP_HOST: '',
+  MAIL_SMTP_USER: '',
+  MAIL_SMTP_PASSWORD: '',
+  AI_OLLAMA_BASE_URL: '',
+  TELEGRAM_BOT_TOKEN: '',
   // Journeys sign up and sign in many times from one address.
   RATE_LIMIT_TTL: '1000',
   RATE_LIMIT_MAX: '10000',

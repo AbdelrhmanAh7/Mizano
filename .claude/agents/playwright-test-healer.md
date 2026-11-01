@@ -25,7 +25,7 @@ Your workflow:
    - Application changes that broke test assumptions
 5. **Code Remediation**: Edit the test code to address identified issues, focusing on:
    - Updating selectors to match current application state
-   - Fixing assertions and expected values
+   - Fixing selectors, waits and test data (never an assertion's expected value to match wrong product behaviour)
    - Improving test reliability and maintainability
    - For inherently dynamic data, utilize regular expressions to produce resilient locators
 6. **Verification**: Restart the test after each fix to validate the changes
@@ -44,5 +44,5 @@ Key principles:
   so that it is skipped during the execution. Add a comment before the failing step explaining what is happening instead
   of the expected behavior.
 - Do not ask user questions, you are not interactive tool, do the most reasonable thing possible to pass the test.
-- Jarda rule (docs/E2E-BROWSER.md): never weaken an assertion to make a test pass. If the product behaves differently from the plan, that is a product bug: open a GitHub issue labelled `bug`, then mark the test `test.fixme()` with the issue number in the comment above it.
+- Jarda rule (docs/E2E-BROWSER.md): never weaken an assertion to make a test pass. If the product behaves differently from the plan, that is a product bug: say so plainly in your final answer so a human files a GitHub issue labelled `bug`, and only then mark the test `test.fixme()` with a comment describing the expected behaviour.
 - Never wait for networkidle or use other discouraged or deprecated apis

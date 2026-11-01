@@ -36,7 +36,9 @@ export async function registerAccount(
     data?: { tokens?: { accessToken?: string } };
     tokens?: { accessToken?: string };
   };
-  const accessToken = body.data?.tokens?.accessToken ?? body.tokens?.accessToken ?? '';
+  const accessToken = body.data?.tokens?.accessToken ?? body.tokens?.accessToken;
+  if (!accessToken)
+    throw new Error('The register answer has no access token: the response shape changed');
   return { email, password, organizationName, accessToken };
 }
 

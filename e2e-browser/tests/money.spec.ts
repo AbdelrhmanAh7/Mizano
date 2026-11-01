@@ -101,8 +101,12 @@ test.describe('money flows', () => {
     await signIn(page, account);
     await page.goto('/en/accounting/trial-balance');
     await expect(page.getByText('Balanced', { exact: true })).toBeVisible();
-    await expect(page.getByRole('row', { name: /Accounts Receivable/ })).toContainText('500.00');
-    await expect(page.getByRole('row', { name: /Accounts Payable/ })).toContainText('300.00');
+    await expect(page.getByRole('row', { name: /Accounts Receivable/ })).toContainText(
+      /(^|\s)500\.00/,
+    );
+    await expect(page.getByRole('row', { name: /Accounts Payable/ })).toContainText(
+      /(^|\s)300\.00/,
+    );
     const total = page.getByRole('row', { name: /^Total/ });
     await expect(total).toContainText('1,300.00');
   });
@@ -124,6 +128,8 @@ test.describe('money flows', () => {
     await page.getByRole('button', { name: 'Sales' }).click();
     await page.getByRole('link', { name: 'Customers' }).click();
     await expect(page).toHaveURL(/\/en\/sales\/customers/);
+    await expect(page.getByRole('heading', { name: 'Customers', level: 1 })).toBeVisible();
+    await expect(page.getByText('No customers yet').or(page.getByRole('table'))).toBeVisible();
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );

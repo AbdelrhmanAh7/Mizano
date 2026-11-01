@@ -22,8 +22,7 @@ export default defineConfig({
       url: `http://127.0.0.1:${API_PORT}/api/health/live`,
       reuseExistingServer: !process.env.CI,
       timeout: 240_000,
-      stdout: 'ignore',
-      stderr: 'ignore',
+      stderr: 'pipe',
       env: apiEnv,
     },
     {

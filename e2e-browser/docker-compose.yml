@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: e2e
       POSTGRES_PASSWORD: e2e
       POSTGRES_DB: jarda_e2e
-    ports: ['5499:5432']
+    ports: ['127.0.0.1:5499:5432']
     tmpfs: ['/var/lib/postgresql/data']
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U e2e -d jarda_e2e']
@@ -16,7 +16,7 @@ services:
       retries: 30
   redis:
     image: redis:7-alpine
-    ports: ['6499:6379']
+    ports: ['127.0.0.1:6499:6379']
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 2s
