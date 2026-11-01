@@ -103,7 +103,7 @@ export class OrganizationsService {
     return organization;
   }
 
-  async setLockDate(id: string, lockDate: Date) {
+  async setLockDate(id: string, lockDate: Date | null) {
     const organization = await this.prisma.organization.update({
       where: { id },
       data: { lockDate },

@@ -9,10 +9,29 @@ import {
   IsIn,
   MinLength,
   MaxLength,
+  IsDate,
+  ValidateIf,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { DOCUMENT_DIGITS, type DocumentDigits } from '../../../common/utils/document-digits';
+
+/** Body of PATCH /organization/lock-date: a calendar day (YYYY-MM-DD), or null to remove the lock. */
+export class SetLockDateDto {
+  @ApiPropertyOptional({
+    description: 'Transactions on or before this day are locked; null removes the lock',
+    nullable: true,
+  })
+  @ValidateIf((o: SetLockDateDto) => o.lockDate !== null)
+  // Only a real calendar day counts ("2026-02-31" or a timestamp is left as is and fails IsDate).
+  @Transform(({ value }: { value: unknown }) => {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    const day = new Date(`${value}T00:00:00.000Z`);
+    return day.toISOString().slice(0, 10) === value ? day : value;
+  })
+  @IsDate()
+  lockDate!: Date | null;
+}
 
 // ============================================
 // GENERAL SETTINGS

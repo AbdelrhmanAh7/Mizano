@@ -513,15 +513,18 @@ export const bankAccountsApi = {
   getBalanceHistory: (id: string) => api.get(`/bank-accounts/${id}/balance-history`),
 };
 
+// The reconciliation endpoints: suggestions for one bank account, and confirming one match.
+export const reconciliationApi = {
+  getSuggestions: (bankAccountId: string) =>
+    api.get(`/reconciliation/suggestions/${bankAccountId}`),
+  confirm: (data: { transactionId: string; entityType: 'invoice' | 'bill'; entityId: string }) =>
+    api.post('/reconciliation/confirm', data),
+};
+
 export const bankTransactionsApi = {
   ...crud('/bank-transactions'),
   getUnmatched: (bankAccountId: string) =>
     api.get('/bank-transactions/unmatched', { params: { bankAccountId } }),
-  getSuggestedMatches: (id: string) => api.get(`/bank-transactions/${id}/suggested-matches`),
-  match: (id: string, data: { documentId: string; documentType: string }) =>
-    api.post(`/bank-transactions/${id}/match`, data),
-  unmatch: (id: string) => api.post(`/bank-transactions/${id}/unmatch`),
-  exclude: (id: string) => api.post(`/bank-transactions/${id}/exclude`),
   createExpense: (id: string, data: Record<string, unknown>) =>
     api.post(`/bank-transactions/${id}/create-expense`, data),
   createTransfer: (id: string, data: Record<string, unknown>) =>

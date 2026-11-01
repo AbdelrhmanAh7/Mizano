@@ -8,7 +8,6 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Check,
-  X,
   Plus,
   FileText,
   Receipt,
@@ -25,7 +24,6 @@ import {
   useUnmatchedTransactions,
   useSuggestedMatches,
   useMatchTransaction,
-  useExcludeTransaction,
   BankTransaction,
   SuggestedMatch,
   getConfidenceColor,
@@ -64,28 +62,26 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
     isLoading: suggestedLoading,
     isError: suggestedFailed,
     refetch: refetchSuggested,
-  } = useSuggestedMatches(selectedTransaction || '');
+  } = useSuggestedMatches(accountId, selectedTransaction || '');
 
   const matchTransaction = useMatchTransaction();
-  const excludeTransaction = useExcludeTransaction();
 
   const transactions: BankTransaction[] = transactionsData?.data || [];
-  const suggestedMatches: SuggestedMatch[] = suggestedData?.data || [];
+  const suggestedMatches: SuggestedMatch[] = suggestedData ?? [];
 
   const isLoading = accountLoading || transactionsLoading;
 
   const handleMatch = async (transactionId: string, match: SuggestedMatch) => {
-    await matchTransaction.mutateAsync({
-      id: transactionId,
-      documentId: match.id,
-      documentType: match.type,
-    });
-    setSelectedTransaction(null);
-  };
-
-  const handleExclude = async (transactionId: string) => {
-    await excludeTransaction.mutateAsync(transactionId);
-    setSelectedTransaction(null);
+    try {
+      await matchTransaction.mutateAsync({
+        id: transactionId,
+        documentId: match.id,
+        documentType: match.type,
+      });
+      setSelectedTransaction(null);
+    } catch {
+      // The failure toast is shown by the mutation; the line stays selected to try again.
+    }
   };
 
   if (isLoading) {
@@ -337,7 +333,8 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                               </div>
                               <Button
                                 size="sm"
-                                onClick={() => handleMatch(selectedTransaction, match)}
+                                disabled={matchTransaction.isPending}
+                                onClick={() => void handleMatch(selectedTransaction, match)}
                               >
                                 <Check className="me-1 h-3 w-3" />
                                 {t('reconciliation.match')}
@@ -361,14 +358,6 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                           <Plus className="me-2 h-4 w-4" />
                           {t('reconciliation.createExpense')}
                         </Link>
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="w-full text-gray-600"
-                        onClick={() => handleExclude(selectedTransaction)}
-                      >
-                        <X className="me-2 h-4 w-4" />
-                        {t('reconciliation.excludeTransaction')}
                       </Button>
                     </div>
                   </div>

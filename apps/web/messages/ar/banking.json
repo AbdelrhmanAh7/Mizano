@@ -255,7 +255,6 @@
     "matchPercent": "{value}% مطابقة",
     "balanceDue": "الرصيد المستحق: {amount}",
     "createExpense": "إنشاء مصروف",
-    "excludeTransaction": "استبعاد المعاملة",
     "accountNotFound": "الحساب البنكي غير موجود",
     "backToReconciliation": "العودة إلى التسوية",
     "form": {
@@ -321,8 +320,6 @@
     "ruleDeleteError": "تعذّر حذف القاعدة البنكية",
     "transactionMatched": "تمت مطابقة الحركة بنجاح",
     "matchError": "تعذّرت مطابقة الحركة",
-    "transactionExcluded": "تم استبعاد الحركة",
-    "excludeError": "تعذّر استبعاد الحركة",
     "transactionsImported": "تم استيراد الحركات بنجاح",
     "importError": "تعذّر استيراد الحركات"
   },
