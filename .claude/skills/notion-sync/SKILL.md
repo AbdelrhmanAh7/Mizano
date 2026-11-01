@@ -7,7 +7,7 @@ description: Keep the owner's Notion HQ true for Jarda · جردة (formerly Miz
 
 The owner reads Notion at a glance: **short, plain words, in English** (Arabic product names sit next to the English ones). No jargon in sentences: not "PR", "SHA", "migration", "RLS", "webhook", "token", "API", "JSON", "worktree". Say "change", "update to the database", "sign-in", "link". Jargon lives only in the GitHub links. Rewrite issue titles in plain words and keep the plan id (R1, P0-2, C02 ...).
 
-Rebuilt on 1 Nov 2026: the old hub pages are in Notion's trash. Everything is now rows in eight databases; the dashboards are filtered live views, so **you write rows, not page sections**. The tools are the claude.ai Notion connector (`notion-fetch`, `notion-query-data-sources`, `notion-create-pages`, `notion-update-page`). If it is not connected, stop and write `NEEDS-OWNER: connect the claude.ai Notion connector` in your status file (`.agent-tasks/sessions/status/<name>.md`).
+Rebuilt on 1 Nov 2026: the old hub pages are in Notion's trash. Everything is now rows in nine databases (names follow the Conventions page, see "Names and live links"); the dashboards are filtered live views, so **you write rows, not page sections**. The tools are the claude.ai Notion connector (`notion-fetch`, `notion-query-data-sources`, `notion-create-pages`, `notion-update-page`). If it is not connected, stop and write `NEEDS-OWNER: connect the claude.ai Notion connector` in your status file (`.agent-tasks/sessions/status/<name>.md`).
 
 ## Ids (data source = the id for queries and for `parent: data_source_id`)
 | What | Id |
@@ -15,17 +15,19 @@ Rebuilt on 1 Nov 2026: the old hub pages are in Notion's trash. Everything is no
 | Company HQ (home dashboard, do not edit by hand) | 3ef27121047281b08732f713eda65503 |
 | **Jarda · جردة (formerly Mizano) dashboard page** | 40b27121047281b4a17dc0c83df9c3ac |
 | **Jarda · جردة (formerly Mizano) row in Products** (page id, used in every Product relation) | 40b27121-0472-8197-9e82-d7441fbb468b |
-| Products | 4f1e4bcc-1652-4a0c-af24-a34905df873e |
-| Milestones | 87ae30cf-f5cb-4814-9a20-d7f49a2a90c1 |
-| Work | 619f0885-ddad-4a43-bce0-78154abd9f20 |
-| Owner tasks | 7329ae2f-9746-4d86-b0ed-3d3938963a0f |
-| Shipped | c2014e22-4e10-40ae-82ee-b0846183e4a3 |
-| Decisions | 437af562-024a-4dfe-96f7-35ff4cbb9fee |
-| Content calendar | 820f49f7-cf25-48d6-96f6-e15c53b49e07 |
-| Pilot pipeline (the owner's, **never write**) | 4cf4ef61-3c65-4ec3-a75a-9074b916b9f2 |
+| Portfolio · Products | 4f1e4bcc-1652-4a0c-af24-a34905df873e |
+| Delivery · Milestones | 87ae30cf-f5cb-4814-9a20-d7f49a2a90c1 |
+| Delivery · Work | 619f0885-ddad-4a43-bce0-78154abd9f20 |
+| Owner · Tasks | 7329ae2f-9746-4d86-b0ed-3d3938963a0f |
+| Delivery · Shipped | c2014e22-4e10-40ae-82ee-b0846183e4a3 |
+| Governance · Decisions | 437af562-024a-4dfe-96f7-35ff4cbb9fee |
+| Marketing · Content calendar | 820f49f7-cf25-48d6-96f6-e15c53b49e07 |
+| **Quality · Reports** (QA and release reports) | af3ea0b2-1631-4017-952b-d280f73dffdc |
+| Sales · Leads (the owner's and the leads research's, **never write**) | 78381010-5dac-47db-8ee8-d4bd2ec133ba |
+| HQ · Runbook · Conventions (naming rules) | 40b27121047281d1ac37c856e83496ff |
 | Milestone rows (page ids) | First client ready `40b27121-0472-8152-9058-dd3855439294` (GitHub milestone 19); First month `40b27121-0472-81cc-b841-ebeeda9fa772` (milestone 20) |
 
-Never touch: the charts, forms, buttons and automations the owner added on the HQ and the Work list (new properties are allowed, removing or renaming these is not), the other product's rows and page, the NileQuant hub and its data, the page "Kept — NileQuant data and personal pages", anything in Notion's trash. Never trash or delete anything and never empty the trash. Do not invent leads, prices or demand; unknown is written "unknown".
+Never touch: the charts, forms, buttons and automations the owner added on the HQ and the Work list (new properties are allowed, removing or renaming these is not), the other product's rows and page, the NileQuant hub and its data, the pages "NileQuant · Data" and "Personal · Archive", anything in Notion's trash. Never trash or delete anything and never empty the trash. Do not invent leads, prices or demand; unknown is written "unknown".
 
 ## Read first (facts come from GitHub and git, never from memory)
 - Milestones: `gh api "repos/AbdelrhmanAh7/Mizano/milestones?state=all" --jq '.[]|[.number,.title,.open_issues,.closed_issues,.html_url]|@tsv'` (the two that matter: **First client ready**, **First month**).
@@ -47,13 +49,22 @@ To upsert: `notion-query-data-sources` with SQL `SELECT url FROM "collection://<
 | **Shipped** | **Append only.** One row per user-visible change (one row per merged request, however many commits it holds; skip requests with no user-visible effect, so the `Source id` stays stable) merged since the newest `Date` of this product's rows minus one day (14 days when there are none): `What shipped` in plain words, `Date`, `Link` to the change, `Source id` = `Mizano:pr<number>` (the merged request number, never a commit id) (always this one form, so a change that is read again on a later run is found and skipped). Do not rewrite older rows. A change that is merged but not deployed is still a row, worded "merged, not live yet". |
 | **Decisions** | **Append only.** `Decision`, `Date`, `Why` in one or two plain sentences, `Source id` = `<date>-<first five words of the Decision, lower case, letters and digits, joined with ->` (computed the same way every run, so the same decision never gets two ids; before creating, also query by `Decision` text and `Date` and skip if a row matches). Never invent a different slug for a decision that is already in Notion. Cross-product decisions leave `Product` empty. |
 | **Content calendar** | One row per post, new rows only: `Post` ("Day N · format · first words"), `Product`, `Language`, `Channel`, `Status` = Draft, proposed `Date`, full text in the page body, `Source id` = `jarda-en-dayN` / `jarda-ar-dayN`. **Never change `Status` or `Date` of an existing row** (the owner moves them to Approved / Posted). |
-| **Pilot pipeline** | Never write. It is the owner's list of real businesses. |
-| **Products** | Update only this product's row: `Status` (Building / Ready for owner / Ready to sell / Paused), `Stage`, `First-client progress` (one line: "25 of 26 done (96%) ▰▰▰▰▰▰▰▰▰▰ — what is left"), `Live link` (leave a URL field empty when unknown; never write the word "unknown" into it), `GitHub`, `Plan`, `Sales kit`, `Handbook` (GitHub file; the owner's "Handbook (Arabic page)" / "Handbook (English page)" links are set by hand, never touch them), `Marketing` (only links that exist on master), `date:Updated:start`. Status "Ready to sell" only when the lead's status file or `docs/RUNBOOK.md` says it is published and smoke-tested. |
+| **Quality · Reports** | **Append only; a found row is skipped** (the one exception: today's Release row, same `Source id`, may be updated while the day is open). One row per report: `Title` = `<Product> · Report · <QA or Release> — what`, `Product` (FlowLine or Jarda; select), `Type` (QA / Release / Weekly), `Date`, `Result` (Pass / Pass with notes / Partial / Fail / Info), `Link` (the place to look: live site, issue, commit list), `Summary` (2–4 plain sentences, real numbers only, nothing invented), `Open bugs` (QA rows only: count from `gh issue list -s open -l bug` at that moment), `Source id` = `report:<product>:<kind>:<name>:<date>`. Sources: (1) each finished QA status file of this product in `.agent-tasks/sessions/status/` (tests by independent testers, TestSprite runs, live checks; last line `DONE`) gives one QA row: `Pass` when nothing was found, `Pass with notes` when there are only observations, `Partial` when defects were filed (say how many are fixed), `Fail` when a main journey fails; (2) one Release row per day with merged changes: how many, 5–8 highlights in plain words, what is live and what is only merged, `Result` = `Info`. |
+| **Products** | Update only this product's row: `Status` (Building / Ready for owner / Ready to sell / Paused), `Stage`, `First-client progress` (one line: "25 of 26 done (96%) ▰▰▰▰▰▰▰▰▰▰ — what is left"), `Live link` (the address testers open: FlowLine https://pixel-perfect-recreation-277.lovable.app; Jarda is a temporary tunnel address that runs on the owner's Mac and changes when it restarts, so take it from `~/jarda-online` or the newest `jarda-deploy` status file; leave a URL field empty when unknown, never write the word "unknown" into it), `GitHub`, `Plan`, `Sales kit`, `Handbook` (GitHub file; the owner's "Handbook (Arabic page)" / "Handbook (English page)" links are set by hand, never touch them), `Marketing` (only links that exist on master), `date:Updated:start`. Status "Ready to sell" only when the lead's status file or `docs/RUNBOOK.md` says it is published and smoke-tested. |
 
 Then, on the **Jarda · جردة (formerly Mizano) dashboard page**, fetch it and update only the sentences after `Where we are (date):` with `update_content` (the exact old sentences as `old_str`, never the link line that follows): the one thing that matters now, counts, the date. The rest of the page is live views and needs no edit. "Where we are" is a synced block: its original lives on this product page and the HQ home shows it as a reference, so edit the text **inside** the block on the product page only (never delete or recreate the block, never edit the HQ copy). **Never use `replace_content` or `allow_deleting_content` on any HQ page**: they can delete the live views.
 
+Also keep the **green callout at the top of the Jarda dashboard page** true (it starts with `Live link:`): fetch the page, then `update_content` only the sentences after each bold label, never the labels: **Live link** (from the Products row; for Jarda add that it is temporary), **Status** (one plain sentence with the done/total count), **Open bugs** (count and, for each, a link `[#n](url)` with a three-word title, from `gh issue list -s open -l bug`), **Latest report** (mentions of the newest QA and Release rows: `<mention url="..."/>`). **Tester Handbook** is set by hand: never change it.
+
+## Names and live links
+- Every page is named `<Product> · <Type> · <Title> — <Arabic subtitle>` and every database `<Area> · <Name> — <Arabic>`; the rules and the allowed Types and emojis are on the Conventions page (id in the table above). Rows you create follow it (Reports titles above). If a page or database you touch breaks the rule, rename it (rename only, never move to trash).
+- Product dashboards (`... · Dashboard · Overview`), handbooks, tester handbooks and the other documents sit under their product dashboard; HQ is the only entry point.
+
+## Scheduled run (no one is watching)
+A launchd job on the owner's Mac (`com.thothlabs.notion-sync`, every 3 hours, logs in `~/Library/Logs/notion-sync`) runs this skill with `claude -p --model sonnet` once per product. In that run: do all of the above, **never ask a question**, never trash or delete, never use `replace_content`, finish within about 10 minutes, and write one line to the status file `notion-sync-jarda.md` (what changed, time, anything that could not be matched). If the Notion connector is missing write `NEEDS-OWNER: connect the claude.ai Notion connector` there and stop.
+
 ## Order of work and checks
-1. Read GitHub, then write Milestones, Work, Owner tasks, Shipped, Decisions, Content calendar, Products, the "Where we are" paragraph.
+1. Read GitHub and the status files, then write Milestones, Work, Owner tasks, Shipped, Decisions, Content calendar, Reports, Products, the "Where we are" paragraph and the green callout.
 2. After the writes, `notion-query-data-sources` once: count Work rows with `Source id` like `Mizano#%` and `Status` not Done; it must equal the open issues in the two milestones. If not, fix the difference and say so in the status file.
 3. Append one line to your status file: what you updated, the time, any row that could not be matched.
 
