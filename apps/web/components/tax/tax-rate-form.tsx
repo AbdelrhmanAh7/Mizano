@@ -15,14 +15,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useCreateTaxRate, useUpdateTaxRate, TaxRate } from '@/lib/hooks/use-tax';
-import { useAccounts, Account } from '@/lib/hooks/use-accounts';
+import { useAccounts, Account, ACCOUNT_PICKER_PARAMS } from '@/lib/hooks/use-accounts';
 import { useToast } from '@/components/ui/use-toast';
 
 const taxRateSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   rate: z.number().min(0, 'Rate must be 0 or higher').max(100, 'Rate cannot exceed 100'),
   type: z.enum(['OUTPUT', 'INPUT', 'BOTH']),
-  accountId: z.string().min(1, 'Linked account is required'),
+  linkedAccountId: z.string().min(1, 'Linked account is required'),
   isDefault: z.boolean().default(false),
   isActive: z.boolean().default(true),
 });
@@ -39,7 +39,7 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
   const createTaxRate = useCreateTaxRate();
   const updateTaxRate = useUpdateTaxRate();
 
-  const { data: accountsData, isLoading: accountsLoading } = useAccounts();
+  const { data: accountsData, isLoading: accountsLoading } = useAccounts(ACCOUNT_PICKER_PARAMS);
   const accounts: Account[] = accountsData?.data || [];
 
   const form = useForm<TaxRateFormData>({
@@ -49,7 +49,7 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
           name: taxRate.name,
           rate: typeof taxRate.rate === 'string' ? parseFloat(taxRate.rate) : taxRate.rate,
           type: taxRate.type,
-          accountId: taxRate.accountId,
+          linkedAccountId: taxRate.linkedAccountId,
           isDefault: taxRate.isDefault,
           isActive: taxRate.isActive,
         }
@@ -57,13 +57,15 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
           name: '',
           rate: 0,
           type: 'BOTH' as const,
-          accountId: '',
+          linkedAccountId: '',
           isDefault: false,
           isActive: true,
         },
   });
 
-  const handleSubmit = async (data: TaxRateFormData) => {
+  const handleSubmit = async (values: TaxRateFormData) => {
+    // The API takes the rate as a decimal string, never a float.
+    const data = { ...values, rate: String(values.rate) };
     try {
       if (taxRate) {
         await updateTaxRate.mutateAsync({ id: taxRate.id, data });
@@ -132,8 +134,8 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
       <div className="space-y-2">
         <Label>Linked Account *</Label>
         <Select
-          value={form.watch('accountId') || ''}
-          onValueChange={(value) => form.setValue('accountId', value)}
+          value={form.watch('linkedAccountId') || ''}
+          onValueChange={(value) => form.setValue('linkedAccountId', value)}
           disabled={accountsLoading}
         >
           <SelectTrigger>
@@ -147,8 +149,8 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
             ))}
           </SelectContent>
         </Select>
-        {form.formState.errors.accountId && (
-          <p className="text-sm text-red-500">{form.formState.errors.accountId.message}</p>
+        {form.formState.errors.linkedAccountId && (
+          <p className="text-sm text-red-500">{form.formState.errors.linkedAccountId.message}</p>
         )}
       </div>
 

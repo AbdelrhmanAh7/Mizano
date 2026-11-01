@@ -74,8 +74,8 @@ export default function TaxRatesPage() {
       result = result.filter(
         (r) =>
           r.name.toLowerCase().includes(q) ||
-          r.account?.name?.toLowerCase().includes(q) ||
-          r.account?.code?.toLowerCase().includes(q),
+          r.linkedAccount?.name?.toLowerCase().includes(q) ||
+          r.linkedAccount?.code?.toLowerCase().includes(q),
       );
     }
 
@@ -175,13 +175,13 @@ export default function TaxRatesPage() {
       cell: ({ row }) => <Badge variant="outline">{getTaxRateTypeLabel(row.original.type)}</Badge>,
     },
     {
-      accessorKey: 'account.name',
+      accessorKey: 'linkedAccount.name',
       header: t('rates.table.linkedAccount'),
       cell: ({ row }) =>
-        row.original.account ? (
+        row.original.linkedAccount ? (
           <span className="text-sm">
-            <span className="text-muted-foreground">{row.original.account.code}</span>{' '}
-            {row.original.account.name}
+            <span className="text-muted-foreground">{row.original.linkedAccount.code}</span>{' '}
+            {row.original.linkedAccount.name}
           </span>
         ) : (
           <span className="text-muted-foreground">-</span>
