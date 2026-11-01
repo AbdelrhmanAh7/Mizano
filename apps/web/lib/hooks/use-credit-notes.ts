@@ -23,7 +23,11 @@ export interface CreditNote {
     id: string;
     invoiceNumber: string;
     grandTotal: string;
+    /** What is still owed on the invoice, after this and any other credits and payments. */
+    balanceDue?: string;
   };
+  /** Detail view only: what the customer still owes across open invoices after this credit. */
+  customerOutstandingBalance?: string;
   date: string;
   type: CreditNoteType;
   amount: string;

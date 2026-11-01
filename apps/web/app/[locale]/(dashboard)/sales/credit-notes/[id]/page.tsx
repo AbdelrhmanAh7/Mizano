@@ -92,6 +92,10 @@ export default function CreditNoteDetailPage() {
               <Badge className={getCreditNoteTypeColor(creditNote.type)}>
                 {t(creditNoteTypeKey(creditNote.type))}
               </Badge>
+              {/* A credit note posts to the ledger when it is created (voided ones 404 here). */}
+              <Badge variant="outline" className="border-green-600 text-green-700">
+                {t('creditNotes.posted')}
+              </Badge>
             </div>
             {creditNote.customer && (
               <Link
@@ -173,6 +177,16 @@ export default function CreditNoteDetailPage() {
                     {creditNote.customer.name}
                   </Link>
                 </div>
+                {creditNote.customerOutstandingBalance !== undefined && (
+                  <div>
+                    <div className="text-sm text-muted-foreground">
+                      {t('creditNotes.customerBalanceAfter')}
+                    </div>
+                    <div className="font-mono">
+                      {formatCurrency(creditNote.customerOutstandingBalance)}
+                    </div>
+                  </div>
+                )}
                 {creditNote.customer.email && (
                   <div>
                     <div className="text-sm text-muted-foreground">{t('customers.form.email')}</div>
@@ -219,6 +233,14 @@ export default function CreditNoteDetailPage() {
                       {t('creditNotes.invoiceTotal')}
                     </div>
                     <div className="font-mono">{formatCurrency(creditNote.invoice.grandTotal)}</div>
+                  </div>
+                )}
+                {creditNote.invoice.balanceDue !== undefined && (
+                  <div>
+                    <div className="text-sm text-muted-foreground">
+                      {t('creditNotes.invoiceBalanceDue')}
+                    </div>
+                    <div className="font-mono">{formatCurrency(creditNote.invoice.balanceDue)}</div>
                   </div>
                 )}
               </>

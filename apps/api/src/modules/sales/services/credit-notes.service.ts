@@ -301,7 +301,19 @@ export class CreditNotesService {
       include: { customer: true, invoice: true, appliedToInvoice: true },
     });
     if (!creditNote) throw new NotFoundException('Credit note not found');
-    return creditNote;
+    // What the customer still owes after this credit, same rule as the customer page: the
+    // balance due of the customer's open receivable invoices in this organization.
+    const open = await this.prisma.invoice.aggregate({
+      where: {
+        organizationId,
+        customerId: creditNote.customerId,
+        deletedAt: null,
+        status: { in: RECEIVABLE_INVOICE_STATUSES },
+      },
+      _sum: { balanceDue: true },
+    });
+    const customerOutstandingBalance = (open._sum.balanceDue ?? new Decimal(0)).toFixed(4);
+    return { ...creditNote, customerOutstandingBalance };
   }
 
   /** Posted credit notes are immutable; only the reason text can be corrected. */
