@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { expect, test } from '@playwright/test';
-import { API_URL } from '../env';
+import { API_URL, QA_ORGANIZATION, isRemote } from '../env';
 import { registerAccount, signIn } from '../support/account';
 
 test.describe('sign up and sign in', () => {
@@ -12,7 +12,9 @@ test.describe('sign up and sign in', () => {
     await page.locator('input[name="lastName"]').fill('Tester');
     const email = `e2e-signup-${id}@example.test`;
     await page.locator('input[name="email"]').fill(email);
-    await page.locator('input[name="organizationName"]').fill(`Journey Signup ${id}`);
+    await page
+      .locator('input[name="organizationName"]')
+      .fill(isRemote ? `${QA_ORGANIZATION} ${id}` : `Journey Signup ${id}`);
     const password = `Pw1-${randomBytes(9).toString('base64url')}`;
     await page.locator('input[name="password"]').fill(password);
     await page.locator('input[name="confirmPassword"]').fill(password);
