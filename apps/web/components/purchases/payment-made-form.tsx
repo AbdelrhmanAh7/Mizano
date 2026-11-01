@@ -39,7 +39,11 @@ import {
   subtractDecimals,
   sumDecimals,
 } from '@/lib/decimal';
-import { useUnpaidBills, paymentModeOptions } from '@/lib/hooks/use-payments-made';
+import {
+  useUnpaidBills,
+  paymentModeOptions,
+  type CreatePaymentMadeData,
+} from '@/lib/hooks/use-payments-made';
 import { useDateFnsLocale } from '@/lib/date-locale';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { VendorCombobox } from '@/components/shared/party-combobox';
@@ -77,13 +81,14 @@ interface BillAllocation {
   currencyCode: string | null;
   grandTotal: string;
   balanceDue: string;
+  /** As typed; empty means nothing allocated. */
   allocated: string;
   selected: boolean;
 }
 
 interface PaymentMadeFormProps {
   bankAccounts: Array<{ id: string; name: string; type: string; linkedAccountId: string }>;
-  onSubmit: (data: Record<string, unknown>) => void;
+  onSubmit: (data: CreatePaymentMadeData) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
   preselectedVendorId?: string;
@@ -146,7 +151,7 @@ export function PaymentMadeForm({
           currencyCode: bill.currencyCode ?? null,
           grandTotal: normalizeDecimal(bill.grandTotal),
           balanceDue: normalizeDecimal(bill.balanceDue),
-          allocated: '0',
+          allocated: '',
           selected: preselectedBillId === bill.id,
         }),
       );
@@ -186,7 +191,7 @@ export function PaymentMadeForm({
           return {
             ...a,
             selected: newSelected,
-            allocated: newSelected ? a.balanceDue : '0',
+            allocated: newSelected ? a.balanceDue : '',
           };
         }
         return a;
@@ -194,18 +199,24 @@ export function PaymentMadeForm({
     );
   };
 
-  // Update allocation amount: kept as typed while between zero and the bill's balance due.
+  // Update allocation amount: kept exactly as typed ("0", "0.5") while between zero and the bill's
+  // balance due, so partial input is never erased; empty means nothing allocated.
   const updateAllocation = (billId: string, typed: string) => {
     setAllocations((prev) =>
       prev.map((a) => {
         if (a.billId === billId) {
-          const parsed = parseDecimal(typed);
+          const text = typed.trim();
+          const parsed = parseDecimal(text);
           const validAmount =
-            parsed === null || compareDecimals(typed, '0') < 0
-              ? '0'
-              : compareDecimals(typed, a.balanceDue) > 0
-                ? a.balanceDue
-                : typed.trim();
+            text === ''
+              ? ''
+              : parsed === null
+                ? a.allocated // more than 4 decimals or not a number: ignore the keystroke
+                : compareDecimals(text, '0') < 0
+                  ? ''
+                  : compareDecimals(text, a.balanceDue) > 0
+                    ? a.balanceDue
+                    : text;
           return {
             ...a,
             allocated: validAmount,
@@ -222,7 +233,7 @@ export function PaymentMadeForm({
     let remaining = normalizeDecimal(paymentAmount);
     setAllocations((prev) =>
       prev.map((a) => {
-        if (!isPositiveDecimal(remaining)) return { ...a, allocated: '0', selected: false };
+        if (!isPositiveDecimal(remaining)) return { ...a, allocated: '', selected: false };
         const toAllocate = compareDecimals(remaining, a.balanceDue) < 0 ? remaining : a.balanceDue;
         remaining = subtractDecimals(remaining, toAllocate);
         return {
@@ -236,7 +247,7 @@ export function PaymentMadeForm({
 
   // Clear all allocations
   const clearAllocations = () => {
-    setAllocations((prev) => prev.map((a) => ({ ...a, allocated: '0', selected: false })));
+    setAllocations((prev) => prev.map((a) => ({ ...a, allocated: '', selected: false })));
   };
 
   const handleSubmit = (data: PaymentMadeFormData) => {
@@ -498,7 +509,7 @@ export function PaymentMadeForm({
                             step="0.01"
                             min="0"
                             max={allocation.balanceDue}
-                            value={allocation.allocated === '0' ? '' : allocation.allocated}
+                            value={allocation.allocated}
                             onChange={(e) => updateAllocation(allocation.billId, e.target.value)}
                             className="w-32 text-end ms-auto"
                           />

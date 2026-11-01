@@ -67,14 +67,15 @@ export interface PaymentMadeParams {
 export interface CreatePaymentMadeData {
   vendorId: string;
   date: string;
-  amount: number;
+  /** Decimal string; money never travels as a JS number (#83). */
+  amount: string;
   paymentMode: string;
   paidFromAccountId: string;
   reference?: string;
   notes?: string;
   allocations?: Array<{
     billId: string;
-    amount: number;
+    amount: string;
   }>;
 }
 

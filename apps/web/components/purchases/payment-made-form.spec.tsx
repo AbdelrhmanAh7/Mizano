@@ -175,6 +175,23 @@ describe('PaymentMadeForm', () => {
     );
   });
 
+  it('keeps a partial allocation such as "0" or "0.5" while it is typed', async () => {
+    render(<PaymentMadeForm bankAccounts={registers} onSubmit={jest.fn()} onCancel={jest.fn()} />);
+    fireEvent.click(screen.getByText('pick vendor 150'));
+    expect(await screen.findByText('V-9001')).toBeInTheDocument();
+
+    const allocation = screen
+      .getAllByRole('spinbutton')
+      .find((el) => el.id !== 'amount') as HTMLInputElement;
+    fireEvent.change(allocation, { target: { value: '0' } });
+    expect(allocation.value).toBe('0');
+    fireEvent.change(allocation, { target: { value: '0.5' } });
+    expect(allocation.value).toBe('0.5');
+    // More than the balance due (918) is capped at it.
+    fireEvent.change(allocation, { target: { value: '5000' } });
+    expect(allocation.value).toBe('918.00');
+  });
+
   it('is translated in Arabic', () => {
     mockLocale = 'ar';
     render(<PaymentMadeForm bankAccounts={registers} onSubmit={jest.fn()} onCancel={jest.fn()} />);
