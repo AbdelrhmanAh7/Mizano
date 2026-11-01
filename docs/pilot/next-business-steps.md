@@ -17,4 +17,4 @@ These are not engineering items and do not block the release (owner decision, 1 
 
 6. **Production credentials** on the server (never in GitHub): database and storage secrets, `MCP_PUBLIC_URL` only if it differs from the public API address. Keep the restic backup password and the app's encryption key (`INTEGRATIONS_ENCRYPTION_KEY`) in the password manager, off the server. Schedule `backup.sh` nightly and send its copy off the server. Mail (`MAIL_SMTP_*`, `MAIL_FROM`) is optional.
 7. **Before the first deploy:** tell the client everyone signs in again once; check for old approved intake jobs without a draft (see #615).
-8. **First backup and a restore drill on the real server** run `deploy/pi/scripts/backup.sh`, then `restore-drill.sh` against that first real backup ([test-data record](../evidence/first-client-ops/restore-drill.md)); agree RPO 24 h / RTO 4 h with the client.
+8. **First backup and a restore drill on the real server:** run `deploy/pi/scripts/backup.sh`, then `restore-drill.sh` against that first real backup ([test-data record](../evidence/first-client-ops/restore-drill.md)); agree RPO 24 h / RTO 4 h with the client.

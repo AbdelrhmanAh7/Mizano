@@ -1,6 +1,6 @@
 # Jarda / جردة first-client pilot: known issues and limits
 
-Date: 1 November 2026. Scope: the stable pilot defined in [first-client.md](../plans/first-client.md) the acceptance checklist (#598) and the decisions in [DECISIONS.md](../DECISIONS.md). Each line says what a person sees, how severe it is, and what to do. Nothing here is security, wrong money, data loss or an unmet tax duty; anything that is would block the release instead of being listed.
+Date: 1 November 2026. Scope: the stable pilot defined in [first-client.md](../plans/first-client.md), the acceptance checklist (#598) and the decisions in [DECISIONS.md](../DECISIONS.md). Each line says what a person sees, how severe it is, and what to do. Nothing here is security, wrong money, data loss or an unmet tax duty; anything that is would block the release instead of being listed.
 
 ## What the pilot is (and is not)
 
