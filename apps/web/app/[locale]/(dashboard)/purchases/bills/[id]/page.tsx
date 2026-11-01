@@ -142,7 +142,8 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
   }
 
   // A failed request is not a missing bill: offer Retry, keep "not found" for a real 404 (#83).
-  if (isError && !isNotFoundError(error)) {
+  // A failed background refresh keeps the bill already on screen.
+  if (isError && !bill && !isNotFoundError(error)) {
     return <ErrorState onRetry={() => void refetch()} />;
   }
 

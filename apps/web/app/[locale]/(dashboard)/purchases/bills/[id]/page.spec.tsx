@@ -88,4 +88,33 @@ describe('BillDetailPage states (#83)', () => {
     expect(screen.getByText('common.errors.notFound')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'common.errors.tryAgain' })).toBeNull();
   });
+
+  it('keeps a loaded bill on screen when a background refresh fails', () => {
+    mockUseBill.mockReturnValue(
+      query({
+        isError: true,
+        error: { response: { status: 500 } },
+        data: {
+          id: 'bill-1',
+          billNumber: 'BILL-001',
+          status: 'OPEN',
+          currencyCode: null,
+          date: '2026-10-01',
+          dueDate: '2026-10-31',
+          grandTotal: '100.00',
+          balanceDue: '100.00',
+          subtotal: '100.00',
+          taxAmount: '0.00',
+          lines: [],
+          billAllocations: [],
+          vendor: { id: 'v-1', name: 'Nile Supplies' },
+        },
+      }),
+    );
+
+    render(<BillDetailPage params={{ id: 'bill-1' }} />);
+
+    expect(screen.getAllByText('BILL-001').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: 'common.errors.tryAgain' })).toBeNull();
+  });
 });

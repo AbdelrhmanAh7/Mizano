@@ -90,12 +90,12 @@ export function BankAccountForm({
         name: account.name || '',
         accountNumber: account.accountNumber || '',
         type: account.type || 'BANK',
-        currency: account.currency || baseCurrency || '',
+        currency: account.currency || '',
         linkedAccountId: account.linkedAccountId || '',
         isActive: account.isActive ?? true,
       });
     }
-  }, [account, baseCurrency, form]);
+  }, [account, form]);
 
   const handleSubmit = (data: BankAccountFormData) => {
     onSubmit(data);

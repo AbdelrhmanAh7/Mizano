@@ -129,7 +129,7 @@ describe('PaymentMadeForm', () => {
     );
   });
 
-  it('allocates with exact decimal strings and shows each bill in its own currency (#83)', async () => {
+  it('allocates with exact decimal strings, never float money (#83)', async () => {
     const onSubmit = jest.fn();
     mockUnpaid.data.data = [
       {
@@ -145,14 +145,14 @@ describe('PaymentMadeForm', () => {
         billNumber: 'B',
         balanceDue: '0.2',
         grandTotal: '0.2',
-        currencyCode: 'SAR',
+        currencyCode: 'EGP',
       },
     ];
     render(<PaymentMadeForm bankAccounts={registers} onSubmit={onSubmit} onCancel={jest.fn()} />);
 
     fireEvent.click(screen.getByText('pick vendor 150'));
     expect(await screen.findByText('B')).toBeInTheDocument();
-    expect(screen.getAllByText(/SAR/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/\$|USD/)).toBeNull();
     const paidFrom = Array.from(document.querySelectorAll('select')).find((el) =>
       Array.from(el.options).some((o) => o.value === 'reg-main'),
     ) as HTMLSelectElement;

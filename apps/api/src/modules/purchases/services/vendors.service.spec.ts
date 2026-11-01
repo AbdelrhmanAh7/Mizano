@@ -40,3 +40,36 @@ describe('VendorsService.bulkDelete', () => {
     });
   });
 });
+
+describe('VendorsService.create currency (#83)', () => {
+  let service: VendorsService;
+  let prisma: MockPrismaClient;
+
+  beforeEach(() => {
+    prisma = createMockPrisma();
+    service = new VendorsService(prisma as unknown as PrismaService);
+    prisma.vendor.create.mockResolvedValue({ id: 'v-1' });
+  });
+
+  it('uses the organization base currency when none is sent, never the USD default', async () => {
+    prisma.organization.findUnique.mockResolvedValue({ baseCurrency: 'EGP' });
+
+    await service.create('org-1', { name: 'Nile Supplies' });
+
+    expect(prisma.organization.findUnique).toHaveBeenCalledWith({
+      where: { id: 'org-1' },
+      select: { baseCurrency: true },
+    });
+    expect(prisma.vendor.create.mock.calls[0][0].data).toMatchObject({
+      currency: 'EGP',
+      organizationId: 'org-1',
+    });
+  });
+
+  it('keeps a currency the user chose', async () => {
+    await service.create('org-1', { name: 'Gulf Trading', currency: 'SAR' });
+
+    expect(prisma.organization.findUnique).not.toHaveBeenCalled();
+    expect(prisma.vendor.create.mock.calls[0][0].data).toMatchObject({ currency: 'SAR' });
+  });
+});

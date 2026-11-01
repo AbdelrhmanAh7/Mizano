@@ -5,14 +5,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** Formats `amount` in `currency`. No default currency: a guessed USD is always wrong (audit B5). */
-export function formatCurrency(amount: number, currency: string, locale: string = 'en'): string {
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency,
-  }).format(amount);
-}
-
 export function formatDate(
   date: Date | string,
   locale: string = 'en',
