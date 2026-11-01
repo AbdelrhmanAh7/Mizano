@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useToast } from '@/components/ui/use-toast';
 import { performanceApi } from '@/lib/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -135,6 +136,7 @@ export function useIndexRecommendations() {
 export function useResetMetrics() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('settings.performance.toast');
 
   return useMutation({
     mutationFn: async () => {
@@ -143,10 +145,10 @@ export function useResetMetrics() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['performance'] });
-      toast({ title: 'Metrics reset', description: 'Query metrics buffer has been cleared.' });
+      toast({ title: t('reset'), description: t('resetDescription') });
     },
     onError: () => {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to reset metrics.' });
+      toast({ variant: 'destructive', title: t('errorTitle'), description: t('resetError') });
     },
   });
 }

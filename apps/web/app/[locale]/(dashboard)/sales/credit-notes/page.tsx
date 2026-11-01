@@ -75,14 +75,14 @@ function CreditNotesPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => creditNotesApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['credit-notes']],
-    successMessage: tBulk.raw('creditNotesDeleted'),
+    successMessage: (count) => tBulk('creditNotesDeleted', { count }),
   });
 
   const bulkActions = [
     ...(canDelete
       ? [
           {
-            label: 'Delete',
+            label: tCommon('buttons.delete'),
             icon: Trash2,
             variant: 'destructive' as const,
             onClick: (rows: CreditNote[]) => {
@@ -227,12 +227,12 @@ function CreditNotesPageContent() {
             <DataTableSearch
               value={tableParams.search}
               onChange={tableParams.setSearch}
-              placeholder="Search by credit note number or customer..."
+              placeholder={t('creditNotes.list.searchPlaceholder')}
             />
             <Select value={selectedType} onValueChange={setSelectedType}>
               <SelectTrigger className="w-[180px]">
                 <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Filter by type" />
+                <SelectValue placeholder={t('creditNotes.list.filterByType')} />
               </SelectTrigger>
               <SelectContent>
                 {TYPE_OPTIONS.map((option) => (
@@ -246,7 +246,7 @@ function CreditNotesPageContent() {
               variant="outline"
               size="icon"
               onClick={() => refetch()}
-              aria-label="Refresh credit notes"
+              aria-label={t('creditNotes.list.refresh')}
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
@@ -279,7 +279,7 @@ function CreditNotesPageContent() {
                 <Button asChild>
                   <Link href="/sales/credit-notes/new">
                     <Plus className="mr-2 h-4 w-4" />
-                    Create Your First Credit Note
+                    {t('creditNotes.empty.action')}
                   </Link>
                 </Button>
               ) : undefined
@@ -295,7 +295,10 @@ function CreditNotesPageContent() {
         action="delete"
         count={bulkSelectedRows.length}
         itemType="credit notes"
-        description="Selected credit notes will be deleted. Credit notes that have been applied will be skipped."
+        title={t('creditNotes.bulkDelete.title', { count: bulkSelectedRows.length })}
+        description={t('creditNotes.bulkDelete.description')}
+        confirmLabel={t('creditNotes.bulkDelete.confirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         destructive
         isLoading={bulkDeleteAction.isLoading}
         onConfirm={async () => {
@@ -310,7 +313,7 @@ function CreditNotesPageContent() {
         open={importOpen}
         onOpenChange={setImportOpen}
         entityType={'credit_notes' as ImportEntityType}
-        entityLabel="Credit Notes"
+        entityLabel={t('creditNotes.title')}
         onComplete={() => refetch()}
       />
     </div>

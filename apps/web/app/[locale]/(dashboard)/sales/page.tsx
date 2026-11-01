@@ -23,6 +23,7 @@ import { useInvoices } from '@/lib/hooks/use-invoices';
 import { useQuotes } from '@/lib/hooks/use-quotes';
 import { differenceInDays } from 'date-fns';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
+import { InvoiceStatusText } from '@/components/sales/status-badge';
 
 export default function SalesPage() {
   // Overview figures are ledger amounts, in the org base currency (audit B5).
@@ -64,51 +65,53 @@ export default function SalesPage() {
   const modules = [
     {
       title: t('customers.title'),
-      description: 'Manage customer accounts and view balances',
+      description: t('overview.modules.customers'),
       icon: Users,
       href: '/sales/customers',
       color: 'bg-blue-500',
-      stats: `${customers.length} total`,
+      stats: t('overview.modules.customersStats', { count: customers.length }),
     },
     {
       title: t('quotes.title'),
-      description: 'Create and send estimates to customers',
+      description: t('overview.modules.quotes'),
       icon: FileText,
       href: '/sales/quotes',
       color: 'bg-purple-500',
-      stats: `${pendingQuotes.length} pending`,
+      stats: t('overview.modules.quotesStats', { count: pendingQuotes.length }),
     },
     {
       title: t('invoices.title'),
-      description: 'Create invoices and track payments',
+      description: t('overview.modules.invoices'),
       icon: Receipt,
       href: '/sales/invoices',
       color: 'bg-green-500',
-      stats: `${invoices.filter((i: { status: string }) => i.status === 'SENT').length} unpaid`,
+      stats: t('overview.modules.invoicesStats', {
+        count: invoices.filter((i: { status: string }) => i.status === 'SENT').length,
+      }),
     },
     {
       title: t('creditNotes.title'),
-      description: 'Issue refunds and invoice adjustments',
+      description: t('overview.modules.creditNotes'),
       icon: CreditCard,
       href: '/sales/credit-notes',
       color: 'bg-orange-500',
-      stats: 'Manage refunds',
+      stats: t('overview.modules.creditNotesStats'),
     },
     {
       title: t('payments.title'),
-      description: 'Record and track customer payments',
+      description: t('overview.modules.payments'),
       icon: TrendingUp,
       href: '/sales/payments',
       color: 'bg-cyan-500',
-      stats: 'Track payments',
+      stats: t('overview.modules.paymentsStats'),
     },
     {
-      title: 'Delivery Challans',
-      description: 'Track goods dispatch and returns',
+      title: t('deliveryChallans.title'),
+      description: t('overview.modules.deliveryChallans'),
       icon: Truck,
       href: '/sales/delivery-challans',
       color: 'bg-rose-500',
-      stats: 'Track deliveries',
+      stats: t('overview.modules.deliveryChallansStats'),
     },
   ];
 
@@ -125,19 +128,19 @@ export default function SalesPage() {
         <Button asChild>
           <Link href="/sales/invoices/new">
             <Plus className="mr-2 h-4 w-4" />
-            New Invoice
+            {t('invoices.newInvoice')}
           </Link>
         </Button>
         <Button asChild variant="outline">
           <Link href="/sales/quotes/new">
             <Plus className="mr-2 h-4 w-4" />
-            New Quote
+            {t('quotes.newQuote')}
           </Link>
         </Button>
         <Button asChild variant="outline">
           <Link href="/sales/payments/new">
             <DollarSign className="mr-2 h-4 w-4" />
-            Record Payment
+            {t('payments.recordPayment')}
           </Link>
         </Button>
       </div>
@@ -155,7 +158,9 @@ export default function SalesPage() {
             ) : (
               <div className="text-2xl font-bold">{formatCurrency(totalOutstanding)}</div>
             )}
-            <p className="text-xs text-muted-foreground">Across {customers.length} customers</p>
+            <p className="text-xs text-muted-foreground">
+              {t('overview.acrossCustomers', { count: customers.length })}
+            </p>
           </CardContent>
         </Card>
 
@@ -171,7 +176,7 @@ export default function SalesPage() {
               <div className="text-2xl font-bold text-red-600">{formatCurrency(overdueAmount)}</div>
             )}
             <p className="text-xs text-muted-foreground">
-              {overdueInvoices.length} overdue invoices
+              {t('overview.overdueCount', { count: overdueInvoices.length })}
             </p>
           </CardContent>
         </Card>
@@ -188,7 +193,7 @@ export default function SalesPage() {
               <div className="text-2xl font-bold">{formatCurrency(pendingQuotesTotal)}</div>
             )}
             <p className="text-xs text-muted-foreground">
-              {pendingQuotes.length} quotes awaiting response
+              {t('overview.quotesAwaiting', { count: pendingQuotes.length })}
             </p>
           </CardContent>
         </Card>
@@ -206,7 +211,7 @@ export default function SalesPage() {
                 {formatCurrency(paidThisMonth)}
               </div>
             )}
-            <p className="text-xs text-muted-foreground">From paid invoices</p>
+            <p className="text-xs text-muted-foreground">{t('overview.fromPaidInvoices')}</p>
           </CardContent>
         </Card>
       </div>
@@ -229,7 +234,7 @@ export default function SalesPage() {
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">{module.description}</p>
               <Button asChild variant="outline" className="w-full">
-                <Link href={module.href}>Open {module.title}</Link>
+                <Link href={module.href}>{t('overview.openModule', { name: module.title })}</Link>
               </Button>
             </CardContent>
           </Card>
@@ -241,11 +246,11 @@ export default function SalesPage() {
         {/* Recent Activity */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Recent Activity</CardTitle>
+            <CardTitle className="text-lg">{t('overview.recentActivity')}</CardTitle>
           </CardHeader>
           <CardContent>
             {invoices.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No recent activity</p>
+              <p className="text-muted-foreground text-sm">{t('overview.noRecentActivity')}</p>
             ) : (
               <div className="space-y-3">
                 {invoices
@@ -274,7 +279,7 @@ export default function SalesPage() {
                         </div>
                         <div className="text-right">
                           <Badge variant="outline" className="text-xs">
-                            {inv.status}
+                            <InvoiceStatusText status={inv.status} />
                           </Badge>
                           <p className="text-sm font-mono mt-1">{formatCurrency(inv.grandTotal)}</p>
                         </div>
@@ -289,16 +294,16 @@ export default function SalesPage() {
         {/* Overdue Invoices */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg text-red-600">Overdue Invoices</CardTitle>
+            <CardTitle className="text-lg text-red-600">{t('overview.overdueInvoices')}</CardTitle>
             {overdueInvoices.length > 0 && (
               <Button asChild variant="outline" size="sm">
-                <Link href="/sales/invoices?status=OVERDUE">View All</Link>
+                <Link href="/sales/invoices?status=OVERDUE">{t('overview.viewAll')}</Link>
               </Button>
             )}
           </CardHeader>
           <CardContent>
             {overdueInvoices.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No overdue invoices</p>
+              <p className="text-muted-foreground text-sm">{t('overview.noOverdue')}</p>
             ) : (
               <div className="space-y-3">
                 {overdueInvoices
@@ -327,7 +332,9 @@ export default function SalesPage() {
                             <p className="text-xs text-muted-foreground">{inv.customer?.name}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-xs text-red-600">{daysOverdue} days overdue</p>
+                            <p className="text-xs text-red-600">
+                              {t('overview.daysOverdue', { days: daysOverdue })}
+                            </p>
                             <p className="text-sm font-mono font-semibold text-red-600">
                               {formatCurrency(inv.balanceDue)}
                             </p>

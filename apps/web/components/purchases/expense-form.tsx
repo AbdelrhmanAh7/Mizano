@@ -26,17 +26,15 @@ import {
   previewExpense,
 } from './expense-payload';
 
+// Messages are keys under purchases.expenses.validation.
 const expenseSchema = z.object({
-  date: z.string().min(1, 'Date is required'),
-  accountId: z.string().min(1, 'Expense account is required'),
+  date: z.string().min(1, 'dateRequired'),
+  accountId: z.string().min(1, 'accountRequired'),
   vendorId: z.string().optional(),
-  amount: z
-    .string()
-    .min(1, 'Amount is required')
-    .regex(MONEY_PATTERN, 'Enter a positive amount with at most 4 decimals'),
+  amount: z.string().min(1, 'amountRequired').regex(MONEY_PATTERN, 'amountInvalid'),
   taxRate: z.string().optional(),
   taxInclusive: z.boolean().default(false),
-  paidThroughAccountId: z.string().min(1, 'Paid through account is required'),
+  paidThroughAccountId: z.string().min(1, 'paidThroughRequired'),
   description: z.string().max(500).optional(),
   reference: z.string().max(200).optional(),
   projectId: z.string().optional(),
@@ -62,12 +60,13 @@ interface ExpenseFormProps {
   defaultVendorId?: string;
 }
 
-const taxRates = [
-  { value: '0', label: 'No Tax (0%)' },
-  { value: '5', label: '5%' },
-  { value: '10', label: '10%' },
-  { value: '14', label: 'VAT 14%' },
-  { value: '15', label: '15%' },
+// labelKey: a translated label (purchases.expenses.form) instead of the bare percentage.
+const taxRates: Array<{ value: string; labelKey?: 'taxNone' | 'taxVat' }> = [
+  { value: '0', labelKey: 'taxNone' },
+  { value: '5' },
+  { value: '10' },
+  { value: '14', labelKey: 'taxVat' },
+  { value: '15' },
 ];
 
 export function ExpenseForm({
@@ -80,6 +79,7 @@ export function ExpenseForm({
   defaultVendorId,
 }: ExpenseFormProps) {
   const t = useTranslations('purchases.expenses.form');
+  const tValidation = useTranslations('purchases.expenses.validation');
 
   const form = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
@@ -119,7 +119,9 @@ export function ExpenseForm({
               <Label htmlFor="date">{t('date')} *</Label>
               <Input id="date" type="date" {...form.register('date')} />
               {form.formState.errors.date && (
-                <p className="text-sm text-red-500">{form.formState.errors.date.message}</p>
+                <p className="text-sm text-red-500">
+                  {tValidation(form.formState.errors.date.message ?? 'dateRequired')}
+                </p>
               )}
             </div>
 
@@ -145,7 +147,9 @@ export function ExpenseForm({
                 <p className="text-sm text-muted-foreground">{t('noExpenseAccounts')}</p>
               )}
               {form.formState.errors.accountId && (
-                <p className="text-sm text-red-500">{form.formState.errors.accountId.message}</p>
+                <p className="text-sm text-red-500">
+                  {tValidation(form.formState.errors.accountId.message ?? 'accountRequired')}
+                </p>
               )}
             </div>
 
@@ -172,7 +176,9 @@ export function ExpenseForm({
                 {...form.register('amount')}
               />
               {form.formState.errors.amount && (
-                <p className="text-sm text-red-500">{form.formState.errors.amount.message}</p>
+                <p className="text-sm text-red-500">
+                  {tValidation(form.formState.errors.amount.message ?? 'amountRequired')}
+                </p>
               )}
             </div>
 
@@ -188,7 +194,7 @@ export function ExpenseForm({
                 <SelectContent>
                   {taxRates.map((rate) => (
                     <SelectItem key={rate.value} value={rate.value}>
-                      {rate.label}
+                      {rate.labelKey ? t(rate.labelKey, { rate: rate.value }) : `${rate.value}%`}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -248,7 +254,9 @@ export function ExpenseForm({
               )}
               {form.formState.errors.paidThroughAccountId && (
                 <p className="text-sm text-red-500">
-                  {form.formState.errors.paidThroughAccountId.message}
+                  {tValidation(
+                    form.formState.errors.paidThroughAccountId.message ?? 'paidThroughRequired',
+                  )}
                 </p>
               )}
             </div>

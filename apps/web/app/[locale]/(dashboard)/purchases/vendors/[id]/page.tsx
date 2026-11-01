@@ -234,7 +234,11 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
                 {vendor.phone && (
                   <div className="flex items-center gap-3">
                     <Phone className="h-4 w-4 text-muted-foreground" />
-                    <a href={`tel:${vendor.phone}`} className="text-blue-600 hover:underline">
+                    <a
+                      href={`tel:${vendor.phone}`}
+                      dir="ltr"
+                      className="text-blue-600 hover:underline"
+                    >
                       {vendor.phone}
                     </a>
                   </div>

@@ -255,11 +255,6 @@ export function LineItemsForm({
     }
   };
 
-  // Calculate column span based on visible columns
-  const baseColumns = 4; // Item/Description, Qty, Rate, Amount
-  const extraColumns = (showDiscount ? 1 : 0) + (showTax ? 1 : 0) + 1; // +1 for actions
-  const _totalColumns = baseColumns + extraColumns;
-
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -280,132 +275,137 @@ export function LineItemsForm({
         {taxRatesStatus?.isLoading && (
           <p className="mb-3 text-sm text-muted-foreground">{t('lineItems.taxLoading')}</p>
         )}
-        {/* Table Header */}
-        <div
-          className="grid gap-2 mb-2 text-sm font-medium text-muted-foreground"
-          style={{
-            gridTemplateColumns: `3fr 1fr 1fr ${showDiscount ? '1fr ' : ''}${showTax ? '1.5fr ' : ''}1fr 0.5fr`,
-          }}
-        >
-          <div>{t('lineItems.itemDescription')}</div>
-          <div className="text-end">{t('lineItems.quantity')}</div>
-          <div className="text-end">{t('lineItems.rate')}</div>
-          {showDiscount && <div className="text-end">{t('lineItems.discountPercent')}</div>}
-          {showTax && <div>{t('lineItems.tax')}</div>}
-          <div className="text-end">{t('lineItems.amount')}</div>
-          <div></div>
-        </div>
-
-        {/* Lines */}
-        <div className="space-y-2">
-          {fields.map((field, index) => (
+        {/* On a phone the lines scroll sideways inside the card instead of widening the page. */}
+        <div className="overflow-x-auto">
+          <div className="min-w-[640px]">
+            {/* Table Header */}
             <div
-              key={field.id}
-              className="grid gap-2 items-center"
+              className="grid gap-2 mb-2 text-sm font-medium text-muted-foreground"
               style={{
                 gridTemplateColumns: `3fr 1fr 1fr ${showDiscount ? '1fr ' : ''}${showTax ? '1.5fr ' : ''}1fr 0.5fr`,
               }}
             >
-              {/* Item/Description */}
-              <div className="space-y-1">
-                <ItemCombobox
-                  className="h-9"
-                  ariaLabel={t('lineItems.item')}
-                  value={watch(`${name}.${index}.itemId`) || ''}
-                  onValueChange={(_id, item) => handleItemSelect(index, item)}
-                  placeholder={t('lineItems.itemPlaceholder')}
-                  noneLabel={t('lineItems.customItem')}
-                  describe={(item) => formatAmount(parseFloat(item.sellingPrice), currency)}
-                />
-                <Input
-                  placeholder={t('lineItems.description')}
-                  aria-label={t('lineItems.description')}
-                  className="h-9"
-                  value={watch(`${name}.${index}.description`) || ''}
-                  onChange={(e) => setValue(`${name}.${index}.description`, e.target.value)}
-                />
-              </div>
+              <div>{t('lineItems.itemDescription')}</div>
+              <div className="text-end">{t('lineItems.quantity')}</div>
+              <div className="text-end">{t('lineItems.rate')}</div>
+              {showDiscount && <div className="text-end">{t('lineItems.discountPercent')}</div>}
+              {showTax && <div>{t('lineItems.tax')}</div>}
+              <div className="text-end">{t('lineItems.amount')}</div>
+              <div></div>
+            </div>
 
-              {/* Quantity */}
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                className="text-end h-9"
-                placeholder="1"
-                value={watch(`${name}.${index}.quantity`) || ''}
-                onChange={(e) => handleQuantityChange(index, e.target.value)}
-              />
-
-              {/* Rate */}
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                className="text-end h-9"
-                placeholder="0.00"
-                value={watch(`${name}.${index}.rate`) || ''}
-                onChange={(e) => handleRateChange(index, e.target.value)}
-              />
-
-              {/* Discount */}
-              {showDiscount && (
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  className="text-end h-9"
-                  placeholder="0"
-                  value={watch(`${name}.${index}.discountPercent`) || ''}
-                  onChange={(e) => handleDiscountChange(index, e.target.value)}
-                />
-              )}
-
-              {/* Tax */}
-              {showTax && (
-                <Select
-                  disabled={taxRatesStatus?.isLoading || taxRatesStatus?.isError}
-                  value={watch(`${name}.${index}.taxRateId`) || '__none__'}
-                  onValueChange={(value) => {
-                    setValue(`${name}.${index}.taxRateId`, value === '__none__' ? '' : value);
-                    // An explicit choice replaces any percent carried over from the item.
-                    setValue(`${name}.${index}.taxPercent`, '');
+            {/* Lines */}
+            <div className="space-y-2">
+              {fields.map((field, index) => (
+                <div
+                  key={field.id}
+                  className="grid gap-2 items-center"
+                  style={{
+                    gridTemplateColumns: `3fr 1fr 1fr ${showDiscount ? '1fr ' : ''}${showTax ? '1.5fr ' : ''}1fr 0.5fr`,
                   }}
                 >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder={t('lineItems.noTax')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">{t('lineItems.noTax')}</SelectItem>
-                    {taxRates.map((tax) => (
-                      <SelectItem key={tax.id} value={tax.id}>
-                        {tax.name} ({tax.rate}%)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+                  {/* Item/Description */}
+                  <div className="space-y-1">
+                    <ItemCombobox
+                      className="h-9"
+                      ariaLabel={t('lineItems.item')}
+                      value={watch(`${name}.${index}.itemId`) || ''}
+                      onValueChange={(_id, item) => handleItemSelect(index, item)}
+                      placeholder={t('lineItems.itemPlaceholder')}
+                      noneLabel={t('lineItems.customItem')}
+                      describe={(item) => formatAmount(parseFloat(item.sellingPrice), currency)}
+                    />
+                    <Input
+                      placeholder={t('lineItems.description')}
+                      aria-label={t('lineItems.description')}
+                      className="h-9"
+                      value={watch(`${name}.${index}.description`) || ''}
+                      onChange={(e) => setValue(`${name}.${index}.description`, e.target.value)}
+                    />
+                  </div>
 
-              {/* Amount */}
-              <div className="text-end font-mono text-sm font-medium h-9 flex items-center justify-end">
-                {formatAmount(parseFloat(watch(`${name}.${index}.amount`) || '0'), currency)}
-              </div>
+                  {/* Quantity */}
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="text-end h-9"
+                    placeholder="1"
+                    value={watch(`${name}.${index}.quantity`) || ''}
+                    onChange={(e) => handleQuantityChange(index, e.target.value)}
+                  />
 
-              {/* Actions */}
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => removeLine(index)}
-                disabled={fields.length <= 1}
-                className="h-9 w-9"
-                aria-label={t('lineItems.removeLine')}
-              >
-                <Trash2 className="h-4 w-4 text-muted-foreground hover:text-red-500" />
-              </Button>
+                  {/* Rate */}
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="text-end h-9"
+                    placeholder="0.00"
+                    value={watch(`${name}.${index}.rate`) || ''}
+                    onChange={(e) => handleRateChange(index, e.target.value)}
+                  />
+
+                  {/* Discount */}
+                  {showDiscount && (
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      className="text-end h-9"
+                      placeholder="0"
+                      value={watch(`${name}.${index}.discountPercent`) || ''}
+                      onChange={(e) => handleDiscountChange(index, e.target.value)}
+                    />
+                  )}
+
+                  {/* Tax */}
+                  {showTax && (
+                    <Select
+                      disabled={taxRatesStatus?.isLoading || taxRatesStatus?.isError}
+                      value={watch(`${name}.${index}.taxRateId`) || '__none__'}
+                      onValueChange={(value) => {
+                        setValue(`${name}.${index}.taxRateId`, value === '__none__' ? '' : value);
+                        // An explicit choice replaces any percent carried over from the item.
+                        setValue(`${name}.${index}.taxPercent`, '');
+                      }}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder={t('lineItems.noTax')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">{t('lineItems.noTax')}</SelectItem>
+                        {taxRates.map((tax) => (
+                          <SelectItem key={tax.id} value={tax.id}>
+                            {tax.name} ({tax.rate}%)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  {/* Amount */}
+                  <div className="text-end font-mono text-sm font-medium h-9 flex items-center justify-end">
+                    {formatAmount(parseFloat(watch(`${name}.${index}.amount`) || '0'), currency)}
+                  </div>
+
+                  {/* Actions */}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeLine(index)}
+                    disabled={fields.length <= 1}
+                    className="h-9 w-9"
+                    aria-label={t('lineItems.removeLine')}
+                  >
+                    <Trash2 className="h-4 w-4 text-muted-foreground hover:text-red-500" />
+                  </Button>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
 
         {/* Totals */}

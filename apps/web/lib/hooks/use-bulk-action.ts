@@ -36,8 +36,8 @@ interface UseBulkActionOptions<TResult = unknown> {
   mutationFn: (ids: string[]) => Promise<TResult>;
   /** Query keys to invalidate on success */
   queryKeys: string[][];
-  /** Translated success toast message (`t.raw(...)`); {count} becomes the number of items. */
-  successMessage?: string;
+  /** Builds the translated success toast for the number of items done, e.g. `(count) => t('x', { count })`. */
+  successMessage?: (count: number) => string;
   /** Translated error toast message, shown when the server sent none */
   errorMessage?: string;
   /** Callback on success */
@@ -67,10 +67,9 @@ export function useBulkAction<TResult = unknown>({
       if (failures.length === 0) {
         toast({
           title: t('success'),
-          description: (successMessage ?? t.raw('defaultSuccess')).replace(
-            '{count}',
-            String(processed),
-          ),
+          description: successMessage
+            ? successMessage(processed)
+            : t('defaultSuccess', { count: processed }),
         });
       } else {
         const reasons = Array.from(new Set(failures.map((f) => f.reason)))

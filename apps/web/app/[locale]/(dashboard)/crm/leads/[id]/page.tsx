@@ -233,7 +233,9 @@ export default function LeadDetailPage() {
               {lead.phone && (
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">{lead.phone}</span>
+                  <span className="text-sm" dir="ltr">
+                    {lead.phone}
+                  </span>
                 </div>
               )}
               {lead.companyName && (

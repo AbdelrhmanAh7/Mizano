@@ -73,7 +73,8 @@
     },
     "empty": {
       "title": "No customers yet",
-      "description": "Get started by adding your first customer"
+      "description": "Get started by adding your first customer",
+      "action": "Add your first customer"
     },
     "notFoundMessage": "The customer you're looking for doesn't exist.",
     "backToCustomers": "Back to Customers",
@@ -129,8 +130,9 @@
       "title": "Delete {count} customers?",
       "description": "Selected customers will be deleted. Customers with transactions will be skipped.",
       "confirm": "Delete {count} customers",
-      "success": "{count} customers deleted"
-    }
+      "success": "{count, plural, one {{count} customer deleted} other {{count} customers deleted}}"
+    },
+    "deleteConfirmName": "Are you sure you want to delete \"{name}\"? This action cannot be undone."
   },
   "quotes": {
     "title": "Quotes",
@@ -205,7 +207,8 @@
     },
     "empty": {
       "title": "No quotes yet",
-      "description": "Create your first quote to get started"
+      "description": "Create your first quote to get started",
+      "action": "Create Your First Quote"
     },
     "toast": {
       "created": "Quote created",
@@ -232,7 +235,12 @@
       "genericError": "An error occurred",
       "duplicated": "Quote duplicated",
       "duplicatedDescription": "A new draft copy has been created.",
-      "duplicateError": "Failed to duplicate quote."
+      "duplicateError": "Failed to duplicate quote.",
+      "deletedNumber": "Quote {number} has been deleted.",
+      "sentNumber": "Quote {number} has been marked as sent.",
+      "acceptedNumber": "Quote {number} has been marked as accepted.",
+      "declinedNumber": "Quote {number} has been marked as declined.",
+      "convertedNumber": "Quote {number} has been converted to invoice."
     },
     "validation": {
       "customerRequired": "Customer is required",
@@ -242,6 +250,30 @@
       "quantityRequired": "Quantity is required",
       "rateRequired": "Rate is required",
       "lineItemRequired": "At least one line item is required"
+    },
+    "markAsAccepted": "Mark as Accepted",
+    "markAsDeclined": "Mark as Declined",
+    "deleteConfirmNumber": "Are you sure you want to delete \"{number}\"? This action cannot be undone.",
+    "list": {
+      "searchPlaceholder": "Search by quote number or customer...",
+      "filterByStatus": "Filter by status",
+      "refresh": "Refresh quotes",
+      "importLabel": "Quotes"
+    },
+    "bulkDelete": {
+      "title": "Delete {count, plural, one {{count} quote} other {{count} quotes}}?",
+      "description": "Only draft quotes will be deleted. Non-draft quotes will be skipped.",
+      "confirm": "Delete {count, plural, one {{count} quote} other {{count} quotes}}"
+    },
+    "bulkSend": {
+      "title": "Send {count, plural, one {{count} quote} other {{count} quotes}}?",
+      "description": "Draft quotes will be marked as sent.",
+      "confirm": "Send {count, plural, one {{count} quote} other {{count} quotes}}"
+    },
+    "bulkDecline": {
+      "title": "Decline {count, plural, one {{count} quote} other {{count} quotes}}?",
+      "description": "Sent quotes will be marked as declined.",
+      "confirm": "Decline {count, plural, one {{count} quote} other {{count} quotes}}"
     }
   },
   "invoices": {
@@ -311,7 +343,8 @@
     },
     "empty": {
       "title": "No invoices yet",
-      "description": "Create your first invoice to start billing"
+      "description": "Create your first invoice to start billing",
+      "action": "Create Your First Invoice"
     },
     "toast": {
       "created": "Invoice created",
@@ -382,25 +415,25 @@
       "title": "Delete {count} invoices?",
       "description": "Only draft invoices will be deleted. Non-draft invoices will be skipped.",
       "confirm": "Delete {count} invoices",
-      "success": "{count} invoices deleted"
+      "success": "{count, plural, one {{count} invoice deleted} other {{count} invoices deleted}}"
     },
     "bulkSend": {
       "title": "Send {count} invoices?",
       "description": "Draft invoices will be marked as sent. This will create accounting entries.",
       "confirm": "Send {count} invoices",
-      "success": "{count} invoices sent"
+      "success": "{count, plural, one {{count} invoice sent} other {{count} invoices sent}}"
     },
     "bulkVoid": {
       "title": "Void {count} invoices?",
       "description": "Selected invoices will be voided. This action cannot be undone.",
       "confirm": "Void {count} invoices",
-      "success": "{count} invoices voided"
+      "success": "{count, plural, one {{count} invoice voided} other {{count} invoices voided}}"
     },
     "bulkPay": {
       "title": "Mark {count} invoices as paid?",
       "description": "Selected sent/overdue invoices will be marked as fully paid.",
       "confirm": "Mark {count} invoices as paid",
-      "success": "{count} invoices marked as paid"
+      "success": "{count, plural, one {{count} invoice marked as paid} other {{count} invoices marked as paid}}"
     }
   },
   "creditNotes": {
@@ -481,7 +514,24 @@
     },
     "empty": {
       "title": "No credit notes yet",
-      "description": "Credit notes will appear here when created"
+      "description": "Credit notes will appear here when created",
+      "action": "Create Your First Credit Note"
+    },
+    "toast": {
+      "created": "Credit note created",
+      "createdDescription": "The credit note has been created successfully.",
+      "createError": "Error creating credit note",
+      "genericError": "Something went wrong. Please try again."
+    },
+    "list": {
+      "searchPlaceholder": "Search by credit note number or customer...",
+      "filterByType": "Filter by type",
+      "refresh": "Refresh credit notes"
+    },
+    "bulkDelete": {
+      "title": "Delete {count, plural, one {{count} credit note} other {{count} credit notes}}?",
+      "description": "Selected credit notes will be deleted. Credit notes that have been applied will be skipped.",
+      "confirm": "Delete {count, plural, one {{count} credit note} other {{count} credit notes}}"
     }
   },
   "payments": {
@@ -555,7 +605,8 @@
     },
     "empty": {
       "title": "No payments yet",
-      "description": "Payments will appear here when recorded"
+      "description": "Payments will appear here when recorded",
+      "action": "Record Your First Payment"
     },
     "voidedBadge": "Voided",
     "voidPayment": "Void payment",
@@ -587,7 +638,7 @@
       "title": "Delete {count} payments?",
       "description": "Selected payments will be deleted. Payments linked to reconciled transactions will be skipped.",
       "confirm": "Delete {count} payments",
-      "success": "{count} payments deleted"
+      "success": "{count, plural, one {{count} payment deleted} other {{count} payments deleted}}"
     }
   },
   "deliveryChallans": {
@@ -637,6 +688,17 @@
       "supply": "Supply",
       "jobWork": "Job Work",
       "sample": "Sample"
+    },
+    "form": {
+      "selectCustomer": "Select customer",
+      "selectItem": "Select item",
+      "addLine": "Add Line",
+      "qty": "Qty",
+      "optional": "Optional",
+      "customerRequired": "Please select a customer.",
+      "lineRequired": "Please add at least one line item.",
+      "created": "Delivery challan created successfully.",
+      "createError": "Failed to create delivery challan"
     }
   },
   "lineItems": {
@@ -670,7 +732,26 @@
     "daysOverdue": "{days} days overdue",
     "noOverdue": "No overdue invoices",
     "noRecentActivity": "No recent activity",
-    "viewAll": "View All"
+    "viewAll": "View All",
+    "acrossCustomers": "Across {count, plural, one {{count} customer} other {{count} customers}}",
+    "overdueCount": "{count, plural, one {{count} overdue invoice} other {{count} overdue invoices}}",
+    "quotesAwaiting": "{count, plural, one {{count} quote awaiting response} other {{count} quotes awaiting response}}",
+    "fromPaidInvoices": "From paid invoices",
+    "openModule": "Open {name}",
+    "modules": {
+      "customers": "Manage customer accounts and view balances",
+      "customersStats": "{count} total",
+      "quotes": "Create and send estimates to customers",
+      "quotesStats": "{count} pending",
+      "invoices": "Create invoices and track payments",
+      "invoicesStats": "{count} unpaid",
+      "creditNotes": "Issue refunds and invoice adjustments",
+      "creditNotesStats": "Manage refunds",
+      "payments": "Record and track customer payments",
+      "paymentsStats": "Track payments",
+      "deliveryChallans": "Track goods dispatch and returns",
+      "deliveryChallansStats": "Track deliveries"
+    }
   },
   "customer360": {
     "overviewTab": "Overview",

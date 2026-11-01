@@ -7,7 +7,9 @@
     "sales": "Sales Reports",
     "purchases": "Purchase Reports",
     "inventory": "Inventory Reports",
-    "tax": "Tax Reports"
+    "tax": "Tax Reports",
+    "receivablesPayables": "Receivables & Payables",
+    "accounting": "Accounting Reports"
   },
   "profitLoss": {
     "title": "Profit & Loss",
@@ -19,7 +21,8 @@
     "operatingProfit": "Operating Profit",
     "otherIncome": "Other Income",
     "otherExpenses": "Other Expenses",
-    "netProfit": "Net Profit"
+    "netProfit": "Net Profit",
+    "noData": "No profit & loss data available. Create some transactions first."
   },
   "balanceSheet": {
     "title": "Balance Sheet",
@@ -37,7 +40,8 @@
     "totalLiabilitiesAndEquity": "Total Liabilities & Equity",
     "retainedEarnings": "Retained Earnings",
     "balanced": "Balance sheet is balanced",
-    "notBalanced": "Balance sheet is not balanced"
+    "notBalanced": "Balance sheet is not balanced",
+    "noData": "No balance sheet data available. Create some transactions first."
   },
   "cashFlow": {
     "title": "Cash Flow Statement",
@@ -58,7 +62,8 @@
       "equityChanges": "Equity Changes",
       "debtChanges": "Debt Changes"
     },
-    "noItems": "No items"
+    "noItems": "No items",
+    "sectionTotal": "Total"
   },
   "trialBalance": {
     "title": "Trial Balance",
@@ -75,7 +80,8 @@
     "accountBalances": "Account Balances",
     "code": "Code",
     "type": "Type",
-    "total": "Total"
+    "total": "Total",
+    "noData": "No trial balance data available. Create some transactions first."
   },
   "generalLedger": {
     "title": "General Ledger",
@@ -83,7 +89,13 @@
     "account": "Account",
     "selectAccount": "Select an account",
     "selectAccountTitle": "Select an Account",
-    "selectAccountHint": "Choose an account from the dropdown above to view its general ledger entries."
+    "selectAccountHint": "Choose an account from the dropdown above to view its general ledger entries.",
+    "entriesTitle": "Ledger Entries",
+    "noEntries": "No entries found for this period.",
+    "date": "Date",
+    "journalNumber": "Journal #",
+    "entryDescription": "Description",
+    "balance": "Balance"
   },
   "arAging": {
     "title": "AR Aging",
@@ -132,11 +144,33 @@
   },
   "salesByCustomer": {
     "title": "Sales by Customer",
-    "description": "Sales breakdown by customer"
+    "description": "Sales breakdown by customer",
+    "columns": {
+      "customer": "Customer",
+      "invoices": "Invoices",
+      "totalAmount": "Total Amount",
+      "paid": "Paid",
+      "balanceDue": "Balance Due"
+    },
+    "totalSales": "Total Sales",
+    "totalPaid": "Total Paid",
+    "outstanding": "Outstanding",
+    "customers": "Customers",
+    "noData": "No sales data found for the selected period."
   },
   "salesByItem": {
     "title": "Sales by Item",
-    "description": "Sales breakdown by item"
+    "description": "Sales breakdown by item",
+    "columns": {
+      "item": "Item",
+      "quantitySold": "Qty Sold",
+      "averagePrice": "Avg. Price",
+      "totalAmount": "Total Amount"
+    },
+    "totalRevenue": "Total Revenue",
+    "totalQuantitySold": "Total Qty Sold",
+    "uniqueItems": "Unique Items",
+    "noData": "No item sales data found for the selected period."
   },
   "purchasesByVendor": {
     "title": "Purchases by Vendor",
@@ -144,7 +178,19 @@
     "unappliedCredits": "Unapplied Credits",
     "netPayable": "Net Payable",
     "totalUnappliedCredits": "Unapplied Vendor Credits",
-    "totalNetPayable": "Net Payable"
+    "totalNetPayable": "Net Payable",
+    "columns": {
+      "vendor": "Vendor",
+      "bills": "Bills",
+      "totalAmount": "Total Amount",
+      "paid": "Paid",
+      "balanceDue": "Balance Due"
+    },
+    "totalPurchases": "Total Purchases",
+    "totalPaid": "Total Paid",
+    "outstanding": "Outstanding",
+    "vendors": "Vendors",
+    "noData": "No purchase data found for the selected period."
   },
   "inventoryValuation": {
     "title": "Inventory Valuation",
@@ -191,5 +237,11 @@
     "loadFailed": "Could not load the summary.",
     "writeFailed": "Could not write the summary.",
     "retry": "Retry"
+  },
+  "categoryDescriptions": {
+    "financial": "Core financial statements",
+    "receivablesPayables": "Track what you owe and are owed",
+    "sales": "Analyze sales and purchasing performance",
+    "accounting": "Detailed accounting records"
   }
 }

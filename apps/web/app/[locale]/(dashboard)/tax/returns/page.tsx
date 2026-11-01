@@ -138,13 +138,13 @@ function VATReturnsPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => vatReturnsApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['vat-returns']],
-    successMessage: tBulk.raw('vatReturnsDeleted'),
+    successMessage: (count) => tBulk('vatReturnsDeleted', { count }),
   });
 
   const bulkSubmitAction = useBulkAction({
     mutationFn: (ids) => vatReturnsApi.bulkSubmit(ids).then((r) => r.data),
     queryKeys: [['vat-returns']],
-    successMessage: tBulk.raw('vatReturnsSubmitted'),
+    successMessage: (count) => tBulk('vatReturnsSubmitted', { count }),
   });
 
   const bulkActions = [

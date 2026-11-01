@@ -52,19 +52,19 @@ function PayrollPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => payrollApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['payroll-runs']],
-    successMessage: t.raw('payroll.bulk.deleteSuccess'),
+    successMessage: (count) => t('payroll.bulk.deleteSuccess', { count }),
   });
 
   const bulkProcessAction = useBulkAction({
     mutationFn: (ids) => payrollApi.bulkProcess(ids).then((r) => r.data),
     queryKeys: [['payroll-runs']],
-    successMessage: t.raw('payroll.bulk.processSuccess'),
+    successMessage: (count) => t('payroll.bulk.processSuccess', { count }),
   });
 
   const bulkPayAction = useBulkAction({
     mutationFn: (ids) => payrollApi.bulkPay(ids).then((r) => r.data),
     queryKeys: [['payroll-runs']],
-    successMessage: t.raw('payroll.bulk.paySuccess'),
+    successMessage: (count) => t('payroll.bulk.paySuccess', { count }),
   });
 
   const bulkActions = [

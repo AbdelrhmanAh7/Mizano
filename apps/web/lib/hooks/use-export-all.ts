@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useToast } from '@/components/ui/use-toast';
 import {
   type ExportFormat,
@@ -18,6 +19,7 @@ import { useCallback, useState } from 'react';
  */
 export function useExportAll(entityType: ImportEntityType, filename: string) {
   const { toast } = useToast();
+  const t = useTranslations('common.exportAll');
   const exportData = useExportData();
   const [isExporting, setIsExporting] = useState(false);
 
@@ -27,8 +29,8 @@ export function useExportAll(entityType: ImportEntityType, filename: string) {
       setIsExporting(true);
 
       toast({
-        title: 'Exporting...',
-        description: `Preparing ${format.toUpperCase()} export of all ${filename}. This may take a moment.`,
+        title: t('exporting'),
+        description: t('exportingDescription', { format: format.toUpperCase() }),
       });
 
       try {
@@ -48,20 +50,20 @@ export function useExportAll(entityType: ImportEntityType, filename: string) {
         window.URL.revokeObjectURL(url);
 
         toast({
-          title: 'Export complete',
-          description: `${filename}.${format} has been downloaded.`,
+          title: t('complete'),
+          description: t('completeDescription', { file: `${filename}.${format}` }),
         });
       } catch {
         toast({
-          title: 'Export failed',
-          description: 'An error occurred while exporting data. Please try again.',
+          title: t('failed'),
+          description: t('failedDescription'),
           variant: 'destructive',
         });
       } finally {
         setIsExporting(false);
       }
     },
-    [entityType, filename, exportData, isExporting, toast],
+    [entityType, filename, exportData, isExporting, toast, t],
   );
 
   return { onExportAll, isExporting };

@@ -212,6 +212,28 @@
       "viewCustomers": "عرض العملاء",
       "viewAccounts": "عرض الحسابات",
       "viewItems": "عرض الأصناف"
+    },
+    "customizer": {
+      "title": "تخصيص لوحة المعلومات",
+      "description": "أظهر أقسام لوحة المعلومات أو أخفها أو غيّر ترتيبها.",
+      "moveUp": "نقل القسم لأعلى",
+      "moveDown": "نقل القسم لأسفل",
+      "reset": "استعادة الترتيب الافتراضي",
+      "widgets": {
+        "kpiRow1": "المؤشرات الرئيسية 1 (الإيرادات، المصروفات، الربح، الرصيد)",
+        "kpiRow2": "المؤشرات الرئيسية 2 (المستحقات، الالتزامات، المتأخرات، المشاريع)",
+        "cashFlowRevenue": "التدفق النقدي والإيرادات",
+        "arApExpenses": "الذمم المدينة والدائنة والمصروفات",
+        "profitCustomers": "هامش الربح وأفضل العملاء",
+        "bankInventory": "رصيد البنك وقيمة المخزون",
+        "insightsTransactions": "المعاملات الأخيرة والمدفوعات القادمة",
+        "projectsBankAccounts": "المشاريع والحسابات البنكية"
+      }
+    },
+    "widgetError": {
+      "failed": "تعذر تحميل هذا القسم.",
+      "failedWithId": "تعذر تحميل هذا القسم ({id}).",
+      "retry": "إعادة المحاولة"
     }
   },
   "header": {
@@ -338,7 +360,8 @@
     "validation": "خطأ في التحقق",
     "network": "خطأ في الشبكة. يرجى التحقق من اتصالك.",
     "server": "خطأ في الخادم. يرجى المحاولة مرة أخرى لاحقاً.",
-    "tryAgain": "حاول مرة أخرى"
+    "tryAgain": "حاول مرة أخرى",
+    "title": "خطأ"
   },
   "empty": {
     "title": "لا توجد بيانات",
@@ -530,5 +553,31 @@
     "today": "اليوم",
     "yesterday": "أمس",
     "earlier": "أقدم"
+  },
+  "phoneInput": {
+    "placeholder": "{count, plural, zero {{count} رقم} one {رقم واحد} two {رقمان} few {{count} أرقام} many {{count} رقمًا} other {{count} رقم}}",
+    "invalid": "عدد أرقام الهاتف في {country}: {lengths}",
+    "select": "اختر"
+  },
+  "exportAll": {
+    "exporting": "جارٍ التصدير...",
+    "exportingDescription": "جارٍ تجهيز ملف {format} بكل السجلات. قد يستغرق ذلك لحظات.",
+    "complete": "اكتمل التصدير",
+    "completeDescription": "تم تنزيل {file}.",
+    "failed": "فشل التصدير",
+    "failedDescription": "حدث خطأ أثناء تصدير البيانات. حاول مرة أخرى."
+  },
+  "a11y": {
+    "notificationsRegion": "الإشعارات ({hotkey})",
+    "notification": "إشعار",
+    "mainNavigation": "القائمة الرئيسية",
+    "mainNavigationMenu": "قائمة التنقل الرئيسية",
+    "errorLogger": "سجل الأخطاء",
+    "selectCountry": "اختر الدولة",
+    "selectCity": "اختر المدينة",
+    "enterCity": "اكتب اسم المدينة",
+    "selectCountryFirst": "اختر الدولة أولًا",
+    "toastsRegion": "الإشعارات",
+    "closeToast": "إغلاق"
   }
 }

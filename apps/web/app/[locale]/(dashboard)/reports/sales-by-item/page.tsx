@@ -36,7 +36,7 @@ function SalesByItemContent() {
     () => [
       {
         accessorKey: 'itemName',
-        header: 'Item',
+        header: t('salesByItem.columns.item'),
         cell: ({ row }) => (
           <div>
             <div className="font-medium">{row.original.itemName}</div>
@@ -48,26 +48,26 @@ function SalesByItemContent() {
       },
       {
         accessorKey: 'quantitySold',
-        header: 'Qty Sold',
+        header: t('salesByItem.columns.quantitySold'),
         cell: ({ row }) => row.original.quantitySold.toLocaleString(),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'averagePrice',
-        header: 'Avg. Price',
+        header: t('salesByItem.columns.averagePrice'),
         cell: ({ row }) => formatCurrency(row.original.averagePrice),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'totalAmount',
-        header: 'Total Amount',
+        header: t('salesByItem.columns.totalAmount'),
         cell: ({ row }) => (
           <span className="font-medium">{formatCurrency(row.original.totalAmount)}</span>
         ),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
     ],
-    [formatCurrency],
+    [t, formatCurrency],
   );
 
   return (
@@ -84,7 +84,7 @@ function SalesByItemContent() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('salesByItem.totalRevenue')}</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -93,7 +93,9 @@ function SalesByItemContent() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Qty Sold</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {t('salesByItem.totalQuantitySold')}
+              </CardTitle>
               <Hash className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -102,7 +104,7 @@ function SalesByItemContent() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Unique Items</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('salesByItem.uniqueItems')}</CardTitle>
               <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -118,7 +120,7 @@ function SalesByItemContent() {
             columns={columns}
             data={data?.entries || []}
             isLoading={isLoading}
-            emptyMessage="No item sales data found for the selected period."
+            emptyMessage={t('salesByItem.noData')}
             enableExport
             exportFilename="sales-by-item"
           />

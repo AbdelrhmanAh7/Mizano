@@ -137,6 +137,18 @@
     "empty": {
       "title": "No warehouses yet",
       "description": "Create your first warehouse"
+    },
+    "toast": {
+      "created": "Warehouse created",
+      "createdDescription": "The warehouse has been created successfully.",
+      "createError": "Error creating warehouse",
+      "updated": "Warehouse updated",
+      "updatedDescription": "The warehouse has been updated successfully.",
+      "updateError": "Error updating warehouse",
+      "deleted": "Warehouse deleted",
+      "deletedDescription": "The warehouse has been deleted successfully.",
+      "deleteError": "Error deleting warehouse",
+      "genericError": "Something went wrong. Please try again."
     }
   },
   "adjustments": {
@@ -188,7 +200,16 @@
       "title": "Void this adjustment?",
       "description": "This reverses the journal entry and restores the stock. It cannot be undone."
     },
-    "accountsLoadError": "Could not load the adjustment accounts"
+    "accountsLoadError": "Could not load the adjustment accounts",
+    "toast": {
+      "created": "Adjustment posted",
+      "createdDescription": "Stock updated and the journal entry posted.",
+      "createError": "Error creating adjustment",
+      "voided": "Adjustment voided",
+      "voidedDescription": "The journal was reversed and stock restored.",
+      "voidError": "Error voiding adjustment",
+      "genericError": "Something went wrong. Please try again."
+    }
   },
   "priceLists": {
     "title": "Price Lists",
@@ -259,6 +280,18 @@
     "empty": {
       "title": "No transfers found",
       "createAction": "Create Transfer"
+    },
+    "toast": {
+      "created": "Transfer created",
+      "createdDescription": "The stock transfer has been created successfully.",
+      "createError": "Error creating transfer",
+      "completed": "Transfer completed",
+      "completedDescription": "The stock transfer has been completed.",
+      "completeError": "Error completing transfer",
+      "cancelled": "Transfer cancelled",
+      "cancelledDescription": "The stock transfer has been cancelled.",
+      "cancelError": "Error cancelling transfer",
+      "genericError": "Something went wrong. Please try again."
     }
   },
   "common": {
@@ -280,5 +313,22 @@
     "backTo": "Back to",
     "confirmDelete": "Are you sure you want to delete this item? This action cannot be undone.",
     "noData": "No data available"
+  },
+  "compositeItems": {
+    "toast": {
+      "created": "Composite item created",
+      "createdDescription": "The composite item has been created successfully.",
+      "createError": "Error creating composite item",
+      "updated": "Composite item updated",
+      "updatedDescription": "The composite item has been updated successfully.",
+      "updateError": "Error updating composite item",
+      "deleted": "Composite item deleted",
+      "deletedDescription": "The composite item has been deleted successfully.",
+      "deleteError": "Error deleting composite item",
+      "assembled": "Assembly completed",
+      "assembledDescription": "The composite item has been assembled successfully.",
+      "assembleError": "Error assembling composite item",
+      "genericError": "Something went wrong. Please try again."
+    }
   }
 }

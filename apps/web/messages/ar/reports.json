@@ -7,7 +7,9 @@
     "sales": "تقارير المبيعات",
     "purchases": "تقارير المشتريات",
     "inventory": "تقارير المخزون",
-    "tax": "التقارير الضريبية"
+    "tax": "التقارير الضريبية",
+    "receivablesPayables": "الذمم المدينة والدائنة",
+    "accounting": "التقارير المحاسبية"
   },
   "profitLoss": {
     "title": "الأرباح والخسائر",
@@ -19,7 +21,8 @@
     "operatingProfit": "الربح التشغيلي",
     "otherIncome": "إيرادات أخرى",
     "otherExpenses": "مصروفات أخرى",
-    "netProfit": "صافي الربح"
+    "netProfit": "صافي الربح",
+    "noData": "لا توجد بيانات للأرباح والخسائر. سجّل بعض المعاملات أولاً."
   },
   "balanceSheet": {
     "title": "الميزانية العمومية",
@@ -37,7 +40,8 @@
     "totalLiabilitiesAndEquity": "إجمالي الالتزامات وحقوق الملكية",
     "retainedEarnings": "الأرباح المحتجزة",
     "balanced": "الميزانية العمومية متوازنة",
-    "notBalanced": "الميزانية العمومية غير متوازنة"
+    "notBalanced": "الميزانية العمومية غير متوازنة",
+    "noData": "لا توجد بيانات للميزانية العمومية. سجّل بعض المعاملات أولاً."
   },
   "cashFlow": {
     "title": "قائمة التدفقات النقدية",
@@ -58,7 +62,8 @@
       "equityChanges": "التغيرات في حقوق الملكية",
       "debtChanges": "التغيرات في الديون"
     },
-    "noItems": "لا توجد بنود"
+    "noItems": "لا توجد بنود",
+    "sectionTotal": "الإجمالي"
   },
   "trialBalance": {
     "title": "ميزان المراجعة",
@@ -75,7 +80,8 @@
     "accountBalances": "أرصدة الحسابات",
     "code": "الرمز",
     "type": "النوع",
-    "total": "الإجمالي"
+    "total": "الإجمالي",
+    "noData": "لا توجد بيانات لميزان المراجعة. سجّل بعض المعاملات أولاً."
   },
   "generalLedger": {
     "title": "دفتر الأستاذ العام",
@@ -83,7 +89,13 @@
     "account": "الحساب",
     "selectAccount": "اختر حساباً",
     "selectAccountTitle": "اختر حساباً",
-    "selectAccountHint": "اختر حساباً من القائمة أعلاه لعرض قيود دفتر الأستاذ الخاصة به."
+    "selectAccountHint": "اختر حساباً من القائمة أعلاه لعرض قيود دفتر الأستاذ الخاصة به.",
+    "entriesTitle": "قيود دفتر الأستاذ",
+    "noEntries": "لا توجد قيود في هذه الفترة.",
+    "date": "التاريخ",
+    "journalNumber": "رقم القيد",
+    "entryDescription": "البيان",
+    "balance": "الرصيد"
   },
   "arAging": {
     "title": "أعمار الذمم المدينة",
@@ -132,11 +144,33 @@
   },
   "salesByCustomer": {
     "title": "المبيعات حسب العميل",
-    "description": "تفصيل المبيعات حسب العميل"
+    "description": "تفصيل المبيعات حسب العميل",
+    "columns": {
+      "customer": "العميل",
+      "invoices": "الفواتير",
+      "totalAmount": "إجمالي المبلغ",
+      "paid": "المدفوع",
+      "balanceDue": "الرصيد المستحق"
+    },
+    "totalSales": "إجمالي المبيعات",
+    "totalPaid": "إجمالي المدفوع",
+    "outstanding": "المستحق",
+    "customers": "العملاء",
+    "noData": "لا توجد مبيعات في الفترة المحددة."
   },
   "salesByItem": {
     "title": "المبيعات حسب الصنف",
-    "description": "تفصيل المبيعات حسب الصنف"
+    "description": "تفصيل المبيعات حسب الصنف",
+    "columns": {
+      "item": "الصنف",
+      "quantitySold": "الكمية المباعة",
+      "averagePrice": "متوسط السعر",
+      "totalAmount": "إجمالي المبلغ"
+    },
+    "totalRevenue": "إجمالي الإيرادات",
+    "totalQuantitySold": "إجمالي الكمية المباعة",
+    "uniqueItems": "عدد الأصناف",
+    "noData": "لا توجد مبيعات أصناف في الفترة المحددة."
   },
   "purchasesByVendor": {
     "title": "المشتريات حسب المورد",
@@ -144,7 +178,19 @@
     "unappliedCredits": "إشعارات دائنة غير مطبّقة",
     "netPayable": "صافي المستحق",
     "totalUnappliedCredits": "إشعارات الموردين غير المطبّقة",
-    "totalNetPayable": "صافي المستحق"
+    "totalNetPayable": "صافي المستحق",
+    "columns": {
+      "vendor": "المورد",
+      "bills": "فواتير الشراء",
+      "totalAmount": "إجمالي المبلغ",
+      "paid": "المدفوع",
+      "balanceDue": "الرصيد المستحق"
+    },
+    "totalPurchases": "إجمالي المشتريات",
+    "totalPaid": "إجمالي المدفوع",
+    "outstanding": "المستحق",
+    "vendors": "الموردون",
+    "noData": "لا توجد مشتريات في الفترة المحددة."
   },
   "inventoryValuation": {
     "title": "تقييم المخزون",
@@ -191,5 +237,11 @@
     "loadFailed": "تعذّر تحميل الملخص.",
     "writeFailed": "تعذّرت كتابة الملخص.",
     "retry": "إعادة المحاولة"
+  },
+  "categoryDescriptions": {
+    "financial": "القوائم المالية الأساسية",
+    "receivablesPayables": "تابع ما لك وما عليك",
+    "sales": "تحليل أداء المبيعات والمشتريات",
+    "accounting": "السجلات المحاسبية التفصيلية"
   }
 }

@@ -14,6 +14,7 @@ export default function EditCustomerPage() {
   const params = useParams();
   const router = useRouter();
   const t = useTranslations('sales');
+  const tCommon = useTranslations('common');
   const { toast } = useToast();
   const customerId = params.id as string;
 
@@ -30,7 +31,7 @@ export default function EditCustomerPage() {
       router.push(`/sales/customers/${customerId}`);
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: tCommon('errors.title'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           t('customers.toast.updateError'),

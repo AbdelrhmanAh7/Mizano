@@ -110,7 +110,7 @@ function EmployeesPageContent() {
     {
       accessorKey: 'phone',
       header: t('employees.table.phone'),
-      cell: ({ row }) => row.original.phone || '-',
+      cell: ({ row }) => (row.original.phone ? <span dir="ltr">{row.original.phone}</span> : '-'),
     },
     {
       accessorKey: 'status',

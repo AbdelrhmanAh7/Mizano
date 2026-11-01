@@ -1,13 +1,11 @@
 'use client';
 
-import { useToast } from '@/components/ui/use-toast';
+import { useToastMutation } from './use-toast-mutation';
 import { compositeItemsApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
-
 export interface CompositeItemComponent {
   id: string;
   itemId: string;
@@ -80,81 +78,41 @@ export function useCompositeItem(id: string | undefined) {
 }
 
 export function useCreateCompositeItem() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'inventory.compositeItems.toast',
     mutationFn: async (data: CreateCompositeItemData) => {
       const response = await compositeItemsApi.create(data);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['composite-items'] });
-      toast({
-        title: 'Composite item created',
-        description: 'The composite item has been created successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error creating composite item',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: () => [['composite-items']],
+    success: 'created',
+    error: 'createError',
   });
 }
 
 export function useUpdateCompositeItem() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'inventory.compositeItems.toast',
     mutationFn: async ({ id, data }: { id: string; data: UpdateCompositeItemData }) => {
       const response = await compositeItemsApi.update(id, data);
       return response.data;
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['composite-items'] });
-      queryClient.invalidateQueries({ queryKey: ['composite-items', variables.id] });
-      toast({
-        title: 'Composite item updated',
-        description: 'The composite item has been updated successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error updating composite item',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: (variables) => [['composite-items'], ['composite-items', variables.id]],
+    success: 'updated',
+    error: 'updateError',
   });
 }
 
 export function useDeleteCompositeItem() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'inventory.compositeItems.toast',
     mutationFn: async (id: string) => {
       const response = await compositeItemsApi.delete(id);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['composite-items'] });
-      toast({
-        title: 'Composite item deleted',
-        description: 'The composite item has been deleted successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error deleting composite item',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: () => [['composite-items']],
+    success: 'deleted',
+    error: 'deleteError',
   });
 }
 
@@ -171,10 +129,8 @@ export function useCheckAvailability(id: string | undefined, quantity?: number) 
 }
 
 export function useAssembleCompositeItem() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'inventory.compositeItems.toast',
     mutationFn: async ({
       id,
       data,
@@ -185,22 +141,13 @@ export function useAssembleCompositeItem() {
       const response = await compositeItemsApi.assemble(id, data);
       return response.data;
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['composite-items'] });
-      queryClient.invalidateQueries({ queryKey: ['composite-items', variables.id] });
-      queryClient.invalidateQueries({ queryKey: ['inventory-levels'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory-movements'] });
-      toast({
-        title: 'Assembly completed',
-        description: 'The composite item has been assembled successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error assembling composite item',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: (variables) => [
+      ['composite-items'],
+      ['composite-items', variables.id],
+      ['inventory-levels'],
+      ['inventory-movements'],
+    ],
+    success: 'assembled',
+    error: 'assembleError',
   });
 }

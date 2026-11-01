@@ -1,7 +1,9 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useToast } from '@/components/ui/use-toast';
 import api from '@/lib/api';
+import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // ─── Types ──────────────────────────────────────────────────────
@@ -100,6 +102,8 @@ export function useAllOrganizationSettings() {
 function useUpdateSection<T>(section: string) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('settings.common.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async (data: Partial<T>) => {
@@ -109,15 +113,16 @@ function useUpdateSection<T>(section: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
       toast({
-        title: 'Settings saved',
-        description: `${section.charAt(0).toUpperCase() + section.slice(1)} settings updated.`,
+        title: t('saved'),
+        description: t('sectionSaved', { section }),
       });
     },
     onError: (error: unknown) => {
-      const errMsg =
-        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Failed to update settings';
-      toast({ variant: 'destructive', title: 'Error', description: errMsg });
+      toast({
+        variant: 'destructive',
+        title: t('saveError'),
+        description: getLocalizedApiErrorMessage(error, t('saveGenericError'), tApiErrors),
+      });
     },
   });
 }
@@ -161,6 +166,8 @@ export function useOrganization() {
 export function useUpdateLockDate() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('settings.common.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async (lockDate: string | null) => {
@@ -170,13 +177,14 @@ export function useUpdateLockDate() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['organization'] });
       queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
-      toast({ title: 'Lock date updated' });
+      toast({ title: t('lockDateUpdated') });
     },
     onError: (error: unknown) => {
-      const errMsg =
-        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Failed to update lock date';
-      toast({ variant: 'destructive', title: 'Error', description: errMsg });
+      toast({
+        variant: 'destructive',
+        title: t('lockDateError'),
+        description: getLocalizedApiErrorMessage(error, t('lockDateGenericError'), tApiErrors),
+      });
     },
   });
 }

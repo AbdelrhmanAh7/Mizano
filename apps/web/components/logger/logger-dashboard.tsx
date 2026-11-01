@@ -21,6 +21,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -363,9 +364,19 @@ function PromptDialog({
 
 // ---- Main Dashboard ----
 
+/**
+ * The error log is a developer tool: its button and panel show only when the operator sets
+ * NEXT_PUBLIC_SHOW_ERROR_LOG=true. Errors are still captured and reported either way.
+ */
+function errorLogShown(): boolean {
+  return process.env.NEXT_PUBLIC_SHOW_ERROR_LOG === 'true';
+}
+
 export function LoggerDashboard() {
   // Initialize global error capture
   useGlobalErrorCapture();
+  const tA11y = useTranslations('common.a11y');
+  const shown = errorLogShown();
 
   const {
     logs,
@@ -392,7 +403,7 @@ export function LoggerDashboard() {
     setOpen,
     toggle,
     refetch,
-  } = useLogger();
+  } = useLogger({ poll: shown });
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [searchValue, setSearchValue] = useState('');
@@ -427,7 +438,7 @@ export function LoggerDashboard() {
 
   // The log endpoints are admin-only (settings.edit): other users never see the trigger.
   // Their own errors are still reported by useGlobalErrorCapture above.
-  if (accessDenied) return null;
+  if (!shown || accessDenied) return null;
 
   const errorCount = stats?.totalErrors || 0;
   const warnCount = stats?.totalWarnings || 0;
@@ -442,7 +453,7 @@ export function LoggerDashboard() {
             <Button
               variant="outline"
               size="icon"
-              aria-label="Toggle error logger"
+              aria-label={tA11y('errorLogger')}
               className="fixed bottom-20 right-4 z-50 h-12 w-12 rounded-full shadow-lg border-2 transition-all hover:scale-105"
               onClick={toggle}
               style={{

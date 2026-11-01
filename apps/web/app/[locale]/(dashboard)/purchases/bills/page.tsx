@@ -126,21 +126,21 @@ function BillsPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => billsApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: LEDGER_QUERY_KEYS,
-    successMessage: tBulk.raw('billsDeleted'),
+    successMessage: (count) => tBulk('billsDeleted', { count }),
   });
   const bulkDelete = useBulkConfirm<Bill>(bulkDeleteAction, () => void refetch());
 
   const bulkApproveAction = useBulkAction({
     mutationFn: (ids) => billsApi.bulkApprove(ids).then((r) => r.data),
     queryKeys: LEDGER_QUERY_KEYS,
-    successMessage: tBulk.raw('billsApproved'),
+    successMessage: (count) => tBulk('billsApproved', { count }),
   });
   const bulkApprove = useBulkConfirm<Bill>(bulkApproveAction, () => void refetch());
 
   const bulkPayAction = useBulkAction({
     mutationFn: (ids) => billsApi.bulkPay(ids).then((r) => r.data),
     queryKeys: LEDGER_QUERY_KEYS,
-    successMessage: tBulk.raw('billsPaid'),
+    successMessage: (count) => tBulk('billsPaid', { count }),
   });
   const bulkPay = useBulkConfirm<Bill>(bulkPayAction, () => void refetch());
 

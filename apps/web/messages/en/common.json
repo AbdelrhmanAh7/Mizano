@@ -212,6 +212,28 @@
       "viewCustomers": "View Customers",
       "viewAccounts": "View Accounts",
       "viewItems": "View Items"
+    },
+    "customizer": {
+      "title": "Customize Dashboard",
+      "description": "Show, hide, and reorder dashboard widgets.",
+      "moveUp": "Move widget up",
+      "moveDown": "Move widget down",
+      "reset": "Reset to Default",
+      "widgets": {
+        "kpiRow1": "KPI Row 1 (Revenue, Expenses, Profit, Balance)",
+        "kpiRow2": "KPI Row 2 (Receivables, Payables, Overdue, Projects)",
+        "cashFlowRevenue": "Cash Flow & Revenue",
+        "arApExpenses": "AR/AP & Expenses",
+        "profitCustomers": "Profit Margin & Top Customers",
+        "bankInventory": "Bank Balance & Inventory Value",
+        "insightsTransactions": "Recent Transactions & Upcoming Payments",
+        "projectsBankAccounts": "Projects & Bank Accounts"
+      }
+    },
+    "widgetError": {
+      "failed": "Failed to load widget.",
+      "failedWithId": "Failed to load widget ({id}).",
+      "retry": "Retry"
     }
   },
   "header": {
@@ -338,7 +360,8 @@
     "validation": "Validation error",
     "network": "Network error. Please check your connection.",
     "server": "Server error. Please try again later.",
-    "tryAgain": "Try again"
+    "tryAgain": "Try again",
+    "title": "Error"
   },
   "empty": {
     "title": "No data",
@@ -439,33 +462,33 @@
     "noneTitle": "Nothing was done",
     "partialBody": "{processed} of {total} done. {failed} could not be done: {reasons}",
     "errorTitle": "Something went wrong",
-    "defaultSuccess": "{count} items updated",
+    "defaultSuccess": "{count, plural, one {{count} item updated} other {{count} items updated}}",
     "defaultError": "The action could not be completed",
-    "journalsDeleted": "{count} unposted journals deleted",
-    "journalsPosted": "{count} journals posted",
-    "vendorsDeleted": "{count} vendors deleted",
-    "paymentsVoided": "{count} payments voided",
-    "expensesDeleted": "{count} expenses deleted",
-    "expensesApproved": "{count} expenses approved",
-    "billsDeleted": "{count} draft bills deleted",
-    "billsApproved": "{count} bills approved and posted",
-    "billsPaid": "{count} bills paid (payments recorded)",
-    "vendorCreditsDeleted": "{count} vendor credits deleted",
-    "quotesDeleted": "{count} draft quotes deleted",
-    "quotesSent": "{count} quotes sent",
-    "quotesDeclined": "{count} quotes declined",
-    "creditNotesDeleted": "{count} credit notes deleted",
-    "projectsDeleted": "{count} projects deleted",
-    "projectsActivated": "{count} projects activated",
-    "projectsCompleted": "{count} projects completed",
-    "projectsOnHold": "{count} projects put on hold",
-    "projectsCancelled": "{count} projects cancelled",
-    "workOrdersDeleted": "{count} work orders deleted",
-    "workOrdersStarted": "{count} work orders started",
-    "workOrdersCompleted": "{count} work orders completed",
-    "workOrdersCancelled": "{count} work orders cancelled",
-    "vatReturnsDeleted": "{count} VAT returns deleted",
-    "vatReturnsSubmitted": "{count} VAT returns submitted"
+    "journalsDeleted": "{count, plural, one {{count} unposted journal deleted} other {{count} unposted journals deleted}}",
+    "journalsPosted": "{count, plural, one {{count} journal posted} other {{count} journals posted}}",
+    "vendorsDeleted": "{count, plural, one {{count} vendor deleted} other {{count} vendors deleted}}",
+    "paymentsVoided": "{count, plural, one {{count} payment voided} other {{count} payments voided}}",
+    "expensesDeleted": "{count, plural, one {{count} expense deleted} other {{count} expenses deleted}}",
+    "expensesApproved": "{count, plural, one {{count} expense approved} other {{count} expenses approved}}",
+    "billsDeleted": "{count, plural, one {{count} draft bill deleted} other {{count} draft bills deleted}}",
+    "billsApproved": "{count, plural, one {{count} bill approved and posted} other {{count} bills approved and posted}}",
+    "billsPaid": "{count, plural, one {{count} bill paid (payment recorded)} other {{count} bills paid (payments recorded)}}",
+    "vendorCreditsDeleted": "{count, plural, one {{count} vendor credit deleted} other {{count} vendor credits deleted}}",
+    "quotesDeleted": "{count, plural, one {{count} draft quote deleted} other {{count} draft quotes deleted}}",
+    "quotesSent": "{count, plural, one {{count} quote sent} other {{count} quotes sent}}",
+    "quotesDeclined": "{count, plural, one {{count} quote declined} other {{count} quotes declined}}",
+    "creditNotesDeleted": "{count, plural, one {{count} credit note deleted} other {{count} credit notes deleted}}",
+    "projectsDeleted": "{count, plural, one {{count} project deleted} other {{count} projects deleted}}",
+    "projectsActivated": "{count, plural, one {{count} project activated} other {{count} projects activated}}",
+    "projectsCompleted": "{count, plural, one {{count} project completed} other {{count} projects completed}}",
+    "projectsOnHold": "{count, plural, one {{count} project put on hold} other {{count} projects put on hold}}",
+    "projectsCancelled": "{count, plural, one {{count} project cancelled} other {{count} projects cancelled}}",
+    "workOrdersDeleted": "{count, plural, one {{count} work order deleted} other {{count} work orders deleted}}",
+    "workOrdersStarted": "{count, plural, one {{count} work order started} other {{count} work orders started}}",
+    "workOrdersCompleted": "{count, plural, one {{count} work order completed} other {{count} work orders completed}}",
+    "workOrdersCancelled": "{count, plural, one {{count} work order cancelled} other {{count} work orders cancelled}}",
+    "vatReturnsDeleted": "{count, plural, one {{count} VAT return deleted} other {{count} VAT returns deleted}}",
+    "vatReturnsSubmitted": "{count, plural, one {{count} VAT return submitted} other {{count} VAT returns submitted}}"
   },
   "clone": {
     "duplicate": "Duplicate",
@@ -530,5 +553,31 @@
     "today": "Today",
     "yesterday": "Yesterday",
     "earlier": "Earlier"
+  },
+  "phoneInput": {
+    "placeholder": "{count} digits",
+    "invalid": "A phone number in {country} has {lengths} digits",
+    "select": "Select"
+  },
+  "exportAll": {
+    "exporting": "Exporting...",
+    "exportingDescription": "Preparing the {format} file with all records. This may take a moment.",
+    "complete": "Export complete",
+    "completeDescription": "{file} has been downloaded.",
+    "failed": "Export failed",
+    "failedDescription": "An error occurred while exporting data. Please try again."
+  },
+  "a11y": {
+    "notificationsRegion": "Notifications ({hotkey})",
+    "notification": "Notification",
+    "mainNavigation": "Main navigation",
+    "mainNavigationMenu": "Main navigation menu",
+    "errorLogger": "Error log",
+    "selectCountry": "Select country",
+    "selectCity": "Select city",
+    "enterCity": "Enter city name",
+    "selectCountryFirst": "Select a country first",
+    "toastsRegion": "Notifications",
+    "closeToast": "Close"
   }
 }

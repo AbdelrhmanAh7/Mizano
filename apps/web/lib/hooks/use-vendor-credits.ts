@@ -1,14 +1,12 @@
 'use client';
 
-import { useToast } from '@/components/ui/use-toast';
+import { useToastMutation } from './use-toast-mutation';
 import { vendorCreditsApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import type { CreateVendorCreditPayload } from '@/components/purchases/vendor-credit-payload';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
-
 export type VendorCreditStatus = 'OPEN' | 'APPLIED' | 'REFUNDED';
 
 export interface VendorCreditLine {
@@ -121,29 +119,15 @@ export function useVendorCredit(id: string | undefined) {
  * Hook to create a new vendor credit
  */
 export function useCreateVendorCredit() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'purchases.credits.toast',
     mutationFn: async (data: CreateVendorCreditData) => {
       const response = await vendorCreditsApi.create(data);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vendor-credits'] });
-      queryClient.invalidateQueries({ queryKey: ['vendors'] });
-      toast({
-        title: 'Vendor credit created',
-        description: 'The vendor credit has been created successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error creating vendor credit',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: () => [['vendor-credits'], ['vendors']],
+    success: 'created',
+    error: 'createError',
   });
 }
 
@@ -151,30 +135,15 @@ export function useCreateVendorCredit() {
  * Hook to apply vendor credit to a bill
  */
 export function useApplyVendorCredit() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'purchases.credits.toast',
     mutationFn: async ({ id, billId }: { id: string; billId: string }) => {
       const response = await vendorCreditsApi.applyToBill(id, billId);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vendor-credits'] });
-      queryClient.invalidateQueries({ queryKey: ['bills'] });
-      queryClient.invalidateQueries({ queryKey: ['vendors'] });
-      toast({
-        title: 'Credit applied',
-        description: 'The vendor credit has been applied to the bill.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error applying credit',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: () => [['vendor-credits'], ['bills'], ['vendors']],
+    success: 'applied',
+    error: 'applyError',
   });
 }
 
@@ -182,10 +151,8 @@ export function useApplyVendorCredit() {
  * Hook to refund vendor credit
  */
 export function useRefundVendorCredit() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'purchases.credits.toast',
     mutationFn: async ({
       id,
       bankAccountId,
@@ -198,21 +165,9 @@ export function useRefundVendorCredit() {
       const response = await vendorCreditsApi.refund(id, bankAccountId, date);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vendor-credits'] });
-      queryClient.invalidateQueries({ queryKey: ['vendors'] });
-      toast({
-        title: 'Refund processed',
-        description: 'The vendor credit has been refunded.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error processing refund',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: () => [['vendor-credits'], ['vendors']],
+    success: 'refunded',
+    error: 'refundError',
   });
 }
 
@@ -220,29 +175,15 @@ export function useRefundVendorCredit() {
  * Hook to void an unapplied, unrefunded vendor credit (reverses its journal)
  */
 export function useVoidVendorCredit() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'purchases.credits.toast',
     mutationFn: async (id: string) => {
       const response = await vendorCreditsApi.void(id);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vendor-credits'] });
-      queryClient.invalidateQueries({ queryKey: ['vendors'] });
-      toast({
-        title: 'Credit voided',
-        description: 'The vendor credit was voided and its journal reversed.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error voiding credit',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: () => [['vendor-credits'], ['vendors']],
+    success: 'voided',
+    error: 'voidError',
   });
 }
 

@@ -73,7 +73,8 @@
     },
     "empty": {
       "title": "لا يوجد عملاء بعد",
-      "description": "ابدأ بإضافة أول عميل"
+      "description": "ابدأ بإضافة أول عميل",
+      "action": "أضف أول عميل"
     },
     "notFoundMessage": "العميل الذي تبحث عنه غير موجود.",
     "backToCustomers": "العودة للعملاء",
@@ -130,7 +131,8 @@
       "description": "سيُحذف العملاء المحددون، وسيُتخطى العملاء الذين لديهم معاملات.",
       "confirm": "حذف {count} عميل",
       "success": "تم حذف {count} عميل"
-    }
+    },
+    "deleteConfirmName": "هل أنت متأكد من حذف \"{name}\"؟ لا يمكن التراجع عن هذا الإجراء."
   },
   "quotes": {
     "title": "عروض الأسعار",
@@ -205,7 +207,8 @@
     },
     "empty": {
       "title": "لا توجد عروض أسعار بعد",
-      "description": "أنشئ أول عرض أسعار للبدء"
+      "description": "أنشئ أول عرض أسعار للبدء",
+      "action": "أنشئ أول عرض أسعار"
     },
     "toast": {
       "created": "تم إنشاء عرض الأسعار",
@@ -232,7 +235,12 @@
       "genericError": "حدث خطأ",
       "duplicated": "تم نسخ عرض الأسعار",
       "duplicatedDescription": "أُنشئت نسخة جديدة كمسودة.",
-      "duplicateError": "تعذّر نسخ عرض الأسعار."
+      "duplicateError": "تعذّر نسخ عرض الأسعار.",
+      "deletedNumber": "تم حذف عرض الأسعار {number}.",
+      "sentNumber": "تم تحديد عرض الأسعار {number} كمرسل.",
+      "acceptedNumber": "تم تحديد عرض الأسعار {number} كمقبول.",
+      "declinedNumber": "تم تحديد عرض الأسعار {number} كمرفوض.",
+      "convertedNumber": "تم تحويل عرض الأسعار {number} إلى فاتورة."
     },
     "validation": {
       "customerRequired": "العميل مطلوب",
@@ -242,6 +250,30 @@
       "quantityRequired": "الكمية مطلوبة",
       "rateRequired": "السعر مطلوب",
       "lineItemRequired": "يلزم بند واحد على الأقل"
+    },
+    "markAsAccepted": "تحديد كمقبول",
+    "markAsDeclined": "تحديد كمرفوض",
+    "deleteConfirmNumber": "هل أنت متأكد من حذف \"{number}\"؟ لا يمكن التراجع عن هذا الإجراء.",
+    "list": {
+      "searchPlaceholder": "ابحث برقم عرض الأسعار أو اسم العميل...",
+      "filterByStatus": "تصفية حسب الحالة",
+      "refresh": "تحديث عروض الأسعار",
+      "importLabel": "عروض الأسعار"
+    },
+    "bulkDelete": {
+      "title": "حذف {count} من عروض الأسعار؟",
+      "description": "ستُحذف عروض الأسعار المسودة فقط، وستُتخطى العروض الأخرى.",
+      "confirm": "حذف {count} من عروض الأسعار"
+    },
+    "bulkSend": {
+      "title": "إرسال {count} من عروض الأسعار؟",
+      "description": "ستُعلَّم عروض الأسعار المسودة كمرسلة.",
+      "confirm": "إرسال {count} من عروض الأسعار"
+    },
+    "bulkDecline": {
+      "title": "رفض {count} من عروض الأسعار؟",
+      "description": "ستُعلَّم عروض الأسعار المرسلة كمرفوضة.",
+      "confirm": "رفض {count} من عروض الأسعار"
     }
   },
   "invoices": {
@@ -311,7 +343,8 @@
     },
     "empty": {
       "title": "لا توجد فواتير بعد",
-      "description": "أنشئ أول فاتورة للبدء بالفوترة"
+      "description": "أنشئ أول فاتورة للبدء بالفوترة",
+      "action": "أنشئ أول فاتورة"
     },
     "toast": {
       "created": "تم إنشاء الفاتورة",
@@ -481,7 +514,24 @@
     },
     "empty": {
       "title": "لا توجد إشعارات ائتمان بعد",
-      "description": "ستظهر إشعارات الائتمان هنا عند إنشائها"
+      "description": "ستظهر إشعارات الائتمان هنا عند إنشائها",
+      "action": "أنشئ أول إشعار ائتمان"
+    },
+    "toast": {
+      "created": "تم إنشاء الإشعار الدائن",
+      "createdDescription": "تم إنشاء الإشعار الدائن بنجاح.",
+      "createError": "تعذّر إنشاء الإشعار الدائن",
+      "genericError": "حدث خطأ ما. حاول مرة أخرى."
+    },
+    "list": {
+      "searchPlaceholder": "ابحث برقم إشعار الائتمان أو اسم العميل...",
+      "filterByType": "تصفية حسب النوع",
+      "refresh": "تحديث إشعارات الائتمان"
+    },
+    "bulkDelete": {
+      "title": "حذف {count} من إشعارات الائتمان؟",
+      "description": "ستُحذف إشعارات الائتمان المحددة، وستُتخطى الإشعارات التي تم تطبيقها.",
+      "confirm": "حذف {count} من إشعارات الائتمان"
     }
   },
   "payments": {
@@ -555,7 +605,8 @@
     },
     "empty": {
       "title": "لا توجد مدفوعات بعد",
-      "description": "ستظهر المدفوعات هنا عند تسجيلها"
+      "description": "ستظهر المدفوعات هنا عند تسجيلها",
+      "action": "سجّل أول دفعة"
     },
     "voidedBadge": "ملغاة",
     "voidPayment": "إلغاء الدفعة",
@@ -637,6 +688,17 @@
       "supply": "توريد",
       "jobWork": "أعمال تصنيع",
       "sample": "عينة"
+    },
+    "form": {
+      "selectCustomer": "اختر العميل",
+      "selectItem": "اختر الصنف",
+      "addLine": "إضافة بند",
+      "qty": "الكمية",
+      "optional": "اختياري",
+      "customerRequired": "يرجى اختيار العميل.",
+      "lineRequired": "يرجى إضافة بند واحد على الأقل.",
+      "created": "تم إنشاء سند التسليم بنجاح.",
+      "createError": "تعذر إنشاء سند التسليم"
     }
   },
   "lineItems": {
@@ -670,7 +732,26 @@
     "daysOverdue": "متأخرة {days} يوم",
     "noOverdue": "لا توجد فواتير متأخرة",
     "noRecentActivity": "لا يوجد نشاط حديث",
-    "viewAll": "عرض الكل"
+    "viewAll": "عرض الكل",
+    "acrossCustomers": "لدى {count} من العملاء",
+    "overdueCount": "عدد الفواتير المتأخرة: {count}",
+    "quotesAwaiting": "عروض أسعار بانتظار الرد: {count}",
+    "fromPaidInvoices": "من الفواتير المدفوعة",
+    "openModule": "فتح {name}",
+    "modules": {
+      "customers": "إدارة حسابات العملاء ومتابعة أرصدتهم",
+      "customersStats": "الإجمالي: {count}",
+      "quotes": "إنشاء عروض الأسعار وإرسالها إلى العملاء",
+      "quotesStats": "المعلقة: {count}",
+      "invoices": "إنشاء الفواتير ومتابعة تحصيلها",
+      "invoicesStats": "غير المدفوعة: {count}",
+      "creditNotes": "إصدار المبالغ المستردة وتسويات الفواتير",
+      "creditNotesStats": "إدارة المبالغ المستردة",
+      "payments": "تسجيل دفعات العملاء ومتابعتها",
+      "paymentsStats": "متابعة المدفوعات",
+      "deliveryChallans": "متابعة صرف البضائع ومرتجعاتها",
+      "deliveryChallansStats": "متابعة التسليمات"
+    }
   },
   "customer360": {
     "overviewTab": "نظرة عامة",

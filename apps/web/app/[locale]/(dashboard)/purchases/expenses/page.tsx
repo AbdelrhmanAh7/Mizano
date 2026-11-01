@@ -86,14 +86,14 @@ function ExpensesPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => expensesApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['expenses']],
-    successMessage: tBulk.raw('expensesDeleted'),
+    successMessage: (count) => tBulk('expensesDeleted', { count }),
   });
   const bulkDelete = useBulkConfirm<Expense>(bulkDeleteAction, () => void refetch());
 
   const bulkApproveAction = useBulkAction({
     mutationFn: (ids) => expensesApi.bulkApprove(ids).then((r) => r.data),
     queryKeys: [['expenses']],
-    successMessage: tBulk.raw('expensesApproved'),
+    successMessage: (count) => tBulk('expensesApproved', { count }),
   });
   const bulkApprove = useBulkConfirm<Expense>(bulkApproveAction, () => void refetch());
 
@@ -103,7 +103,7 @@ function ExpensesPageContent() {
     ...(canEdit
       ? [
           {
-            label: 'Approve',
+            label: tCommon('buttons.approve'),
             icon: CheckCircle,
             onClick: bulkApprove.openFor,
           },
@@ -112,7 +112,7 @@ function ExpensesPageContent() {
     ...(canDelete
       ? [
           {
-            label: 'Delete',
+            label: tCommon('buttons.delete'),
             icon: Trash2,
             variant: 'destructive' as const,
             onClick: bulkDelete.openFor,
@@ -356,14 +356,20 @@ function ExpensesPageContent() {
         {...bulkDelete.dialogProps}
         action="delete"
         itemType="expenses"
-        description="Selected expenses will be permanently deleted."
+        title={t('expenses.bulkDelete.title', { count: bulkDelete.dialogProps.count })}
+        description={t('expenses.bulkDelete.description')}
+        confirmLabel={t('expenses.bulkDelete.confirm', { count: bulkDelete.dialogProps.count })}
+        cancelLabel={tCommon('buttons.cancel')}
         destructive
       />
       <BulkActionConfirmDialog
         {...bulkApprove.dialogProps}
         action="approve"
         itemType="expenses"
-        description="Selected expenses will be approved."
+        title={t('expenses.bulkApprove.title', { count: bulkApprove.dialogProps.count })}
+        description={t('expenses.bulkApprove.description')}
+        confirmLabel={t('expenses.bulkApprove.confirm', { count: bulkApprove.dialogProps.count })}
+        cancelLabel={tCommon('buttons.cancel')}
       />
 
       {/* Import Wizard */}
@@ -371,7 +377,7 @@ function ExpensesPageContent() {
         open={importOpen}
         onOpenChange={setImportOpen}
         entityType={'expenses' as ImportEntityType}
-        entityLabel="Expenses"
+        entityLabel={t('expenses.title')}
         onComplete={() => refetch()}
       />
     </div>

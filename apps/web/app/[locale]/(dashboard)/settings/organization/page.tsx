@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ErrorState } from '@/components/shared/error-state';
 import { Textarea } from '@/components/ui/textarea';
 import { useAllOrganizationSettings, useUpdateGeneralSettings } from '@/lib/hooks/use-all-settings';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -52,7 +53,7 @@ type FormData = z.infer<typeof schema>;
 
 export default function OrganizationSettingsPage() {
   const t = useTranslations('settings');
-  const { data: settings, isLoading } = useAllOrganizationSettings();
+  const { data: settings, isLoading, refetch } = useAllOrganizationSettings();
   const updateGeneral = useUpdateGeneralSettings();
 
   const form = useForm<FormData>({
@@ -123,6 +124,12 @@ export default function OrganizationSettingsPage() {
     );
   }
 
+  // Never show the form without the saved settings: its defaults (USD) would be saved over them.
+  // Only a missing load shows the error; a failed background reload keeps the form on screen.
+  if (!settings?.general) {
+    return <ErrorState onRetry={() => void refetch()} />;
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -152,7 +159,11 @@ export default function OrganizationSettingsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">{t('organization.form.nameRequired')}</Label>
-                <Input id="name" {...form.register('name')} placeholder="Acme Corp" />
+                <Input
+                  id="name"
+                  {...form.register('name')}
+                  placeholder={t('organization.placeholders.name')}
+                />
                 {form.formState.errors.name && (
                   <p className="text-sm text-destructive">
                     {errorText(form.formState.errors.name.message)}
@@ -166,7 +177,7 @@ export default function OrganizationSettingsPage() {
                   id="email"
                   type="email"
                   {...form.register('email')}
-                  placeholder="contact@acme.com"
+                  placeholder={t('organization.placeholders.email')}
                 />
                 {form.formState.errors.email && (
                   <p className="text-sm text-destructive">
@@ -177,12 +188,20 @@ export default function OrganizationSettingsPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="phone">{t('organization.form.phone')}</Label>
-                <Input id="phone" {...form.register('phone')} placeholder="+1 (555) 000-0000" />
+                <Input
+                  id="phone"
+                  {...form.register('phone')}
+                  placeholder={t('organization.placeholders.phone')}
+                />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="website">{t('organization.form.website')}</Label>
-                <Input id="website" {...form.register('website')} placeholder="https://acme.com" />
+                <Input
+                  id="website"
+                  {...form.register('website')}
+                  placeholder={t('organization.placeholders.website')}
+                />
                 {form.formState.errors.website && (
                   <p className="text-sm text-destructive">
                     {errorText(form.formState.errors.website.message)}
@@ -196,7 +215,7 @@ export default function OrganizationSettingsPage() {
               <Textarea
                 id="address"
                 {...form.register('address')}
-                placeholder="123 Business Street, Suite 100&#10;New York, NY 10001"
+                placeholder={t('organization.placeholders.address')}
                 rows={3}
               />
             </div>
@@ -218,7 +237,7 @@ export default function OrganizationSettingsPage() {
                 <Input
                   id="taxRegistrationNumber"
                   {...form.register('taxRegistrationNumber')}
-                  placeholder="e.g., VAT123456789"
+                  placeholder={t('organization.placeholders.taxId')}
                 />
               </div>
 

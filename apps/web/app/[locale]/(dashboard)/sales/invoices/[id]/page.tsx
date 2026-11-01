@@ -198,7 +198,9 @@ export default function InvoiceDetailPage() {
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">{invoice.invoiceNumber}</h1>
+              <h1 dir="ltr" className="text-3xl font-bold tracking-tight whitespace-nowrap">
+                {invoice.invoiceNumber}
+              </h1>
               <InvoiceStatusBadge status={invoice.status} />
             </div>
             {invoice.customer && (

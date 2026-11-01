@@ -108,26 +108,26 @@ function QuotesPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => quotesApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['quotes']],
-    successMessage: tBulk.raw('quotesDeleted'),
+    successMessage: (count) => tBulk('quotesDeleted', { count }),
   });
 
   const bulkSendAction = useBulkAction({
     mutationFn: (ids) => quotesApi.bulkSend(ids).then((r) => r.data),
     queryKeys: [['quotes']],
-    successMessage: tBulk.raw('quotesSent'),
+    successMessage: (count) => tBulk('quotesSent', { count }),
   });
 
   const bulkDeclineAction = useBulkAction({
     mutationFn: (ids) => quotesApi.bulkDecline(ids).then((r) => r.data),
     queryKeys: [['quotes']],
-    successMessage: tBulk.raw('quotesDeclined'),
+    successMessage: (count) => tBulk('quotesDeclined', { count }),
   });
 
   const bulkActions = [
     ...(canEdit
       ? [
           {
-            label: 'Send',
+            label: tCommon('buttons.send'),
             icon: Send,
             onClick: (rows: Quote[]) => {
               setBulkSelectedRows(rows);
@@ -139,7 +139,7 @@ function QuotesPageContent() {
     ...(canEdit
       ? [
           {
-            label: 'Decline',
+            label: t('quotes.decline'),
             icon: Ban,
             variant: 'outline' as const,
             onClick: (rows: Quote[]) => {
@@ -152,7 +152,7 @@ function QuotesPageContent() {
     ...(canDelete
       ? [
           {
-            label: 'Delete',
+            label: tCommon('buttons.delete'),
             icon: Trash2,
             variant: 'destructive' as const,
             onClick: (rows: Quote[]) => {
@@ -174,15 +174,15 @@ function QuotesPageContent() {
       try {
         await deleteQuote.mutateAsync(quoteToDelete.id);
         toast({
-          title: 'Quote deleted',
-          description: `Quote ${quoteToDelete.quoteNumber} has been deleted.`,
+          title: t('quotes.toast.deleted'),
+          description: t('quotes.toast.deletedNumber', { number: quoteToDelete.quoteNumber }),
         });
       } catch (error: unknown) {
         toast({
-          title: 'Error',
+          title: tCommon('errors.title'),
           description:
             (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-            'Failed to delete quote.',
+            t('quotes.toast.deleteError'),
           variant: 'destructive',
         });
       }
@@ -195,15 +195,15 @@ function QuotesPageContent() {
     try {
       await sendQuote.mutateAsync(quote.id);
       toast({
-        title: 'Quote sent',
-        description: `Quote ${quote.quoteNumber} has been marked as sent.`,
+        title: t('quotes.toast.sent'),
+        description: t('quotes.toast.sentNumber', { number: quote.quoteNumber }),
       });
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: tCommon('errors.title'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to send quote.',
+          t('quotes.toast.sendError'),
         variant: 'destructive',
       });
     }
@@ -213,15 +213,15 @@ function QuotesPageContent() {
     try {
       await acceptQuote.mutateAsync(quote.id);
       toast({
-        title: 'Quote accepted',
-        description: `Quote ${quote.quoteNumber} has been marked as accepted.`,
+        title: t('quotes.toast.accepted'),
+        description: t('quotes.toast.acceptedNumber', { number: quote.quoteNumber }),
       });
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: tCommon('errors.title'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to accept quote.',
+          t('quotes.toast.acceptError'),
         variant: 'destructive',
       });
     }
@@ -231,15 +231,15 @@ function QuotesPageContent() {
     try {
       await declineQuote.mutateAsync(quote.id);
       toast({
-        title: 'Quote declined',
-        description: `Quote ${quote.quoteNumber} has been marked as declined.`,
+        title: t('quotes.toast.declined'),
+        description: t('quotes.toast.declinedNumber', { number: quote.quoteNumber }),
       });
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: tCommon('errors.title'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to decline quote.',
+          t('quotes.toast.declineError'),
         variant: 'destructive',
       });
     }
@@ -249,16 +249,16 @@ function QuotesPageContent() {
     try {
       await convertToInvoice.mutateAsync(quote.id);
       toast({
-        title: 'Invoice created',
-        description: `Quote ${quote.quoteNumber} has been converted to invoice.`,
+        title: t('quotes.toast.invoiceCreated'),
+        description: t('quotes.toast.convertedNumber', { number: quote.quoteNumber }),
       });
       // Optionally navigate to the new invoice
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: tCommon('errors.title'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to convert quote.',
+          t('quotes.toast.convertError'),
         variant: 'destructive',
       });
     }
@@ -350,13 +350,13 @@ function QuotesPageContent() {
               <DropdownMenuItem asChild>
                 <Link href={`/sales/quotes/${quote.id}`}>
                   <Eye className="mr-2 h-4 w-4" />
-                  View
+                  {tCommon('buttons.view')}
                 </Link>
               </DropdownMenuItem>
               {canCreate && (
                 <DropdownMenuItem onClick={() => cloneQuote.mutate(quote.id)}>
                   <Copy className="mr-2 h-4 w-4" />
-                  Duplicate
+                  {tCommon('clone.duplicate')}
                 </DropdownMenuItem>
               )}
 
@@ -365,12 +365,12 @@ function QuotesPageContent() {
                   <DropdownMenuItem asChild>
                     <Link href={`/sales/quotes/${quote.id}/edit`}>
                       <Edit className="mr-2 h-4 w-4" />
-                      Edit
+                      {tCommon('buttons.edit')}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleSend(quote)}>
                     <Send className="mr-2 h-4 w-4" />
-                    Mark as Sent
+                    {t('quotes.markAsSent')}
                   </DropdownMenuItem>
                 </>
               )}
@@ -380,11 +380,11 @@ function QuotesPageContent() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => handleAccept(quote)}>
                     <FileText className="mr-2 h-4 w-4" />
-                    Mark as Accepted
+                    {t('quotes.markAsAccepted')}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleDecline(quote)}>
                     <Ban className="mr-2 h-4 w-4" />
-                    Mark as Declined
+                    {t('quotes.markAsDeclined')}
                   </DropdownMenuItem>
                 </>
               )}
@@ -404,7 +404,7 @@ function QuotesPageContent() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => handleDelete(quote)} className="text-red-600">
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
+                    {tCommon('buttons.delete')}
                   </DropdownMenuItem>
                 </>
               )}
@@ -446,11 +446,11 @@ function QuotesPageContent() {
             <DataTableSearch
               value={tableParams.search}
               onChange={tableParams.setSearch}
-              placeholder="Search by quote number or customer..."
+              placeholder={t('quotes.list.searchPlaceholder')}
             />
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by status" />
+                <SelectValue placeholder={t('quotes.list.filterByStatus')} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{tCommon('all')}</SelectItem>
@@ -466,7 +466,7 @@ function QuotesPageContent() {
               variant="outline"
               size="icon"
               onClick={() => refetch()}
-              aria-label="Refresh quotes"
+              aria-label={t('quotes.list.refresh')}
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
@@ -499,7 +499,7 @@ function QuotesPageContent() {
                 <Button asChild>
                   <Link href="/sales/quotes/new">
                     <Plus className="mr-2 h-4 w-4" />
-                    Create Your First Quote
+                    {t('quotes.empty.action')}
                   </Link>
                 </Button>
               ) : undefined
@@ -512,12 +512,7 @@ function QuotesPageContent() {
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         title={t('quotes.deleteQuote')}
-        description={
-          <>
-            Are you sure you want to delete &quot;{quoteToDelete?.quoteNumber}&quot;? This action
-            cannot be undone.
-          </>
-        }
+        description={t('quotes.deleteConfirmNumber', { number: quoteToDelete?.quoteNumber ?? '' })}
         onConfirm={confirmDelete}
       />
 
@@ -528,7 +523,10 @@ function QuotesPageContent() {
         action="delete"
         count={bulkSelectedRows.length}
         itemType="quotes"
-        description="Only draft quotes will be deleted. Non-draft quotes will be skipped."
+        title={t('quotes.bulkDelete.title', { count: bulkSelectedRows.length })}
+        description={t('quotes.bulkDelete.description')}
+        confirmLabel={t('quotes.bulkDelete.confirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         destructive
         isLoading={bulkDeleteAction.isLoading}
         onConfirm={async () => {
@@ -543,7 +541,10 @@ function QuotesPageContent() {
         action="send"
         count={bulkSelectedRows.length}
         itemType="quotes"
-        description="Draft quotes will be marked as sent."
+        title={t('quotes.bulkSend.title', { count: bulkSelectedRows.length })}
+        description={t('quotes.bulkSend.description')}
+        confirmLabel={t('quotes.bulkSend.confirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         isLoading={bulkSendAction.isLoading}
         onConfirm={async () => {
           await bulkSendAction.execute(bulkSelectedRows.map((r) => r.id));
@@ -557,7 +558,10 @@ function QuotesPageContent() {
         action="decline"
         count={bulkSelectedRows.length}
         itemType="quotes"
-        description="Sent quotes will be marked as declined."
+        title={t('quotes.bulkDecline.title', { count: bulkSelectedRows.length })}
+        description={t('quotes.bulkDecline.description')}
+        confirmLabel={t('quotes.bulkDecline.confirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         destructive
         isLoading={bulkDeclineAction.isLoading}
         onConfirm={async () => {
@@ -572,7 +576,7 @@ function QuotesPageContent() {
         open={importOpen}
         onOpenChange={setImportOpen}
         entityType={'quotes' as ImportEntityType}
-        entityLabel="Quotes"
+        entityLabel={t('quotes.list.importLabel')}
         onComplete={() => refetch()}
       />
     </div>

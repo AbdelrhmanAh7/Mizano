@@ -104,6 +104,14 @@
       "invalidEmail": "أدخل بريداً إلكترونياً صحيحاً",
       "invalidUrl": "أدخل رابطاً صحيحاً، مثل https://example.com",
       "currencyRequired": "اختر العملة الأساسية"
+    },
+    "placeholders": {
+      "name": "مثال: شركة النيل للتجارة",
+      "email": "info@example.com",
+      "phone": "+20 10 0000 0000",
+      "website": "https://example.com",
+      "address": "مثال: 12 شارع التحرير، القاهرة",
+      "taxId": "مثال: 123-456-789"
     }
   },
   "localization": {
@@ -177,7 +185,13 @@
     "defaultCashAccountHint": "يُستخدم للمدفوعات النقدية",
     "selectAccount": "اختر حساباً",
     "notSet": "-- غير محدد --",
-    "saveSettings": "حفظ الإعدادات"
+    "saveSettings": "حفظ الإعدادات",
+    "toast": {
+      "saved": "تم حفظ الإعدادات",
+      "savedDescription": "تم تحديث إعدادات الحسابات بنجاح.",
+      "saveError": "تعذّر حفظ الإعدادات",
+      "genericError": "حدث خطأ ما. حاول مرة أخرى."
+    }
   },
   "invoicing": {
     "title": "إعدادات الفواتير والمستندات",
@@ -270,7 +284,7 @@
       "description": "تتوقف الطلبات عندما تتجاوز التكلفة المقدّرة الحد (بالدولار، لكل شهر ميلادي).",
       "limit": "الحد الشهري (دولار)",
       "used": "المستخدم هذا الشهر: ${spent} من ${limit}",
-      "calls": "{count, plural, one {طلب واحد} two {طلبان} few {# طلبات} many {# طلبًا} other {# طلب}}",
+      "calls": "{count, plural, one {طلب واحد} two {طلبان} few {{count} طلبات} many {{count} طلبًا} other {{count} طلب}}",
       "loadingModels": "جارٍ تحميل النماذج…",
       "modelsFailed": "تعذّر تحميل نماذج المزوّد.",
       "usageFailed": "تعذّر تحميل استخدام هذا الشهر."
@@ -489,6 +503,12 @@
       "userDeletedDescription": "أُزيل عضو الفريق.",
       "userDeleteError": "تعذّرت إزالة العضو",
       "genericError": "حدث خطأ ما. يرجى المحاولة مرة أخرى.",
+      "rolesSeeded": "تم إنشاء الأدوار الافتراضية",
+      "rolesSeededDescription": "تم إنشاء الأدوار الافتراضية بنجاح.",
+      "rolesSeedError": "تعذّر إنشاء الأدوار الافتراضية",
+      "roleAssigned": "تم تعيين الدور",
+      "roleAssignedDescription": "تم تعيين الدور بنجاح.",
+      "roleAssignError": "تعذّر تعيين الدور",
       "resetLinkCreated": "رابط إعادة التعيين جاهز",
       "resetLinkCreatedDescription": "انسخ الرابط وأرسله إلى العضو.",
       "resetLinkError": "تعذّر إنشاء رابط إعادة التعيين"
@@ -562,6 +582,12 @@
     "empty": {
       "title": "لم يتم جمع مقاييس بعد",
       "description": "ستظهر المقاييس عند تنفيذ استعلامات قاعدة البيانات"
+    },
+    "toast": {
+      "errorTitle": "خطأ",
+      "reset": "تمت إعادة ضبط المقاييس",
+      "resetDescription": "تم مسح بيانات قياس أداء قاعدة البيانات.",
+      "resetError": "تعذّرت إعادة ضبط المقاييس."
     }
   },
   "cache": {
@@ -603,7 +629,16 @@
     "accountLists": "قوائم الحسابات والشجرة",
     "accountListsDescription": "يتم التخزين المؤقت لمدة 10 دقائق. نادرًا ما يتغير دليل الحسابات، لذا يوفر TTL الأطول تحسينًا كبيرًا في الأداء.",
     "salesPurchases": "قوائم المبيعات والمشتريات",
-    "salesPurchasesDescription": "يتم التخزين المؤقت لمدة دقيقتين. يضمن TTL القصير حداثة البيانات للبيانات المعاملاتية المتغيرة بشكل متكرر."
+    "salesPurchasesDescription": "يتم التخزين المؤقت لمدة دقيقتين. يضمن TTL القصير حداثة البيانات للبيانات المعاملاتية المتغيرة بشكل متكرر.",
+    "toast": {
+      "errorTitle": "خطأ",
+      "flushed": "تم مسح الذاكرة المؤقتة",
+      "flushedDescription": "عدد النسخ المؤقتة التي مُسحت: {count}. بياناتك لم تتغير.",
+      "flushError": "تعذّر مسح الذاكرة المؤقتة. حاول مرة أخرى.",
+      "patternDeleted": "تم حذف العناصر المطابقة",
+      "patternDeletedDescription": "عدد النسخ المؤقتة المطابقة لـ \"{pattern}\" التي مُسحت: {count}. بياناتك لم تتغير.",
+      "patternDeleteError": "تعذّر حذف العناصر المطابقة. حاول مرة أخرى."
+    }
   },
   "auditLogs": {
     "title": "سجل التدقيق",
@@ -649,7 +684,16 @@
   "common": {
     "saveChanges": "حفظ التغييرات",
     "saving": "جارٍ الحفظ...",
-    "goBack": "الرجوع"
+    "goBack": "الرجوع",
+    "toast": {
+      "saved": "تم حفظ الإعدادات",
+      "sectionSaved": "تم تحديث {section, select, general {الإعدادات العامة} financial {الإعدادات المالية} invoice {إعدادات الفواتير} localization {إعدادات اللغة والمنطقة} branding {إعدادات الهوية} other {الإعدادات}}.",
+      "saveError": "تعذّر حفظ الإعدادات",
+      "saveGenericError": "فشل تحديث الإعدادات",
+      "lockDateUpdated": "تم تحديث تاريخ الإقفال",
+      "lockDateError": "تعذّر تحديث تاريخ الإقفال",
+      "lockDateGenericError": "فشل تحديث تاريخ الإقفال"
+    }
   },
   "users": {
     "title": "المستخدمون",

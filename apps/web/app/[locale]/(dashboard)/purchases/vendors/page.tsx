@@ -70,7 +70,7 @@ function VendorsPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => vendorsApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['vendors']],
-    successMessage: tBulk.raw('vendorsDeleted'),
+    successMessage: (count) => tBulk('vendorsDeleted', { count }),
   });
 
   const bulkActions = [
@@ -150,7 +150,7 @@ function VendorsPageContent() {
     {
       accessorKey: 'phone',
       header: t('vendors.table.phone'),
-      cell: ({ row }) => row.original.phone || '-',
+      cell: ({ row }) => (row.original.phone ? <span dir="ltr">{row.original.phone}</span> : '-'),
     },
     {
       accessorKey: 'currency',

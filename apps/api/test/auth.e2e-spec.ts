@@ -80,6 +80,52 @@ describe('Auth (e2e)', () => {
       expect(JSON.stringify(res.body)).not.toMatch(/passwordHash/i);
     });
 
+    it('starts an Egyptian organization in EGP with its chart of accounts ready', async () => {
+      const res = await anon.post('/auth/register').send({
+        ...testUser,
+        email: `eg-${suffix}@mizano.test`,
+        organizationName: `E2E Egypt Org ${suffix}`,
+        country: 'EG',
+      });
+      expect(res.status).toBe(201);
+      const prisma = getPrisma(app);
+      const org = await prisma.organization.findUniqueOrThrow({
+        where: { id: res.body.organization.id },
+        select: {
+          baseCurrency: true,
+          currency: true,
+          country: true,
+          timezone: true,
+          defaultArAccountId: true,
+          defaultRevenueAccountId: true,
+        },
+      });
+      expect(org).toMatchObject({
+        baseCurrency: 'EGP',
+        currency: 'EGP',
+        country: 'EG',
+        timezone: 'Africa/Cairo',
+      });
+      expect(org.defaultArAccountId).toBeTruthy();
+      expect(org.defaultRevenueAccountId).toBeTruthy();
+      const accounts = await prisma.account.count({
+        where: { organizationId: res.body.organization.id, currency: 'EGP' },
+      });
+      expect(accounts).toBeGreaterThan(10);
+      // The seeded chart carries Arabic names for an Arabic-speaking owner.
+      const untranslated = await prisma.account.count({
+        where: { organizationId: res.body.organization.id, nameAr: null },
+      });
+      expect(untranslated).toBe(0);
+    });
+
+    it('rejects a country it cannot set up', async () => {
+      const res = await anon
+        .post('/auth/register')
+        .send({ ...testUser, email: `xx-${suffix}@mizano.test`, country: 'FR' });
+      expect(res.status).toBe(400);
+    });
+
     it('rejects a duplicate email', async () => {
       const res = await anon.post('/auth/register').send(testUser);
       expect([400, 409]).toContain(res.status);
@@ -461,8 +507,11 @@ describe('Logger endpoints and stream (e2e)', () => {
 
       const byIds = await tenantB.api.delete('/logger/clear').send({ ids: [entryId] });
       expect(byIds.body).toEqual({ removed: 0 });
+      // B's own entries (such as the 404 above, logged in B's organization) are B's to clear;
+      // A's entry must survive, which is checked right below.
+      const own = await tenantB.api.get('/logger/logs');
       const all = await tenantB.api.delete('/logger/clear');
-      expect(all.body).toEqual({ removed: 0 });
+      expect(all.body).toEqual({ removed: (own.body as LogEntry[]).length });
 
       const still = await tenantA.api.get('/logger/logs');
       expect((still.body as LogEntry[]).some((l) => l.id === entryId)).toBe(true);

@@ -76,7 +76,7 @@ function PaymentsReceivedPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => paymentsReceivedApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['payments-received']],
-    successMessage: t.raw('payments.bulkDelete.success'),
+    successMessage: (count) => t('payments.bulkDelete.success', { count }),
   });
 
   const bulkActions = [
@@ -273,7 +273,7 @@ function PaymentsReceivedPageContent() {
                 <Button asChild>
                   <Link href="/sales/payments/new">
                     <Plus className="me-2 h-4 w-4" />
-                    Record Your First Payment
+                    {t('payments.empty.action')}
                   </Link>
                 </Button>
               ) : undefined

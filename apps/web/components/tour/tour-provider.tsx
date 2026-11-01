@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import type { Driver } from 'driver.js';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useTourStore } from '@/lib/stores/use-tour-store';
 import { useUpdateTourProgress, useDismissTour } from '@/lib/hooks/use-user-preferences';
 import { tourDefinitions } from './tour-definitions';
 
 export function TourProvider({ children }: { children: React.ReactNode }) {
   const locale = useLocale();
+  const tButtons = useTranslations('tour.common');
   const { currentTour, isActive, endTour, completeTour, dismissTour } = useTourStore();
   const updateTourMutation = useUpdateTourProgress();
   const dismissTourMutation = useDismissTour();
@@ -77,10 +78,11 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
         disableActiveInteraction: true,
         stagePadding: 10,
         stageRadius: 8,
-        progressText: locale === 'ar' ? '{{current}} من {{total}}' : '{{current}} of {{total}}',
-        nextBtnText: locale === 'ar' ? 'التالي' : 'Next',
-        prevBtnText: locale === 'ar' ? 'السابق' : 'Previous',
-        doneBtnText: locale === 'ar' ? 'إنهاء' : 'Done',
+        // driver.js fills {{current}} and {{total}}; raw() keeps the braces from next-intl.
+        progressText: tButtons.raw('progress') as string,
+        nextBtnText: tButtons('next'),
+        prevBtnText: tButtons('previous'),
+        doneBtnText: tButtons('done'),
         popoverClass: isDirRtl ? 'driver-popover-rtl' : 'driver-popover-ltr',
         onCloseClick: () => {
           // User clicked X — treat as dismiss (not complete)
@@ -121,7 +123,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
         isDestroyingRef.current = false;
       }
     };
-  }, [isActive, currentTour, locale, endTour, handleTourComplete]);
+  }, [isActive, currentTour, locale, tButtons, endTour, handleTourComplete]);
 
   return <>{children}</>;
 }

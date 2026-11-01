@@ -1,6 +1,9 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException, ConflictException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AccountsService } from '../accounting/services/accounts.service';
+import { describeError } from '../../common/utils/redact';
+import { organizationRegion } from './organization-region';
 import { AuthSessionsService } from './auth-sessions.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -8,13 +11,17 @@ import { systemName } from '../../common/i18n/localize';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private sessions: AuthSessionsService,
+    private accounts: AccountsService,
   ) {}
 
   async register(registerDto: RegisterDto) {
-    const { email, password, firstName, lastName, organizationName } = registerDto;
+    const { email, password, firstName, lastName, organizationName, country } = registerDto;
+    const region = organizationRegion(country);
     const name = `${firstName} ${lastName}`;
 
     // Check if email already exists
@@ -35,9 +42,11 @@ export class AuthService {
       const organization = await tx.organization.create({
         data: {
           name: organizationName,
-          // Keep both currency fields consistent until onboarding sets the base currency.
-          currency: 'USD',
-          baseCurrency: 'USD',
+          // Both currency fields stay equal; the country chosen at sign-up sets them.
+          currency: region.baseCurrency,
+          baseCurrency: region.baseCurrency,
+          ...(region.country ? { country: region.country } : {}),
+          ...(region.timezone ? { timezone: region.timezone } : {}),
         },
       });
 
@@ -80,6 +89,16 @@ export class AuthService {
 
       return { organization, user };
     });
+
+    // A ready chart of accounts with its defaults linked, so the first invoice can be issued.
+    // Sign-up still succeeds without it; the owner can add it from the chart of accounts.
+    try {
+      await this.accounts.seedDefaultAccounts(result.organization.id);
+    } catch (error) {
+      this.logger.warn(
+        `Default chart of accounts not created: ${describeError(error, { includeMessage: false })}`,
+      );
+    }
 
     const tokens = await this.sessions.start(result.user);
 

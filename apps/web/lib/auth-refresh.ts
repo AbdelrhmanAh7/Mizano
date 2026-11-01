@@ -9,6 +9,10 @@ import { createHash } from 'crypto';
  * refreshes for the same session share one network call, while different
  * sessions never see each other's results or failures.
  *
+ * A successful result is also kept briefly for the refresh token it replaced: requests that
+ * left the browser before the new cookie arrived still carry the old token, and the API refuses
+ * a rotated-out token, so they reuse the result instead of failing (and signing the person out).
+ *
  * The raw refresh token is never used as a map key and never logged.
  */
 
@@ -24,8 +28,13 @@ export interface TokenRefresherOptions {
   refresh: RefreshTokensFn;
   /** Cooldown after a failed refresh for the same session (default 30s). */
   cooldownMs?: number;
-  /** Upper bound on tracked cooldown entries (default 10_000). */
+  /** Upper bound on tracked cooldown and recent-result entries (default 10_000). */
   maxCooldownEntries?: number;
+  /**
+   * How long a successful result answers later calls with the replaced token (default 25s,
+   * inside the API's 30s grace for a rotated-out token).
+   */
+  reuseMs?: number;
   now?: () => number;
 }
 
@@ -37,8 +46,8 @@ export interface TokenRefresher {
   refresh(refreshToken: string | undefined | null): Promise<RefreshedTokens | null>;
   /** Drop all state for the session owning `refreshToken` (call on logout). */
   forget(refreshToken: string | undefined | null): void;
-  /** Number of in-flight refreshes and cooldown entries (for tests/diagnostics). */
-  size(): { inFlight: number; cooldowns: number };
+  /** Number of in-flight refreshes, cooldowns and kept results (for tests/diagnostics). */
+  size(): { inFlight: number; cooldowns: number; recent: number };
   /** Clear all state. */
   reset(): void;
 }
@@ -50,11 +59,13 @@ export function sessionRefreshKey(refreshToken: string): string {
 export function createTokenRefresher(options: TokenRefresherOptions): TokenRefresher {
   const cooldownMs = options.cooldownMs ?? 30_000;
   const maxCooldownEntries = options.maxCooldownEntries ?? 10_000;
+  const reuseMs = options.reuseMs ?? 25_000;
   const now = options.now ?? Date.now;
 
   const inFlight = new Map<string, Promise<RefreshedTokens | null>>();
   // Map preserves insertion order, so the first entry is always the oldest.
   const cooldownUntil = new Map<string, number>();
+  const recent = new Map<string, { tokens: RefreshedTokens; until: number }>();
 
   function pruneCooldowns(currentTime: number): void {
     const expired: string[] = [];
@@ -68,6 +79,22 @@ export function createTokenRefresher(options: TokenRefresherOptions): TokenRefre
       const oldest = cooldownUntil.keys().next().value;
       if (oldest === undefined) break;
       cooldownUntil.delete(oldest);
+    }
+  }
+
+  function remember(key: string, tokens: RefreshedTokens): void {
+    const currentTime = now();
+    recent.delete(key);
+    recent.set(key, { tokens, until: currentTime + reuseMs });
+    const expired: string[] = [];
+    recent.forEach((entry, entryKey) => {
+      if (entry.until <= currentTime) expired.push(entryKey);
+    });
+    expired.forEach((entryKey) => recent.delete(entryKey));
+    while (recent.size > maxCooldownEntries) {
+      const oldest = recent.keys().next().value;
+      if (oldest === undefined) break;
+      recent.delete(oldest);
     }
   }
 
@@ -86,7 +113,9 @@ export function createTokenRefresher(options: TokenRefresherOptions): TokenRefre
         return null;
       }
       cooldownUntil.delete(key);
-      return { accessToken: result.accessToken, refreshToken: result.refreshToken };
+      const tokens = { accessToken: result.accessToken, refreshToken: result.refreshToken };
+      remember(key, tokens);
+      return tokens;
     } catch {
       setCooldown(key);
       return null;
@@ -99,6 +128,14 @@ export function createTokenRefresher(options: TokenRefresherOptions): TokenRefre
         return Promise.resolve(null);
       }
       const key = sessionRefreshKey(refreshToken);
+
+      const kept = recent.get(key);
+      if (kept) {
+        if (now() < kept.until) {
+          return Promise.resolve({ ...kept.tokens });
+        }
+        recent.delete(key);
+      }
 
       const until = cooldownUntil.get(key);
       if (until !== undefined) {
@@ -128,13 +165,22 @@ export function createTokenRefresher(options: TokenRefresherOptions): TokenRefre
       const key = sessionRefreshKey(refreshToken);
       inFlight.delete(key);
       cooldownUntil.delete(key);
+      recent.delete(key);
+      // A result kept for the token this one replaced would hand the ended session back to a
+      // late request that still carries the older cookie.
+      const replaced: string[] = [];
+      recent.forEach((entry, entryKey) => {
+        if (entry.tokens.refreshToken === refreshToken) replaced.push(entryKey);
+      });
+      replaced.forEach((entryKey) => recent.delete(entryKey));
     },
     size() {
-      return { inFlight: inFlight.size, cooldowns: cooldownUntil.size };
+      return { inFlight: inFlight.size, cooldowns: cooldownUntil.size, recent: recent.size };
     },
     reset() {
       inFlight.clear();
       cooldownUntil.clear();
+      recent.clear();
     },
   };
 }

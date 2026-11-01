@@ -1,14 +1,15 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { useToastMutation } from './use-toast-mutation';
 import { useToast } from '@/components/ui/use-toast';
+import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 import { journalsApi } from '@/lib/api';
 import { absDecimal, compareDecimals, decimalToDisplayNumber, sumDecimals } from '@/lib/decimal';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
-
 export type JournalStatus = 'DRAFT' | 'POSTED' | 'VOIDED';
 
 /** Business events that post journals (mirrors the API's JournalSourceType). */
@@ -182,6 +183,8 @@ export function useJournal(id: string | undefined) {
 export function useCreateJournal() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('accounting.journals.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async (data: CreateJournalData) => {
@@ -191,15 +194,15 @@ export function useCreateJournal() {
     onSuccess: () => {
       void invalidateLedgerQueries(queryClient);
       toast({
-        title: 'Journal created',
-        description: 'The journal entry has been created successfully.',
+        title: t('created'),
+        description: t('createdDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error creating journal',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('createError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });
@@ -209,29 +212,15 @@ export function useCreateJournal() {
  * Hook to update an existing journal (manual drafts only; the API rejects posted/system ones)
  */
 export function useUpdateJournal() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'accounting.journals.toast',
     mutationFn: async ({ id, data }: { id: string; data: UpdateJournalData }) => {
       const response = await journalsApi.update(id, data);
       return response.data;
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['journals'] });
-      queryClient.invalidateQueries({ queryKey: ['journals', variables.id] });
-      toast({
-        title: 'Journal updated',
-        description: 'The journal entry has been updated successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error updating journal',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: (variables) => [['journals'], ['journals', variables.id]],
+    success: 'updated',
+    error: 'updateError',
   });
 }
 
