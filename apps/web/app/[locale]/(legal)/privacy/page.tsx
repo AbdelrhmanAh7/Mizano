@@ -11,10 +11,6 @@ export async function generateMetadata({
   return { title: t('title'), description: t('description') };
 }
 
-export default async function Page({
-  params,
-}: {
-  params: { locale: string };
-}): Promise<JSX.Element> {
-  return LegalPage({ locale: params.locale, page: 'privacy' });
+export default function Page({ params }: { params: { locale: string } }): JSX.Element {
+  return <LegalPage locale={params.locale} page="privacy" />;
 }
