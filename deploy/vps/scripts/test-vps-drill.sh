@@ -11,6 +11,10 @@
 #
 #   DRILL_API_IMAGE=jarda-api:x DRILL_WEB_IMAGE=jarda-web:x deploy/vps/scripts/test-vps-drill.sh
 # The web image must be built with NEXT_PUBLIC_API_URL=https://jarda-api.localhost:18443/api.
+# Then: restore.sh --check (scratch database), the health check's alert and recovery for a stopped
+# container, and, when the images are tagged jarda-api:<tag> / jarda-web:<tag> and a second pair
+# DRILL_PREVIOUS_TAG exists, rollback.sh to that version and forward again (GO-LIVE.md 6, 8, 9).
+# GitHub runs all of it on a fresh Ubuntu 24.04 machine (.github/workflows/vps-drill.yml).
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 vps="$(cd "$here/.." && pwd)"
@@ -49,6 +53,7 @@ CADDY_HTTPS_PORT=127.0.0.1:$port
 MIZANO_DATA_DIR=$work/data
 MIZANO_API_IMAGE=$DRILL_API_IMAGE
 MIZANO_WEB_IMAGE=$DRILL_WEB_IMAGE
+MIZANO_DEPLOYED_SHA=${DRILL_API_IMAGE#*:}
 POSTGRES_USER=jarda
 POSTGRES_PASSWORD=$pg_pw
 POSTGRES_DB=source
@@ -203,6 +208,53 @@ restic init >/dev/null
 [ "$(login)" = token ] || die "sign-in after the local restore"
 echo "local restore with safety backup: ok"
 restic snapshots --json --host jarda-vps --tag mizano,jarda | python3 -c 'import json,sys; print("local snapshots now:", len(json.load(sys.stdin)))'
+
+step restore-check
+# GO-LIVE scenario 6: prove the newest backup into a scratch database; the live one is untouched.
+"$here/backup.sh" >/dev/null
+state >"$work/live-before-check.json"
+"$here/restore.sh" --check | tee "$work/check.log"
+grep -q 'restore-check OK' "$work/check.log" || die "restore --check"
+state >"$work/live-after-check.json"
+cmp -s "$work/live-before-check.json" "$work/live-after-check.json" || die "restore --check changed the live database"
+leftover="$(dc exec -T postgres psql -XqAt -U jarda -d postgres -c "select count(*) from pg_database where datname like '%restore_check'")"
+[ "$leftover" = 0 ] || die "scratch database left behind"
+echo "restore --check: OK, live data unchanged, scratch database dropped"
+
+step alert
+# GO-LIVE scenario 9: a stopped container raises one alert, and its return one recovery.
+# Caddy's own test certificates last hours, so the HTTPS-expiry part is switched off here.
+export CERT_MIN_DAYS=0
+dc stop worker >/dev/null
+"$here/healthcheck.sh" >/dev/null 2>&1 || true
+grep -qx 'worker-down' "$work/data/monitor/active-keys" || die "no alert for the stopped worker"
+echo "alert raised: worker-down ($(grep -c . "$work/data/monitor/active-keys") active)"
+dc start worker >/dev/null
+wait_up
+"$here/healthcheck.sh" >/dev/null 2>&1 || true
+! grep -qx 'worker-down' "$work/data/monitor/active-keys" || die "worker-down did not recover"
+echo "recovered: worker-down cleared"
+if command -v journalctl >/dev/null && journalctl -t jarda-alert --since '-10 min' --no-pager 2>/dev/null | grep -q 'RECOVERED: worker-down'; then
+  echo "system log has the alert and the recovery (journalctl -t jarda-alert)"
+fi
+
+if [ -n "${DRILL_PREVIOUS_TAG:-}" ]; then
+  step rollback
+  # GO-LIVE scenario 8: back to the version kept before this one, then forward again.
+  new_tag="${DRILL_API_IMAGE#*:}"
+  "$here/rollback.sh" --list
+  "$here/rollback.sh" --to "$DRILL_PREVIOUS_TAG" | tee "$work/rollback.log"
+  seconds="$(sed -n 's/.*rollback OK .*seconds=\([0-9]*\).*/\1/p' "$work/rollback.log")"
+  [ -n "$seconds" ] && [ "$seconds" -lt 300 ] || die "rollback not done within 5 minutes (${seconds:-?} s)"
+  running="$(docker inspect -f '{{.Config.Image}}' "$(dc ps -q api)")"
+  [ "$running" = "jarda-api:$DRILL_PREVIOUS_TAG" ] || die "api runs $running after the rollback"
+  [ "$(login)" = token ] || die "sign-in after the rollback"
+  echo "rollback to $DRILL_PREVIOUS_TAG: ${seconds}s, api runs $running, the user signs in"
+  "$here/rollback.sh" --to "$new_tag" --skip-backup >/dev/null
+  running="$(docker inspect -f '{{.Config.Image}}' "$(dc ps -q api)")"
+  [ "$running" = "jarda-api:$new_tag" ] || die "api runs $running after rolling forward"
+  echo "forward again to $new_tag: ok"
+fi
 
 step finished
 echo "VPS DRILL PASSED"

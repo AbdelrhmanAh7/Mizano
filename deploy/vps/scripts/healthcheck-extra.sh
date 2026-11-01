@@ -3,7 +3,9 @@
 # "problems". Caddy renews certificates by itself about 30 days before they expire, so a
 # certificate with fewer than CERT_MIN_DAYS left (default 14) means renewal is failing.
 cert_min_days="${CERT_MIN_DAYS:-14}"
+# CADDY_HTTPS_PORT may carry a bind address (127.0.0.1:18443): keep the port only.
 cert_port="${CADDY_HTTPS_PORT:-443}"
+cert_port="${cert_port##*:}"
 cert_hosts=("${JARDA_WEB_HOST:-}" "${JARDA_API_HOST:-}")
 # Other products' sites on this server (first line "host {" in each site file).
 for site in "${JARDA_CADDY_SITES_DIR:-/etc/jarda/caddy-sites}"/*.caddy; do
