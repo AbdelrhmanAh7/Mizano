@@ -19,10 +19,15 @@ const publicPaths = [
 // the terms of use and privacy policy are open to everyone.
 const passwordPaths = ['/forgot-password', '/reset-password', '/terms', '/privacy'];
 
+/** `/terms` matches `/terms` and `/terms/…`, never `/terms-admin`. */
+function isPathOrChild(pathname: string, path: string): boolean {
+  return pathname === path || pathname.startsWith(`${path}/`);
+}
+
 // Check if path is public (remove locale prefix for checking)
 function isPublicPath(pathname: string): boolean {
   const pathWithoutLocale = pathname.replace(/^\/(en|ar)/, '') || '/';
-  return publicPaths.some((path) => pathWithoutLocale.startsWith(path));
+  return publicPaths.some((path) => isPathOrChild(pathWithoutLocale, path));
 }
 
 // Extract locale from pathname
@@ -45,7 +50,7 @@ export async function middleware(request: NextRequest) {
   // For public paths: only check token if we need to redirect authenticated users away
   // This avoids expensive JWT verification for unauthenticated visitors on login/register
   if (isPublicPath(pathname)) {
-    if (passwordPaths.some((path) => pathWithoutLocale.startsWith(path))) {
+    if (passwordPaths.some((path) => isPathOrChild(pathWithoutLocale, path))) {
       return intlMiddleware(request);
     }
     // Quick check: if no session cookie exists, skip token verification entirely

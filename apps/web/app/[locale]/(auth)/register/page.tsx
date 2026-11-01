@@ -231,13 +231,25 @@ export default function RegisterPage() {
             <p className="text-xs leading-5 text-muted-foreground">
               {tLegal.rich('agreement', {
                 terms: (chunks) => (
-                  <Link href="/terms" target="_blank" className="text-primary underline">
+                  <Link
+                    href="/terms"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline"
+                  >
                     {chunks}
+                    <span className="sr-only"> ({tLegal('newTab')})</span>
                   </Link>
                 ),
                 privacy: (chunks) => (
-                  <Link href="/privacy" target="_blank" className="text-primary underline">
+                  <Link
+                    href="/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline"
+                  >
                     {chunks}
+                    <span className="sr-only"> ({tLegal('newTab')})</span>
                   </Link>
                 ),
               })}

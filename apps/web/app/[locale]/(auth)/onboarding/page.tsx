@@ -17,6 +17,7 @@ import {
   Server,
 } from 'lucide-react';
 import { BrandLogo } from '@/components/brand/brand-logo';
+import { LegalLinks } from '@/components/legal/legal-links';
 import { brandName, brandTagline } from '@mizano/shared-types';
 
 const featureCards = [
@@ -158,6 +159,7 @@ export default function OnboardingPage() {
           <BrandLogo variant="icon" height={18} alt="" />
           {brandTagline(locale)}
         </div>
+        <LegalLinks className="pb-0" />
       </footer>
     </div>
   );

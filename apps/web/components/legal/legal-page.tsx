@@ -18,7 +18,6 @@ export async function LegalPage({
   page: 'terms' | 'privacy';
 }): Promise<JSX.Element> {
   const t = await getTranslations({ locale, namespace: 'legal' });
-  const tCommon = await getTranslations({ locale, namespace: 'common' });
   const sections = t.raw(`${page}.sections`) as Record<string, Section>;
   const updated = new Intl.DateTimeFormat(locale, { dateStyle: 'long', timeZone: 'UTC' }).format(
     new Date(`${LEGAL_UPDATED}T12:00:00Z`),
@@ -27,7 +26,7 @@ export async function LegalPage({
     <div className="flex min-h-screen flex-col bg-background">
       <header className="mx-auto flex w-full max-w-3xl items-center justify-between gap-4 px-4 py-4">
         <Link href="/" aria-label={t('common.back')} className="rounded-md">
-          <BrandLogo height={32} alt={tCommon('appName')} />
+          <BrandLogo height={32} alt="" />
         </Link>
         <LanguageSwitcher />
       </header>
@@ -67,7 +66,9 @@ export async function LegalPage({
           <p className="mt-6 text-sm leading-6 text-muted-foreground">{t('common.draftNote')}</p>
         </article>
       </main>
-      <LegalLinks />
+      <footer className="border-t">
+        <LegalLinks />
+      </footer>
     </div>
   );
 }

@@ -10,7 +10,8 @@
     "terms": "Terms of use",
     "privacy": "Privacy policy",
     "back": "Back to {brand}",
-    "agreement": "By creating an account you agree to the <terms>Terms of use</terms> and the <privacy>Privacy policy</privacy>."
+    "agreement": "By creating an account you agree to the <terms>Terms of use</terms> and the <privacy>Privacy policy</privacy>.",
+    "newTab": "opens in a new tab"
   },
   "terms": {
     "title": "Terms of use",
