@@ -13,7 +13,8 @@ const WEB = join(__dirname, '..');
 
 /**
  * The pilot screens: setup (auth + onboarding), sales, purchases (bills upload included), banking,
- * accounting, reports, settings, and the shared layout and UI primitives they use.
+ * accounting, reports, settings, tax, the dashboard error and not-found pages, and the shared
+ * layout, table, import and UI pieces they use. A path may be a folder or one file.
  */
 const PILOT_DIRS = [
   'app/[locale]/(auth)',
@@ -23,13 +24,19 @@ const PILOT_DIRS = [
   'app/[locale]/(dashboard)/accounting',
   'app/[locale]/(dashboard)/reports',
   'app/[locale]/(dashboard)/settings',
+  'app/[locale]/(dashboard)/tax',
+  'app/[locale]/(dashboard)/error.tsx',
+  'app/[locale]/(dashboard)/not-found.tsx',
   'components/sales',
   'components/purchases',
   'components/banking',
   'components/accounting',
   'components/reports',
   'components/settings',
+  'components/tax',
   'components/layout',
+  'components/data-table',
+  'components/import',
   'components/ui',
 ];
 
@@ -43,6 +50,7 @@ const TEXT_PROPS = new Set(['placeholder', 'title', 'aria-label', 'alt', 'label'
 const HAS_WORD = /[A-Za-z؀-ۿ]{2,}/;
 
 function tsxFiles(dir: string, out: string[] = []): string[] {
+  if (dir.endsWith('.tsx')) return [...out, dir];
   let entries;
   try {
     entries = readdirSync(dir, { withFileTypes: true });

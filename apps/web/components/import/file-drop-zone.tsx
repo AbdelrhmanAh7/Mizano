@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useTranslations } from 'next-intl';
 import { Upload, File, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -36,6 +37,7 @@ export function FileDropZone({
   accept = DEFAULT_ACCEPT,
   maxSize = DEFAULT_MAX_SIZE,
 }: FileDropZoneProps): React.JSX.Element {
+  const t = useTranslations('common.import');
   const [isDragOver, setIsDragOver] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -46,19 +48,19 @@ export function FileDropZone({
       setError(null);
 
       if (!isAcceptedFile(file, accept)) {
-        setError(`Unsupported file type. Accepted formats: ${accept.join(', ')}`);
+        setError(t('unsupportedType', { formats: accept.join(', ') }));
         return;
       }
 
       if (file.size > maxSize) {
-        setError(`File is too large. Maximum size: ${formatFileSize(maxSize)}`);
+        setError(t('tooLarge', { size: formatFileSize(maxSize) }));
         return;
       }
 
       setSelectedFile(file);
       onFileSelect(file);
     },
-    [accept, maxSize, onFileSelect],
+    [accept, maxSize, onFileSelect, t],
   );
 
   const handleDragOver = React.useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -124,7 +126,7 @@ export function FileDropZone({
           size="icon"
           className="h-8 w-8 shrink-0"
           onClick={handleClear}
-          aria-label="Remove file"
+          aria-label={t('removeFile')}
         >
           <X className="h-4 w-4" />
         </Button>
@@ -166,9 +168,12 @@ export function FileDropZone({
           />
         </div>
         <div className="text-center">
-          <p className="text-sm font-medium">Drag and drop your file here, or click to browse</p>
+          <p className="text-sm font-medium">{t('dragDrop')}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Supported formats: {accept.join(', ')} (max {formatFileSize(maxSize)})
+            {t('supportedFormatsList', {
+              formats: accept.join(', '),
+              size: formatFileSize(maxSize),
+            })}
           </p>
         </div>
       </div>
@@ -181,7 +186,7 @@ export function FileDropZone({
         accept={accept.join(',')}
         onChange={handleInputChange}
         className="hidden"
-        aria-label="File upload"
+        aria-label={t('upload')}
       />
     </div>
   );

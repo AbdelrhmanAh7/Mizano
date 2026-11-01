@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useTranslations } from 'next-intl';
 import {
   CheckCircle2,
   Download,
@@ -80,13 +81,6 @@ interface WizardState {
 
 const STEPS: WizardStep[] = ['upload', 'map', 'preview', 'import'];
 
-const STEP_LABELS: Record<WizardStep, string> = {
-  upload: 'Upload File',
-  map: 'Map Columns',
-  preview: 'Preview & Validate',
-  import: 'Import',
-};
-
 const INITIAL_STATE: WizardState = {
   step: 'upload',
   file: null,
@@ -108,7 +102,16 @@ export function ImportWizard({
   entityLabel,
   onComplete,
 }: ImportWizardProps): React.JSX.Element {
+  const t = useTranslations('common.import');
+  const tButtons = useTranslations('common.buttons');
   const { toast } = useToast();
+
+  const stepLabels: Record<WizardStep, string> = {
+    upload: t('upload'),
+    map: t('mapColumns'),
+    preview: t('preview'),
+    import: t('stepImport'),
+  };
 
   // State
   const [state, setState] = React.useState<WizardState>(INITIAL_STATE);
@@ -198,14 +201,14 @@ export function ImportWizard({
         },
         onError: () => {
           toast({
-            title: 'Parse Error',
-            description: 'Failed to parse the file. Please check the format and try again.',
+            title: t('parseErrorTitle'),
+            description: t('parseErrorBody'),
             variant: 'destructive',
           });
         },
       });
     },
-    [parseFile, fieldDefinitions, toast],
+    [parseFile, fieldDefinitions, toast, t],
   );
 
   const handleDownloadTemplate = React.useCallback(() => {
@@ -217,14 +220,14 @@ export function ImportWizard({
         },
         onError: () => {
           toast({
-            title: 'Download Error',
-            description: 'Failed to download the template.',
+            title: t('downloadErrorTitle'),
+            description: t('downloadErrorBody'),
             variant: 'destructive',
           });
         },
       },
     );
-  }, [exportTemplate, entityType, toast]);
+  }, [exportTemplate, entityType, toast, t]);
 
   const handleMappingsChange = React.useCallback((mappings: ColumnMapping[]) => {
     setState((prev) => ({
@@ -252,8 +255,8 @@ export function ImportWizard({
           },
           onError: () => {
             toast({
-              title: 'Validation Error',
-              description: 'Failed to validate the import data.',
+              title: t('validateErrorTitle'),
+              description: t('validateErrorBody'),
               variant: 'destructive',
             });
           },
@@ -273,15 +276,18 @@ export function ImportWizard({
             setState((prev) => ({ ...prev, importResult: result }));
             if (result.success) {
               toast({
-                title: 'Import Complete',
-                description: `Successfully imported ${result.importedRows} ${entityLabel.toLowerCase()}.`,
+                title: t('complete'),
+                description: t('completeBody', {
+                  count: result.importedRows,
+                  entity: entityLabel.toLowerCase(),
+                }),
               });
             }
           },
           onError: () => {
             toast({
-              title: 'Import Error',
-              description: 'Failed to import data. Please try again.',
+              title: t('importErrorTitle'),
+              description: t('importErrorBody'),
               variant: 'destructive',
             });
           },
@@ -291,7 +297,16 @@ export function ImportWizard({
     }
 
     setState((prev) => ({ ...prev, step: nextStep }));
-  }, [currentStepIndex, state.file, buildConfig, validateImport, importData, entityLabel, toast]);
+  }, [
+    currentStepIndex,
+    state.file,
+    buildConfig,
+    validateImport,
+    importData,
+    entityLabel,
+    toast,
+    t,
+  ]);
 
   const handleBack = React.useCallback(() => {
     const prevIndex = currentStepIndex - 1;
@@ -337,7 +352,7 @@ export function ImportWizard({
                     isActive ? 'font-medium text-foreground' : 'text-muted-foreground'
                   }`}
                 >
-                  {STEP_LABELS[step]}
+                  {stepLabels[step]}
                 </span>
               </div>
             </React.Fragment>
@@ -355,15 +370,18 @@ export function ImportWizard({
         {parseFile.isPending && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Parsing file...
+            {t('parsing')}
           </div>
         )}
 
         {state.parseResult && (
           <div className="rounded-md border bg-muted/30 p-3">
             <p className="text-sm">
-              Found <strong>{state.parseResult.totalRows}</strong> rows with{' '}
-              <strong>{state.parseResult.headers.length}</strong> columns
+              {t.rich('foundRows', {
+                rows: state.parseResult.totalRows,
+                columns: state.parseResult.headers.length,
+                strong: (chunks) => <strong>{chunks}</strong>,
+              })}
             </p>
           </div>
         )}
@@ -380,13 +398,13 @@ export function ImportWizard({
             ) : (
               <Download className="mr-2 h-4 w-4" />
             )}
-            Download Template
+            {t('downloadTemplate')}
           </Button>
         </div>
 
         {/* Import options */}
         <div className="space-y-3 rounded-md border p-3">
-          <p className="text-sm font-medium">Import Options</p>
+          <p className="text-sm font-medium">{t('optionsTitle')}</p>
           <div className="flex items-center gap-2">
             <Checkbox
               id="skipFirstRow"
@@ -396,7 +414,7 @@ export function ImportWizard({
               }
             />
             <Label htmlFor="skipFirstRow" className="text-sm">
-              First row contains headers
+              {t('firstRowHeaders')}
             </Label>
           </div>
           <div className="flex items-center gap-2">
@@ -408,12 +426,12 @@ export function ImportWizard({
               }
             />
             <Label htmlFor="updateExisting" className="text-sm">
-              Update existing records if duplicates found
+              {t('updateExisting')}
             </Label>
           </div>
           <div className="flex items-center gap-3">
             <Label htmlFor="duplicateHandling" className="shrink-0 text-sm">
-              Duplicate handling:
+              {t('duplicateHandling')}
             </Label>
             <Select
               value={state.duplicateHandling}
@@ -428,9 +446,9 @@ export function ImportWizard({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="skip">Skip</SelectItem>
-                <SelectItem value="update">Update</SelectItem>
-                <SelectItem value="error">Error</SelectItem>
+                <SelectItem value="skip">{t('duplicateSkip')}</SelectItem>
+                <SelectItem value="update">{t('duplicateUpdate')}</SelectItem>
+                <SelectItem value="error">{t('duplicateError')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -442,9 +460,7 @@ export function ImportWizard({
   const renderMapStep = (): React.JSX.Element => {
     if (!state.parseResult) {
       return (
-        <div className="py-8 text-center text-sm text-muted-foreground">
-          No file data available. Please go back and upload a file.
-        </div>
+        <div className="py-8 text-center text-sm text-muted-foreground">{t('noFileData')}</div>
       );
     }
 
@@ -465,16 +481,14 @@ export function ImportWizard({
       return (
         <div className="flex flex-col items-center justify-center gap-3 py-8">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Validating import data...</p>
+          <p className="text-sm text-muted-foreground">{t('validating')}</p>
         </div>
       );
     }
 
     if (!state.parseResult) {
       return (
-        <div className="py-8 text-center text-sm text-muted-foreground">
-          No data available for preview.
-        </div>
+        <div className="py-8 text-center text-sm text-muted-foreground">{t('noPreviewData')}</div>
       );
     }
 
@@ -496,8 +510,8 @@ export function ImportWizard({
       return (
         <div className="flex flex-col items-center justify-center gap-4 py-8">
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <p className="text-sm font-medium">Importing {entityLabel}...</p>
-          <p className="text-xs text-muted-foreground">This may take a moment.</p>
+          <p className="text-sm font-medium">{t('importingEntity', { entity: entityLabel })}</p>
+          <p className="text-xs text-muted-foreground">{t('takesAMoment')}</p>
           <Progress value={undefined} className="w-64" />
         </div>
       );
@@ -510,10 +524,8 @@ export function ImportWizard({
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
             <AlertCircle className="h-6 w-6 text-destructive" />
           </div>
-          <p className="text-sm font-medium text-destructive">Import Failed</p>
-          <p className="text-xs text-muted-foreground">
-            An error occurred during import. Please try again.
-          </p>
+          <p className="text-sm font-medium text-destructive">{t('failedTitle')}</p>
+          <p className="text-xs text-muted-foreground">{t('failedBody')}</p>
         </div>
       );
     }
@@ -527,15 +539,23 @@ export function ImportWizard({
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/30">
               <CheckCircle2 className="h-6 w-6 text-emerald-600" />
             </div>
-            <p className="text-sm font-medium">Import Complete</p>
+            <p className="text-sm font-medium">{t('complete')}</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <ResultCard label="Total Rows" value={importResult.totalRows} />
-            <ResultCard label="Imported" value={importResult.importedRows} variant="success" />
-            <ResultCard label="Skipped" value={importResult.skippedRows} variant="warning" />
+            <ResultCard label={t('resultTotal')} value={importResult.totalRows} />
             <ResultCard
-              label="Failed"
+              label={t('resultImported')}
+              value={importResult.importedRows}
+              variant="success"
+            />
+            <ResultCard
+              label={t('resultSkipped')}
+              value={importResult.skippedRows}
+              variant="warning"
+            />
+            <ResultCard
+              label={t('resultFailed')}
               value={importResult.errors.length}
               variant={importResult.errors.length > 0 ? 'error' : 'default'}
             />
@@ -544,17 +564,17 @@ export function ImportWizard({
           {importResult.errors.length > 0 && (
             <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
               <p className="mb-2 text-sm font-medium text-destructive">
-                Errors ({importResult.errors.length})
+                {t('errorsCount', { count: importResult.errors.length })}
               </p>
               <ul className="space-y-1">
                 {importResult.errors.slice(0, 10).map((err, i) => (
                   <li key={i} className="text-xs text-destructive/80">
-                    Row {err.row + 1}, {err.field}: {err.error}
+                    {t('errorRow', { row: err.row + 1, field: err.field, error: err.error })}
                   </li>
                 ))}
                 {importResult.errors.length > 10 && (
                   <li className="text-xs text-muted-foreground">
-                    ...and {importResult.errors.length - 10} more errors
+                    {t('moreErrors', { count: importResult.errors.length - 10 })}
                   </li>
                 )}
               </ul>
@@ -564,7 +584,9 @@ export function ImportWizard({
       );
     }
 
-    return <div className="py-8 text-center text-sm text-muted-foreground">Ready to import.</div>;
+    return (
+      <div className="py-8 text-center text-sm text-muted-foreground">{t('readyToImport')}</div>
+    );
   };
 
   const renderStepContent = (): React.JSX.Element => {
@@ -584,11 +606,11 @@ export function ImportWizard({
 
   return (
     <Dialog open={open} onOpenChange={isImportComplete ? handleClose : onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl" closeLabel={tButtons('close')}>
         <DialogHeader>
-          <DialogTitle>Import {entityLabel}</DialogTitle>
+          <DialogTitle>{t('title', { entity: entityLabel })}</DialogTitle>
           <DialogDescription>
-            Upload a CSV or Excel file to import {entityLabel.toLowerCase()} into your organization.
+            {t('description', { entity: entityLabel.toLowerCase() })}
           </DialogDescription>
         </DialogHeader>
 
@@ -601,11 +623,11 @@ export function ImportWizard({
         {/* Footer */}
         <DialogFooter className="gap-2 sm:gap-0">
           {isImportComplete ? (
-            <Button onClick={handleClose}>Done</Button>
+            <Button onClick={handleClose}>{t('done')}</Button>
           ) : (
             <>
               <Button variant="outline" onClick={handleClose} disabled={importData.isPending}>
-                Cancel
+                {tButtons('cancel')}
               </Button>
               <div className="flex gap-2">
                 {!isFirstStep && state.step !== 'import' && (
@@ -615,7 +637,7 @@ export function ImportWizard({
                     disabled={importData.isPending || validateImport.isPending}
                   >
                     <ChevronLeft className="mr-1 h-4 w-4" />
-                    Back
+                    {tButtons('back')}
                   </Button>
                 )}
                 {state.step !== 'import' && (
@@ -631,16 +653,16 @@ export function ImportWizard({
                     {validateImport.isPending ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Validating...
+                        {t('validatingButton')}
                       </>
                     ) : state.step === 'preview' ? (
                       <>
-                        Start Import
+                        {t('startImport')}
                         <ChevronRight className="ml-1 h-4 w-4" />
                       </>
                     ) : (
                       <>
-                        Next
+                        {tButtons('next')}
                         <ChevronRight className="ml-1 h-4 w-4" />
                       </>
                     )}

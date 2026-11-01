@@ -62,7 +62,6 @@ import {
   useMarkVATReturnFiled,
   useVatPaymentAccounts,
   getVATReturnStatusColor,
-  getVATReturnStatusLabel,
   getVATReturnStatusStep,
   normalizeVATReturn,
   VATReturnStatus,
@@ -231,7 +230,7 @@ export default function VATReturnDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={tCommon('buttons.back')}>
             <Link href="/tax/returns">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -265,7 +264,7 @@ export default function VATReturnDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={tCommon('buttons.back')}>
             <Link href="/tax/returns">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -276,11 +275,11 @@ export default function VATReturnDetailPage() {
                 {vatReturn.returnNumber || t('returns.vatReturn')}
               </h1>
               <Badge className={getVATReturnStatusColor(vatReturn.status)}>
-                {getVATReturnStatusLabel(vatReturn.status)}
+                {t(`returns.status.${vatReturn.status}`)}
               </Badge>
             </div>
             <p className="text-muted-foreground">
-              {format(new Date(vatReturn.startDate), 'MMMM d')} -{' '}
+              {format(new Date(vatReturn.startDate), 'MMMM d', { locale: dateLocale })} -{' '}
               {formatLongDate(new Date(vatReturn.endDate))}
             </p>
           </div>
@@ -473,7 +472,7 @@ export default function VATReturnDetailPage() {
                   <dt className="text-sm text-muted-foreground">{t('returns.detail.status')}</dt>
                   <dd>
                     <Badge className={getVATReturnStatusColor(vatReturn.status)}>
-                      {getVATReturnStatusLabel(vatReturn.status)}
+                      {t(`returns.status.${vatReturn.status}`)}
                     </Badge>
                   </dd>
                 </div>
@@ -704,7 +703,7 @@ export default function VATReturnDetailPage() {
 
       {/* Record Payment Dialog */}
       <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
-        <DialogContent>
+        <DialogContent closeLabel={tCommon('buttons.close')}>
           <DialogHeader>
             <DialogTitle>{t('payments.recordTitle')}</DialogTitle>
             <DialogDescription>{t('payments.recordDescription')}</DialogDescription>

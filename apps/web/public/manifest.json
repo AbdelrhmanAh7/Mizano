@@ -1,7 +1,7 @@
 {
   "name": "Jarda",
   "short_name": "Jarda",
-  "description": "AI-Powered Autonomous Accounting Platform",
+  "description": "Accounting in Arabic and English. AI is optional.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FFFFFF",

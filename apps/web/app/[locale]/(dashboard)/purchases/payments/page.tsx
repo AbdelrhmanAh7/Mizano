@@ -304,7 +304,7 @@ function PaymentsMadePageContent() {
         open={importOpen}
         onOpenChange={setImportOpen}
         entityType={'payments_made' as ImportEntityType}
-        entityLabel="Payments Made"
+        entityLabel={t('payments.title')}
         onComplete={() => refetch()}
       />
 

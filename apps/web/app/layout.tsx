@@ -17,20 +17,21 @@ const notoArabic = Noto_Sans_Arabic({
   display: 'swap',
 });
 
+const DESCRIPTION =
+  'Accounting in Arabic and English for businesses in Egypt, Saudi Arabia and the UAE: invoices, bills, journals and reports. AI is optional.';
+
 export const metadata: Metadata = {
   title: {
     default: BRAND.tagline.en,
     template: `%s | ${BRAND.name.en}`,
   },
-  description:
-    'Autonomous Accounting Platform - Zero-touch accounting powered by AI. Invoicing, bills, banking, HR, inventory, and more.',
+  description: DESCRIPTION,
   applicationName: BRAND.name.en,
   keywords: [
     'ERP',
     'accounting',
     'invoicing',
     'AI accounting',
-    'autonomous accounting',
     'small business',
     'financial management',
   ],
@@ -40,13 +41,13 @@ export const metadata: Metadata = {
     type: 'website',
     siteName: BRAND.name.en,
     title: BRAND.tagline.en,
-    description: 'Autonomous Accounting Platform - Zero-touch accounting powered by AI.',
+    description: DESCRIPTION,
     locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
     title: BRAND.tagline.en,
-    description: 'Autonomous Accounting Platform - Zero-touch accounting powered by AI.',
+    description: DESCRIPTION,
   },
   manifest: '/manifest.json',
   icons: {

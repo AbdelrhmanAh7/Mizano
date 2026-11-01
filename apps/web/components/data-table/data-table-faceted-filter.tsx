@@ -16,6 +16,7 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { Check, PlusCircle } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 export interface FacetedFilterOption {
   label: string;
@@ -40,6 +41,8 @@ export function DataTableFacetedFilter({
   onSelectionChange,
   singleSelect = false,
 }: DataTableFacetedFilterProps) {
+  const t = useTranslations('common.dataTable');
+  const tTable = useTranslations('common.table');
   const [open, setOpen] = useState(false);
   const selectedSet = new Set(selected);
 
@@ -76,7 +79,7 @@ export function DataTableFacetedFilter({
               <div className="flex gap-1">
                 {selectedSet.size > 2 ? (
                   <Badge variant="secondary" className="rounded-sm px-1 font-normal">
-                    {selectedSet.size} selected
+                    {t('selected', { count: selectedSet.size })}
                   </Badge>
                 ) : (
                   options
@@ -98,9 +101,9 @@ export function DataTableFacetedFilter({
       </PopoverTrigger>
       <PopoverContent className="w-[220px] p-0" align="start">
         <Command>
-          <CommandInput placeholder={`Search ${title.toLowerCase()}...`} />
+          <CommandInput placeholder={t('searchOption', { title: title.toLowerCase() })} />
           <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
+            <CommandEmpty>{tTable('noResults')}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => {
                 const isSelected = selectedSet.has(option.value);
@@ -131,7 +134,7 @@ export function DataTableFacetedFilter({
                 <CommandSeparator />
                 <CommandGroup>
                   <CommandItem onSelect={handleClear} className="justify-center text-center">
-                    Clear filters
+                    {t('clearFilters')}
                   </CommandItem>
                 </CommandGroup>
               </>

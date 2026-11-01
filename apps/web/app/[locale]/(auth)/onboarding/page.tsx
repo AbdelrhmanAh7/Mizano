@@ -7,40 +7,25 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Brain,
-  Zap,
   BarChart3,
   Shield,
   Package,
   FileText,
-  TrendingUp,
-  Users,
-  MessageSquare,
-  Settings,
   Landmark,
   Lock,
-  Wifi,
+  KeyRound,
   Server,
 } from 'lucide-react';
 import Image from 'next/image';
 import { brandName, brandTagline } from '@mizano/shared-types';
 
 const featureCards = [
-  { key: 'zeroTouch' as const, icon: Zap },
-  { key: 'aiIntelligence' as const, icon: Brain },
+  { key: 'documents' as const, icon: FileText },
+  { key: 'ai' as const, icon: Brain },
   { key: 'financial' as const, icon: Landmark },
   { key: 'operations' as const, icon: Package },
   { key: 'security' as const, icon: Shield },
   { key: 'analytics' as const, icon: BarChart3 },
-];
-
-const aiCategories = [
-  { key: 'coreFinancial' as const, icon: Landmark, count: '10' },
-  { key: 'salesCrm' as const, icon: TrendingUp, count: '5' },
-  { key: 'security' as const, icon: Shield, count: '3' },
-  { key: 'nlp' as const, icon: FileText, count: '4' },
-  { key: 'hr' as const, icon: Users, count: '3' },
-  { key: 'operations' as const, icon: Settings, count: '5' },
-  { key: 'chat' as const, icon: MessageSquare, count: '3' },
 ];
 
 export default function OnboardingPage() {
@@ -109,33 +94,6 @@ export default function OnboardingPage() {
         </div>
       </section>
 
-      {/* Stats Bar */}
-      <section className="border-y bg-muted/30">
-        <div className="container mx-auto px-4 py-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-            <div>
-              <p className="text-3xl font-bold text-primary">33</p>
-              <p className="text-sm text-muted-foreground mt-1">{t('stats.aiModels')}</p>
-            </div>
-            <div>
-              <p className="text-3xl font-bold text-primary">7</p>
-              <p className="text-sm text-muted-foreground mt-1">{t('stats.aiCategories')}</p>
-            </div>
-            <div>
-              <p className="text-3xl font-bold text-primary">12+</p>
-              <p className="text-sm text-muted-foreground mt-1">{t('stats.businessModules')}</p>
-            </div>
-            <div>
-              <div className="flex items-center justify-center gap-1">
-                <Lock className="h-5 w-5 text-primary" />
-                <p className="text-xl font-bold text-primary">100%</p>
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">{t('stats.localAi')}</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Features Grid */}
       <section className="container mx-auto px-4 py-20">
         <div className="text-center mb-12">
@@ -159,36 +117,6 @@ export default function OnboardingPage() {
         </div>
       </section>
 
-      {/* AI Models Showcase */}
-      <section className="bg-muted/30 border-y">
-        <div className="container mx-auto px-4 py-20">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold">{t('aiShowcase.sectionTitle')}</h2>
-            <p className="text-muted-foreground mt-2">{t('aiShowcase.sectionSubtitle')}</p>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {aiCategories.map(({ key, icon: Icon }) => (
-              <Card key={key} className="group hover:shadow-md transition-shadow">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="rounded-lg bg-primary/10 p-2">
-                      <Icon className="h-5 w-5 text-primary" />
-                    </div>
-                    <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                      {t(`aiShowcase.${key}.count`)}
-                    </span>
-                  </div>
-                  <h3 className="font-semibold text-sm">{t(`aiShowcase.${key}.title`)}</h3>
-                  <p className="text-xs text-muted-foreground mt-1.5">
-                    {t(`aiShowcase.${key}.description`)}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Technology Highlights */}
       <section className="container mx-auto px-4 py-20">
         <div className="text-center mb-12">
@@ -203,7 +131,7 @@ export default function OnboardingPage() {
           </div>
           <div className="text-center">
             <div className="rounded-full bg-blue-100 dark:bg-blue-950 p-4 w-fit mx-auto mb-4">
-              <Wifi className="h-6 w-6 text-blue-600" />
+              <KeyRound className="h-6 w-6 text-blue-600" />
             </div>
             <p className="text-sm font-medium">{t('technology.offline')}</p>
           </div>

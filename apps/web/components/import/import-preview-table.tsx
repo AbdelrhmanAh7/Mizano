@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useTranslations } from 'next-intl';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import {
   Table,
@@ -39,6 +40,7 @@ export function ImportPreviewTable({
   fieldDefinitions,
   validationErrors = [],
 }: ImportPreviewTableProps): React.JSX.Element {
+  const t = useTranslations('common.import');
   // Build a lookup for active mappings (those with a valid target field)
   const activeMappings = React.useMemo(() => mappings.filter((m) => m.targetField), [mappings]);
 
@@ -91,9 +93,7 @@ export function ImportPreviewTable({
   if (activeMappings.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center">
-        <p className="text-sm text-muted-foreground">
-          No columns are mapped. Go back and map at least one column to preview data.
-        </p>
+        <p className="text-sm text-muted-foreground">{t('noColumnsMapped')}</p>
       </div>
     );
   }
@@ -104,18 +104,18 @@ export function ImportPreviewTable({
       <div className="flex items-center gap-4 rounded-md border bg-muted/30 px-4 py-3">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-          <span className="text-sm font-medium">{validRowCount} valid</span>
+          <span className="text-sm font-medium">{t('validCount', { count: validRowCount })}</span>
         </div>
         {invalidRowCount > 0 && (
           <div className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4 text-destructive" />
             <span className="text-sm font-medium text-destructive">
-              {invalidRowCount} with errors
+              {t('errorCount', { count: invalidRowCount })}
             </span>
           </div>
         )}
         <span className="text-xs text-muted-foreground">
-          (showing {previewRows.length} of {totalRows} rows)
+          {t('showingRows', { shown: previewRows.length, total: totalRows })}
         </span>
       </div>
 
@@ -133,7 +133,7 @@ export function ImportPreviewTable({
                       <div className="flex items-center gap-1">
                         <span>{fieldDef?.label ?? mapping.targetField}</span>
                         {fieldDef?.required && (
-                          <span className="text-destructive" aria-label="required">
+                          <span className="text-destructive" aria-label={t('requiredMark')}>
                             *
                           </span>
                         )}
@@ -153,7 +153,7 @@ export function ImportPreviewTable({
                     colSpan={activeMappings.length + 1}
                     className="py-8 text-center text-muted-foreground"
                   >
-                    No data to preview
+                    {t('noDataToPreview')}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -175,7 +175,7 @@ export function ImportPreviewTable({
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <span className="cursor-help text-sm text-destructive underline decoration-dashed">
-                                  {formatCellValue(cellValue) || '(empty)'}
+                                  {formatCellValue(cellValue) || t('emptyCell')}
                                 </span>
                               </TooltipTrigger>
                               <TooltipContent side="bottom" className="max-w-xs">
@@ -204,12 +204,12 @@ export function ImportPreviewTable({
       {validationErrors.length > 0 && validationErrors.length <= 20 && (
         <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
           <p className="mb-2 text-sm font-medium text-destructive">
-            Validation Errors ({validationErrors.length})
+            {t('validationErrorsTitle', { count: validationErrors.length })}
           </p>
           <ul className="space-y-1">
             {validationErrors.map((err, i) => (
               <li key={i} className="text-xs text-destructive/80">
-                Row {err.row + 1}, {err.field}: {err.error}
+                {t('errorRow', { row: err.row + 1, field: err.field, error: err.error })}
               </li>
             ))}
           </ul>
@@ -219,15 +219,13 @@ export function ImportPreviewTable({
       {validationErrors.length > 20 && (
         <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
           <p className="text-sm font-medium text-destructive">
-            {validationErrors.length} validation errors found.
+            {t('manyErrors', { count: validationErrors.length })}
           </p>
-          <p className="mt-1 text-xs text-destructive/80">
-            Showing first 20 errors. Fix the most common issues and re-upload.
-          </p>
+          <p className="mt-1 text-xs text-destructive/80">{t('manyErrorsHint')}</p>
           <ul className="mt-2 space-y-1">
             {validationErrors.slice(0, 20).map((err, i) => (
               <li key={i} className="text-xs text-destructive/80">
-                Row {err.row + 1}, {err.field}: {err.error}
+                {t('errorRow', { row: err.row + 1, field: err.field, error: err.error })}
               </li>
             ))}
           </ul>
