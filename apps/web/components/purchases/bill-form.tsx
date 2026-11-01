@@ -22,6 +22,8 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Bill, useBillAccountOptions } from '@/lib/hooks/use-bills';
 import { useVendor, Vendor } from '@/lib/hooks/use-vendors';
+import { useMoneyFormat } from '@/lib/hooks/use-organization';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { ItemCombobox, VendorCombobox } from '@/components/shared/party-combobox';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { addDays, format, parseISO } from 'date-fns';
@@ -219,6 +221,15 @@ export function BillForm({
   });
 
   const watchVendorId = form.watch('vendorId');
+
+  // A bill saved without a currency is in the organization base currency, so the form names it
+  // before saving (issue #645). A scan that found no currency names none until the person picks one.
+  const money = useMoneyFormatter();
+  const baseCurrency = useMoneyFormat().data?.baseCurrency;
+  const chosenCurrency = form.watch('currencyCode') || '';
+  const effectiveCurrency = chosenCurrency || (requireCurrency ? undefined : baseCurrency);
+  const formatTotal = (value: string): string =>
+    effectiveCurrency ? money(value, effectiveCurrency) : value;
   // Fetched by id, so any vendor works, not only the first page (audit B11).
   const { data: selectedVendor } = useVendor(watchVendorId || undefined);
 
@@ -477,7 +488,7 @@ export function BillForm({
             <div className="space-y-2">
               <Label htmlFor="currencyCode">{tForm('currency')}</Label>
               <Select
-                value={form.watch('currencyCode') || ''}
+                value={chosenCurrency || (requireCurrency ? '' : 'default')}
                 onValueChange={(value) =>
                   form.setValue('currencyCode', value === 'default' ? '' : value)
                 }
@@ -487,7 +498,11 @@ export function BillForm({
                 </SelectTrigger>
                 <SelectContent>
                   {!requireCurrency && (
-                    <SelectItem value="default">{tForm('defaultCurrency')}</SelectItem>
+                    <SelectItem value="default">
+                      {baseCurrency
+                        ? tForm('defaultCurrencyNamed', { currency: baseCurrency })
+                        : tForm('defaultCurrency')}
+                    </SelectItem>
                   )}
                   {CURRENCY_CODES.map((code) => (
                     <SelectItem key={code} value={code}>
@@ -562,6 +577,11 @@ export function BillForm({
             </p>
           )}
 
+          {effectiveCurrency && (
+            <p className="mb-2 text-sm text-muted-foreground" data-testid="bill-amounts-currency">
+              {tForm('amountsIn', { currency: effectiveCurrency })}
+            </p>
+          )}
           <Table>
             <TableHeader>
               <TableRow>
@@ -710,15 +730,21 @@ export function BillForm({
             <div className="w-64 space-y-2">
               <div className="flex justify-between text-sm">
                 <span>{tForm('subtotal')}</span>
-                <span className="font-mono">{totals.subtotal}</span>
+                <span className="font-mono" data-testid="bill-subtotal">
+                  {formatTotal(totals.subtotal)}
+                </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span>{tForm('tax')}</span>
-                <span className="font-mono">{totals.taxAmount}</span>
+                <span className="font-mono" data-testid="bill-taxAmount">
+                  {formatTotal(totals.taxAmount)}
+                </span>
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2">
                 <span>{tForm('total')}</span>
-                <span className="font-mono">{totals.grandTotal}</span>
+                <span className="font-mono" data-testid="bill-grandTotal">
+                  {formatTotal(totals.grandTotal)}
+                </span>
               </div>
             </div>
           </div>

@@ -26,6 +26,7 @@ jest.mock('next-intl', () => {
         messages[mockLocale],
       );
   return {
+    useLocale: () => mockLocale,
     useTranslations: (namespace: string) => {
       const t = (key: string, values?: Record<string, string | number>) =>
         String(lookup(`${namespace}.${key}`) ?? key).replace(/\{(\w+)\}/g, (_, name: string) =>
@@ -36,6 +37,13 @@ jest.mock('next-intl', () => {
     },
   };
 });
+
+// The organization base currency (undefined while it loads).
+let mockBaseCurrency: string | undefined = 'EGP';
+jest.mock('@/lib/hooks/use-organization', () => ({
+  useMoneyFormat: () => ({ data: { baseCurrency: mockBaseCurrency, documentDigits: 'latn' } }),
+  documentCurrency: (code: string | null | undefined, base: string | undefined) => code || base,
+}));
 
 const defaultVendors = [
   { id: 'vendor-1', name: 'Acme', paymentTerms: 30 },
@@ -399,5 +407,75 @@ describe('BillForm due date (audit B8)', () => {
   it('starts a new bill for a vendor on that vendor terms', () => {
     renderForm({ defaultVendorId: 'vendor-cod' });
     expect(dueDateInput().value).toBe(dateInput().value);
+  });
+});
+
+describe('BillForm currency before saving (issue #645)', () => {
+  beforeEach(() => {
+    mockLocale = 'en';
+    mockOptions = ready();
+    mockBaseCurrency = 'EGP';
+  });
+
+  const currencyOption = (): string | null =>
+    screen
+      .getAllByRole('option')
+      .filter((o) => o.getAttribute('aria-selected') === 'true')
+      .map((o) => o.textContent)
+      .find((text) => text?.includes('(') || /^[A-Z]{3} /.test(text ?? '')) ?? null;
+
+  function fillIssueLine() {
+    fireEvent.change(document.querySelector('input[name="lines.0.description"]')!, {
+      target: { value: 'Paper' },
+    });
+    fireEvent.change(document.querySelector('input[name="lines.0.quantity"]')!, {
+      target: { value: '2' },
+    });
+    fireEvent.change(document.querySelector('input[name="lines.0.rate"]')!, {
+      target: { value: '50.25' },
+    });
+    fireEvent.change(document.querySelector('input[name="lines.0.taxRate"]')!, {
+      target: { value: '14' },
+    });
+  }
+
+  it('names the organization currency on an untouched picker and beside every total', () => {
+    renderForm();
+    fillIssueLine();
+
+    expect(currencyOption()).toBe('Default (EGP)');
+    expect(screen.getByTestId('bill-amounts-currency')).toHaveTextContent('Amounts in EGP');
+    expect(screen.getByTestId('bill-subtotal')).toHaveTextContent('EGP 100.50');
+    expect(screen.getByTestId('bill-taxAmount')).toHaveTextContent('EGP 14.07');
+    expect(screen.getByTestId('bill-grandTotal')).toHaveTextContent('EGP 114.57');
+  });
+
+  it('follows a currency the person picks', () => {
+    renderForm();
+    fillIssueLine();
+    fireEvent.click(screen.getByRole('option', { name: 'SAR — Saudi Riyal' }));
+
+    expect(screen.getByTestId('bill-amounts-currency')).toHaveTextContent('Amounts in SAR');
+    expect(screen.getByTestId('bill-grandTotal')).toHaveTextContent('SAR 114.57');
+  });
+
+  it('says the same in Arabic', () => {
+    mockLocale = 'ar';
+    renderForm();
+
+    expect(screen.getByRole('option', { name: 'الافتراضية (EGP)' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(screen.getByTestId('bill-amounts-currency')).toHaveTextContent('المبالغ بعملة EGP');
+  });
+
+  it('shows plain numbers, never a guessed currency, while the base currency loads', () => {
+    mockBaseCurrency = undefined;
+    renderForm();
+    fillIssueLine();
+
+    expect(screen.queryByTestId('bill-amounts-currency')).not.toBeInTheDocument();
+    expect(screen.getByTestId('bill-grandTotal')).toHaveTextContent(/^114\.57$/);
   });
 });

@@ -247,6 +247,8 @@
       "currency": "العملة",
       "currencyPlaceholder": "اختر العملة",
       "defaultCurrency": "الافتراضية",
+      "defaultCurrencyNamed": "الافتراضية ({currency})",
+      "amountsIn": "المبالغ بعملة {currency}",
       "projectOptional": "المشروع (اختياري)",
       "projectPlaceholder": "اختر مشروعًا",
       "noProject": "بدون مشروع",

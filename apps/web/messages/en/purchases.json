@@ -247,6 +247,8 @@
       "currency": "Currency",
       "currencyPlaceholder": "Select currency",
       "defaultCurrency": "Default",
+      "defaultCurrencyNamed": "Default ({currency})",
+      "amountsIn": "Amounts in {currency}",
       "projectOptional": "Project (Optional)",
       "projectPlaceholder": "Select project",
       "noProject": "No Project",
