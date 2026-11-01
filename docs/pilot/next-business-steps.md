@@ -10,11 +10,11 @@ These are not engineering items and do not block the release (owner decision, 1 
 
 ## Onboarding the client (first week)
 
-4. **Accountant's ETA confirmation:** the client's accountant confirms in writing (dated) the client's e-invoice / e-receipt obligation and which authorized issuer it keeps using. Jarda stores that issuer's ETA number on each invoice; it does not submit to the tax authority.
-5. **Opening balances:** import the signed opening trial balance and reconcile it in Jarda (Accounting → opening journal).
+4. **Accountant's ETA confirmation:** the client's accountant confirms in writing (dated) the client's e-invoice / e-receipt obligation and which authorized issuer it keeps using. Jarda lets the accountant record that issuer's ETA number or UUID on each invoice and credit note; it does not submit to the tax authority.
+5. **Opening balances:** enter the signed opening trial balance as one opening journal (Accounting → Journals) and check that Jarda's trial balance matches it.
 
 ## At go-live (operator)
 
-6. **Production credentials** on the server (never in GitHub): database and storage secrets, the restic backup password kept off the server too, `MCP_PUBLIC_URL` only if it differs from the public API address. Mail (`MAIL_SMTP_*`, `MAIL_FROM`) is optional.
+6. **Production credentials** on the server (never in GitHub): database and storage secrets, `MCP_PUBLIC_URL` only if it differs from the public API address. Keep the restic backup password and the app's encryption key (`INTEGRATIONS_ENCRYPTION_KEY`) in the password manager, off the server. Schedule `backup.sh` nightly and send its copy off the server. Mail (`MAIL_SMTP_*`, `MAIL_FROM`) is optional.
 7. **Before the first deploy:** tell the client everyone signs in again once; check for old approved intake jobs without a draft (see #615).
-8. **First backup and a restore drill on the real server** with `deploy/pi/scripts/backup.sh` and `restore-drill.sh` ([test-data record](../evidence/first-client-ops/restore-drill.md)); agree RPO 24 h / RTO 4 h with the client.
+8. **First backup and a restore drill on the real server** run `deploy/pi/scripts/backup.sh`, then `restore-drill.sh` against that first real backup ([test-data record](../evidence/first-client-ops/restore-drill.md)); agree RPO 24 h / RTO 4 h with the client.
