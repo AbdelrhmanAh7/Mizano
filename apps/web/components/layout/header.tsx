@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { LanguageSwitcher } from './language-switcher';
+import { BrandLogo } from '@/components/brand/brand-logo';
 import { NotificationPanel } from './notification-panel';
 import { SignOutEverywhereDialog } from './sign-out-everywhere';
 import { useTourStore } from '@/lib/stores/use-tour-store';
@@ -27,6 +28,7 @@ interface HeaderProps {
 export function Header({ sessionUser }: HeaderProps) {
   const locale = useLocale();
   const t = useTranslations('common.header');
+  const tCommon = useTranslations('common');
   const tTable = useTranslations('common.table');
   const pathname = usePathname();
   const { startTour } = useTourStore();
@@ -51,7 +53,11 @@ export function Header({ sessionUser }: HeaderProps) {
     <header role="banner" className="bg-card border-b border-border px-6 py-4 ps-14 lg:ps-6">
       <div className="flex items-center justify-between">
         <div className="min-w-0 flex-1 pe-2">
-          <h1 className="truncate text-base font-semibold text-foreground sm:text-lg">
+          {/* Phones: the logo; the greeting does not fit beside the header buttons. */}
+          <span className="sm:hidden">
+            <BrandLogo height={24} alt={tCommon('appName')} />
+          </span>
+          <h1 className="hidden truncate text-lg font-semibold text-foreground sm:block">
             {t('welcomeBack', { name: sessionUser?.firstName || '' })}
           </h1>
         </div>
