@@ -1,4 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { CustomersService } from './customers.service';
 import { AgingReportsService } from '../../reports/services/aging-reports.service';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -143,5 +144,31 @@ describe('CustomersService', () => {
       NotFoundException,
     );
     expect(outbox.customerEvent).not.toHaveBeenCalled();
+  });
+
+  // Golden scenario (test-cases C03): INV-0001 paid, INV-0002 570.00 less credit note 114.00.
+  it("gives the cursor list each customer's outstanding balance (#668)", async () => {
+    prisma.customer.findMany.mockResolvedValue([
+      { id: 'cust-nile', name: 'Nile Dental Clinic' },
+      { id: 'cust-delta', name: 'Delta Trading' },
+    ] as never);
+    prisma.customer.count.mockResolvedValue(2 as never);
+    prisma.invoice.groupBy.mockResolvedValue([
+      { customerId: 'cust-nile', _sum: { balanceDue: new Prisma.Decimal('456') } },
+    ] as never);
+
+    const page = await service.findAllCursor(ORG_ID, {});
+
+    expect(page.data.map((c) => [c.name, c.outstandingBalance])).toEqual([
+      ['Nile Dental Clinic', '456.0000'],
+      ['Delta Trading', '0.0000'],
+    ]);
+    expect(prisma.invoice.groupBy.mock.calls[0][0]).toMatchObject({
+      where: {
+        organizationId: ORG_ID,
+        customerId: { in: ['cust-nile', 'cust-delta'] },
+        deletedAt: null,
+      },
+    });
   });
 });

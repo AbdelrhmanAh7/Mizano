@@ -118,32 +118,8 @@ export class CustomersService {
       this.prisma.customer.count({ where }),
     ]);
 
-    // Batch balance calculation: single groupBy query instead of N+1
-    const customerIds = customers.map((c) => c.id);
-    const balances =
-      customerIds.length > 0
-        ? await this.prisma.invoice.groupBy({
-            by: ['customerId'],
-            where: {
-              customerId: { in: customerIds },
-              deletedAt: null,
-              status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] },
-            },
-            _sum: { balanceDue: true },
-          })
-        : [];
-
-    const balanceMap = new Map(
-      balances.map((b) => [b.customerId, b._sum.balanceDue?.toFixed(4) ?? '0.0000']),
-    );
-
-    const customersWithBalance = customers.map((customer) => ({
-      ...customer,
-      outstandingBalance: balanceMap.get(customer.id) ?? '0.0000',
-    }));
-
     return {
-      data: customersWithBalance,
+      data: await this.withOutstandingBalances(organizationId, customers),
       meta: {
         page,
         limit,
@@ -167,7 +143,7 @@ export class CustomersService {
       ];
     }
 
-    return cursorPaginate(
+    const page = await cursorPaginate(
       this.prisma.customer,
       where,
       { [sortBy]: sortOrder },
@@ -176,6 +152,36 @@ export class CustomersService {
         take,
       },
     );
+    // The customer list reads this endpoint: without the balance every row showed 0.00 (#668).
+    return { ...page, data: await this.withOutstandingBalances(organizationId, page.data) };
+  }
+
+  /** Each customer's open invoice balance, in one groupBy query for the whole page. */
+  private async withOutstandingBalances<T extends { id: string }>(
+    organizationId: string,
+    customers: T[],
+  ): Promise<Array<T & { outstandingBalance: string }>> {
+    const customerIds = customers.map((c) => c.id);
+    const balances =
+      customerIds.length > 0
+        ? await this.prisma.invoice.groupBy({
+            by: ['customerId'],
+            where: {
+              organizationId,
+              customerId: { in: customerIds },
+              deletedAt: null,
+              status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] },
+            },
+            _sum: { balanceDue: true },
+          })
+        : [];
+    const balanceMap = new Map(
+      balances.map((b) => [b.customerId, b._sum.balanceDue?.toFixed(4) ?? '0.0000']),
+    );
+    return customers.map((customer) => ({
+      ...customer,
+      outstandingBalance: balanceMap.get(customer.id) ?? '0.0000',
+    }));
   }
 
   async findOne(organizationId: string, id: string) {
@@ -187,7 +193,7 @@ export class CustomersService {
       throw new NotFoundException('Customer not found');
     }
 
-    const outstandingBalance = await this.calculateOutstandingBalance(id);
+    const outstandingBalance = await this.calculateOutstandingBalance(organizationId, id);
 
     return { ...customer, outstandingBalance };
   }
@@ -261,9 +267,13 @@ export class CustomersService {
     return runBulk(ids, (id) => this.remove(organizationId, id));
   }
 
-  private async calculateOutstandingBalance(customerId: string): Promise<string> {
+  private async calculateOutstandingBalance(
+    organizationId: string,
+    customerId: string,
+  ): Promise<string> {
     const invoices = await this.prisma.invoice.findMany({
       where: {
+        organizationId,
         customerId,
         deletedAt: null,
         status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] },
