@@ -126,4 +126,89 @@ describe('FinancialReportsService', () => {
       expect(report.isBalanced).toBe(true);
     });
   });
+  describe('getSalesByCustomer (#666)', () => {
+    // Golden scenario C03 + C09: INV-0001 2 x 100 + 14% VAT = 228.00 paid 100 + 128; INV-0002
+    // 500 + 14% VAT = 570.00 with CN-001 114.00 (100 + 14 VAT) applied to it.
+    beforeEach(() => {
+      prisma.organization.findUnique.mockResolvedValue({
+        baseCurrency: 'EGP',
+        currency: 'EGP',
+        defaultVatPayableAccountId: 'acc-vat',
+      } as never);
+      prisma.invoice.findMany.mockResolvedValue([
+        {
+          id: 'inv-1',
+          customerId: 'cust-nile',
+          grandTotal: new Decimal('228'),
+          taxAmount: new Decimal('28'),
+          balanceDue: new Decimal('0'),
+          currencyCode: 'EGP',
+          customer: { id: 'cust-nile', name: 'Nile Dental Clinic' },
+        },
+        {
+          id: 'inv-2',
+          customerId: 'cust-nile',
+          grandTotal: new Decimal('570'),
+          taxAmount: new Decimal('70'),
+          balanceDue: new Decimal('456'),
+          currencyCode: 'EGP',
+          customer: { id: 'cust-nile', name: 'Nile Dental Clinic' },
+        },
+      ] as never);
+      prisma.creditNote.findMany.mockResolvedValue([
+        {
+          id: 'cn-1',
+          customerId: 'cust-nile',
+          amount: new Decimal('114'),
+          customer: { id: 'cust-nile', name: 'Nile Dental Clinic' },
+          invoice: { currencyCode: 'EGP' },
+        },
+      ] as never);
+      prisma.paymentAllocation.findMany.mockResolvedValue([
+        { invoiceId: 'inv-1', amount: new Decimal('100') },
+        { invoiceId: 'inv-1', amount: new Decimal('128') },
+      ] as never);
+      prisma.journalLine.findMany.mockResolvedValue([
+        { debit: new Decimal('14'), journal: { sourceId: 'cn-1' } },
+      ] as never);
+    });
+
+    it('reports net sales without VAT less credit notes, and cash received as paid', async () => {
+      const report = await service.getSalesByCustomer(ORG_ID, '2026-01-01', '2026-11-30');
+
+      expect(report.entries).toEqual([
+        {
+          customerId: 'cust-nile',
+          customerName: 'Nile Dental Clinic',
+          invoiceCount: 2,
+          totalAmount: '600.0000',
+          paidAmount: '228.0000',
+          balanceDue: '456.0000',
+          currencyCode: 'EGP',
+        },
+      ]);
+      expect(report.totalAmount).toBe('600.0000');
+      expect(report.totalPaid).toBe('228.0000');
+      expect(report.totalBalance).toBe('456.0000');
+    });
+
+    it('reads only this organization and the credit notes posted VAT', async () => {
+      await service.getSalesByCustomer(ORG_ID, '2026-01-01', '2026-11-30');
+
+      expect(prisma.creditNote.findMany.mock.calls[0][0]?.where).toMatchObject({
+        organizationId: ORG_ID,
+        deletedAt: null,
+        invoice: { organizationId: ORG_ID },
+      });
+      expect(prisma.paymentAllocation.findMany.mock.calls[0][0]?.where).toMatchObject({
+        invoiceId: { in: ['inv-1', 'inv-2'] },
+        invoice: { organizationId: ORG_ID },
+        payment: { organizationId: ORG_ID, deletedAt: null },
+      });
+      expect(prisma.journalLine.findMany.mock.calls[0][0]?.where).toMatchObject({
+        accountId: 'acc-vat',
+        journal: { organizationId: ORG_ID, sourceType: 'CREDIT_NOTE', sourceId: { in: ['cn-1'] } },
+      });
+    });
+  });
 });

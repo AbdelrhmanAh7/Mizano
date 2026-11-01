@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Account, AccountType } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { ReadReplicaService } from '../../../prisma/read-replica.service';
+import { JournalSourceType } from '../../accounting/services/journals.service';
 import {
   documentCurrency,
   getBaseCurrency,
@@ -735,6 +736,14 @@ export class FinancialReportsService {
 
   // === Sales & Purchases Reports (document based; draft/pending/void/deleted excluded) ===
 
+  /**
+   * Sales per customer for the period (#666), on the same basis as the P&L:
+   * - `totalAmount` is net sales: posted invoices dated in the period, excluding VAT
+   *   (grandTotal - taxAmount), less the net (excluding VAT) of credit notes dated in the period.
+   * - `paidAmount` is money received against those invoices (payment allocations); a credit
+   *   note settles a balance but is not a payment.
+   * - `balanceDue` is what those invoices still owe today.
+   */
   async getSalesByCustomer(
     organizationId: string,
     startDate?: string,
@@ -745,60 +754,134 @@ export class FinancialReportsService {
     const base = await getBaseCurrency(this.prisma, organizationId);
     const reportCurrency = normalizeCurrencyParam(currency, base);
 
-    const invoices = await this.prisma.invoice.findMany({
-      where: {
-        organizationId,
-        deletedAt: null,
-        status: { in: POSTED_INVOICE_STATUSES },
-        date: { gte: period.start, lte: period.end },
-      },
-      select: {
-        customerId: true,
-        grandTotal: true,
-        balanceDue: true,
-        currencyCode: true,
-        customer: { select: { id: true, name: true } },
-      },
-    });
+    const [invoices, creditNotes, org] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where: {
+          organizationId,
+          deletedAt: null,
+          status: { in: POSTED_INVOICE_STATUSES },
+          date: { gte: period.start, lte: period.end },
+        },
+        select: {
+          id: true,
+          customerId: true,
+          grandTotal: true,
+          taxAmount: true,
+          balanceDue: true,
+          currencyCode: true,
+          customer: { select: { id: true, name: true } },
+        },
+      }),
+      this.prisma.creditNote.findMany({
+        where: {
+          organizationId,
+          deletedAt: null,
+          date: { gte: period.start, lte: period.end },
+          invoice: { organizationId, deletedAt: null, status: { in: POSTED_INVOICE_STATUSES } },
+        },
+        select: {
+          id: true,
+          customerId: true,
+          amount: true,
+          customer: { select: { id: true, name: true } },
+          invoice: { select: { currencyCode: true } },
+        },
+      }),
+      this.prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { defaultVatPayableAccountId: true },
+      }),
+    ]);
     const { included, otherCurrencies } = splitByCurrency(
       invoices,
       (i) => documentCurrency(i.currencyCode, base),
       reportCurrency,
     );
+    const credits = creditNotes.filter(
+      (c) => documentCurrency(c.invoice.currencyCode, base) === reportCurrency,
+    );
 
-    const byCustomer = new Map<
-      string,
-      { name: string; count: number; total: Decimal; balance: Decimal }
-    >();
-    for (const inv of included) {
-      const row = byCustomer.get(inv.customerId) ?? {
-        name: inv.customer.name,
-        count: 0,
-        total: ZERO,
-        balance: ZERO,
-      };
-      row.count += 1;
-      row.total = row.total.add(toDecimal(inv.grandTotal));
-      row.balance = row.balance.add(toDecimal(inv.balanceDue));
-      byCustomer.set(inv.customerId, row);
+    const [allocations, creditVat] = await Promise.all([
+      included.length > 0
+        ? this.prisma.paymentAllocation.findMany({
+            where: {
+              invoiceId: { in: included.map((i) => i.id) },
+              invoice: { organizationId },
+              payment: { organizationId, deletedAt: null },
+            },
+            select: { invoiceId: true, amount: true },
+          })
+        : Promise.resolve([]),
+      // A credit note's VAT is what its journal debited to VAT Payable (the posting rule).
+      credits.length > 0 && org?.defaultVatPayableAccountId
+        ? this.prisma.journalLine.findMany({
+            where: {
+              accountId: org.defaultVatPayableAccountId,
+              journal: {
+                organizationId,
+                deletedAt: null,
+                sourceType: JournalSourceType.CREDIT_NOTE,
+                sourceId: { in: credits.map((c) => c.id) },
+              },
+            },
+            select: { debit: true, journal: { select: { sourceId: true } } },
+          })
+        : Promise.resolve([]),
+    ]);
+    const paidByInvoice = new Map<string, Decimal>();
+    for (const a of allocations) {
+      paidByInvoice.set(
+        a.invoiceId,
+        (paidByInvoice.get(a.invoiceId) ?? ZERO).add(toDecimal(a.amount)),
+      );
+    }
+    const vatByCredit = new Map<string, Decimal>();
+    for (const line of creditVat) {
+      const id = line.journal.sourceId;
+      if (id) vatByCredit.set(id, (vatByCredit.get(id) ?? ZERO).add(toDecimal(line.debit)));
     }
 
-    const rows = [...byCustomer.entries()].sort((a, b) => b[1].total.comparedTo(a[1].total));
-    const totalAmount = rows.reduce((s, [, r]) => s.add(r.total), ZERO);
-    const totalBalance = rows.reduce((s, [, r]) => s.add(r.balance), ZERO);
+    type Row = { name: string; count: number; net: Decimal; paid: Decimal; balance: Decimal };
+    const byCustomer = new Map<string, Row>();
+    const rowOf = (customerId: string, name: string): Row => {
+      const row = byCustomer.get(customerId) ?? {
+        name,
+        count: 0,
+        net: ZERO,
+        paid: ZERO,
+        balance: ZERO,
+      };
+      byCustomer.set(customerId, row);
+      return row;
+    };
+    for (const inv of included) {
+      const row = rowOf(inv.customerId, inv.customer.name);
+      row.count += 1;
+      row.net = row.net.add(toDecimal(inv.grandTotal).sub(toDecimal(inv.taxAmount)));
+      row.paid = row.paid.add(paidByInvoice.get(inv.id) ?? ZERO);
+      row.balance = row.balance.add(toDecimal(inv.balanceDue));
+    }
+    for (const c of credits) {
+      const row = rowOf(c.customerId, c.customer.name);
+      row.net = row.net.sub(toDecimal(c.amount).sub(vatByCredit.get(c.id) ?? ZERO));
+    }
+
+    const rows = [...byCustomer.entries()].sort((a, b) => b[1].net.comparedTo(a[1].net));
+    const sum = (pick: (r: Row) => Decimal): Decimal =>
+      rows.reduce((s, [, r]) => s.add(pick(r)), ZERO);
     return {
       entries: rows.map(([customerId, r]) => ({
         customerId,
         customerName: r.name,
         invoiceCount: r.count,
-        totalAmount: money(r.total),
-        paidAmount: money(r.total.sub(r.balance)),
+        totalAmount: money(r.net),
+        paidAmount: money(r.paid),
         balanceDue: money(r.balance),
         currencyCode: reportCurrency,
       })),
-      totalAmount: money(totalAmount),
-      totalPaid: money(totalAmount.sub(totalBalance)),
-      totalBalance: money(totalBalance),
+      totalAmount: money(sum((r) => r.net)),
+      totalPaid: money(sum((r) => r.paid)),
+      totalBalance: money(sum((r) => r.balance)),
       currencyCode: reportCurrency,
       otherCurrencies,
       period: { startDate: period.startDate, endDate: period.endDate },
