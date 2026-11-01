@@ -26,7 +26,12 @@ for h in "${hosts[@]}"; do
   end="$(echo | timeout 15 openssl s_client -connect "$h:443" -servername "$h" -verify_return_error 2>/dev/null |
     openssl x509 -noout -enddate 2>/dev/null | sed -n 's/^notAfter=//p' || true)"
   if [ -n "$end" ]; then
-    pass "HTTPS $h trusted certificate, $(( ($(date -d "$end" +%s) - $(date +%s)) / 86400 )) days left (Caddy renews at about 30)"
+    days=$((($(date -d "$end" +%s) - $(date +%s)) / 86400))
+    if [ "$days" -ge "${CERT_MIN_DAYS:-14}" ]; then
+      pass "HTTPS $h trusted certificate, $days days left (Caddy renews at about 30)"
+    else
+      fail "HTTPS $h certificate has only $days days left: renewal is failing (journalctl / compose logs caddy)"
+    fi
   else
     fail "HTTPS $h no trusted certificate"
   fi
@@ -63,7 +68,8 @@ sshd -T 2>/dev/null | grep -qx 'passwordauthentication no' && pass "SSH: keys on
 
 bstatus="$DATA_DIR/backups/backup.status"
 if [ -f "$bstatus" ] && grep -q '^OK' "$bstatus"; then
-  pass "last backup OK, $(( ($(date +%s) - $(stat -c %Y "$bstatus")) / 3600 )) h ago"
+  age_h=$((($(date +%s) - $(stat -c %Y "$bstatus")) / 3600))
+  if [ "$age_h" -le 26 ]; then pass "last backup OK, $age_h h ago"; else fail "last backup is $age_h h old (nightly timer not running?)"; fi
 else
   fail "no successful backup yet ($bstatus)"
 fi

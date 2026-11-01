@@ -104,6 +104,7 @@ if [ "$check" -eq 1 ]; then
     echo "RESTORE CHECK FAILED: restored data does not match the snapshot" >&2
     exit 1
   }
+  drop_scratch
   log "restore-check OK snapshot=${snapshot:0:8} originals=verified scratch=dropped"
   exit 0
 fi
