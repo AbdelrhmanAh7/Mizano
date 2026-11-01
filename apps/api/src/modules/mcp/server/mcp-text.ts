@@ -1,3 +1,4 @@
+import { BRAND } from '@mizano/shared-types';
 import { McpLocale } from '../mcp-locale';
 
 /**
@@ -49,8 +50,8 @@ export const MCP_TEXT = {
     en: 'Expense accounts and bank or cash accounts you can pay from',
   },
   draftSaved: ((what: Text, number: string) => ({
-    ar: `تم حفظ ${what.ar} ${number} كمسودة. لم يُرحَّل أو يُرسل أو يُدفع أي شيء: راجع المسودة في ميزان ثم رحّلها بنفسك.`,
-    en: `Saved ${what.en} ${number} as a draft. Nothing was posted, sent or paid: review it in Mizano and post it yourself.`,
+    ar: `تم حفظ ${what.ar} ${number} كمسودة. لم يُرحَّل أو يُرسل أو يُدفع أي شيء: راجع المسودة في ${BRAND.name.ar} ثم رحّلها بنفسك.`,
+    en: `Saved ${what.en} ${number} as a draft. Nothing was posted, sent or paid: review it in ${BRAND.name.en} and post it yourself.`,
   })) as Fn<[Text, string]>,
   quoteNoun: { ar: 'عرض السعر', en: 'quote' },
   invoiceNoun: { ar: 'الفاتورة', en: 'invoice' },
@@ -58,16 +59,16 @@ export const MCP_TEXT = {
   expenseNoun: { ar: 'المصروف', en: 'expense' },
   notFound: { ar: 'لم يُعثر عليه في هذه المؤسسة.', en: 'Not found in this organization.' },
   noPermission: ((permission: string) => ({
-    ar: `دورك في ميزان لا يسمح بهذا (يلزم ${permission}).`,
-    en: `Your role in Mizano does not allow this (needs ${permission}).`,
+    ar: `دورك في ${BRAND.name.ar} لا يسمح بهذا (يلزم ${permission}).`,
+    en: `Your role in ${BRAND.name.en} does not allow this (needs ${permission}).`,
   })) as Fn<[string]>,
   invalid: ((fields: string) => ({
     ar: `بيانات غير صحيحة في: ${fields}`,
     en: `Please check these fields: ${fields}`,
   })) as Fn<[string]>,
   refused: ((reason: string) => ({
-    ar: `رفض ميزان الطلب: ${reason}`,
-    en: `Mizano refused this: ${reason}`,
+    ar: `رفضت ${BRAND.name.ar} الطلب: ${reason}`,
+    en: `${BRAND.name.en} refused this: ${reason}`,
   })) as Fn<[string]>,
   failed: {
     ar: 'تعذّر إكمال الطلب الآن. حاول مرة أخرى بعد قليل.',

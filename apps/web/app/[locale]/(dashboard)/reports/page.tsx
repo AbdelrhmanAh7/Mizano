@@ -22,7 +22,7 @@ export default function ReportsPage() {
   const reportCategories = [
     {
       name: t('categories.financial'),
-      description: t('categories.financialDescription'),
+      description: t('categoryDescriptions.financial'),
       reports: [
         {
           name: t('profitLoss.title'),
@@ -46,7 +46,7 @@ export default function ReportsPage() {
     },
     {
       name: t('categories.receivablesPayables'),
-      description: t('categories.receivablesPayablesDescription'),
+      description: t('categoryDescriptions.receivablesPayables'),
       reports: [
         {
           name: t('arAging.title'),
@@ -64,7 +64,7 @@ export default function ReportsPage() {
     },
     {
       name: t('categories.sales'),
-      description: t('categories.salesDescription'),
+      description: t('categoryDescriptions.sales'),
       reports: [
         {
           name: t('salesByCustomer.title'),
@@ -88,7 +88,7 @@ export default function ReportsPage() {
     },
     {
       name: t('categories.accounting'),
-      description: t('categories.accountingDescription'),
+      description: t('categoryDescriptions.accounting'),
       reports: [
         {
           name: t('generalLedger.title'),

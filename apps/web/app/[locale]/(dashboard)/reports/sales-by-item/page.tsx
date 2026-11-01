@@ -36,7 +36,7 @@ function SalesByItemContent() {
     () => [
       {
         accessorKey: 'itemName',
-        header: t('salesByItem.item'),
+        header: t('salesByItem.columns.item'),
         cell: ({ row }) => (
           <div>
             <div className="font-medium">{row.original.itemName}</div>
@@ -48,19 +48,19 @@ function SalesByItemContent() {
       },
       {
         accessorKey: 'quantitySold',
-        header: t('salesByItem.qtySold'),
+        header: t('salesByItem.columns.quantitySold'),
         cell: ({ row }) => row.original.quantitySold.toLocaleString(),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'averagePrice',
-        header: t('salesByItem.avgPrice'),
+        header: t('salesByItem.columns.averagePrice'),
         cell: ({ row }) => formatCurrency(row.original.averagePrice),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'totalAmount',
-        header: t('salesByItem.totalAmount'),
+        header: t('salesByItem.columns.totalAmount'),
         cell: ({ row }) => (
           <span className="font-medium">{formatCurrency(row.original.totalAmount)}</span>
         ),
@@ -93,7 +93,9 @@ function SalesByItemContent() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">{t('salesByItem.totalQtySold')}</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {t('salesByItem.totalQuantitySold')}
+              </CardTitle>
               <Hash className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -118,7 +120,7 @@ function SalesByItemContent() {
             columns={columns}
             data={data?.entries || []}
             isLoading={isLoading}
-            emptyMessage={t('salesByItem.empty')}
+            emptyMessage={t('salesByItem.noData')}
             enableExport
             exportFilename="sales-by-item"
           />

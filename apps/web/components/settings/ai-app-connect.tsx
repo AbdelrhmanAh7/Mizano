@@ -22,15 +22,16 @@ import { useMcpConnections, useRevokeMcpConnection } from '@/lib/hooks/use-mcp';
 import { Check, Copy, PlugZap } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
+import { BRAND } from '@mizano/shared-types';
 
 const APPS = ['claude', 'claudeCode', 'chatgpt', 'codex', 'gemini'] as const;
 type App = (typeof APPS)[number];
 
 /** Builder commands per app; `{url}` is the server address. Shown as-is in both languages. */
 const COMMANDS: Partial<Record<App, string[]>> = {
-  claudeCode: ['claude mcp add --transport http mizano {url}', '/mcp'],
-  codex: ['codex mcp add mizano --url {url}', 'codex mcp login mizano'],
-  gemini: ['gemini mcp add --transport http mizano {url}', '/mcp auth mizano'],
+  claudeCode: [`claude mcp add --transport http ${BRAND.slug} {url}`, '/mcp'],
+  codex: [`codex mcp add ${BRAND.slug} --url {url}`, `codex mcp login ${BRAND.slug}`],
+  gemini: [`gemini mcp add --transport http ${BRAND.slug} {url}`, `/mcp auth ${BRAND.slug}`],
 };
 
 /** Steps (message keys) per app, in order. */
@@ -85,7 +86,7 @@ function CommandBlock({
 }
 
 /**
- * "Connect your AI app": the person's own Claude, ChatGPT, Codex or Gemini works through Mizano's
+ * "Connect your AI app": the person's own Claude, ChatGPT, Codex or Gemini works through the product's
  * tools with no key; the list shows connected apps and lets their owner (or an admin) disconnect.
  */
 export function AiAppConnect() {

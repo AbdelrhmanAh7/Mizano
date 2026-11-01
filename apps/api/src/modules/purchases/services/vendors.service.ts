@@ -18,6 +18,9 @@ export class VendorsService {
     return this.prisma.vendor.create({
       data: {
         ...rest,
+        // Without an explicit currency a vendor uses the org base currency, never the USD
+        // schema default (#83), like customers.
+        currency: rest.currency || (await this.baseCurrency(organizationId)),
         billingStreet: billingAddress?.street,
         billingCity: billingAddress?.city,
         billingState: billingAddress?.state,
@@ -26,6 +29,15 @@ export class VendorsService {
         organizationId,
       },
     });
+  }
+
+  private async baseCurrency(organizationId: string): Promise<string> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { baseCurrency: true },
+    });
+    if (!org) throw new NotFoundException('Organization not found');
+    return org.baseCurrency;
   }
 
   async findAll(organizationId: string, query: PaginationDto) {

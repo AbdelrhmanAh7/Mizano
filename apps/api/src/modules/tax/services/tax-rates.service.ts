@@ -6,6 +6,7 @@ import { DecimalUtils } from '../../../common/utils/decimal';
 import { CreateTaxRateDto } from '../dto/create-tax-rate.dto';
 import { UpdateTaxRateDto } from '../dto/update-tax-rate.dto';
 import { TaxRateQueryDto } from '../dto/tax-rate-query.dto';
+import { renameFields, systemName } from '../../../common/i18n/localize';
 
 /** Tax rates are percentages (the column is Decimal(5, 2)): 0 to 100. */
 function assertRateInRange(rate: string | undefined): void {
@@ -66,8 +67,10 @@ export class TaxRatesService {
     const data = await this.prisma.taxRate.findMany({
       where,
       include: {
-        linkedAccount: { select: { id: true, code: true, name: true } },
-        collectAccount: { select: { id: true, code: true, name: true } },
+        linkedAccount: { select: { id: true, code: true, name: true, nameAr: true, nameEn: true } },
+        collectAccount: {
+          select: { id: true, code: true, name: true, nameAr: true, nameEn: true },
+        },
       },
       orderBy: { name: 'asc' },
     });
@@ -88,11 +91,12 @@ export class TaxRatesService {
   }
 
   async update(organizationId: string, id: string, dto: UpdateTaxRateDto) {
-    await this.findOne(organizationId, id);
+    const existing = await this.findOne(organizationId, id);
     assertRateInRange(dto.rate);
     await this.assertOwnAccounts(organizationId, [dto.linkedAccountId, dto.collectAccountId]);
 
-    const data: Record<string, unknown> = { ...dto };
+    const { name, ...rest } = dto;
+    const data: Record<string, unknown> = { ...rest, ...renameFields(existing, name) };
     if (dto.rate !== undefined) data.rate = DecimalUtils.parseInput(dto.rate, 'rate');
 
     // If setting as default, unset other defaults
@@ -153,7 +157,7 @@ export class TaxRatesService {
       if (!existing) {
         await this.prisma.taxRate.create({
           data: {
-            name: tax.name,
+            ...systemName(tax.name),
             rate: new Decimal(tax.rate),
             type: tax.type,
             linkedAccountId,

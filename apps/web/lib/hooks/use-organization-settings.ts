@@ -1,12 +1,10 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToastMutation } from './use-toast-mutation';
+import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { useToast } from '@/components/ui/use-toast';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
-
 export interface AccountSettings {
   defaultArAccountId: string | null;
   defaultRevenueAccountId: string | null;
@@ -46,27 +44,14 @@ export function useAccountSettings() {
  * Hook to update organization account settings
  */
 export function useUpdateAccountSettings() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'settings.accountSettings.toast',
     mutationFn: async (data: UpdateAccountSettingsData) => {
       const response = await api.patch('/organization/account-settings', data);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['organization', 'account-settings'] });
-      toast({
-        title: 'Settings saved',
-        description: 'Account settings have been updated successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error saving settings',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: () => [['organization', 'account-settings']],
+    success: 'saved',
+    error: 'saveError',
   });
 }

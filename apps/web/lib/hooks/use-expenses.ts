@@ -1,14 +1,15 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { useToastMutation } from './use-toast-mutation';
 import { useToast } from '@/components/ui/use-toast';
+import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 import { expensesApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CreateExpensePayload } from '@/components/purchases/expense-payload';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
-
 export interface Expense {
   id: string;
   date: string;
@@ -109,28 +110,15 @@ export function useExpense(id: string | undefined) {
  * Hook to create a new expense
  */
 export function useCreateExpense() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'purchases.expenses.toast',
     mutationFn: async (data: CreateExpenseData) => {
       const response = await expensesApi.create(data);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      toast({
-        title: 'Expense recorded',
-        description: 'The expense has been recorded successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error recording expense',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: () => [['expenses']],
+    success: 'recorded',
+    error: 'recordError',
   });
 }
 
@@ -140,6 +128,8 @@ export function useCreateExpense() {
 export function usePostExpense() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('purchases.expenses.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -148,13 +138,13 @@ export function usePostExpense() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      toast({ title: 'Expense posted', description: 'The expense was posted to the ledger.' });
+      toast({ title: t('posted'), description: t('postedDescription') });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error posting expense',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('postError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });
@@ -164,38 +154,14 @@ export function usePostExpense() {
  * Hook to delete an expense
  */
 export function useDeleteExpense() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'purchases.expenses.toast',
     mutationFn: async (id: string) => {
       const response = await expensesApi.delete(id);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      toast({
-        title: 'Expense voided',
-        description: 'The expense was voided and its journal reversed.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error voiding expense',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: () => [['expenses']],
+    success: 'voided',
+    error: 'voidError',
   });
-}
-
-/**
- * Format currency amount
- */
-export function formatCurrency(amount: string | number, currency: string = 'USD'): string {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(num);
 }

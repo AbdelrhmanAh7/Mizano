@@ -23,7 +23,6 @@ import {
 import { useToast } from '@/components/ui/use-toast';
 import { ImportWizard } from '@/components/import/import-wizard';
 import { quotesApi } from '@/lib/api';
-import { getApiErrorMessage } from '@/lib/api-error';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { usePermissions } from '@/lib/hooks/use-permissions';
@@ -109,19 +108,19 @@ function QuotesPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => quotesApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['quotes']],
-    successMessage: tBulk.raw('quotesDeleted'),
+    successMessage: (count) => tBulk('quotesDeleted', { count }),
   });
 
   const bulkSendAction = useBulkAction({
     mutationFn: (ids) => quotesApi.bulkSend(ids).then((r) => r.data),
     queryKeys: [['quotes']],
-    successMessage: tBulk.raw('quotesSent'),
+    successMessage: (count) => tBulk('quotesSent', { count }),
   });
 
   const bulkDeclineAction = useBulkAction({
     mutationFn: (ids) => quotesApi.bulkDecline(ids).then((r) => r.data),
     queryKeys: [['quotes']],
-    successMessage: tBulk.raw('quotesDeclined'),
+    successMessage: (count) => tBulk('quotesDeclined', { count }),
   });
 
   const bulkActions = [
@@ -176,11 +175,11 @@ function QuotesPageContent() {
         await deleteQuote.mutateAsync(quoteToDelete.id);
         toast({
           title: t('quotes.toast.deleted'),
-          description: t('quotes.toast.deletedDescription'),
+          description: t('quotes.toast.deletedNumber', { number: quoteToDelete.quoteNumber }),
         });
       } catch (error: unknown) {
         toast({
-          title: t('toast.error'),
+          title: tCommon('errors.title'),
           description:
             (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
             t('quotes.toast.deleteError'),
@@ -192,35 +191,78 @@ function QuotesPageContent() {
     }
   };
 
-  // One toast pattern for every quote action: success copy, else the server's reason.
-  const runQuoteAction = async (
-    action: () => Promise<unknown>,
-    done: 'sent' | 'accepted' | 'declined' | 'invoiceCreated',
-    failed: 'sendError' | 'acceptError' | 'declineError' | 'convertError',
-  ): Promise<void> => {
+  const handleSend = async (quote: Quote) => {
     try {
-      await action();
+      await sendQuote.mutateAsync(quote.id);
       toast({
-        title: t(`quotes.toast.${done}`),
-        description: t(`quotes.toast.${done}Description`),
+        title: t('quotes.toast.sent'),
+        description: t('quotes.toast.sentNumber', { number: quote.quoteNumber }),
       });
     } catch (error: unknown) {
       toast({
-        title: t('toast.error'),
-        description: getApiErrorMessage(error, t(`quotes.toast.${failed}`)),
+        title: tCommon('errors.title'),
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          t('quotes.toast.sendError'),
         variant: 'destructive',
       });
     }
   };
 
-  const handleSend = (quote: Quote) =>
-    runQuoteAction(() => sendQuote.mutateAsync(quote.id), 'sent', 'sendError');
-  const handleAccept = (quote: Quote) =>
-    runQuoteAction(() => acceptQuote.mutateAsync(quote.id), 'accepted', 'acceptError');
-  const handleDecline = (quote: Quote) =>
-    runQuoteAction(() => declineQuote.mutateAsync(quote.id), 'declined', 'declineError');
-  const handleConvert = (quote: Quote) =>
-    runQuoteAction(() => convertToInvoice.mutateAsync(quote.id), 'invoiceCreated', 'convertError');
+  const handleAccept = async (quote: Quote) => {
+    try {
+      await acceptQuote.mutateAsync(quote.id);
+      toast({
+        title: t('quotes.toast.accepted'),
+        description: t('quotes.toast.acceptedNumber', { number: quote.quoteNumber }),
+      });
+    } catch (error: unknown) {
+      toast({
+        title: tCommon('errors.title'),
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          t('quotes.toast.acceptError'),
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDecline = async (quote: Quote) => {
+    try {
+      await declineQuote.mutateAsync(quote.id);
+      toast({
+        title: t('quotes.toast.declined'),
+        description: t('quotes.toast.declinedNumber', { number: quote.quoteNumber }),
+      });
+    } catch (error: unknown) {
+      toast({
+        title: tCommon('errors.title'),
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          t('quotes.toast.declineError'),
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleConvert = async (quote: Quote) => {
+    try {
+      await convertToInvoice.mutateAsync(quote.id);
+      toast({
+        title: t('quotes.toast.invoiceCreated'),
+        description: t('quotes.toast.convertedNumber', { number: quote.quoteNumber }),
+      });
+      // Optionally navigate to the new invoice
+    } catch (error: unknown) {
+      toast({
+        title: tCommon('errors.title'),
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          t('quotes.toast.convertError'),
+        variant: 'destructive',
+      });
+    }
+  };
 
   const columns: ColumnDef<Quote>[] = [
     {
@@ -534,7 +576,7 @@ function QuotesPageContent() {
         open={importOpen}
         onOpenChange={setImportOpen}
         entityType={'quotes' as ImportEntityType}
-        entityLabel={t('quotes.title')}
+        entityLabel={t('quotes.list.importLabel')}
         onComplete={() => refetch()}
       />
     </div>

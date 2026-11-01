@@ -3,6 +3,11 @@ import { render, screen } from '@testing-library/react';
 import AssetsPage from './page';
 
 // Mock next-intl
+// Amounts come from the shared formatter (org base currency, never USD; #83).
+jest.mock('@/lib/hooks/use-money-formatter', () => ({
+  useMoneyFormatter: () => (v: unknown) => `EGP ${String(v ?? 0)}`,
+}));
+
 jest.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }));
@@ -44,7 +49,6 @@ jest.mock('@/lib/hooks/use-assets', () => ({
   getAssetStatusColor: () => '',
   getAssetStatusLabel: (status: string) => status,
   getDepreciationMethodLabel: (method: string) => method,
-  formatCurrency: (val: number) => `$${val}`,
   AssetStatus: { ACTIVE: 'ACTIVE', DISPOSED: 'DISPOSED', FULLY_DEPRECIATED: 'FULLY_DEPRECIATED' },
   AssetType: { ELECTRONICS: 'ELECTRONICS', FURNITURE: 'FURNITURE' },
   DepreciationMethod: { STRAIGHT_LINE: 'STRAIGHT_LINE' },

@@ -9,7 +9,8 @@ function matches(row: Row, where: Where): boolean {
     if (key === 'OR') return (cond as Where[]).some((w) => matches(row, w));
     const value = row[key];
     if (cond !== null && typeof cond === 'object' && !(cond instanceof Date)) {
-      const c = cond as { in?: unknown[]; lt?: Date; gt?: string };
+      const c = cond as { in?: unknown[]; lt?: Date; gt?: string; not?: unknown };
+      if ('not' in c) return value !== c.not;
       if (c.in) return c.in.includes(value);
       if (c.lt) return value instanceof Date && value.getTime() < c.lt.getTime();
       if (c.gt !== undefined) return String(value) > c.gt;

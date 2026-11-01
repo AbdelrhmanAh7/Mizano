@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -44,12 +44,22 @@ export function PhoneInput({
   id,
   disabled,
 }: PhoneInputProps) {
-  const t = useTranslations('common.phoneInput');
   const parsed = useMemo(() => parsePhoneValue(value), [value]);
   const [selectedCountry, setSelectedCountry] = useState(parsed.countryCode || defaultCountry);
   const [phoneNumber, setPhoneNumber] = useState(parsed.number);
 
   const country = countriesByCode[selectedCountry];
+  const t = useTranslations('common.phoneInput');
+  const locale = useLocale();
+  // Country names in the screen's language; the list's English name is the fallback.
+  const regionNames = useMemo(() => {
+    try {
+      return new Intl.DisplayNames([locale], { type: 'region' });
+    } catch {
+      return null;
+    }
+  }, [locale]);
+  const countryName = (code: string, fallback: string): string => regionNames?.of(code) ?? fallback;
   const maxLength = country ? Math.max(...country.phoneLength) : 15;
 
   const handleCountryChange = (code: string) => {
@@ -79,12 +89,12 @@ export function PhoneInput({
     <div className="flex gap-2">
       <Select value={selectedCountry} onValueChange={handleCountryChange} disabled={disabled}>
         <SelectTrigger className="w-[130px] shrink-0">
-          <SelectValue>{country ? `${country.flag} ${country.dialCode}` : 'Select'}</SelectValue>
+          <SelectValue>{country ? `${country.flag} ${country.dialCode}` : t('select')}</SelectValue>
         </SelectTrigger>
         <SelectContent className="max-h-[300px]">
           {countries.map((c) => (
             <SelectItem key={c.code} value={c.code}>
-              {c.flag} {c.name} ({c.dialCode})
+              {c.flag} {countryName(c.code, c.name)} (<span dir="ltr">{c.dialCode}</span>)
             </SelectItem>
           ))}
         </SelectContent>
@@ -94,7 +104,7 @@ export function PhoneInput({
           id={id}
           type="tel"
           inputMode="numeric"
-          placeholder={placeholder || `${maxLength} digits`}
+          placeholder={placeholder || t('placeholder', { count: maxLength })}
           value={phoneNumber}
           onChange={handlePhoneChange}
           disabled={disabled}
@@ -102,9 +112,9 @@ export function PhoneInput({
         />
         {!isValid && phoneNumber && (
           <p className="text-xs text-destructive mt-1">
-            {t('invalidLength', {
+            {t('invalid', {
+              country: countryName(country.code, country.name),
               lengths: country.phoneLength.join(' / '),
-              country: country.name,
             })}
           </p>
         )}

@@ -3,7 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { IntakeJob, IntakeJobStatus } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { DocumentIntakeResult, DocumentIntakeService } from '../services/document-intake.service';
-import { IntakeProcessorService, needsReview } from './intake-processor.service';
+import { IntakeReadError } from '../extraction/extraction-result';
+import { IntakeProcessorService, reviewReasons } from './intake-processor.service';
 import { IntakeQueueService } from './intake-queue.service';
 import { FakeIntakeJobTable, MemoryIntakeStorage } from './intake-test-utils';
 import { sha256Hex } from './intake-storage';
@@ -12,16 +13,27 @@ const ORG_A = 'org-a';
 const ORG_B = 'org-b';
 const SECRET_TEXT = 'ACME Corp invoice 123456 total 9999.99';
 
+/** A complete reading: every value a draft bill needs was found. */
 function result(
   fields: Partial<DocumentIntakeResult['extractedFields']> = {},
   ocr = 0.9,
+  extra: Partial<DocumentIntakeResult> = {},
 ): DocumentIntakeResult {
   return {
     documentType: 'BILL',
     ocrConfidence: ocr,
     duplicateWarning: null,
+    matchedVendor: { id: 'v1', name: 'ACME Corp', similarity: 0.95 },
     rawText: SECRET_TEXT,
-    extractedFields: { total: 10, date: '2026-09-01', vendorName: 'ACME Corp', ...fields },
+    extractedFields: {
+      total: 10,
+      date: '2026-09-01',
+      vendorName: 'ACME Corp',
+      currency: 'EGP',
+      lineItems: [{ description: 'x', quantity: 1, unitPrice: 10, taxAmount: 0, total: 10 }],
+      ...fields,
+    },
+    ...extra,
   } as unknown as DocumentIntakeResult;
 }
 
@@ -87,14 +99,48 @@ describe('IntakeProcessorService', () => {
     expect(table.rows[0].result).toMatchObject({ documentType: 'BILL' });
   });
 
-  it('marks incomplete or low-confidence extractions NEEDS_REVIEW', async () => {
+  it('marks incomplete or low-confidence extractions NEEDS_REVIEW with their reasons', async () => {
     intake.processDocument.mockResolvedValue(result({ total: null }));
     const job = await seed();
     await processor.handle({ jobId: job.id, organizationId: ORG_A });
     expect(table.rows[0].status).toBe(IntakeJobStatus.NEEDS_REVIEW);
-    expect(needsReview(result({}, 0.2))).toBe(true);
-    expect(needsReview(result())).toBe(false);
+    expect(table.rows[0].result).toMatchObject({ reviewReasons: ['TOTAL_MISSING'] });
+    expect(reviewReasons(result({}, 0.2))).toEqual(['LOW_CONFIDENCE']);
+    expect(reviewReasons(result())).toEqual([]);
   });
+
+  it('never marks a reading EXTRACTED without vendor, lines or currency (#587)', () => {
+    expect(
+      reviewReasons(
+        result({ vendorName: null, lineItems: [], currency: null }, 0.9, {
+          matchedVendor: null,
+        }),
+      ),
+    ).toEqual(['VENDOR_MISSING', 'CURRENCY_MISSING', 'LINES_MISSING']);
+    expect(reviewReasons(result({}, 0.9, { extractionWarnings: ['TOTALS_MISMATCH'] }))).toEqual([
+      'VALUES_INCONSISTENT',
+    ]);
+    expect(reviewReasons(result({}, 0.9, { derivedFields: ['dueDate'] }))).toEqual([
+      'DUE_DATE_DERIVED',
+    ]);
+  });
+
+  it.each(['INTAKE_NO_TEXT', 'INTAKE_NOTHING_READ'] as const)(
+    'a reading that found nothing (%s) fails at once with its code, never 100%%',
+    async (code) => {
+      intake.processDocument.mockRejectedValue(new IntakeReadError(code));
+      const job = await seed();
+      await processor.handle({ jobId: job.id, organizationId: ORG_A });
+      expect(table.rows[0]).toMatchObject({
+        status: IntakeJobStatus.DEAD_LETTER,
+        lastError: code,
+        progress: 0,
+        result: null,
+      });
+      // Reading the same file again gives the same answer: no automatic retry is queued.
+      expect(queue.enqueue).not.toHaveBeenCalled();
+    },
+  );
 
   it('is idempotent: a second delivery of a finished job does nothing', async () => {
     const job = await seed();

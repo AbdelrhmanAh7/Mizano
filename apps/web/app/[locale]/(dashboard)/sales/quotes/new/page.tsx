@@ -13,6 +13,7 @@ import Link from 'next/link';
 export default function NewQuotePage() {
   const router = useRouter();
   const t = useTranslations('sales');
+  const tCommon = useTranslations('common');
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
@@ -33,7 +34,7 @@ export default function NewQuotePage() {
       router.push(`/sales/quotes/${result.data?.id || ''}`);
     } catch (error: unknown) {
       toast({
-        title: t('toast.error'),
+        title: tCommon('errors.title'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           t('quotes.toast.createError'),

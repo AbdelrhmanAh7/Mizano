@@ -23,6 +23,7 @@ import { useInvoices } from '@/lib/hooks/use-invoices';
 import { useQuotes } from '@/lib/hooks/use-quotes';
 import { differenceInDays } from 'date-fns';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
+import { InvoiceStatusText } from '@/components/sales/status-badge';
 
 export default function SalesPage() {
   // Overview figures are ledger amounts, in the org base currency (audit B5).
@@ -64,53 +65,53 @@ export default function SalesPage() {
   const modules = [
     {
       title: t('customers.title'),
-      description: t('overview.modules.customers.description'),
+      description: t('overview.modules.customers'),
       icon: Users,
       href: '/sales/customers',
       color: 'bg-blue-500',
-      stats: t('overview.modules.customers.stats', { count: customers.length }),
+      stats: t('overview.modules.customersStats', { count: customers.length }),
     },
     {
       title: t('quotes.title'),
-      description: t('overview.modules.quotes.description'),
+      description: t('overview.modules.quotes'),
       icon: FileText,
       href: '/sales/quotes',
       color: 'bg-purple-500',
-      stats: t('overview.modules.quotes.stats', { count: pendingQuotes.length }),
+      stats: t('overview.modules.quotesStats', { count: pendingQuotes.length }),
     },
     {
       title: t('invoices.title'),
-      description: t('overview.modules.invoices.description'),
+      description: t('overview.modules.invoices'),
       icon: Receipt,
       href: '/sales/invoices',
       color: 'bg-green-500',
-      stats: t('overview.modules.invoices.stats', {
+      stats: t('overview.modules.invoicesStats', {
         count: invoices.filter((i: { status: string }) => i.status === 'SENT').length,
       }),
     },
     {
       title: t('creditNotes.title'),
-      description: t('overview.modules.creditNotes.description'),
+      description: t('overview.modules.creditNotes'),
       icon: CreditCard,
       href: '/sales/credit-notes',
       color: 'bg-orange-500',
-      stats: t('overview.modules.creditNotes.stats'),
+      stats: t('overview.modules.creditNotesStats'),
     },
     {
       title: t('payments.title'),
-      description: t('overview.modules.payments.description'),
+      description: t('overview.modules.payments'),
       icon: TrendingUp,
       href: '/sales/payments',
       color: 'bg-cyan-500',
-      stats: t('overview.modules.payments.stats'),
+      stats: t('overview.modules.paymentsStats'),
     },
     {
       title: t('deliveryChallans.title'),
-      description: t('overview.modules.deliveryChallans.description'),
+      description: t('overview.modules.deliveryChallans'),
       icon: Truck,
       href: '/sales/delivery-challans',
       color: 'bg-rose-500',
-      stats: t('overview.modules.deliveryChallans.stats'),
+      stats: t('overview.modules.deliveryChallansStats'),
     },
   ];
 
@@ -175,7 +176,7 @@ export default function SalesPage() {
               <div className="text-2xl font-bold text-red-600">{formatCurrency(overdueAmount)}</div>
             )}
             <p className="text-xs text-muted-foreground">
-              {t('overview.overdueInvoicesCount', { count: overdueInvoices.length })}
+              {t('overview.overdueCount', { count: overdueInvoices.length })}
             </p>
           </CardContent>
         </Card>
@@ -233,7 +234,7 @@ export default function SalesPage() {
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">{module.description}</p>
               <Button asChild variant="outline" className="w-full">
-                <Link href={module.href}>{t('overview.openModule', { title: module.title })}</Link>
+                <Link href={module.href}>{t('overview.openModule', { name: module.title })}</Link>
               </Button>
             </CardContent>
           </Card>
@@ -278,7 +279,7 @@ export default function SalesPage() {
                         </div>
                         <div className="text-right">
                           <Badge variant="outline" className="text-xs">
-                            {inv.status}
+                            <InvoiceStatusText status={inv.status} />
                           </Badge>
                           <p className="text-sm font-mono mt-1">{formatCurrency(inv.grandTotal)}</p>
                         </div>

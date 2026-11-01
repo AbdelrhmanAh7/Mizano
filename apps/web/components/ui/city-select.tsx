@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -24,10 +25,11 @@ export function CitySelect({
   value,
   onValueChange,
   country,
-  placeholder = 'Select city',
+  placeholder,
   disabled,
   id,
 }: CitySelectProps) {
+  const t = useTranslations('common.a11y');
   const cities = useMemo(() => {
     if (!country) return [];
     // Find country code from name
@@ -43,7 +45,7 @@ export function CitySelect({
         id={id}
         value={value || ''}
         onChange={(e) => onValueChange?.(e.target.value)}
-        placeholder={country ? 'Enter city name' : 'Select a country first'}
+        placeholder={country ? t('enterCity') : t('selectCountryFirst')}
         disabled={disabled || !country}
       />
     );
@@ -52,7 +54,7 @@ export function CitySelect({
   return (
     <Select value={value || ''} onValueChange={onValueChange} disabled={disabled}>
       <SelectTrigger id={id}>
-        <SelectValue placeholder={placeholder} />
+        <SelectValue placeholder={placeholder ?? t('selectCity')} />
       </SelectTrigger>
       <SelectContent className="max-h-[300px]">
         {cities.map((city) => (

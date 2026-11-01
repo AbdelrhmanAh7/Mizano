@@ -46,7 +46,7 @@ describe('useBulkAction', () => {
         useBulkAction({
           mutationFn,
           queryKeys: [['items']],
-          successMessage: '{count} items deleted',
+          successMessage: (count) => `${count} items deleted`,
         }),
       { wrapper: createWrapper() },
     );
@@ -58,7 +58,7 @@ describe('useBulkAction', () => {
     expect(mutationFn).toHaveBeenCalledWith(['id1', 'id2', 'id3']);
   });
 
-  it('shows a success toast with the count replaced', async () => {
+  it('shows a success toast built for the number of items', async () => {
     const mutationFn = jest.fn().mockResolvedValue({ success: true });
 
     const { result } = renderHook(
@@ -66,7 +66,7 @@ describe('useBulkAction', () => {
         useBulkAction({
           mutationFn,
           queryKeys: [['items']],
-          successMessage: '{count} items deleted',
+          successMessage: (count) => `${count} items deleted`,
         }),
       { wrapper: createWrapper() },
     );
@@ -80,6 +80,22 @@ describe('useBulkAction', () => {
         title: 'success',
         description: '2 items deleted',
       }),
+    );
+  });
+
+  it('passes the number of items to the default message so it can choose a plural', async () => {
+    const mutationFn = jest.fn().mockResolvedValue({ data: { processed: 1, failures: [] } });
+
+    const { result } = renderHook(() => useBulkAction({ mutationFn, queryKeys: [['items']] }), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.execute(['id1']);
+    });
+
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ description: 'defaultSuccess {"count":1}' }),
     );
   });
 

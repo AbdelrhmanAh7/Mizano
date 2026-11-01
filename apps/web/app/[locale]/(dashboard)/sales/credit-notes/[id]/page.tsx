@@ -17,8 +17,11 @@ import {
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { format } from 'date-fns';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function CreditNoteDetailPage() {
+  // Credit notes post in the organization base currency (#83).
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const { hasPermission } = usePermissions();
   const params = useParams();
@@ -26,14 +29,6 @@ export default function CreditNoteDetailPage() {
   const creditNoteId = params.id as string;
 
   const { data: creditNote, isLoading } = useCreditNote(creditNoteId);
-
-  const formatCurrency = (amount: string | number, currency: string = 'USD') => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(num);
-  };
 
   if (isLoading) {
     return (
@@ -91,7 +86,9 @@ export default function CreditNoteDetailPage() {
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">{creditNote.creditNoteNumber}</h1>
+              <h1 dir="ltr" className="text-3xl font-bold tracking-tight whitespace-nowrap">
+                {creditNote.creditNoteNumber}
+              </h1>
               <Badge className={getCreditNoteTypeColor(creditNote.type)}>
                 {getCreditNoteTypeLabel(creditNote.type)}
               </Badge>

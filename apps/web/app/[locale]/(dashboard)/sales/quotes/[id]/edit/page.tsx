@@ -16,6 +16,7 @@ export default function EditQuotePage() {
   const params = useParams();
   const router = useRouter();
   const t = useTranslations('sales');
+  const tCommon = useTranslations('common');
   const { toast } = useToast();
   const quoteId = params.id as string;
 
@@ -34,7 +35,7 @@ export default function EditQuotePage() {
       router.push(`/sales/quotes/${quoteId}`);
     } catch (error: unknown) {
       toast({
-        title: t('toast.error'),
+        title: tCommon('errors.title'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           t('quotes.toast.updateError'),

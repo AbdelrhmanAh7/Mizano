@@ -18,6 +18,7 @@ import {
 } from '../../../common/utils/report-utils';
 import { CreateAccountDto } from '../dto/create-account.dto';
 import { UpdateAccountDto } from '../dto/update-account.dto';
+import { renameFields, systemName } from '../../../common/i18n/localize';
 
 type DefaultAccountSettings = {
   defaultCashAccountId?: string;
@@ -78,7 +79,7 @@ export class AccountsService {
       },
       include: {
         parent: {
-          select: { id: true, code: true, name: true },
+          select: { id: true, code: true, name: true, nameAr: true, nameEn: true },
         },
       },
     });
@@ -96,6 +97,7 @@ export class AccountsService {
       ...(search && {
         OR: [
           { name: { contains: search, mode: 'insensitive' as const } },
+          { nameAr: { contains: search, mode: 'insensitive' as const } },
           { code: { contains: search, mode: 'insensitive' as const } },
         ],
       }),
@@ -106,7 +108,7 @@ export class AccountsService {
         where,
         include: {
           parent: {
-            select: { id: true, code: true, name: true },
+            select: { id: true, code: true, name: true, nameAr: true, nameEn: true },
           },
         },
         orderBy: { [sortBy]: sortOrder },
@@ -133,6 +135,7 @@ export class AccountsService {
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
+        { nameAr: { contains: search, mode: 'insensitive' } },
         { code: { contains: search, mode: 'insensitive' } },
       ];
     }
@@ -143,7 +146,9 @@ export class AccountsService {
       {
         cursor,
         take,
-        include: { parent: { select: { id: true, code: true, name: true } } },
+        include: {
+          parent: { select: { id: true, code: true, name: true, nameAr: true, nameEn: true } },
+        },
       },
     );
   }
@@ -184,10 +189,10 @@ export class AccountsService {
       where: { id, organizationId, deletedAt: null },
       include: {
         parent: {
-          select: { id: true, code: true, name: true },
+          select: { id: true, code: true, name: true, nameAr: true, nameEn: true },
         },
         children: {
-          select: { id: true, code: true, name: true, type: true },
+          select: { id: true, code: true, name: true, nameAr: true, nameEn: true, type: true },
         },
       },
     });
@@ -244,12 +249,13 @@ export class AccountsService {
       }
     }
 
+    const { name, ...rest } = updateAccountDto;
     const updatedAccount = await this.prisma.account.update({
       where: { id },
-      data: updateAccountDto,
+      data: { ...rest, ...renameFields(account, name) },
       include: {
         parent: {
-          select: { id: true, code: true, name: true },
+          select: { id: true, code: true, name: true, nameAr: true, nameEn: true },
         },
       },
     });
@@ -345,7 +351,7 @@ export class AccountsService {
       this.prisma.account.findMany({
         where: { organizationId, deletedAt: null },
         orderBy: { code: 'asc' },
-        select: { id: true, code: true, name: true, type: true },
+        select: { id: true, code: true, name: true, nameAr: true, nameEn: true, type: true },
       }),
       sumPostedLinesByAccount(this.prisma, organizationId, asOf ? { lte: asOf } : undefined),
     ]);
@@ -399,6 +405,7 @@ export class AccountsService {
           update: {},
           create: {
             ...account,
+            ...systemName(account.name),
             organizationId,
             isSystem: true,
             ...(org?.baseCurrency ? { currency: org.baseCurrency } : {}),

@@ -4,11 +4,12 @@
  * now validates these bodies, so a drifting payload is a 400 instead of a silent 500.
  */
 
-// The command dialog names itself from the catalog.
+// The address fields render translated pickers; their copy is not under test here.
 jest.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
   useLocale: () => 'en',
 }));
+
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
   useSearchParams: () => new URLSearchParams(),

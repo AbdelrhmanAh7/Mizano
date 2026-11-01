@@ -1,13 +1,11 @@
 'use client';
 
-import { useToast } from '@/components/ui/use-toast';
+import { useToastMutation } from './use-toast-mutation';
 import { transfersApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
-
 export type TransferStatus = 'PENDING' | 'IN_TRANSIT' | 'COMPLETED' | 'CANCELLED';
 
 export interface TransferLine {
@@ -91,30 +89,15 @@ export function useTransfer(id: string | undefined) {
  * Hook to create a new transfer
  */
 export function useCreateTransfer() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'inventory.transfers.toast',
     mutationFn: async (data: CreateTransferData) => {
       const response = await transfersApi.create(data);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transfers'] });
-      queryClient.invalidateQueries({ queryKey: ['warehouses'] });
-      queryClient.invalidateQueries({ queryKey: ['items'] });
-      toast({
-        title: 'Transfer created',
-        description: 'The stock transfer has been created successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error creating transfer',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: () => [['transfers'], ['warehouses'], ['items']],
+    success: 'created',
+    error: 'createError',
   });
 }
 
@@ -122,30 +105,15 @@ export function useCreateTransfer() {
  * Hook to complete a transfer
  */
 export function useCompleteTransfer() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'inventory.transfers.toast',
     mutationFn: async (id: string) => {
       const response = await transfersApi.complete(id);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transfers'] });
-      queryClient.invalidateQueries({ queryKey: ['warehouses'] });
-      queryClient.invalidateQueries({ queryKey: ['items'] });
-      toast({
-        title: 'Transfer completed',
-        description: 'The stock transfer has been completed.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error completing transfer',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: () => [['transfers'], ['warehouses'], ['items']],
+    success: 'completed',
+    error: 'completeError',
   });
 }
 
@@ -153,28 +121,15 @@ export function useCompleteTransfer() {
  * Hook to cancel a transfer
  */
 export function useCancelTransfer() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'inventory.transfers.toast',
     mutationFn: async (id: string) => {
       const response = await transfersApi.cancel(id);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transfers'] });
-      toast({
-        title: 'Transfer cancelled',
-        description: 'The stock transfer has been cancelled.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error cancelling transfer',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: () => [['transfers']],
+    success: 'cancelled',
+    error: 'cancelError',
   });
 }
 

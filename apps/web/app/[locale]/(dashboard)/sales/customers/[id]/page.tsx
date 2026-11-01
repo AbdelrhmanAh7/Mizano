@@ -88,7 +88,7 @@ export default function CustomerDetailPage() {
       router.push('/sales/customers');
     } catch (error: unknown) {
       toast({
-        title: tCommon('errors.generic'),
+        title: tCommon('errors.title'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           t('customers.toast.deleteError'),
@@ -293,7 +293,7 @@ export default function CustomerDetailPage() {
                         {t('customers.form.phone')}
                       </dt>
                       <dd>
-                        <a href={`tel:${customer.phone}`} className="hover:underline">
+                        <a href={`tel:${customer.phone}`} dir="ltr" className="hover:underline">
                           {customer.phone}
                         </a>
                       </dd>

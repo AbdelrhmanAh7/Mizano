@@ -1,3 +1,4 @@
+import { BRAND } from '@mizano/shared-types';
 import { McpScope } from '../mcp.config';
 import { McpPrincipal } from '../oauth/mcp-oauth.service';
 import { Args, McpToolsService, ToolAnswer } from './mcp-tools.service';
@@ -82,8 +83,7 @@ const PERIOD = object({
   endDate: { ...DATE, description: 'Last day (default: today)' },
 });
 
-const DRAFT_NOTE =
-  ' Saved as a DRAFT only: nothing is posted, sent, paid or deleted. Returns a link where a person reviews and posts it in Mizano.';
+const DRAFT_NOTE = ` Saved as a DRAFT only: nothing is posted, sent, paid or deleted. Returns a link where a person reviews and posts it in ${BRAND.name.en}.`;
 
 /** The tools an AI app sees. Amounts in and out are decimal strings, never numbers. */
 export const MCP_TOOLS: McpToolDef[] = [

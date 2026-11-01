@@ -25,6 +25,7 @@
       "typePlaceholder": "Select type",
       "accountNumberHint": "Last 4 digits or full number",
       "currencyPlaceholder": "Select currency",
+      "currencyRequired": "Currency is required",
       "glAccount": "GL Account",
       "glAccountPlaceholder": "Link to GL account",
       "glAccountSelect": "Select a GL account",
@@ -336,8 +337,8 @@
     "importing": "Importing transactions...",
     "total": "{count} total",
     "imported": "{count} imported",
-    "duplicates": "{count} duplicates skipped",
-    "rulesApplied": "{count} rules applied",
+    "duplicates": "{count, plural, one {{count} duplicate skipped} other {{count} duplicates skipped}}",
+    "rulesApplied": "{count, plural, one {{count} rule applied} other {{count} rules applied}}",
     "another": "Import Another File"
   }
 }

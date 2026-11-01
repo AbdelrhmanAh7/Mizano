@@ -1,11 +1,9 @@
 'use client';
 
-import { useToast } from '@/components/ui/use-toast';
+import { useToastMutation } from './use-toast-mutation';
 import { adjustmentsApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-
-type ApiError = { response?: { data?: { message?: string } } };
+import { useQuery } from '@tanstack/react-query';
 
 // Types (mirror the API: one item per adjustment; status is derived from the ledger)
 export type AdjustmentType = 'INCREASE' | 'DECREASE';
@@ -103,30 +101,15 @@ export function useAdjustment(id: string | undefined) {
  * Hook to create a new adjustment
  */
 export function useCreateAdjustment() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'inventory.adjustments.toast',
     mutationFn: async (data: CreateAdjustmentData) => {
       const response = await adjustmentsApi.create(data);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['adjustments'] });
-      queryClient.invalidateQueries({ queryKey: ['items'] });
-      queryClient.invalidateQueries({ queryKey: ['warehouses'] });
-      toast({
-        title: 'Adjustment posted',
-        description: 'Stock updated and the journal entry posted.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error creating adjustment',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: () => [['adjustments'], ['items'], ['warehouses']],
+    success: 'created',
+    error: 'createError',
   });
 }
 
@@ -134,31 +117,15 @@ export function useCreateAdjustment() {
  * Hook to void an adjustment (reverses the journal and restores stock)
  */
 export function useVoidAdjustment() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'inventory.adjustments.toast',
     mutationFn: async (id: string) => {
       const response = await adjustmentsApi.void(id);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['adjustments'] });
-      queryClient.invalidateQueries({ queryKey: ['items'] });
-      queryClient.invalidateQueries({ queryKey: ['warehouses'] });
-      queryClient.invalidateQueries({ queryKey: ['journals'] });
-      toast({
-        title: 'Adjustment voided',
-        description: 'The journal was reversed and stock restored.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error voiding adjustment',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: () => [['adjustments'], ['items'], ['warehouses'], ['journals']],
+    success: 'voided',
+    error: 'voidError',
   });
 }
 

@@ -6,6 +6,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 
 // Mock shared types
+jest.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
+
 jest.mock('@mizano/shared-types', () => ({
   LogLevel: { ERROR: 'error', WARN: 'warn', INFO: 'info', DEBUG: 'debug' },
   LogSource: { FRONTEND: 'frontend', BACKEND: 'backend', AI_MODEL: 'ai-model' },
@@ -271,7 +273,13 @@ jest.mock('@/lib/hooks/use-global-error-capture', () => ({
 import { LoggerDashboard } from './logger-dashboard';
 
 describe('LoggerDashboard', () => {
+  const previousFlag = process.env.NEXT_PUBLIC_SHOW_ERROR_LOG;
+  afterAll(() => {
+    process.env.NEXT_PUBLIC_SHOW_ERROR_LOG = previousFlag;
+  });
+
   beforeEach(() => {
+    process.env.NEXT_PUBLIC_SHOW_ERROR_LOG = 'true';
     jest.clearAllMocks();
     mockUseLogger.logs = [];
     mockUseLogger.selectedIds = [];
@@ -284,7 +292,13 @@ describe('LoggerDashboard', () => {
     mockUseLogger.accessDenied = true;
     const { container } = render(<LoggerDashboard />);
     expect(container).toBeEmptyDOMElement();
-    expect(screen.queryByLabelText('Toggle error logger')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('errorLogger')).not.toBeInTheDocument();
+  });
+
+  it('stays hidden unless the operator turns the error log on', () => {
+    delete process.env.NEXT_PUBLIC_SHOW_ERROR_LOG;
+    const { container } = render(<LoggerDashboard />);
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('should render the empty state when no logs', () => {

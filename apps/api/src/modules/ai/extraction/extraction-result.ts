@@ -43,30 +43,30 @@ export interface DocumentExtractionResult {
   processingTimeMs: number;
 }
 
-/** The result when no reader produced anything: every field unknown. */
-export function emptyExtraction(rawText = ''): DocumentExtractionResult {
-  return {
-    vendorName: null,
-    vendorAddress: null,
-    vendorPhone: null,
-    vendorEmail: null,
-    vendorTaxId: null,
-    invoiceNumber: null,
-    date: null,
-    dueDate: null,
-    total: null,
-    subtotal: null,
-    tax: null,
-    discount: null,
-    currency: null,
-    paymentTerms: null,
-    notes: null,
-    lineItems: [],
-    rawText,
-    ocrConfidence: 0,
-    fieldConfidence: {},
-    documentCategory: null,
-    accountingEntry: null,
-    processingTimeMs: 0,
-  };
+/**
+ * Stable codes for a reading that produced nothing usable. The job fails with the code as its
+ * `lastError` (never complete/100%): `INTAKE_NO_TEXT` when no text could be read at all,
+ * `INTAKE_NOTHING_READ` when text was read but no bill value was found in it.
+ */
+export type IntakeReadFailureCode = 'INTAKE_NO_TEXT' | 'INTAKE_NOTHING_READ';
+
+/** A reading that produced nothing usable. Retrying reads the same file the same way. */
+export class IntakeReadError extends Error {
+  constructor(readonly code: IntakeReadFailureCode) {
+    super(code);
+    this.name = 'IntakeReadError';
+  }
+}
+
+/** True when a reader returned no vendor, number, date, amount or line at all. */
+export function isEmptyExtraction(extraction: DocumentExtractionResult): boolean {
+  return (
+    !extraction.vendorName &&
+    !extraction.invoiceNumber &&
+    !extraction.date &&
+    extraction.total === null &&
+    extraction.subtotal === null &&
+    extraction.tax === null &&
+    extraction.lineItems.length === 0
+  );
 }

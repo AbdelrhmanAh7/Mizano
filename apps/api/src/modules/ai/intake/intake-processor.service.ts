@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { IntakeJob, IntakeJobStatus, Prisma } from '@prisma/client';
 import { describeError } from '../../../common/utils/redact';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { IntakeReadError } from '../extraction/extraction-result';
 import { DocumentIntakeResult, DocumentIntakeService } from '../services/document-intake.service';
 import { intakeLeaseMs, queueJobId } from './intake-jobs.service';
 import { IntakeQueuePayload, IntakeQueueService } from './intake-queue.service';
@@ -13,16 +14,25 @@ import { Clock, INTAKE_CLOCK, monotonicClock, StageTimer } from './stage-timer';
 const LOW_CONFIDENCE = 0.6;
 const DEFAULT_RETRY_BASE_MS = 5000;
 
-/** Decide whether an accountant must look before approval. */
-export function needsReview(result: DocumentIntakeResult): boolean {
+/**
+ * Why an accountant must look before approval, as stable codes (empty: ready to approve).
+ * Every value a draft bill needs (vendor, date, total, currency, at least one line) must have
+ * been read; derived values such as the +30-day due date are checked by the person too.
+ */
+export function reviewReasons(result: DocumentIntakeResult): string[] {
   const fields = result.extractedFields;
-  return (
-    result.ocrConfidence < LOW_CONFIDENCE ||
-    fields.total === null ||
-    fields.date === null ||
-    result.documentType === 'OTHER' ||
-    result.duplicateWarning?.isDuplicate === true
-  );
+  const reasons: string[] = [];
+  if (result.ocrConfidence < LOW_CONFIDENCE) reasons.push('LOW_CONFIDENCE');
+  if (result.documentType === 'OTHER') reasons.push('NOT_A_BILL');
+  if (!result.matchedVendor) reasons.push('VENDOR_MISSING');
+  if (fields.date === null) reasons.push('DATE_MISSING');
+  if (fields.total === null) reasons.push('TOTAL_MISSING');
+  if (!fields.currency) reasons.push('CURRENCY_MISSING');
+  if (fields.lineItems.length === 0) reasons.push('LINES_MISSING');
+  if ((result.extractionWarnings ?? []).length > 0) reasons.push('VALUES_INCONSISTENT');
+  if (result.derivedFields?.includes('dueDate')) reasons.push('DUE_DATE_DERIVED');
+  if (result.duplicateWarning?.isDuplicate === true) reasons.push('POSSIBLE_DUPLICATE');
+  return reasons;
 }
 
 class LeaseLostError extends Error {
@@ -151,7 +161,8 @@ export class IntakeProcessorService implements OnModuleInit {
         ),
         lostLease,
       ]);
-      const status = needsReview(result) ? IntakeJobStatus.NEEDS_REVIEW : IntakeJobStatus.EXTRACTED;
+      const reasons = reviewReasons(result);
+      const status = reasons.length > 0 ? IntakeJobStatus.NEEDS_REVIEW : IntakeJobStatus.EXTRACTED;
       timer.stop();
       const written = await this.prisma.intakeJob.updateMany({
         where: { id: jobId, organizationId, status: IntakeJobStatus.PROCESSING, leaseToken },
@@ -161,7 +172,9 @@ export class IntakeProcessorService implements OnModuleInit {
           lastError: null,
           leaseToken: null,
           leaseExpiresAt: null,
-          result: JSON.parse(JSON.stringify(result)) as Prisma.InputJsonValue,
+          result: JSON.parse(
+            JSON.stringify({ ...result, reviewReasons: reasons }),
+          ) as Prisma.InputJsonValue,
           stageTimingsMs: timer.snapshot(),
         },
       });
@@ -200,10 +213,13 @@ export class IntakeProcessorService implements OnModuleInit {
     stageTimingsMs: Record<string, number>,
   ): Promise<void> {
     // Extractor errors may quote document text: keep the error type/code only.
-    const lastError = describeError(error, { includeMessage: false }).slice(0, 200);
+    const readFailure = error instanceof IntakeReadError ? error.code : null;
+    const lastError = readFailure ?? describeError(error, { includeMessage: false }).slice(0, 200);
     // `job` was read after the claim, so job.attempts already counts this run.
     const attempts = job.attempts;
-    const dead = attempts >= job.maxAttempts;
+    // A reading that found nothing reads the same way again: fail now (the person can still
+    // press Retry) instead of spending the automatic retries on it.
+    const dead = readFailure !== null || attempts >= job.maxAttempts;
     const status = dead ? IntakeJobStatus.DEAD_LETTER : IntakeJobStatus.FAILED;
     const moved = await this.prisma.intakeJob.updateMany({
       where: {

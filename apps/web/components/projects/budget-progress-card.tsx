@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { DollarSign, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatCurrency } from '@/lib/hooks/use-projects';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface BudgetData {
   budgetUsedPercent?: number;
@@ -20,6 +20,7 @@ interface BudgetProgressCardProps {
 }
 
 export function BudgetProgressCard({ data, isLoading }: BudgetProgressCardProps) {
+  const formatCurrency = useMoneyFormatter();
   if (isLoading || !data) return null;
 
   const pct = Math.min(data.budgetUsedPercent ?? 0, 100);

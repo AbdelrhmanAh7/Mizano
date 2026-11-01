@@ -8,12 +8,8 @@
     "purchases": "Purchase Reports",
     "inventory": "Inventory Reports",
     "tax": "Tax Reports",
-    "financialDescription": "Core financial statements",
     "receivablesPayables": "Receivables & Payables",
-    "receivablesPayablesDescription": "Track what you owe and are owed",
-    "salesDescription": "Analyze sales and purchasing performance",
-    "accounting": "Accounting Reports",
-    "accountingDescription": "Detailed accounting records"
+    "accounting": "Accounting Reports"
   },
   "profitLoss": {
     "title": "Profit & Loss",
@@ -26,7 +22,7 @@
     "otherIncome": "Other Income",
     "otherExpenses": "Other Expenses",
     "netProfit": "Net Profit",
-    "empty": "No profit & loss data available. Create some transactions first."
+    "noData": "No profit & loss data available. Create some transactions first."
   },
   "balanceSheet": {
     "title": "Balance Sheet",
@@ -45,7 +41,7 @@
     "retainedEarnings": "Retained Earnings",
     "balanced": "Balance sheet is balanced",
     "notBalanced": "Balance sheet is not balanced",
-    "empty": "No balance sheet data available. Create some transactions first."
+    "noData": "No balance sheet data available. Create some transactions first."
   },
   "cashFlow": {
     "title": "Cash Flow Statement",
@@ -67,7 +63,7 @@
       "debtChanges": "Debt Changes"
     },
     "noItems": "No items",
-    "total": "Total"
+    "sectionTotal": "Total"
   },
   "trialBalance": {
     "title": "Trial Balance",
@@ -85,7 +81,7 @@
     "code": "Code",
     "type": "Type",
     "total": "Total",
-    "empty": "No trial balance data available. Create some transactions first."
+    "noData": "No trial balance data available. Create some transactions first."
   },
   "generalLedger": {
     "title": "General Ledger",
@@ -94,11 +90,11 @@
     "selectAccount": "Select an account",
     "selectAccountTitle": "Select an Account",
     "selectAccountHint": "Choose an account from the dropdown above to view its general ledger entries.",
-    "entries": "Ledger Entries",
-    "empty": "No entries found for this period.",
+    "entriesTitle": "Ledger Entries",
+    "noEntries": "No entries found for this period.",
     "date": "Date",
     "journalNumber": "Journal #",
-    "descriptionColumn": "Description",
+    "entryDescription": "Description",
     "balance": "Balance"
   },
   "arAging": {
@@ -149,28 +145,32 @@
   "salesByCustomer": {
     "title": "Sales by Customer",
     "description": "Sales breakdown by customer",
-    "customer": "Customer",
-    "invoices": "Invoices",
-    "totalAmount": "Total Amount",
-    "paid": "Paid",
-    "balanceDue": "Balance Due",
+    "columns": {
+      "customer": "Customer",
+      "invoices": "Invoices",
+      "totalAmount": "Total Amount",
+      "paid": "Paid",
+      "balanceDue": "Balance Due"
+    },
     "totalSales": "Total Sales",
     "totalPaid": "Total Paid",
     "outstanding": "Outstanding",
     "customers": "Customers",
-    "empty": "No sales data found for the selected period."
+    "noData": "No sales data found for the selected period."
   },
   "salesByItem": {
     "title": "Sales by Item",
     "description": "Sales breakdown by item",
-    "item": "Item",
-    "qtySold": "Qty Sold",
-    "avgPrice": "Avg. Price",
-    "totalAmount": "Total Amount",
+    "columns": {
+      "item": "Item",
+      "quantitySold": "Qty Sold",
+      "averagePrice": "Avg. Price",
+      "totalAmount": "Total Amount"
+    },
     "totalRevenue": "Total Revenue",
-    "totalQtySold": "Total Qty Sold",
+    "totalQuantitySold": "Total Qty Sold",
     "uniqueItems": "Unique Items",
-    "empty": "No item sales data found for the selected period."
+    "noData": "No item sales data found for the selected period."
   },
   "purchasesByVendor": {
     "title": "Purchases by Vendor",
@@ -179,16 +179,18 @@
     "netPayable": "Net Payable",
     "totalUnappliedCredits": "Unapplied Vendor Credits",
     "totalNetPayable": "Net Payable",
-    "vendor": "Vendor",
-    "bills": "Bills",
-    "totalAmount": "Total Amount",
-    "paid": "Paid",
-    "balanceDue": "Balance Due",
+    "columns": {
+      "vendor": "Vendor",
+      "bills": "Bills",
+      "totalAmount": "Total Amount",
+      "paid": "Paid",
+      "balanceDue": "Balance Due"
+    },
     "totalPurchases": "Total Purchases",
     "totalPaid": "Total Paid",
     "outstanding": "Outstanding",
     "vendors": "Vendors",
-    "empty": "No purchase data found for the selected period."
+    "noData": "No purchase data found for the selected period."
   },
   "inventoryValuation": {
     "title": "Inventory Valuation",
@@ -235,5 +237,11 @@
     "loadFailed": "Could not load the summary.",
     "writeFailed": "Could not write the summary.",
     "retry": "Retry"
+  },
+  "categoryDescriptions": {
+    "financial": "Core financial statements",
+    "receivablesPayables": "Track what you owe and are owed",
+    "sales": "Analyze sales and purchasing performance",
+    "accounting": "Detailed accounting records"
   }
 }

@@ -1,11 +1,11 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { rolesApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 import { useToastMutation } from '@/lib/hooks/use-toast-mutation';
-
-type ApiError = { response?: { data?: { message?: string } } };
 
 interface RoleParams {
   page?: number;
@@ -105,6 +105,8 @@ export function useDeleteRole() {
 export function useSeedDefaultRoles() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('settings.team.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async () => {
@@ -114,15 +116,15 @@ export function useSeedDefaultRoles() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['roles'] });
       toast({
-        title: 'Roles seeded',
-        description: data.message || 'Default roles have been created.',
+        title: t('rolesSeeded'),
+        description: data.message || t('rolesSeededDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error seeding roles',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('rolesSeedError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });
@@ -134,6 +136,8 @@ export function useSeedDefaultRoles() {
 export function useAssignRole() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('settings.team.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async (data: AssignRoleData) => {
@@ -143,15 +147,15 @@ export function useAssignRole() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       toast({
-        title: 'Role assigned',
-        description: data.message || 'The role has been assigned successfully.',
+        title: t('roleAssigned'),
+        description: data.message || t('roleAssignedDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error assigning role',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('roleAssignError'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });

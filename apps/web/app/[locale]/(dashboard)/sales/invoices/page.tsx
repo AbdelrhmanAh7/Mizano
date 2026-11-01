@@ -134,25 +134,25 @@ function InvoicesPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => invoicesApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['invoices']],
-    successMessage: t.raw('invoices.bulkDelete.success'),
+    successMessage: (count) => t('invoices.bulkDelete.success', { count }),
   });
 
   const bulkSendAction = useBulkAction({
     mutationFn: (ids) => invoicesApi.bulkSend(ids).then((r) => r.data),
     queryKeys: [['invoices']],
-    successMessage: t.raw('invoices.bulkSend.success'),
+    successMessage: (count) => t('invoices.bulkSend.success', { count }),
   });
 
   const bulkVoidAction = useBulkAction({
     mutationFn: (ids) => invoicesApi.bulkVoid(ids).then((r) => r.data),
     queryKeys: [['invoices']],
-    successMessage: t.raw('invoices.bulkVoid.success'),
+    successMessage: (count) => t('invoices.bulkVoid.success', { count }),
   });
 
   const bulkPayAction = useBulkAction({
     mutationFn: (ids) => invoicesApi.bulkPay(ids).then((r) => r.data),
     queryKeys: [['invoices']],
-    successMessage: t.raw('invoices.bulkPay.success'),
+    successMessage: (count) => t('invoices.bulkPay.success', { count }),
   });
 
   const bulkActions = [

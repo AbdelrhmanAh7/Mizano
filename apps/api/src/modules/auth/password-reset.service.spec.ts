@@ -64,7 +64,7 @@ describe('PasswordResetService', () => {
     await service.issue('owner@x.test', 'ar');
     const mail = sendMail.mock.calls[0][0];
     expect(mail.to).toBe('owner@x.test');
-    expect(mail.subject).toBe('إعادة تعيين كلمة المرور في ميزانو');
+    expect(mail.subject).toBe('إعادة تعيين كلمة المرور في جردة');
     expect(mail.text).toContain('https://app.mizano.test/ar/reset-password#token=');
 
     const token = lastLinkToken();

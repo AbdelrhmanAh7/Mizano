@@ -10,6 +10,7 @@ import { CacheModule } from './cache/cache.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { requestLocaleMiddleware } from './common/i18n/request-locale';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
+import { LocalizeNamesInterceptor } from './common/interceptors/localize-names.interceptor';
 import { CacheResponseInterceptor } from './common/interceptors/cache-response.interceptor';
 import { HttpCacheInterceptor } from './common/interceptors/http-cache.interceptor';
 import { HealthModule } from './health/health.module';
@@ -145,6 +146,11 @@ import { IpThrottlerGuard } from './throttler-ip.guard';
     {
       provide: APP_FILTER,
       useClass: AllExceptionsFilter,
+    },
+    // Outermost: localizes system names after the response cache (see the interceptor).
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: LocalizeNamesInterceptor,
     },
     {
       provide: APP_INTERCEPTOR,

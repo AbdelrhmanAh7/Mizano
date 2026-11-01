@@ -32,8 +32,11 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function CreditNotesPageContent() {
+  // Credit notes post in the organization base currency (#83).
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
@@ -72,7 +75,7 @@ function CreditNotesPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => creditNotesApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['credit-notes']],
-    successMessage: tBulk.raw('creditNotesDeleted'),
+    successMessage: (count) => tBulk('creditNotesDeleted', { count }),
   });
 
   const bulkActions = [
@@ -90,14 +93,6 @@ function CreditNotesPageContent() {
         ]
       : []),
   ];
-
-  const formatCurrency = (amount: string | number, currency: string = 'USD') => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(num);
-  };
 
   const columns: ColumnDef<CreditNote>[] = [
     {

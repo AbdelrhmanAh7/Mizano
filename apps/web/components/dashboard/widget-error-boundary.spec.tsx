@@ -1,6 +1,24 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 
+jest.mock('next-intl', () => {
+  const messages = { common: jest.requireActual('@/messages/en/common.json') };
+  const lookup = (path: string): unknown =>
+    path
+      .split('.')
+      .reduce<unknown>(
+        (node, part) =>
+          node && typeof node === 'object' ? (node as Record<string, unknown>)[part] : undefined,
+        messages,
+      );
+  return {
+    useTranslations: (namespace: string) => (key: string, values?: Record<string, string>) =>
+      String(lookup(`${namespace}.${key}`) ?? key).replace(/\{(\w+)\}/g, (_, name: string) =>
+        String(values?.[name] ?? ''),
+      ),
+  };
+});
+
 jest.mock('lucide-react', () => ({
   AlertCircle: ({ className }: { className?: string }) => (
     <span data-testid="icon-alert" className={className} />

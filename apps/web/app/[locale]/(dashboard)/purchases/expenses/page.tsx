@@ -23,12 +23,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { expensesApi } from '@/lib/api';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import { useBulkConfirm } from '@/lib/hooks/use-bulk-confirm';
-import {
-  Expense,
-  formatCurrency,
-  useDeleteExpense,
-  useInfiniteExpenses,
-} from '@/lib/hooks/use-expenses';
+import { Expense, useDeleteExpense, useInfiniteExpenses } from '@/lib/hooks/use-expenses';
 import { useExportAll } from '@/lib/hooks/use-export-all';
 import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { usePermissions } from '@/lib/hooks/use-permissions';
@@ -41,8 +36,10 @@ import { CheckCircle, Eye, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function ExpensesPageContent() {
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('purchases');
   const tCommon = useTranslations('common');
@@ -89,14 +86,14 @@ function ExpensesPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => expensesApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['expenses']],
-    successMessage: tBulk.raw('expensesDeleted'),
+    successMessage: (count) => tBulk('expensesDeleted', { count }),
   });
   const bulkDelete = useBulkConfirm<Expense>(bulkDeleteAction, () => void refetch());
 
   const bulkApproveAction = useBulkAction({
     mutationFn: (ids) => expensesApi.bulkApprove(ids).then((r) => r.data),
     queryKeys: [['expenses']],
-    successMessage: tBulk.raw('expensesApproved'),
+    successMessage: (count) => tBulk('expensesApproved', { count }),
   });
   const bulkApprove = useBulkConfirm<Expense>(bulkApproveAction, () => void refetch());
 
@@ -359,9 +356,9 @@ function ExpensesPageContent() {
         {...bulkDelete.dialogProps}
         action="delete"
         itemType="expenses"
-        title={t('expenses.bulkDelete.title', { count: bulkDelete.count })}
+        title={t('expenses.bulkDelete.title', { count: bulkDelete.dialogProps.count })}
         description={t('expenses.bulkDelete.description')}
-        confirmLabel={t('expenses.bulkDelete.confirm', { count: bulkDelete.count })}
+        confirmLabel={t('expenses.bulkDelete.confirm', { count: bulkDelete.dialogProps.count })}
         cancelLabel={tCommon('buttons.cancel')}
         destructive
       />
@@ -369,9 +366,9 @@ function ExpensesPageContent() {
         {...bulkApprove.dialogProps}
         action="approve"
         itemType="expenses"
-        title={t('expenses.bulkApprove.title', { count: bulkApprove.count })}
+        title={t('expenses.bulkApprove.title', { count: bulkApprove.dialogProps.count })}
         description={t('expenses.bulkApprove.description')}
-        confirmLabel={t('expenses.bulkApprove.confirm', { count: bulkApprove.count })}
+        confirmLabel={t('expenses.bulkApprove.confirm', { count: bulkApprove.dialogProps.count })}
         cancelLabel={tCommon('buttons.cancel')}
       />
 

@@ -23,11 +23,7 @@ import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
-import {
-  formatCurrency,
-  useInfiniteVendorCredits,
-  VendorCredit,
-} from '@/lib/hooks/use-vendor-credits';
+import { useInfiniteVendorCredits, VendorCredit } from '@/lib/hooks/use-vendor-credits';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { useTranslations } from 'next-intl';
@@ -35,8 +31,10 @@ import { Eye, Plus, Trash2, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function VendorCreditsPageContent() {
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('purchases');
   const tCommon = useTranslations('common');
@@ -68,7 +66,7 @@ function VendorCreditsPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => vendorCreditsApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['vendor-credits']],
-    successMessage: tBulk.raw('vendorCreditsDeleted'),
+    successMessage: (count) => tBulk('vendorCreditsDeleted', { count }),
   });
 
   const bulkActions = [
@@ -138,8 +136,8 @@ function VendorCreditsPageContent() {
         />
       ),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
-      cell: ({ row }) =>
-        formatCurrency(row.original.amount, row.original.vendor?.currency || 'USD'),
+      // Vendor credits post in the organization base currency, never the vendor's default (#83).
+      cell: ({ row }) => formatCurrency(row.original.amount),
     },
     {
       id: 'balance',
@@ -147,7 +145,7 @@ function VendorCreditsPageContent() {
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
       cell: ({ row }) => {
         const balance = row.original.appliedToBillId ? '0' : row.original.amount;
-        return formatCurrency(balance, row.original.vendor?.currency || 'USD');
+        return formatCurrency(balance);
       },
     },
     {

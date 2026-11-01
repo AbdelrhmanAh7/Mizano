@@ -193,7 +193,5 @@
     "details": "تفاصيل {parent}",
     "detailsOnly": "التفاصيل",
     "label": "مسار التنقل"
-  },
-  "mainNavigation": "التنقل الرئيسي",
-  "mainNavigationMenu": "قائمة التنقل الرئيسية"
+  }
 }

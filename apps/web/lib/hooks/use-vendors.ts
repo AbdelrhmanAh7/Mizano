@@ -1,13 +1,14 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { useToastMutation } from './use-toast-mutation';
 import { useToast } from '@/components/ui/use-toast';
+import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 import { vendorsApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
-
 export interface VendorAddress {
   street: string | null;
   city: string | null;
@@ -104,10 +105,8 @@ export function useVendor(id: string | undefined) {
  * Hook to create a new vendor
  */
 export function useCreateVendor() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'purchases.vendors.toast',
     mutationFn: async (data: CreateVendorData) => {
       // Flatten address for API
       const submitData = {
@@ -115,7 +114,7 @@ export function useCreateVendor() {
         displayName: data.displayName || null,
         email: data.email || null,
         phone: data.phone || null,
-        currency: data.currency || 'USD',
+        currency: data.currency || undefined,
         taxId: data.taxId || null,
         paymentTerms: data.paymentTerms || 0,
         billingAddress: data.billingAddress,
@@ -123,20 +122,9 @@ export function useCreateVendor() {
       const response = await vendorsApi.create(submitData);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vendors'] });
-      toast({
-        title: 'Vendor created',
-        description: 'The vendor has been created successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error creating vendor',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: () => [['vendors']],
+    success: 'created',
+    error: 'createError',
   });
 }
 
@@ -144,10 +132,8 @@ export function useCreateVendor() {
  * Hook to update an existing vendor
  */
 export function useUpdateVendor() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'purchases.vendors.toast',
     mutationFn: async ({ id, data }: { id: string; data: UpdateVendorData }) => {
       // Flatten address for API
       const submitData = {
@@ -167,21 +153,9 @@ export function useUpdateVendor() {
       const response = await vendorsApi.update(id, submitData);
       return response.data;
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['vendors'] });
-      queryClient.invalidateQueries({ queryKey: ['vendors', variables.id] });
-      toast({
-        title: 'Vendor updated',
-        description: 'The vendor has been updated successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error updating vendor',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: (variables) => [['vendors'], ['vendors', variables.id]],
+    success: 'updated',
+    error: 'updateError',
   });
 }
 
@@ -191,6 +165,8 @@ export function useUpdateVendor() {
 export function useDeleteVendor() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const t = useTranslations('purchases.vendors.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -200,15 +176,15 @@ export function useDeleteVendor() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
       toast({
-        title: 'Vendor deleted',
-        description: 'The vendor has been deleted successfully.',
+        title: t('deleted'),
+        description: t('deletedGenericDescription'),
       });
     },
-    onError: (error: ApiError) => {
+    onError: (error: unknown) => {
       toast({
         variant: 'destructive',
-        title: 'Error deleting vendor',
-        description: error.response?.data?.message || 'An error occurred',
+        title: t('deleteErrorTitle'),
+        description: getLocalizedApiErrorMessage(error, t('genericError'), tApiErrors),
       });
     },
   });
@@ -237,15 +213,4 @@ export function getBalanceColor(balance: string | number | undefined): string {
   if (value > 0) return 'text-red-600 font-semibold';
   if (value < 0) return 'text-green-600';
   return 'text-gray-600';
-}
-
-/**
- * Format currency amount
- */
-export function formatCurrency(amount: string | number, currency: string = 'USD'): string {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(num);
 }

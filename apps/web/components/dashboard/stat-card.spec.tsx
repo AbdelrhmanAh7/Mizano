@@ -53,6 +53,7 @@ jest.mock('@/lib/utils', () => ({
 // The real compact money formatter, with the organization base currency mocked.
 jest.mock('@/lib/hooks/use-organization', () => ({
   useBaseCurrency: () => 'EGP',
+  useMoneyFormat: () => ({ data: { baseCurrency: 'EGP', documentDigits: 'latn' } }),
   documentCurrency: (code: string | null | undefined, base: string | undefined) => code || base,
 }));
 

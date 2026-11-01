@@ -225,6 +225,7 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
   const pathname = usePathname();
   const locale = useLocale();
   const t = useTranslations('navigation');
+  const tA11y = useTranslations('common.a11y');
   const { hasPermission, isLoading } = usePermissions();
   const direction = localeDirections[locale as Locale];
   const isRtl = direction === 'rtl';
@@ -341,7 +342,7 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
   };
 
   return (
-    <nav aria-label={t('mainNavigation')} className="flex-1 px-2 pb-4 space-y-1">
+    <nav aria-label={tA11y('mainNavigation')} className="flex-1 px-2 pb-4 space-y-1">
       {filteredNavigation.map((item) => renderNavItem(item))}
     </nav>
   );
@@ -389,7 +390,9 @@ export function Sidebar() {
                   className="hidden dark:block"
                 />
               </SheetTitle>
-              <SheetDescription className="sr-only">{t('mainNavigationMenu')}</SheetDescription>
+              <SheetDescription className="sr-only">
+                {tCommon('a11y.mainNavigationMenu')}
+              </SheetDescription>
             </SheetHeader>
             <div className="flex flex-col h-[calc(100%-73px)] overflow-y-auto pt-4">
               <SidebarNav onItemClick={() => setMobileOpen(false)} />

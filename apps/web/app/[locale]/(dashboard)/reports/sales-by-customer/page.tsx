@@ -36,30 +36,30 @@ function SalesByCustomerContent() {
     () => [
       {
         accessorKey: 'customerName',
-        header: t('salesByCustomer.customer'),
+        header: t('salesByCustomer.columns.customer'),
         cell: ({ row }) => <div className="font-medium">{row.original.customerName}</div>,
       },
       {
         accessorKey: 'invoiceCount',
-        header: t('salesByCustomer.invoices'),
+        header: t('salesByCustomer.columns.invoices'),
         cell: ({ row }) => row.original.invoiceCount,
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'totalAmount',
-        header: t('salesByCustomer.totalAmount'),
+        header: t('salesByCustomer.columns.totalAmount'),
         cell: ({ row }) => formatCurrency(row.original.totalAmount),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'paidAmount',
-        header: t('salesByCustomer.paid'),
+        header: t('salesByCustomer.columns.paid'),
         cell: ({ row }) => formatCurrency(row.original.paidAmount),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'balanceDue',
-        header: t('salesByCustomer.balanceDue'),
+        header: t('salesByCustomer.columns.balanceDue'),
         cell: ({ row }) => (
           <span className={row.original.balanceDue > 0 ? 'text-red-600 font-medium' : ''}>
             {formatCurrency(row.original.balanceDue)}
@@ -140,7 +140,7 @@ function SalesByCustomerContent() {
             columns={columns}
             data={data?.entries || []}
             isLoading={isLoading}
-            emptyMessage={t('salesByCustomer.empty')}
+            emptyMessage={t('salesByCustomer.noData')}
             enableExport
             exportFilename="sales-by-customer"
           />

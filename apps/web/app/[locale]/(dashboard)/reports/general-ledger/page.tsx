@@ -114,69 +114,73 @@ export default function GeneralLedgerPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>{t('generalLedger.entries')}</CardTitle>
+              <CardTitle>{t('generalLedger.entriesTitle')}</CardTitle>
             </CardHeader>
             <CardContent>
               {entries.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground">{t('generalLedger.empty')}</p>
+                <p className="text-center py-8 text-muted-foreground">
+                  {t('generalLedger.noEntries')}
+                </p>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('generalLedger.date')}</TableHead>
-                      <TableHead>{t('generalLedger.journalNumber')}</TableHead>
-                      <TableHead>{t('generalLedger.descriptionColumn')}</TableHead>
-                      <TableHead className="text-right">{t('trialBalance.debit')}</TableHead>
-                      <TableHead className="text-right">{t('trialBalance.credit')}</TableHead>
-                      <TableHead className="text-right">{t('generalLedger.balance')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {entries.map(
-                      (
-                        entry: {
-                          date: string;
-                          journalNumber?: string;
-                          journalId?: string;
-                          description?: string;
-                          reference?: string;
-                          debit: number;
-                          credit: number;
-                          runningBalance?: number;
-                        },
-                        i: number,
-                      ) => (
-                        <TableRow key={i}>
-                          <TableCell>
-                            {format(new Date(entry.date), 'PP', { locale: dateLocale })}
-                          </TableCell>
-                          <TableCell>
-                            {entry.journalNumber ? (
-                              <Link
-                                href={`/accounting/journals/${entry.journalId}`}
-                                className="text-blue-600 hover:underline"
-                              >
-                                {entry.journalNumber}
-                              </Link>
-                            ) : (
-                              '-'
-                            )}
-                          </TableCell>
-                          <TableCell>{entry.description || entry.reference || '-'}</TableCell>
-                          <TableCell className="text-right font-mono">
-                            {entry.debit > 0 ? formatCurrency(entry.debit) : '-'}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {entry.credit > 0 ? formatCurrency(entry.credit) : '-'}
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-medium">
-                            {formatCurrency(entry.runningBalance || 0)}
-                          </TableCell>
-                        </TableRow>
-                      ),
-                    )}
-                  </TableBody>
-                </Table>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t('generalLedger.date')}</TableHead>
+                        <TableHead>{t('generalLedger.journalNumber')}</TableHead>
+                        <TableHead>{t('generalLedger.entryDescription')}</TableHead>
+                        <TableHead className="text-right">{t('trialBalance.debit')}</TableHead>
+                        <TableHead className="text-right">{t('trialBalance.credit')}</TableHead>
+                        <TableHead className="text-right">{t('generalLedger.balance')}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {entries.map(
+                        (
+                          entry: {
+                            date: string;
+                            journalNumber?: string;
+                            journalId?: string;
+                            description?: string;
+                            reference?: string;
+                            debit: number;
+                            credit: number;
+                            runningBalance?: number;
+                          },
+                          i: number,
+                        ) => (
+                          <TableRow key={i}>
+                            <TableCell>
+                              {format(new Date(entry.date), 'PP', { locale: dateLocale })}
+                            </TableCell>
+                            <TableCell>
+                              {entry.journalNumber ? (
+                                <Link
+                                  href={`/accounting/journals/${entry.journalId}`}
+                                  className="text-blue-600 hover:underline"
+                                >
+                                  {entry.journalNumber}
+                                </Link>
+                              ) : (
+                                '-'
+                              )}
+                            </TableCell>
+                            <TableCell>{entry.description || entry.reference || '-'}</TableCell>
+                            <TableCell className="text-right font-mono">
+                              {entry.debit > 0 ? formatCurrency(entry.debit) : '-'}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {entry.credit > 0 ? formatCurrency(entry.credit) : '-'}
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-medium">
+                              {formatCurrency(entry.runningBalance || 0)}
+                            </TableCell>
+                          </TableRow>
+                        ),
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>

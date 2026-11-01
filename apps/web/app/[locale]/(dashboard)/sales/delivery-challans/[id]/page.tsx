@@ -91,7 +91,9 @@ export default function ChallanDetailPage({ params }: ChallanDetailPageProps) {
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">{challan.challanNumber}</h1>
+              <h1 dir="ltr" className="text-3xl font-bold tracking-tight whitespace-nowrap">
+                {challan.challanNumber}
+              </h1>
               <Badge variant="outline" className={getChallanStatusColor(challan.status)}>
                 {getChallanStatusLabel(challan.status)}
               </Badge>

@@ -1,3 +1,4 @@
+import { BRAND } from '@mizano/shared-types';
 import { escapeHtml } from '../documents/templates/base.template';
 import type { ResetLocale } from './dto/password.dto';
 
@@ -18,18 +19,18 @@ const COPY: Record<
   }
 > = {
   en: {
-    subject: 'Reset your Mizano password',
+    subject: `Reset your ${BRAND.name.en} password`,
     greeting: (name) => `Hello ${name},`,
     body: (minutes) =>
-      `We received a request to reset your Mizano password. The link works once and expires in ${minutes} minutes.`,
+      `We received a request to reset your ${BRAND.name.en} password. The link works once and expires in ${minutes} minutes.`,
     button: 'Choose a new password',
     ignore: 'If you did not ask for this, ignore this email: your password stays the same.',
   },
   ar: {
-    subject: 'إعادة تعيين كلمة المرور في ميزانو',
+    subject: `إعادة تعيين كلمة المرور في ${BRAND.name.ar}`,
     greeting: (name) => `مرحبًا ${name}،`,
     body: (minutes) =>
-      `وصلنا طلب لإعادة تعيين كلمة المرور لحسابك في ميزانو. يعمل الرابط مرة واحدة وتنتهي صلاحيته بعد ${minutes} دقيقة.`,
+      `وصلنا طلب لإعادة تعيين كلمة المرور لحسابك في ${BRAND.name.ar}. يعمل الرابط مرة واحدة وتنتهي صلاحيته بعد ${minutes} دقيقة.`,
     button: 'اختر كلمة مرور جديدة',
     ignore: 'إذا لم تطلب ذلك فتجاهل هذه الرسالة، وستبقى كلمة المرور كما هي.',
   },

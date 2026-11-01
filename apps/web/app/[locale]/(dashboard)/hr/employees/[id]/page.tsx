@@ -47,13 +47,14 @@ import {
   getEmployeeStatusColor,
   getPayrollStatusLabel,
   type PayrollStatus,
-  formatCurrency,
 } from '@/lib/hooks/use-hr';
 import { useTranslations } from 'next-intl';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function EmployeeDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('hr');
   const tCommon = useTranslations('common');
   const dateLocale = useDateFnsLocale();
@@ -212,7 +213,9 @@ export default function EmployeeDetailPage({ params }: { params: { id: string } 
                 {employee.phone && (
                   <div className="flex items-center gap-3">
                     <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">{employee.phone}</span>
+                    <span className="text-sm" dir="ltr">
+                      {employee.phone}
+                    </span>
                   </div>
                 )}
                 {employee.department && (

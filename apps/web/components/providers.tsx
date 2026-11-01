@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SessionProvider, signOut, useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Toaster as SonnerToaster } from 'sonner';
 import { Toaster } from '@/components/ui/toaster';
 
@@ -23,6 +24,7 @@ function SessionGuard({ children }: { children: React.ReactNode }) {
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  const tA11y = useTranslations('common.a11y');
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -43,7 +45,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <SessionGuard>{children}</SessionGuard>
         <Toaster />
         {/* Some hooks still call sonner's toast(); mount its viewport so those messages render */}
-        <SonnerToaster position="top-center" richColors closeButton />
+        <SonnerToaster
+          position="top-center"
+          richColors
+          closeButton
+          containerAriaLabel={tA11y('toastsRegion')}
+          toastOptions={{ closeButtonAriaLabel: tA11y('closeToast') }}
+        />
       </QueryClientProvider>
     </SessionProvider>
   );

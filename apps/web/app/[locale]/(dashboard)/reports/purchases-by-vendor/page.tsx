@@ -36,30 +36,30 @@ function PurchasesByVendorContent() {
     () => [
       {
         accessorKey: 'vendorName',
-        header: t('purchasesByVendor.vendor'),
+        header: t('purchasesByVendor.columns.vendor'),
         cell: ({ row }) => <div className="font-medium">{row.original.vendorName}</div>,
       },
       {
         accessorKey: 'billCount',
-        header: t('purchasesByVendor.bills'),
+        header: t('purchasesByVendor.columns.bills'),
         cell: ({ row }) => row.original.billCount,
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'totalAmount',
-        header: t('purchasesByVendor.totalAmount'),
+        header: t('purchasesByVendor.columns.totalAmount'),
         cell: ({ row }) => formatCurrency(row.original.totalAmount),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'paidAmount',
-        header: t('purchasesByVendor.paid'),
+        header: t('purchasesByVendor.columns.paid'),
         cell: ({ row }) => formatCurrency(row.original.paidAmount),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'balanceDue',
-        header: t('purchasesByVendor.balanceDue'),
+        header: t('purchasesByVendor.columns.balanceDue'),
         cell: ({ row }) => (
           <span className={row.original.balanceDue > 0 ? 'text-red-600 font-medium' : ''}>
             {formatCurrency(row.original.balanceDue)}
@@ -178,7 +178,7 @@ function PurchasesByVendorContent() {
             columns={columns}
             data={data?.entries || []}
             isLoading={isLoading}
-            emptyMessage={t('purchasesByVendor.empty')}
+            emptyMessage={t('purchasesByVendor.noData')}
             enableExport
             exportFilename="purchases-by-vendor"
           />

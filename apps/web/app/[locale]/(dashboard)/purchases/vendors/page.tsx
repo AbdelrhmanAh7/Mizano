@@ -20,7 +20,6 @@ import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import {
-  formatCurrency,
   getBalanceColor,
   useDeleteVendor,
   useInfiniteVendors,
@@ -32,8 +31,10 @@ import { useTranslations } from 'next-intl';
 import { Edit, Eye, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function VendorsPageContent() {
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('purchases');
   const tCommon = useTranslations('common');
   const { toast } = useToast();
@@ -69,7 +70,7 @@ function VendorsPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => vendorsApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['vendors']],
-    successMessage: tBulk.raw('vendorsDeleted'),
+    successMessage: (count) => tBulk('vendorsDeleted', { count }),
   });
 
   const bulkActions = [
@@ -149,7 +150,7 @@ function VendorsPageContent() {
     {
       accessorKey: 'phone',
       header: t('vendors.table.phone'),
-      cell: ({ row }) => row.original.phone || '-',
+      cell: ({ row }) => (row.original.phone ? <span dir="ltr">{row.original.phone}</span> : '-'),
     },
     {
       accessorKey: 'currency',
@@ -168,10 +169,11 @@ function VendorsPageContent() {
       ),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       cell: ({ row }) => {
+        // A ledger balance, so the organization base currency, never the vendor's default (#83).
         const balance = parseFloat(row.original.outstandingBalance || '0');
         return (
           <span className={cn('font-mono font-medium', getBalanceColor(balance))}>
-            {formatCurrency(balance, row.original.currency)}
+            {formatCurrency(balance)}
           </span>
         );
       },

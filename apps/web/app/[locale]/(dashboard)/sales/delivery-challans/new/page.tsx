@@ -36,7 +36,8 @@ interface ChallanLine {
 
 const CHALLAN_TYPES: ChallanType[] = ['SUPPLY', 'JOB_WORK', 'SAMPLE'];
 
-const CHALLAN_TYPE_KEYS: Record<ChallanType, 'supply' | 'jobWork' | 'sample'> = {
+// Translation key of each challan type (sales.deliveryChallans.types).
+const CHALLAN_TYPE_KEYS: Record<ChallanType, string> = {
   SUPPLY: 'supply',
   JOB_WORK: 'jobWork',
   SAMPLE: 'sample',
@@ -81,8 +82,8 @@ export default function NewDeliveryChallanPage() {
 
     if (!customerId) {
       toast({
-        title: t('deliveryChallans.toast.validationError'),
-        description: t('deliveryChallans.toast.customerRequired'),
+        title: tCommon('errors.validation'),
+        description: t('deliveryChallans.form.customerRequired'),
         variant: 'destructive',
       });
       return;
@@ -91,8 +92,8 @@ export default function NewDeliveryChallanPage() {
     const validLines = lines.filter((l) => l.itemId && Number(l.quantity) > 0);
     if (validLines.length === 0) {
       toast({
-        title: t('deliveryChallans.toast.validationError'),
-        description: t('deliveryChallans.toast.linesRequired'),
+        title: tCommon('errors.validation'),
+        description: t('deliveryChallans.form.lineRequired'),
         variant: 'destructive',
       });
       return;
@@ -115,14 +116,14 @@ export default function NewDeliveryChallanPage() {
       await createChallan.mutateAsync(dto);
       toast({
         title: t('deliveryChallans.newChallan'),
-        description: t('deliveryChallans.toast.created'),
+        description: t('deliveryChallans.form.created'),
       });
       router.push('/sales/delivery-challans');
     } catch (error: unknown) {
       const msg =
         (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-        t('deliveryChallans.toast.createError');
-      toast({ title: t('toast.error'), description: msg, variant: 'destructive' });
+        t('deliveryChallans.form.createError');
+      toast({ title: tCommon('errors.title'), description: msg, variant: 'destructive' });
     }
   };
 
@@ -151,7 +152,7 @@ export default function NewDeliveryChallanPage() {
                 <Label htmlFor="customer">{t('deliveryChallans.customer')}</Label>
                 <Select value={customerId} onValueChange={setCustomerId}>
                   <SelectTrigger id="customer">
-                    <SelectValue placeholder={t('deliveryChallans.selectCustomer')} />
+                    <SelectValue placeholder={t('deliveryChallans.form.selectCustomer')} />
                   </SelectTrigger>
                   <SelectContent>
                     {customers.map((c) => (
@@ -206,20 +207,20 @@ export default function NewDeliveryChallanPage() {
               <CardTitle>{t('deliveryChallans.lineItems')}</CardTitle>
               <Button type="button" variant="outline" size="sm" onClick={addLine}>
                 <Plus className="mr-2 h-4 w-4" />
-                {t('deliveryChallans.addLine')}
+                {t('deliveryChallans.form.addLine')}
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               {lines.map((line, index) => (
                 <div key={index} className="flex items-end gap-3">
                   <div className="flex-1 space-y-2">
-                    <Label>{t('lineItems.item')}</Label>
+                    <Label>{t('deliveryChallans.table.item')}</Label>
                     <Select
                       value={line.itemId}
                       onValueChange={(v) => updateLine(index, 'itemId', v)}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder={t('deliveryChallans.selectItem')} />
+                        <SelectValue placeholder={t('deliveryChallans.form.selectItem')} />
                       </SelectTrigger>
                       <SelectContent>
                         {items.map((item) => (
@@ -231,7 +232,7 @@ export default function NewDeliveryChallanPage() {
                     </Select>
                   </div>
                   <div className="w-24 space-y-2">
-                    <Label>{t('lineItems.quantity')}</Label>
+                    <Label>{t('deliveryChallans.form.qty')}</Label>
                     <Input
                       type="number"
                       min="1"
@@ -240,11 +241,11 @@ export default function NewDeliveryChallanPage() {
                     />
                   </div>
                   <div className="flex-1 space-y-2">
-                    <Label>{t('lineItems.description')}</Label>
+                    <Label>{t('deliveryChallans.table.description')}</Label>
                     <Input
                       value={line.description}
                       onChange={(e) => updateLine(index, 'description', e.target.value)}
-                      placeholder={t('deliveryChallans.optional')}
+                      placeholder={t('deliveryChallans.form.optional')}
                     />
                   </div>
                   {lines.length > 1 && (

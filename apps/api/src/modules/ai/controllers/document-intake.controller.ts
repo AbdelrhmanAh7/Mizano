@@ -1,6 +1,5 @@
 import {
   Controller,
-  Logger,
   Post,
   Get,
   Body,
@@ -67,8 +66,6 @@ const SSE_MAX_DURATION_MS = 10 * 60 * 1000;
 @Controller('ai/document-intake')
 @UseGuards(JwtAuthGuard, OrganizationGuard, PermissionsGuard)
 export class DocumentIntakeController {
-  private readonly logger = new Logger(DocumentIntakeController.name);
-
   constructor(
     private intakeService: DocumentIntakeService,
     private jobs: IntakeJobsService,
@@ -201,6 +198,8 @@ export class DocumentIntakeController {
                   ? (job.result as unknown as DocumentIntakeResult)
                   : undefined,
               error: stage === 'error' ? (job.lastError ?? 'Processing failed') : undefined,
+              // Stable code (read failure or interrupted approval) for the screen to explain.
+              code: job.lastError ?? undefined,
             };
             subscriber.next({ data: event, id: `${job.progress}`, type: 'progress' });
           }
@@ -304,6 +303,7 @@ export class DocumentIntakeController {
   @ApiResponse({ status: 409, description: 'Intake job already approved or not ready' })
   async confirmDocument(
     @CurrentOrg() orgId: string,
+    @CurrentUser('id') userId: string,
     @Body() dto: ConfirmIntakeDto,
   ): Promise<{ data: { type: 'bill' | 'invoice'; id: string; number: string } }> {
     const { jobId, ...input } = dto;
@@ -311,14 +311,14 @@ export class DocumentIntakeController {
       return { data: await this.intakeService.confirmAndCreate(orgId, input) };
     }
     // Replay-safe: only one confirm can move the job to APPROVED.
-    const restore = await this.jobs.claimForApproval(jobId, orgId);
+    const restore = await this.jobs.claimForApproval(jobId, orgId, {
+      type: input.type,
+      currencyCode: input.currencyCode,
+    });
     try {
-      const result = await this.intakeService.confirmAndCreate(orgId, input);
-      // The draft is committed: from here on the job is never reopened. If linking fails the
-      // job stays APPROVED, so a second confirm is refused (409) instead of creating a duplicate.
-      await this.jobs.linkDraft(jobId, orgId, { type: result.type, id: result.id }).catch(() => {
-        this.logger.error(`Could not link draft ${result.id} to intake job ${jobId}`);
-      });
+      // The draft, its INTAKE_DRAFT marker and the job's draft link commit together; a crash
+      // before that leaves the job APPROVED without a link, which recoverApprovals repairs.
+      const result = await this.intakeService.confirmAndCreate(orgId, input, { jobId, userId });
       return { data: result };
     } catch (error) {
       await this.jobs.releaseApproval(jobId, orgId, restore);

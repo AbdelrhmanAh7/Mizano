@@ -79,7 +79,7 @@ export default function QuoteDetailPage() {
       router.push('/sales/quotes');
     } catch (error: unknown) {
       toast({
-        title: t('toast.error'),
+        title: tCommon('errors.title'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           t('quotes.toast.deleteError'),
@@ -98,7 +98,7 @@ export default function QuoteDetailPage() {
       });
     } catch (error: unknown) {
       toast({
-        title: t('toast.error'),
+        title: tCommon('errors.title'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           t('quotes.toast.sendError'),
@@ -116,7 +116,7 @@ export default function QuoteDetailPage() {
       });
     } catch (error: unknown) {
       toast({
-        title: t('toast.error'),
+        title: tCommon('errors.title'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           t('quotes.toast.acceptError'),
@@ -134,7 +134,7 @@ export default function QuoteDetailPage() {
       });
     } catch (error: unknown) {
       toast({
-        title: t('toast.error'),
+        title: tCommon('errors.title'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           t('quotes.toast.declineError'),
@@ -157,7 +157,7 @@ export default function QuoteDetailPage() {
       }
     } catch (error: unknown) {
       toast({
-        title: t('toast.error'),
+        title: tCommon('errors.title'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           t('quotes.toast.convertError'),
@@ -220,7 +220,9 @@ export default function QuoteDetailPage() {
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">{quote.quoteNumber}</h1>
+              <h1 dir="ltr" className="text-3xl font-bold tracking-tight whitespace-nowrap">
+                {quote.quoteNumber}
+              </h1>
               <QuoteStatusBadge status={quote.status} />
             </div>
             <p className="text-muted-foreground">
@@ -440,8 +442,6 @@ export default function QuoteDetailPage() {
         title={t('quotes.deleteQuote')}
         description={t('quotes.deleteConfirmation')}
         onConfirm={confirmDelete}
-        cancelLabel={tCommon('buttons.cancel')}
-        deleteLabel={tCommon('buttons.delete')}
       />
 
       {/* Convert to Invoice Dialog */}

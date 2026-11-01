@@ -1,4 +1,5 @@
 /* eslint-disable no-console */
+import { BRAND } from '@mizano/shared-types';
 import {
   PrismaClient,
   UserStatus,
@@ -55,6 +56,7 @@ import {
 import * as bcrypt from 'bcrypt';
 import { Decimal } from '@prisma/client/runtime/library';
 import { seedBlockedReason } from './seed-guard';
+import { systemName } from '../src/common/i18n/localize';
 
 const prisma = new PrismaClient();
 const DEFAULT_PASSWORD = 'password123';
@@ -77,7 +79,7 @@ async function main() {
     update: {},
     create: {
       id: 'seed-org-001',
-      name: 'Mizano Demo Company',
+      name: `${BRAND.name.en} Demo Company`,
       email: 'demo@mizano.com',
       phone: '+201234567890',
       address: '123 Tahrir Square, Downtown',
@@ -105,7 +107,12 @@ async function main() {
     const r = await prisma.role.upsert({
       where: { name_organizationId: { name, organizationId: orgId } },
       update: {},
-      create: { name, description: name, isDefault: name === 'Admin', organizationId: orgId },
+      create: {
+        ...systemName(name),
+        description: name,
+        isDefault: name === 'Admin',
+        organizationId: orgId,
+      },
     });
     roleMap[name] = r.id;
   }
@@ -222,7 +229,7 @@ async function main() {
     const acc = await prisma.account.upsert({
       where: { code_organizationId: { code: a.code, organizationId: orgId } },
       update: {},
-      create: { ...a, organizationId: orgId },
+      create: { ...a, ...systemName(a.name), organizationId: orgId },
     });
     accountMap[a.code] = acc.id;
   }
@@ -265,7 +272,7 @@ async function main() {
     update: {},
     create: {
       id: 'tax-vat-15',
-      name: 'VAT 15%',
+      ...systemName('VAT 15%'),
       code: 'VAT15',
       rate: d(15),
       type: TaxType.BOTH,
@@ -280,7 +287,7 @@ async function main() {
     update: {},
     create: {
       id: 'tax-vat-5',
-      name: 'VAT 5%',
+      ...systemName('VAT 5%'),
       code: 'VAT5',
       rate: d(5),
       type: TaxType.SALES,
@@ -2819,7 +2826,7 @@ async function main() {
     create: {
       id: 'email-001',
       to: 'hello@niletech.eg',
-      subject: 'Invoice INV-001 from Mizano Demo Company',
+      subject: `Invoice INV-001 from ${BRAND.name.en} Demo Company`,
       entityType: 'invoice',
       entityId: invMap['inv-INV-001'],
       status: 'sent',
@@ -2832,7 +2839,7 @@ async function main() {
     create: {
       id: 'email-002',
       to: 'info@delta.eg',
-      subject: 'Quote QT-002 from Mizano Demo Company',
+      subject: `Quote QT-002 from ${BRAND.name.en} Demo Company`,
       entityType: 'quote',
       entityId: quote2.id,
       status: 'sent',

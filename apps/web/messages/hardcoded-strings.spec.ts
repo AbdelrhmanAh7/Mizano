@@ -36,16 +36,8 @@ const PILOT_DIRS = [
 /** Operator-only screens with technical units, not seen by business users. */
 const SKIP_FILES = new Set(['app/[locale]/(dashboard)/settings/performance/page.tsx']);
 
-/** Literals that are not copy: the brand, and sample values shown as placeholders. */
-const ALLOWED = new Set([
-  'Mizano',
-  'Mizano ERP',
-  'Acme Corp',
-  'contact@acme.com',
-  'https://acme.com',
-  'https://…/api/public/webhooks/…',
-  'whsec_…',
-]);
+/** Literals that are not copy: sample values shown as placeholders. */
+const ALLOWED = new Set(['https://…/api/public/webhooks/…', 'whsec_…']);
 
 const TEXT_PROPS = new Set(['placeholder', 'title', 'aria-label', 'alt', 'label', 'description']);
 const HAS_WORD = /[A-Za-z؀-ۿ]{2,}/;

@@ -137,6 +137,18 @@
     "empty": {
       "title": "لا توجد مستودعات بعد",
       "description": "أنشئ أول مستودع"
+    },
+    "toast": {
+      "created": "تم إنشاء المستودع",
+      "createdDescription": "تم إنشاء المستودع بنجاح.",
+      "createError": "تعذّر إنشاء المستودع",
+      "updated": "تم تحديث المستودع",
+      "updatedDescription": "تم تحديث المستودع بنجاح.",
+      "updateError": "تعذّر تحديث المستودع",
+      "deleted": "تم حذف المستودع",
+      "deletedDescription": "تم حذف المستودع بنجاح.",
+      "deleteError": "تعذّر حذف المستودع",
+      "genericError": "حدث خطأ ما. حاول مرة أخرى."
     }
   },
   "adjustments": {
@@ -188,7 +200,16 @@
       "title": "إلغاء هذه التسوية؟",
       "description": "سيتم عكس قيد اليومية واستعادة المخزون. لا يمكن التراجع عن هذا الإجراء."
     },
-    "accountsLoadError": "تعذر تحميل حسابات التسوية"
+    "accountsLoadError": "تعذر تحميل حسابات التسوية",
+    "toast": {
+      "created": "تم ترحيل التسوية",
+      "createdDescription": "تم تحديث المخزون وترحيل قيد اليومية.",
+      "createError": "تعذّر إنشاء التسوية",
+      "voided": "تم إلغاء التسوية",
+      "voidedDescription": "تم عكس قيد اليومية وإرجاع المخزون.",
+      "voidError": "تعذّر إلغاء التسوية",
+      "genericError": "حدث خطأ ما. حاول مرة أخرى."
+    }
   },
   "priceLists": {
     "title": "قوائم الأسعار",
@@ -259,6 +280,18 @@
     "empty": {
       "title": "لا توجد تحويلات",
       "createAction": "إنشاء تحويل"
+    },
+    "toast": {
+      "created": "تم إنشاء التحويل",
+      "createdDescription": "تم إنشاء تحويل المخزون بنجاح.",
+      "createError": "تعذّر إنشاء التحويل",
+      "completed": "تم إتمام التحويل",
+      "completedDescription": "تم إتمام تحويل المخزون.",
+      "completeError": "تعذّر إتمام التحويل",
+      "cancelled": "تم إلغاء التحويل",
+      "cancelledDescription": "تم إلغاء تحويل المخزون.",
+      "cancelError": "تعذّر إلغاء التحويل",
+      "genericError": "حدث خطأ ما. حاول مرة أخرى."
     }
   },
   "common": {
@@ -280,5 +313,22 @@
     "backTo": "العودة إلى",
     "confirmDelete": "هل أنت متأكد من حذف هذا العنصر؟ لا يمكن التراجع عن هذا الإجراء.",
     "noData": "لا تتوفر بيانات"
+  },
+  "compositeItems": {
+    "toast": {
+      "created": "تم إنشاء الصنف المركب",
+      "createdDescription": "تم إنشاء الصنف المركب بنجاح.",
+      "createError": "تعذّر إنشاء الصنف المركب",
+      "updated": "تم تحديث الصنف المركب",
+      "updatedDescription": "تم تحديث الصنف المركب بنجاح.",
+      "updateError": "تعذّر تحديث الصنف المركب",
+      "deleted": "تم حذف الصنف المركب",
+      "deletedDescription": "تم حذف الصنف المركب بنجاح.",
+      "deleteError": "تعذّر حذف الصنف المركب",
+      "assembled": "تم التجميع",
+      "assembledDescription": "تم تجميع الصنف المركب بنجاح.",
+      "assembleError": "تعذّر تجميع الصنف المركب",
+      "genericError": "حدث خطأ ما. حاول مرة أخرى."
+    }
   }
 }

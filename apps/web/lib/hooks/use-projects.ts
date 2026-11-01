@@ -1,8 +1,10 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import { getLocalizedApiErrorMessage } from '@/lib/api-error';
 
 export interface Project {
   id: string;
@@ -104,9 +106,6 @@ export interface CreateTimesheetPayload {
   isBillable?: boolean;
 }
 
-// Error type for API responses
-type ApiError = { response?: { data?: { message?: string } } };
-
 // API functions
 const projectsApi = {
   getAll: (params?: ProjectFilters) => api.get('/projects', { params }),
@@ -175,46 +174,52 @@ export function useProjectProfitability(id: string) {
 
 export function useCreateProject() {
   const queryClient = useQueryClient();
+  const t = useTranslations('projects.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: projectsApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      toast.success('Project created successfully');
+      toast.success(t('projectCreated'));
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to create project');
+    onError: (error: unknown) => {
+      toast.error(getLocalizedApiErrorMessage(error, t('projectCreateError'), tApiErrors));
     },
   });
 }
 
 export function useUpdateProject() {
   const queryClient = useQueryClient();
+  const t = useTranslations('projects.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
       projectsApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      toast.success('Project updated successfully');
+      toast.success(t('projectUpdated'));
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to update project');
+    onError: (error: unknown) => {
+      toast.error(getLocalizedApiErrorMessage(error, t('projectUpdateError'), tApiErrors));
     },
   });
 }
 
 export function useDeleteProject() {
   const queryClient = useQueryClient();
+  const t = useTranslations('projects.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: projectsApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      toast.success('Project deleted successfully');
+      toast.success(t('projectDeleted'));
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to delete project');
+    onError: (error: unknown) => {
+      toast.error(getLocalizedApiErrorMessage(error, t('projectDeleteError'), tApiErrors));
     },
   });
 }
@@ -233,6 +238,8 @@ export function useTasks(projectId: string) {
 
 export function useCreateTask() {
   const queryClient = useQueryClient();
+  const t = useTranslations('projects.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: ({ projectId, data }: { projectId: string; data: Record<string, unknown> }) =>
@@ -240,16 +247,18 @@ export function useCreateTask() {
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'tasks'] });
       queryClient.invalidateQueries({ queryKey: ['projects', projectId] });
-      toast.success('Task created successfully');
+      toast.success(t('taskCreated'));
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to create task');
+    onError: (error: unknown) => {
+      toast.error(getLocalizedApiErrorMessage(error, t('taskCreateError'), tApiErrors));
     },
   });
 }
 
 export function useUpdateTask() {
   const queryClient = useQueryClient();
+  const t = useTranslations('projects.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: ({
@@ -264,10 +273,10 @@ export function useUpdateTask() {
       queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'tasks'] });
       queryClient.invalidateQueries({ queryKey: ['projects', projectId] });
       queryClient.invalidateQueries({ queryKey: ['tasks', 'my-tasks'] });
-      toast.success('Task updated successfully');
+      toast.success(t('taskUpdated'));
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to update task');
+    onError: (error: unknown) => {
+      toast.error(getLocalizedApiErrorMessage(error, t('taskUpdateError'), tApiErrors));
     },
   });
 }
@@ -295,32 +304,36 @@ export function useTimesheets(params?: TimesheetFilters) {
 
 export function useCreateTimesheet() {
   const queryClient = useQueryClient();
+  const t = useTranslations('projects.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: timesheetsApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['timesheets'] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      toast.success('Time entry created successfully');
+      toast.success(t('timeEntryCreated'));
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to create time entry');
+    onError: (error: unknown) => {
+      toast.error(getLocalizedApiErrorMessage(error, t('timeEntryCreateError'), tApiErrors));
     },
   });
 }
 
 export function useDeleteTimesheet() {
   const queryClient = useQueryClient();
+  const t = useTranslations('projects.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: timesheetsApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['timesheets'] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      toast.success('Time entry deleted successfully');
+      toast.success(t('timeEntryDeleted'));
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to delete time entry');
+    onError: (error: unknown) => {
+      toast.error(getLocalizedApiErrorMessage(error, t('timeEntryDeleteError'), tApiErrors));
     },
   });
 }
@@ -338,31 +351,35 @@ export function useActiveTimer() {
 
 export function useStartTimer() {
   const queryClient = useQueryClient();
+  const t = useTranslations('projects.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: timesheetsApi.startTimer,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['timesheets', 'timer'] });
-      toast.success('Timer started');
+      toast.success(t('timerStarted'));
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to start timer');
+    onError: (error: unknown) => {
+      toast.error(getLocalizedApiErrorMessage(error, t('timerStartError'), tApiErrors));
     },
   });
 }
 
 export function useStopTimer() {
   const queryClient = useQueryClient();
+  const t = useTranslations('projects.toast');
+  const tApiErrors = useTranslations('common.apiErrors');
 
   return useMutation({
     mutationFn: timesheetsApi.stopTimer,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['timesheets'] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      toast.success('Timer stopped and time entry created');
+      toast.success(t('timerStopped'));
     },
-    onError: (error: ApiError) => {
-      toast.error(error.response?.data?.message || 'Failed to stop timer');
+    onError: (error: unknown) => {
+      toast.error(getLocalizedApiErrorMessage(error, t('timerStopError'), tApiErrors));
     },
   });
 }
@@ -424,15 +441,6 @@ export function getTaskStatusColor(status: TaskStatus): string {
     DONE: 'bg-green-100 text-green-800',
   };
   return colors[status] || colors.TODO;
-}
-
-export function formatCurrency(amount: string | number | null | undefined): string {
-  if (amount === null || amount === undefined) return '$0.00';
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(num);
 }
 
 export function formatHours(hours: string | number | null | undefined): string {

@@ -1,12 +1,10 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToastMutation } from './use-toast-mutation';
+import { useQuery } from '@tanstack/react-query';
 import { warehousesApi } from '@/lib/api';
-import { useToast } from '@/components/ui/use-toast';
 
 // Types
-type ApiError = { response?: { data?: { message?: string } } };
-
 export interface Warehouse {
   id: string;
   name: string;
@@ -105,28 +103,15 @@ export function useWarehouseStock(id: string | undefined) {
  * Hook to create a new warehouse
  */
 export function useCreateWarehouse() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'inventory.warehouses.toast',
     mutationFn: async (data: CreateWarehouseData) => {
       const response = await warehousesApi.create(data);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['warehouses'] });
-      toast({
-        title: 'Warehouse created',
-        description: 'The warehouse has been created successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error creating warehouse',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: () => [['warehouses']],
+    success: 'created',
+    error: 'createError',
   });
 }
 
@@ -134,29 +119,15 @@ export function useCreateWarehouse() {
  * Hook to update an existing warehouse
  */
 export function useUpdateWarehouse() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'inventory.warehouses.toast',
     mutationFn: async ({ id, data }: { id: string; data: UpdateWarehouseData }) => {
       const response = await warehousesApi.update(id, data);
       return response.data;
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['warehouses'] });
-      queryClient.invalidateQueries({ queryKey: ['warehouses', variables.id] });
-      toast({
-        title: 'Warehouse updated',
-        description: 'The warehouse has been updated successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error updating warehouse',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: (variables) => [['warehouses'], ['warehouses', variables.id]],
+    success: 'updated',
+    error: 'updateError',
   });
 }
 
@@ -164,28 +135,15 @@ export function useUpdateWarehouse() {
  * Hook to delete a warehouse
  */
 export function useDeleteWarehouse() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
+  return useToastMutation({
+    namespace: 'inventory.warehouses.toast',
     mutationFn: async (id: string) => {
       const response = await warehousesApi.delete(id);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['warehouses'] });
-      toast({
-        title: 'Warehouse deleted',
-        description: 'The warehouse has been deleted successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error deleting warehouse',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    invalidate: () => [['warehouses']],
+    success: 'deleted',
+    error: 'deleteError',
   });
 }
 

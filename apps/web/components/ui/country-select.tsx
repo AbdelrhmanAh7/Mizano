@@ -7,6 +7,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useMemo } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
 import { countries } from '@/lib/data/countries';
 
 interface CountrySelectProps {
@@ -20,25 +22,37 @@ interface CountrySelectProps {
 export function CountrySelect({
   value,
   onValueChange,
-  placeholder = 'Select country',
+  placeholder,
   disabled,
   id,
 }: CountrySelectProps) {
+  const t = useTranslations('common.a11y');
+  const locale = useLocale();
+  const label = placeholder ?? t('selectCountry');
+  // The stored value stays the English name; only the shown name follows the screen language.
+  const regionNames = useMemo(() => {
+    try {
+      return new Intl.DisplayNames([locale], { type: 'region' });
+    } catch {
+      return null;
+    }
+  }, [locale]);
+  const shownName = (code: string, fallback: string): string => regionNames?.of(code) ?? fallback;
+  const selected = value ? countries.find((c) => c.name === value || c.code === value) : undefined;
+
   return (
     <Select value={value || ''} onValueChange={onValueChange} disabled={disabled}>
       <SelectTrigger id={id}>
-        <SelectValue placeholder={placeholder}>
-          {value
-            ? countries.find((c) => c.name === value || c.code === value)
-              ? `${countries.find((c) => c.name === value || c.code === value)!.flag} ${value}`
-              : value
-            : placeholder}
+        <SelectValue placeholder={label}>
+          {selected
+            ? `${selected.flag} ${shownName(selected.code, selected.name)}`
+            : value || label}
         </SelectValue>
       </SelectTrigger>
       <SelectContent className="max-h-[300px]">
         {countries.map((c) => (
           <SelectItem key={c.code} value={c.name}>
-            {c.flag} {c.name}
+            {c.flag} {shownName(c.code, c.name)}
           </SelectItem>
         ))}
       </SelectContent>

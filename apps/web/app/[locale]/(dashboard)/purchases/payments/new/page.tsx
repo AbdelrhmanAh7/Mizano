@@ -7,7 +7,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PaymentMadeForm } from '@/components/purchases/payment-made-form';
-import { useCreatePaymentMade } from '@/lib/hooks/use-payments-made';
+import { useCreatePaymentMade, type CreatePaymentMadeData } from '@/lib/hooks/use-payments-made';
 import { useBankAccounts } from '@/lib/hooks/use-bank-accounts';
 
 export default function NewPaymentMadePage() {
@@ -27,11 +27,9 @@ export default function NewPaymentMadePage() {
 
   const bankAccounts = bankAccountsData?.data || [];
 
-  const handleSubmit = async (data: Record<string, unknown>) => {
+  const handleSubmit = async (data: CreatePaymentMadeData) => {
     try {
-      await createPayment.mutateAsync(
-        data as unknown as Parameters<typeof createPayment.mutateAsync>[0],
-      );
+      await createPayment.mutateAsync(data);
       router.push('/purchases/payments');
     } catch (error) {
       // Error is handled in the hook

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   HttpException,
   HttpStatus,
@@ -13,6 +14,7 @@ import { IntakeJob, IntakeJobStatus, IntakeSource, Prisma } from '@prisma/client
 import { describeError } from '../../../common/utils/redact';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { IntakeStage } from '../services/document-intake.service';
+import { INTAKE_DRAFT_ENTITY, parseIntakeDraftMarker } from './intake-draft-marker';
 import { IntakeQueueService } from './intake-queue.service';
 import { buildIntakeStorageKey, IntakeStorage, sha256Hex } from './intake-storage';
 
@@ -74,6 +76,20 @@ export function queueJobId(jobId: string, attempts: number): string {
 
 const RECOVERY_BATCH = 200;
 const MAX_SWEEP_INTERVAL_MS = 30_000;
+/** An APPROVED job still without its draft after this long lost its confirm request. */
+const DEFAULT_APPROVAL_GRACE_MS = 10 * 60 * 1000;
+
+/** `lastError` of a job whose approval was interrupted before any draft was created. */
+export const INTAKE_APPROVAL_INTERRUPTED = 'INTAKE_APPROVAL_INTERRUPTED';
+
+/** The currency read from a stored result, or null when the reader found none. */
+function readCurrency(result: Prisma.JsonValue | null): string | null {
+  if (!result || typeof result !== 'object' || Array.isArray(result)) return null;
+  const fields = (result as Record<string, unknown>).extractedFields;
+  if (!fields || typeof fields !== 'object') return null;
+  const currency = (fields as Record<string, unknown>).currency;
+  return typeof currency === 'string' && currency.trim() !== '' ? currency : null;
+}
 
 @Injectable()
 export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestroy {
@@ -89,9 +105,13 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
 
   async onApplicationBootstrap(): Promise<void> {
     await this.recoverJobs();
+    await this.recoverApprovals();
     // Periodic sweep (interval <= lease) so a crashed worker's job is always reclaimed.
     const interval = Math.max(500, Math.min(MAX_SWEEP_INTERVAL_MS, intakeLeaseMs(this.config) / 2));
-    this.sweepTimer = setInterval(() => void this.recoverJobs(), interval);
+    this.sweepTimer = setInterval(() => {
+      void this.recoverJobs();
+      void this.recoverApprovals();
+    }, interval);
     this.sweepTimer.unref();
   }
 
@@ -163,6 +183,84 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
       );
     }
     return enqueued;
+  }
+
+  /**
+   * Repair APPROVED jobs that still have no draft link after the grace period (the confirm
+   * request died between the approval claim and the draft). If the job's INTAKE_DRAFT marker
+   * exists, link the draft it names (defensive: today the marker and the link commit together);
+   * otherwise no draft was created, so reopen the job for review with the stable code
+   * INTAKE_APPROVAL_INTERRUPTED. Both writes are guarded by APPROVED + no link, and a confirm
+   * that commits later fails its own guarded link and rolls back, so a job never ends with two
+   * drafts. Cross-tenant system sweep like `recoverJobs`; every lookup and write is scoped by the
+   * job's own organizationId.
+   *
+   * Only claims that recorded their draft type are swept. The earlier code linked the draft in a
+   * separate step and wrote no type at claim time, so an older APPROVED job without a link may
+   * have a draft no marker names: it is left alone rather than reopened for a second draft.
+   */
+  async recoverApprovals(now: Date = new Date()): Promise<{ linked: number; reopened: number }> {
+    const counts = { linked: 0, reopened: 0 };
+    const configured = Number(this.config.get<string>('INTAKE_APPROVAL_GRACE_MS'));
+    const graceMs =
+      Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_APPROVAL_GRACE_MS;
+    try {
+      const stuck = await this.prisma.intakeJob.findMany({
+        where: {
+          deletedAt: null,
+          status: IntakeJobStatus.APPROVED,
+          draftDocumentId: null,
+          draftDocumentType: { not: null },
+          updatedAt: { lt: new Date(now.getTime() - graceMs) },
+        },
+        select: { id: true, organizationId: true },
+        orderBy: { id: 'asc' },
+        take: RECOVERY_BATCH,
+      });
+      for (const job of stuck) {
+        const guard = {
+          id: job.id,
+          organizationId: job.organizationId,
+          deletedAt: null,
+          status: IntakeJobStatus.APPROVED,
+          draftDocumentId: null,
+        };
+        const marker = await this.prisma.auditLog.findFirst({
+          where: {
+            organizationId: job.organizationId,
+            entityType: INTAKE_DRAFT_ENTITY,
+            entityId: job.id,
+          },
+          orderBy: { createdAt: 'desc' },
+          select: { newValues: true },
+        });
+        const draft = parseIntakeDraftMarker(marker?.newValues ?? null);
+        if (draft) {
+          const res = await this.prisma.intakeJob.updateMany({ where: guard, data: draft });
+          counts.linked += res.count;
+        } else {
+          const res = await this.prisma.intakeJob.updateMany({
+            where: guard,
+            data: {
+              status: IntakeJobStatus.NEEDS_REVIEW,
+              lastError: INTAKE_APPROVAL_INTERRUPTED,
+              draftDocumentType: null,
+            },
+          });
+          counts.reopened += res.count;
+        }
+      }
+      if (counts.linked + counts.reopened > 0) {
+        this.logger.warn(
+          `Recovered interrupted intake approvals: linked=${counts.linked} reopened=${counts.reopened}`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Intake approval recovery failed: ${describeError(error, { includeMessage: false })}`,
+      );
+    }
+    return counts;
   }
 
   toView(job: IntakeJob, includeResult: boolean): IntakeJobView {
@@ -324,10 +422,26 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
     return job;
   }
 
-  /** EXTRACTED/NEEDS_REVIEW -> APPROVED; returns the status to restore if the draft fails. */
-  async claimForApproval(jobId: string, organizationId: string): Promise<IntakeJobStatus> {
+  /**
+   * EXTRACTED/NEEDS_REVIEW -> APPROVED; returns the status to restore if the draft fails.
+   * A currency the reader could not find is never assumed: the person must pick one. The claim
+   * records the draft type it is about to create, which marks it for `recoverApprovals`.
+   */
+  async claimForApproval(
+    jobId: string,
+    organizationId: string,
+    draft: { type: 'BILL' | 'INVOICE'; currencyCode?: string },
+  ): Promise<IntakeJobStatus> {
     const current = await this.getForOrg(jobId, organizationId);
     const previous = current.status;
+    const claimable =
+      current.status === IntakeJobStatus.EXTRACTED ||
+      current.status === IntakeJobStatus.NEEDS_REVIEW;
+    if (claimable && !readCurrency(current.result) && !draft.currencyCode?.trim()) {
+      throw new BadRequestException(
+        'The currency could not be read from the document; choose the currency before approving',
+      );
+    }
     const claimed = await this.prisma.intakeJob.updateMany({
       where: {
         id: jobId,
@@ -335,7 +449,10 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
         deletedAt: null,
         status: { in: [IntakeJobStatus.EXTRACTED, IntakeJobStatus.NEEDS_REVIEW] },
       },
-      data: { status: IntakeJobStatus.APPROVED },
+      data: {
+        status: IntakeJobStatus.APPROVED,
+        draftDocumentType: draft.type === 'BILL' ? 'bill' : 'invoice',
+      },
     });
     if (claimed.count === 0) {
       throw new ConflictException({
@@ -354,18 +471,7 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
   ): Promise<void> {
     await this.prisma.intakeJob.updateMany({
       where: { id: jobId, organizationId, status: IntakeJobStatus.APPROVED, draftDocumentId: null },
-      data: { status: restore },
-    });
-  }
-
-  async linkDraft(
-    jobId: string,
-    organizationId: string,
-    draft: { type: string; id: string },
-  ): Promise<void> {
-    await this.prisma.intakeJob.updateMany({
-      where: { id: jobId, organizationId, status: IntakeJobStatus.APPROVED },
-      data: { draftDocumentType: draft.type, draftDocumentId: draft.id },
+      data: { status: restore, draftDocumentType: null },
     });
   }
 }

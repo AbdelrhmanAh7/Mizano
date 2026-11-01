@@ -1,4 +1,9 @@
 /** @jest-environment node */
+// The address fields render translated pickers; their copy is not under test here.
+jest.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => key,
+  useLocale: () => 'en',
+}));
 import { addressFromParty, addressSchema, emptyAddress } from './address-fields';
 
 describe('party address helpers (customer and vendor forms)', () => {

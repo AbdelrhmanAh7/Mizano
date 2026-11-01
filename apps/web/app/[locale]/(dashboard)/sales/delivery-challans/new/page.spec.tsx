@@ -129,7 +129,7 @@ describe('NewDeliveryChallanPage', () => {
     expect(submitButton).not.toBeDisabled();
   });
 
-  it('shows the creating label when submission is pending', () => {
+  it('shows the creating text when submission is pending', () => {
     mockUseCreateDeliveryChallan.mockReturnValue({
       mutateAsync: jest.fn(),
       isPending: true,
@@ -159,9 +159,11 @@ describe('NewDeliveryChallanPage', () => {
     expect(() => renderPage()).not.toThrow();
   });
 
-  it('renders the add line button', () => {
+  it('renders Add Line button', () => {
     renderPage();
-    expect(screen.getByRole('button', { name: 'deliveryChallans.addLine' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'deliveryChallans.form.addLine' }),
+    ).toBeInTheDocument();
   });
 
   it('renders notes textarea', () => {

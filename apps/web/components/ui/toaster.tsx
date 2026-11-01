@@ -8,13 +8,15 @@ import {
   ToastTitle,
   ToastViewport,
 } from '@/components/ui/toast';
+import { useTranslations } from 'next-intl';
 import { useToast } from '@/components/ui/use-toast';
 
 export function Toaster() {
   const { toasts } = useToast();
+  const t = useTranslations('common.a11y');
 
   return (
-    <ToastProvider>
+    <ToastProvider label={t('notification')}>
       {toasts.map(function ({ id, title, description, action, ...props }) {
         return (
           <Toast key={id} {...props}>
@@ -27,7 +29,8 @@ export function Toaster() {
           </Toast>
         );
       })}
-      <ToastViewport />
+      {/* Radix fills {hotkey} itself, so the label is passed raw. */}
+      <ToastViewport label={t.raw('notificationsRegion') as string} />
     </ToastProvider>
   );
 }

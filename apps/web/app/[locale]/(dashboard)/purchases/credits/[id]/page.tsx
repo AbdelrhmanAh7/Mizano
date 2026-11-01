@@ -39,19 +39,20 @@ import {
   useApplyVendorCredit,
   useRefundVendorCredit,
   useVoidVendorCredit,
-  formatCurrency,
 } from '@/lib/hooks/use-vendor-credits';
 import { useQuery } from '@tanstack/react-query';
 import { billsApi, vendorCreditsApi } from '@/lib/api';
 import { compareDecimals } from '@/lib/decimal';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 interface VendorCreditDetailPageProps {
   params: { id: string };
 }
 
 export default function VendorCreditDetailPage({ params }: VendorCreditDetailPageProps) {
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const { id } = params;
   const t = useTranslations('purchases');
@@ -69,7 +70,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
   const refundCredit = useRefundVendorCredit();
   const voidCredit = useVoidVendorCredit();
 
-  const currency = credit?.vendor?.currency || 'USD';
+  // Vendor credits post in the organization base currency, never the vendor's default (#83).
 
   // Fetch unpaid bills for the vendor
   const { data: billsData } = useQuery({
@@ -105,6 +106,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
       id: string;
       billNumber: string;
       balanceDue: string | number;
+      currencyCode?: string | null;
     }>
   ).filter((b) => !credit || compareDecimals(b.balanceDue, credit.amount) >= 0);
 
@@ -219,9 +221,11 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                                 id: string;
                                 billNumber: string;
                                 balanceDue: string | number;
+                                currencyCode?: string | null;
                               }) => (
                                 <SelectItem key={bill.id} value={bill.id}>
-                                  {bill.billNumber} - {formatCurrency(bill.balanceDue, currency)}
+                                  {bill.billNumber} -{' '}
+                                  {formatCurrency(bill.balanceDue, bill.currencyCode)}
                                 </SelectItem>
                               ),
                             )
@@ -299,7 +303,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                     <div className="p-4 bg-muted rounded-lg">
                       <p className="text-sm text-muted-foreground">{t('credits.refundAmount')}</p>
                       <p className="text-2xl font-bold font-mono">
-                        {formatCurrency(credit.appliedToBillId ? '0' : credit.amount, currency)}
+                        {formatCurrency(credit.appliedToBillId ? '0' : credit.amount)}
                       </p>
                     </div>
                   </div>
@@ -359,9 +363,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('credits.total')}</p>
-                <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(credit.amount, currency)}
-                </p>
+                <p className="text-2xl font-bold font-mono">{formatCurrency(credit.amount)}</p>
               </div>
             </div>
           </CardContent>
@@ -392,7 +394,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
               <div>
                 <p className="text-sm text-muted-foreground">{t('credits.balanceRemaining')}</p>
                 <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(credit.appliedToBillId ? '0' : credit.amount, currency)}
+                  {formatCurrency(credit.appliedToBillId ? '0' : credit.amount)}
                 </p>
               </div>
             </div>
@@ -455,12 +457,12 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
             <div className="space-y-3">
               <div className="flex justify-between text-lg font-semibold border-t pt-3">
                 <span>{t('credits.total')}</span>
-                <span className="font-mono">{formatCurrency(credit.amount, currency)}</span>
+                <span className="font-mono">{formatCurrency(credit.amount)}</span>
               </div>
               <div className="flex justify-between text-lg border-t pt-3">
                 <span className="text-muted-foreground">{t('credits.balanceRemaining')}</span>
                 <span className="font-mono font-bold text-green-600">
-                  {formatCurrency(credit.appliedToBillId ? '0' : credit.amount, currency)}
+                  {formatCurrency(credit.appliedToBillId ? '0' : credit.amount)}
                 </span>
               </div>
             </div>
@@ -493,11 +495,11 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                     <TableCell>{line.description || '-'}</TableCell>
                     <TableCell className="text-right font-mono">{line.quantity}</TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatCurrency(line.rate, currency)}
+                      {formatCurrency(line.rate)}
                     </TableCell>
                     <TableCell className="text-right font-mono">{line.taxRate}%</TableCell>
                     <TableCell className="text-right font-mono font-medium">
-                      {formatCurrency(line.amount, currency)}
+                      {formatCurrency(line.amount)}
                     </TableCell>
                   </TableRow>
                 ))}

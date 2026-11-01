@@ -58,7 +58,7 @@ export default function ProfitLossReportPage() {
       {!hasData ? (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            {t('profitLoss.empty')}
+            {t('profitLoss.noData')}
           </CardContent>
         </Card>
       ) : (

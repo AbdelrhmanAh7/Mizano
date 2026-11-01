@@ -2,6 +2,7 @@ import { Body, Controller, Get, Headers, HttpCode, Logger, Post, Query, Res } fr
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
+import { BRAND } from '@mizano/shared-types';
 import { describeError } from '../../../common/utils/redact';
 import { McpOAuthService, OAuthError } from './mcp-oauth.service';
 
@@ -13,12 +14,12 @@ const ERROR_PAGES: Record<string, { ar: string; en: string }> = {
     en: 'Connecting AI apps is not turned on for this server.',
   },
   unknown_client: {
-    ar: 'هذا التطبيق غير معروف لميزان. ابدأ الربط من جديد من تطبيقك.',
-    en: 'Mizano does not know this app. Start connecting again from your AI app.',
+    ar: `هذا التطبيق غير معروف لدى ${BRAND.name.ar}. ابدأ الربط من جديد من تطبيقك.`,
+    en: `${BRAND.name.en} does not know this app. Start connecting again from your AI app.`,
   },
   bad_redirect: {
-    ar: 'عنوان الرجوع لا يطابق ما سجّله التطبيق، لذلك أوقف ميزان الربط لحمايتك.',
-    en: 'The return address does not match what the app registered, so Mizano stopped to protect you.',
+    ar: `عنوان الرجوع لا يطابق ما سجّله التطبيق، لذلك أوقفت ${BRAND.name.ar} الربط لحمايتك.`,
+    en: `The return address does not match what the app registered, so ${BRAND.name.en} stopped to protect you.`,
   },
 };
 
@@ -67,7 +68,7 @@ export class McpOAuthController {
         .type('html')
         .set('Cache-Control', 'no-store')
         .send(
-          `<!doctype html><html lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Mizano</title></head>` +
+          `<!doctype html><html lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${BRAND.name.en}</title></head>` +
             `<body style="font-family:system-ui,sans-serif;max-width:32rem;margin:3rem auto;padding:0 1rem;line-height:1.6">` +
             `<p dir="rtl">${text.ar}</p><p dir="ltr">${text.en}</p></body></html>`,
         );

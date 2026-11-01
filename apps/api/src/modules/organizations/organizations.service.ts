@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { lockOrganizationLedger } from '../../common/utils/ledger-lock';
 import { PrismaService } from '../../prisma/prisma.service';
 import { timingSafeStringEqual } from '../../common/utils/secure-compare.util';
-import { documentDigitsFrom } from '../../common/utils/document-digits';
+import { type DocumentDigits, documentDigitsFrom } from '../../common/utils/document-digits';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { UpdateAccountSettingsDto } from './dto/update-account-settings.dto';
 import {
@@ -25,6 +25,7 @@ import {
   OnboardingStatusResponse,
   CoaTemplatePreview,
 } from './dto/onboarding.dto';
+import { systemName } from '../../common/i18n/localize';
 
 @Injectable()
 export class OrganizationsService {
@@ -57,6 +58,29 @@ export class OrganizationsService {
     }
 
     return organization;
+  }
+
+  /**
+   * What every member needs to display money: the base (ledger) currency and the digits Arabic
+   * amounts use. Readable without `settings.view` (accountants and sales reps lack it), so screens
+   * never fall back to a guessed currency (#83).
+   */
+  async getMoneyFormat(
+    id: string,
+  ): Promise<{ baseCurrency: string; documentDigits: DocumentDigits }> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id },
+      select: { baseCurrency: true, documentDigits: true },
+    });
+
+    if (!organization) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    return {
+      baseCurrency: organization.baseCurrency,
+      documentDigits: documentDigitsFrom(organization.documentDigits),
+    };
   }
 
   async update(id: string, updateOrganizationDto: UpdateOrganizationDto) {
@@ -248,9 +272,9 @@ export class OrganizationsService {
   }
 
   async updateGeneralSettings(id: string, dto: GeneralSettingsDto) {
-    // Guard and update commit together under the ledger lock (see assertBaseCurrencyChangeAllowed).
+    // Guard and update commit together under the ledger lock (see prepareBaseCurrencyChange).
     return this.prisma.$transaction(async (tx) => {
-      await this.assertBaseCurrencyChangeAllowed(tx, id, dto.baseCurrency);
+      await this.prepareBaseCurrencyChange(tx, id, dto.baseCurrency);
       return tx.organization.update({
         where: { id },
         data: {
@@ -273,9 +297,11 @@ export class OrganizationsService {
 
   /**
    * The ledger stores amounts in the base currency without conversion, so the base currency is
-   * frozen once anything is posted; changing it would relabel every historical amount.
+   * frozen once anything is posted; changing it would relabel every historical amount. Before
+   * that, the seeded chart (system accounts still in the old base currency) moves with it;
+   * accounts someone created themselves keep the currency they chose.
    */
-  private async assertBaseCurrencyChangeAllowed(
+  private async prepareBaseCurrencyChange(
     tx: Prisma.TransactionClient,
     organizationId: string,
     baseCurrency: string | undefined,
@@ -296,6 +322,10 @@ export class OrganizationsService {
         'The base currency cannot be changed after journals have been posted',
       );
     }
+    await tx.account.updateMany({
+      where: { organizationId, isSystem: true, currency: org.baseCurrency },
+      data: { currency: baseCurrency },
+    });
   }
 
   async updateFinancialSettings(id: string, dto: FinancialSettingsDto) {
@@ -475,9 +505,9 @@ export class OrganizationsService {
   }
 
   async completeCompanyInfoStep(orgId: string, dto: CompanyInfoStepDto) {
-    // Guard and update commit together under the ledger lock (see assertBaseCurrencyChangeAllowed).
+    // Guard and update commit together under the ledger lock (see prepareBaseCurrencyChange).
     await this.prisma.$transaction(async (tx) => {
-      await this.assertBaseCurrencyChangeAllowed(tx, orgId, dto.baseCurrency);
+      await this.prepareBaseCurrencyChange(tx, orgId, dto.baseCurrency);
       await tx.organization.update({
         where: { id: orgId },
         data: {
@@ -818,7 +848,7 @@ export class OrganizationsService {
     // For now, return base accounts - can be extended per template
     return baseAccounts.map((acc) => ({
       code: acc.code,
-      name: acc.name,
+      ...systemName(acc.name),
       type: acc.type as import('@prisma/client').AccountType,
       isActive: true,
     }));

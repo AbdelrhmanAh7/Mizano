@@ -225,6 +225,24 @@
     "reversed": "Reversal posted",
     "reverseFailed": "Failed to reverse journal",
     "newJournalDescription": "Create a new manual journal entry",
+    "toast": {
+      "created": "Journal created",
+      "createdDescription": "The journal entry has been created successfully.",
+      "createError": "Error creating journal",
+      "updated": "Journal updated",
+      "updatedDescription": "The journal entry has been updated successfully.",
+      "updateError": "Error updating journal",
+      "genericError": "Something went wrong. Please try again.",
+      "error": "Error",
+      "deleted": "Journal deleted",
+      "deletedNumber": "Journal {number} has been deleted.",
+      "deletedDescription": "The journal entry has been deleted.",
+      "deleteError": "Failed to delete journal.",
+      "posted": "Journal posted",
+      "postedNumber": "Journal {number} has been posted.",
+      "postedDescription": "The journal entry has been posted successfully.",
+      "postError": "Failed to post journal."
+    },
     "description": "Create and manage manual journal entries",
     "editDescription": "Update the journal entry details",
     "post": "Post",
@@ -247,23 +265,6 @@
       "DRAFT": "Draft",
       "POSTED": "Posted",
       "VOIDED": "Voided"
-    },
-    "toast": {
-      "error": "Error",
-      "created": "Journal created",
-      "createdDescription": "The journal entry has been created successfully.",
-      "createError": "Failed to create journal entry.",
-      "updated": "Journal updated",
-      "updatedDescription": "The journal entry has been updated successfully.",
-      "updateError": "Failed to update journal entry.",
-      "deleted": "Journal deleted",
-      "deletedNumber": "Journal {number} has been deleted.",
-      "deletedDescription": "The journal entry has been deleted.",
-      "deleteError": "Failed to delete journal.",
-      "posted": "Journal posted",
-      "postedNumber": "Journal {number} has been posted.",
-      "postedDescription": "The journal entry has been posted successfully.",
-      "postError": "Failed to post journal."
     }
   },
   "recurring": {

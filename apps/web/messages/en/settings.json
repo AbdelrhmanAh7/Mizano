@@ -33,7 +33,7 @@
     },
     "ai": {
       "title": "AI",
-      "description": "Connect your Claude, ChatGPT, Codex or Gemini app, or use your own AI account for features inside Mizano"
+      "description": "Connect your Claude, ChatGPT, Codex or Gemini app, or use your own AI account for features inside {brand}"
     },
     "notifications": {
       "title": "Notifications",
@@ -81,8 +81,7 @@
       "taxId": "Tax ID",
       "taxIdPlaceholder": "Enter tax ID",
       "lockDate": "Lock Date",
-      "lockDateDescription": "Prevent changes to transactions before this date",
-      "addressSample": "123 Business Street, Suite 100\nNew York, NY 10001"
+      "lockDateDescription": "Prevent changes to transactions before this date"
     },
     "taxCurrency": "Tax & Currency",
     "taxCurrencyDescription": "Tax registration and base currency settings",
@@ -106,7 +105,14 @@
       "invalidUrl": "Enter a valid URL, for example https://example.com",
       "currencyRequired": "Select a base currency"
     },
-    "taxIdPlaceholder": "e.g., VAT123456789"
+    "placeholders": {
+      "name": "e.g. Nile Trading Co.",
+      "email": "info@example.com",
+      "phone": "+20 10 0000 0000",
+      "website": "https://example.com",
+      "address": "e.g. 12 Tahrir Street, Cairo",
+      "taxId": "e.g. 123-456-789"
+    }
   },
   "localization": {
     "title": "Localization",
@@ -116,8 +122,8 @@
     "dateFormat": "Date Format",
     "numberFormat": "Number Format",
     "timezone": "Timezone",
-    "documentDigits": "Digits in Arabic PDFs",
-    "documentDigitsDescription": "Invoices, quotes and bills printed in Arabic use these digits. English PDFs always use 0123.",
+    "documentDigits": "Digits in Arabic",
+    "documentDigitsDescription": "Amounts on Arabic screens and invoices, quotes and bills printed in Arabic use these digits. English always uses 0123.",
     "digitsLatn": "Western (0123)",
     "digitsArab": "Arabic-Indic (٠١٢٣)",
     "dateUs": "MM/DD/YYYY (US)",
@@ -185,7 +191,13 @@
     "defaultCashAccountHint": "Used for cash payments",
     "selectAccount": "Select account",
     "notSet": "-- Not Set --",
-    "saveSettings": "Save Settings"
+    "saveSettings": "Save Settings",
+    "toast": {
+      "saved": "Settings saved",
+      "savedDescription": "Account settings have been updated successfully.",
+      "saveError": "Error saving settings",
+      "genericError": "Something went wrong. Please try again."
+    }
   },
   "invoicing": {
     "title": "Invoice & Document Settings",
@@ -211,7 +223,7 @@
   },
   "ai": {
     "title": "AI",
-    "description": "Optional AI through your own AI app or account. Mizano works fully without it.",
+    "description": "Optional AI through your own AI app or account. {brand} works fully without it.",
     "back": "Back to settings",
     "retry": "Retry",
     "cancel": "Cancel",
@@ -232,20 +244,20 @@
       "none": "None"
     },
     "connection": {
-      "title": "Use an API key for features inside Mizano",
+      "title": "Use an API key for features inside {brand}",
       "connectedTitle": "Your AI account",
-      "description": "Only needed for the features that run inside Mizano. Your key is checked with the provider before it is saved, stored encrypted and never shown again.",
+      "description": "Only needed for the features that run inside {brand}. Your key is checked with the provider before it is saved, stored encrypted and never shown again.",
       "provider": "Provider",
       "apiKey": "API key",
       "apiKeyPlaceholder": "Paste the API key",
       "connect": "Check and connect",
       "verifying": "Checking…",
       "getKey": "Get an API key from {provider}",
-      "subscriptionNote": "Have a Claude, ChatGPT, Codex or Gemini subscription? Use \"Connect your AI app\" above: it needs no key. An API key here is only for the features that run inside Mizano: reading bills and receipts, account suggestions and the monthly summary.",
+      "subscriptionNote": "Have a Claude, ChatGPT, Codex or Gemini subscription? Use \"Connect your AI app\" above: it needs no key. An API key here is only for the features that run inside {brand}: reading bills and receipts, account suggestions and the monthly summary.",
       "openRouterHint": "Have an OpenRouter account? Connect it without copying a key.",
       "openRouterConnect": "Connect your OpenRouter account",
       "viaOpenRouter": "Connected through OpenRouter",
-      "ollamaHint": "Uses the Ollama server the operator of this Mizano installation configured. No key needed.",
+      "ollamaHint": "Uses the Ollama server the operator of this {brand} installation configured. No key needed.",
       "model": "Model",
       "test": "Test",
       "testing": "Testing…",
@@ -257,7 +269,7 @@
     },
     "consent": {
       "title": "Permission to send data",
-      "body": "When an AI feature is on, Mizano sends the data that feature needs to {provider} under your account: uploaded bills and receipts (files or their text), your chart of accounts names for account suggestions, and monthly profit and loss totals for summaries. Nothing is sent before you agree, and AI never posts anything: you review every draft.",
+      "body": "When an AI feature is on, {brand} sends the data that feature needs to {provider} under your account: uploaded bills and receipts (files or their text), your chart of accounts names for account suggestions, and monthly profit and loss totals for summaries. Nothing is sent before you agree, and AI never posts anything: you review every draft.",
       "checkbox": "I agree to send this data to {provider}",
       "accept": "Agree",
       "given": "Agreed on {date}."
@@ -267,7 +279,7 @@
       "description": "Each feature is off until you turn it on.",
       "needsConsent": "Agree to send data first.",
       "documents": "Read bills and receipts",
-      "documentsDescription": "Fills the draft from an uploaded file. Without it, Mizano reads documents on this server.",
+      "documentsDescription": "Fills the draft from an uploaded file. Without it, {brand} reads documents on this server.",
       "categorization": "Suggest accounts",
       "categorizationDescription": "Suggests an expense account for each line of a read bill. You can change it before saving.",
       "summary": "Monthly summary",
@@ -278,7 +290,7 @@
       "description": "Calls stop when the estimated cost would pass the limit (USD, per calendar month).",
       "limit": "Monthly limit (USD)",
       "used": "Used this month: ${spent} of ${limit}",
-      "calls": "{count, plural, one {# call} other {# calls}}",
+      "calls": "{count, plural, one {{count} call} other {{count} calls}}",
       "loadingModels": "Loading models…",
       "modelsFailed": "Could not load the provider's models.",
       "usageFailed": "Could not load this month's usage."
@@ -308,16 +320,16 @@
   },
   "aiApp": {
     "title": "Connect your AI app",
-    "description": "Use your own Claude, ChatGPT, Codex or Gemini subscription with Mizano. No key is needed. Your AI app can read your books and prepare drafts; a person in Mizano reviews and posts them.",
-    "address": "Mizano address for your AI app",
-    "addressHint": "Paste this address in your AI app, then sign in to Mizano and allow the connection.",
+    "description": "Use your own Claude, ChatGPT, Codex or Gemini subscription with {brand}. No key is needed. Your AI app can read your books and prepare drafts; a person in {brand} reviews and posts them.",
+    "address": "{brand} address for your AI app",
+    "addressHint": "Paste this address in your AI app, then sign in to {brand} and allow the connection.",
     "copy": "Copy",
     "copied": "Copied",
     "retry": "Retry",
     "cancel": "Cancel",
     "loadFailed": "Could not load the connected AI apps.",
     "genericError": "Something went wrong. Please try again.",
-    "notConfigured": "Connecting an AI app is not turned on for this Mizano server yet. Ask whoever runs Mizano for your business to turn it on.",
+    "notConfigured": "Connecting an AI app is not turned on for this {brand} server yet. Ask whoever runs {brand} for your business to turn it on.",
     "safety": "Your AI app never posts, sends, pays or deletes anything. It can only read, and prepare drafts if you allow it.",
     "apps": {
       "claude": "Claude",
@@ -328,18 +340,18 @@
     },
     "steps": {
       "claude1": "In claude.ai or the Claude Desktop app, open Settings → Connectors and choose Add custom connector.",
-      "claude2": "Paste the Mizano address above, then choose Connect.",
-      "claude3": "Sign in to Mizano and allow the connection. Claude Desktop uses the same connectors as claude.ai.",
+      "claude2": "Paste the {brand} address above, then choose Connect.",
+      "claude3": "Sign in to {brand} and allow the connection. Claude Desktop uses the same connectors as claude.ai.",
       "claudeCode1": "In a terminal, run the first command below.",
-      "claudeCode2": "In Claude Code, type /mcp, choose Mizano, then sign in to Mizano and allow the connection.",
+      "claudeCode2": "In Claude Code, type /mcp, choose {brandSlug}, then sign in to {brand} and allow the connection.",
       "chatgpt1": "In ChatGPT, open Settings → Apps & Connectors → Advanced settings and turn on Developer mode (paid ChatGPT plans; the menu names can move).",
-      "chatgpt2": "Choose Create, paste the Mizano address above and choose OAuth for sign-in.",
-      "chatgpt3": "Sign in to Mizano and allow the connection.",
-      "codex1": "In a terminal, run the first command below to add Mizano.",
-      "codex2": "Run the second command, then sign in to Mizano in the browser and allow the connection.",
+      "chatgpt2": "Choose Create, paste the {brand} address above and choose OAuth for sign-in.",
+      "chatgpt3": "Sign in to {brand} and allow the connection.",
+      "codex1": "In a terminal, run the first command below to add {brand}.",
+      "codex2": "Run the second command, then sign in to {brand} in the browser and allow the connection.",
       "gemini1": "With Gemini CLI, run the first command below in a terminal.",
-      "gemini2": "In Gemini CLI, run /mcp auth mizano, then sign in to Mizano and allow the connection.",
-      "gemini3": "If your Gemini app shows Settings → Connected apps → Add a custom app, you can paste the Mizano address there instead."
+      "gemini2": "In Gemini CLI, run /mcp auth {brandSlug}, then sign in to {brand} and allow the connection.",
+      "gemini3": "If your Gemini app shows Settings → Connected apps → Add a custom app, you can paste the {brand} address there instead."
     },
     "access": {
       "read": "Read only",
@@ -354,12 +366,12 @@
       "notUsed": "not used yet",
       "disconnect": "Disconnect",
       "disconnectTitle": "Disconnect {app}?",
-      "disconnectBody": "The app loses access to Mizano right away. You can connect it again later from the app."
+      "disconnectBody": "The app loses access to {brand} right away. You can connect it again later from the app."
     }
   },
   "mcpConsent": {
-    "title": "{app} wants to connect to Mizano",
-    "description": "Allow it to work with your books in Mizano for you.",
+    "title": "{app} wants to connect to {brand}",
+    "description": "Allow it to work with your books in {brand} for you.",
     "organization": "Organization",
     "organizationHint": "The connection works only with the organization you are signed into. To connect another organization, sign into it and start again from your AI app.",
     "signedInAs": "Signed in as",
@@ -369,7 +381,7 @@
       "read": "Read only",
       "readDescription": "Look at customers, vendors, items, invoices, bills and reports.",
       "drafts": "Read and prepare drafts",
-      "draftsDescription": "Also prepare quotes, invoices, bills and expenses as drafts that a person reviews and posts in Mizano."
+      "draftsDescription": "Also prepare quotes, invoices, bills and expenses as drafts that a person reviews and posts in {brand}."
     },
     "safety": "The AI app never posts, sends, pays or deletes anything. You can disconnect it any time in Settings → AI.",
     "allow": "Allow",
@@ -384,7 +396,7 @@
   "mcpErrors": {
     "MCP_REQUEST_NOT_FOUND": "This connection request has ended. Start again from your AI app.",
     "MCP_REQUEST_EXPIRED": "This connection request expired. Start again from your AI app.",
-    "MCP_NOT_CONFIGURED": "Connecting an AI app is not turned on for this Mizano server.",
+    "MCP_NOT_CONFIGURED": "Connecting an AI app is not turned on for this {brand} server.",
     "MCP_CONNECTION_NOT_FOUND": "This connection no longer exists.",
     "MCP_FORBIDDEN": "You cannot change this connection."
   },
@@ -497,6 +509,12 @@
       "userDeletedDescription": "The team member has been removed.",
       "userDeleteError": "Could not remove the member",
       "genericError": "Something went wrong. Please try again.",
+      "rolesSeeded": "Roles seeded",
+      "rolesSeededDescription": "Default roles have been created.",
+      "rolesSeedError": "Error seeding roles",
+      "roleAssigned": "Role assigned",
+      "roleAssignedDescription": "The role has been assigned successfully.",
+      "roleAssignError": "Error assigning role",
       "resetLinkCreated": "Reset link ready",
       "resetLinkCreatedDescription": "Copy the link and send it to the member.",
       "resetLinkError": "Could not create the reset link"
@@ -570,6 +588,12 @@
     "empty": {
       "title": "No query metrics collected yet",
       "description": "Metrics will appear as database queries are executed"
+    },
+    "toast": {
+      "errorTitle": "Error",
+      "reset": "Metrics reset",
+      "resetDescription": "Query metrics buffer has been cleared.",
+      "resetError": "Failed to reset metrics."
     }
   },
   "cache": {
@@ -612,6 +636,15 @@
     "accountListsDescription": "Cached for 10 minutes. Chart of Accounts rarely changes, so longer TTL provides significant performance improvement.",
     "salesPurchases": "Sales & Purchases Lists",
     "salesPurchasesDescription": "Cached for 2 minutes. Short TTL ensures data freshness for frequently-changing transactional data.",
+    "toast": {
+      "errorTitle": "Error",
+      "flushed": "Cache flushed",
+      "flushedDescription": "Cleared {count, plural, one {{count} cached copy} other {{count} cached copies}}. Your data is unchanged.",
+      "flushError": "Failed to flush cache. Please try again.",
+      "patternDeleted": "Pattern deleted",
+      "patternDeletedDescription": "Cleared {count, plural, one {{count} cached copy} other {{count} cached copies}} matching \"{pattern}\". Your data is unchanged.",
+      "patternDeleteError": "Failed to delete cache pattern. Please try again."
+    },
     "noExpiry": "No expiry",
     "expired": "Expired",
     "deleteKey": "Delete this key",
@@ -661,7 +694,16 @@
   "common": {
     "saveChanges": "Save Changes",
     "saving": "Saving...",
-    "goBack": "Go back"
+    "goBack": "Go back",
+    "toast": {
+      "saved": "Settings saved",
+      "sectionSaved": "{section, select, general {General} financial {Financial} invoice {Invoice} localization {Localization} branding {Branding} other {The}} settings updated.",
+      "saveError": "Could not save the settings",
+      "saveGenericError": "Failed to update settings",
+      "lockDateUpdated": "Lock date updated",
+      "lockDateError": "Could not update the lock date",
+      "lockDateGenericError": "Failed to update lock date"
+    }
   },
   "users": {
     "title": "Users",
@@ -794,7 +836,7 @@
   },
   "flowline": {
     "title": "Connect to FlowLine",
-    "description": "Let FlowLine automations react to Mizano events and act in Mizano with a scoped key.",
+    "description": "Let FlowLine automations react to {brand} events and act in {brand} with a scoped key.",
     "back": "Back to settings",
     "copy": "Copy",
     "copied": "Copied",
@@ -807,9 +849,9 @@
     "status": "Status",
     "encryptionMissing": "Webhook secrets cannot be stored until the server administrator sets INTEGRATIONS_ENCRYPTION_KEY on the API.",
     "step1": {
-      "title": "1. FlowLine → Mizano (API key)",
-      "description": "Create a key and paste it, with the API address, into FlowLine's Mizano connection.",
-      "baseUrl": "Mizano API address for FlowLine",
+      "title": "1. FlowLine → {brand} (API key)",
+      "description": "Create a key and paste it, with the API address, into FlowLine's {brand} connection.",
+      "baseUrl": "{brand} API address for FlowLine",
       "newKey": "Your new API key",
       "newKeyWarning": "Copy it now: it will not be shown again. Anyone with this key can act with its scopes.",
       "scopes": "Allowed actions",
@@ -825,8 +867,8 @@
       "howToUse": "FlowLine sends it as \"Authorization: Bearer <key>\". Keys act with your role's permissions."
     },
     "step2": {
-      "title": "2. Mizano → FlowLine (events)",
-      "description": "In FlowLine, add a Mizano trigger to a flow, then paste its webhook URL and signing secret here.",
+      "title": "2. {brand} → FlowLine (events)",
+      "description": "In FlowLine, add a {brand} trigger to a flow, then paste its webhook URL and signing secret here.",
       "url": "FlowLine webhook URL",
       "secret": "Signing secret (whsec_…)",
       "events": "Events to send",
@@ -844,7 +886,7 @@
       "backlogQueued": "Overdue invoices will be sent on the next hourly check",
       "delete": "Delete",
       "deleteTitle": "Delete this webhook?",
-      "deleteDescription": "Mizano stops sending events to it. Queued deliveries will fail."
+      "deleteDescription": "{brand} stops sending events to it. Queued deliveries will fail."
     },
     "log": {
       "title": "Delivery log",
