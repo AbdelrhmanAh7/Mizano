@@ -62,6 +62,7 @@ const formatAmount = (amount: string | number | undefined): string => {
 export default function TrialBalancePage() {
   const formatLongDate = useDateFormatter('long');
   const tc = useTranslations('common');
+  const t = useTranslations('accounting');
   const [asOfDate, setAsOfDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const { data, isLoading, isError, refetch } = useTrialBalance(asOfDate);
 
@@ -83,14 +84,14 @@ export default function TrialBalancePage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild aria-label="Go back">
+        <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
           <Link href="/accounting">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Trial Balance</h1>
-          <p className="text-muted-foreground">View debit and credit balances for all accounts</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('trialBalance.title')}</h1>
+          <p className="text-muted-foreground">{t('trialBalance.description')}</p>
         </div>
       </div>
 
@@ -100,7 +101,7 @@ export default function TrialBalancePage() {
           <div className="flex items-center gap-4">
             <div>
               <label htmlFor="asOfDate" className="text-sm font-medium text-muted-foreground">
-                As of Date
+                {t('trialBalance.asOfDate')}
               </label>
               <Input
                 id="asOfDate"
@@ -114,12 +115,15 @@ export default function TrialBalancePage() {
               {isBalanced ? (
                 <Badge className="bg-green-100 text-green-800">
                   <CheckCircle className="mr-1 h-3 w-3" />
-                  Balanced
+                  {t('trialBalance.balanced')}
                 </Badge>
               ) : (
                 <Badge className="bg-red-100 text-red-800">
                   <AlertTriangle className="mr-1 h-3 w-3" />
-                  Out of Balance: {formatAmount(totalDebit)} / {formatAmount(totalCredit)}
+                  {t('trialBalance.outOfBalance', {
+                    debit: formatAmount(totalDebit),
+                    credit: formatAmount(totalCredit),
+                  })}
                 </Badge>
               )}
             </div>
@@ -130,7 +134,9 @@ export default function TrialBalancePage() {
       {/* Trial Balance Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Trial Balance as of {formatLongDate(new Date(asOfDate))}</CardTitle>
+          <CardTitle>
+            {t('trialBalance.asOfTitle', { date: formatLongDate(new Date(asOfDate)) })}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -148,17 +154,17 @@ export default function TrialBalancePage() {
             </div>
           ) : rows.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">
-              No trial balance data available. Create and post journal entries to see data here.
+              {t('trialBalance.empty')}
             </p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Account Code</TableHead>
-                  <TableHead>Account Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="text-right">Debit</TableHead>
-                  <TableHead className="text-right">Credit</TableHead>
+                  <TableHead>{t('trialBalance.accountCode')}</TableHead>
+                  <TableHead>{t('trialBalance.accountName')}</TableHead>
+                  <TableHead>{t('trialBalance.type')}</TableHead>
+                  <TableHead className="text-right">{t('journals.table.debit')}</TableHead>
+                  <TableHead className="text-right">{t('journals.table.credit')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -186,7 +192,7 @@ export default function TrialBalancePage() {
                 ))}
                 {/* Totals */}
                 <TableRow className="border-t-2 font-semibold bg-muted/50">
-                  <TableCell colSpan={3}>Total</TableCell>
+                  <TableCell colSpan={3}>{tc('total')}</TableCell>
                   <TableCell className="text-right font-mono">{formatAmount(totalDebit)}</TableCell>
                   <TableCell className="text-right font-mono">
                     {formatAmount(totalCredit)}

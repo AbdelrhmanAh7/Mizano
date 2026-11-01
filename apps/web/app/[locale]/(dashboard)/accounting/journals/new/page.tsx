@@ -25,16 +25,16 @@ export default function NewJournalPage() {
         data as unknown as Parameters<typeof createJournal.mutateAsync>[0],
       );
       toast({
-        title: 'Journal created',
-        description: 'The journal entry has been created successfully.',
+        title: t('journals.toast.created'),
+        description: t('journals.toast.createdDescription'),
       });
       router.push('/accounting/journals');
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: t('journals.toast.error'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to create journal entry.',
+          t('journals.toast.createError'),
         variant: 'destructive',
       });
     }
@@ -60,7 +60,7 @@ export default function NewJournalPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild aria-label="Go back">
+        <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
           <Link href="/accounting/journals">
             <ArrowLeft className="h-4 w-4" />
           </Link>

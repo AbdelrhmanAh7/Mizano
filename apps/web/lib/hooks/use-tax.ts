@@ -346,25 +346,6 @@ export function useRecordVATPayment() {
 
 // ============ Helper Functions ============
 
-export function getTaxRateTypeLabel(type: TaxRateType): string {
-  const labels: Record<TaxRateType, string> = {
-    SALES: 'Output (Sales)',
-    PURCHASES: 'Input (Purchases)',
-    BOTH: 'Both',
-  };
-  return labels[type] || type;
-}
-
-export function getVATReturnStatusLabel(status: VATReturnStatus): string {
-  const labels: Record<VATReturnStatus, string> = {
-    DRAFT: 'Draft',
-    CALCULATED: 'Calculated',
-    SUBMITTED: 'Submitted',
-    FILED: 'Filed',
-  };
-  return labels[status] || status;
-}
-
 export function getVATReturnStatusColor(status: VATReturnStatus): string {
   const colors: Record<VATReturnStatus, string> = {
     DRAFT: 'bg-gray-100 text-gray-800 border-gray-200',

@@ -1,5 +1,7 @@
 'use client';
 
+import { useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,16 +20,22 @@ import { useCreateTaxRate, useUpdateTaxRate, TaxRate } from '@/lib/hooks/use-tax
 import { useAccounts, Account, ACCOUNT_PICKER_PARAMS } from '@/lib/hooks/use-accounts';
 import { useToast } from '@/components/ui/use-toast';
 
-const taxRateSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  rate: z.number().min(0, 'Rate must be 0 or higher').max(100, 'Rate cannot exceed 100'),
-  type: z.enum(['SALES', 'PURCHASES', 'BOTH']),
-  linkedAccountId: z.string().min(1, 'Linked account is required'),
-  isDefault: z.boolean().default(false),
-  isActive: z.boolean().default(true),
-});
+/** Validation rules; the messages come from the catalog so the form follows the page language. */
+function buildTaxRateSchema(t: (key: string) => string) {
+  return z.object({
+    name: z.string().min(1, t('nameRequired')),
+    rate: z
+      .number({ invalid_type_error: t('rateInvalid') })
+      .min(0, t('rateMin'))
+      .max(100, t('rateMax')),
+    type: z.enum(['SALES', 'PURCHASES', 'BOTH']),
+    linkedAccountId: z.string().min(1, t('accountRequired')),
+    isDefault: z.boolean().default(false),
+    isActive: z.boolean().default(true),
+  });
+}
 
-type TaxRateFormData = z.infer<typeof taxRateSchema>;
+type TaxRateFormData = z.infer<ReturnType<typeof buildTaxRateSchema>>;
 
 interface TaxRateFormProps {
   taxRate?: TaxRate;
@@ -35,7 +43,11 @@ interface TaxRateFormProps {
 }
 
 export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
+  const t = useTranslations('tax.rates');
+  const tForm = useTranslations('tax.rates.form');
+  const tCommon = useTranslations('common');
   const { toast } = useToast();
+  const taxRateSchema = useMemo(() => buildTaxRateSchema(tForm), [tForm]);
   const createTaxRate = useCreateTaxRate();
   const updateTaxRate = useUpdateTaxRate();
 
@@ -69,17 +81,17 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
     try {
       if (taxRate) {
         await updateTaxRate.mutateAsync({ id: taxRate.id, data });
-        toast({ title: 'Tax rate updated successfully' });
+        toast({ title: tForm('updated') });
       } else {
         await createTaxRate.mutateAsync(data);
-        toast({ title: 'Tax rate created successfully' });
+        toast({ title: tForm('created') });
       }
       onSuccess?.();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       toast({
-        title: 'Error',
-        description: err.response?.data?.message || 'Failed to save tax rate',
+        title: tCommon('errors.title'),
+        description: err.response?.data?.message || tForm('saveFailed'),
         variant: 'destructive',
       });
     }
@@ -90,8 +102,8 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
   return (
     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="name">Name *</Label>
-        <Input id="name" placeholder="e.g., VAT 15%" {...form.register('name')} />
+        <Label htmlFor="name">{t('table.name')} *</Label>
+        <Input id="name" placeholder={tForm('namePlaceholder')} {...form.register('name')} />
         {form.formState.errors.name && (
           <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
         )}
@@ -99,7 +111,7 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="rate">Rate (%) *</Label>
+          <Label htmlFor="rate">{tForm('rate')} *</Label>
           <Input
             id="rate"
             type="number"
@@ -114,32 +126,32 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
         </div>
 
         <div className="space-y-2">
-          <Label>Type *</Label>
+          <Label>{t('table.type')} *</Label>
           <Select
             value={form.watch('type')}
             onValueChange={(value) => form.setValue('type', value as TaxRateFormData['type'])}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select type" />
+              <SelectValue placeholder={tForm('selectType')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="SALES">Output (Sales)</SelectItem>
-              <SelectItem value="PURCHASES">Input (Purchases)</SelectItem>
-              <SelectItem value="BOTH">Both</SelectItem>
+              <SelectItem value="SALES">{t('type.SALES')}</SelectItem>
+              <SelectItem value="PURCHASES">{t('type.PURCHASES')}</SelectItem>
+              <SelectItem value="BOTH">{t('type.BOTH')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label>Linked Account *</Label>
+        <Label>{t('table.linkedAccount')} *</Label>
         <Select
           value={form.watch('linkedAccountId') || ''}
           onValueChange={(value) => form.setValue('linkedAccountId', value)}
           disabled={accountsLoading}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Select account" />
+            <SelectValue placeholder={tForm('selectAccount')} />
           </SelectTrigger>
           <SelectContent>
             {accounts.map((account) => (
@@ -161,7 +173,7 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
             checked={form.watch('isDefault')}
             onCheckedChange={(checked) => form.setValue('isDefault', checked)}
           />
-          <Label htmlFor="isDefault">Default tax rate</Label>
+          <Label htmlFor="isDefault">{tForm('defaultRate')}</Label>
         </div>
 
         <div className="flex items-center space-x-2">
@@ -170,13 +182,17 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
             checked={form.watch('isActive')}
             onCheckedChange={(checked) => form.setValue('isActive', checked)}
           />
-          <Label htmlFor="isActive">Active</Label>
+          <Label htmlFor="isActive">{tCommon('status.active')}</Label>
         </div>
       </div>
 
       <div className="flex justify-end gap-3 pt-4">
         <Button type="submit" disabled={isPending}>
-          {isPending ? 'Saving...' : taxRate ? 'Update' : 'Create'}
+          {isPending
+            ? tCommon('loading.saving')
+            : taxRate
+              ? tForm('update')
+              : tCommon('buttons.create')}
         </Button>
       </div>
     </form>

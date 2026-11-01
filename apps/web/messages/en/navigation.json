@@ -191,6 +191,7 @@
     "run": "Run",
     "mark": "Mark",
     "details": "{parent} Details",
-    "detailsOnly": "Details"
+    "detailsOnly": "Details",
+    "label": "Breadcrumb"
   }
 }

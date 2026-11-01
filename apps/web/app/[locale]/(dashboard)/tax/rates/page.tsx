@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Plus, Trash2, Edit, Star, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Edit, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
@@ -23,14 +23,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { DataTable, SortableHeader } from '@/components/data-table';
+import { DataTableRefreshButton } from '@/components/data-table/data-table-refresh-button';
 import { DataTableSearch, DataTableFacetedFilter } from '@/components/data-table';
-import {
-  useTaxRates,
-  useDeleteTaxRate,
-  TaxRate,
-  getTaxRateTypeLabel,
-  formatPercentage,
-} from '@/lib/hooks/use-tax';
+import { useTaxRates, useDeleteTaxRate, TaxRate, formatPercentage } from '@/lib/hooks/use-tax';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { TaxRateForm } from '@/components/tax/tax-rate-form';
@@ -44,9 +39,9 @@ export default function TaxRatesPage() {
   const tableParams = useTableParams({ defaultSortBy: 'name' });
 
   const TYPE_OPTIONS = [
-    { value: 'SALES', label: 'Output (Sales)' },
-    { value: 'PURCHASES', label: 'Input (Purchases)' },
-    { value: 'BOTH', label: 'Both' },
+    { value: 'SALES', label: t('rates.type.SALES') },
+    { value: 'PURCHASES', label: t('rates.type.PURCHASES') },
+    { value: 'BOTH', label: t('rates.type.BOTH') },
   ];
 
   const STATUS_OPTIONS = [
@@ -172,7 +167,7 @@ export default function TaxRatesPage() {
     {
       accessorKey: 'type',
       header: t('rates.table.type'),
-      cell: ({ row }) => <Badge variant="outline">{getTaxRateTypeLabel(row.original.type)}</Badge>,
+      cell: ({ row }) => <Badge variant="outline">{t(`rates.type.${row.original.type}`)}</Badge>,
     },
     {
       accessorKey: 'linkedAccount.name',
@@ -281,9 +276,7 @@ export default function TaxRatesPage() {
               }
               singleSelect
             />
-            <Button variant="outline" size="icon" onClick={() => refetch()} aria-label="Refresh">
-              <RefreshCw className="h-4 w-4" />
-            </Button>
+            <DataTableRefreshButton onRefresh={() => void refetch()} />
           </div>
         </CardContent>
       </Card>
@@ -314,7 +307,7 @@ export default function TaxRatesPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={formDialogOpen} onOpenChange={setFormDialogOpen}>
-        <DialogContent>
+        <DialogContent closeLabel={tCommon('buttons.close')}>
           <DialogHeader>
             <DialogTitle>
               {editingRate ? t('rates.editTaxRate') : t('rates.newTaxRate')}

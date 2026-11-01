@@ -207,7 +207,7 @@ export default function InvoicingSettingsPage() {
               <Textarea
                 id="invoiceDefaultNotes"
                 {...form.register('invoiceDefaultNotes')}
-                placeholder="Thank you for your business!"
+                placeholder={t('invoicing.defaultNotesPlaceholder')}
                 rows={2}
               />
             </div>
@@ -217,7 +217,7 @@ export default function InvoicingSettingsPage() {
               <Textarea
                 id="invoiceDefaultTerms"
                 {...form.register('invoiceDefaultTerms')}
-                placeholder="Payment is due within the specified terms..."
+                placeholder={t('invoicing.defaultTermsPlaceholder')}
                 rows={3}
               />
             </div>
@@ -227,7 +227,7 @@ export default function InvoicingSettingsPage() {
               <Textarea
                 id="bankDetails"
                 {...form.register('bankDetails')}
-                placeholder="Bank: Example Bank&#10;Account: 1234567890&#10;Routing: 987654321"
+                placeholder={t('invoicing.bankDetailsPlaceholder')}
                 rows={3}
               />
             </div>

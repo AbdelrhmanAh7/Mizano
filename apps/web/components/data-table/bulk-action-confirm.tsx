@@ -11,6 +11,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Loader2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 interface BulkActionConfirmDialogProps {
   open: boolean;
@@ -49,6 +50,7 @@ export function BulkActionConfirmDialog({
   confirmLabel,
   cancelLabel,
 }: BulkActionConfirmDialogProps) {
+  const tButtons = useTranslations('common.buttons');
   const composedLabel = `${action.charAt(0).toUpperCase() + action.slice(1)} ${count} ${itemType}`;
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -61,7 +63,9 @@ export function BulkActionConfirmDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isLoading}>{cancelLabel ?? 'Cancel'}</AlertDialogCancel>
+          <AlertDialogCancel disabled={isLoading}>
+            {cancelLabel ?? tButtons('cancel')}
+          </AlertDialogCancel>
           <AlertDialogAction
             onClick={(e) => {
               e.preventDefault(); // Prevent dialog from closing before async completes

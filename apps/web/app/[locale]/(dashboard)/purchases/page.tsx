@@ -68,48 +68,48 @@ export default function PurchasesPage() {
   const modules = [
     {
       title: t('vendors.title'),
-      description: 'Manage your vendor contacts, payment terms, and purchase history.',
+      description: t('overview.modules.vendors.description'),
       icon: Users,
       href: '/purchases/vendors',
       color: 'text-blue-600',
       bgColor: 'bg-blue-500',
-      stats: `${vendors.length} total`,
+      stats: t('overview.modules.vendors.stats', { count: vendors.length }),
     },
     {
       title: t('expenses.title'),
-      description: 'Record and categorize business expenses for accurate tracking.',
+      description: t('overview.modules.expenses.description'),
       icon: Receipt,
       href: '/purchases/expenses',
       color: 'text-red-600',
       bgColor: 'bg-red-500',
-      stats: `${expenses.length} recorded`,
+      stats: t('overview.modules.expenses.stats', { count: expenses.length }),
     },
     {
       title: t('bills.title'),
-      description: 'Track vendor bills, schedule payments, and manage accounts payable.',
+      description: t('overview.modules.bills.description'),
       icon: FileText,
       href: '/purchases/bills',
       color: 'text-purple-600',
       bgColor: 'bg-purple-500',
-      stats: `${unpaidBills.length} unpaid`,
+      stats: t('overview.modules.bills.stats', { count: unpaidBills.length }),
     },
     {
       title: t('payments.title'),
-      description: 'Record payments made to vendors and suppliers.',
+      description: t('overview.modules.payments.description'),
       icon: Banknote,
       href: '/purchases/payments',
       color: 'text-emerald-600',
       bgColor: 'bg-emerald-500',
-      stats: 'Track payments',
+      stats: t('overview.modules.payments.stats'),
     },
     {
       title: t('credits.title'),
-      description: 'Manage vendor credits and apply them to outstanding bills.',
+      description: t('overview.modules.credits.description'),
       icon: CreditCard,
       href: '/purchases/credits',
       color: 'text-orange-600',
       bgColor: 'bg-orange-500',
-      stats: 'Manage credits',
+      stats: t('overview.modules.credits.stats'),
     },
   ];
 
@@ -125,7 +125,7 @@ export default function PurchasesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Payable</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('overview.totalPayable')}</CardTitle>
             <TrendingDown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -134,13 +134,15 @@ export default function PurchasesPage() {
             ) : (
               <div className="text-2xl font-bold">{formatCurrency(totalPayable)}</div>
             )}
-            <p className="text-xs text-muted-foreground">Across {vendors.length} vendors</p>
+            <p className="text-xs text-muted-foreground">
+              {t('overview.acrossVendors', { count: vendors.length })}
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Overdue Amount</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('overview.overdueAmount')}</CardTitle>
             <AlertCircle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
@@ -149,13 +151,15 @@ export default function PurchasesPage() {
             ) : (
               <div className="text-2xl font-bold text-red-600">{formatCurrency(overdueAmount)}</div>
             )}
-            <p className="text-xs text-muted-foreground">{overdueBills.length} overdue bills</p>
+            <p className="text-xs text-muted-foreground">
+              {t('overview.overdueBillsCount', { count: overdueBills.length })}
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Unpaid Bills</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('overview.unpaidBills')}</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -164,13 +168,13 @@ export default function PurchasesPage() {
             ) : (
               <div className="text-2xl font-bold">{unpaidBills.length}</div>
             )}
-            <p className="text-xs text-muted-foreground">Open, overdue, or partially paid</p>
+            <p className="text-xs text-muted-foreground">{t('overview.unpaidHint')}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Paid This Month</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('overview.paidThisMonth')}</CardTitle>
             <DollarSign className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
@@ -179,7 +183,7 @@ export default function PurchasesPage() {
             ) : (
               <div className="text-2xl font-bold text-green-600">{paidThisMonth.length}</div>
             )}
-            <p className="text-xs text-muted-foreground">Bills paid this month</p>
+            <p className="text-xs text-muted-foreground">{t('overview.paidThisMonthHint')}</p>
           </CardContent>
         </Card>
       </div>
@@ -189,19 +193,19 @@ export default function PurchasesPage() {
         <Button asChild>
           <Link href="/purchases/bills/new">
             <Plus className="mr-2 h-4 w-4" />
-            New Bill
+            {t('bills.newBill')}
           </Link>
         </Button>
         <Button asChild variant="outline">
           <Link href="/purchases/expenses/new">
             <Plus className="mr-2 h-4 w-4" />
-            New Expense
+            {t('expenses.newExpense')}
           </Link>
         </Button>
         <Button asChild variant="outline">
           <Link href="/purchases/payments/new">
             <Plus className="mr-2 h-4 w-4" />
-            Record Payment
+            {t('payments.recordPayment')}
           </Link>
         </Button>
       </div>
@@ -239,11 +243,11 @@ export default function PurchasesPage() {
         {/* Recent Activity */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Recent Activity</CardTitle>
+            <CardTitle className="text-lg">{t('overview.recentActivity')}</CardTitle>
           </CardHeader>
           <CardContent>
             {bills.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No recent activity</p>
+              <p className="text-muted-foreground text-sm">{t('overview.noRecentActivity')}</p>
             ) : (
               <div className="space-y-3">
                 {bills
@@ -300,16 +304,16 @@ export default function PurchasesPage() {
         {/* Overdue Bills */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg text-red-600">Overdue Bills</CardTitle>
+            <CardTitle className="text-lg text-red-600">{t('overview.overdueBills')}</CardTitle>
             {overdueBills.length > 0 && (
               <Button asChild variant="outline" size="sm">
-                <Link href="/purchases/bills?status=OVERDUE">View All</Link>
+                <Link href="/purchases/bills?status=OVERDUE">{t('overview.viewAll')}</Link>
               </Button>
             )}
           </CardHeader>
           <CardContent>
             {overdueBills.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No overdue bills</p>
+              <p className="text-muted-foreground text-sm">{t('overview.noOverdue')}</p>
             ) : (
               <div className="space-y-3">
                 {overdueBills
@@ -338,7 +342,9 @@ export default function PurchasesPage() {
                             <p className="text-xs text-muted-foreground">{bill.vendor?.name}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-xs text-red-600">{daysOverdue} days overdue</p>
+                            <p className="text-xs text-red-600">
+                              {t('overview.daysOverdue', { days: daysOverdue })}
+                            </p>
                             <p className="text-sm font-mono font-semibold text-red-600">
                               {formatCurrency(bill.balanceDue)}
                             </p>

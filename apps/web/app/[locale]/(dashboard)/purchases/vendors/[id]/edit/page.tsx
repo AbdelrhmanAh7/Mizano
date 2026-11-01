@@ -54,7 +54,7 @@ export default function EditVendorPage({ params }: EditVendorPageProps) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild aria-label="Go back">
+        <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
           <Link href={`/purchases/vendors/${id}`}>
             <ArrowLeft className="h-4 w-4" />
           </Link>

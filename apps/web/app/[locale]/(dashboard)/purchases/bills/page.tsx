@@ -153,7 +153,7 @@ function BillsPageContent() {
             onClick: bulkApprove.openFor,
           },
           {
-            label: 'Mark as Paid',
+            label: t('bills.markAsPaid'),
             icon: DollarSign,
             onClick: bulkPay.openFor,
           },
@@ -162,7 +162,7 @@ function BillsPageContent() {
     ...(canDelete
       ? [
           {
-            label: 'Delete',
+            label: tCommon('buttons.delete'),
             icon: Trash2,
             variant: 'destructive' as const,
             onClick: bulkDelete.openFor,
@@ -181,15 +181,17 @@ function BillsPageContent() {
       try {
         await deleteBill.mutateAsync(billToDelete.id);
         toast({
-          title: 'Bill deleted',
-          description: `Bill ${billToDelete.billNumber} has been deleted.`,
+          title: t('bills.toasts.deleted'),
+          description: t('bills.toasts.deletedDescription', {
+            number: billToDelete.billNumber,
+          }),
         });
       } catch (error: unknown) {
         toast({
-          title: 'Error',
+          title: tCommon('errors.generic'),
           description:
             (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-            'Failed to delete bill.',
+            t('bills.toasts.deleteFailed'),
           variant: 'destructive',
         });
       }
@@ -345,7 +347,7 @@ function BillsPageContent() {
               {canCreate && (
                 <DropdownMenuItem onClick={() => cloneBill.mutate(bill.id)}>
                   <Copy className="mr-2 h-4 w-4" />
-                  Duplicate
+                  {t('bills.duplicate')}
                 </DropdownMenuItem>
               )}
               {canDelete && bill.status === 'DRAFT' && (
@@ -433,14 +435,14 @@ function BillsPageContent() {
                 className="text-muted-foreground"
               >
                 <X className="mr-1 h-4 w-4" />
-                Reset
+                {tCommon('buttons.reset')}
               </Button>
             )}
             <Button
               variant="outline"
               size="icon"
               onClick={() => refetch()}
-              aria-label="Refresh bills"
+              aria-label={t('bills.refreshBills')}
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
@@ -499,7 +501,10 @@ function BillsPageContent() {
         {...bulkDelete.dialogProps}
         action="delete"
         itemType="bills"
-        description="Only draft bills will be deleted. Non-draft bills will be skipped."
+        title={t('bills.bulkDelete.title', { count: bulkDelete.count })}
+        description={t('bills.bulkDelete.description')}
+        confirmLabel={t('bills.bulkDelete.confirm', { count: bulkDelete.count })}
+        cancelLabel={tCommon('buttons.cancel')}
         destructive
       />
       <BulkActionConfirmDialog
@@ -515,7 +520,10 @@ function BillsPageContent() {
         {...bulkPay.dialogProps}
         action="mark as paid"
         itemType="bills"
-        description="A payment for the full remaining balance will be recorded for each bill from the default bank account and posted to the ledger."
+        title={t('bills.bulkPay.title', { count: bulkPay.count })}
+        description={t('bills.bulkPay.description')}
+        confirmLabel={t('bills.bulkPay.confirm', { count: bulkPay.count })}
+        cancelLabel={tCommon('buttons.cancel')}
       />
 
       {/* Import Wizard */}
@@ -523,7 +531,7 @@ function BillsPageContent() {
         open={importOpen}
         onOpenChange={setImportOpen}
         entityType={'bills' as ImportEntityType}
-        entityLabel="Bills"
+        entityLabel={t('bills.title')}
         onComplete={() => refetch()}
       />
     </div>

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -64,6 +64,7 @@ function toConfirmDecimal(value: unknown, field: ConfirmLineField, lineNumber: n
 
 export default function ScanBillPage() {
   const router = useRouter();
+  const locale = useLocale();
   const t = useTranslations('ai.intake');
   const ts = useTranslations('ai.intake.scan');
 
@@ -301,10 +302,10 @@ export default function ScanBillPage() {
     return <Badge variant="destructive">{ts('confidence.low')}</Badge>;
   };
 
-  // Stage-specific messages for the processing UI
+  // Stage-specific messages for the processing UI, in the user's language (the server's own
+  // progress text is English).
   const stageMessage =
-    intake.message ||
-    (intake.stage === 'received'
+    intake.stage === 'received'
       ? ts('stage.received')
       : intake.stage === 'extracting'
         ? ts('stage.extracting')
@@ -312,7 +313,7 @@ export default function ScanBillPage() {
           ? ts('stage.classifying')
           : intake.stage === 'matching'
             ? ts('stage.matching')
-            : ts('stage.processing'));
+            : ts('stage.processing');
 
   const result = localResult;
   const error = localError;
@@ -456,7 +457,12 @@ export default function ScanBillPage() {
                   <div>
                     <p className="font-medium">{selectedFile.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                      {/* Intl names the unit in the UI language (MB / ميغابايت). */}
+                      {new Intl.NumberFormat(locale === 'ar' ? 'ar-u-nu-latn' : 'en', {
+                        style: 'unit',
+                        unit: 'megabyte',
+                        maximumFractionDigits: 2,
+                      }).format(selectedFile.size / 1024 / 1024)}
                     </p>
                   </div>
                   <Button
@@ -618,7 +624,7 @@ export default function ScanBillPage() {
             </Card>
           )}
 
-          {/* AI Vendor Intelligence */}
+          {/* Vendor match */}
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">{ts('vendorTitle')}</CardTitle>

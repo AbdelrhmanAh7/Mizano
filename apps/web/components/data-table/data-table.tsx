@@ -147,7 +147,7 @@ export function DataTable<TData, TValue>({
   onPageChange,
   onLimitChange,
   isLoading,
-  emptyMessage = 'No results found.',
+  emptyMessage,
   emptyAction,
   onRowClick,
   enableSelection = false,
@@ -167,6 +167,7 @@ export function DataTable<TData, TValue>({
 }: DataTableProps<TData, TValue>) {
   const resolvedTableId = tableId || exportFilename;
   const t = useTranslations('common.table');
+  const tDataTable = useTranslations('common.dataTable');
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() =>
@@ -303,7 +304,7 @@ export function DataTable<TData, TValue>({
   if (data.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground mb-4">{emptyMessage}</p>
+        <p className="text-muted-foreground mb-4">{emptyMessage ?? t('noResults')}</p>
         {emptyAction}
       </div>
     );
@@ -316,7 +317,9 @@ export function DataTable<TData, TValue>({
       <div className="flex items-center gap-2">
         {hasSelection && (
           <>
-            <span className="text-sm text-muted-foreground">{selectedRows.length} selected</span>
+            <span className="text-sm text-muted-foreground">
+              {tDataTable('selected', { count: selectedRows.length })}
+            </span>
             {bulkActions?.map((action) => {
               const Icon = action.icon;
               return (

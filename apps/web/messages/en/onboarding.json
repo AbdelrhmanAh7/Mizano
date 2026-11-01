@@ -1,26 +1,20 @@
 {
   "hero": {
-    "title": "AI-Powered Autonomous Accounting",
-    "subtitle": "Zero-touch accounting platform with 33 AI models. No accounting knowledge required.",
+    "title": "Accounting for businesses in Egypt, Saudi Arabia and the UAE",
+    "subtitle": "Invoices, bills, double-entry journals and reports in Arabic and English. Bills and receipts are read into drafts that a person reviews before posting.",
     "getStarted": "Get Started",
     "login": "Login"
-  },
-  "stats": {
-    "aiModels": "AI Models",
-    "aiCategories": "AI Categories",
-    "businessModules": "Business Modules",
-    "localAi": "100% Local AI"
   },
   "features": {
     "sectionTitle": "Everything You Need",
     "sectionSubtitle": "A complete platform for modern businesses",
-    "zeroTouch": {
-      "title": "Zero-Touch Accounting",
-      "description": "Auto-categorization, bank reconciliation, and OCR document intake. Let AI handle the bookkeeping."
+    "documents": {
+      "title": "Bills read into drafts",
+      "description": "Upload a bill or receipt (image or PDF) and it is read into a draft on this server. Nothing is posted until you review it."
     },
-    "aiIntelligence": {
-      "title": "AI Intelligence",
-      "description": "33 models for forecasting, anomaly detection, fraud prevention, and predictive analytics."
+    "ai": {
+      "title": "Optional AI on your own account",
+      "description": "AI is off by default. An admin can turn it on with the organization's own provider account to read documents, suggest accounts and summarise the month."
     },
     "financial": {
       "title": "Financial Management",
@@ -31,62 +25,23 @@
       "description": "Inventory, manufacturing, HR, payroll, and project management fully integrated."
     },
     "security": {
-      "title": "Security & Compliance",
-      "description": "Fraud detection, audit risk scoring, and compliance monitoring to protect your business."
+      "title": "Security & audit trail",
+      "description": "Each organization's data is kept apart, permissions follow each person's role, and every change is recorded in an audit log."
     },
     "analytics": {
       "title": "Analytics & Reporting",
-      "description": "P&L, balance sheet, cash flow forecast, customer insights, and real-time dashboards."
-    }
-  },
-  "aiShowcase": {
-    "sectionTitle": "33 AI Models, 7 Categories",
-    "sectionSubtitle": "All running locally on your infrastructure",
-    "coreFinancial": {
-      "title": "Core Financial",
-      "description": "Transaction categorization, bank reconciliation, anomaly detection, and cash flow forecasting",
-      "count": "10 models"
-    },
-    "salesCrm": {
-      "title": "Sales & CRM",
-      "description": "Lead scoring, churn prediction, customer lifetime value, and pipeline forecasting",
-      "count": "5 models"
-    },
-    "security": {
-      "title": "Security & Compliance",
-      "description": "Fraud detection, compliance monitoring, and audit risk scoring",
-      "count": "3 models"
-    },
-    "nlp": {
-      "title": "NLP & Documents",
-      "description": "Document classification, sentiment analysis, entity extraction, and contract analysis",
-      "count": "4 models"
-    },
-    "hr": {
-      "title": "HR & Workforce",
-      "description": "Employee attrition prediction, compensation benchmarking, and skills gap analysis",
-      "count": "3 models"
-    },
-    "operations": {
-      "title": "Operations",
-      "description": "Quality prediction, predictive maintenance, workforce scheduling, and route optimization",
-      "count": "5 models"
-    },
-    "chat": {
-      "title": "Chat & Voice",
-      "description": "AI chatbot, knowledge assistant, and voice command processing",
-      "count": "3 models"
+      "description": "Profit and loss, balance sheet, cash flow, trial balance and aging reports."
     }
   },
   "technology": {
-    "sectionTitle": "Built for Privacy & Performance",
-    "localAi": "100% Local AI - Your data never leaves your servers",
-    "offline": "No external API dependencies - runs completely offline",
-    "techStack": "Modern tech stack for enterprise reliability"
+    "sectionTitle": "Your data, your control",
+    "localAi": "Documents are read on this server by default. Nothing goes to an AI provider unless you turn AI on.",
+    "offline": "When AI is on, it runs only on your organization's own provider account, after an admin agrees.",
+    "techStack": "Built on open, widely used technology"
   },
   "cta": {
-    "title": "Ready to automate your accounting?",
-    "subtitle": "Join the future of autonomous financial management",
+    "title": "Ready to start?",
+    "subtitle": "Create your organization and enter your opening balances.",
     "getStarted": "Create Account",
     "login": "Sign In"
   }

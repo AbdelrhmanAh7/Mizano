@@ -329,7 +329,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
             </CardHeader>
             <CardContent>
               {billsLoading ? (
-                <p className="text-muted-foreground">Loading...</p>
+                <p className="text-muted-foreground">{tCommon('loading.default')}</p>
               ) : bills.length === 0 ? (
                 <p className="text-muted-foreground">{t('vendors.noBillsFound')}</p>
               ) : (
@@ -385,7 +385,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
             </CardHeader>
             <CardContent>
               {expensesLoading ? (
-                <p className="text-muted-foreground">Loading...</p>
+                <p className="text-muted-foreground">{tCommon('loading.default')}</p>
               ) : expenses.length === 0 ? (
                 <p className="text-muted-foreground">{t('vendors.noExpensesFound')}</p>
               ) : (
@@ -424,7 +424,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
             </CardHeader>
             <CardContent>
               {paymentsLoading ? (
-                <p className="text-muted-foreground">Loading...</p>
+                <p className="text-muted-foreground">{tCommon('loading.default')}</p>
               ) : payments.length === 0 ? (
                 <p className="text-muted-foreground">{t('vendors.noPaymentsFound')}</p>
               ) : (
@@ -472,7 +472,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
             </CardHeader>
             <CardContent>
               {creditsLoading ? (
-                <p className="text-muted-foreground">Loading...</p>
+                <p className="text-muted-foreground">{tCommon('loading.default')}</p>
               ) : credits.length === 0 ? (
                 <p className="text-muted-foreground">{t('vendors.noCreditsFound')}</p>
               ) : (

@@ -22,7 +22,10 @@
     "upcomingDeadlines": "Upcoming Deadlines",
     "noDeadlines": "No upcoming deadlines",
     "dueIn": "Due in {days} days",
-    "overdue": "Overdue by {days} days"
+    "overdue": "Overdue by {days} days",
+    "activeCount": "{count} active",
+    "pendingCount": "{count} pending",
+    "openModule": "Open {title}"
   },
   "rates": {
     "title": "Tax Rates",
@@ -52,6 +55,27 @@
       "default": "Default",
       "active": "Active",
       "actions": "Actions"
+    },
+    "type": {
+      "SALES": "Output (Sales)",
+      "PURCHASES": "Input (Purchases)",
+      "BOTH": "Both"
+    },
+    "form": {
+      "nameRequired": "Name is required",
+      "rateInvalid": "Enter a valid rate",
+      "rateMin": "Rate must be 0 or higher",
+      "rateMax": "Rate cannot exceed 100",
+      "accountRequired": "Linked account is required",
+      "updated": "Tax rate updated successfully",
+      "created": "Tax rate created successfully",
+      "saveFailed": "Failed to save tax rate",
+      "rate": "Rate (%)",
+      "namePlaceholder": "e.g., VAT 15%",
+      "selectType": "Select type",
+      "selectAccount": "Select account",
+      "defaultRate": "Default tax rate",
+      "update": "Update"
     }
   },
   "returns": {
@@ -145,7 +169,21 @@
     },
     "markFiled": "Mark as filed",
     "markFiledSuccess": "VAT return marked as filed",
-    "markFiledFail": "Failed to mark the VAT return as filed"
+    "markFiledFail": "Failed to mark the VAT return as filed",
+    "status": {
+      "DRAFT": "Draft",
+      "CALCULATED": "Calculated",
+      "SUBMITTED": "Submitted",
+      "FILED": "Filed"
+    },
+    "bulkDelete": {
+      "title": "{count, plural, one {Delete # VAT return?} other {Delete # VAT returns?}}",
+      "confirm": "{count, plural, one {Delete # VAT return} other {Delete # VAT returns}}"
+    },
+    "bulkFile": {
+      "title": "{count, plural, one {File # VAT return?} other {File # VAT returns?}}",
+      "confirm": "{count, plural, one {File # VAT return} other {File # VAT returns}}"
+    }
   },
   "generate": {
     "title": "Generate VAT Return",
@@ -160,7 +198,8 @@
     "generateButton": "Generate Return",
     "generating": "Generating...",
     "generateSuccess": "VAT return generated successfully",
-    "generateFail": "Failed to generate VAT return"
+    "generateFail": "Failed to generate VAT return",
+    "quarter": "Q{quarter} {year}"
   },
   "payments": {
     "title": "VAT Payments",

@@ -73,7 +73,7 @@ function VendorCreditsPageContent() {
     ...(canDelete
       ? [
           {
-            label: 'Delete',
+            label: tCommon('buttons.delete'),
             icon: Trash2,
             variant: 'destructive' as const,
             onClick: (rows: VendorCredit[]) => {
@@ -90,7 +90,7 @@ function VendorCreditsPageContent() {
       accessorKey: 'creditNumber',
       header: () => (
         <SortableHeader
-          label="Credit #"
+          label={t('credits.table.creditNumber')}
           columnId="creditNumber"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -108,14 +108,14 @@ function VendorCreditsPageContent() {
     },
     {
       accessorKey: 'vendor.name',
-      header: 'Vendor',
+      header: t('credits.table.vendor'),
       cell: ({ row }) => row.original.vendor?.name || '-',
     },
     {
       accessorKey: 'date',
       header: () => (
         <SortableHeader
-          label="Date"
+          label={t('credits.table.date')}
           columnId="date"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -128,7 +128,7 @@ function VendorCreditsPageContent() {
       accessorKey: 'amount',
       header: () => (
         <SortableHeader
-          label="Total"
+          label={t('credits.total')}
           columnId="amount"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -141,7 +141,7 @@ function VendorCreditsPageContent() {
     },
     {
       id: 'balance',
-      header: 'Balance',
+      header: t('credits.table.balance'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
       cell: ({ row }) => {
         const balance = row.original.appliedToBillId ? '0' : row.original.amount;
@@ -163,7 +163,7 @@ function VendorCreditsPageContent() {
             <DropdownMenuItem asChild>
               <Link href={`/purchases/credits/${row.original.id}`}>
                 <Eye className="mr-2 h-4 w-4" />
-                View
+                {tCommon('buttons.view')}
               </Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -205,13 +205,13 @@ function VendorCreditsPageContent() {
             />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-40">
-                <SelectValue placeholder="Status" />
+                <SelectValue placeholder={t('credits.status')} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('credits.allStatus')}</SelectItem>
-                <SelectItem value="OPEN">Open</SelectItem>
-                <SelectItem value="APPLIED">Applied</SelectItem>
-                <SelectItem value="REFUNDED">Refunded</SelectItem>
+                <SelectItem value="OPEN">{t('credits.statusLabels.open')}</SelectItem>
+                <SelectItem value="APPLIED">{t('credits.statusLabels.applied')}</SelectItem>
+                <SelectItem value="REFUNDED">{t('credits.statusLabels.refunded')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -254,7 +254,10 @@ function VendorCreditsPageContent() {
         action="delete"
         count={bulkSelectedRows.length}
         itemType="vendor credits"
-        description="Selected vendor credits will be deleted. Credits that have been applied will be skipped."
+        title={t('credits.bulkDelete.title', { count: bulkSelectedRows.length })}
+        description={t('credits.bulkDelete.description')}
+        confirmLabel={t('credits.bulkDelete.confirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         destructive
         isLoading={bulkDeleteAction.isLoading}
         onConfirm={async () => {
@@ -269,7 +272,7 @@ function VendorCreditsPageContent() {
         open={importOpen}
         onOpenChange={setImportOpen}
         entityType={'vendor_credits' as ImportEntityType}
-        entityLabel="Vendor Credits"
+        entityLabel={t('credits.title')}
         onComplete={() => refetch()}
       />
     </div>

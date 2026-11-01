@@ -125,7 +125,13 @@
     "documentDigits": "الأرقام بالعربية",
     "documentDigitsDescription": "تظهر المبالغ في الشاشات العربية بهذه الأرقام، وتُطبع بها الفواتير وعروض الأسعار وفواتير الموردين بالعربية. الإنجليزية تستخدم دائمًا 0123.",
     "digitsLatn": "غربية (0123)",
-    "digitsArab": "عربية هندية (٠١٢٣)"
+    "digitsArab": "عربية هندية (٠١٢٣)",
+    "dateUs": "MM/DD/YYYY (أمريكي)",
+    "dateInternational": "DD/MM/YYYY (دولي)",
+    "dateIso": "YYYY-MM-DD (قياسي)",
+    "numberUs": "1,000.00 (أمريكي/بريطاني)",
+    "numberEuropean": "1.000,00 (أوروبي)",
+    "numberFrench": "1 000,00 (فرنسي/دولي)"
   },
   "branding": {
     "title": "الهوية البصرية",
@@ -638,7 +644,11 @@
       "patternDeleted": "تم حذف العناصر المطابقة",
       "patternDeletedDescription": "عدد النسخ المؤقتة المطابقة لـ \"{pattern}\" التي مُسحت: {count}. بياناتك لم تتغير.",
       "patternDeleteError": "تعذّر حذف العناصر المطابقة. حاول مرة أخرى."
-    }
+    },
+    "noExpiry": "بلا انتهاء",
+    "expired": "منتهي",
+    "deleteKey": "حذف هذا المفتاح",
+    "deleteKeyLabel": "حذف مفتاح الذاكرة المؤقتة"
   },
   "auditLogs": {
     "title": "سجل التدقيق",

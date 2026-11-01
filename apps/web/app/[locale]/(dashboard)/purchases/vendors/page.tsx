@@ -77,7 +77,7 @@ function VendorsPageContent() {
     ...(canDelete
       ? [
           {
-            label: 'Delete',
+            label: tCommon('buttons.delete'),
             icon: Trash2,
             variant: 'destructive' as const,
             onClick: (rows: Vendor[]) => {
@@ -309,7 +309,10 @@ function VendorsPageContent() {
         action="delete"
         count={bulkSelectedRows.length}
         itemType="vendors"
-        description="Selected vendors will be deleted. Vendors with transactions will be skipped."
+        title={t('vendors.bulkDelete.title', { count: bulkSelectedRows.length })}
+        description={t('vendors.bulkDelete.description')}
+        confirmLabel={t('vendors.bulkDelete.confirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         destructive
         isLoading={bulkDeleteAction.isLoading}
         onConfirm={async () => {
@@ -324,7 +327,7 @@ function VendorsPageContent() {
         open={importOpen}
         onOpenChange={setImportOpen}
         entityType={'vendors' as ImportEntityType}
-        entityLabel="Vendors"
+        entityLabel={t('vendors.title')}
         onComplete={() => refetch()}
       />
 

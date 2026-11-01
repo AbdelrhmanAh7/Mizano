@@ -22,7 +22,10 @@
     "upcomingDeadlines": "المواعيد النهائية القادمة",
     "noDeadlines": "لا توجد مواعيد نهائية قادمة",
     "dueIn": "مستحق خلال {days} يوم",
-    "overdue": "متأخر بـ {days} يوم"
+    "overdue": "متأخر بـ {days} يوم",
+    "activeCount": "{count} نشط",
+    "pendingCount": "{count} معلق",
+    "openModule": "فتح {title}"
   },
   "rates": {
     "title": "معدلات الضرائب",
@@ -52,6 +55,27 @@
       "default": "افتراضي",
       "active": "نشط",
       "actions": "إجراءات"
+    },
+    "type": {
+      "SALES": "مخرجات (المبيعات)",
+      "PURCHASES": "مدخلات (المشتريات)",
+      "BOTH": "كلاهما"
+    },
+    "form": {
+      "nameRequired": "الاسم مطلوب",
+      "rateInvalid": "أدخل معدلًا صحيحًا",
+      "rateMin": "يجب ألا يقل المعدل عن 0",
+      "rateMax": "يجب ألا يتجاوز المعدل 100",
+      "accountRequired": "الحساب المرتبط مطلوب",
+      "updated": "تم تحديث معدل الضريبة بنجاح",
+      "created": "تم إنشاء معدل الضريبة بنجاح",
+      "saveFailed": "تعذر حفظ معدل الضريبة",
+      "rate": "المعدل (%)",
+      "namePlaceholder": "مثال: ضريبة القيمة المضافة 15%",
+      "selectType": "اختر النوع",
+      "selectAccount": "اختر الحساب",
+      "defaultRate": "معدل الضريبة الافتراضي",
+      "update": "تحديث"
     }
   },
   "returns": {
@@ -145,7 +169,21 @@
     },
     "markFiled": "تمييز كمقدمة",
     "markFiledSuccess": "تم تمييز إقرار ضريبة القيمة المضافة كمقدم",
-    "markFiledFail": "تعذر تمييز الإقرار كمقدم"
+    "markFiledFail": "تعذر تمييز الإقرار كمقدم",
+    "status": {
+      "DRAFT": "مسودة",
+      "CALCULATED": "محسوب",
+      "SUBMITTED": "مقدم",
+      "FILED": "مودَع"
+    },
+    "bulkDelete": {
+      "title": "حذف الإقرارات المحددة ({count})؟",
+      "confirm": "حذف {count} من الإقرارات"
+    },
+    "bulkFile": {
+      "title": "تقديم الإقرارات المحددة ({count})؟",
+      "confirm": "تقديم {count} من الإقرارات"
+    }
   },
   "generate": {
     "title": "إنشاء إقرار ضريبة القيمة المضافة",
@@ -160,7 +198,8 @@
     "generateButton": "إنشاء الإقرار",
     "generating": "جاري الإنشاء...",
     "generateSuccess": "تم إنشاء إقرار ضريبة القيمة المضافة بنجاح",
-    "generateFail": "فشل إنشاء إقرار ضريبة القيمة المضافة"
+    "generateFail": "فشل إنشاء إقرار ضريبة القيمة المضافة",
+    "quarter": "الربع {quarter} {year}"
   },
   "payments": {
     "title": "مدفوعات ضريبة القيمة المضافة",

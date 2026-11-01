@@ -269,7 +269,7 @@ export class DocumentIntakeService {
     const isPdf = mimeType === 'application/pdf';
 
     // Step 1: Build extraction context
-    onProgress?.('extracting', 20, 'AI is reading your document...');
+    onProgress?.('extracting', 20, 'Reading your document...');
 
     const context: ExtractionContext = {
       fileBuffer,

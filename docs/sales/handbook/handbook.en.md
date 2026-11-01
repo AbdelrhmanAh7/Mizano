@@ -1,11 +1,11 @@
-# Mizano user handbook (English)
+# Jarda user handbook (English)
 
 _1 November 2026 · Free during the pilot · Names in **bold** are the menus and buttons exactly as the app shows them in English.
 The Arabic handbook says the same things._
 
 ## 1. The idea
 
-Mizano keeps the books of a small business in Arabic and English: what you sell, what you buy, what you are paid and what you
+Jarda keeps the books of a small business in Arabic and English: what you sell, what you buy, what you are paid and what you
 pay, and the reports that show where you stand. It is built for an owner and an accountant working together.
 
 Three rules you can rely on:
@@ -13,15 +13,15 @@ Three rules you can rely on:
 1. **A person approves what is posted.** A scanned bill becomes a draft; it reaches the books only when someone approves it.
 2. **History is never rewritten.** A posted entry is never edited: a mistake is corrected through its document (void or
    correct it) or by a linked reversal, so you can always see what happened.
-3. **AI is optional and never in charge.** Mizano reads bills on its own server without AI. If you connect your own AI, it can
+3. **AI is optional and never in charge.** Jarda reads bills on its own server without AI. If you connect your own AI, it can
    read and prepare drafts, and nothing more.
 
-What Mizano does **not** do today: it does not issue or submit e-invoices to ETA (Egypt) or ZATCA (Saudi Arabia); it does not
+What Jarda does **not** do today: it does not issue or submit e-invoices to ETA (Egypt) or ZATCA (Saudi Arabia); it does not
 receive bills by WhatsApp, Telegram or email (you upload them); it does not connect to your bank directly (you import the
 statement). Inventory, HR, CRM, projects and manufacturing screens exist but are not part of the pilot.
 
-Words you will see: **Organization** (your business in Mizano), **Draft** (saved, not yet in the books), **Post** (write into
-the books), **Journal entry** (the debit and credit lines behind every document), **Void** (cancel a document; Mizano posts the
+Words you will see: **Organization** (your business in Jarda), **Draft** (saved, not yet in the books), **Post** (write into
+the books), **Journal entry** (the debit and credit lines behind every document), **Void** (cancel a document; Jarda posts the
 reversal), **Lock date** (nothing before this date can change).
 
 ---
@@ -30,7 +30,7 @@ reversal), **Lock date** (nothing before this date can change).
 
 **Who:** the owner. **Before you start:** an email address.
 
-1. Open the Mizano address you were given and choose **Sign up** (on the sign-in page: "Don't have an account? Sign up").
+1. Open the Jarda address you were given and choose **Sign up** (on the sign-in page: "Don't have an account? Sign up").
 2. Fill **First Name**, **Last Name**, **Organization Name**, **Email**, **Password** and **Confirm Password**, then press
    **Sign Up**.
 3. You see **Account created**. Sign in with your email and password.
@@ -109,7 +109,7 @@ while you create the credit note; it cannot be applied later.
 
 **What you should see:** the invoice status changes as it is sent and paid; the customer's balance updates.
 
-**If it does not work:** a mistake on a sent invoice is fixed with **Void Invoice** (Mizano posts the reversal) or a credit
+**If it does not work:** a mistake on a sent invoice is fixed with **Void Invoice** (Jarda posts the reversal) or a credit
 note, never by editing the posted entry. An invoice that already has payments or credit notes cannot be voided until those
 are voided first.
 
@@ -146,15 +146,15 @@ are voided first.
 **Who:** a user who can create bills. **Before you start:** the bill as a photo (JPEG, PNG, WebP, HEIC) or a PDF, up to 15 MB.
 
 1. **Purchases → Bills → Scan Bill** (the page is called **Scan Bill**). Drop the file or click to choose it (one file at a time).
-2. Press **Read document**. You see the steps **Upload → Processing → Review → Done**. Mizano reads the file on its own server;
+2. Press **Read document**. You see the steps **Upload → Processing → Review → Done**. Jarda reads the file on its own server;
    if you connected your own AI account and turned on **Read bills and receipts**, it reads with that instead (section 10).
 3. Check what it found: the vendor (matched, or **Create "…" as a new vendor**), the date, the lines and the totals. Fields it
    was not sure of are marked; if you see **Tax rate needs review**, check the tax on each line and tick
    **I have reviewed the tax % on these lines**.
-4. If you see **Possible duplicate detected**, check whether this bill was already entered before you continue. If the same file was uploaded before, Mizano shows the existing scan instead.
+4. If you see **Possible duplicate detected**, check whether this bill was already entered before you continue. If the same file was uploaded before, Jarda shows the existing scan instead.
 5. Press **Create Bill**. You see **Bill created successfully!** The bill is a draft: approve it as in section 5.
 
-**What you should see:** the draft bill. Mizano keeps the uploaded file with the scan, but no screen opens it from the bill
+**What you should see:** the draft bill. Jarda keeps the uploaded file with the scan, but no screen opens it from the bill
 yet: keep your own copy too.
 
 **If it does not work:** if a field is empty, the reader did not find it: type it. It never invents a number. Word files are
@@ -186,7 +186,7 @@ Excel). **Sales by Customer**, **Sales by Item** and **Purchases by Vendor** hav
 
 1. **Banking**, then **Bank Transactions**, then **Import Statement**: upload the month's statement (CSV, Excel, OFX or QFX). Lines already
    imported are skipped.
-2. **Banking → Reconciliation:** for each bank line, **Match** it with the payment or expense Mizano suggests, or record what
+2. **Banking → Reconciliation:** for each bank line, **Match** it with the payment or expense Jarda suggests, or record what
    is missing (for example a bank charge as an expense). **Bank Rules** help with lines that repeat every month.
 3. Check that every bill and expense of the month is posted and every payment recorded.
 4. Read **Trial Balance** and **Profit & Loss** for the month. Fix mistakes now: void or correct the document, or, for a manual
@@ -221,22 +221,22 @@ again afterwards.
 
 ## 10. Connect your AI (optional)
 
-Mizano works fully without AI. There are two separate ways to use your own.
+Jarda works fully without AI. There are two separate ways to use your own.
 
 ### 10.1 Your AI app, with no key (Claude, ChatGPT, Codex, Gemini)
 
-1. **Settings → AI → Connect your AI app:** copy the **Mizano address for your AI app**.
+1. **Settings → AI → Connect your AI app:** copy the **Jarda address for your AI app**.
 2. Follow the steps for your app on the same page. For example in Claude: Settings → Connectors → Add custom connector, paste
    the address, Connect. In ChatGPT this needs a paid plan and Developer mode.
-3. Sign in to Mizano when asked and choose **Read only** or **Read and prepare drafts**.
+3. Sign in to Jarda when asked and choose **Read only** or **Read and prepare drafts**.
 4. **Connected AI apps** lists each app, who connected it and when it was last used; **Disconnect** removes its access at once.
 
-Your AI app never posts, sends, pays or deletes anything. Drafts it prepares wait in Mizano for a person. If the page says
+Your AI app never posts, sends, pays or deletes anything. Drafts it prepares wait in Jarda for a person. If the page says
 connecting an AI app is not turned on for this server, ask us: it is switched on per server.
 
-### 10.2 Your AI account for features inside Mizano (with a key)
+### 10.2 Your AI account for features inside Jarda (with a key)
 
-1. **Settings → AI → Use an API key for features inside Mizano:** choose the **Provider** (Claude, OpenAI, Google Gemini,
+1. **Settings → AI → Use an API key for features inside Jarda:** choose the **Provider** (Claude, OpenAI, Google Gemini,
    OpenRouter), paste the **API key**, press **Check and connect**. The key is checked, stored encrypted and never shown again.
 2. **Permission to send data:** read what is sent, tick **I agree to send this data to {provider}**, press **Agree**.
 3. **AI features** (each off until you turn it on): **Read bills and receipts**, **Suggest accounts**, **Monthly summary**.
@@ -249,14 +249,14 @@ connecting an AI app is not turned on for this server, ask us: it is switched on
 
 ## 11. Connect to FlowLine (optional)
 
-FlowLine, our automation product, can react to Mizano events (for example a paid invoice) and act in Mizano with a key limited
+FlowLine, our automation product, can react to Jarda events (for example a paid invoice) and act in Jarda with a key limited
 to what you allow: create customers and notes, and prepare draft invoices. The **Connect to FlowLine** card on the **Settings**
-page gives the connection details to paste into FlowLine. Draft invoices from FlowLine wait for a person in Mizano like any
+page gives the connection details to paste into FlowLine. Draft invoices from FlowLine wait for a person in Jarda like any
 other draft.
 
 ---
 
 ## Help
 
-Contact: [contact details: to be filled in by the owner]. When something fails, note what you pressed and what the message
+Contact: the support contact named in your signed pilot agreement. When something fails, note what you pressed and what the message
 said, and send it to us.

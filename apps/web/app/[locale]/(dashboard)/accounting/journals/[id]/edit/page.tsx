@@ -29,16 +29,16 @@ export default function EditJournalPage() {
     try {
       await updateJournal.mutateAsync({ id: journalId, data });
       toast({
-        title: 'Journal updated',
-        description: 'The journal entry has been updated successfully.',
+        title: t('journals.toast.updated'),
+        description: t('journals.toast.updatedDescription'),
       });
       router.push(`/accounting/journals/${journalId}`);
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: t('journals.toast.error'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to update journal entry.',
+          t('journals.toast.updateError'),
         variant: 'destructive',
       });
     }
@@ -64,22 +64,20 @@ export default function EditJournalPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/accounting/journals">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Journal Not Found</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{t('journals.notFoundTitle')}</h1>
           </div>
         </div>
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              The journal entry you&apos;re looking for doesn&apos;t exist.
-            </p>
+            <p className="text-muted-foreground">{t('journals.notFoundDescription')}</p>
             <Button asChild className="mt-4">
-              <Link href="/accounting/journals">Back to Journals</Link>
+              <Link href="/accounting/journals">{t('journals.backToJournals')}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -91,22 +89,24 @@ export default function EditJournalPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href={`/accounting/journals/${journalId}`}>
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Cannot Edit Journal</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{t('journals.cannotEditTitle')}</h1>
           </div>
         </div>
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground">
-              Only draft journals can be edited. This journal is {journal.status.toLowerCase()}.
+              {t('journals.cannotEditDescription', {
+                status: t(`journals.status.${journal.status}`).toLowerCase(),
+              })}
             </p>
             <Button asChild className="mt-4">
-              <Link href={`/accounting/journals/${journalId}`}>Back to Journal</Link>
+              <Link href={`/accounting/journals/${journalId}`}>{t('journals.backToJournal')}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -118,7 +118,7 @@ export default function EditJournalPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild aria-label="Go back">
+        <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
           <Link href={`/accounting/journals/${journalId}`}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
@@ -127,7 +127,7 @@ export default function EditJournalPage() {
           <h1 className="text-3xl font-bold tracking-tight">
             {t('journals.editJournal')} - {journal.journalNumber}
           </h1>
-          <p className="text-muted-foreground">Update the journal entry details</p>
+          <p className="text-muted-foreground">{t('journals.editDescription')}</p>
         </div>
       </div>
 
