@@ -25,6 +25,7 @@ ae, us, Latin and Arabic terms, including near spellings), by domain, GitHub and
 
 **Jarda checks (2026-11-01):**
 - App stores (eg, sa, ae, us; Latin "jarda", Arabic «جردة»): no app named Jarda. The only hit is an app called "SAVI - YourAIAssistant" (Productivity) whose **publisher is "Jarda LLC"**: a company with the same name but a different category (an AI assistant). Arabic searches return only newspaper apps («جريدة» matches loosely). Google Play: not conclusive (script-rendered page).
+- Near spellings (Jarrda, Jarida, Garda, Gerda, Jardah) in the eg, sa, ae and us stores: only unrelated apps (Garda is an alarm and security app by Garda Sikring AS; JARIDA is a medical app in the Emirati store).
 - Web search in Arabic and English (accounting, bookkeeping, inventory): no product named Jarda; results are generic count-of-stock guides (for example Daftra's inventory-count guide).
 - Domains: jarda.sa free (whois, no match); jarda.app not registered (RDAP via rdap.org, 404); jarda.eg and jarda.ae: no DNS records (those registries are not queryable, unverified); **jarda.ai is in use** (live name servers; the page could not be read, owner unknown); **jarda.com is registered** (created 2000-03-04, a small hosted site; not bought).
 - GitHub: user `jarda` is a person (74 repos); no accounting project found by name. X, Instagram, LinkedIn handles: scripted requests return 200/301 for any name, so **not established**; check by hand.
