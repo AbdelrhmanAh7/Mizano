@@ -12,6 +12,7 @@ jest.mock('next-intl', () => {
   const messages = {
     accounting: jest.requireActual('@/messages/ar/accounting.json'),
     common: jest.requireActual('@/messages/ar/common.json'),
+    reports: jest.requireActual('@/messages/ar/reports.json'),
   };
   const lookup = (path: string): unknown =>
     path
@@ -31,6 +32,10 @@ jest.mock('next-intl', () => {
   };
 });
 
+jest.mock('@/lib/hooks/use-permissions', () => ({
+  usePermissions: () => ({ hasPermission: () => true }),
+}));
+
 jest.mock('@/lib/hooks/use-date-locale', () => ({
   useDateFormatter: () => (value: string) => value,
 }));
@@ -44,16 +49,12 @@ const account = (code: string, type: string) => ({
   credit: '0',
 });
 
+let mockAccounts: ReturnType<typeof account>[] = [];
+
 jest.mock('@/lib/hooks/use-accounting-reports', () => ({
   useTrialBalance: () => ({
     data: {
-      accounts: [
-        account('1010', 'ASSET'),
-        account('2000', 'LIABILITY'),
-        account('3000', 'EQUITY'),
-        account('4000', 'INCOME'),
-        account('6100', 'EXPENSE'),
-      ],
+      accounts: mockAccounts,
       totals: { totalDebits: '500', totalCredits: '500' },
       isBalanced: true,
     },
@@ -64,6 +65,27 @@ jest.mock('@/lib/hooks/use-accounting-reports', () => ({
 }));
 
 describe('Accounting trial balance', () => {
+  beforeEach(() => {
+    mockAccounts = [
+      account('1010', 'ASSET'),
+      account('2000', 'LIABILITY'),
+      account('3000', 'EQUITY'),
+      account('4000', 'INCOME'),
+      account('6100', 'EXPENSE'),
+    ];
+  });
+
+  it('says plainly that a new organization has nothing posted yet (RPT-015)', () => {
+    mockAccounts = [];
+    render(<TrialBalancePage />);
+
+    expect(screen.getByText('لا توجد قيود مُرحّلة بعد')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'قيد يومية جديد' })).toHaveAttribute(
+      'href',
+      '/accounting/journals/new',
+    );
+  });
+
   it('labels account types in Arabic, not with the API enum', () => {
     render(<TrialBalancePage />);
 

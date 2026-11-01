@@ -544,6 +544,48 @@ describe('CreditNotesService (posting)', () => {
     });
   });
 
+  describe('findOne', () => {
+    it("adds the customer's outstanding balance from open invoices in the organization", async () => {
+      prisma.creditNote.findFirst.mockResolvedValue({
+        id: 'cn1',
+        customerId: 'cust1',
+        invoice: { id: 'inv1', balanceDue: dec('300') },
+      } as any);
+      prisma.invoice.aggregate.mockResolvedValue({ _sum: { balanceDue: dec('450.5') } } as any);
+
+      const note = await service.findOne('org1', 'cn1');
+
+      expect(note.customerOutstandingBalance).toBe('450.5000');
+      expect(prisma.invoice.aggregate.mock.calls[0][0]!.where).toEqual({
+        organizationId: 'org1',
+        customerId: 'cust1',
+        deletedAt: null,
+        status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] },
+      });
+    });
+
+    it('reports zero when the customer owes nothing', async () => {
+      prisma.creditNote.findFirst.mockResolvedValue({ id: 'cn1', customerId: 'cust1' } as any);
+      prisma.invoice.aggregate.mockResolvedValue({ _sum: { balanceDue: null } } as any);
+
+      const note = await service.findOne('org1', 'cn1');
+
+      expect(note.customerOutstandingBalance).toBe('0.0000');
+    });
+
+    it('is not found for another organization or a voided note', async () => {
+      prisma.creditNote.findFirst.mockResolvedValue(null);
+
+      await expect(service.findOne('org1', 'cn1')).rejects.toThrow('Credit note not found');
+      expect(prisma.creditNote.findFirst.mock.calls[0][0]!.where).toEqual({
+        id: 'cn1',
+        organizationId: 'org1',
+        deletedAt: null,
+      });
+      expect(prisma.invoice.aggregate).not.toHaveBeenCalled();
+    });
+  });
+
   describe('update', () => {
     it('only changes the reason of a live credit note in the tenant', async () => {
       prisma.creditNote.updateMany.mockResolvedValue({ count: 1 });

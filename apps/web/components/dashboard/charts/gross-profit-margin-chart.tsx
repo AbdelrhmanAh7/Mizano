@@ -9,6 +9,7 @@ import {
   CHART_AXIS,
   CHART_TOOLTIP_STYLE,
 } from '@/components/dashboard/charts/chart-card';
+import { monthLabel } from '@/lib/month-label';
 
 interface GrossProfitMarginChartProps {
   data: GrossMarginPoint[];
@@ -23,9 +24,9 @@ export const GrossProfitMarginChart = memo(function GrossProfitMarginChart({
     <ChartCard title={t('grossProfitMargin')}>
       <LineChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
-        <XAxis dataKey="month" {...CHART_AXIS} />
+        <XAxis dataKey="month" tickFormatter={monthLabel} {...CHART_AXIS} />
         <YAxis {...CHART_AXIS} tickFormatter={(v) => `${v}%`} />
-        <Tooltip
+        <Tooltip labelFormatter={monthLabel}
           formatter={(value: number) => `${value.toFixed(1)}%`}
           contentStyle={CHART_TOOLTIP_STYLE}
         />

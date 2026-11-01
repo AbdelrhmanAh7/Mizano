@@ -5,8 +5,57 @@ import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { Check, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const DropdownMenu = DropdownMenuPrimitive.Root;
-const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
+/** Opens or closes the menu from its trigger (see DropdownMenuTrigger). */
+const ToggleContext = React.createContext<(() => void) | null>(null);
+
+/**
+ * Radix opens a menu on pointer down and on Enter/Space, never on a plain click event. Screen
+ * readers and some automation activate a button with exactly that (a click with no pointer and
+ * no key), so the menu did not open for them (TestSprite: the language selector). The open state
+ * is kept here so the trigger can toggle it on such a click; controlled use still works.
+ */
+function DropdownMenu({
+  open: openProp,
+  defaultOpen,
+  onOpenChange,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Root>): React.JSX.Element {
+  const [openState, setOpenState] = React.useState(defaultOpen ?? false);
+  const open = openProp ?? openState;
+  const setOpen = React.useCallback(
+    (next: boolean) => {
+      if (openProp === undefined) setOpenState(next);
+      onOpenChange?.(next);
+    },
+    [openProp, onOpenChange],
+  );
+  const toggle = React.useCallback(() => setOpen(!open), [open, setOpen]);
+  return (
+    <ToggleContext.Provider value={toggle}>
+      <DropdownMenuPrimitive.Root open={open} onOpenChange={setOpen} {...props} />
+    </ToggleContext.Provider>
+  );
+}
+
+const DropdownMenuTrigger = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Trigger>
+>(({ onClick, ...props }, ref) => {
+  const toggle = React.useContext(ToggleContext);
+  return (
+    <DropdownMenuPrimitive.Trigger
+      ref={ref}
+      onClick={(event) => {
+        onClick?.(event);
+        // detail 0: not from a pointer (Radix handled pointer down) and not from Enter/Space
+        // (Radix prevents that click), so it is an assistive-technology or scripted activation.
+        if (!event.defaultPrevented && event.detail === 0) toggle?.();
+      }}
+      {...props}
+    />
+  );
+});
+DropdownMenuTrigger.displayName = DropdownMenuPrimitive.Trigger.displayName;
 const DropdownMenuGroup = DropdownMenuPrimitive.Group;
 const DropdownMenuPortal = DropdownMenuPrimitive.Portal;
 const DropdownMenuSub = DropdownMenuPrimitive.Sub;

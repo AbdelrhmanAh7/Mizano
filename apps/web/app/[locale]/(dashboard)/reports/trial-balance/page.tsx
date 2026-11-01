@@ -24,6 +24,7 @@ import {
 } from '@/components/reports/report-page';
 import { useTrialBalanceReport, TrialBalanceAccount } from '@/lib/hooks/use-reports';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
+import { TrialBalanceEmpty } from '@/components/reports/trial-balance-empty';
 
 export default function TrialBalanceReportPage() {
   // Report figures are ledger amounts, in the organization base currency (audit B5).
@@ -70,8 +71,8 @@ export default function TrialBalanceReportPage() {
 
       {!hasData ? (
         <Card>
-          <CardContent className="pt-6 text-center text-muted-foreground">
-            {t('trialBalance.noData')}
+          <CardContent className="pt-6">
+            <TrialBalanceEmpty />
           </CardContent>
         </Card>
       ) : (

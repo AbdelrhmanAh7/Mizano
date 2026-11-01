@@ -414,7 +414,6 @@
     "balanced": "Balanced",
     "outOfBalance": "Out of Balance: {debit} / {credit}",
     "asOfTitle": "Trial Balance as of {date}",
-    "empty": "No trial balance data available. Create and post journal entries to see data here.",
     "accountCode": "Account Code",
     "accountName": "Account Name",
     "type": "Type"

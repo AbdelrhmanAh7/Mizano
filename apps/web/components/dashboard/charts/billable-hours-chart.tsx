@@ -9,6 +9,7 @@ import {
   CHART_AXIS,
   CHART_TOOLTIP_STYLE,
 } from '@/components/dashboard/charts/chart-card';
+import { monthLabel } from '@/lib/month-label';
 
 interface BillableHoursChartProps {
   data: BillableHoursPoint[];
@@ -33,9 +34,9 @@ export const BillableHoursChart = memo(function BillableHoursChart({
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
-        <XAxis dataKey="month" {...CHART_AXIS} />
+        <XAxis dataKey="month" tickFormatter={monthLabel} {...CHART_AXIS} />
         <YAxis {...CHART_AXIS} />
-        <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
+        <Tooltip labelFormatter={monthLabel} contentStyle={CHART_TOOLTIP_STYLE} />
         <Legend wrapperStyle={{ paddingTop: '10px' }} iconType="circle" />
         <Area
           type="monotone"
