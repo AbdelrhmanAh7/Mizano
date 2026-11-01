@@ -90,6 +90,7 @@ export class AiSettingsController {
     trial?: { model: string; price: StoredPrice },
   ) {
     const started = Date.now();
+    const tested = await this.settings.snapshot(orgId);
     try {
       const result = await this.gateway.run({
         organizationId: orgId,
@@ -101,7 +102,7 @@ export class AiSettingsController {
         maxOutputTokens: 200,
         schema: PING_SCHEMA,
       });
-      if (!trial) await this.settings.markVerified(orgId, true);
+      if (!trial) await this.settings.markVerified(orgId, true, tested);
       return {
         ok: true,
         provider: result.provider,
@@ -113,7 +114,7 @@ export class AiSettingsController {
         error instanceof AiError &&
         (error.code === 'AI_SETTINGS_CHANGED' || error.code === 'AI_NOT_ENABLED');
       // A refused trial of another model says nothing about the saved one.
-      if (!unrelated && !trial) await this.settings.markVerified(orgId, false);
+      if (!unrelated && !trial) await this.settings.markVerified(orgId, false, tested);
       throw error;
     }
   }
@@ -145,6 +146,8 @@ export class AiSettingsController {
    * screen translates) with the next recommended models to try; nothing is saved.
    */
   private async tryModel(orgId: string, userId: string, model: string) {
+    const tested = await this.settings.snapshot(orgId);
+    if (!tested) throw new AiError('AI_NOT_ENABLED', 'AI is not connected');
     const { price, next } = await this.settings.planModelChange(orgId, model);
     try {
       await this.runTest(orgId, userId, { model, price });
@@ -156,7 +159,7 @@ export class AiSettingsController {
     }
     return {
       ok: true as const,
-      settings: await this.settings.saveTestedModel(orgId, model, price),
+      settings: await this.settings.saveTestedModel(orgId, model, price, tested),
     };
   }
 

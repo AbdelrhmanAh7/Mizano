@@ -270,7 +270,7 @@
       "verified": "Verified",
       "notVerified": "Not verified",
       "lastErrorTitle": "The last AI call failed",
-      "lastErrorAt": "{date}. Documents are read without AI until a test passes."
+      "lastErrorAt": "{date}. Until a test passes, documents may be read without AI."
     },
     "consent": {
       "title": "Permission to send data",

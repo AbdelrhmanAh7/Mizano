@@ -61,6 +61,19 @@ type ConnectionFields = Pick<
   'provider' | 'model' | 'keyCiphertext' | 'consentProvider' | 'consentAt'
 >;
 
+/** Provider, model and sealed key at the moment a test began. */
+export interface ConnectionSnapshot {
+  provider: string;
+  model: string | null;
+  keyCiphertext: string | null;
+}
+
+function snapshotWhere(snapshot?: ConnectionSnapshot | null): Partial<ConnectionSnapshot> {
+  return snapshot
+    ? { provider: snapshot.provider, model: snapshot.model, keyCiphertext: snapshot.keyCiphertext }
+    : {};
+}
+
 /**
  * Identifies the provider, model, key and consent a connection was opened with. A new key has a
  * new ciphertext (random IV), so rotating, revoking or switching provider changes it.
@@ -288,11 +301,21 @@ export class AiSettingsService {
    * Records the outcome of a connection test: a passing test marks the connection verified, a
    * failing one clears it, so a refused connection never shows as verified.
    */
-  async markVerified(organizationId: string, ok: boolean): Promise<void> {
+  async markVerified(
+    organizationId: string,
+    ok: boolean,
+    snapshot?: ConnectionSnapshot | null,
+  ): Promise<void> {
     await this.prisma.aiSettings.updateMany({
-      where: { organizationId },
+      where: { organizationId, ...snapshotWhere(snapshot) },
       data: { verifiedAt: ok ? new Date() : null },
     });
+  }
+
+  /** The connection a test starts from: results are written only if it is still the same one. */
+  async snapshot(organizationId: string): Promise<ConnectionSnapshot | null> {
+    const s = await this.row(organizationId);
+    return s ? { provider: s.provider, model: s.model, keyCiphertext: s.keyCiphertext } : null;
   }
 
   async view(organizationId: string): Promise<AiSettingsView> {
@@ -482,14 +505,18 @@ export class AiSettingsService {
     return { price: chosen.pricePerMtok ?? null, next };
   }
 
-  /** Saves a model that passed a test call, and marks the connection verified. */
+  /**
+   * Saves a model that passed a test call, and marks the connection verified. Only if the
+   * connection is still the one that was tested: a reconnect or revoke in between wins.
+   */
   async saveTestedModel(
     organizationId: string,
     model: string,
     price: StoredPrice,
+    tested: ConnectionSnapshot,
   ): Promise<AiSettingsView> {
-    await this.prisma.aiSettings.updateMany({
-      where: { organizationId },
+    const { count } = await this.prisma.aiSettings.updateMany({
+      where: { organizationId, ...snapshotWhere(tested) },
       data: {
         model,
         priceInPerMtok: price ? String(price[0]) : null,
@@ -497,6 +524,8 @@ export class AiSettingsService {
         verifiedAt: new Date(),
       },
     });
+    if (count === 0)
+      throw new AiError('AI_SETTINGS_CHANGED', 'The AI settings changed; nothing was saved');
     return this.view(organizationId);
   }
 
