@@ -16,6 +16,9 @@ export interface TrialBalanceAccountRow {
   id: string;
   code: string;
   name: string;
+  /** Both languages of a seeded account; LocalizeNamesInterceptor answers in the asked one. */
+  nameAr: string | null;
+  nameEn: string | null;
   type: string;
   /** Exact Decimal; serialized as a plain decimal string (JSON). */
   debit: Decimal;
@@ -41,7 +44,14 @@ export interface GeneralLedgerEntry {
 }
 
 export interface GeneralLedgerResult {
-  account: { id: string; code: string; name: string; type: string };
+  account: {
+    id: string;
+    code: string;
+    name: string;
+    nameAr: string | null;
+    nameEn: string | null;
+    type: string;
+  };
   openingBalance: string;
   entries: GeneralLedgerEntry[];
   closingBalance: string;
@@ -64,7 +74,7 @@ export class AccountingReportsService {
       this.prisma.account.findMany({
         where: { organizationId, deletedAt: null },
         orderBy: { code: 'asc' },
-        select: { id: true, code: true, name: true, type: true },
+        select: { id: true, code: true, name: true, nameAr: true, nameEn: true, type: true },
       }),
       sumPostedLinesByAccount(this.prisma, organizationId, asOf ? { lte: asOf } : undefined),
     ]);
@@ -90,6 +100,8 @@ export class AccountingReportsService {
         id: account.id,
         code: account.code,
         name: account.name,
+        nameAr: account.nameAr,
+        nameEn: account.nameEn,
         type: account.type,
         debit,
         credit,
@@ -165,7 +177,14 @@ export class AccountingReportsService {
     });
 
     return {
-      account: { id: account.id, code: account.code, name: account.name, type: account.type },
+      account: {
+        id: account.id,
+        code: account.code,
+        name: account.name,
+        nameAr: account.nameAr,
+        nameEn: account.nameEn,
+        type: account.type,
+      },
       openingBalance: money(openingBalance),
       entries,
       closingBalance: money(runningBalance),
