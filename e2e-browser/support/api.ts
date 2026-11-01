@@ -27,7 +27,6 @@ export type Line = {
   taxRate?: string;
   discount?: string;
 };
-export const call2 = call;
 export async function createInvoice(
   a: Account,
   customerId: string,
