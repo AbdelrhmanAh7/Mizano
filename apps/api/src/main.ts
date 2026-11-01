@@ -1,3 +1,4 @@
+import { BRAND } from '@mizano/shared-types';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe, Logger, RequestMethod } from '@nestjs/common';
@@ -97,7 +98,7 @@ async function bootstrap() {
   // Swagger/OpenAPI docs at /api/docs (disabled in production for security)
   if (!isProduction) {
     const config = new DocumentBuilder()
-      .setTitle('Mizano ERP API')
+      .setTitle(`${BRAND.name.en} API`)
       .setDescription('AI-powered ERP system API documentation')
       .setVersion('1.0')
       .addBearerAuth()
@@ -112,7 +113,7 @@ async function bootstrap() {
   const port = configService.get('API_PORT') || configService.get('PORT', 6001);
   await app.listen(port);
 
-  logger.log(`Mizano ERP API running on: http://localhost:${port}`);
+  logger.log(`${BRAND.name.en} API running on: http://localhost:${port}`);
   if (!isProduction) {
     logger.log(`API Documentation: http://localhost:${port}/api/docs`);
   }

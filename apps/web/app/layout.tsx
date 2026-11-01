@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, Noto_Sans_Arabic } from 'next/font/google';
 import { getLocale } from 'next-intl/server';
+import { BRAND } from '@mizano/shared-types';
 import { defaultLocale, localeDirections, locales, type Locale } from '@/i18n/config';
 import './globals.css';
 
@@ -18,12 +19,12 @@ const notoArabic = Noto_Sans_Arabic({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Mizano - AI-Powered ERP',
-    template: '%s | Mizano',
+    default: BRAND.tagline.en,
+    template: `%s | ${BRAND.name.en}`,
   },
   description:
     'Autonomous Accounting Platform - Zero-touch accounting powered by AI. Invoicing, bills, banking, HR, inventory, and more.',
-  applicationName: 'Mizano',
+  applicationName: BRAND.name.en,
   keywords: [
     'ERP',
     'accounting',
@@ -33,18 +34,18 @@ export const metadata: Metadata = {
     'small business',
     'financial management',
   ],
-  authors: [{ name: 'Mizano' }],
+  authors: [{ name: BRAND.name.en }],
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://mizano.app'),
   openGraph: {
     type: 'website',
-    siteName: 'Mizano',
-    title: 'Mizano - AI-Powered ERP',
+    siteName: BRAND.name.en,
+    title: BRAND.tagline.en,
     description: 'Autonomous Accounting Platform - Zero-touch accounting powered by AI.',
     locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Mizano - AI-Powered ERP',
+    title: BRAND.tagline.en,
     description: 'Autonomous Accounting Platform - Zero-touch accounting powered by AI.',
   },
   manifest: '/manifest.json',

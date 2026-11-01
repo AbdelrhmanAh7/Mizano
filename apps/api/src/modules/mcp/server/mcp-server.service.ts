@@ -1,3 +1,4 @@
+import { BRAND } from '@mizano/shared-types';
 import {
   BadRequestException,
   ConflictException,
@@ -27,9 +28,9 @@ import { MCP_TEXT, say } from './mcp-text';
 import { Args, McpToolsService, ToolInputError, ToolNotFoundError } from './mcp-tools.service';
 
 const INSTRUCTIONS =
-  'Mizano is the accounting system of this business. Use the find_* tools to get ids before ' +
+  `${BRAND.name.en} is the accounting system of this business. Use the find_* tools to get ids before ` +
   'preparing drafts. Amounts are decimal strings in the organization currency. Draft tools only ' +
-  'save drafts: a person reviews and posts them in Mizano, so share the returned link. Answer ' +
+  `save drafts: a person reviews and posts them in ${BRAND.name.en}, so share the returned link. Answer ` +
   'in the language the user writes in.';
 
 type ToolOutcome = { result: CallToolResult; errorCode: string | null };
@@ -75,7 +76,7 @@ export class McpServerService implements OnModuleDestroy {
   /** Only the tools this connection may use are listed: its access and the person's role. */
   private async build(authInfo: AuthInfo | undefined): Promise<McpServer> {
     const server = new McpServer(
-      { name: 'mizano', title: 'Mizano', version: '1.0.0' },
+      { name: BRAND.slug, title: BRAND.name.en, version: '1.0.0' },
       { instructions: INSTRUCTIONS },
     );
     const principal = authInfo?.extra?.principal as McpPrincipal | undefined;

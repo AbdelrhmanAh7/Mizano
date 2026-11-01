@@ -1,3 +1,4 @@
+import { BRAND } from '@mizano/shared-types';
 import {
   BadRequestException,
   ConflictException,
@@ -286,7 +287,9 @@ export class IntegrationSettingsService {
       this.prisma,
       organizationId,
       TEST_EVENT_TYPE,
-      { message: 'Test event from Mizano. If a FlowLine run started, the connection works.' },
+      {
+        message: `Test event from ${BRAND.name.en}. If a FlowLine run started, the connection works.`,
+      },
       { endpointIds: [id], source: { type: 'user' } },
     );
     await this.dispatcher.processDue();

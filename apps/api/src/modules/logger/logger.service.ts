@@ -1,3 +1,4 @@
+import { BRAND } from '@mizano/shared-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { redactSensitive, redactText, redactUrl, sanitizeStack } from '../../common/utils/redact';
@@ -439,7 +440,7 @@ export class LoggerService {
       })
       .join('\n\n---\n\n');
 
-    const prompt = `Fix ${selectedLogs.length} error(s) in Mizano ERP (NestJS/Next.js 14/TypeScript/Prisma monorepo).
+    const prompt = `Fix ${selectedLogs.length} error(s) in ${BRAND.name.en} (NestJS/Next.js 14/TypeScript/Prisma monorepo).
 
 ${errorDetails}
 

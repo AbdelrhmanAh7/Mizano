@@ -1,3 +1,4 @@
+import { BRAND } from '@mizano/shared-types';
 import {
   Body,
   Controller,
@@ -111,7 +112,9 @@ export class IntegrationApiController {
   @RequireScopes('invoices:write')
   @Permissions('sales.create')
   @InvalidateCache('invoices:*', 'customers:*')
-  @ApiOperation({ summary: 'Create a DRAFT invoice (an accountant sends/posts it in Mizano)' })
+  @ApiOperation({
+    summary: `Create a DRAFT invoice (an accountant sends/posts it in ${BRAND.name.en})`,
+  })
   @ApiHeader({ name: 'Idempotency-Key', required: false })
   async createInvoice(
     @Req() req: AuthedRequest,
