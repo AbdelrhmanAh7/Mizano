@@ -34,16 +34,17 @@ Health: `GET /api/health`, `/api/health/ready`, `/api/health/live`.
 
 ## Commands
 
-| Area      | Command                                                                                              | Notes                                   |
-| --------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| Dev       | `pnpm dev`, `pnpm dev:api`, `pnpm dev:web`                                                           | `dev:local` forces `APP_ENV=local`      |
-| Build     | `pnpm build`, `pnpm build:{dev,sit,prod}`                                                            | sets `APP_ENV` for the build            |
-| Quality   | `pnpm lint`, `pnpm lint:fix`, `pnpm type-check`, `pnpm format:check`                                 | `pnpm format` rewrites files            |
-| Tests     | `pnpm test`, `pnpm test:api`, `pnpm test:web`, `pnpm test:cov`, `pnpm test:e2e`                      | E2E needs a seeded database             |
-| CI gate   | `pnpm ci:full`                                                                                       | lint + type-check + unit tests (no E2E) |
-| Database  | `pnpm db:{generate,push,migrate,seed,reset,studio,check}`                                            | `db:reset` drops data                   |
-| Docker    | `pnpm docker:{up,down,logs,dev,sit,prod,prod:down}`, `pnpm status`                                   |                                         |
-| Utilities | `pnpm env:check`, `pnpm generate:types`, `pnpm generate:validators`, `pnpm clean`, `pnpm clean:full` |                                         |
+| Area      | Command                                                                                              | Notes                                                     |
+| --------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Dev       | `pnpm dev`, `pnpm dev:api`, `pnpm dev:web`                                                           | `dev:local` forces `APP_ENV=local`                        |
+| Build     | `pnpm build`, `pnpm build:{dev,sit,prod}`                                                            | sets `APP_ENV` for the build                              |
+| Quality   | `pnpm lint`, `pnpm lint:fix`, `pnpm type-check`, `pnpm format:check`                                 | `pnpm format` rewrites files                              |
+| Tests     | `pnpm test`, `pnpm test:api`, `pnpm test:web`, `pnpm test:cov`, `pnpm test:e2e`                      | E2E needs a seeded database                               |
+| CI gate   | `pnpm ci:full`                                                                                       | lint + type-check + unit tests (no E2E)                   |
+| Database  | `pnpm db:{generate,push,migrate,seed,reset,studio,check}`                                            | `db:reset` drops data                                     |
+| Browser   | `pnpm e2e:up`, `pnpm e2e`, `pnpm e2e:down`                                                           | Playwright journeys, see [E2E-BROWSER.md](E2E-BROWSER.md) |
+| Docker    | `pnpm docker:{up,down,logs,dev,sit,prod,prod:down}`, `pnpm status`                                   |                                                           |
+| Utilities | `pnpm env:check`, `pnpm generate:types`, `pnpm generate:validators`, `pnpm clean`, `pnpm clean:full` |                                                           |
 
 Agent slash-command recipes for these live in [`.agents/workflows/`](../.agents/workflows/).
 

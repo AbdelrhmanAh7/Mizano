@@ -112,3 +112,7 @@ services/vlm-service/models/
 **/*.pt
 **/*.pth
 .claude/worktrees/
+
+# Browser journeys: reports and traces
+playwright-report/
+test-results/
