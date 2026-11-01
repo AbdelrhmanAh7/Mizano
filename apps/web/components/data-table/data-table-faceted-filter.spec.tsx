@@ -104,6 +104,25 @@ jest.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
 
+// Real English labels from the common catalog, with {name} placeholders filled in.
+jest.mock('next-intl', () => {
+  const catalog: Record<string, unknown> = {
+    common: jest.requireActual('../../messages/en/common.json'),
+  };
+  return {
+    useTranslations:
+      (namespace: string) => (key: string, values?: Record<string, string | number>) => {
+        const scope = namespace
+          .split('.')
+          .reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], catalog);
+        const message = String((scope as Record<string, unknown>)[key] ?? key);
+        return message.replace(/\{(\w+)\}/g, (_match, name: string) =>
+          String(values?.[name] ?? ''),
+        );
+      },
+  };
+});
+
 import { DataTableFacetedFilter } from './data-table-faceted-filter';
 
 const STATUS_OPTIONS = [

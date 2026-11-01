@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useTranslations } from 'next-intl';
 import { ArrowRight } from 'lucide-react';
 import {
   Select,
@@ -34,6 +35,7 @@ export function ColumnMapper({
   mappings,
   onMappingsChange,
 }: ColumnMapperProps): React.JSX.Element {
+  const t = useTranslations('common.import');
   const mappedTargetFields = React.useMemo(() => {
     const mapped = new Set<string>();
     for (const mapping of mappings) {
@@ -94,7 +96,7 @@ export function ColumnMapper({
       {unmappedRequired.length > 0 && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30">
           <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-            Required fields not yet mapped:
+            {t('requiredFieldsUnmapped')}
           </p>
           <div className="mt-1 flex flex-wrap gap-1">
             {unmappedRequired.map((field) => (
@@ -109,9 +111,9 @@ export function ColumnMapper({
       {/* Column mapping rows */}
       <div className="space-y-2">
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          <span>Source Column</span>
+          <span>{t('sourceColumn')}</span>
           <span />
-          <span>Target Field</span>
+          <span>{t('targetField')}</span>
         </div>
 
         {headers.map((header) => {
@@ -142,11 +144,11 @@ export function ColumnMapper({
                 onValueChange={(value) => handleMappingChange(header, value)}
               >
                 <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Select target field" />
+                  <SelectValue placeholder={t('selectTargetField')} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={SKIP_VALUE}>
-                    <span className="text-muted-foreground">-- Skip this column --</span>
+                    <span className="text-muted-foreground">-- {t('skip')} --</span>
                   </SelectItem>
                   {fieldDefinitions.map((field) => {
                     const isMappedElsewhere =
@@ -157,12 +159,14 @@ export function ColumnMapper({
                         <span className="flex items-center gap-1.5">
                           {field.label}
                           {field.required && (
-                            <span className="text-destructive" aria-label="required">
+                            <span className="text-destructive" aria-label={t('requiredMark')}>
                               *
                             </span>
                           )}
                           {isMappedElsewhere && (
-                            <span className="text-xs text-muted-foreground">(mapped)</span>
+                            <span className="text-xs text-muted-foreground">
+                              {t('alreadyMapped')}
+                            </span>
                           )}
                         </span>
                       </SelectItem>

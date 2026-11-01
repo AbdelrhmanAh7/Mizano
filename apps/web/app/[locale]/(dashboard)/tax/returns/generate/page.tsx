@@ -76,7 +76,7 @@ export default function GenerateVATReturnPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild aria-label="Go back">
+        <Button variant="ghost" size="icon" asChild aria-label={tCommon('buttons.back')}>
           <Link href="/tax/returns">
             <ArrowLeft className="h-4 w-4" />
           </Link>
@@ -99,7 +99,7 @@ export default function GenerateVATReturnPage() {
             <div className="flex gap-2">
               {[1, 2, 3, 4].map((q) => (
                 <Button key={q} variant="outline" size="sm" onClick={() => setQuarter(q)}>
-                  Q{q} {currentYear}
+                  {t('generate.quarter', { quarter: q, year: currentYear })}
                 </Button>
               ))}
             </div>

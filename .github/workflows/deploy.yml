@@ -232,7 +232,7 @@ jobs:
               echo "API_PORT=6001"
               echo "CORS_ORIGIN=${PROD_URL}"
               echo "NEXT_PUBLIC_API_URL=http://${DH}:6001/api"
-              echo "NEXT_PUBLIC_APP_NAME=Mizano"
+              echo "NEXT_PUBLIC_APP_NAME=Jarda"
               echo "RATE_LIMIT_TTL=1000"
               echo "RATE_LIMIT_MAX=30"
               echo "RATE_LIMIT_AUTH_MAX=10"

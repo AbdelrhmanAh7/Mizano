@@ -55,7 +55,8 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
     name: BRAND.name.en,
     applicationCategory: 'BusinessApplication',
     operatingSystem: 'Web',
-    description: 'AI-Powered ERP - Autonomous Accounting Platform for zero-touch accounting.',
+    description:
+      'Accounting in Arabic and English for businesses in Egypt, Saudi Arabia and the UAE: invoices, bills, journals and reports. AI is optional.',
     url: BASE_URL,
   };
 

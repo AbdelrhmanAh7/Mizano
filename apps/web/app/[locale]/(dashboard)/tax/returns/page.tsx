@@ -6,6 +6,7 @@ import {
   DataTableSearch,
   SortableHeader,
 } from '@/components/data-table';
+import { DataTableRefreshButton } from '@/components/data-table/data-table-refresh-button';
 import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
 import {
   AlertDialog,
@@ -36,7 +37,6 @@ import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import {
   getVATReturnStatusColor,
-  getVATReturnStatusLabel,
   normalizeVATReturn,
   useDeleteVATReturn,
   useFileVATReturn,
@@ -53,7 +53,6 @@ import {
   Eye,
   FileCheck,
   Plus,
-  RefreshCw,
   Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -254,7 +253,7 @@ function VATReturnsPageContent() {
       ),
       cell: ({ row }) => (
         <span className="text-sm">
-          {format(new Date(row.original.startDate), 'MMM d')} -{' '}
+          {format(new Date(row.original.startDate), 'MMM d', { locale: dateLocale })} -{' '}
           {format(new Date(row.original.endDate), 'PP', { locale: dateLocale })}
         </span>
       ),
@@ -299,7 +298,7 @@ function VATReturnsPageContent() {
       header: t('returns.table.status'),
       cell: ({ row }) => (
         <Badge className={getVATReturnStatusColor(row.original.status)}>
-          {getVATReturnStatusLabel(row.original.status)}
+          {t(`returns.status.${row.original.status}`)}
         </Badge>
       ),
     },
@@ -449,9 +448,7 @@ function VATReturnsPageContent() {
               }
               singleSelect
             />
-            <Button variant="outline" size="icon" onClick={() => refetch()} aria-label="Refresh">
-              <RefreshCw className="h-4 w-4" />
-            </Button>
+            <DataTableRefreshButton onRefresh={() => void refetch()} />
           </div>
         </CardContent>
       </Card>
@@ -513,7 +510,10 @@ function VATReturnsPageContent() {
         action="delete"
         count={bulkSelectedRows.length}
         itemType={t('returns.itemType')}
+        title={t('returns.bulkDelete.title', { count: bulkSelectedRows.length })}
         description={t('returns.bulkDeleteDescription')}
+        confirmLabel={t('returns.bulkDelete.confirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         destructive
         isLoading={bulkDeleteAction.isLoading}
         onConfirm={async () => {
@@ -528,7 +528,10 @@ function VATReturnsPageContent() {
         action="file"
         count={bulkSelectedRows.length}
         itemType={t('returns.itemType')}
+        title={t('returns.bulkFile.title', { count: bulkSelectedRows.length })}
         description={t('returns.bulkFileDescription')}
+        confirmLabel={t('returns.bulkFile.confirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         isLoading={bulkSubmitAction.isLoading}
         onConfirm={async () => {
           await bulkSubmitAction.execute(bulkSelectedRows.map((r) => r.id));

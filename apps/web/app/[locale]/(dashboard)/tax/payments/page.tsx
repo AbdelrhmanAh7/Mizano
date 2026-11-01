@@ -179,7 +179,7 @@ export default function VATPaymentsPage() {
                       </Link>
                     </TableCell>
                     <TableCell className="text-sm">
-                      {format(new Date(pr.vatReturn.startDate), 'MMM d')} -{' '}
+                      {format(new Date(pr.vatReturn.startDate), 'MMM d', { locale: dateLocale })} -{' '}
                       {format(new Date(pr.vatReturn.endDate), 'PP', { locale: dateLocale })}
                     </TableCell>
                     <TableCell className="text-right font-mono font-semibold">

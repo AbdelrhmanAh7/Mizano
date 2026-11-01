@@ -21,7 +21,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   useTaxDashboardStats,
   getVATReturnStatusColor,
-  getVATReturnStatusLabel,
   type VATReturnStatus,
 } from '@/lib/hooks/use-tax';
 import { useDateFnsLocale } from '@/lib/date-locale';
@@ -40,7 +39,7 @@ export default function TaxPage() {
       icon: Percent,
       href: '/tax/rates',
       color: 'bg-blue-500',
-      stats: stats ? `${stats.activeRates} active` : undefined,
+      stats: stats ? t('hub.activeCount', { count: stats.activeRates }) : undefined,
     },
     {
       title: t('returns.title'),
@@ -48,7 +47,7 @@ export default function TaxPage() {
       icon: FileText,
       href: '/tax/returns',
       color: 'bg-green-500',
-      stats: stats ? `${stats.pendingReturns} pending` : undefined,
+      stats: stats ? t('hub.pendingCount', { count: stats.pendingReturns }) : undefined,
     },
     {
       title: t('payments.title'),
@@ -191,7 +190,7 @@ export default function TaxPage() {
               <p className="text-sm text-muted-foreground mb-4">{module.description}</p>
               <Button asChild variant="outline" className="w-full group">
                 <Link href={module.href}>
-                  Open {module.title}
+                  {t('hub.openModule', { title: module.title })}
                   <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </Button>
@@ -255,16 +254,16 @@ export default function TaxPage() {
                             href={`/tax/returns/${ret.id}`}
                             className="font-medium hover:underline text-sm"
                           >
-                            {ret.returnNumber || 'VAT Return'}
+                            {ret.returnNumber || t('returns.vatReturn')}
                           </Link>
                           <p className="text-xs text-muted-foreground">
-                            {format(new Date(ret.startDate), 'MMM d')} -{' '}
+                            {format(new Date(ret.startDate), 'MMM d', { locale: dateLocale })} -{' '}
                             {format(new Date(ret.endDate), 'PP', { locale: dateLocale })}
                           </p>
                         </div>
                         <div className="text-right">
                           <Badge className={getVATReturnStatusColor(ret.status as VATReturnStatus)}>
-                            {getVATReturnStatusLabel(ret.status as VATReturnStatus)}
+                            {t(`returns.status.${ret.status as VATReturnStatus}`)}
                           </Badge>
                           <p
                             className={`text-sm font-mono mt-1 ${netVal > 0 ? 'text-red-600' : 'text-green-600'}`}
@@ -325,10 +324,10 @@ export default function TaxPage() {
                             href={`/tax/returns/${dl.id}`}
                             className="font-medium hover:underline text-sm"
                           >
-                            {dl.returnNumber || 'VAT Return'}
+                            {dl.returnNumber || t('returns.vatReturn')}
                           </Link>
                           <p className="text-xs text-muted-foreground">
-                            {format(new Date(dl.startDate), 'MMM d')} -{' '}
+                            {format(new Date(dl.startDate), 'MMM d', { locale: dateLocale })} -{' '}
                             {format(new Date(dl.endDate), 'PP', { locale: dateLocale })}
                           </p>
                         </div>
