@@ -320,15 +320,19 @@ export class PaymentsReceivedService {
       }
 
       // A reconciled payment frees its bank line: the money on the statement waits to be
-      // reconciled again (#635).
+      // reconciled again (#635). The link is read under the payment's row lock (the order
+      // reconciliation also takes: payment, then bank line), so a concurrent match is never missed.
+      const [locked] = await tx.$queryRaw<
+        Array<{ bankTransactionId: string | null }>
+      >`SELECT "bankTransactionId" FROM "payments_received" WHERE id = ${id} AND "organizationId" = ${organizationId} FOR UPDATE`;
       const { count } = await tx.paymentReceived.updateMany({
         where: { id, organizationId, deletedAt: null },
         data: { deletedAt: new Date(), bankTransactionId: null },
       });
       if (count === 0) throw new NotFoundException('Payment not found');
-      if (payment.bankTransactionId) {
+      if (locked?.bankTransactionId) {
         await tx.bankTransaction.updateMany({
-          where: { id: payment.bankTransactionId, organizationId },
+          where: { id: locked.bankTransactionId, organizationId },
           data: {
             status: ReconciliationStatus.PENDING,
             matchedEntityType: null,

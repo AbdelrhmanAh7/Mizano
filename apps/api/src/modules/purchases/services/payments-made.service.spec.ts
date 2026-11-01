@@ -96,6 +96,7 @@ describe('PaymentsMadeService (posting)', () => {
 
   beforeEach(async () => {
     prisma = createMockPrisma();
+    prisma.$queryRaw.mockResolvedValue([]); // the payment's row lock (void) answers no link by default
     bills = { lockBills: jest.fn(), recalculateBalance: jest.fn() };
     journals = { create: jest.fn().mockResolvedValue({}), reverse: jest.fn() };
     const module: TestingModule = await Test.createTestingModule({
@@ -264,11 +265,9 @@ describe('PaymentsMadeService (posting)', () => {
   });
 
   it('void of a reconciled payment sends its bank line back to be reconciled (#635)', async () => {
-    prisma.paymentMade.findFirst.mockResolvedValue({
-      id: 'p1',
-      bankTransactionId: 't1',
-      allocations: [{ billId: 'b1' }],
-    });
+    // The link is read under the row lock, not from the earlier unlocked read.
+    prisma.paymentMade.findFirst.mockResolvedValue({ id: 'p1', allocations: [{ billId: 'b1' }] });
+    prisma.$queryRaw.mockResolvedValue([{ bankTransactionId: 't1' }]);
     prisma.paymentMade.updateMany.mockResolvedValue({ count: 1 });
     prisma.journal.findFirst.mockResolvedValue({ id: 'j1' });
 

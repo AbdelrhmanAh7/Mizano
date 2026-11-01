@@ -64,6 +64,7 @@ describe('Reconciliation of payments already in the books (#635)', () => {
     prisma.paymentMade.updateMany.mockResolvedValue({ count: 1 });
     prisma.invoice.findMany.mockResolvedValue([]);
     prisma.bill.findMany.mockResolvedValue([]);
+    prisma.$queryRaw.mockResolvedValue([]);
   });
 
   describe('suggestions', () => {
@@ -130,6 +131,14 @@ describe('Reconciliation of payments already in the books (#635)', () => {
         where: { id: 'pr1', organizationId: ORG, deletedAt: null, bankTransactionId: null },
         data: { bankTransactionId: 't1' },
       });
+      // The payment row is locked before the bank line (the order voiding takes too).
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      expect(prisma.$queryRaw.mock.calls[0][0].join('?')).toContain(
+        'FROM "payments_received" WHERE id = ? AND "organizationId" = ? FOR UPDATE',
+      );
+      expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.bankTransaction.updateMany.mock.invocationCallOrder[0],
+      );
       expect(prisma.paymentReceived.findFirst.mock.calls[0][0].where).toEqual({
         id: 'pr1',
         organizationId: ORG,

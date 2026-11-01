@@ -456,6 +456,13 @@ export class ReconciliationService {
       });
       if (!bankAccount) throw new NotFoundException('Bank account not found');
 
+      // Lock order shared with voiding a payment: the payment row first, then the bank line. The
+      // reads below then see the payment as any concurrent void or link left it.
+      if (entityType === 'payment_received') {
+        await tx.$queryRaw`SELECT id FROM "payments_received" WHERE id = ${paymentId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+      } else {
+        await tx.$queryRaw`SELECT id FROM "payments_made" WHERE id = ${paymentId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+      }
       const payment =
         entityType === 'payment_received'
           ? await tx.paymentReceived
