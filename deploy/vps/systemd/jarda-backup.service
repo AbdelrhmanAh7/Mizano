@@ -2,6 +2,8 @@
 Description=Jarda nightly encrypted backup (local, then Cloudflare R2 when enabled)
 Requires=docker.service
 After=docker.service jarda-stack.service
+# A restore that stopped halfway must be finished (or rolled back) by hand first.
+ConditionPathExists=!/etc/jarda/restore-in-progress
 
 [Service]
 Type=oneshot

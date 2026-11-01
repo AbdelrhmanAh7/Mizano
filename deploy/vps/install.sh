@@ -55,6 +55,7 @@ case "$arch" in amd64 | arm64) ;; *) die "unsupported CPU architecture $arch" ;;
 host_re='^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'
 
 env_get() { [ -f "$ENV_FILE" ] && sed -n "s/^$1=//p" "$ENV_FILE" | tail -n 1 || true; }
+domain="${domain,,}"
 if [ -n "$domain" ]; then
   web_host="${web_host:-jarda.$domain}"
   api_host="${api_host:-jarda-api.$domain}"
@@ -62,6 +63,7 @@ fi
 web_host="${web_host:-$(env_get JARDA_WEB_HOST)}"
 api_host="${api_host:-$(env_get JARDA_API_HOST)}"
 email="${email:-$(env_get ACME_EMAIL)}"
+web_host="${web_host,,}" api_host="${api_host,,}"
 [ -n "$web_host" ] && [ -n "$api_host" ] || die "first run needs --domain (or --web-host and --api-host)"
 [[ "$web_host" =~ $host_re ]] && [[ "$api_host" =~ $host_re ]] || die "invalid hostname"
 # Strict: the email is written into the env file that root later loads.
@@ -131,8 +133,17 @@ ufw default deny incoming >/dev/null
 ufw default allow outgoing >/dev/null
 ufw allow 22/tcp >/dev/null
 # Never lock out a server whose SSH listens on another port too.
-ssh_port="$(sshd -T 2>/dev/null | sed -n 's/^port //p' | head -n 1)"
-if [[ "$ssh_port" =~ ^[0-9]+$ ]] && [ "$ssh_port" != 22 ]; then ufw allow "$ssh_port/tcp" >/dev/null; fi
+# Covers every sshd_config port, ssh.socket listeners and the port of this session.
+ssh_ports="$(
+  {
+    sshd -T 2>/dev/null | sed -n 's/^port //p' || true
+    systemctl show ssh.socket -p Listen --value 2>/dev/null | grep -oE '[0-9]+ \(Stream\)' | cut -d' ' -f1 || true
+    echo "${SSH_CONNECTION:-}" | awk '{print $4}' || true
+  } | sort -u
+)"
+for p in $ssh_ports; do
+  if [[ "$p" =~ ^[0-9]+$ ]] && [ "$p" != 22 ]; then ufw allow "$p/tcp" >/dev/null; fi
+done
 ufw allow 80/tcp >/dev/null
 ufw allow 443/tcp >/dev/null
 ufw allow 443/udp >/dev/null
