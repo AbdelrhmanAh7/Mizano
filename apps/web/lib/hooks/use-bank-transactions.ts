@@ -1,6 +1,6 @@
 'use client';
 
-import { bankTransactionsApi } from '@/lib/api';
+import { bankTransactionsApi, reconciliationApi } from '@/lib/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
@@ -85,14 +85,53 @@ export function useUnmatchedTransactions(bankAccountId: string) {
   });
 }
 
-export function useSuggestedMatches(transactionId: string) {
+/** One line of `GET /reconciliation/suggestions/:bankAccountId`: a pending bank line and its candidates. */
+interface SuggestionRow {
+  transaction: { id: string };
+  matches: Array<{ type: 'invoice' | 'bill'; entity: Record<string, unknown>; confidence: number }>;
+}
+
+const asText = (value: unknown): string => (typeof value === 'string' ? value : '');
+const nameOf = (party: unknown): string =>
+  party && typeof party === 'object' ? asText((party as { name?: unknown }).name) : '';
+
+/** Turns the server's candidate (an invoice or bill with its customer or vendor) into a row of the list. */
+function toSuggestedMatch(match: SuggestionRow['matches'][number]): SuggestedMatch {
+  const { entity } = match;
+  const isInvoice = match.type === 'invoice';
+  return {
+    id: asText(entity.id),
+    type: isInvoice ? 'INVOICE' : 'BILL',
+    number: asText(isInvoice ? entity.invoiceNumber : entity.billNumber),
+    date: asText(entity.date),
+    amount: asText(entity.total) || '0',
+    balanceDue: asText(entity.balanceDue) || '0',
+    counterpartyName: nameOf(isInvoice ? entity.customer : entity.vendor),
+    confidence: match.confidence,
+  };
+}
+
+/** Candidates for one pending bank line, read from its account's suggestions (one request per account). */
+export function pickSuggestedMatches(
+  rows: SuggestionRow[],
+  transactionId: string,
+): SuggestedMatch[] {
+  const row = rows.find((r) => r.transaction.id === transactionId);
+  return (row?.matches ?? []).map(toSuggestedMatch);
+}
+
+export function useSuggestedMatches(bankAccountId: string, transactionId: string) {
   return useQuery({
-    queryKey: ['bank-transactions', transactionId, 'suggested-matches'],
+    queryKey: ['bank-transactions', 'suggestions', bankAccountId],
     queryFn: async () => {
-      const response = await bankTransactionsApi.getSuggestedMatches(transactionId);
-      return response.data;
+      const response = await reconciliationApi.getSuggestions(bankAccountId);
+      const body: unknown = response.data;
+      return (
+        Array.isArray(body) ? body : ((body as { data?: unknown })?.data ?? [])
+      ) as SuggestionRow[];
     },
-    enabled: !!transactionId,
+    select: (rows) => pickSuggestedMatches(rows, transactionId),
+    enabled: !!bankAccountId && !!transactionId,
   });
 }
 
@@ -109,32 +148,22 @@ export function useMatchTransaction() {
     }: {
       id: string;
       documentId: string;
-      documentType: string;
-    }) => bankTransactionsApi.match(id, { documentId, documentType }),
+      documentType: SuggestedMatch['type'];
+    }) =>
+      reconciliationApi.confirm({
+        transactionId: id,
+        entityType: documentType === 'INVOICE' ? 'invoice' : 'bill',
+        entityId: documentId,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['bills'] });
       toast.success(t('transactionMatched'));
     },
     onError: (error: unknown) => {
       toast.error(getLocalizedApiErrorMessage(error, t('matchError'), tApiErrors));
-    },
-  });
-}
-
-export function useExcludeTransaction() {
-  const queryClient = useQueryClient();
-  const t = useTranslations('banking.toast');
-  const tApiErrors = useTranslations('common.apiErrors');
-
-  return useMutation({
-    mutationFn: bankTransactionsApi.exclude,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
-      toast.success(t('transactionExcluded'));
-    },
-    onError: (error: unknown) => {
-      toast.error(getLocalizedApiErrorMessage(error, t('excludeError'), tApiErrors));
     },
   });
 }

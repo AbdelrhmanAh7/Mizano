@@ -255,7 +255,6 @@
     "matchPercent": "{value}% match",
     "balanceDue": "Balance due: {amount}",
     "createExpense": "Create Expense",
-    "excludeTransaction": "Exclude Transaction",
     "accountNotFound": "Bank account not found",
     "backToReconciliation": "Back to Reconciliation",
     "form": {
@@ -321,8 +320,6 @@
     "ruleDeleteError": "Failed to delete bank rule",
     "transactionMatched": "Transaction matched successfully",
     "matchError": "Failed to match transaction",
-    "transactionExcluded": "Transaction excluded",
-    "excludeError": "Failed to exclude transaction",
     "transactionsImported": "Transactions imported successfully",
     "importError": "Failed to import transactions"
   },

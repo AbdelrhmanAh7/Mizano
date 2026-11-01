@@ -22,6 +22,7 @@ import {
   EmailSettingsDto,
   LocalizationSettingsDto,
   BrandingSettingsDto,
+  SetLockDateDto,
 } from './dto/organization-settings.dto';
 import {
   CompanyInfoStepDto,
@@ -69,8 +70,8 @@ export class OrganizationsController {
   @Patch('lock-date')
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'Set transaction lock date' })
-  setLockDate(@CurrentOrg() orgId: string, @Body('lockDate') lockDate: Date) {
-    return this.organizationsService.setLockDate(orgId, lockDate);
+  setLockDate(@CurrentOrg() orgId: string, @Body() dto: SetLockDateDto) {
+    return this.organizationsService.setLockDate(orgId, dto.lockDate);
   }
 
   // ============================================
