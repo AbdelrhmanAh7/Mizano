@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { payrollApi } from '@/lib/api';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import {
-  formatCurrency,
   getPayrollStatusColor,
   getPayrollStatusLabel,
   type PayrollStatus,
@@ -23,8 +22,10 @@ import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function PayrollPageContent() {
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const t = useTranslations('hr');
   const tCommon = useTranslations('common');

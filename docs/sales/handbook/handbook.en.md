@@ -9,6 +9,7 @@ Mizano keeps the books of a small business in Arabic and English: what you sell,
 pay, and the reports that show where you stand. It is built for an owner and an accountant working together.
 
 Three rules you can rely on:
+
 1. **A person approves what is posted.** A scanned bill becomes a draft; it reaches the books only when someone approves it.
 2. **History is never rewritten.** A posted entry is never edited: a mistake is corrected through its document (void or
    correct it) or by a linked reversal, so you can always see what happened.
@@ -55,8 +56,8 @@ in **Settings**, and we do it with you in the first week.
    example EGP) and enter your **Tax Registration Number**. **Do this first:** a new organization starts in US dollars, and the
    base currency cannot change once something is posted.
 2. **Settings → Financial Settings:** choose the **Fiscal Year Start Month** and the **Default Payment Terms (days)**.
-3. **Settings → Localization:** choose the date and number format, the timezone, and the **Digits in Arabic PDFs** (Western
-   0123 or Arabic-Indic ٠١٢٣).
+3. **Settings → Localization:** choose the date and number format, the timezone, and the **Digits in Arabic** (Western 0123 or
+   Arabic-Indic ٠١٢٣), used for amounts on Arabic screens and in Arabic PDFs.
 4. **Accounting → Chart of Accounts:** press **Seed Accounts** and choose **Services Industry**, **Retail Industry** or
    **Construction Industry**. Add or rename accounts as you need.
 5. **Tax → Tax Rates:** check the rates you charge and pay.
@@ -78,14 +79,17 @@ in **Settings**, and we do it with you in the first week.
 **Who:** the owner, the accountant or a sales user (depending on the role).
 
 ### 4.1 Customers
+
 **Sales → Customers → New Customer.** Name, contact details and tax number. Names stay as you type them.
 
 ### 4.2 Quotes
+
 1. **Sales → Quotes → New Quote**: choose the customer, add the lines (description, quantity, rate, tax), save.
 2. **Send Quote** (or **Mark as Sent** if you sent it yourself), and **Accept** when the customer agrees.
 3. **Convert to Invoice**: the invoice is created from the quote with the same lines and totals.
 
 ### 4.3 Invoices
+
 1. **Sales → Invoices → New Invoice** (or from a quote, above). It is a draft until you send it.
 2. Press **Send Invoice**: the invoice is posted to the books (sales, tax, receivables).
 3. **Export PDF** or **Print** gives the invoice in Arabic or English.
@@ -93,11 +97,13 @@ in **Settings**, and we do it with you in the first week.
    your authorized issuer and press **Save reference**. This is only for matching your records.
 
 ### 4.4 Payments received
+
 1. On the invoice press **Record Payment**, enter the amount received (all or part) and the bank or cash account.
 2. A partial payment leaves the rest open; it shows in **Reports → AR Aging**.
 3. **Sales → Payments** lists every payment received. Voiding a payment reopens what it paid and posts a linked reversal.
 
 ### 4.5 Credit notes
+
 **Sales → Credit Notes → New Credit Note** for a return or a discount after the invoice. To set it against an invoice, choose **Apply to Invoice** and pick the invoice
 while you create the credit note; it cannot be applied later.
 
@@ -218,6 +224,7 @@ again afterwards.
 Mizano works fully without AI. There are two separate ways to use your own.
 
 ### 10.1 Your AI app, with no key (Claude, ChatGPT, Codex, Gemini)
+
 1. **Settings → AI → Connect your AI app:** copy the **Mizano address for your AI app**.
 2. Follow the steps for your app on the same page. For example in Claude: Settings → Connectors → Add custom connector, paste
    the address, Connect. In ChatGPT this needs a paid plan and Developer mode.
@@ -228,6 +235,7 @@ Your AI app never posts, sends, pays or deletes anything. Drafts it prepares wai
 connecting an AI app is not turned on for this server, ask us: it is switched on per server.
 
 ### 10.2 Your AI account for features inside Mizano (with a key)
+
 1. **Settings → AI → Use an API key for features inside Mizano:** choose the **Provider** (Claude, OpenAI, Google Gemini,
    OpenRouter), paste the **API key**, press **Check and connect**. The key is checked, stored encrypted and never shown again.
 2. **Permission to send data:** read what is sent, tick **I agree to send this data to {provider}**, press **Agree**.

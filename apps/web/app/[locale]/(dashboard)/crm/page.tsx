@@ -20,7 +20,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   useLeads,
   useDeals,
-  formatCurrency,
   calculateWeightedValue,
   getLeadSourceLabel,
   getDealStageLabel,
@@ -30,8 +29,10 @@ import {
   type LeadSource,
   type DealStage,
 } from '@/lib/hooks/use-crm';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function CRMPage() {
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('crm');
 
   const { data: leadsData, isLoading: leadsLoading } = useLeads({ limit: 200 });

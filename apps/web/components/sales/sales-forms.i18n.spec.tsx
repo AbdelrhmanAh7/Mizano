@@ -53,6 +53,7 @@ jest.mock('@/components/shared/party-combobox', () => {
 jest.mock('@/lib/hooks/use-organization', () => ({
   ...jest.requireActual('@/lib/hooks/use-organization'),
   useBaseCurrency: () => 'EGP',
+  useMoneyFormat: () => ({ data: { baseCurrency: 'EGP', documentDigits: 'latn' } }),
 }));
 jest.mock('@/lib/hooks/use-accounts', () => ({ useAccountsByType: () => ({ data: [] }) }));
 let mockOpenInvoices: unknown[] = [];

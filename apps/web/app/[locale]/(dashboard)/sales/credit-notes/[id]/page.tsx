@@ -17,8 +17,11 @@ import {
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { format } from 'date-fns';
 import { useDateFnsLocale } from '@/lib/date-locale';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 export default function CreditNoteDetailPage() {
+  // Credit notes post in the organization base currency (#83).
+  const formatCurrency = useMoneyFormatter();
   const dateLocale = useDateFnsLocale();
   const { hasPermission } = usePermissions();
   const params = useParams();
@@ -26,14 +29,6 @@ export default function CreditNoteDetailPage() {
   const creditNoteId = params.id as string;
 
   const { data: creditNote, isLoading } = useCreditNote(creditNoteId);
-
-  const formatCurrency = (amount: string | number, currency: string = 'USD') => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(num);
-  };
 
   if (isLoading) {
     return (

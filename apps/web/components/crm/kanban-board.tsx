@@ -7,14 +7,9 @@ import { DollarSign, User, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  useUpdateDealStage,
-  Deal,
-  DealStage,
-  getDealStageLabel,
-  formatCurrency,
-} from '@/lib/hooks/use-crm';
+import { useUpdateDealStage, Deal, DealStage, getDealStageLabel } from '@/lib/hooks/use-crm';
 import { useToast } from '@/components/ui/use-toast';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 const STAGES: DealStage[] = [
   'NEW',
@@ -30,6 +25,7 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ deals }: KanbanBoardProps) {
+  const formatCurrency = useMoneyFormatter();
   const t = useTranslations('crm');
   const tCommon = useTranslations('common');
   const { toast } = useToast();

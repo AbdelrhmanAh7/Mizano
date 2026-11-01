@@ -23,6 +23,7 @@ import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { Activity } from 'lucide-react';
 import { Suspense, useState } from 'react';
+import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function getMovementTypeColor(type: MovementType): string {
   return type === 'IN' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
@@ -54,13 +55,9 @@ function getSourceColor(source: MovementSource): string {
   return colors[source] || 'bg-gray-50 text-gray-700';
 }
 
-function formatCurrency(amount: string | number | null | undefined): string {
-  if (amount === null || amount === undefined) return '$0.00';
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num);
-}
-
 function MovementsPageContent() {
+  // Stock costs are valued in the organization base currency (#83).
+  const formatCurrency = useMoneyFormatter();
   const tableParams = useTableParams({ defaultSortBy: 'createdAt', mode: 'virtual' });
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');

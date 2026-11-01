@@ -3,7 +3,6 @@
 import { useToast } from '@/components/ui/use-toast';
 import { billsApi } from '@/lib/api';
 import { getLocalizedApiErrorMessage } from '@/lib/api-error';
-import { decimalToDisplayNumber } from '@/lib/decimal';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { invalidateLedgerQueries } from '@/lib/hooks/use-journals';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -380,19 +379,4 @@ export function useBillStatusLabel(): (status: BillStatus | string) => string {
     },
     [t],
   );
-}
-
-/**
- * Format currency amount (display only; value stays a decimal string elsewhere)
- */
-export function formatCurrency(
-  amount: string | number,
-  currency: string = 'USD',
-  locale = 'en-US',
-): string {
-  const num = typeof amount === 'string' ? decimalToDisplayNumber(amount) : amount;
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency,
-  }).format(Number.isFinite(num) ? num : 0);
 }

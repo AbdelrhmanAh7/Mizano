@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { OrganizationsService } from './organizations.service';
+import { OrganizationsController } from './organizations.controller';
+import { ANY_PERMISSION_KEY, PERMISSIONS_KEY } from '../../common/decorators/permissions.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
 
 const ORG_ID = 'org-001';
@@ -120,6 +122,54 @@ describe('OrganizationsService', () => {
       mockPrisma.organization.findUnique.mockResolvedValue(null);
 
       await expect(service.findOne('bad-id')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // ── getMoneyFormat ──────────────────────────────────────────────
+
+  describe('getMoneyFormat', () => {
+    it('returns only the base currency and the Arabic digits of this organization', async () => {
+      mockPrisma.organization.findUnique.mockResolvedValue({
+        baseCurrency: 'EGP',
+        documentDigits: 'arab',
+      });
+
+      await expect(service.getMoneyFormat(ORG_ID)).resolves.toEqual({
+        baseCurrency: 'EGP',
+        documentDigits: 'arab',
+      });
+      expect(mockPrisma.organization.findUnique).toHaveBeenCalledWith({
+        where: { id: ORG_ID },
+        select: { baseCurrency: true, documentDigits: true },
+      });
+    });
+
+    it('reads an unknown digit setting as Western digits', async () => {
+      mockPrisma.organization.findUnique.mockResolvedValue({
+        baseCurrency: 'SAR',
+        documentDigits: null,
+      });
+
+      await expect(service.getMoneyFormat(ORG_ID)).resolves.toEqual({
+        baseCurrency: 'SAR',
+        documentDigits: 'latn',
+      });
+    });
+
+    it('needs no settings permission, so every member can display money', () => {
+      const handler = Object.getOwnPropertyDescriptor(
+        OrganizationsController.prototype,
+        'getMoneyFormat',
+      )?.value as object;
+
+      expect(Reflect.getMetadata(PERMISSIONS_KEY, handler)).toBeUndefined();
+      expect(Reflect.getMetadata(ANY_PERMISSION_KEY, handler)).toBeUndefined();
+    });
+
+    it('throws NotFoundException when org not found', async () => {
+      mockPrisma.organization.findUnique.mockResolvedValue(null);
+
+      await expect(service.getMoneyFormat('bad-id')).rejects.toThrow(NotFoundException);
     });
   });
 

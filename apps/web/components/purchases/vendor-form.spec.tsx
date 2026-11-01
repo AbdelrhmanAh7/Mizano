@@ -32,6 +32,7 @@ jest.mock('next-intl', () => {
 jest.mock('@/lib/hooks/use-organization', () => ({
   ...jest.requireActual('@/lib/hooks/use-organization'),
   useBaseCurrency: () => 'EGP',
+  useMoneyFormat: () => ({ data: { baseCurrency: 'EGP', documentDigits: 'latn' } }),
 }));
 
 const selectValue = (optionValue: string): string | undefined =>
