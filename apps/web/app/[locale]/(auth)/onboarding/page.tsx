@@ -69,6 +69,9 @@ export default function OnboardingPage() {
           <div className="flex items-center gap-3">
             <LanguageSwitcher />
             <Button variant="ghost" asChild>
+              <Link href="/demo">{isRtl ? 'احجز عرضًا' : 'Book a demo'}</Link>
+            </Button>
+            <Button variant="ghost" asChild>
               <Link href="/login">{t('hero.login')}</Link>
             </Button>
             <Button asChild>
@@ -96,9 +99,14 @@ export default function OnboardingPage() {
           <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
             {t('hero.subtitle')}
           </p>
-          <div className="mt-10 flex items-center justify-center gap-4">
+          <div className="mt-10 flex items-center justify-center gap-4 flex-wrap">
             <Button size="lg" asChild>
               <Link href="/register">{t('hero.getStarted')}</Link>
+            </Button>
+            <Button size="lg" variant="secondary" asChild>
+              <Link href="/demo">
+                {isRtl ? 'احجز عرضًا مدته 15 دقيقة' : 'Book a 15-minute demo'}
+              </Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
               <Link href="/login">{t('hero.login')}</Link>
@@ -229,9 +237,19 @@ export default function OnboardingPage() {
         <div className="container mx-auto px-4 py-20 text-center">
           <h2 className="text-3xl font-bold">{t('cta.title')}</h2>
           <p className="mt-3 text-blue-100 text-lg">{t('cta.subtitle')}</p>
-          <div className="mt-8 flex items-center justify-center gap-4">
+          <div className="mt-8 flex items-center justify-center gap-4 flex-wrap">
             <Button size="lg" variant="secondary" asChild>
               <Link href="/register">{t('cta.getStarted')}</Link>
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="border-white/30 text-white hover:bg-white/10"
+              asChild
+            >
+              <Link href="/demo">
+                {isRtl ? 'احجز عرضًا مدته 15 دقيقة' : 'Book a 15-minute demo'}
+              </Link>
             </Button>
             <Button
               size="lg"

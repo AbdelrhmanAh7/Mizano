@@ -216,6 +216,20 @@ export const authApi = {
   logoutAll: () => api.post('/auth/logout-all'),
 };
 
+export const demoApi = {
+  submit: (data: {
+    name: string;
+    contact: string;
+    role?: string;
+    businessType?: string;
+    country?: string;
+    preferredTime?: string;
+    message?: string;
+    locale?: string;
+    website?: string;
+  }) => publicApi.post('/demo-requests', data),
+};
+
 // ===========================================================================
 // Sales
 // ===========================================================================

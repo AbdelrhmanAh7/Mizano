@@ -6,9 +6,16 @@ import { routing } from './i18n/routing';
 const intlMiddleware = createMiddleware(routing);
 
 // Define public paths that don't require authentication
-const publicPaths = ['/login', '/register', '/onboarding', '/forgot-password', '/reset-password'];
+const publicPaths = [
+  '/login',
+  '/register',
+  '/onboarding',
+  '/forgot-password',
+  '/reset-password',
+  '/demo',
+];
 // Reachable while signed in too: a reset link opened in a signed-in browser must still work.
-const passwordPaths = ['/forgot-password', '/reset-password'];
+const passwordPaths = ['/forgot-password', '/reset-password', '/demo'];
 
 // Check if path is public (remove locale prefix for checking)
 function isPublicPath(pathname: string): boolean {

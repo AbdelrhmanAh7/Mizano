@@ -3526,3 +3526,22 @@ model McpToolCall {
   @@index([grantId, createdAt])
   @@map("mcp_tool_calls")
 }
+
+/// A demo request from the public /demo page (marketing). No organization.
+model DemoRequest {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  name          String
+  contact       String
+  role          String   @default("owner")
+  businessType  String   @default("")
+  country       String   @default("EG")
+  preferredTime String   @default("")
+  message       String   @default("")
+  locale        String   @default("ar")
+  status        String   @default("NEW")
+
+  @@index([createdAt(sort: Desc)])
+  @@map("demo_requests")
+}
+

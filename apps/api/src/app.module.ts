@@ -45,6 +45,7 @@ import { UserPreferencesModule } from './modules/user-preferences/user-preferenc
 import { UsersModule } from './modules/users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { CommonModule } from './common/common.module';
+import { DemoRequestsModule } from './modules/demo-requests/demo-requests.module';
 import { IpThrottlerGuard } from './throttler-ip.guard';
 
 @Module({
@@ -92,6 +93,7 @@ import { IpThrottlerGuard } from './throttler-ip.guard';
     // Infrastructure
     PrismaModule,
     CommonModule,
+    DemoRequestsModule,
 
     // Auth & Users
     AuthModule,

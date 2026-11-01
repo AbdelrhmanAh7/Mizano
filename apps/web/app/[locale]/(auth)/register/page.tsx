@@ -165,11 +165,18 @@ export default function RegisterPage() {
               {isLoading ? t('creatingAccount') : t('signUp')}
             </Button>
           </form>
-          <div className="mt-4 text-center text-sm">
-            {t('hasAccount')}{' '}
-            <Link href="/login" className="text-primary hover:underline">
-              {t('signIn')}
-            </Link>
+          <div className="mt-4 text-center text-sm space-y-1">
+            <div>
+              {t('hasAccount')}{' '}
+              <Link href="/login" className="text-primary hover:underline">
+                {t('signIn')}
+              </Link>
+            </div>
+            <div>
+              <Link href="/demo" className="text-xs text-primary font-medium hover:underline">
+                {locale === 'ar' ? 'احجز عرضًا مدته 15 دقيقة' : 'Book a 15-minute demo'}
+              </Link>
+            </div>
           </div>
         </CardContent>
       </Card>
