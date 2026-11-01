@@ -106,11 +106,11 @@ export class AuthService {
     };
   }
 
-  async login(loginDto: LoginDto) {
+  async login(loginDto: LoginDto, clientAddress = 'unknown') {
     const { email, password } = loginDto;
     // Reserved before the password check (and before any await), so concurrent guesses cannot all
     // slip past the cap, and a blocked account gives no hint whether a guess was right.
-    if (!this.loginFailures.tryAttempt(email)) {
+    if (!this.loginFailures.tryAttempt(email, clientAddress)) {
       throw new HttpException(
         'Too many failed sign-ins for this account. Try again in 15 minutes.',
         HttpStatus.TOO_MANY_REQUESTS,
@@ -141,7 +141,7 @@ export class AuthService {
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid email or password');
     }
-    this.loginFailures.succeeded(email);
+    this.loginFailures.succeeded(email, clientAddress);
 
     // A new session per sign-in: other devices stay signed in.
     const tokens = await this.sessions.start(user);

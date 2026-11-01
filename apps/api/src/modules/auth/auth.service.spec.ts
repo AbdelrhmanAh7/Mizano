@@ -115,7 +115,7 @@ describe('AuthService.register', () => {
 });
 
 describe('AuthService.login failed-attempt cap (#639)', () => {
-  it('refuses an account after 10 failed sign-ins without reading the database again', async () => {
+  it('refuses an account at one address after 10 failed sign-ins without reading the database again', async () => {
     const { service } = setup();
     const prisma = (service as unknown as { prisma: { user: { findFirst: jest.Mock } } }).prisma;
     for (let i = 0; i < 10; i++) {
@@ -130,10 +130,13 @@ describe('AuthService.login failed-attempt cap (#639)', () => {
       status: 429,
     });
     expect(prisma.user.findFirst).not.toHaveBeenCalled();
-    // Another account is not affected.
+    // Another account is not affected, and neither is the same account from another address.
     await expect(service.login({ email: 'other@nile.test', password: 'x' })).rejects.toMatchObject({
       status: 401,
     });
+    await expect(
+      service.login({ email: 'guess@nile.test', password: 'x' }, '198.51.100.9'),
+    ).rejects.toMatchObject({ status: 401 });
   });
 });
 
