@@ -91,9 +91,13 @@ export class ItemsService {
     const item = await this.prisma.item.findFirst({
       where: { id, organizationId, deletedAt: null },
       include: {
-        salesAccount: { select: { id: true, name: true, code: true } },
-        purchaseAccount: { select: { id: true, name: true, code: true } },
-        inventoryAccount: { select: { id: true, name: true, code: true } },
+        salesAccount: { select: { id: true, name: true, code: true, nameAr: true, nameEn: true } },
+        purchaseAccount: {
+          select: { id: true, name: true, code: true, nameAr: true, nameEn: true },
+        },
+        inventoryAccount: {
+          select: { id: true, name: true, code: true, nameAr: true, nameEn: true },
+        },
       },
     });
     if (!item) throw new NotFoundException('Item not found');

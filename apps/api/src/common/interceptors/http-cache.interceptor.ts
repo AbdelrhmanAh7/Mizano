@@ -41,7 +41,7 @@ export class HttpCacheInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap(() => {
         response.setHeader('Cache-Control', CACHE_PROFILES[profile]);
-        response.setHeader('Vary', 'Authorization');
+        response.setHeader('Vary', 'Authorization, Accept-Language');
       }),
     );
   }

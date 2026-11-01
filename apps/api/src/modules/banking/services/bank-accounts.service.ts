@@ -79,7 +79,11 @@ export class BankAccountsService {
     const [data, total] = await Promise.all([
       this.prisma.bankAccount.findMany({
         where,
-        include: { linkedAccount: { select: { id: true, code: true, name: true } } },
+        include: {
+          linkedAccount: {
+            select: { id: true, code: true, name: true, nameAr: true, nameEn: true },
+          },
+        },
         orderBy: { [sortBy]: sortOrder },
         skip: (page - 1) * limit,
         take: limit,

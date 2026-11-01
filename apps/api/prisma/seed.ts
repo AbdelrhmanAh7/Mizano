@@ -55,6 +55,7 @@ import {
 import * as bcrypt from 'bcrypt';
 import { Decimal } from '@prisma/client/runtime/library';
 import { seedBlockedReason } from './seed-guard';
+import { systemName } from '../src/common/i18n/localize';
 
 const prisma = new PrismaClient();
 const DEFAULT_PASSWORD = 'password123';
@@ -105,7 +106,12 @@ async function main() {
     const r = await prisma.role.upsert({
       where: { name_organizationId: { name, organizationId: orgId } },
       update: {},
-      create: { name, description: name, isDefault: name === 'Admin', organizationId: orgId },
+      create: {
+        ...systemName(name),
+        description: name,
+        isDefault: name === 'Admin',
+        organizationId: orgId,
+      },
     });
     roleMap[name] = r.id;
   }
@@ -222,7 +228,7 @@ async function main() {
     const acc = await prisma.account.upsert({
       where: { code_organizationId: { code: a.code, organizationId: orgId } },
       update: {},
-      create: { ...a, organizationId: orgId },
+      create: { ...a, ...systemName(a.name), organizationId: orgId },
     });
     accountMap[a.code] = acc.id;
   }
@@ -265,7 +271,7 @@ async function main() {
     update: {},
     create: {
       id: 'tax-vat-15',
-      name: 'VAT 15%',
+      ...systemName('VAT 15%'),
       code: 'VAT15',
       rate: d(15),
       type: TaxType.BOTH,
@@ -280,7 +286,7 @@ async function main() {
     update: {},
     create: {
       id: 'tax-vat-5',
-      name: 'VAT 5%',
+      ...systemName('VAT 5%'),
       code: 'VAT5',
       rate: d(5),
       type: TaxType.SALES,

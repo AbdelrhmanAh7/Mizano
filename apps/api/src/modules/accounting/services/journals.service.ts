@@ -63,7 +63,9 @@ const AMOUNT_LIMIT = new Decimal(10).pow(MAX_INTEGER_DIGITS);
 const JOURNAL_INCLUDE = {
   lines: {
     include: {
-      account: { select: { id: true, code: true, name: true, type: true } },
+      account: {
+        select: { id: true, code: true, name: true, nameAr: true, nameEn: true, type: true },
+      },
     },
   },
   // Lets clients see that a journal was already reversed (and link to the reversal).
