@@ -11,7 +11,7 @@ const pipe = new ValidationPipe({
 const run = (body: unknown): Promise<SetLockDateDto> =>
   pipe.transform(body, { type: 'body', metatype: SetLockDateDto }) as Promise<SetLockDateDto>;
 
-describe('PATCH /organization/lock-date body (#626)', () => {
+describe('PATCH /organization/lock-date body (#626, #636)', () => {
   it('accepts the day the browser sends and turns it into a date', async () => {
     const dto = await run({ lockDate: '2026-10-31' });
     expect(dto.lockDate).toBeInstanceOf(Date);
@@ -27,6 +27,10 @@ describe('PATCH /organization/lock-date body (#626)', () => {
     { lockDate: 'not a day' },
     { lockDate: '' },
     { lockDate: '2026-02-31' },
+    { lockDate: '2026-13-01' },
+    { lockDate: '2026-00-01' },
+    { lockDate: '2026-10-00' },
+    { lockDate: '2026-10-32' },
     { lockDate: '2026-10-31T21:00:00Z' },
     { lockDate: '1' },
     { lockDate: 0 },

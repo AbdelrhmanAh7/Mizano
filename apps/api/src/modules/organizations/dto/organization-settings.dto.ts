@@ -23,10 +23,12 @@ export class SetLockDateDto {
     nullable: true,
   })
   @ValidateIf((o: SetLockDateDto) => o.lockDate !== null)
-  // Only a real calendar day counts ("2026-02-31" or a timestamp is left as is and fails IsDate).
+  // Only a real calendar day counts ("2026-02-31", "2026-13-01" or a timestamp is left as is and
+  // fails IsDate). Month 00/13 gives an Invalid Date, so check it before toISOString() throws (#636).
   @Transform(({ value }: { value: unknown }) => {
     if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
     const day = new Date(`${value}T00:00:00.000Z`);
+    if (Number.isNaN(day.getTime())) return value;
     return day.toISOString().slice(0, 10) === value ? day : value;
   })
   @IsDate()
