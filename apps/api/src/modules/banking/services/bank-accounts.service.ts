@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { BankAccountType, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -28,11 +33,7 @@ export class BankAccountsService {
         'Record opening bank balances through Opening Balances (Accounting → Opening Balances)',
       );
     }
-    const linked = await this.prisma.account.findFirst({
-      where: { id: dto.linkedAccountId, organizationId, deletedAt: null },
-      select: { id: true },
-    });
-    if (!linked) throw new BadRequestException('Linked ledger account not found');
+    await this.assertLinkableAccount(organizationId, dto.linkedAccountId);
 
     return this.prisma.bankAccount.create({
       data: {
@@ -127,8 +128,43 @@ export class BankAccountsService {
     });
   }
 
+  /**
+   * A bank record's balance IS its ledger account's balance, so two bank records on one ledger
+   * account would each show the full balance and every total would count it twice (#663).
+   */
+  private async assertLinkableAccount(
+    organizationId: string,
+    linkedAccountId: string,
+    exceptBankAccountId?: string,
+  ): Promise<void> {
+    const [linked, taken] = await Promise.all([
+      this.prisma.account.findFirst({
+        where: { id: linkedAccountId, organizationId, deletedAt: null },
+        select: { id: true },
+      }),
+      this.prisma.bankAccount.findFirst({
+        where: {
+          organizationId,
+          linkedAccountId,
+          deletedAt: null,
+          ...(exceptBankAccountId ? { id: { not: exceptBankAccountId } } : {}),
+        },
+        select: { name: true },
+      }),
+    ]);
+    if (!linked) throw new BadRequestException('Linked ledger account not found');
+    if (taken) {
+      throw new ConflictException(
+        `This ledger account is already linked to the bank account "${taken.name}". Each bank account needs its own ledger account.`,
+      );
+    }
+  }
+
   async update(organizationId: string, id: string, dto: UpdateBankAccountDto) {
-    await this.findOne(organizationId, id);
+    const current = await this.findOne(organizationId, id);
+    if (dto.linkedAccountId !== undefined && dto.linkedAccountId !== current.linkedAccountId) {
+      await this.assertLinkableAccount(organizationId, dto.linkedAccountId, id);
+    }
     return this.prisma.bankAccount.update({ where: { id }, data: dto });
   }
 
@@ -164,7 +200,9 @@ export class BankAccountsService {
     ]);
 
     const accounts = await this.withLedgerBalances(organizationId, activeAccounts);
-    const totalSystemBalance = money(sumDecimals(accounts.map((a) => a.systemBalance)));
+    // One ledger balance per ledger account: bank records that share one count it once (#663).
+    const ledgerBalances = new Map(accounts.map((a) => [a.linkedAccountId, a.systemBalance]));
+    const totalSystemBalance = money(sumDecimals([...ledgerBalances.values()]));
 
     return {
       totalAccounts: accounts.length,

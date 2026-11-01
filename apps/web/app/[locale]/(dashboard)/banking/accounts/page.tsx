@@ -57,9 +57,15 @@ function BankAccountsPageContent() {
     }
   };
 
-  // Calculate totals
-  // Ledger balances (base currency), summed exactly.
-  const totalBalance = sumDecimals(accounts.map((acc) => String(acc.systemBalance ?? 0)));
+  // Ledger balances (base currency), summed exactly. A bank account's balance is its ledger
+  // account's, so bank accounts that share one ledger account count it once (#663).
+  const totalBalance = sumDecimals(
+    Array.from(
+      new Map(
+        accounts.map((acc) => [acc.linkedAccountId || acc.id, String(acc.systemBalance ?? 0)]),
+      ).values(),
+    ),
+  );
 
   const columns: ColumnDef<BankAccount>[] = [
     {
