@@ -81,7 +81,8 @@
       "taxId": "الرقم الضريبي",
       "taxIdPlaceholder": "أدخل الرقم الضريبي",
       "lockDate": "تاريخ الإقفال",
-      "lockDateDescription": "منع التغييرات على المعاملات قبل هذا التاريخ"
+      "lockDateDescription": "منع التغييرات على المعاملات قبل هذا التاريخ",
+      "addressSample": "١٢٣ شارع الأعمال، مكتب ١٠٠\nالقاهرة"
     },
     "taxCurrency": "الضرائب والعملة",
     "taxCurrencyDescription": "إعدادات التسجيل الضريبي والعملة الأساسية",
@@ -104,7 +105,8 @@
       "invalidEmail": "أدخل بريداً إلكترونياً صحيحاً",
       "invalidUrl": "أدخل رابطاً صحيحاً، مثل https://example.com",
       "currencyRequired": "اختر العملة الأساسية"
-    }
+    },
+    "taxIdPlaceholder": "مثال: 300012345600003"
   },
   "localization": {
     "title": "التوطين",
@@ -117,7 +119,13 @@
     "documentDigits": "الأرقام في ملفات PDF العربية",
     "documentDigitsDescription": "تُطبع الفواتير وعروض الأسعار وفواتير الموردين بالعربية بهذه الأرقام. ملفات PDF الإنجليزية تستخدم دائمًا 0123.",
     "digitsLatn": "غربية (0123)",
-    "digitsArab": "عربية هندية (٠١٢٣)"
+    "digitsArab": "عربية هندية (٠١٢٣)",
+    "dateUs": "MM/DD/YYYY (أمريكي)",
+    "dateInternational": "DD/MM/YYYY (دولي)",
+    "dateIso": "YYYY-MM-DD (قياسي)",
+    "numberUs": "1,000.00 (أمريكي/بريطاني)",
+    "numberEuropean": "1.000,00 (أوروبي)",
+    "numberFrench": "1 000,00 (فرنسي/دولي)"
   },
   "branding": {
     "title": "الهوية البصرية",
@@ -603,7 +611,11 @@
     "accountLists": "قوائم الحسابات والشجرة",
     "accountListsDescription": "يتم التخزين المؤقت لمدة 10 دقائق. نادرًا ما يتغير دليل الحسابات، لذا يوفر TTL الأطول تحسينًا كبيرًا في الأداء.",
     "salesPurchases": "قوائم المبيعات والمشتريات",
-    "salesPurchasesDescription": "يتم التخزين المؤقت لمدة دقيقتين. يضمن TTL القصير حداثة البيانات للبيانات المعاملاتية المتغيرة بشكل متكرر."
+    "salesPurchasesDescription": "يتم التخزين المؤقت لمدة دقيقتين. يضمن TTL القصير حداثة البيانات للبيانات المعاملاتية المتغيرة بشكل متكرر.",
+    "noExpiry": "بلا انتهاء",
+    "expired": "منتهي",
+    "deleteKey": "حذف هذا المفتاح",
+    "deleteKeyLabel": "حذف مفتاح الذاكرة المؤقتة"
   },
   "auditLogs": {
     "title": "سجل التدقيق",

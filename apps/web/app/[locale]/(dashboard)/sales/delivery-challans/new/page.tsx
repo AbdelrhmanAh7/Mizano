@@ -36,9 +36,16 @@ interface ChallanLine {
 
 const CHALLAN_TYPES: ChallanType[] = ['SUPPLY', 'JOB_WORK', 'SAMPLE'];
 
+const CHALLAN_TYPE_KEYS: Record<ChallanType, 'supply' | 'jobWork' | 'sample'> = {
+  SUPPLY: 'supply',
+  JOB_WORK: 'jobWork',
+  SAMPLE: 'sample',
+};
+
 export default function NewDeliveryChallanPage() {
   const router = useRouter();
   const t = useTranslations('sales');
+  const tCommon = useTranslations('common');
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
@@ -74,8 +81,8 @@ export default function NewDeliveryChallanPage() {
 
     if (!customerId) {
       toast({
-        title: 'Validation Error',
-        description: 'Please select a customer.',
+        title: t('deliveryChallans.toast.validationError'),
+        description: t('deliveryChallans.toast.customerRequired'),
         variant: 'destructive',
       });
       return;
@@ -84,8 +91,8 @@ export default function NewDeliveryChallanPage() {
     const validLines = lines.filter((l) => l.itemId && Number(l.quantity) > 0);
     if (validLines.length === 0) {
       toast({
-        title: 'Validation Error',
-        description: 'Please add at least one line item.',
+        title: t('deliveryChallans.toast.validationError'),
+        description: t('deliveryChallans.toast.linesRequired'),
         variant: 'destructive',
       });
       return;
@@ -108,14 +115,14 @@ export default function NewDeliveryChallanPage() {
       await createChallan.mutateAsync(dto);
       toast({
         title: t('deliveryChallans.newChallan'),
-        description: 'Delivery challan created successfully.',
+        description: t('deliveryChallans.toast.created'),
       });
       router.push('/sales/delivery-challans');
     } catch (error: unknown) {
       const msg =
         (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-        'Failed to create delivery challan';
-      toast({ title: 'Error', description: msg, variant: 'destructive' });
+        t('deliveryChallans.toast.createError');
+      toast({ title: t('toast.error'), description: msg, variant: 'destructive' });
     }
   };
 
@@ -144,7 +151,7 @@ export default function NewDeliveryChallanPage() {
                 <Label htmlFor="customer">{t('deliveryChallans.customer')}</Label>
                 <Select value={customerId} onValueChange={setCustomerId}>
                   <SelectTrigger id="customer">
-                    <SelectValue placeholder="Select customer" />
+                    <SelectValue placeholder={t('deliveryChallans.selectCustomer')} />
                   </SelectTrigger>
                   <SelectContent>
                     {customers.map((c) => (
@@ -165,7 +172,7 @@ export default function NewDeliveryChallanPage() {
                   <SelectContent>
                     {CHALLAN_TYPES.map((ct) => (
                       <SelectItem key={ct} value={ct}>
-                        {ct.replace('_', ' ')}
+                        {t(`deliveryChallans.types.${CHALLAN_TYPE_KEYS[ct]}`)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -199,20 +206,20 @@ export default function NewDeliveryChallanPage() {
               <CardTitle>{t('deliveryChallans.lineItems')}</CardTitle>
               <Button type="button" variant="outline" size="sm" onClick={addLine}>
                 <Plus className="mr-2 h-4 w-4" />
-                Add Line
+                {t('deliveryChallans.addLine')}
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               {lines.map((line, index) => (
                 <div key={index} className="flex items-end gap-3">
                   <div className="flex-1 space-y-2">
-                    <Label>Item</Label>
+                    <Label>{t('lineItems.item')}</Label>
                     <Select
                       value={line.itemId}
                       onValueChange={(v) => updateLine(index, 'itemId', v)}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select item" />
+                        <SelectValue placeholder={t('deliveryChallans.selectItem')} />
                       </SelectTrigger>
                       <SelectContent>
                         {items.map((item) => (
@@ -224,7 +231,7 @@ export default function NewDeliveryChallanPage() {
                     </Select>
                   </div>
                   <div className="w-24 space-y-2">
-                    <Label>Qty</Label>
+                    <Label>{t('lineItems.quantity')}</Label>
                     <Input
                       type="number"
                       min="1"
@@ -233,11 +240,11 @@ export default function NewDeliveryChallanPage() {
                     />
                   </div>
                   <div className="flex-1 space-y-2">
-                    <Label>Description</Label>
+                    <Label>{t('lineItems.description')}</Label>
                     <Input
                       value={line.description}
                       onChange={(e) => updateLine(index, 'description', e.target.value)}
-                      placeholder="Optional"
+                      placeholder={t('deliveryChallans.optional')}
                     />
                   </div>
                   {lines.length > 1 && (
@@ -260,7 +267,9 @@ export default function NewDeliveryChallanPage() {
               <Link href="/sales/delivery-challans">{t('deliveryChallans.backToChallans')}</Link>
             </Button>
             <Button type="submit" disabled={createChallan.isPending}>
-              {createChallan.isPending ? 'Creating...' : t('deliveryChallans.newChallan')}
+              {createChallan.isPending
+                ? tCommon('loading.creating')
+                : t('deliveryChallans.newChallan')}
             </Button>
           </div>
         </div>

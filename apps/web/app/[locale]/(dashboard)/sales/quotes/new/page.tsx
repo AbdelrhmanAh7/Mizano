@@ -33,7 +33,7 @@ export default function NewQuotePage() {
       router.push(`/sales/quotes/${result.data?.id || ''}`);
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: t('toast.error'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           t('quotes.toast.createError'),

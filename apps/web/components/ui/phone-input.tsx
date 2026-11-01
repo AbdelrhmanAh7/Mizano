@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -43,6 +44,7 @@ export function PhoneInput({
   id,
   disabled,
 }: PhoneInputProps) {
+  const t = useTranslations('common.phoneInput');
   const parsed = useMemo(() => parsePhoneValue(value), [value]);
   const [selectedCountry, setSelectedCountry] = useState(parsed.countryCode || defaultCountry);
   const [phoneNumber, setPhoneNumber] = useState(parsed.number);
@@ -100,7 +102,10 @@ export function PhoneInput({
         />
         {!isValid && phoneNumber && (
           <p className="text-xs text-destructive mt-1">
-            Phone number should be {country.phoneLength.join(' or ')} digits for {country.name}
+            {t('invalidLength', {
+              lengths: country.phoneLength.join(' / '),
+              country: country.name,
+            })}
           </p>
         )}
       </div>

@@ -183,21 +183,21 @@ function CustomersPageContent() {
               <DropdownMenuItem asChild>
                 <Link href={`/sales/customers/${customer.id}`}>
                   <Eye className="me-2 h-4 w-4" />
-                  View
+                  {tCommon('buttons.view')}
                 </Link>
               </DropdownMenuItem>
               {canEdit && (
                 <DropdownMenuItem asChild>
                   <Link href={`/sales/customers/${customer.id}/edit`}>
                     <Edit className="me-2 h-4 w-4" />
-                    Edit
+                    {tCommon('buttons.edit')}
                   </Link>
                 </DropdownMenuItem>
               )}
               {canDelete && (
                 <DropdownMenuItem onClick={() => handleDelete(customer)} className="text-red-600">
                   <Trash2 className="me-2 h-4 w-4" />
-                  Delete
+                  {tCommon('buttons.delete')}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -282,7 +282,7 @@ function CustomersPageContent() {
                 <Button asChild>
                   <Link href="/sales/customers/new">
                     <Plus className="me-2 h-4 w-4" />
-                    Add Your First Customer
+                    {t('customers.empty.action')}
                   </Link>
                 </Button>
               ) : undefined
@@ -324,12 +324,7 @@ function CustomersPageContent() {
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         title={t('customers.deleteCustomer')}
-        description={
-          <>
-            Are you sure you want to delete &quot;{customerToDelete?.name}&quot;? This action cannot
-            be undone.
-          </>
-        }
+        description={t('customers.deleteConfirmName', { name: customerToDelete?.name ?? '' })}
         onConfirm={confirmDelete}
       />
     </div>

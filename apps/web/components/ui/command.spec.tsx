@@ -8,6 +8,11 @@ import { render, screen } from '@testing-library/react';
 import React from 'react';
 
 // Mock cmdk with sub-components
+// The command dialog names itself from the catalog.
+jest.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => key,
+  useLocale: () => 'en',
+}));
 jest.mock('cmdk', () => {
   const forwardRefDiv = (name: string) => {
     const Comp = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
@@ -83,7 +88,7 @@ describe('CommandDialog', () => {
     );
 
     // The sr-only DialogTitle should be present in the document
-    const title = screen.getByText('Command');
+    const title = screen.getByText('title');
     expect(title).toBeInTheDocument();
     expect(title.className).toContain('sr-only');
   });
@@ -95,7 +100,7 @@ describe('CommandDialog', () => {
       </CommandDialog>,
     );
 
-    const description = screen.getByText('Search and execute commands');
+    const description = screen.getByText('description');
     expect(description).toBeInTheDocument();
     expect(description.className).toContain('sr-only');
   });

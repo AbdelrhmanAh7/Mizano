@@ -24,16 +24,16 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 
 const DATE_FORMATS = [
-  { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY (US)' },
-  { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY (International)' },
-  { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD (ISO)' },
-];
+  { value: 'MM/DD/YYYY', labelKey: 'localization.dateUs' },
+  { value: 'DD/MM/YYYY', labelKey: 'localization.dateInternational' },
+  { value: 'YYYY-MM-DD', labelKey: 'localization.dateIso' },
+] as const;
 
 const NUMBER_FORMATS = [
-  { value: '1,000.00', label: '1,000.00 (US/UK)' },
-  { value: '1.000,00', label: '1.000,00 (European)' },
-  { value: '1 000,00', label: '1 000,00 (French/International)' },
-];
+  { value: '1,000.00', labelKey: 'localization.numberUs' },
+  { value: '1.000,00', labelKey: 'localization.numberEuropean' },
+  { value: '1 000,00', labelKey: 'localization.numberFrench' },
+] as const;
 
 const TIMEZONES = [
   'UTC',
@@ -157,7 +157,7 @@ export default function LocalizationSettingsPage() {
                   <SelectContent>
                     {DATE_FORMATS.map((f) => (
                       <SelectItem key={f.value} value={f.value}>
-                        {f.label}
+                        {t(f.labelKey)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -176,7 +176,7 @@ export default function LocalizationSettingsPage() {
                   <SelectContent>
                     {NUMBER_FORMATS.map((f) => (
                       <SelectItem key={f.value} value={f.value}>
-                        {f.label}
+                        {t(f.labelKey)}
                       </SelectItem>
                     ))}
                   </SelectContent>

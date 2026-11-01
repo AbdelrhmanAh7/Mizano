@@ -151,7 +151,9 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
           <CardContent>
             <div className="text-2xl font-bold font-mono">{formatCurrency(amount)}</div>
             {hasTax && (
-              <p className="text-sm text-muted-foreground">+ {formatCurrency(taxAmount)} tax</p>
+              <p className="text-sm text-muted-foreground">
+                {t('expenses.plusTax', { amount: formatCurrency(taxAmount) })}
+              </p>
             )}
           </CardContent>
         </Card>

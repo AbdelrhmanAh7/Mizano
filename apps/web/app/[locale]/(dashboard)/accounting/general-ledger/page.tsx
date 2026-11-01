@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/table';
 import { useAccountsTree, flattenAccountsTree } from '@/lib/hooks/use-accounts';
 import { useGeneralLedger } from '@/lib/hooks/use-accounting-reports';
+import { useTranslations } from 'next-intl';
 import { useDateFnsLocale } from '@/lib/date-locale';
 
 interface LedgerEntry {
@@ -56,6 +57,7 @@ const formatCurrency = (amount: number | string, currency = 'USD'): string => {
 
 export default function GeneralLedgerPage() {
   const dateLocale = useDateFnsLocale();
+  const t = useTranslations('accounting');
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [dateFrom, setDateFrom] = useState(format(subMonths(new Date(), 3), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -81,14 +83,14 @@ export default function GeneralLedgerPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild aria-label="Go back">
+        <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
           <Link href="/accounting">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">General Ledger</h1>
-          <p className="text-muted-foreground">View detailed transaction history by account</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('generalLedger.title')}</h1>
+          <p className="text-muted-foreground">{t('generalLedger.description')}</p>
         </div>
       </div>
 
@@ -97,13 +99,15 @@ export default function GeneralLedgerPage() {
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="text-sm font-medium text-muted-foreground">Account</label>
+              <label className="text-sm font-medium text-muted-foreground">
+                {t('generalLedger.account')}
+              </label>
               {accountsLoading ? (
                 <Skeleton className="h-10 w-full mt-1" />
               ) : (
                 <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
                   <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Select an account" />
+                    <SelectValue placeholder={t('generalLedger.selectAccount')} />
                   </SelectTrigger>
                   <SelectContent>
                     {flatAccounts.map((account) => (
@@ -119,7 +123,7 @@ export default function GeneralLedgerPage() {
             </div>
             <div>
               <label htmlFor="dateFrom" className="text-sm font-medium text-muted-foreground">
-                From
+                {t('generalLedger.from')}
               </label>
               <Input
                 id="dateFrom"
@@ -131,7 +135,7 @@ export default function GeneralLedgerPage() {
             </div>
             <div>
               <label htmlFor="dateTo" className="text-sm font-medium text-muted-foreground">
-                To
+                {t('generalLedger.to')}
               </label>
               <Input
                 id="dateTo"
@@ -149,7 +153,7 @@ export default function GeneralLedgerPage() {
       {!selectedAccountId ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">Select an account to view its general ledger.</p>
+            <p className="text-muted-foreground">{t('generalLedger.selectPrompt')}</p>
           </CardContent>
         </Card>
       ) : (
@@ -158,7 +162,7 @@ export default function GeneralLedgerPage() {
             <CardTitle>
               {selectedAccount
                 ? `${selectedAccount.code} - ${selectedAccount.name}`
-                : 'General Ledger'}
+                : t('generalLedger.title')}
               <span className="text-sm font-normal text-muted-foreground ml-2">
                 {format(new Date(dateFrom), 'PP', { locale: dateLocale })} -{' '}
                 {format(new Date(dateTo), 'PP', { locale: dateLocale })}
@@ -176,18 +180,18 @@ export default function GeneralLedgerPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Journal #</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Debit</TableHead>
-                    <TableHead className="text-right">Credit</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
+                    <TableHead>{t('journals.table.date')}</TableHead>
+                    <TableHead>{t('journals.table.journalNumber')}</TableHead>
+                    <TableHead>{t('journals.form.description')}</TableHead>
+                    <TableHead className="text-right">{t('journals.table.debit')}</TableHead>
+                    <TableHead className="text-right">{t('journals.table.credit')}</TableHead>
+                    <TableHead className="text-right">{t('accounts.table.balance')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {/* Opening Balance */}
                   <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell colSpan={5}>Opening Balance</TableCell>
+                    <TableCell colSpan={5}>{t('generalLedger.openingBalance')}</TableCell>
                     <TableCell className="text-right font-mono">
                       {formatCurrency(openingBalance)}
                     </TableCell>
@@ -196,7 +200,7 @@ export default function GeneralLedgerPage() {
                   {entries.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        No transactions found for the selected period.
+                        {t('generalLedger.noTransactions')}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -229,7 +233,7 @@ export default function GeneralLedgerPage() {
 
                   {/* Closing Balance */}
                   <TableRow className="border-t-2 bg-muted/50 font-semibold">
-                    <TableCell colSpan={5}>Closing Balance</TableCell>
+                    <TableCell colSpan={5}>{t('generalLedger.closingBalance')}</TableCell>
                     <TableCell className="text-right font-mono">
                       {formatCurrency(closingBalance)}
                     </TableCell>

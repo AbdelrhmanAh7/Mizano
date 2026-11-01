@@ -88,7 +88,7 @@ export default function CustomerDetailPage() {
       router.push('/sales/customers');
     } catch (error: unknown) {
       toast({
-        title: tCommon('error'),
+        title: tCommon('errors.generic'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           t('customers.toast.deleteError'),

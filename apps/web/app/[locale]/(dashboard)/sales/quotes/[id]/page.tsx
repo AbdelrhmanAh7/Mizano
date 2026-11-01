@@ -49,6 +49,7 @@ export default function QuoteDetailPage() {
   const params = useParams();
   const router = useRouter();
   const t = useTranslations('sales');
+  const tCommon = useTranslations('common');
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const quoteId = params.id as string;
@@ -78,7 +79,7 @@ export default function QuoteDetailPage() {
       router.push('/sales/quotes');
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: t('toast.error'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           t('quotes.toast.deleteError'),
@@ -97,7 +98,7 @@ export default function QuoteDetailPage() {
       });
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: t('toast.error'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           t('quotes.toast.sendError'),
@@ -115,7 +116,7 @@ export default function QuoteDetailPage() {
       });
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: t('toast.error'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           t('quotes.toast.acceptError'),
@@ -133,7 +134,7 @@ export default function QuoteDetailPage() {
       });
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: t('toast.error'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           t('quotes.toast.declineError'),
@@ -156,7 +157,7 @@ export default function QuoteDetailPage() {
       }
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: t('toast.error'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           t('quotes.toast.convertError'),
@@ -270,7 +271,7 @@ export default function QuoteDetailPage() {
           {canDelete && quote.status === 'DRAFT' && (
             <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete
+              {tCommon('buttons.delete')}
             </Button>
           )}
         </div>
@@ -439,8 +440,8 @@ export default function QuoteDetailPage() {
         title={t('quotes.deleteQuote')}
         description={t('quotes.deleteConfirmation')}
         onConfirm={confirmDelete}
-        cancelLabel="Cancel"
-        deleteLabel="Delete"
+        cancelLabel={tCommon('buttons.cancel')}
+        deleteLabel={tCommon('buttons.delete')}
       />
 
       {/* Convert to Invoice Dialog */}
@@ -451,7 +452,7 @@ export default function QuoteDetailPage() {
             <AlertDialogDescription>{t('quotes.convertDescription')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleConvert}>
               {t('quotes.convertToInvoice')}
             </AlertDialogAction>

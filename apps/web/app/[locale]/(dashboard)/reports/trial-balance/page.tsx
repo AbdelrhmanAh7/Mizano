@@ -71,7 +71,7 @@ export default function TrialBalanceReportPage() {
       {!hasData ? (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            No trial balance data available. Create some transactions first.
+            {t('trialBalance.empty')}
           </CardContent>
         </Card>
       ) : (

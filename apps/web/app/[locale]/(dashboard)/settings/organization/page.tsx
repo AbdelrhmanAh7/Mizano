@@ -196,7 +196,7 @@ export default function OrganizationSettingsPage() {
               <Textarea
                 id="address"
                 {...form.register('address')}
-                placeholder="123 Business Street, Suite 100&#10;New York, NY 10001"
+                placeholder={t('organization.form.addressSample')}
                 rows={3}
               />
             </div>
@@ -218,7 +218,7 @@ export default function OrganizationSettingsPage() {
                 <Input
                   id="taxRegistrationNumber"
                   {...form.register('taxRegistrationNumber')}
-                  placeholder="e.g., VAT123456789"
+                  placeholder={t('organization.taxIdPlaceholder')}
                 />
               </div>
 

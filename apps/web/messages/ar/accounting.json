@@ -224,7 +224,47 @@
     "reverseConfirm": "سيتم ترحيل قيد جديد يعكس جميع بنود {number}. يبقى القيد الأصلي دون تغيير.",
     "reversed": "تم ترحيل القيد العكسي",
     "reverseFailed": "تعذر عكس القيد",
-    "newJournalDescription": "إنشاء قيد يومية يدوي جديد"
+    "newJournalDescription": "إنشاء قيد يومية يدوي جديد",
+    "description": "إنشاء وإدارة قيود اليومية اليدوية",
+    "editDescription": "تحديث تفاصيل قيد اليومية",
+    "post": "ترحيل",
+    "searchPlaceholder": "ابحث برقم القيد أو الوصف...",
+    "dateRange": "الفترة الزمنية",
+    "refresh": "تحديث القيود",
+    "listTitle": "القيود",
+    "createFirst": "أنشئ أول قيد",
+    "deleteConfirm": "هل تريد حذف \"{number}\"؟ لا يمكن التراجع عن هذا الإجراء.",
+    "deleteConfirmThis": "هل تريد حذف قيد اليومية هذا؟ لا يمكن التراجع عن هذا الإجراء.",
+    "bulkDeleteDescription": "سيتم حذف القيود غير المرحّلة فقط، وسيتم تخطي القيود المرحّلة.",
+    "bulkPostDescription": "سيتم ترحيل القيود المحددة غير المرحّلة، وسينشئ ذلك قيودًا محاسبية.",
+    "notFoundTitle": "القيد غير موجود",
+    "notFoundDescription": "قيد اليومية الذي تبحث عنه غير موجود.",
+    "backToJournals": "العودة إلى القيود",
+    "backToJournal": "العودة إلى القيد",
+    "cannotEditTitle": "لا يمكن تعديل القيد",
+    "cannotEditDescription": "يمكن تعديل القيود المسودة فقط. حالة هذا القيد: {status}.",
+    "status": {
+      "DRAFT": "مسودة",
+      "POSTED": "مرحّل",
+      "VOIDED": "ملغى"
+    },
+    "toast": {
+      "error": "خطأ",
+      "created": "تم إنشاء القيد",
+      "createdDescription": "تم إنشاء قيد اليومية بنجاح.",
+      "createError": "تعذر إنشاء قيد اليومية.",
+      "updated": "تم تحديث القيد",
+      "updatedDescription": "تم تحديث قيد اليومية بنجاح.",
+      "updateError": "تعذر تحديث قيد اليومية.",
+      "deleted": "تم حذف القيد",
+      "deletedNumber": "تم حذف القيد {number}.",
+      "deletedDescription": "تم حذف قيد اليومية.",
+      "deleteError": "تعذر حذف القيد.",
+      "posted": "تم ترحيل القيد",
+      "postedNumber": "تم ترحيل القيد {number}.",
+      "postedDescription": "تم ترحيل قيد اليومية بنجاح.",
+      "postError": "تعذر ترحيل القيد."
+    }
   },
   "recurring": {
     "title": "الملفات المتكررة",
@@ -349,5 +389,41 @@
       "toggleError": "تعذّر تغيير حالة الملف",
       "genericError": "حدث خطأ ما. حاول مرة أخرى."
     }
+  },
+  "goBack": "رجوع",
+  "hub": {
+    "description": "إدارة دليل الحسابات وقيود اليومية والتقارير المالية",
+    "open": "فتح {title}",
+    "modules": {
+      "accounts": "إدارة هيكل الحسابات وأنواعها وأرصدتها",
+      "journals": "إنشاء وإدارة قيود اليومية المزدوجة",
+      "recurring": "أتمتة قيود اليومية المتكررة وفق جدول زمني",
+      "trialBalance": "عرض أرصدة المدين والدائن لجميع الحسابات",
+      "generalLedger": "عرض سجل الحركات التفصيلي لكل حساب"
+    }
+  },
+  "trialBalance": {
+    "title": "ميزان المراجعة",
+    "description": "عرض أرصدة المدين والدائن لجميع الحسابات",
+    "asOfDate": "حتى تاريخ",
+    "balanced": "متوازن",
+    "outOfBalance": "غير متوازن: {debit} / {credit}",
+    "asOfTitle": "ميزان المراجعة حتى {date}",
+    "empty": "لا توجد بيانات لميزان المراجعة. أنشئ قيود يومية ورحّلها لتظهر البيانات هنا.",
+    "accountCode": "رمز الحساب",
+    "accountName": "اسم الحساب",
+    "type": "النوع"
+  },
+  "generalLedger": {
+    "title": "دفتر الأستاذ العام",
+    "description": "عرض سجل الحركات التفصيلي لكل حساب",
+    "account": "الحساب",
+    "selectAccount": "اختر حسابًا",
+    "from": "من",
+    "to": "إلى",
+    "selectPrompt": "اختر حسابًا لعرض دفتر الأستاذ الخاص به.",
+    "openingBalance": "الرصيد الافتتاحي",
+    "closingBalance": "الرصيد الختامي",
+    "noTransactions": "لا توجد حركات في الفترة المحددة."
   }
 }

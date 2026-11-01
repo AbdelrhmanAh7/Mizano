@@ -48,6 +48,7 @@ interface ChallanDetailPageProps {
 export default function ChallanDetailPage({ params }: ChallanDetailPageProps) {
   const { id } = params;
   const t = useTranslations('sales');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const { data: challan, isLoading } = useDeliveryChallan(id);
   const deleteChallan = useDeleteDeliveryChallan();
@@ -116,7 +117,7 @@ export default function ChallanDetailPage({ params }: ChallanDetailPageProps) {
               <AlertDialogTrigger asChild>
                 <Button variant="outline" className="text-red-600">
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  {tCommon('buttons.delete')}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
@@ -127,9 +128,9 @@ export default function ChallanDetailPage({ params }: ChallanDetailPageProps) {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
                   <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-                    Delete
+                    {tCommon('buttons.delete')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

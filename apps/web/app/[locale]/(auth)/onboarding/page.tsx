@@ -249,7 +249,7 @@ export default function OnboardingPage() {
       <footer className="border-t py-6">
         <div className="container mx-auto px-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
           <Image src="/svg/logo-icon.svg" alt="Mizano" width={18} height={18} />
-          Mizano ERP - AI-Powered Autonomous Accounting Platform
+          {t('footer.tagline')}
         </div>
       </footer>
     </div>

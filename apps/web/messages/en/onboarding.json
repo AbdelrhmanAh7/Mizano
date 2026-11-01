@@ -89,5 +89,8 @@
     "subtitle": "Join the future of autonomous financial management",
     "getStarted": "Create Account",
     "login": "Sign In"
+  },
+  "footer": {
+    "tagline": "Mizano ERP - AI-Powered Autonomous Accounting Platform"
   }
 }

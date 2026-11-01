@@ -58,7 +58,7 @@ export default function ProfitLossReportPage() {
       {!hasData ? (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            No profit & loss data available. Create some transactions first.
+            {t('profitLoss.empty')}
           </CardContent>
         </Card>
       ) : (

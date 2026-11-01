@@ -530,5 +530,12 @@
     "today": "Today",
     "yesterday": "Yesterday",
     "earlier": "Earlier"
+  },
+  "commandDialog": {
+    "title": "Command",
+    "description": "Search and run commands"
+  },
+  "phoneInput": {
+    "invalidLength": "Phone number should be {lengths} digits for {country}"
   }
 }

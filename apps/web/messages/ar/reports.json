@@ -7,7 +7,13 @@
     "sales": "تقارير المبيعات",
     "purchases": "تقارير المشتريات",
     "inventory": "تقارير المخزون",
-    "tax": "التقارير الضريبية"
+    "tax": "التقارير الضريبية",
+    "financialDescription": "القوائم المالية الأساسية",
+    "receivablesPayables": "الذمم المدينة والدائنة",
+    "receivablesPayablesDescription": "تابع ما عليك وما لك",
+    "salesDescription": "حلّل أداء المبيعات والمشتريات",
+    "accounting": "التقارير المحاسبية",
+    "accountingDescription": "السجلات المحاسبية التفصيلية"
   },
   "profitLoss": {
     "title": "الأرباح والخسائر",
@@ -19,7 +25,8 @@
     "operatingProfit": "الربح التشغيلي",
     "otherIncome": "إيرادات أخرى",
     "otherExpenses": "مصروفات أخرى",
-    "netProfit": "صافي الربح"
+    "netProfit": "صافي الربح",
+    "empty": "لا توجد بيانات للأرباح والخسائر. أنشئ بعض المعاملات أولاً."
   },
   "balanceSheet": {
     "title": "الميزانية العمومية",
@@ -37,7 +44,8 @@
     "totalLiabilitiesAndEquity": "إجمالي الالتزامات وحقوق الملكية",
     "retainedEarnings": "الأرباح المحتجزة",
     "balanced": "الميزانية العمومية متوازنة",
-    "notBalanced": "الميزانية العمومية غير متوازنة"
+    "notBalanced": "الميزانية العمومية غير متوازنة",
+    "empty": "لا توجد بيانات للميزانية العمومية. أنشئ بعض المعاملات أولاً."
   },
   "cashFlow": {
     "title": "قائمة التدفقات النقدية",
@@ -58,7 +66,8 @@
       "equityChanges": "التغيرات في حقوق الملكية",
       "debtChanges": "التغيرات في الديون"
     },
-    "noItems": "لا توجد بنود"
+    "noItems": "لا توجد بنود",
+    "total": "الإجمالي"
   },
   "trialBalance": {
     "title": "ميزان المراجعة",
@@ -75,7 +84,8 @@
     "accountBalances": "أرصدة الحسابات",
     "code": "الرمز",
     "type": "النوع",
-    "total": "الإجمالي"
+    "total": "الإجمالي",
+    "empty": "لا توجد بيانات لميزان المراجعة. أنشئ بعض المعاملات أولاً."
   },
   "generalLedger": {
     "title": "دفتر الأستاذ العام",
@@ -83,7 +93,13 @@
     "account": "الحساب",
     "selectAccount": "اختر حساباً",
     "selectAccountTitle": "اختر حساباً",
-    "selectAccountHint": "اختر حساباً من القائمة أعلاه لعرض قيود دفتر الأستاذ الخاصة به."
+    "selectAccountHint": "اختر حساباً من القائمة أعلاه لعرض قيود دفتر الأستاذ الخاصة به.",
+    "entries": "قيود دفتر الأستاذ",
+    "empty": "لا توجد قيود في هذه الفترة.",
+    "date": "التاريخ",
+    "journalNumber": "رقم القيد",
+    "descriptionColumn": "الوصف",
+    "balance": "الرصيد"
   },
   "arAging": {
     "title": "أعمار الذمم المدينة",
@@ -132,11 +148,29 @@
   },
   "salesByCustomer": {
     "title": "المبيعات حسب العميل",
-    "description": "تفصيل المبيعات حسب العميل"
+    "description": "تفصيل المبيعات حسب العميل",
+    "customer": "العميل",
+    "invoices": "الفواتير",
+    "totalAmount": "إجمالي المبلغ",
+    "paid": "المدفوع",
+    "balanceDue": "الرصيد المستحق",
+    "totalSales": "إجمالي المبيعات",
+    "totalPaid": "إجمالي المدفوع",
+    "outstanding": "المستحق",
+    "customers": "العملاء",
+    "empty": "لا توجد بيانات مبيعات للفترة المحددة."
   },
   "salesByItem": {
     "title": "المبيعات حسب الصنف",
-    "description": "تفصيل المبيعات حسب الصنف"
+    "description": "تفصيل المبيعات حسب الصنف",
+    "item": "الصنف",
+    "qtySold": "الكمية المباعة",
+    "avgPrice": "متوسط السعر",
+    "totalAmount": "إجمالي المبلغ",
+    "totalRevenue": "إجمالي الإيرادات",
+    "totalQtySold": "إجمالي الكمية المباعة",
+    "uniqueItems": "عدد الأصناف",
+    "empty": "لا توجد بيانات مبيعات أصناف للفترة المحددة."
   },
   "purchasesByVendor": {
     "title": "المشتريات حسب المورد",
@@ -144,7 +178,17 @@
     "unappliedCredits": "إشعارات دائنة غير مطبّقة",
     "netPayable": "صافي المستحق",
     "totalUnappliedCredits": "إشعارات الموردين غير المطبّقة",
-    "totalNetPayable": "صافي المستحق"
+    "totalNetPayable": "صافي المستحق",
+    "vendor": "المورد",
+    "bills": "فواتير الموردين",
+    "totalAmount": "إجمالي المبلغ",
+    "paid": "المدفوع",
+    "balanceDue": "الرصيد المستحق",
+    "totalPurchases": "إجمالي المشتريات",
+    "totalPaid": "إجمالي المدفوع",
+    "outstanding": "المستحق",
+    "vendors": "الموردون",
+    "empty": "لا توجد بيانات مشتريات للفترة المحددة."
   },
   "inventoryValuation": {
     "title": "تقييم المخزون",

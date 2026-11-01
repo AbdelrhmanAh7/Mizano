@@ -81,7 +81,8 @@
       "taxId": "Tax ID",
       "taxIdPlaceholder": "Enter tax ID",
       "lockDate": "Lock Date",
-      "lockDateDescription": "Prevent changes to transactions before this date"
+      "lockDateDescription": "Prevent changes to transactions before this date",
+      "addressSample": "123 Business Street, Suite 100\nNew York, NY 10001"
     },
     "taxCurrency": "Tax & Currency",
     "taxCurrencyDescription": "Tax registration and base currency settings",
@@ -104,7 +105,8 @@
       "invalidEmail": "Enter a valid email address",
       "invalidUrl": "Enter a valid URL, for example https://example.com",
       "currencyRequired": "Select a base currency"
-    }
+    },
+    "taxIdPlaceholder": "e.g., VAT123456789"
   },
   "localization": {
     "title": "Localization",
@@ -117,7 +119,13 @@
     "documentDigits": "Digits in Arabic PDFs",
     "documentDigitsDescription": "Invoices, quotes and bills printed in Arabic use these digits. English PDFs always use 0123.",
     "digitsLatn": "Western (0123)",
-    "digitsArab": "Arabic-Indic (٠١٢٣)"
+    "digitsArab": "Arabic-Indic (٠١٢٣)",
+    "dateUs": "MM/DD/YYYY (US)",
+    "dateInternational": "DD/MM/YYYY (International)",
+    "dateIso": "YYYY-MM-DD (ISO)",
+    "numberUs": "1,000.00 (US/UK)",
+    "numberEuropean": "1.000,00 (European)",
+    "numberFrench": "1 000,00 (French/International)"
   },
   "branding": {
     "title": "Branding",
@@ -603,7 +611,11 @@
     "accountLists": "Account Lists & Trees",
     "accountListsDescription": "Cached for 10 minutes. Chart of Accounts rarely changes, so longer TTL provides significant performance improvement.",
     "salesPurchases": "Sales & Purchases Lists",
-    "salesPurchasesDescription": "Cached for 2 minutes. Short TTL ensures data freshness for frequently-changing transactional data."
+    "salesPurchasesDescription": "Cached for 2 minutes. Short TTL ensures data freshness for frequently-changing transactional data.",
+    "noExpiry": "No expiry",
+    "expired": "Expired",
+    "deleteKey": "Delete this key",
+    "deleteKeyLabel": "Delete cache key"
   },
   "auditLogs": {
     "title": "Audit Logs",

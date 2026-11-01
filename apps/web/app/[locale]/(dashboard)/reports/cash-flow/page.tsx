@@ -92,7 +92,7 @@ export default function CashFlowReportPage() {
           </div>
         )}
         <div className="flex justify-between pt-3 mt-3 border-t font-semibold">
-          <span>Total</span>
+          <span>{t('cashFlow.total')}</span>
           <span className={cn('font-mono', section.total >= 0 ? 'text-green-600' : 'text-red-600')}>
             {formatCurrency(Math.abs(section.total))}
           </span>

@@ -36,30 +36,30 @@ function SalesByCustomerContent() {
     () => [
       {
         accessorKey: 'customerName',
-        header: 'Customer',
+        header: t('salesByCustomer.customer'),
         cell: ({ row }) => <div className="font-medium">{row.original.customerName}</div>,
       },
       {
         accessorKey: 'invoiceCount',
-        header: 'Invoices',
+        header: t('salesByCustomer.invoices'),
         cell: ({ row }) => row.original.invoiceCount,
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'totalAmount',
-        header: 'Total Amount',
+        header: t('salesByCustomer.totalAmount'),
         cell: ({ row }) => formatCurrency(row.original.totalAmount),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'paidAmount',
-        header: 'Paid',
+        header: t('salesByCustomer.paid'),
         cell: ({ row }) => formatCurrency(row.original.paidAmount),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'balanceDue',
-        header: 'Balance Due',
+        header: t('salesByCustomer.balanceDue'),
         cell: ({ row }) => (
           <span className={row.original.balanceDue > 0 ? 'text-red-600 font-medium' : ''}>
             {formatCurrency(row.original.balanceDue)}
@@ -68,7 +68,7 @@ function SalesByCustomerContent() {
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
     ],
-    [formatCurrency],
+    [t, formatCurrency],
   );
 
   return (
@@ -85,7 +85,9 @@ function SalesByCustomerContent() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {t('salesByCustomer.totalSales')}
+              </CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -94,7 +96,9 @@ function SalesByCustomerContent() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Paid</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {t('salesByCustomer.totalPaid')}
+              </CardTitle>
               <Wallet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -105,7 +109,9 @@ function SalesByCustomerContent() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Outstanding</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {t('salesByCustomer.outstanding')}
+              </CardTitle>
               <Receipt className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -116,7 +122,9 @@ function SalesByCustomerContent() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Customers</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {t('salesByCustomer.customers')}
+              </CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -132,7 +140,7 @@ function SalesByCustomerContent() {
             columns={columns}
             data={data?.entries || []}
             isLoading={isLoading}
-            emptyMessage="No sales data found for the selected period."
+            emptyMessage={t('salesByCustomer.empty')}
             enableExport
             exportFilename="sales-by-customer"
           />

@@ -191,6 +191,9 @@
     "run": "تشغيل",
     "mark": "تسجيل",
     "details": "تفاصيل {parent}",
-    "detailsOnly": "التفاصيل"
-  }
+    "detailsOnly": "التفاصيل",
+    "label": "مسار التنقل"
+  },
+  "mainNavigation": "التنقل الرئيسي",
+  "mainNavigationMenu": "قائمة التنقل الرئيسية"
 }

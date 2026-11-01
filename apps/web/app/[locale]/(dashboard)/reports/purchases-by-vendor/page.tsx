@@ -36,30 +36,30 @@ function PurchasesByVendorContent() {
     () => [
       {
         accessorKey: 'vendorName',
-        header: 'Vendor',
+        header: t('purchasesByVendor.vendor'),
         cell: ({ row }) => <div className="font-medium">{row.original.vendorName}</div>,
       },
       {
         accessorKey: 'billCount',
-        header: 'Bills',
+        header: t('purchasesByVendor.bills'),
         cell: ({ row }) => row.original.billCount,
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'totalAmount',
-        header: 'Total Amount',
+        header: t('purchasesByVendor.totalAmount'),
         cell: ({ row }) => formatCurrency(row.original.totalAmount),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'paidAmount',
-        header: 'Paid',
+        header: t('purchasesByVendor.paid'),
         cell: ({ row }) => formatCurrency(row.original.paidAmount),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'balanceDue',
-        header: 'Balance Due',
+        header: t('purchasesByVendor.balanceDue'),
         cell: ({ row }) => (
           <span className={row.original.balanceDue > 0 ? 'text-red-600 font-medium' : ''}>
             {formatCurrency(row.original.balanceDue)}
@@ -99,7 +99,9 @@ function PurchasesByVendorContent() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Purchases</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {t('purchasesByVendor.totalPurchases')}
+              </CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -108,7 +110,9 @@ function PurchasesByVendorContent() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Paid</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {t('purchasesByVendor.totalPaid')}
+              </CardTitle>
               <Wallet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -119,7 +123,9 @@ function PurchasesByVendorContent() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Outstanding</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {t('purchasesByVendor.outstanding')}
+              </CardTitle>
               <Receipt className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -154,7 +160,9 @@ function PurchasesByVendorContent() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Vendors</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {t('purchasesByVendor.vendors')}
+              </CardTitle>
               <Building2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -170,7 +178,7 @@ function PurchasesByVendorContent() {
             columns={columns}
             data={data?.entries || []}
             isLoading={isLoading}
-            emptyMessage="No purchase data found for the selected period."
+            emptyMessage={t('purchasesByVendor.empty')}
             enableExport
             exportFilename="purchases-by-vendor"
           />

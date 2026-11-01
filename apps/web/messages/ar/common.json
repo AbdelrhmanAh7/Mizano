@@ -530,5 +530,12 @@
     "today": "اليوم",
     "yesterday": "أمس",
     "earlier": "أقدم"
+  },
+  "commandDialog": {
+    "title": "الأوامر",
+    "description": "ابحث عن أمر ونفّذه"
+  },
+  "phoneInput": {
+    "invalidLength": "يجب أن يتكون رقم الهاتف من {lengths} رقمًا في {country}"
   }
 }

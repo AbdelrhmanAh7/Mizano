@@ -126,7 +126,7 @@ function JournalsPageContent() {
     ...(canEdit
       ? [
           {
-            label: 'Post',
+            label: t('journals.post'),
             icon: CheckCircle,
             onClick: (rows: Journal[]) => {
               setBulkSelectedRows(rows);
@@ -138,7 +138,7 @@ function JournalsPageContent() {
     ...(canDelete
       ? [
           {
-            label: 'Delete',
+            label: tCommon('buttons.delete'),
             icon: Trash2,
             variant: 'destructive' as const,
             onClick: (rows: Journal[]) => {
@@ -160,13 +160,15 @@ function JournalsPageContent() {
       try {
         await deleteJournal.mutateAsync(journalToDelete.id);
         toast({
-          title: 'Journal deleted',
-          description: `Journal ${journalToDelete.journalNumber} has been deleted.`,
+          title: t('journals.toast.deleted'),
+          description: t('journals.toast.deletedNumber', {
+            number: journalToDelete.journalNumber,
+          }),
         });
       } catch (error) {
         toast({
-          title: 'Error',
-          description: getApiErrorMessage(error, 'Failed to delete journal.'),
+          title: t('journals.toast.error'),
+          description: getApiErrorMessage(error, t('journals.toast.deleteError')),
           variant: 'destructive',
         });
       }
@@ -179,13 +181,13 @@ function JournalsPageContent() {
     try {
       await postJournal.mutateAsync(journal.id);
       toast({
-        title: 'Journal posted',
-        description: `Journal ${journal.journalNumber} has been posted.`,
+        title: t('journals.toast.posted'),
+        description: t('journals.toast.postedNumber', { number: journal.journalNumber }),
       });
     } catch (error) {
       toast({
-        title: 'Error',
-        description: getApiErrorMessage(error, 'Failed to post journal.'),
+        title: t('journals.toast.error'),
+        description: getApiErrorMessage(error, t('journals.toast.postError')),
         variant: 'destructive',
       });
     }
@@ -252,7 +254,9 @@ function JournalsPageContent() {
       accessorKey: 'status',
       header: t('recurring.table.status'),
       cell: ({ row }) => (
-        <Badge className={getStatusColor(row.original.status)}>{row.original.status}</Badge>
+        <Badge className={getStatusColor(row.original.status)}>
+          {t(`journals.status.${row.original.status}`)}
+        </Badge>
       ),
     },
     {
@@ -274,7 +278,7 @@ function JournalsPageContent() {
               <DropdownMenuItem asChild>
                 <Link href={`/accounting/journals/${journal.id}`}>
                   <Eye className="mr-2 h-4 w-4" />
-                  View
+                  {tCommon('buttons.view')}
                 </Link>
               </DropdownMenuItem>
               {canEdit && editable && (
@@ -282,12 +286,12 @@ function JournalsPageContent() {
                   <DropdownMenuItem asChild>
                     <Link href={`/accounting/journals/${journal.id}/edit`}>
                       <Edit className="mr-2 h-4 w-4" />
-                      Edit
+                      {tCommon('buttons.edit')}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handlePost(journal)}>
                     <CheckCircle className="mr-2 h-4 w-4" />
-                    Post
+                    {t('journals.post')}
                   </DropdownMenuItem>
                 </>
               )}
@@ -297,7 +301,7 @@ function JournalsPageContent() {
                   className="text-destructive"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  {tCommon('buttons.delete')}
                 </DropdownMenuItem>
               )}
               {canReverse && reversible && (
@@ -320,7 +324,7 @@ function JournalsPageContent() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('journals.title')}</h1>
-          <p className="text-muted-foreground">Create and manage manual journal entries</p>
+          <p className="text-muted-foreground">{t('journals.description')}</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
@@ -341,7 +345,7 @@ function JournalsPageContent() {
             <DataTableSearch
               value={tableParams.search}
               onChange={tableParams.setSearch}
-              placeholder="Search by journal number or description..."
+              placeholder={t('journals.searchPlaceholder')}
             />
             <DataTableDateRangeFilter
               value={dateRange}
@@ -355,13 +359,13 @@ function JournalsPageContent() {
                   tableParams.setFilters({ dateFrom: undefined, dateTo: undefined });
                 }
               }}
-              placeholder="Date range"
+              placeholder={t('journals.dateRange')}
             />
             <Button
               variant="outline"
               size="icon"
               onClick={() => refetch()}
-              aria-label="Refresh journals"
+              aria-label={t('journals.refresh')}
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
@@ -372,7 +376,7 @@ function JournalsPageContent() {
       {/* Journals Table */}
       <Card data-tour="journal-list">
         <CardHeader>
-          <CardTitle>Journals</CardTitle>
+          <CardTitle>{t('journals.listTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -398,7 +402,7 @@ function JournalsPageContent() {
                 <Button asChild>
                   <Link href="/accounting/journals/new">
                     <Plus className="mr-2 h-4 w-4" />
-                    Create Your First Journal
+                    {t('journals.createFirst')}
                   </Link>
                 </Button>
               ) : undefined
@@ -413,8 +417,7 @@ function JournalsPageContent() {
           <AlertDialogHeader>
             <AlertDialogTitle>{t('journals.deleteJournal')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete &quot;{journalToDelete?.journalNumber}&quot;? This
-              action cannot be undone.
+              {t('journals.deleteConfirm', { number: journalToDelete?.journalNumber ?? '' })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -423,7 +426,7 @@ function JournalsPageContent() {
               onClick={confirmDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {tCommon('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -457,7 +460,7 @@ function JournalsPageContent() {
         action="delete"
         count={bulkSelectedRows.length}
         itemType="journals"
-        description="Only unposted journals will be deleted. Posted journals will be skipped."
+        description={t('journals.bulkDeleteDescription')}
         destructive
         isLoading={bulkDeleteAction.isLoading}
         onConfirm={async () => {
@@ -472,7 +475,7 @@ function JournalsPageContent() {
         action="post"
         count={bulkSelectedRows.length}
         itemType="journals"
-        description="Selected unposted journals will be posted. This will create accounting entries."
+        description={t('journals.bulkPostDescription')}
         isLoading={bulkPostAction.isLoading}
         onConfirm={async () => {
           await bulkPostAction.execute(bulkSelectedRows.map((r) => r.id));

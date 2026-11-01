@@ -114,23 +114,21 @@ export default function GeneralLedgerPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Ledger Entries</CardTitle>
+              <CardTitle>{t('generalLedger.entries')}</CardTitle>
             </CardHeader>
             <CardContent>
               {entries.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground">
-                  No entries found for this period.
-                </p>
+                <p className="text-center py-8 text-muted-foreground">{t('generalLedger.empty')}</p>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Journal #</TableHead>
-                      <TableHead>Description</TableHead>
+                      <TableHead>{t('generalLedger.date')}</TableHead>
+                      <TableHead>{t('generalLedger.journalNumber')}</TableHead>
+                      <TableHead>{t('generalLedger.descriptionColumn')}</TableHead>
                       <TableHead className="text-right">{t('trialBalance.debit')}</TableHead>
                       <TableHead className="text-right">{t('trialBalance.credit')}</TableHead>
-                      <TableHead className="text-right">Balance</TableHead>
+                      <TableHead className="text-right">{t('generalLedger.balance')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

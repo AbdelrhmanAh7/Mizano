@@ -73,7 +73,8 @@
     },
     "empty": {
       "title": "No customers yet",
-      "description": "Get started by adding your first customer"
+      "description": "Get started by adding your first customer",
+      "action": "Add Your First Customer"
     },
     "notFoundMessage": "The customer you're looking for doesn't exist.",
     "backToCustomers": "Back to Customers",
@@ -130,7 +131,8 @@
       "description": "Selected customers will be deleted. Customers with transactions will be skipped.",
       "confirm": "Delete {count} customers",
       "success": "{count} customers deleted"
-    }
+    },
+    "deleteConfirmName": "Are you sure you want to delete \"{name}\"? This action cannot be undone."
   },
   "quotes": {
     "title": "Quotes",
@@ -205,7 +207,8 @@
     },
     "empty": {
       "title": "No quotes yet",
-      "description": "Create your first quote to get started"
+      "description": "Create your first quote to get started",
+      "action": "Create Your First Quote"
     },
     "toast": {
       "created": "Quote created",
@@ -242,6 +245,29 @@
       "quantityRequired": "Quantity is required",
       "rateRequired": "Rate is required",
       "lineItemRequired": "At least one line item is required"
+    },
+    "markAsAccepted": "Mark as Accepted",
+    "markAsDeclined": "Mark as Declined",
+    "deleteConfirmNumber": "Are you sure you want to delete \"{number}\"? This action cannot be undone.",
+    "list": {
+      "searchPlaceholder": "Search by quote number or customer...",
+      "filterByStatus": "Filter by status",
+      "refresh": "Refresh quotes"
+    },
+    "bulkDelete": {
+      "title": "Delete {count} quotes?",
+      "description": "Only draft quotes will be deleted. Non-draft quotes will be skipped.",
+      "confirm": "Delete {count} quotes"
+    },
+    "bulkSend": {
+      "title": "Send {count} quotes?",
+      "description": "Draft quotes will be marked as sent.",
+      "confirm": "Send {count} quotes"
+    },
+    "bulkDecline": {
+      "title": "Decline {count} quotes?",
+      "description": "Sent quotes will be marked as declined.",
+      "confirm": "Decline {count} quotes"
     }
   },
   "invoices": {
@@ -311,7 +337,8 @@
     },
     "empty": {
       "title": "No invoices yet",
-      "description": "Create your first invoice to start billing"
+      "description": "Create your first invoice to start billing",
+      "action": "Create Your First Invoice"
     },
     "toast": {
       "created": "Invoice created",
@@ -481,7 +508,18 @@
     },
     "empty": {
       "title": "No credit notes yet",
-      "description": "Credit notes will appear here when created"
+      "description": "Credit notes will appear here when created",
+      "action": "Create Your First Credit Note"
+    },
+    "list": {
+      "searchPlaceholder": "Search by credit note number or customer...",
+      "filterByType": "Filter by type",
+      "refresh": "Refresh credit notes"
+    },
+    "bulkDelete": {
+      "title": "Delete {count} credit notes?",
+      "description": "Selected credit notes will be deleted. Credit notes that have been applied will be skipped.",
+      "confirm": "Delete {count} credit notes"
     }
   },
   "payments": {
@@ -555,7 +593,8 @@
     },
     "empty": {
       "title": "No payments yet",
-      "description": "Payments will appear here when recorded"
+      "description": "Payments will appear here when recorded",
+      "action": "Record Your First Payment"
     },
     "voidedBadge": "Voided",
     "voidPayment": "Void payment",
@@ -637,6 +676,17 @@
       "supply": "Supply",
       "jobWork": "Job Work",
       "sample": "Sample"
+    },
+    "addLine": "Add Line",
+    "selectCustomer": "Select customer",
+    "selectItem": "Select item",
+    "optional": "Optional",
+    "toast": {
+      "validationError": "Validation Error",
+      "customerRequired": "Please select a customer.",
+      "linesRequired": "Please add at least one line item.",
+      "created": "Delivery challan created successfully.",
+      "createError": "Failed to create delivery challan"
     }
   },
   "lineItems": {
@@ -670,7 +720,38 @@
     "daysOverdue": "{days} days overdue",
     "noOverdue": "No overdue invoices",
     "noRecentActivity": "No recent activity",
-    "viewAll": "View All"
+    "viewAll": "View All",
+    "acrossCustomers": "Across {count, plural, one {# customer} other {# customers}}",
+    "overdueInvoicesCount": "{count, plural, one {# overdue invoice} other {# overdue invoices}}",
+    "quotesAwaiting": "{count, plural, one {# quote awaiting response} other {# quotes awaiting response}}",
+    "fromPaidInvoices": "From paid invoices",
+    "openModule": "Open {title}",
+    "modules": {
+      "customers": {
+        "description": "Manage customer accounts and view balances",
+        "stats": "{count} total"
+      },
+      "quotes": {
+        "description": "Create and send estimates to customers",
+        "stats": "{count} pending"
+      },
+      "invoices": {
+        "description": "Create invoices and track payments",
+        "stats": "{count} unpaid"
+      },
+      "creditNotes": {
+        "description": "Issue refunds and invoice adjustments",
+        "stats": "Manage refunds"
+      },
+      "payments": {
+        "description": "Record and track customer payments",
+        "stats": "Track payments"
+      },
+      "deliveryChallans": {
+        "description": "Track goods dispatch and returns",
+        "stats": "Track deliveries"
+      }
+    }
   },
   "customer360": {
     "overviewTab": "Overview",
@@ -710,5 +791,8 @@
     "saving": "Saving…",
     "saved": "Reference saved",
     "error": "Could not save. Check that this reference is not already used, then try again."
+  },
+  "toast": {
+    "error": "Error"
   }
 }

@@ -179,7 +179,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/purchases/bills">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -315,7 +315,9 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
                           <div>
                             <p className="font-medium">{line.description}</p>
                             {line.item && (
-                              <p className="text-sm text-muted-foreground">SKU: {line.item.sku}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {t('bills.sku', { sku: line.item.sku })}
+                              </p>
                             )}
                           </div>
                         </TableCell>
@@ -372,7 +374,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
               </div>
             </>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">No line items</div>
+            <div className="text-center py-8 text-muted-foreground">{t('bills.noLineItems')}</div>
           )}
         </CardContent>
       </Card>
@@ -462,7 +464,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
             </Button>
             {bill.projectId && (
               <Button variant="outline" asChild>
-                <Link href={`/projects/${bill.projectId}`}>View Project</Link>
+                <Link href={`/projects/${bill.projectId}`}>{t('bills.viewProject')}</Link>
               </Button>
             )}
           </div>

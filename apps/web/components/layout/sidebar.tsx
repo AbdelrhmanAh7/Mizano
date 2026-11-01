@@ -341,7 +341,7 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
   };
 
   return (
-    <nav aria-label="Main navigation" className="flex-1 px-2 pb-4 space-y-1">
+    <nav aria-label={t('mainNavigation')} className="flex-1 px-2 pb-4 space-y-1">
       {filteredNavigation.map((item) => renderNavItem(item))}
     </nav>
   );
@@ -389,7 +389,7 @@ export function Sidebar() {
                   className="hidden dark:block"
                 />
               </SheetTitle>
-              <SheetDescription className="sr-only">Main navigation menu</SheetDescription>
+              <SheetDescription className="sr-only">{t('mainNavigationMenu')}</SheetDescription>
             </SheetHeader>
             <div className="flex flex-col h-[calc(100%-73px)] overflow-y-auto pt-4">
               <SidebarNav onItemClick={() => setMobileOpen(false)} />

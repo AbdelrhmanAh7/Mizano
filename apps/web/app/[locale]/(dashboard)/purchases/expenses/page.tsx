@@ -106,7 +106,7 @@ function ExpensesPageContent() {
     ...(canEdit
       ? [
           {
-            label: 'Approve',
+            label: tCommon('buttons.approve'),
             icon: CheckCircle,
             onClick: bulkApprove.openFor,
           },
@@ -115,7 +115,7 @@ function ExpensesPageContent() {
     ...(canDelete
       ? [
           {
-            label: 'Delete',
+            label: tCommon('buttons.delete'),
             icon: Trash2,
             variant: 'destructive' as const,
             onClick: bulkDelete.openFor,
@@ -359,14 +359,20 @@ function ExpensesPageContent() {
         {...bulkDelete.dialogProps}
         action="delete"
         itemType="expenses"
-        description="Selected expenses will be permanently deleted."
+        title={t('expenses.bulkDelete.title', { count: bulkDelete.count })}
+        description={t('expenses.bulkDelete.description')}
+        confirmLabel={t('expenses.bulkDelete.confirm', { count: bulkDelete.count })}
+        cancelLabel={tCommon('buttons.cancel')}
         destructive
       />
       <BulkActionConfirmDialog
         {...bulkApprove.dialogProps}
         action="approve"
         itemType="expenses"
-        description="Selected expenses will be approved."
+        title={t('expenses.bulkApprove.title', { count: bulkApprove.count })}
+        description={t('expenses.bulkApprove.description')}
+        confirmLabel={t('expenses.bulkApprove.confirm', { count: bulkApprove.count })}
+        cancelLabel={tCommon('buttons.cancel')}
       />
 
       {/* Import Wizard */}
@@ -374,7 +380,7 @@ function ExpensesPageContent() {
         open={importOpen}
         onOpenChange={setImportOpen}
         entityType={'expenses' as ImportEntityType}
-        entityLabel="Expenses"
+        entityLabel={t('expenses.title')}
         onComplete={() => refetch()}
       />
     </div>

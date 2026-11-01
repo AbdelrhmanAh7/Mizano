@@ -30,7 +30,7 @@ export default function EditCustomerPage() {
       router.push(`/sales/customers/${customerId}`);
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: t('toast.error'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           t('customers.toast.updateError'),

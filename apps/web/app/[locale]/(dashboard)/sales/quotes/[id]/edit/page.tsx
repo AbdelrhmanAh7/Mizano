@@ -34,7 +34,7 @@ export default function EditQuotePage() {
       router.push(`/sales/quotes/${quoteId}`);
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: t('toast.error'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           t('quotes.toast.updateError'),
