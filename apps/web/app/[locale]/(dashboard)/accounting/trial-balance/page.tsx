@@ -21,6 +21,7 @@ import { useTranslations } from 'next-intl';
 import { moneyToNumber } from '@/lib/money';
 import { useTrialBalance } from '@/lib/hooks/use-accounting-reports';
 import { useDateFormatter } from '@/lib/hooks/use-date-locale';
+import { TrialBalanceEmpty } from '@/components/reports/trial-balance-empty';
 
 interface TrialBalanceRow {
   accountId: string;
@@ -159,9 +160,7 @@ export default function TrialBalancePage() {
               </Button>
             </div>
           ) : rows.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">
-              {t('trialBalance.empty')}
-            </p>
+            <TrialBalanceEmpty />
           ) : (
             <Table>
               <TableHeader>

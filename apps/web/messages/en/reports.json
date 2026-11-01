@@ -81,7 +81,10 @@
     "code": "Code",
     "type": "Type",
     "total": "Total",
-    "noData": "No trial balance data available. Create some transactions first."
+    "emptyTitle": "Nothing posted yet",
+    "emptyBody": "The trial balance lists every account with posted entries up to this date. A new organization starts empty; it fills in as soon as you post an invoice, a bill, a payment or a journal entry.",
+    "emptyNewInvoice": "New invoice",
+    "emptyNewJournal": "New journal entry"
   },
   "generalLedger": {
     "title": "General Ledger",
