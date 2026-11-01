@@ -182,14 +182,14 @@ function ItemsPageContent() {
         <DataTableSearch
           value={tableParams.search}
           onChange={tableParams.setSearch}
-          placeholder="Search items..."
+          placeholder={t('common.searchItems')}
         />
         <Select value={typeFilter} onValueChange={setTypeFilter}>
           <SelectTrigger className="w-32">
-            <SelectValue placeholder="Type" />
+            <SelectValue placeholder={t('items.table.type')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="all">{t('common.allTypes')}</SelectItem>
             <SelectItem value="GOODS">{t('items.types.goods')}</SelectItem>
             <SelectItem value="SERVICE">{t('items.types.service')}</SelectItem>
             <SelectItem value="DIGITAL">{t('items.types.digital')}</SelectItem>
@@ -197,11 +197,11 @@ function ItemsPageContent() {
         </Select>
         <Select value={stockFilter} onValueChange={setStockFilter}>
           <SelectTrigger className="w-32">
-            <SelectValue placeholder="Stock" />
+            <SelectValue placeholder={t('items.table.stock')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Stock</SelectItem>
-            <SelectItem value="low">Low Stock</SelectItem>
+            <SelectItem value="all">{t('common.allStock')}</SelectItem>
+            <SelectItem value="low">{t('items.stockStatus.low')}</SelectItem>
           </SelectContent>
         </Select>
       </div>

@@ -1,4 +1,9 @@
 import { BRAND } from '@mizano/shared-types';
+import {
+  brandMarkAttachment,
+  brandMarkImg,
+  type BrandMailAttachment,
+} from '../../common/brand-mail';
 import { escapeHtml } from '../documents/templates/base.template';
 import type { ResetLocale } from './dto/password.dto';
 
@@ -6,6 +11,7 @@ interface ResetMail {
   subject: string;
   html: string;
   text: string;
+  attachments: BrandMailAttachment[];
 }
 
 const COPY: Record<
@@ -49,13 +55,14 @@ export function buildPasswordResetMail(
 <html lang="${locale}" dir="${dir}">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="font-family: Tahoma, Arial, sans-serif; color: #111827; line-height: 1.6;">
+  <p style="margin: 0 0 16px; font-size: 18px; font-weight: bold; color: #0F766E;">${brandMarkImg(24, '')}&nbsp;&nbsp;${escapeHtml(BRAND.name[locale])}</p>
   <p>${escapeHtml(copy.greeting(name))}</p>
   <p>${escapeHtml(copy.body(minutes))}</p>
-  <p><a href="${escapeHtml(link)}" style="display: inline-block; padding: 10px 18px; background: #2563EB; color: #ffffff; text-decoration: none; border-radius: 6px;">${escapeHtml(copy.button)}</a></p>
+  <p><a href="${escapeHtml(link)}" style="display: inline-block; padding: 10px 18px; background: #0D9488; color: #ffffff; text-decoration: none; border-radius: 6px;">${escapeHtml(copy.button)}</a></p>
   <p style="word-break: break-all; font-size: 12px; color: #6B7280;">${escapeHtml(link)}</p>
   <p style="font-size: 13px; color: #6B7280;">${escapeHtml(copy.ignore)}</p>
 </body>
 </html>`;
   const text = [copy.greeting(name), copy.body(minutes), link, copy.ignore].join('\n\n');
-  return { subject: copy.subject, html, text };
+  return { subject: copy.subject, html, text, attachments: [brandMarkAttachment()] };
 }

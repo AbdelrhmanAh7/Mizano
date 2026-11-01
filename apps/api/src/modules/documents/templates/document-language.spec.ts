@@ -1,3 +1,4 @@
+import { BRAND } from '@mizano/shared-types';
 import { generateBillHtml, BillData } from './bill.template';
 import { generateInvoiceHtml, InvoiceData } from './invoice.template';
 import { generateQuoteHtml, QuoteData } from './quote.template';
@@ -212,5 +213,14 @@ describe('external ETA reference on the invoice PDF', () => {
   );
   it('omits the ETA line when no reference has been recorded', () => {
     expect(generateInvoiceHtml(org(), invoice, 'en')).not.toContain('ETA UUID:');
+  });
+});
+
+describe('product line at the foot of the PDF', () => {
+  it.each(['quote', 'bill', 'invoice'] as const)('names the product in the %s language', (kind) => {
+    expect(visibleText(render[kind]('ar'))).toContain(`أُعدّ باستخدام ${BRAND.name.ar}`);
+    expect(visibleText(render[kind]('en'))).toContain(`Prepared with ${BRAND.name.en}`);
+    // The mark is drawn inline: the sandboxed renderer loads nothing from outside the page.
+    expect(render[kind]('en')).toMatch(/<svg [^>]*viewBox="0 0 64 64"/);
   });
 });

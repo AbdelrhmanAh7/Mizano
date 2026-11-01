@@ -6,6 +6,7 @@ import {
   defaultTemplateConfig,
   escapeHtml,
   safeColor,
+  brandFooterHtml,
 } from './base.template';
 
 export interface PayslipData {
@@ -232,6 +233,7 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
             This is a computer-generated payslip and does not require a signature.
           </p>
           ${org.footerText ? `<p style="color: #9CA3AF; font-size: 10px; margin-top: 10px;">${escapeHtml(org.footerText)}</p>` : ''}
+          ${brandFooterHtml()}
         </div>
       </div>
     </body>

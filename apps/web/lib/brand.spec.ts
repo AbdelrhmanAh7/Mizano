@@ -53,8 +53,14 @@ describe('brand in the web app', () => {
       short_name: string;
     };
     expect([manifest.name, manifest.short_name]).toEqual([BRAND.name.en, BRAND.name.en]);
-    for (const logo of files(join(WEB, 'public/svg'), /^logo-(full|stacked|wordmark).*\.svg$/)) {
-      expect(readFileSync(logo, 'utf8')).toContain(`>${BRAND.slug}</text>`);
+    // The wordmarks are outlined glyphs (so Arabic renders the same with no fonts); the title
+    // names the product in both scripts for screen readers and must follow the constant.
+    const logos = files(join(WEB, 'public/svg'), /^logo-.*\.svg$/);
+    expect(logos.length).toBeGreaterThanOrEqual(8);
+    for (const logo of logos) {
+      expect(readFileSync(logo, 'utf8')).toContain(
+        `<title>${BRAND.name.en} · ${BRAND.name.ar}</title>`,
+      );
     }
   });
 

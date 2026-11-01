@@ -1,7 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
-  <path d="M3 12 L3 5 L8 9 L13 5 L13 12" 
-        fill="none" stroke="black" stroke-width="1.2" 
-        stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="8" cy="3.5" r="1.5" fill="black"/>
-  <line x1="3" y1="12" x2="13" y2="12" stroke="black" stroke-width="1" stroke-linecap="round"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Jarda · جردة"><title>Jarda · جردة</title><g transform="translate(0 4)"><path d="M17 18H47M38 18V35A10 10 0 0 1 18 35" fill="none" stroke="#000000" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="28" cy="33.5" r="4" fill="#000000"/></g></svg>

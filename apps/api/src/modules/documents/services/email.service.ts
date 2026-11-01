@@ -9,6 +9,8 @@ import {
 } from '../dto/documents.dto';
 import { escapeHtml, formatCurrency, formatDate, safeColor } from '../templates/base.template';
 import nodemailer from 'nodemailer';
+import { BRAND } from '@mizano/shared-types';
+import { brandMarkAttachment, brandMarkImg } from '../../../common/brand-mail';
 import type { Attachment } from 'nodemailer/lib/mailer';
 
 @Injectable()
@@ -431,7 +433,7 @@ export class EmailService {
       bcc: options.bcc?.join(', '),
       subject: options.subject,
       html: options.html,
-      attachments: options.attachments,
+      attachments: [...(options.attachments ?? []), brandMarkAttachment()],
     });
   }
 
@@ -468,6 +470,9 @@ export class EmailService {
                   <td style="background-color: #F9FAFB; padding: 20px 30px; text-align: center; border-top: 1px solid #E5E7EB;">
                     <p style="margin: 0; color: #9CA3AF; font-size: 12px;">
                       This email was sent by ${safeOrgName}
+                    </p>
+                    <p style="margin: 8px 0 0; color: #9CA3AF; font-size: 11px;">
+                      ${brandMarkImg(16, '')}&nbsp;${BRAND.name.en} · <span dir="rtl">${BRAND.name.ar}</span>
                     </p>
                   </td>
                 </tr>

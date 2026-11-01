@@ -145,6 +145,7 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             NEXT_PUBLIC_API_URL=http://${{ secrets.DEPLOY_HOST }}:6001/api
+            NEXT_PUBLIC_APP_URL=${{ secrets.PRODUCTION_URL }}
 
   # ==========================================
   # Deploy to GCP VM via SSH

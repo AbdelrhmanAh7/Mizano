@@ -361,7 +361,8 @@
     "network": "Network error. Please check your connection.",
     "server": "Server error. Please try again later.",
     "tryAgain": "Try again",
-    "title": "Error"
+    "title": "Error",
+    "tryLater": "Please try again in a moment."
   },
   "empty": {
     "title": "No data",

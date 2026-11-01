@@ -28,6 +28,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 ARG NEXT_PUBLIC_API_URL=http://localhost:6001/api
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+# Public web origin for canonical links and share cards (falls back to NEXTAUTH_URL at runtime).
+ARG NEXT_PUBLIC_APP_URL=
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
 
 # Build shared packages first
 RUN pnpm --filter @mizano/shared-types build && pnpm --filter @mizano/validators build

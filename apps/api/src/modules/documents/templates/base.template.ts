@@ -1,3 +1,4 @@
+import { BRAND } from '@mizano/shared-types';
 import type { DocumentDigits } from '../../../common/utils/document-digits';
 
 // Base template configuration for PDF generation
@@ -118,6 +119,7 @@ const BASE_LABELS: Record<DocumentLocale, Record<string, string>> = {
     email: 'Email',
     taxId: 'Tax ID',
     bankDetails: 'Bank Details',
+    preparedWith: 'Prepared with',
   },
   ar: {
     description: 'الوصف',
@@ -135,6 +137,7 @@ const BASE_LABELS: Record<DocumentLocale, Record<string, string>> = {
     email: 'البريد الإلكتروني',
     taxId: 'الرقم الضريبي',
     bankDetails: 'البيانات البنكية',
+    preparedWith: 'أُعدّ باستخدام',
   },
 };
 
@@ -306,6 +309,19 @@ export function generateHeaderHtml(
   `;
 }
 
+/**
+ * One small line naming the product at the foot of every PDF, with the logo tile drawn inline
+ * (the renderer loads nothing from outside the page). The organization's own logo stays on top.
+ */
+export function brandFooterHtml(locale: DocumentLocale = 'en'): string {
+  const mark =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="12" height="12" aria-hidden="true" style="vertical-align: -2px;">' +
+    '<rect width="64" height="64" rx="15" fill="#0D9488"/>' +
+    '<path d="M17 18H47M38 18V35A10 10 0 0 1 18 35" fill="none" stroke="#FFFFFF" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<circle cx="28" cy="33.5" r="4" fill="#EF9F27"/></svg>';
+  return `<p style="margin-top: 12px; text-align: center; color: #9CA3AF; font-size: 9px;">${mark}&nbsp;${BASE_LABELS[locale].preparedWith} ${escapeHtml(BRAND.name[locale])}</p>`;
+}
+
 // Generate footer section for documents
 export function generateFooterHtml(
   org: OrganizationInfo,
@@ -334,6 +350,7 @@ export function generateFooterHtml(
       `
           : ''
       }
+      ${brandFooterHtml(locale)}
     </div>
   `;
 }

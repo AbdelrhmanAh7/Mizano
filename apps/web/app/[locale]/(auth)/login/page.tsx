@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { LanguageSwitcher } from '@/components/layout/language-switcher';
+import { BrandLogo } from '@/components/brand/brand-logo';
 import { Brain, BarChart3, Shield, Zap, Eye, EyeOff } from 'lucide-react';
 
 const loginSchema = z.object({
@@ -107,7 +108,7 @@ function LoginForm() {
   return (
     <div className="min-h-screen flex">
       {/* Left panel — brand showcase */}
-      <div className="hidden lg:flex lg:w-[55%] relative bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 p-12 flex-col justify-between overflow-hidden">
+      <div className="hidden lg:flex lg:w-[55%] relative bg-gradient-to-br from-[#0D9488] via-[#0B6E64] to-[#063A33] p-12 flex-col justify-between overflow-hidden">
         {/* Background pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full -translate-x-1/2 -translate-y-1/2" />
@@ -116,8 +117,10 @@ function LoginForm() {
         </div>
 
         <div className="relative z-10">
-          <h1 className="text-4xl font-bold text-white tracking-tight">{tCommon('appName')}</h1>
-          <p className="mt-2 text-blue-100 text-lg">{t('brandTagline')}</p>
+          <h1>
+            <BrandLogo height={56} alt={tCommon('appName')} tone="dark" priority />
+          </h1>
+          <p className="mt-4 text-teal-50 text-lg">{t('brandTagline')}</p>
         </div>
 
         <div className="relative z-10 space-y-6">
@@ -128,14 +131,14 @@ function LoginForm() {
               </div>
               <div>
                 <h3 className="text-white font-semibold text-sm">{t(feature.titleKey)}</h3>
-                <p className="text-blue-100 text-sm mt-0.5">{t(feature.descKey)}</p>
+                <p className="text-teal-50/90 text-sm mt-0.5">{t(feature.descKey)}</p>
               </div>
             </div>
           ))}
         </div>
 
         <div className="relative z-10">
-          <p className="text-blue-200 text-xs">{t('brandFooter')}</p>
+          <p className="text-teal-100/80 text-xs">{t('brandFooter')}</p>
         </div>
       </div>
 
@@ -143,7 +146,9 @@ function LoginForm() {
       <div className="flex-1 flex flex-col">
         {/* Top bar */}
         <div className="flex items-center justify-between p-6">
-          <span className="lg:hidden text-2xl font-bold text-primary">{tCommon('appName')}</span>
+          <span className="lg:hidden">
+            <BrandLogo height={36} alt={tCommon('appName')} priority />
+          </span>
           <div className="ms-auto">
             <LanguageSwitcher />
           </div>

@@ -46,7 +46,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import Image from 'next/image';
+import { BrandLogo } from '@/components/brand/brand-logo';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
@@ -366,7 +366,7 @@ export function Sidebar() {
             <Button
               variant="ghost"
               size="icon"
-              className={cn('fixed top-4 z-40', isRtl ? 'end-4' : 'start-4')}
+              className="fixed top-4 start-4 z-40"
               aria-label={t('openMenu')}
             >
               <Menu className="h-6 w-6" />
@@ -375,20 +375,7 @@ export function Sidebar() {
           <SheetContent side={isRtl ? 'right' : 'left'} className="w-64 p-0">
             <SheetHeader className="px-4 py-5 border-b">
               <SheetTitle>
-                <Image
-                  src="/svg/logo-full.svg"
-                  alt={tCommon('appName')}
-                  width={120}
-                  height={32}
-                  className="dark:hidden"
-                />
-                <Image
-                  src="/svg/logo-full-dark.svg"
-                  alt={tCommon('appName')}
-                  width={120}
-                  height={32}
-                  className="hidden dark:block"
-                />
+                <BrandLogo height={32} alt={tCommon('appName')} />
               </SheetTitle>
               <SheetDescription className="sr-only">
                 {tCommon('a11y.mainNavigationMenu')}
@@ -414,24 +401,9 @@ export function Sidebar() {
           >
             <div className="flex items-center justify-between flex-shrink-0 px-4 py-5">
               {collapsed ? (
-                <Image src="/svg/logo-icon.svg" alt={tCommon('appName')} width={28} height={28} />
+                <BrandLogo variant="icon" height={28} alt={tCommon('appName')} />
               ) : (
-                <>
-                  <Image
-                    src="/svg/logo-full.svg"
-                    alt={tCommon('appName')}
-                    width={120}
-                    height={32}
-                    className="dark:hidden"
-                  />
-                  <Image
-                    src="/svg/logo-full-dark.svg"
-                    alt={tCommon('appName')}
-                    width={120}
-                    height={32}
-                    className="hidden dark:block"
-                  />
-                </>
+                <BrandLogo height={32} alt={tCommon('appName')} />
               )}
               <Button
                 variant="ghost"
