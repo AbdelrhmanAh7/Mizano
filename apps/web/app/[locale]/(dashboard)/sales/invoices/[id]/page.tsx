@@ -177,7 +177,8 @@ export default function InvoiceDetailPage() {
     id: string;
     creditNoteNumber?: string;
     date?: string;
-    total?: string;
+    // The credit note's amount (`total` is never set by the API: issue #656).
+    amount?: string;
   }>;
 
   return (
@@ -623,7 +624,7 @@ export default function InvoiceDetailPage() {
                         : '-'}
                     </TableCell>
                     <TableCell className="text-end font-mono text-orange-600">
-                      {formatCurrency(creditNote.total || '0')}
+                      {formatCurrency(creditNote.amount || '0')}
                     </TableCell>
                   </TableRow>
                 ))}
