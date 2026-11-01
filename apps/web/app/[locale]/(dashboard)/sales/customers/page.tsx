@@ -147,15 +147,8 @@ function CustomersPageContent() {
     },
     {
       accessorKey: 'outstandingBalance',
-      header: () => (
-        <SortableHeader
-          label={t('customers.table.outstanding')}
-          columnId="outstandingBalance"
-          currentSortBy={tableParams.sortBy}
-          currentSortOrder={tableParams.sortOrder}
-          onSort={tableParams.setSort}
-        />
-      ),
+      // Computed per page from open invoices, so the server cannot sort by it.
+      header: t('customers.table.outstanding'),
       meta: { headerClassName: 'text-end', cellClassName: 'text-end' },
       cell: ({ row }) => {
         const balance = parseFloat(row.original.outstandingBalance || '0');

@@ -171,4 +171,14 @@ describe('CustomersService', () => {
       },
     });
   });
+
+  it('sorts the list by name when asked for a column the customer has not (#668)', async () => {
+    prisma.customer.findMany.mockResolvedValue([] as never);
+
+    await service.findAllCursor(ORG_ID, { sortBy: 'outstandingBalance', sortOrder: 'desc' });
+
+    const { orderBy } = prisma.customer.findMany.mock.calls[0][0] as { orderBy: unknown };
+    expect(JSON.stringify(orderBy)).toContain('"name":"desc"');
+    expect(JSON.stringify(orderBy)).not.toContain('outstandingBalance');
+  });
 });

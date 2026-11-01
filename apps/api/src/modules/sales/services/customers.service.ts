@@ -9,6 +9,7 @@ import { AgingReportsService } from '../../reports/services/aging-reports.servic
 import { PrismaService } from '../../../prisma/prisma.service';
 import { WebhookOutboxService } from '../../integrations/services/webhook-outbox.service';
 import { CreateCustomerDto } from '../dto/create-customer.dto';
+import { RECEIVABLE_INVOICE_STATUSES } from './invoices.service';
 import { UpdateCustomerDto } from '../dto/update-customer.dto';
 
 type CustomerAddress = CreateCustomerDto['billingAddress'];
@@ -27,6 +28,13 @@ function flatAddresses(billing: CustomerAddress, shipping: CustomerAddress) {
     shippingPostalCode: shipping?.postalCode,
     shippingCountry: shipping?.country,
   };
+}
+
+/** Customer columns a list may sort by; anything else (e.g. the computed balance) sorts by name. */
+const SORTABLE_FIELDS = new Set(['name', 'displayName', 'email', 'phone', 'currency', 'createdAt']);
+
+function customerSort(sortBy: string | undefined): string {
+  return sortBy && SORTABLE_FIELDS.has(sortBy) ? sortBy : 'name';
 }
 
 @Injectable()
@@ -93,7 +101,8 @@ export class CustomersService {
   }
 
   async findAll(organizationId: string, query: PaginationDto) {
-    const { page = 1, limit = 20, search, sortBy = 'name', sortOrder = 'asc' } = query;
+    const { page = 1, limit = 20, search, sortOrder = 'asc' } = query;
+    const sortBy = customerSort(query.sortBy);
 
     const where = {
       organizationId,
@@ -130,7 +139,8 @@ export class CustomersService {
   }
 
   async findAllCursor(organizationId: string, query: CursorPaginationDto) {
-    const { cursor, take = 50, search, sortBy = 'name', sortOrder = 'asc' } = query;
+    const { cursor, take = 50, search, sortOrder = 'asc' } = query;
+    const sortBy = customerSort(query.sortBy);
 
     const where: Prisma.CustomerWhereInput = { organizationId, deletedAt: null };
 
@@ -170,7 +180,7 @@ export class CustomersService {
               organizationId,
               customerId: { in: customerIds },
               deletedAt: null,
-              status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] },
+              status: { in: RECEIVABLE_INVOICE_STATUSES },
             },
             _sum: { balanceDue: true },
           })
@@ -276,7 +286,7 @@ export class CustomersService {
         organizationId,
         customerId,
         deletedAt: null,
-        status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] },
+        status: { in: RECEIVABLE_INVOICE_STATUSES },
       },
       select: { balanceDue: true },
     });
