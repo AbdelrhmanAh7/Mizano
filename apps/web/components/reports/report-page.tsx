@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { format } from 'date-fns';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,19 @@ import { useDateFormatter } from '@/lib/hooks/use-date-locale';
 import type { ReportAccount } from '@/lib/hooks/use-reports';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { cn } from '@/lib/utils';
+
+/**
+ * The General Ledger of one account for a period: where a report figure leads, so the
+ * accountant reaches its journals and source documents (#669).
+ */
+export function ledgerHref(accountId: string, startDate: Date, endDate: Date): string {
+  const params = new URLSearchParams({
+    accountId,
+    startDate: format(startDate, 'yyyy-MM-dd'),
+    endDate: format(endDate, 'yyyy-MM-dd'),
+  });
+  return `/reports/general-ledger?${params.toString()}`;
+}
 
 /** A report page's title row: back to the reports index, title and period line. */
 export function ReportPageHeader({
@@ -80,18 +94,24 @@ export function ReportLoadError({ onRetry }: { onRetry: () => void }): JSX.Eleme
 /**
  * One statement account with its children indented below it, amounts in the base currency.
  * `labelOf` names a row in the page language (the section rows the report transform adds);
- * it is passed down to the children and falls back to the account name.
+ * `hrefOf` makes the name and amount open the account's ledger (undefined: plain text, as
+ * for section rows). Both are passed down to the children.
  */
 export function ReportAccountRow({
   account,
   level = 0,
   labelOf,
+  hrefOf,
 }: {
   account: ReportAccount;
   level?: number;
   labelOf?: (account: ReportAccount) => string;
+  hrefOf?: (account: ReportAccount) => string | undefined;
 }): JSX.Element {
   const formatCurrency = useMoneyFormatter();
+  const href = hrefOf?.(account);
+  const label = labelOf ? labelOf(account) : account.name;
+  const amount = formatCurrency(account.balance);
   return (
     <div>
       <div
@@ -100,16 +120,34 @@ export function ReportAccountRow({
           level === 0 && 'font-medium',
           level > 0 && 'text-sm',
         )}
-        style={{ paddingLeft: `${level * 24}px` }}
+        style={{ paddingInlineStart: `${level * 24}px` }}
       >
         <span className="flex items-center gap-2">
           <span className="text-muted-foreground font-mono">{account.code}</span>
-          {labelOf ? labelOf(account) : account.name}
+          {href ? (
+            <Link href={href} className="hover:underline">
+              {label}
+            </Link>
+          ) : (
+            label
+          )}
         </span>
-        <span className="font-mono">{formatCurrency(account.balance)}</span>
+        {href ? (
+          <Link href={href} className="font-mono text-primary hover:underline">
+            {amount}
+          </Link>
+        ) : (
+          <span className="font-mono">{amount}</span>
+        )}
       </div>
       {account.children?.map((child) => (
-        <ReportAccountRow key={child.id} account={child} level={level + 1} labelOf={labelOf} />
+        <ReportAccountRow
+          key={child.id}
+          account={child}
+          level={level + 1}
+          labelOf={labelOf}
+          hrefOf={hrefOf}
+        />
       ))}
     </div>
   );

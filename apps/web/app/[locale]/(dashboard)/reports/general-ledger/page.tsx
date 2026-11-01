@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { format, startOfYear, endOfMonth } from 'date-fns';
+import { format, startOfYear, endOfMonth, isValid, parseISO } from 'date-fns';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { BookOpen } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,17 +33,26 @@ import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 import { useAccounts, ACCOUNT_PICKER_PARAMS } from '@/lib/hooks/use-accounts';
 import { useDateFnsLocale } from '@/lib/date-locale';
 
+/** A yyyy-MM-dd link parameter as a local date, or the fallback when absent or invalid. */
+function dateParam(value: string | null, fallback: Date): Date {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return fallback;
+  const date = parseISO(value);
+  return isValid(date) ? date : fallback;
+}
+
 export default function GeneralLedgerPage() {
   const dateLocale = useDateFnsLocale();
   // Report figures are ledger amounts, in the organization base currency (audit B5).
   const formatCurrency = useMoneyFormatter();
   const t = useTranslations('reports');
   const dateLabels = useReportDateLabels();
-  const [dateRange, setDateRange] = useState({
-    startDate: startOfYear(new Date()),
-    endDate: endOfMonth(new Date()),
-  });
-  const [accountId, setAccountId] = useState('');
+  // Report figures link here with the account and period already chosen (#669).
+  const searchParams = useSearchParams();
+  const [dateRange, setDateRange] = useState(() => ({
+    startDate: dateParam(searchParams?.get('startDate') ?? null, startOfYear(new Date())),
+    endDate: dateParam(searchParams?.get('endDate') ?? null, endOfMonth(new Date())),
+  }));
+  const [accountId, setAccountId] = useState(() => searchParams?.get('accountId') ?? '');
 
   const { data: accounts } = useAccounts(ACCOUNT_PICKER_PARAMS);
   const { data: ledger, isLoading } = useGeneralLedgerReport(accountId, {

@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { format } from 'date-fns';
+import { format, startOfYear } from 'date-fns';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
 import {
   ReportAccountRow,
+  ledgerHref,
   ReportPageHeader,
   ReportPageSkeleton,
   useReportDateLabels,
@@ -21,6 +22,7 @@ const SECTION_KEYS: Record<string, string> = {
   'fixed-assets': 'fixedAssets',
   'current-liabilities': 'currentLiabilities',
   'long-term-liabilities': 'longTermLiabilities',
+  // Computed from all income and expense accounts; not a ledger account.
   'retained-earnings': 'retainedEarnings',
 };
 
@@ -35,6 +37,12 @@ export default function BalanceSheetReportPage() {
 
   const labelOf = (account: ReportAccount) =>
     SECTION_KEYS[account.id] ? t(`balanceSheet.${SECTION_KEYS[account.id]}`) : account.name;
+  // A real account opens its ledger up to the as-of date (closing balance = this figure, #669).
+  // Section rows and retained earnings are computed, not one account, so they stay plain.
+  const hrefOf = (account: ReportAccount) =>
+    !account.id || SECTION_KEYS[account.id]
+      ? undefined
+      : ledgerHref(account.id, startOfYear(asOfDate), asOfDate);
 
   if (isLoading) {
     return <ReportPageSkeleton />;
@@ -103,7 +111,12 @@ export default function BalanceSheetReportPage() {
               </CardHeader>
               <CardContent>
                 {assets.map((account: ReportAccount) => (
-                  <ReportAccountRow key={account.id} account={account} labelOf={labelOf} />
+                  <ReportAccountRow
+                    key={account.id}
+                    account={account}
+                    labelOf={labelOf}
+                    hrefOf={hrefOf}
+                  />
                 ))}
                 <div className="flex justify-between py-3 border-t-2 font-bold">
                   <span>{t('balanceSheet.totalAssets')}</span>
@@ -120,7 +133,12 @@ export default function BalanceSheetReportPage() {
                 </CardHeader>
                 <CardContent>
                   {liabilities.map((account: ReportAccount) => (
-                    <ReportAccountRow key={account.id} account={account} labelOf={labelOf} />
+                    <ReportAccountRow
+                      key={account.id}
+                      account={account}
+                      labelOf={labelOf}
+                      hrefOf={hrefOf}
+                    />
                   ))}
                   <div className="flex justify-between py-3 border-t-2 font-bold">
                     <span>{t('balanceSheet.totalLiabilities')}</span>
@@ -135,7 +153,12 @@ export default function BalanceSheetReportPage() {
                 </CardHeader>
                 <CardContent>
                   {equity.map((account: ReportAccount) => (
-                    <ReportAccountRow key={account.id} account={account} labelOf={labelOf} />
+                    <ReportAccountRow
+                      key={account.id}
+                      account={account}
+                      labelOf={labelOf}
+                      hrefOf={hrefOf}
+                    />
                   ))}
                   <div className="flex justify-between py-3 border-t-2 font-bold">
                     <span>{t('balanceSheet.totalEquity')}</span>

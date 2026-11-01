@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { format } from 'date-fns';
+import { format, startOfYear } from 'date-fns';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
 import {
+  ledgerHref,
   ReportPageHeader,
   ReportPageSkeleton,
   useReportDateLabels,
@@ -138,25 +140,41 @@ export default function TrialBalanceReportPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {accounts.map((account: TrialBalanceAccount) => (
-                      <TableRow key={account.id}>
-                        <TableCell className="font-mono">{account.code}</TableCell>
-                        <TableCell className="font-medium">{account.name}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={getAccountTypeColor(account.type)}>
-                            {tTypes.has(account.type.toLowerCase())
-                              ? tTypes(account.type.toLowerCase())
-                              : account.type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {account.debit > 0 ? formatCurrency(account.debit) : '-'}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {account.credit > 0 ? formatCurrency(account.credit) : '-'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {accounts.map((account: TrialBalanceAccount) => {
+                      // The account's ledger up to the as-of date: its journals and documents (#669).
+                      const href = ledgerHref(account.id, startOfYear(asOfDate), asOfDate);
+                      const figure = (value: number) =>
+                        value > 0 ? (
+                          <Link href={href} className="text-primary hover:underline">
+                            {formatCurrency(value)}
+                          </Link>
+                        ) : (
+                          '-'
+                        );
+                      return (
+                        <TableRow key={account.id}>
+                          <TableCell className="font-mono">{account.code}</TableCell>
+                          <TableCell className="font-medium">
+                            <Link href={href} className="hover:underline">
+                              {account.name}
+                            </Link>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={getAccountTypeColor(account.type)}>
+                              {tTypes.has(account.type.toLowerCase())
+                                ? tTypes(account.type.toLowerCase())
+                                : account.type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {figure(account.debit)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {figure(account.credit)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                   <TableFooter>
                     <TableRow className="font-bold">
