@@ -120,7 +120,8 @@ export function useCreateVendor() {
         billingAddress: data.billingAddress,
       };
       const response = await vendorsApi.create(submitData);
-      return response.data;
+      // POST /vendors answers the vendor itself (no { data } wrapper).
+      return response.data as Vendor;
     },
     invalidate: () => [['vendors']],
     success: 'created',

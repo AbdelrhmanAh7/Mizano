@@ -718,10 +718,10 @@ export default function ScanBillPage() {
                       phone: suggestion.phone ?? undefined,
                       taxId: suggestion.taxId ?? undefined,
                     });
-                    if (created?.data?.id) {
-                      setScanDefaults((prev) =>
-                        prev ? { ...prev, vendorId: created.data.id } : prev,
-                      );
+                    // The vendor itself, not { data } (#671).
+                    const vendorId = created?.id;
+                    if (vendorId) {
+                      setScanDefaults((prev) => (prev ? { ...prev, vendorId } : prev));
                     }
                   }}
                 >
