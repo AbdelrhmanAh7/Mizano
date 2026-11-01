@@ -82,13 +82,13 @@ done
 
 for key in "${!now_msg[@]}"; do
   if ! grep -qxF "$key" "$state"; then
-    notify "[Mizano $host] ALERT: ${now_msg[$key]}"
+    notify "[Jarda $host] ALERT: ${now_msg[$key]}"
   fi
 done
 while IFS= read -r key; do
   [ -n "$key" ] || continue
   if [ -z "${now_msg[$key]:-}" ]; then
-    notify "[Mizano $host] RECOVERED: $key"
+    notify "[Jarda $host] RECOVERED: $key"
   fi
 done <"$state"
 

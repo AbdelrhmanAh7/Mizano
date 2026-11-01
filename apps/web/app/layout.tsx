@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     'financial management',
   ],
   authors: [{ name: BRAND.name.en }],
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://mizano.app'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5001'),
   openGraph: {
     type: 'website',
     siteName: BRAND.name.en,
@@ -55,6 +55,7 @@ export const metadata: Metadata = {
       { url: '/ico/favicon.ico', sizes: 'any' },
       { url: '/png/icon-32x32.png', sizes: '32x32', type: 'image/png' },
       { url: '/png/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/svg/logo-icon.svg', type: 'image/svg+xml' },
     ],
     apple: [{ url: '/png/apple-touch-icon.png' }],
   },

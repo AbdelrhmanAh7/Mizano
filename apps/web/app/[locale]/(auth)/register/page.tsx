@@ -22,6 +22,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/components/ui/use-toast';
 import { authApi } from '@/lib/api';
 import { LanguageSwitcher } from '@/components/layout/language-switcher';
+import { AuthCardLogo } from '@/components/brand/auth-card-logo';
 import { passwordRule, passwordSchema } from '@/lib/password-policy';
 
 /** Countries a new organization can start in, with the base currency each one sets. */
@@ -118,12 +119,13 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50 to-cyan-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <div className="absolute top-4 end-4">
         <LanguageSwitcher />
       </div>
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
+          <AuthCardLogo />
           <CardTitle className="text-3xl font-bold tracking-tight">{t('title')}</CardTitle>
           <CardDescription>{t('subtitle')}</CardDescription>
         </CardHeader>

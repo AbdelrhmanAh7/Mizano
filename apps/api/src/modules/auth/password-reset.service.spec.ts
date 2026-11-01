@@ -7,8 +7,14 @@ import { PasswordResetService } from './password-reset.service';
 import { hashToken } from './token-hash';
 import { createFakeAuthStore, FakeAuthStore } from './testing/fake-auth-store';
 
-const sendMail = jest.fn((_mail: { to: string; subject: string; text: string }) =>
-  Promise.resolve(),
+const sendMail = jest.fn(
+  (_mail: {
+    to: string;
+    subject: string;
+    text: string;
+    html: string;
+    attachments?: { cid: string }[];
+  }) => Promise.resolve(),
 );
 jest.mock('nodemailer', () => ({
   __esModule: true,
@@ -66,6 +72,9 @@ describe('PasswordResetService', () => {
     expect(mail.to).toBe('owner@x.test');
     expect(mail.subject).toBe('إعادة تعيين كلمة المرور في جردة');
     expect(mail.text).toContain('https://app.mizano.test/ar/reset-password#token=');
+    // The logo travels inside the mail (cid), so it shows without loading remote images.
+    expect(mail.html).toContain('src="cid:brand-mark"');
+    expect(mail.attachments?.map((a) => a.cid)).toEqual(['brand-mark']);
 
     const token = lastLinkToken();
     expect(token.length).toBeGreaterThan(40);

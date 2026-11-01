@@ -2,14 +2,26 @@ import type { Metadata } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
-import { BRAND } from '@mizano/shared-types';
+import { BRAND, brandName, brandTagline } from '@mizano/shared-types';
 import { Suspense } from 'react';
 import { locales, localeDirections, type Locale } from '@/i18n/config';
 import { LocaleDirectionProvider } from '@/components/locale-direction-provider';
 import { Providers } from '@/components/providers';
 import { NavigationProgress } from '@/components/navigation-progress';
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://mizano.app';
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5001';
+
+const DESCRIPTION: Record<'ar' | 'en', string> = {
+  en: 'Accounting in Arabic and English for businesses in Egypt, Saudi Arabia and the UAE: invoices, bills, journals and reports. AI is optional.',
+  ar: 'محاسبة بالعربية والإنجليزية للشركات في مصر والسعودية والإمارات: فواتير البيع والشراء والقيود والتقارير. الذكاء الاصطناعي اختياري.',
+};
+/** The share card (1200x630, both scripts); a child segment's openGraph replaces the parent's whole object. */
+const SHARE_IMAGE = {
+  url: '/social/og-image.png',
+  width: 1200,
+  height: 630,
+  alt: `${BRAND.name.en} · ${BRAND.name.ar}`,
+};
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
@@ -21,14 +33,29 @@ export async function generateMetadata({
   params: { locale: string };
 }): Promise<Metadata> {
   const { locale } = params;
+  const lang = locale === 'ar' ? 'ar' : 'en';
 
   return {
+    title: { default: brandTagline(lang), template: `%s | ${brandName(lang)}` },
+    description: DESCRIPTION[lang],
+    applicationName: brandName(lang),
     alternates: {
       canonical: `${BASE_URL}/${locale}`,
       languages: Object.fromEntries(locales.map((l) => [l, `${BASE_URL}/${l}`])),
     },
     openGraph: {
-      locale: locale === 'ar' ? 'ar_SA' : 'en_US',
+      type: 'website',
+      siteName: brandName(lang),
+      title: brandTagline(lang),
+      description: DESCRIPTION[lang],
+      locale: lang === 'ar' ? 'ar_SA' : 'en_US',
+      images: [SHARE_IMAGE],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: brandTagline(lang),
+      description: DESCRIPTION[lang],
+      images: [SHARE_IMAGE.url],
     },
   };
 }

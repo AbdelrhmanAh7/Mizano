@@ -15,6 +15,7 @@ import { describeError } from '../../common/utils/redact';
 import { AuthSessionsService } from './auth-sessions.service';
 import { hashToken } from './token-hash';
 import { buildPasswordResetMail } from './password-reset-mail';
+import type { BrandMailAttachment } from '../../common/brand-mail';
 import type { ForgotPasswordDto, ResetLocale } from './dto/password.dto';
 
 const RESET_TTL_MINUTES = 30;
@@ -39,7 +40,13 @@ const INVALID_LINK = {
 };
 
 interface MailTransport {
-  send(mail: { to: string; subject: string; html: string; text: string }): Promise<void>;
+  send(mail: {
+    to: string;
+    subject: string;
+    html: string;
+    text: string;
+    attachments?: BrandMailAttachment[];
+  }): Promise<void>;
 }
 
 /**

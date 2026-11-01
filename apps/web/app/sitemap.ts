@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next';
 import { locales } from '@/i18n/config';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mizano.app';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5001';
 
   const publicRoutes = ['', '/login', '/register'];
 
