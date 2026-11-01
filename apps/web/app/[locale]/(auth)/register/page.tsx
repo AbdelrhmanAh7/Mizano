@@ -54,6 +54,7 @@ export default function RegisterPage() {
   const t = useTranslations('auth.register');
   const tErrors = useTranslations('auth.errors');
   const tValidation = useTranslations('validation');
+  const tLegal = useTranslations('legal.common');
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   // Country and currency names in the screen's language, from the browser's own data.
@@ -227,6 +228,20 @@ export default function RegisterPage() {
                 <p className="text-sm text-red-500">{tValidation('passwordMismatch')}</p>
               )}
             </div>
+            <p className="text-xs leading-5 text-muted-foreground">
+              {tLegal.rich('agreement', {
+                terms: (chunks) => (
+                  <Link href="/terms" target="_blank" className="text-primary underline">
+                    {chunks}
+                  </Link>
+                ),
+                privacy: (chunks) => (
+                  <Link href="/privacy" target="_blank" className="text-primary underline">
+                    {chunks}
+                  </Link>
+                ),
+              })}
+            </p>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? t('creatingAccount') : t('signUp')}
             </Button>

@@ -1,0 +1,113 @@
+{
+  "common": {
+    "updated": "Last updated:",
+    "draftBadge": "Draft: not yet reviewed by a lawyer",
+    "draftNote": "This page is a plain-language draft for the free pilot. A lawyer will review it before we charge anything. Until then, where this page and the law differ, the law applies.",
+    "provider": "On this page, “we” means {brand}, provided by Abdelrhman Ahmed Farag Mohamed (Giza, Egypt).",
+    "contactHeading": "Contact us",
+    "contactBody": "For any question about this page or your data, write to us through the support contact we gave you when you joined the pilot (WhatsApp or email). We reply within two working days.",
+    "nav": "Legal",
+    "terms": "Terms of use",
+    "privacy": "Privacy policy",
+    "back": "Back to {brand}",
+    "agreement": "By creating an account you agree to the <terms>Terms of use</terms> and the <privacy>Privacy policy</privacy>."
+  },
+  "terms": {
+    "title": "Terms of use",
+    "description": "The terms for using {brand} during the free pilot.",
+    "lead": "These terms govern your use of {brand}. Please read them before you create an account.",
+    "sections": {
+      "service": {
+        "heading": "What {brand} is",
+        "p1": "{brand} is an online accounting service for businesses and accountants: a chart of accounts, invoices, bills, payments, bank lines, stock, payroll and reports, kept with double-entry bookkeeping. By creating an account or using {brand}, you agree to these terms."
+      },
+      "pilot": {
+        "heading": "The free pilot",
+        "p1": "{brand} is in a pilot and costs nothing during it. Features may change, and mistakes can happen. Export your important reports regularly and keep your own copies."
+      },
+      "account": {
+        "heading": "Your account and your team",
+        "p1": "You are responsible for keeping your password safe and for everything done in your account. Your organization's admins decide who joins it and what each person may see and do."
+      },
+      "data": {
+        "heading": "Your data",
+        "p1": "The accounting data you enter or upload stays yours. We use it only to run the service for you: to store it, calculate your reports and show them to you.",
+        "p2": "You are responsible for having the right to use the data you add, including the details of your customers, suppliers and employees."
+      },
+      "advice": {
+        "heading": "Not professional advice",
+        "p1": "{brand} helps you keep your books; it does not replace an accountant, an auditor or a tax adviser. You remain responsible for your tax returns, e-invoices and filings, and for checking the figures before you submit them. Suggestions in the app, including AI suggestions, are never posted without a person's approval."
+      },
+      "ai": {
+        "heading": "AI and services you connect",
+        "p1": "AI is off unless your organization turns it on with its own account at an AI provider (such as Claude, OpenAI, Gemini or OpenRouter). When it is on, the documents you choose are sent to that provider, under its own terms and prices. The same applies to other services you connect, such as FlowLine."
+      },
+      "use": {
+        "heading": "Acceptable use",
+        "p1": "Don't use {brand} for anything against the law, to hide income or avoid tax, to try to reach another organization's data, or to disrupt the service. We may suspend an account that does."
+      },
+      "liability": {
+        "heading": "Limits of our responsibility",
+        "p1": "We work to keep {brand} available and your data safe, and we take an encrypted backup every night. During the free pilot we provide the service as it is and, as far as the law allows, we are not liable for indirect losses such as lost profit. Nothing in these terms takes away rights you have under consumer protection law."
+      },
+      "ending": {
+        "heading": "Stopping",
+        "p1": "You can stop using {brand} at any time. Ask us to close your organization and we will delete its data within 30 days, except what the law requires us to keep. If we end the pilot, we will tell you at least 30 days ahead so you can export your data."
+      },
+      "law": {
+        "heading": "Governing law",
+        "p1": "These terms are governed by the laws of the Arab Republic of Egypt. Any dispute we cannot settle together goes to the competent courts in Giza, Egypt. If you are a consumer in another country, the protections its law requires still apply to you."
+      },
+      "changes": {
+        "heading": "Changes to these terms",
+        "p1": "We may change these terms. We update the date at the top of this page, and for a significant change we tell your organization's admins before it takes effect."
+      }
+    }
+  },
+  "privacy": {
+    "title": "Privacy policy",
+    "description": "What data {brand} collects, why, where it is kept, and how you control it.",
+    "lead": "This page explains what data {brand} collects, why, where it is kept, and how you control it.",
+    "sections": {
+      "collect": {
+        "heading": "What we collect",
+        "p1": "Your account: your name, email address, your organization's name and country, and your preferred language. Your password is stored only in a scrambled form that nobody can read back.",
+        "p2": "Your accounting data: customers, suppliers, products, invoices, bills, payments, journal entries, bank lines, employees and payroll if you use them, and the documents you upload, such as bills and receipts.",
+        "p3": "Activity: a log of who changed what and when, which accountants rely on. Technical logs record errors and requests, without the contents of your documents."
+      },
+      "why": {
+        "heading": "Why we use it",
+        "p1": "Only to run {brand} for you: to keep your books, produce your reports, send the emails you ask for (such as an invoice to your customer or a password reset link), protect your account and fix problems. We don't sell your data, show ads, or use your data to train AI models."
+      },
+      "where": {
+        "heading": "Where it is kept",
+        "p1": "Your data is stored in a database on a cloud server that we rent and run, and an encrypted backup is made every night. When the off-site copy is turned on, that encrypted backup is also kept in Cloudflare R2 storage. We will name the hosting company and the country of the server on this page before the first paid plan."
+      },
+      "sharing": {
+        "heading": "Who else handles it",
+        "p1": "Only the services needed to run {brand}: the company that hosts our server, Cloudflare (our domain, the secure connection and the off-site backup copy), the email service that sends the emails you ask for, and, only if your organization turns AI on, the AI provider of its own account. Each one receives only what its task needs."
+      },
+      "keep": {
+        "heading": "How long we keep it",
+        "p1": "For as long as your organization uses {brand}. After you ask us to close it, we delete it within 30 days, and the nightly backups that still contain it expire within a further 30 days. Before closing, export the accounting records the law requires you to keep."
+      },
+      "rights": {
+        "heading": "Your rights",
+        "p1": "You can see and correct your data in the app and export your lists and reports at any time. To get a full copy, correct something you cannot change yourself, object to a use, or delete your account or organization, contact us and we will answer within 30 days.",
+        "p2": "Egypt's Personal Data Protection Law (Law No. 151 of 2020) gives you these rights, and the law of your own country may give you more."
+      },
+      "security": {
+        "heading": "Keeping data safe",
+        "p1": "Passwords are stored scrambled, connections are encrypted (HTTPS), each organization's data is kept apart from the others, keys you save are encrypted, and backups are encrypted before they leave the server. If your data is put at risk, we will tell you as the law requires."
+      },
+      "cookies": {
+        "heading": "Cookies",
+        "p1": "We use only the cookies needed to keep you signed in and to remember your language. There are no advertising or third-party tracking cookies."
+      },
+      "changes": {
+        "heading": "Changes to this policy",
+        "p1": "When this policy changes we update the date at the top of this page, and for a significant change we tell your organization's admins first."
+      }
+    }
+  }
+}
