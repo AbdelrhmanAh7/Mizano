@@ -311,7 +311,10 @@ export class DocumentIntakeController {
       return { data: await this.intakeService.confirmAndCreate(orgId, input) };
     }
     // Replay-safe: only one confirm can move the job to APPROVED.
-    const restore = await this.jobs.claimForApproval(jobId, orgId, input.currencyCode);
+    const restore = await this.jobs.claimForApproval(jobId, orgId, {
+      type: input.type,
+      currencyCode: input.currencyCode,
+    });
     try {
       // The draft, its INTAKE_DRAFT marker and the job's draft link commit together; a crash
       // before that leaves the job APPROVED without a link, which recoverApprovals repairs.

@@ -3,7 +3,7 @@
  * Redis/BullMQ. Only the extraction strategy is stubbed (no model is required): it returns a
  * fixed extraction, or throws when `stub.mode === 'fail'`.
  */
-import { INestApplication } from '@nestjs/common';
+import { ConflictException, INestApplication } from '@nestjs/common';
 import { IntakeJobStatus } from '@prisma/client';
 import { createTestApp, getPrisma, uniqueSuffix } from './helpers/app.helper';
 import { registerTenant, TestTenant } from './helpers/tenant.helper';
@@ -11,6 +11,10 @@ import { eventually } from './helpers/journey.helper';
 import { ApiHelper } from './helpers/api-client.helper';
 import { ExtractionStrategyResolver } from '../src/modules/ai/extraction/extraction-strategy-resolver.service';
 import { IntakeStorage, sha256Hex } from '../src/modules/ai/intake/intake-storage';
+import {
+  INTAKE_APPROVAL_INTERRUPTED,
+  IntakeJobsService,
+} from '../src/modules/ai/intake/intake-jobs.service';
 import { IntakeProcessorService } from '../src/modules/ai/intake/intake-processor.service';
 import { IntakeQueueService } from '../src/modules/ai/intake/intake-queue.service';
 import { DocumentIntakeService } from '../src/modules/ai/services/document-intake.service';
@@ -427,5 +431,90 @@ describe('Document intake (e2e)', () => {
     });
     const done = await waitForStatus(failed.id, IntakeJobStatus.NEEDS_REVIEW);
     expect(done?.attempts).toBe(2);
+  });
+
+  it('#587 the sweep reopens a stalled approval, a late draft rolls back, an old one is kept', async () => {
+    const jobsService = app.get(IntakeJobsService);
+    const finished = async (marker: string): Promise<string> => {
+      const res = await upload(a, pdfFixture(`${marker}-${uniqueSuffix()}`));
+      expect(res.status).toBe(201);
+      const id = res.body.data.jobId as string;
+      await waitForStatus(id, IntakeJobStatus.NEEDS_REVIEW);
+      return id;
+    };
+    const stalled = await finished('STALLED');
+    const legacy = await finished('LEGACY');
+
+    // The confirm request claimed the job, then died before its draft committed.
+    await jobsService.claimForApproval(stalled, tenantA.organizationId, { type: 'BILL' });
+    // An approval claimed by the earlier code: no draft type recorded, its draft may exist.
+    await prisma.intakeJob.update({
+      where: { id: legacy },
+      data: { status: IntakeJobStatus.APPROVED },
+    });
+    await prisma.$executeRaw`UPDATE intake_jobs SET "updatedAt" = now() - interval '1 hour' WHERE id IN (${stalled}, ${legacy})`;
+
+    // The app's own periodic sweep may get there first; either way the row ends the same.
+    await jobsService.recoverApprovals();
+    expect(await prisma.intakeJob.findUniqueOrThrow({ where: { id: stalled } })).toMatchObject({
+      status: IntakeJobStatus.NEEDS_REVIEW,
+      lastError: INTAKE_APPROVAL_INTERRUPTED,
+      draftDocumentType: null,
+      draftDocumentId: null,
+    });
+    expect(await prisma.intakeJob.findUniqueOrThrow({ where: { id: legacy } })).toMatchObject({
+      status: IntakeJobStatus.APPROVED,
+      draftDocumentId: null,
+    });
+
+    // The stalled request finally reaches its draft transaction: the guarded link fails and the
+    // bill and its marker roll back.
+    const vendor = await a.post('/vendors').send({ name: `Sweep Vendor ${uniqueSuffix()}` });
+    expect(vendor.status).toBe(201);
+    const billNumber = `LATE-${uniqueSuffix()}`;
+    const dto = {
+      type: 'BILL' as const,
+      vendorId: vendor.body.id as string,
+      date: '2026-09-01',
+      dueDate: '2026-10-01',
+      documentNumber: billNumber,
+      lines: [{ description: 'CPU', quantity: '1', rate: '100', taxRatePercent: '0' }],
+    };
+    await expect(
+      app
+        .get(DocumentIntakeService)
+        .confirmAndCreate(tenantA.organizationId, dto, { jobId: stalled, userId: tenantA.userId }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(
+      await prisma.bill.count({ where: { organizationId: tenantA.organizationId, billNumber } }),
+    ).toBe(0);
+    expect(
+      await prisma.auditLog.count({
+        where: {
+          organizationId: tenantA.organizationId,
+          entityType: 'INTAKE_DRAFT',
+          entityId: stalled,
+        },
+      }),
+    ).toBe(0);
+
+    // The reopened job is approved normally, exactly once, with its marker.
+    const confirm = await a.post('/ai/document-intake/confirm').send({ ...dto, jobId: stalled });
+    expect(confirm.status).toBe(201);
+    expect(await prisma.intakeJob.findUniqueOrThrow({ where: { id: stalled } })).toMatchObject({
+      status: IntakeJobStatus.APPROVED,
+      draftDocumentType: 'bill',
+      draftDocumentId: confirm.body.data.id,
+      lastError: null,
+    });
+    expect(
+      await prisma.auditLog.count({
+        where: {
+          organizationId: tenantA.organizationId,
+          entityType: 'INTAKE_DRAFT',
+          entityId: stalled,
+        },
+      }),
+    ).toBe(1);
   });
 });

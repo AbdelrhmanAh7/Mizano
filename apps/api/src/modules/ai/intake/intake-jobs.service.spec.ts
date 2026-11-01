@@ -14,6 +14,7 @@ import { FakeIntakeJobTable, MemoryIntakeStorage } from './intake-test-utils';
 
 const ORG_A = 'org-a';
 const ORG_B = 'org-b';
+const BILL = { type: 'BILL' } as const;
 
 describe('IntakeJobsService', () => {
   let table: FakeIntakeJobTable;
@@ -199,37 +200,41 @@ describe('IntakeJobsService', () => {
       const { job } = await upload(ORG_A);
       table.rows[0].status = IntakeJobStatus.EXTRACTED;
       table.rows[0].result = { extractedFields: { currency: 'EGP' } };
-      await expect(service.claimForApproval(job.id, ORG_A)).resolves.toBe(
+      await expect(service.claimForApproval(job.id, ORG_A, BILL)).resolves.toBe(
         IntakeJobStatus.EXTRACTED,
       );
-      await expect(service.claimForApproval(job.id, ORG_A)).rejects.toBeInstanceOf(
+      await expect(service.claimForApproval(job.id, ORG_A, BILL)).rejects.toBeInstanceOf(
         ConflictException,
       );
+      expect(table.rows[0].draftDocumentType).toBe('bill');
       await service.releaseApproval(job.id, ORG_A, IntakeJobStatus.EXTRACTED);
-      expect(table.rows[0].status).toBe(IntakeJobStatus.EXTRACTED);
+      expect(table.rows[0]).toMatchObject({
+        status: IntakeJobStatus.EXTRACTED,
+        draftDocumentType: null,
+      });
     });
 
     it('refuses approval while an unread currency has not been chosen (#587)', async () => {
       const { job } = await upload(ORG_A);
       table.rows[0].status = IntakeJobStatus.NEEDS_REVIEW;
       table.rows[0].result = { extractedFields: { currency: null } };
-      await expect(service.claimForApproval(job.id, ORG_A)).rejects.toBeInstanceOf(
+      await expect(service.claimForApproval(job.id, ORG_A, BILL)).rejects.toBeInstanceOf(
         BadRequestException,
       );
-      await expect(service.claimForApproval(job.id, ORG_A, '  ')).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(
+        service.claimForApproval(job.id, ORG_A, { type: 'BILL', currencyCode: '  ' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
       expect(table.rows[0].status).toBe(IntakeJobStatus.NEEDS_REVIEW);
-      await expect(service.claimForApproval(job.id, ORG_A, 'EGP')).resolves.toBe(
-        IntakeJobStatus.NEEDS_REVIEW,
-      );
+      await expect(
+        service.claimForApproval(job.id, ORG_A, { type: 'BILL', currencyCode: 'EGP' }),
+      ).resolves.toBe(IntakeJobStatus.NEEDS_REVIEW);
       expect(table.rows[0].status).toBe(IntakeJobStatus.APPROVED);
     });
 
     it('does not let another tenant claim', async () => {
       const { job } = await upload(ORG_A);
       table.rows[0].status = IntakeJobStatus.EXTRACTED;
-      await expect(service.claimForApproval(job.id, ORG_B)).rejects.toBeInstanceOf(
+      await expect(service.claimForApproval(job.id, ORG_B, BILL)).rejects.toBeInstanceOf(
         NotFoundException,
       );
     });
@@ -354,7 +359,7 @@ describe('IntakeJobsService', () => {
     const { job } = await upload(ORG_A);
     table.rows[0].status = IntakeJobStatus.APPROVED;
     table.rows[0].draftDocumentId = 'bill-9';
-    await expect(service.claimForApproval(job.id, ORG_A)).rejects.toMatchObject({
+    await expect(service.claimForApproval(job.id, ORG_A, BILL)).rejects.toMatchObject({
       response: { draftDocumentId: 'bill-9' },
     });
   });
@@ -370,7 +375,7 @@ describe('IntakeJobsService', () => {
       if (!row) throw new Error('missing row');
       row.status = IntakeJobStatus.NEEDS_REVIEW;
       row.result = { extractedFields: { currency: 'EGP' } };
-      await service.claimForApproval(job.id, org);
+      await service.claimForApproval(job.id, org, BILL);
       return job.id;
     }
 
@@ -381,6 +386,7 @@ describe('IntakeJobsService', () => {
         id,
         status: IntakeJobStatus.NEEDS_REVIEW,
         lastError: INTAKE_APPROVAL_INTERRUPTED,
+        draftDocumentType: null,
         draftDocumentId: null,
       });
       expect(auditLog.findFirst).toHaveBeenCalledWith(
@@ -389,7 +395,9 @@ describe('IntakeJobsService', () => {
         }),
       );
       // The reopened job can be approved again.
-      await expect(service.claimForApproval(id, ORG_A)).resolves.toBe(IntakeJobStatus.NEEDS_REVIEW);
+      await expect(service.claimForApproval(id, ORG_A, BILL)).resolves.toBe(
+        IntakeJobStatus.NEEDS_REVIEW,
+      );
     });
 
     it('links the draft named by the job marker instead of reopening it', async () => {
@@ -405,7 +413,7 @@ describe('IntakeJobsService', () => {
         draftDocumentId: 'bill-7',
       });
       // A replayed confirm is refused and points at that draft.
-      await expect(service.claimForApproval(id, ORG_A)).rejects.toMatchObject({
+      await expect(service.claimForApproval(id, ORG_A, BILL)).rejects.toMatchObject({
         response: { draftDocumentId: 'bill-7' },
       });
     });
@@ -419,6 +427,18 @@ describe('IntakeJobsService', () => {
       expect(table.rows[1]).toMatchObject({
         status: IntakeJobStatus.APPROVED,
         draftDocumentId: 'bill-1',
+        lastError: null,
+      });
+    });
+
+    it('leaves an older unlinked approval alone: its draft may exist with no marker', async () => {
+      // Claimed by the earlier code, which recorded no draft type and linked in a separate step.
+      const id = await crashedApproval();
+      table.rows[0].draftDocumentType = null;
+      expect(await service.recoverApprovals(later())).toEqual({ linked: 0, reopened: 0 });
+      expect(table.rows[0]).toMatchObject({
+        id,
+        status: IntakeJobStatus.APPROVED,
         lastError: null,
       });
     });

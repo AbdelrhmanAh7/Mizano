@@ -216,7 +216,10 @@ describe('DocumentIntakeController', () => {
         currencyCode: 'EGP',
         jobId: 'job-1',
       });
-      expect(jobs.claimForApproval).toHaveBeenCalledWith('job-1', ORG_A, 'EGP');
+      expect(jobs.claimForApproval).toHaveBeenCalledWith('job-1', ORG_A, {
+        type: 'BILL',
+        currencyCode: 'EGP',
+      });
       expect(service.confirmAndCreate).toHaveBeenCalledWith(
         ORG_A,
         { ...dto, currencyCode: 'EGP' },

@@ -135,6 +135,8 @@ interface BillFormProps {
   scanDefaults?: BillFormDefaultValues;
   /** Totals read from the scanned document; compared with the computed totals while reviewing */
   extractedTotals?: ExtractedTotalsInput & { discount?: string | number | null };
+  /** Scan review whose document showed no currency: the person must pick one explicitly. */
+  requireCurrency?: boolean;
 }
 
 /**
@@ -172,6 +174,7 @@ export function BillForm({
   defaultVendorId,
   scanDefaults,
   extractedTotals,
+  requireCurrency = false,
 }: BillFormProps) {
   const isEditing = !!bill;
   const tForm = useTranslations('purchases.bills.form');
@@ -483,7 +486,9 @@ export function BillForm({
                   <SelectValue placeholder={tForm('currencyPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="default">{tForm('defaultCurrency')}</SelectItem>
+                  {!requireCurrency && (
+                    <SelectItem value="default">{tForm('defaultCurrency')}</SelectItem>
+                  )}
                   {CURRENCY_CODES.map((code) => (
                     <SelectItem key={code} value={code}>
                       {tForm(`currencies.${code}`)}

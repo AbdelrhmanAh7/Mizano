@@ -20,6 +20,18 @@ interface TesseractWorker {
   recognize(buffer: Buffer): Promise<{ data: { text: string; confidence: number } }>;
 }
 
+/**
+ * The OCR engine itself failed (worker start, language assets, recognition), as opposed to OCR
+ * that ran and found too little text. It propagates so the job takes its automatic retries
+ * instead of being reported as an unreadable document.
+ */
+export class OcrEngineError extends Error {
+  constructor() {
+    super('OCR engine failed');
+    this.name = 'OcrEngineError';
+  }
+}
+
 /** Decimal -> number only at the legacy extraction-result boundary (4 dp). */
 function money(field: RuleField<Decimal> | null): number | null {
   return field ? Number(field.value.toFixed(4)) : null;
@@ -109,6 +121,7 @@ export class RulesStrategy implements ExtractionStrategy {
         textConfidence = ocr.confidence / 100;
       } catch (error) {
         this.logger.error(`Tesseract OCR failed: ${describeError(error)}`);
+        throw new OcrEngineError();
       }
     }
 

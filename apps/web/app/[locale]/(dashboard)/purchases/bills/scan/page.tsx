@@ -814,6 +814,7 @@ export default function ScanBillPage() {
               total: result.extractedFields.total,
               discount: result.extractedFields.discount,
             }}
+            requireCurrency={!result.extractedFields.currency}
             onSubmit={handleConfirm}
             onCancel={handleReupload}
             isSubmitting={confirmIntake.isPending}

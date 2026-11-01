@@ -188,11 +188,16 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
   /**
    * Repair APPROVED jobs that still have no draft link after the grace period (the confirm
    * request died between the approval claim and the draft). If the job's INTAKE_DRAFT marker
-   * exists, link the draft it names; otherwise no draft was created, so reopen the job for
-   * review with the stable code INTAKE_APPROVAL_INTERRUPTED. Both writes are guarded by
-   * APPROVED + no link, and a confirm that commits later fails its own guarded link and rolls
-   * back, so a job never ends with two drafts. Cross-tenant system sweep like `recoverJobs`;
-   * every lookup and write is scoped by the job's own organizationId.
+   * exists, link the draft it names (defensive: today the marker and the link commit together);
+   * otherwise no draft was created, so reopen the job for review with the stable code
+   * INTAKE_APPROVAL_INTERRUPTED. Both writes are guarded by APPROVED + no link, and a confirm
+   * that commits later fails its own guarded link and rolls back, so a job never ends with two
+   * drafts. Cross-tenant system sweep like `recoverJobs`; every lookup and write is scoped by the
+   * job's own organizationId.
+   *
+   * Only claims that recorded their draft type are swept. The earlier code linked the draft in a
+   * separate step and wrote no type at claim time, so an older APPROVED job without a link may
+   * have a draft no marker names: it is left alone rather than reopened for a second draft.
    */
   async recoverApprovals(now: Date = new Date()): Promise<{ linked: number; reopened: number }> {
     const counts = { linked: 0, reopened: 0 };
@@ -205,6 +210,7 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
           deletedAt: null,
           status: IntakeJobStatus.APPROVED,
           draftDocumentId: null,
+          draftDocumentType: { not: null },
           updatedAt: { lt: new Date(now.getTime() - graceMs) },
         },
         select: { id: true, organizationId: true },
@@ -235,7 +241,11 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
         } else {
           const res = await this.prisma.intakeJob.updateMany({
             where: guard,
-            data: { status: IntakeJobStatus.NEEDS_REVIEW, lastError: INTAKE_APPROVAL_INTERRUPTED },
+            data: {
+              status: IntakeJobStatus.NEEDS_REVIEW,
+              lastError: INTAKE_APPROVAL_INTERRUPTED,
+              draftDocumentType: null,
+            },
           });
           counts.reopened += res.count;
         }
@@ -414,19 +424,20 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
 
   /**
    * EXTRACTED/NEEDS_REVIEW -> APPROVED; returns the status to restore if the draft fails.
-   * A currency the reader could not find is never assumed: the person must pick one.
+   * A currency the reader could not find is never assumed: the person must pick one. The claim
+   * records the draft type it is about to create, which marks it for `recoverApprovals`.
    */
   async claimForApproval(
     jobId: string,
     organizationId: string,
-    chosenCurrency?: string,
+    draft: { type: 'BILL' | 'INVOICE'; currencyCode?: string },
   ): Promise<IntakeJobStatus> {
     const current = await this.getForOrg(jobId, organizationId);
     const previous = current.status;
     const claimable =
       current.status === IntakeJobStatus.EXTRACTED ||
       current.status === IntakeJobStatus.NEEDS_REVIEW;
-    if (claimable && !readCurrency(current.result) && !chosenCurrency?.trim()) {
+    if (claimable && !readCurrency(current.result) && !draft.currencyCode?.trim()) {
       throw new BadRequestException(
         'The currency could not be read from the document; choose the currency before approving',
       );
@@ -438,7 +449,10 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
         deletedAt: null,
         status: { in: [IntakeJobStatus.EXTRACTED, IntakeJobStatus.NEEDS_REVIEW] },
       },
-      data: { status: IntakeJobStatus.APPROVED },
+      data: {
+        status: IntakeJobStatus.APPROVED,
+        draftDocumentType: draft.type === 'BILL' ? 'bill' : 'invoice',
+      },
     });
     if (claimed.count === 0) {
       throw new ConflictException({
@@ -457,7 +471,7 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
   ): Promise<void> {
     await this.prisma.intakeJob.updateMany({
       where: { id: jobId, organizationId, status: IntakeJobStatus.APPROVED, draftDocumentId: null },
-      data: { status: restore },
+      data: { status: restore, draftDocumentType: null },
     });
   }
 }

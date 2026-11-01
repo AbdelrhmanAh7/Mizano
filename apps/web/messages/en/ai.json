@@ -8,7 +8,7 @@
     "code": {
       "INTAKE_NO_TEXT": "No text could be read from this document. Upload a clearer photo or a PDF, or enter the bill by hand.",
       "INTAKE_NOTHING_READ": "No bill details were found in this document. Check that it is a bill or receipt, or enter it by hand.",
-      "INTAKE_APPROVAL_INTERRUPTED": "Approving this document was interrupted before a draft was created. Check your bills for a draft from this document before approving it again."
+      "INTAKE_APPROVAL_INTERRUPTED": "Approving this document was interrupted before a draft was created. Review it and approve it again."
     },
     "reviewReason": {
       "LOW_CONFIDENCE": "The document was hard to read. Compare every value with the original.",
