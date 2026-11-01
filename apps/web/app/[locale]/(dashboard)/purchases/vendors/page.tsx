@@ -69,7 +69,7 @@ function VendorsPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => vendorsApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['vendors']],
-    successMessage: tBulk.raw('vendorsDeleted'),
+    successMessage: (count) => tBulk('vendorsDeleted', { count }),
   });
 
   const bulkActions = [

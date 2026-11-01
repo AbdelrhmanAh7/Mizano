@@ -273,7 +273,13 @@ jest.mock('@/lib/hooks/use-global-error-capture', () => ({
 import { LoggerDashboard } from './logger-dashboard';
 
 describe('LoggerDashboard', () => {
+  const previousFlag = process.env.NEXT_PUBLIC_SHOW_ERROR_LOG;
+  afterAll(() => {
+    process.env.NEXT_PUBLIC_SHOW_ERROR_LOG = previousFlag;
+  });
+
   beforeEach(() => {
+    process.env.NEXT_PUBLIC_SHOW_ERROR_LOG = 'true';
     jest.clearAllMocks();
     mockUseLogger.logs = [];
     mockUseLogger.selectedIds = [];
@@ -287,6 +293,12 @@ describe('LoggerDashboard', () => {
     const { container } = render(<LoggerDashboard />);
     expect(container).toBeEmptyDOMElement();
     expect(screen.queryByLabelText('errorLogger')).not.toBeInTheDocument();
+  });
+
+  it('stays hidden unless the operator turns the error log on', () => {
+    delete process.env.NEXT_PUBLIC_SHOW_ERROR_LOG;
+    const { container } = render(<LoggerDashboard />);
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('should render the empty state when no logs', () => {

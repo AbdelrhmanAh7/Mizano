@@ -284,7 +284,7 @@
       "description": "Calls stop when the estimated cost would pass the limit (USD, per calendar month).",
       "limit": "Monthly limit (USD)",
       "used": "Used this month: ${spent} of ${limit}",
-      "calls": "{count, plural, one {# call} other {# calls}}",
+      "calls": "{count, plural, one {{count} call} other {{count} calls}}",
       "loadingModels": "Loading models…",
       "modelsFailed": "Could not load the provider's models.",
       "usageFailed": "Could not load this month's usage."
@@ -633,10 +633,10 @@
     "toast": {
       "errorTitle": "Error",
       "flushed": "Cache flushed",
-      "flushedDescription": "Removed {count, plural, one {# saved item} other {# saved items}}.",
+      "flushedDescription": "Cleared {count, plural, one {{count} cached copy} other {{count} cached copies}}. Your data is unchanged.",
       "flushError": "Failed to flush cache. Please try again.",
       "patternDeleted": "Pattern deleted",
-      "patternDeletedDescription": "Removed {count, plural, one {# saved item} other {# saved items}} matching \"{pattern}\".",
+      "patternDeletedDescription": "Cleared {count, plural, one {{count} cached copy} other {{count} cached copies}} matching \"{pattern}\". Your data is unchanged.",
       "patternDeleteError": "Failed to delete cache pattern. Please try again."
     }
   },

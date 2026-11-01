@@ -76,7 +76,7 @@ function PaymentsReceivedPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => paymentsReceivedApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['payments-received']],
-    successMessage: t.raw('payments.bulkDelete.success'),
+    successMessage: (count) => t('payments.bulkDelete.success', { count }),
   });
 
   const bulkActions = [

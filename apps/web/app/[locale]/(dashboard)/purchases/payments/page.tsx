@@ -79,7 +79,7 @@ function PaymentsMadePageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => paymentsMadeApi.bulkVoid(ids).then((r) => r.data),
     queryKeys: LEDGER_QUERY_KEYS,
-    successMessage: tBulk.raw('paymentsVoided'),
+    successMessage: (count) => tBulk('paymentsVoided', { count }),
   });
 
   const bulkActions = [

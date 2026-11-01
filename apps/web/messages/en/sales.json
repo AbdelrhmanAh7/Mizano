@@ -130,7 +130,7 @@
       "title": "Delete {count} customers?",
       "description": "Selected customers will be deleted. Customers with transactions will be skipped.",
       "confirm": "Delete {count} customers",
-      "success": "{count} customers deleted"
+      "success": "{count, plural, one {{count} customer deleted} other {{count} customers deleted}}"
     },
     "deleteConfirmName": "Are you sure you want to delete \"{name}\"? This action cannot be undone."
   },
@@ -261,19 +261,19 @@
       "importLabel": "Quotes"
     },
     "bulkDelete": {
-      "title": "Delete {count, plural, one {# quote} other {# quotes}}?",
+      "title": "Delete {count, plural, one {{count} quote} other {{count} quotes}}?",
       "description": "Only draft quotes will be deleted. Non-draft quotes will be skipped.",
-      "confirm": "Delete {count, plural, one {# quote} other {# quotes}}"
+      "confirm": "Delete {count, plural, one {{count} quote} other {{count} quotes}}"
     },
     "bulkSend": {
-      "title": "Send {count, plural, one {# quote} other {# quotes}}?",
+      "title": "Send {count, plural, one {{count} quote} other {{count} quotes}}?",
       "description": "Draft quotes will be marked as sent.",
-      "confirm": "Send {count, plural, one {# quote} other {# quotes}}"
+      "confirm": "Send {count, plural, one {{count} quote} other {{count} quotes}}"
     },
     "bulkDecline": {
-      "title": "Decline {count, plural, one {# quote} other {# quotes}}?",
+      "title": "Decline {count, plural, one {{count} quote} other {{count} quotes}}?",
       "description": "Sent quotes will be marked as declined.",
-      "confirm": "Decline {count, plural, one {# quote} other {# quotes}}"
+      "confirm": "Decline {count, plural, one {{count} quote} other {{count} quotes}}"
     }
   },
   "invoices": {
@@ -415,25 +415,25 @@
       "title": "Delete {count} invoices?",
       "description": "Only draft invoices will be deleted. Non-draft invoices will be skipped.",
       "confirm": "Delete {count} invoices",
-      "success": "{count} invoices deleted"
+      "success": "{count, plural, one {{count} invoice deleted} other {{count} invoices deleted}}"
     },
     "bulkSend": {
       "title": "Send {count} invoices?",
       "description": "Draft invoices will be marked as sent. This will create accounting entries.",
       "confirm": "Send {count} invoices",
-      "success": "{count} invoices sent"
+      "success": "{count, plural, one {{count} invoice sent} other {{count} invoices sent}}"
     },
     "bulkVoid": {
       "title": "Void {count} invoices?",
       "description": "Selected invoices will be voided. This action cannot be undone.",
       "confirm": "Void {count} invoices",
-      "success": "{count} invoices voided"
+      "success": "{count, plural, one {{count} invoice voided} other {{count} invoices voided}}"
     },
     "bulkPay": {
       "title": "Mark {count} invoices as paid?",
       "description": "Selected sent/overdue invoices will be marked as fully paid.",
       "confirm": "Mark {count} invoices as paid",
-      "success": "{count} invoices marked as paid"
+      "success": "{count, plural, one {{count} invoice marked as paid} other {{count} invoices marked as paid}}"
     }
   },
   "creditNotes": {
@@ -529,9 +529,9 @@
       "refresh": "Refresh credit notes"
     },
     "bulkDelete": {
-      "title": "Delete {count, plural, one {# credit note} other {# credit notes}}?",
+      "title": "Delete {count, plural, one {{count} credit note} other {{count} credit notes}}?",
       "description": "Selected credit notes will be deleted. Credit notes that have been applied will be skipped.",
-      "confirm": "Delete {count, plural, one {# credit note} other {# credit notes}}"
+      "confirm": "Delete {count, plural, one {{count} credit note} other {{count} credit notes}}"
     }
   },
   "payments": {
@@ -638,7 +638,7 @@
       "title": "Delete {count} payments?",
       "description": "Selected payments will be deleted. Payments linked to reconciled transactions will be skipped.",
       "confirm": "Delete {count} payments",
-      "success": "{count} payments deleted"
+      "success": "{count, plural, one {{count} payment deleted} other {{count} payments deleted}}"
     }
   },
   "deliveryChallans": {
@@ -733,9 +733,9 @@
     "noOverdue": "No overdue invoices",
     "noRecentActivity": "No recent activity",
     "viewAll": "View All",
-    "acrossCustomers": "Across {count, plural, one {# customer} other {# customers}}",
-    "overdueCount": "{count, plural, one {# overdue invoice} other {# overdue invoices}}",
-    "quotesAwaiting": "{count, plural, one {# quote awaiting response} other {# quotes awaiting response}}",
+    "acrossCustomers": "Across {count, plural, one {{count} customer} other {{count} customers}}",
+    "overdueCount": "{count, plural, one {{count} overdue invoice} other {{count} overdue invoices}}",
+    "quotesAwaiting": "{count, plural, one {{count} quote awaiting response} other {{count} quotes awaiting response}}",
     "fromPaidInvoices": "From paid invoices",
     "openModule": "Open {name}",
     "modules": {

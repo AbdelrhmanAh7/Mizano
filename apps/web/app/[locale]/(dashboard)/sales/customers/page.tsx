@@ -69,7 +69,7 @@ function CustomersPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => customersApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['customers']],
-    successMessage: t.raw('customers.bulkDelete.success'),
+    successMessage: (count) => t('customers.bulkDelete.success', { count }),
   });
 
   const bulkActions = [

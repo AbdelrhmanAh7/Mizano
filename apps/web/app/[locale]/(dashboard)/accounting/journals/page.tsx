@@ -85,13 +85,13 @@ function JournalsPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => journalsApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: LEDGER_QUERY_KEYS,
-    successMessage: tBulk.raw('journalsDeleted'),
+    successMessage: (count) => tBulk('journalsDeleted', { count }),
   });
 
   const bulkPostAction = useBulkAction({
     mutationFn: (ids) => journalsApi.bulkPost(ids).then((r) => r.data),
     queryKeys: LEDGER_QUERY_KEYS,
-    successMessage: tBulk.raw('journalsPosted'),
+    successMessage: (count) => tBulk('journalsPosted', { count }),
   });
 
   const {

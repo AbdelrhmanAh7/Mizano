@@ -204,14 +204,14 @@
       "paidThroughRequired": "Paid through account is required"
     },
     "bulkDelete": {
-      "title": "Delete {count, plural, one {# expense} other {# expenses}}?",
+      "title": "Delete {count, plural, one {{count} expense} other {{count} expenses}}?",
       "description": "Selected expenses will be permanently deleted.",
-      "confirm": "Delete {count, plural, one {# expense} other {# expenses}}"
+      "confirm": "Delete {count, plural, one {{count} expense} other {{count} expenses}}"
     },
     "bulkApprove": {
-      "title": "Approve {count, plural, one {# expense} other {# expenses}}?",
+      "title": "Approve {count, plural, one {{count} expense} other {{count} expenses}}?",
       "description": "Selected expenses will be approved.",
-      "confirm": "Approve {count, plural, one {# expense} other {# expenses}}"
+      "confirm": "Approve {count, plural, one {{count} expense} other {{count} expenses}}"
     }
   },
   "bills": {

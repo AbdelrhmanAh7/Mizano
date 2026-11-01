@@ -89,14 +89,14 @@ function ExpensesPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => expensesApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['expenses']],
-    successMessage: tBulk.raw('expensesDeleted'),
+    successMessage: (count) => tBulk('expensesDeleted', { count }),
   });
   const bulkDelete = useBulkConfirm<Expense>(bulkDeleteAction, () => void refetch());
 
   const bulkApproveAction = useBulkAction({
     mutationFn: (ids) => expensesApi.bulkApprove(ids).then((r) => r.data),
     queryKeys: [['expenses']],
-    successMessage: tBulk.raw('expensesApproved'),
+    successMessage: (count) => tBulk('expensesApproved', { count }),
   });
   const bulkApprove = useBulkConfirm<Expense>(bulkApproveAction, () => void refetch());
 

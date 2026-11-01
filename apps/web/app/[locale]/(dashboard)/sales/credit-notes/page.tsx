@@ -72,7 +72,7 @@ function CreditNotesPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => creditNotesApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['credit-notes']],
-    successMessage: tBulk.raw('creditNotesDeleted'),
+    successMessage: (count) => tBulk('creditNotesDeleted', { count }),
   });
 
   const bulkActions = [

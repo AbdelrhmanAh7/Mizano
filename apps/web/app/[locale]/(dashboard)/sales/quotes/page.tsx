@@ -108,19 +108,19 @@ function QuotesPageContent() {
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => quotesApi.bulkDelete(ids).then((r) => r.data),
     queryKeys: [['quotes']],
-    successMessage: tBulk.raw('quotesDeleted'),
+    successMessage: (count) => tBulk('quotesDeleted', { count }),
   });
 
   const bulkSendAction = useBulkAction({
     mutationFn: (ids) => quotesApi.bulkSend(ids).then((r) => r.data),
     queryKeys: [['quotes']],
-    successMessage: tBulk.raw('quotesSent'),
+    successMessage: (count) => tBulk('quotesSent', { count }),
   });
 
   const bulkDeclineAction = useBulkAction({
     mutationFn: (ids) => quotesApi.bulkDecline(ids).then((r) => r.data),
     queryKeys: [['quotes']],
-    successMessage: tBulk.raw('quotesDeclined'),
+    successMessage: (count) => tBulk('quotesDeclined', { count }),
   });
 
   const bulkActions = [

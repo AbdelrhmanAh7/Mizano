@@ -77,6 +77,20 @@ describe('OrganizationSettingsPage', () => {
     }
   });
 
+  it('keeps the loaded form on screen when a background reload fails', () => {
+    const reloadFailed = { ...mockSettings, isError: true, refetch: jest.fn() };
+    const spy = jest
+      .spyOn(jest.requireMock('@/lib/hooks/use-all-settings'), 'useAllOrganizationSettings')
+      .mockReturnValue(reloadFailed);
+    try {
+      render(<OrganizationSettingsPage />);
+      expect(screen.getByRole('button', { name: /common.saveChanges/ })).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'tryAgain' })).toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('offers the API industry values', () => {
     render(<OrganizationSettingsPage />);
     const values = Array.from(document.querySelectorAll('select option')).map(

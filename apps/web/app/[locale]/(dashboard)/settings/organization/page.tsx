@@ -53,7 +53,7 @@ type FormData = z.infer<typeof schema>;
 
 export default function OrganizationSettingsPage() {
   const t = useTranslations('settings');
-  const { data: settings, isLoading, isError, refetch } = useAllOrganizationSettings();
+  const { data: settings, isLoading, refetch } = useAllOrganizationSettings();
   const updateGeneral = useUpdateGeneralSettings();
 
   const form = useForm<FormData>({
@@ -125,7 +125,8 @@ export default function OrganizationSettingsPage() {
   }
 
   // Never show the form without the saved settings: its defaults (USD) would be saved over them.
-  if (isError || !settings?.general) {
+  // Only a missing load shows the error; a failed background reload keeps the form on screen.
+  if (!settings?.general) {
     return <ErrorState onRetry={() => void refetch()} />;
   }
 

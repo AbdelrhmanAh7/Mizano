@@ -284,7 +284,7 @@
       "description": "تتوقف الطلبات عندما تتجاوز التكلفة المقدّرة الحد (بالدولار، لكل شهر ميلادي).",
       "limit": "الحد الشهري (دولار)",
       "used": "المستخدم هذا الشهر: ${spent} من ${limit}",
-      "calls": "{count, plural, one {طلب واحد} two {طلبان} few {# طلبات} many {# طلبًا} other {# طلب}}",
+      "calls": "{count, plural, one {طلب واحد} two {طلبان} few {{count} طلبات} many {{count} طلبًا} other {{count} طلب}}",
       "loadingModels": "جارٍ تحميل النماذج…",
       "modelsFailed": "تعذّر تحميل نماذج المزوّد.",
       "usageFailed": "تعذّر تحميل استخدام هذا الشهر."
@@ -633,10 +633,10 @@
     "toast": {
       "errorTitle": "خطأ",
       "flushed": "تم مسح الذاكرة المؤقتة",
-      "flushedDescription": "عدد العناصر المحذوفة من الذاكرة المؤقتة: {count}.",
+      "flushedDescription": "عدد النسخ المؤقتة التي مُسحت: {count}. بياناتك لم تتغير.",
       "flushError": "تعذّر مسح الذاكرة المؤقتة. حاول مرة أخرى.",
       "patternDeleted": "تم حذف العناصر المطابقة",
-      "patternDeletedDescription": "عدد العناصر المحذوفة المطابقة لـ \"{pattern}\": {count}.",
+      "patternDeletedDescription": "عدد النسخ المؤقتة المطابقة لـ \"{pattern}\" التي مُسحت: {count}. بياناتك لم تتغير.",
       "patternDeleteError": "تعذّر حذف العناصر المطابقة. حاول مرة أخرى."
     }
   },

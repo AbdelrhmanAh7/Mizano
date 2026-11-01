@@ -112,6 +112,11 @@ describe('Auth (e2e)', () => {
         where: { organizationId: res.body.organization.id, currency: 'EGP' },
       });
       expect(accounts).toBeGreaterThan(10);
+      // The seeded chart carries Arabic names for an Arabic-speaking owner.
+      const untranslated = await prisma.account.count({
+        where: { organizationId: res.body.organization.id, nameAr: null },
+      });
+      expect(untranslated).toBe(0);
     });
 
     it('rejects a country it cannot set up', async () => {
