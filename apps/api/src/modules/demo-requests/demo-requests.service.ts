@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateDemoRequestDto } from './dto/create-demo-request.dto';
 
@@ -14,10 +14,16 @@ export class DemoRequestsService {
       return { success: true };
     }
 
+    const name = dto.name?.trim();
+    const contact = dto.contact?.trim();
+    if (!name || !contact) {
+      throw new BadRequestException('name and contact are required');
+    }
+
     const row = await this.prisma.demoRequest.create({
       data: {
-        name: dto.name.trim(),
-        contact: dto.contact.trim(),
+        name,
+        contact,
         role: dto.role || 'owner',
         businessType: dto.businessType?.trim() || '',
         country: dto.country?.trim() || 'EG',

@@ -5,7 +5,13 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:6001/a
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const forwarded = request.headers.get('x-forwarded-for') || request.ip || '';
+    const clientIp = request.ip;
+    const incomingForwarded = request.headers.get('x-forwarded-for');
+    const forwarded = clientIp
+      ? incomingForwarded
+        ? `${incomingForwarded}, ${clientIp}`
+        : clientIp
+      : incomingForwarded || '';
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };

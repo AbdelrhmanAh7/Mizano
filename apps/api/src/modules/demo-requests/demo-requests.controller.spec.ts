@@ -60,4 +60,20 @@ describe('DemoRequestsController', () => {
     expect(res).toEqual({ success: true });
     expect(prisma.demoRequest.create).not.toHaveBeenCalled();
   });
+
+  it('rejects whitespace-only name or contact with BadRequestException', async () => {
+    await expect(
+      controller.create({
+        name: '   ',
+        contact: '+201001234567',
+      }),
+    ).rejects.toThrow('name and contact are required');
+
+    await expect(
+      controller.create({
+        name: 'محمد',
+        contact: '   ',
+      }),
+    ).rejects.toThrow('name and contact are required');
+  });
 });

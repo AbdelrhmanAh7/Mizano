@@ -281,6 +281,11 @@ const AUTH_ERRORS: ErrorCatalogEntry[] = [
 /** Shared rules: amounts, dates, documents and reference checks. */
 const COMMON_ERRORS: ErrorCatalogEntry[] = [
   {
+    code: 'DEMO_REQUEST_REQUIRED_FIELDS',
+    en: 'name and contact are required',
+    ar: 'الاسم ووسيلة التواصل مطلوبان.',
+  },
+  {
     code: 'DECIMAL_INVALID',
     en: '{field} must be a valid decimal number',
     ar: 'يجب أن تكون قيمة {field} رقمًا عشريًا صحيحًا.',

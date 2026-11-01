@@ -1,11 +1,14 @@
 import { IsNotEmpty, IsString, MaxLength, IsOptional, IsIn } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateDemoRequestDto {
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   @IsNotEmpty()
   @IsString()
   @MaxLength(120)
   name: string;
 
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   @IsNotEmpty()
   @IsString()
   @MaxLength(160)
