@@ -2130,6 +2130,11 @@ const INTAKE_SETTINGS_ERRORS: ErrorCatalogEntry[] = [
     ar: 'لا يمكن اعتماد مهمة قراءة المستند هذه في حالتها الحالية.',
   },
   {
+    code: 'INTAKE_CURRENCY_REQUIRED',
+    en: 'The currency could not be read from the document; choose the currency before approving',
+    ar: 'تعذّرت قراءة العملة من المستند. اختر العملة قبل الاعتماد.',
+  },
+  {
     code: 'INTAKE_TYPE_INVALID',
     en: 'type must be BILL or INVOICE',
     ar: 'يجب أن يكون نوع المستند فاتورة مورد أو فاتورة مبيعات.',

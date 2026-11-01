@@ -29,6 +29,42 @@ export type IntakeJobStatus =
 
 export const RETRYABLE_INTAKE_STATUSES: IntakeJobStatus[] = ['FAILED', 'DEAD_LETTER'];
 
+/** Stable job codes the screen explains in words (`ai.intake.code.*`). */
+export const INTAKE_CODES = [
+  'INTAKE_NO_TEXT',
+  'INTAKE_NOTHING_READ',
+  'INTAKE_APPROVAL_INTERRUPTED',
+] as const;
+export type IntakeCode = (typeof INTAKE_CODES)[number];
+
+export function isIntakeCode(value: unknown): value is IntakeCode {
+  return typeof value === 'string' && (INTAKE_CODES as readonly string[]).includes(value);
+}
+
+/** Why a reading needs a person's check (`ai.intake.reviewReason.*`). */
+export const REVIEW_REASONS = [
+  'LOW_CONFIDENCE',
+  'NOT_A_BILL',
+  'VENDOR_MISSING',
+  'DATE_MISSING',
+  'TOTAL_MISSING',
+  'CURRENCY_MISSING',
+  'LINES_MISSING',
+  'VALUES_INCONSISTENT',
+  'DUE_DATE_DERIVED',
+  'POSSIBLE_DUPLICATE',
+] as const;
+export type ReviewReason = (typeof REVIEW_REASONS)[number];
+
+/** The reasons of a reading the screen can explain, in the server's order. */
+export function knownReviewReasons(
+  result: Pick<DocumentIntakeResult, 'reviewReasons'>,
+): ReviewReason[] {
+  return (result.reviewReasons ?? []).filter((r): r is ReviewReason =>
+    (REVIEW_REASONS as readonly string[]).includes(r),
+  );
+}
+
 export interface VendorCandidate {
   id: string;
   name: string;
@@ -71,6 +107,10 @@ export interface DocumentIntakeResult {
     lineItems: IntakeLineItem[];
   };
   fieldConfidence: Record<string, number>;
+  /** Fields the document did not show and the server filled in (e.g. `dueDate` = date + 30). */
+  derivedFields?: string[];
+  /** Stable codes for what a person must check before approval. */
+  reviewReasons?: string[];
   ocrConfidence: number;
   matchedVendor: VendorCandidate | null;
   vendorCandidates: VendorCandidate[];
@@ -150,6 +190,8 @@ export interface IntakeProgressEvent {
   message?: string;
   result?: DocumentIntakeResult;
   error?: string;
+  /** The job's stable code (read failure or interrupted approval). */
+  code?: string;
 }
 
 // ============ API Functions ============
@@ -266,6 +308,8 @@ export function useDocumentIntakeStream(): {
   isReconnecting: boolean;
   jobId: string | null;
   jobStatus: IntakeJobStatus | null;
+  /** Stable code of the job (e.g. its approval was interrupted), when the screen explains it. */
+  jobCode: IntakeCode | null;
   isDuplicate: boolean;
   /** Set when an identical file was already approved: the draft it produced. */
   existingDraft: { type: string; id: string } | null;
@@ -283,6 +327,7 @@ export function useDocumentIntakeStream(): {
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<IntakeJobStatus | null>(null);
+  const [jobCode, setJobCode] = useState<IntakeCode | null>(null);
   const [isDuplicate, setIsDuplicate] = useState(false);
   const [existingDraft, setExistingDraft] = useState<{ type: string; id: string } | null>(null);
 
@@ -312,6 +357,7 @@ export function useDocumentIntakeStream(): {
     setIsReconnecting(false);
     setJobId(null);
     setJobStatus(null);
+    setJobCode(null);
     setIsDuplicate(false);
     setExistingDraft(null);
   }, [stopAll]);
@@ -323,6 +369,8 @@ export function useDocumentIntakeStream(): {
       setProgress(event.progress);
       if (event.status) setJobStatus(event.status);
       if (event.message) setMessage(event.message);
+      const code = isIntakeCode(event.code) ? event.code : null;
+      setJobCode(code);
 
       if (event.stage === 'complete') {
         if (event.result) setResult(event.result);
@@ -332,7 +380,8 @@ export function useDocumentIntakeStream(): {
         return true;
       }
       if (event.stage === 'error') {
-        setError(event.error || t('streamFailed'));
+        // Known codes get their own words; other failures never show raw error names.
+        setError(code ? t(`code.${code}`) : t('streamFailed'));
         setIsProcessing(false);
         setIsReconnecting(false);
         return true;
@@ -367,6 +416,7 @@ export function useDocumentIntakeStream(): {
             progress: job.progress,
             result: job.result ?? undefined,
             error: job.lastError ?? undefined,
+            code: job.lastError ?? undefined,
           });
           if (terminal) return;
         } catch (err) {
@@ -535,6 +585,7 @@ export function useDocumentIntakeStream(): {
     isReconnecting,
     jobId,
     jobStatus,
+    jobCode,
     isDuplicate,
     existingDraft,
     canRetry: jobId !== null && jobStatus !== null && RETRYABLE_INTAKE_STATUSES.includes(jobStatus),

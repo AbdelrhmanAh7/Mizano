@@ -3,7 +3,7 @@
  * Redis/BullMQ. Only the extraction strategy is stubbed (no model is required): it returns a
  * fixed extraction, or throws when `stub.mode === 'fail'`.
  */
-import { INestApplication } from '@nestjs/common';
+import { ConflictException, INestApplication } from '@nestjs/common';
 import { IntakeJobStatus } from '@prisma/client';
 import { createTestApp, getPrisma, uniqueSuffix } from './helpers/app.helper';
 import { registerTenant, TestTenant } from './helpers/tenant.helper';
@@ -11,6 +11,10 @@ import { eventually } from './helpers/journey.helper';
 import { ApiHelper } from './helpers/api-client.helper';
 import { ExtractionStrategyResolver } from '../src/modules/ai/extraction/extraction-strategy-resolver.service';
 import { IntakeStorage, sha256Hex } from '../src/modules/ai/intake/intake-storage';
+import {
+  INTAKE_APPROVAL_INTERRUPTED,
+  IntakeJobsService,
+} from '../src/modules/ai/intake/intake-jobs.service';
 import { IntakeProcessorService } from '../src/modules/ai/intake/intake-processor.service';
 import { IntakeQueueService } from '../src/modules/ai/intake/intake-queue.service';
 import { DocumentIntakeService } from '../src/modules/ai/services/document-intake.service';
@@ -22,6 +26,7 @@ process.env.INTAKE_LEASE_MS = '1000';
 
 const stub = { mode: 'ok' as 'ok' | 'fail', calls: 0 };
 
+// The stub reads no lines and no due date, so a finished job is NEEDS_REVIEW (#587).
 const stubResolver = {
   resolve: async () => {
     stub.calls += 1;
@@ -135,7 +140,7 @@ describe('Document intake (e2e)', () => {
     expect(res.body.data).toMatchObject({ duplicate: false });
     jobId = res.body.data.jobId;
 
-    const done = await waitForStatus(jobId, IntakeJobStatus.EXTRACTED);
+    const done = await waitForStatus(jobId, IntakeJobStatus.NEEDS_REVIEW);
     expect(done).toMatchObject({
       organizationId: tenantA.organizationId,
       createdById: tenantA.userId,
@@ -147,7 +152,11 @@ describe('Document intake (e2e)', () => {
 
     const result = await a.get(`/ai/document-intake/${jobId}/result`);
     expect(result.status).toBe(200);
-    expect(result.body.data).toMatchObject({ id: jobId, status: 'EXTRACTED', stage: 'complete' });
+    expect(result.body.data).toMatchObject({
+      id: jobId,
+      status: 'NEEDS_REVIEW',
+      stage: 'complete',
+    });
     expect(result.body.data.result.extractedFields.total).toBe(115);
     expect(result.body.data).not.toHaveProperty('storageKey');
   });
@@ -187,7 +196,7 @@ describe('Document intake (e2e)', () => {
   });
 
   it('lists only the caller organization and filters by status', async () => {
-    const mine = await a.get('/ai/document-intake/jobs?status=EXTRACTED');
+    const mine = await a.get('/ai/document-intake/jobs?status=NEEDS_REVIEW');
     expect(mine.status).toBe(200);
     expect(mine.body.data.map((j: { id: string }) => j.id)).toContain(jobId);
     expect(mine.body.data.every((j: { storageKey?: string }) => j.storageKey === undefined)).toBe(
@@ -216,7 +225,7 @@ describe('Document intake (e2e)', () => {
     });
     expect(confirm.status).toBe(404);
     const untouched = await prisma.intakeJob.findUniqueOrThrow({ where: { id: jobId } });
-    expect(untouched.status).toBe(IntakeJobStatus.EXTRACTED);
+    expect(untouched.status).toBe(IntakeJobStatus.NEEDS_REVIEW);
   });
 
   it('anonymous callers get 401 on every intake route', async () => {
@@ -240,7 +249,7 @@ describe('Document intake (e2e)', () => {
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('text/event-stream');
     expect(String(res.body)).toContain('"stage":"complete"');
-    expect(String(res.body)).toContain('"status":"EXTRACTED"');
+    expect(String(res.body)).toContain('"status":"NEEDS_REVIEW"');
   });
 
   it('job state survives an application restart and stays readable', async () => {
@@ -249,7 +258,7 @@ describe('Document intake (e2e)', () => {
     prisma = getPrisma(app);
     const res = await a.withToken(tenantA.accessToken).get(`/ai/document-intake/${jobId}/result`);
     expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe('EXTRACTED');
+    expect(res.body.data.status).toBe('NEEDS_REVIEW');
     a = new ApiHelper(app, tenantA.accessToken);
     b = new ApiHelper(app, tenantB.accessToken);
     anon = ApiHelper.anonymous(app);
@@ -284,7 +293,7 @@ describe('Document intake (e2e)', () => {
     b = new ApiHelper(app, tenantB.accessToken);
     anon = ApiHelper.anonymous(app);
 
-    const done = await waitForStatus(orphan.id, IntakeJobStatus.EXTRACTED);
+    const done = await waitForStatus(orphan.id, IntakeJobStatus.NEEDS_REVIEW);
     expect(done?.attempts).toBe(2);
     expect(stub.calls).toBe(before + 1);
   });
@@ -304,7 +313,7 @@ describe('Document intake (e2e)', () => {
     stub.mode = 'ok';
     const retry = await a.post(`/ai/document-intake/${failingId}/retry`);
     expect(retry.status).toBe(201);
-    await waitForStatus(failingId, IntakeJobStatus.EXTRACTED);
+    await waitForStatus(failingId, IntakeJobStatus.NEEDS_REVIEW);
     expect((await a.post(`/ai/document-intake/${failingId}/retry`)).status).toBe(409);
   });
 
@@ -380,7 +389,7 @@ describe('Document intake (e2e)', () => {
     const bytes = pdfFixture(`DEL-${uniqueSuffix()}`);
     const first = await upload(a, bytes);
     const firstId = first.body.data.jobId as string;
-    await waitForStatus(firstId, IntakeJobStatus.EXTRACTED);
+    await waitForStatus(firstId, IntakeJobStatus.NEEDS_REVIEW);
     await prisma.intakeJob.update({ where: { id: firstId }, data: { deletedAt: new Date() } });
     const again = await upload(a, bytes);
     expect(again.status).toBe(201);
@@ -420,7 +429,92 @@ describe('Document intake (e2e)', () => {
         attempts: 1,
       },
     });
-    const done = await waitForStatus(failed.id, IntakeJobStatus.EXTRACTED);
+    const done = await waitForStatus(failed.id, IntakeJobStatus.NEEDS_REVIEW);
     expect(done?.attempts).toBe(2);
+  });
+
+  it('#587 the sweep reopens a stalled approval, a late draft rolls back, an old one is kept', async () => {
+    const jobsService = app.get(IntakeJobsService);
+    const finished = async (marker: string): Promise<string> => {
+      const res = await upload(a, pdfFixture(`${marker}-${uniqueSuffix()}`));
+      expect(res.status).toBe(201);
+      const id = res.body.data.jobId as string;
+      await waitForStatus(id, IntakeJobStatus.NEEDS_REVIEW);
+      return id;
+    };
+    const stalled = await finished('STALLED');
+    const legacy = await finished('LEGACY');
+
+    // The confirm request claimed the job, then died before its draft committed.
+    await jobsService.claimForApproval(stalled, tenantA.organizationId, { type: 'BILL' });
+    // An approval claimed by the earlier code: no draft type recorded, its draft may exist.
+    await prisma.intakeJob.update({
+      where: { id: legacy },
+      data: { status: IntakeJobStatus.APPROVED },
+    });
+    await prisma.$executeRaw`UPDATE intake_jobs SET "updatedAt" = now() - interval '1 hour' WHERE id IN (${stalled}, ${legacy})`;
+
+    // The app's own periodic sweep may get there first; either way the row ends the same.
+    await jobsService.recoverApprovals();
+    expect(await prisma.intakeJob.findUniqueOrThrow({ where: { id: stalled } })).toMatchObject({
+      status: IntakeJobStatus.NEEDS_REVIEW,
+      lastError: INTAKE_APPROVAL_INTERRUPTED,
+      draftDocumentType: null,
+      draftDocumentId: null,
+    });
+    expect(await prisma.intakeJob.findUniqueOrThrow({ where: { id: legacy } })).toMatchObject({
+      status: IntakeJobStatus.APPROVED,
+      draftDocumentId: null,
+    });
+
+    // The stalled request finally reaches its draft transaction: the guarded link fails and the
+    // bill and its marker roll back.
+    const vendor = await a.post('/vendors').send({ name: `Sweep Vendor ${uniqueSuffix()}` });
+    expect(vendor.status).toBe(201);
+    const billNumber = `LATE-${uniqueSuffix()}`;
+    const dto = {
+      type: 'BILL' as const,
+      vendorId: vendor.body.id as string,
+      date: '2026-09-01',
+      dueDate: '2026-10-01',
+      documentNumber: billNumber,
+      lines: [{ description: 'CPU', quantity: '1', rate: '100', taxRatePercent: '0' }],
+    };
+    await expect(
+      app
+        .get(DocumentIntakeService)
+        .confirmAndCreate(tenantA.organizationId, dto, { jobId: stalled, userId: tenantA.userId }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(
+      await prisma.bill.count({ where: { organizationId: tenantA.organizationId, billNumber } }),
+    ).toBe(0);
+    expect(
+      await prisma.auditLog.count({
+        where: {
+          organizationId: tenantA.organizationId,
+          entityType: 'INTAKE_DRAFT',
+          entityId: stalled,
+        },
+      }),
+    ).toBe(0);
+
+    // The reopened job is approved normally, exactly once, with its marker.
+    const confirm = await a.post('/ai/document-intake/confirm').send({ ...dto, jobId: stalled });
+    expect(confirm.status).toBe(201);
+    expect(await prisma.intakeJob.findUniqueOrThrow({ where: { id: stalled } })).toMatchObject({
+      status: IntakeJobStatus.APPROVED,
+      draftDocumentType: 'bill',
+      draftDocumentId: confirm.body.data.id,
+      lastError: null,
+    });
+    expect(
+      await prisma.auditLog.count({
+        where: {
+          organizationId: tenantA.organizationId,
+          entityType: 'INTAKE_DRAFT',
+          entityId: stalled,
+        },
+      }),
+    ).toBe(1);
   });
 });
