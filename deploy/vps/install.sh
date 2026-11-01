@@ -64,14 +64,17 @@ api_host="${api_host:-$(env_get JARDA_API_HOST)}"
 email="${email:-$(env_get ACME_EMAIL)}"
 [ -n "$web_host" ] && [ -n "$api_host" ] || die "first run needs --domain (or --web-host and --api-host)"
 [[ "$web_host" =~ $host_re ]] && [[ "$api_host" =~ $host_re ]] || die "invalid hostname"
-[[ "$email" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]] || die "first run needs --email"
+# Strict: the email is written into the env file that root later loads.
+[[ "$email" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || die "first run needs a valid --email"
 
 # ---------------------------------------------------------------- base packages
 say "Updating the system and installing base packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
-apt-get upgrade -y -q
-apt-get install -y -q ca-certificates curl git ufw python3 bzip2 openssl unattended-upgrades
+# Keep existing config files (the cloud's sshd settings) instead of stopping at a prompt.
+apt_opts=(-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold)
+apt-get upgrade "${apt_opts[@]}"
+apt-get install "${apt_opts[@]}" ca-certificates curl git ufw python3 bzip2 openssl unattended-upgrades
 # Security updates install themselves every night (Ubuntu's default policy, made explicit).
 printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' \
   >/etc/apt/apt.conf.d/20auto-upgrades
@@ -141,7 +144,7 @@ if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1; t
   echo "deb [arch=$arch signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $VERSION_CODENAME stable" \
     >/etc/apt/sources.list.d/docker.list
   apt-get update -q
-  apt-get install -y -q docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  apt-get install "${apt_opts[@]}" docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 fi
 if [ ! -f /etc/docker/daemon.json ]; then
   # Log rotation for every container; containers keep running while Docker itself upgrades.
@@ -324,6 +327,9 @@ cat <<SUMMARY
   Update:   run this same command again
   SSH:      key login only; user '$ADMIN_USER' (sudo) and root with your key
 SUMMARY
+if [ -f /var/run/reboot-required ]; then
+  echo "  Reboot:   a system update needs a restart; run 'sudo reboot' when convenient (Jarda starts by itself)."
+fi
 if [ "$new_password" -eq 1 ]; then
   cat <<NOTICE
 
