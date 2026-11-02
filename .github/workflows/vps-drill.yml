@@ -44,8 +44,9 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           df -h /
 
+      # Warnings and errors only: older shellcheck builds add style hints the scripts avoid on purpose.
       - name: Shell scripts pass shellcheck
-        run: shellcheck -x deploy/vps/install.sh deploy/vps/scripts/*.sh deploy/pi/scripts/healthcheck.sh
+        run: shellcheck -x --severity=warning deploy/vps/install.sh deploy/vps/scripts/*.sh deploy/pi/scripts/healthcheck.sh
 
       - name: Install restic (same release and checksum check as install.sh)
         run: |
