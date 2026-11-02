@@ -171,4 +171,48 @@ describe('Bank matching (e2e)', () => {
       matchedEntityId: null,
     });
   });
+
+  // #682: a match racing a void of the same expense never leaves the line linked to a voided expense.
+  it('a match racing the void of its expense leaves the line open and unlinked', async () => {
+    const settings = (await a.get('/organization/account-settings')).body;
+    const list = await a.get('/accounts').query({ limit: 500 });
+    const rentAccount = list.body.data.find((x: { code: string }) => x.code === '6100').id;
+    const expense = await a.post('/expenses').send({
+      date: isoDay(0),
+      accountId: rentAccount,
+      amount: '275.00',
+      paidThroughAccountId: settings.defaultBankAccountId,
+      description: 'Cleaning',
+    });
+    expect(expense.status).toBe(201);
+    const line = await a.post('/bank-transactions').send({
+      bankAccountId,
+      date: isoDay(0),
+      type: 'WITHDRAWAL',
+      amount: '275.00',
+      description: 'Cleaning',
+    });
+    expect(line.status).toBe(201);
+
+    const [matched, voided] = await Promise.all([
+      a.post('/reconciliation/confirm').send({
+        transactionId: line.body.id,
+        entityType: 'expense',
+        entityId: expense.body.id,
+      }),
+      a.delete(`/expenses/${expense.body.id}`),
+    ]);
+    // Either order is allowed; the void always succeeds and wins in the end.
+    expect(voided.status).toBe(200);
+    expect([201, 404]).toContain(matched.status);
+
+    const after = await prisma.bankTransaction.findFirst({
+      where: { id: line.body.id, organizationId: tenant.organizationId },
+    });
+    expect(after).toMatchObject({
+      status: 'PENDING',
+      matchedEntityType: null,
+      matchedEntityId: null,
+    });
+  });
 });
