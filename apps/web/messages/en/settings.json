@@ -961,12 +961,15 @@
     "reason": {
       "ok": "FlowLine received it",
       "notFound": "FlowLine doesn't know this address: the flow may have been deleted or the address copied wrong. Copy it again from the flow's trigger.",
-      "signature": "FlowLine refused the signing secret: copy it again from the same flow.",
-      "unpublished": "The flow is not published in FlowLine yet: publish it and {brand} will try again.",
-      "tooLarge": "The event is larger than FlowLine accepts.",
+      "signature": "FlowLine refused the signing secret: copy it again from the same flow. If the secret is right, ask your administrator to check the server clock.",
+      "unpublished": "The flow is not published in FlowLine yet: publish it in FlowLine.",
+      "tooLarge": "The event is larger than FlowLine accepts. Contact support.",
+      "busy": "FlowLine is busy or has a problem right now.",
       "refused": "FlowLine refused the event. Check the address and the signing secret.",
-      "unreachable": "Couldn't reach FlowLine (no answer in time, or the address is unavailable). {brand} will try again automatically.",
-      "privateAddress": "This address points to an internal address, which is not allowed."
+      "unreachable": "Couldn't reach FlowLine: no answer in time, or the address is unavailable.",
+      "privateAddress": "This address points to a private network, which isn't allowed.",
+      "stopped": "Not sent: this link was turned off or deleted.",
+      "failed": "The event was not sent. Try again, and contact support if it keeps happening."
     }
   }
 }

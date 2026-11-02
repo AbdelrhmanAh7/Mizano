@@ -69,14 +69,22 @@ export type DeliveryReason =
   | 'signature'
   | 'unpublished'
   | 'tooLarge'
+  | 'busy'
   | 'refused'
   | 'unreachable'
-  | 'privateAddress';
+  | 'privateAddress'
+  | 'stopped'
+  | 'failed';
+
+/** Errors of the connection itself (no answer at all), as the dispatcher records them. */
+const TRANSPORT_ERROR =
+  /fetch failed|Timed out after|ETIMEDOUT|ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN|EHOSTUNREACH|ENETUNREACH|socket hang up/i;
 
 /**
- * What the last attempt means for the person, from the receiver's status code or the transport
- * error (`TypeError: fetch failed (ETIMEDOUT)`); null before any attempt. FlowLine answers 404 for
- * an unknown address, 401 for a wrong secret, 409 while the flow is unpublished.
+ * What the last attempt means for the person, from the receiver's status code or the recorded
+ * error; null before any attempt. FlowLine answers 404 for an unknown address, 401 for a wrong
+ * secret (or a clock that is far off), 409 while the flow is unpublished. Whether Jarda tries
+ * again is shown by the status column, never promised here.
  */
 export function deliveryReason(
   statusCode: number | null,
@@ -88,11 +96,15 @@ export function deliveryReason(
     if (statusCode === 401 || statusCode === 403) return 'signature';
     if (statusCode === 409) return 'unpublished';
     if (statusCode === 413) return 'tooLarge';
-    if (statusCode >= 500 || [408, 425, 429].includes(statusCode)) return 'unreachable';
+    if (statusCode >= 500 || [408, 425, 429].includes(statusCode)) return 'busy';
     return 'refused';
   }
   if (!lastError) return null;
-  return /EPRIVATEADDRESS|private address/i.test(lastError) ? 'privateAddress' : 'unreachable';
+  if (/EPRIVATEADDRESS|private address|must be a public address/i.test(lastError)) {
+    return 'privateAddress';
+  }
+  if (/disabled or deleted/i.test(lastError)) return 'stopped';
+  return TRANSPORT_ERROR.test(lastError) ? 'unreachable' : 'failed';
 }
 
 /** Unwraps an optional `{ data }` envelope. */

@@ -187,7 +187,7 @@ describe('FlowlineConnect', () => {
     render(<FlowlineConnect />);
     expect(screen.getByText('log.status.RETRYING')).toBeInTheDocument();
     // A plain reason, never the raw transport text; the code stays as the cell's title.
-    expect(screen.getByText('reason.unreachable')).toHaveAttribute('title', 'HTTP 503');
+    expect(screen.getByText('reason.busy')).toHaveAttribute('title', 'HTTP 503');
     expect(screen.queryByText('HTTP 503')).not.toBeInTheDocument();
   });
 });
@@ -199,11 +199,15 @@ describe('deliveryReason', () => {
     [401, 'HTTP 401', 'signature'],
     [409, 'HTTP 409', 'unpublished'],
     [413, 'HTTP 413', 'tooLarge'],
-    [429, 'HTTP 429', 'unreachable'],
-    [502, 'HTTP 502', 'unreachable'],
+    [429, 'HTTP 429', 'busy'],
+    [502, 'HTTP 502', 'busy'],
     [400, 'HTTP 400', 'refused'],
     [null, 'TypeError: fetch failed (ETIMEDOUT)', 'unreachable'],
     [null, 'TypeError: fetch failed (ENOTFOUND)', 'unreachable'],
+    [null, 'Timed out after 15s', 'unreachable'],
+    [null, 'Endpoint is disabled or deleted', 'stopped'],
+    [null, 'BadRequestException: Webhook URL must be a public address', 'privateAddress'],
+    [null, 'Error: Unsupported state or unable to authenticate data', 'failed'],
     [null, 'Error: Webhook host resolved to a private address (EPRIVATEADDRESS)', 'privateAddress'],
     [null, null, null],
   ])('%s / %s -> %s', (code, error, reason) => {
