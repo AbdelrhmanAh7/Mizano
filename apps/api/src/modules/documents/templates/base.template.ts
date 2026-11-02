@@ -300,10 +300,10 @@ export function generateHeaderHtml(
       <div>
         ${renderLogoHtml(org, 'max-height: 60px; max-width: 200px;')}
         <h1 style="color: ${color}; margin: 10px 0 5px 0; font-size: 24px;">${escapeHtml(org.name)}</h1>
-        ${renderAddressHtml(org, 'margin: 2px 0; color: #6B7280; font-size: 12px;')}
-        ${org.phone ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${l.tel}: <span dir="ltr">${escapeHtml(org.phone)}</span></p>` : ''}
-        ${org.email ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${l.email}: ${escapeHtml(org.email)}</p>` : ''}
-        ${org.taxId ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${l.taxId}: ${escapeHtml(org.taxId)}</p>` : ''}
+        ${renderAddressHtml(org, 'margin: 2px 0; color: ${BRAND_COLORS.muted}; font-size: 12px;')}
+        ${org.phone ? `<p style="margin: 2px 0; color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.tel}: <span dir="ltr">${escapeHtml(org.phone)}</span></p>` : ''}
+        ${org.email ? `<p style="margin: 2px 0; color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.email}: ${escapeHtml(org.email)}</p>` : ''}
+        ${org.taxId ? `<p style="margin: 2px 0; color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.taxId}: ${escapeHtml(org.taxId)}</p>` : ''}
       </div>
     </div>
   `;
@@ -319,7 +319,7 @@ export function brandFooterHtml(locale: DocumentLocale = 'en'): string {
     '<rect width="64" height="64" rx="15" fill="#0D9488"/>' +
     '<path d="M17 18H47M38 18V35A10 10 0 0 1 18 35" fill="none" stroke="#FFFFFF" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>' +
     '<circle cx="28" cy="33.5" r="4" fill="#EF9F27"/></svg>';
-  return `<p style="margin-top: 12px; text-align: center; color: #9CA3AF; font-size: 9px;">${mark}&nbsp;${BASE_LABELS[locale].preparedWith} ${escapeHtml(BRAND.name[locale])}</p>`;
+  return `<p style="margin-top: 12px; text-align: center; color: ${BRAND_COLORS.muted}; font-size: 9px;">${mark}&nbsp;${BASE_LABELS[locale].preparedWith} ${escapeHtml(BRAND.name[locale])}</p>`;
 }
 
 // Generate footer section for documents
@@ -338,7 +338,7 @@ export function generateFooterHtml(
           ? `
         <div style="margin-bottom: 15px;">
           <h4 style="color: ${color}; margin-bottom: 5px; font-size: 12px;">${l.bankDetails}</h4>
-          <p style="white-space: pre-line; color: #6B7280; font-size: 11px;">${escapeHtml(org.bankDetails)}</p>
+          <p style="white-space: pre-line; color: ${BRAND_COLORS.muted}; font-size: 11px;">${escapeHtml(org.bankDetails)}</p>
         </div>
       `
           : ''
@@ -346,7 +346,7 @@ export function generateFooterHtml(
       ${
         org.footerText
           ? `
-        <p style="text-align: center; color: #9CA3AF; font-size: 10px;">${escapeHtml(org.footerText)}</p>
+        <p style="text-align: center; color: ${BRAND_COLORS.muted}; font-size: 10px;">${escapeHtml(org.footerText)}</p>
       `
           : ''
       }

@@ -39,7 +39,10 @@ export function RunningTimerWidget() {
       <Clock className="h-3.5 w-3.5 text-success animate-pulse" />
       <span className="text-xs font-mono font-medium text-success">{elapsed}</span>
       {entry.task?.project?.name && (
-        <Badge variant="outline" className="text-xs h-5 bg-white border-success/30 text-success">
+        <Badge
+          variant="outline"
+          className="text-xs h-5 bg-background border-success/30 text-success"
+        >
           {entry.task.project.name}
         </Badge>
       )}

@@ -468,10 +468,10 @@ export class EmailService {
                 <!-- Footer -->
                 <tr>
                   <td style="background-color: #F9FAFB; padding: 20px 30px; text-align: center; border-top: 1px solid #E5E7EB;">
-                    <p style="margin: 0; color: #9CA3AF; font-size: 12px;">
+                    <p style="margin: 0; color: ${BRAND_COLORS.muted}; font-size: 12px;">
                       This email was sent by ${safeOrgName}
                     </p>
-                    <p style="margin: 8px 0 0; color: #9CA3AF; font-size: 11px;">
+                    <p style="margin: 8px 0 0; color: ${BRAND_COLORS.muted}; font-size: 11px;">
                       ${brandMarkImg(16, '')}&nbsp;${BRAND.name.en} · <span dir="rtl">${BRAND.name.ar}</span>
                     </p>
                   </td>
@@ -496,21 +496,21 @@ export class EmailService {
       <table style="width: 100%; background-color: #F9FAFB; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
         <tr>
           <td style="padding: 10px;">
-            <p style="margin: 0; color: #6B7280; font-size: 12px;">Invoice Number</p>
+            <p style="margin: 0; color: ${BRAND_COLORS.muted}; font-size: 12px;">Invoice Number</p>
             <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${escapeHtml(context.invoiceNumber)}</p>
           </td>
           <td style="padding: 10px;">
-            <p style="margin: 0; color: #6B7280; font-size: 12px;">Invoice Date</p>
+            <p style="margin: 0; color: ${BRAND_COLORS.muted}; font-size: 12px;">Invoice Date</p>
             <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${escapeHtml(context.invoiceDate)}</p>
           </td>
         </tr>
         <tr>
           <td style="padding: 10px;">
-            <p style="margin: 0; color: #6B7280; font-size: 12px;">Due Date</p>
+            <p style="margin: 0; color: ${BRAND_COLORS.muted}; font-size: 12px;">Due Date</p>
             <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${escapeHtml(context.dueDate)}</p>
           </td>
           <td style="padding: 10px;">
-            <p style="margin: 0; color: #6B7280; font-size: 12px;">Amount Due</p>
+            <p style="margin: 0; color: ${BRAND_COLORS.muted}; font-size: 12px;">Amount Due</p>
             <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold; font-size: 18px;">${escapeHtml(context.grandTotal)}</p>
           </td>
         </tr>
@@ -539,21 +539,21 @@ export class EmailService {
       <table style="width: 100%; background-color: #F9FAFB; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
         <tr>
           <td style="padding: 10px;">
-            <p style="margin: 0; color: #6B7280; font-size: 12px;">Quote Number</p>
+            <p style="margin: 0; color: ${BRAND_COLORS.muted}; font-size: 12px;">Quote Number</p>
             <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${escapeHtml(context.quoteNumber)}</p>
           </td>
           <td style="padding: 10px;">
-            <p style="margin: 0; color: #6B7280; font-size: 12px;">Quote Date</p>
+            <p style="margin: 0; color: ${BRAND_COLORS.muted}; font-size: 12px;">Quote Date</p>
             <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${escapeHtml(context.quoteDate)}</p>
           </td>
         </tr>
         <tr>
           <td style="padding: 10px;">
-            <p style="margin: 0; color: #6B7280; font-size: 12px;">Valid Until</p>
+            <p style="margin: 0; color: ${BRAND_COLORS.muted}; font-size: 12px;">Valid Until</p>
             <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${escapeHtml(context.expiryDate)}</p>
           </td>
           <td style="padding: 10px;">
-            <p style="margin: 0; color: #6B7280; font-size: 12px;">Total Amount</p>
+            <p style="margin: 0; color: ${BRAND_COLORS.muted}; font-size: 12px;">Total Amount</p>
             <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold; font-size: 18px;">${escapeHtml(context.grandTotal)}</p>
           </td>
         </tr>
@@ -579,17 +579,17 @@ export class EmailService {
       <table style="width: 100%; background-color: #F9FAFB; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
         <tr>
           <td style="padding: 10px;">
-            <p style="margin: 0; color: #6B7280; font-size: 12px;">Pay Period</p>
+            <p style="margin: 0; color: ${BRAND_COLORS.muted}; font-size: 12px;">Pay Period</p>
             <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${escapeHtml(context.payPeriod)}</p>
           </td>
           <td style="padding: 10px;">
-            <p style="margin: 0; color: #6B7280; font-size: 12px;">Pay Date</p>
+            <p style="margin: 0; color: ${BRAND_COLORS.muted}; font-size: 12px;">Pay Date</p>
             <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${escapeHtml(context.payDate)}</p>
           </td>
         </tr>
         <tr>
           <td colspan="2" style="padding: 10px; text-align: center;">
-            <p style="margin: 0; color: #6B7280; font-size: 12px;">Net Pay</p>
+            <p style="margin: 0; color: ${BRAND_COLORS.muted}; font-size: 12px;">Net Pay</p>
             <p style="margin: 5px 0 0 0; color: ${BRAND_COLORS.success}; font-weight: bold; font-size: 24px;">${escapeHtml(context.netPay)}</p>
           </td>
         </tr>
@@ -597,7 +597,7 @@ export class EmailService {
       <p style="color: #4B5563; font-size: 14px; line-height: 1.6;">
         Please find your detailed payslip attached. If you have any questions, contact the HR department.
       </p>
-      <p style="color: #9CA3AF; font-size: 12px; margin-top: 20px;">
+      <p style="color: ${BRAND_COLORS.muted}; font-size: 12px; margin-top: 20px;">
         This is an automated email. Please do not reply.
       </p>
     `;
