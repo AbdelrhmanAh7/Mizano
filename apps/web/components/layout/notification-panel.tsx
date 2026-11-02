@@ -194,7 +194,7 @@ export function NotificationPanel() {
                         onClick={() => handleNotificationClick(notification)}
                         className={cn(
                           'w-full flex items-start gap-3 px-4 py-3 text-start transition-colors hover:bg-muted/50',
-                          !notification.isRead && 'bg-info/50',
+                          !notification.isRead && 'bg-accent/50',
                         )}
                       >
                         <div

@@ -621,7 +621,7 @@ export default function WorkOrderDetailPage() {
             <AlertDialogCancel>Keep</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => void handleCancel()}
-              className="bg-warning hover:bg-warning/90"
+              className="bg-warning text-warning-foreground hover:bg-warning/90"
             >
               Cancel Work Order
             </AlertDialogAction>

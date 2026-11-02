@@ -66,6 +66,8 @@ describe.each([':root', '.dark'])('design tokens %s', (selector) => {
     ['success-foreground', 'success'],
     ['warning-foreground', 'warning'],
     ['info-foreground', 'info'],
+    ['brand-foreground', 'brand-dark'],
+    ['brand-foreground', 'brand-deep'],
   ])('%s on %s passes AA', (fg, bg) => {
     expect(contrast(c(fg), c(bg))).toBeGreaterThanOrEqual(4.5);
   });

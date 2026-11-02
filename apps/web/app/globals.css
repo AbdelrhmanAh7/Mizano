@@ -34,6 +34,7 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 175.3 77.4% 26.1%;
     --radius: 0.5rem;
+    --overlay: 0 0% 0%;
 
     /* Semantic status colors, shared with FlowLine (soft: bg-success/10 + text-success) */
     /* #15753A */
@@ -48,6 +49,7 @@
 
     /* Logo colors (#0D9488, #085041, #063A33, gold #EF9F27): decorative only, never text */
     --brand: 174.7 83.9% 31.6%;
+    --brand-foreground: 0 0% 100%;
     --brand-dark: 167.5 81.8% 17.3%;
     --brand-deep: 171.9 81.3% 12.5%;
     --brand-gold: 36 86.2% 54.5%;
@@ -89,9 +91,10 @@
     --info: 213.1 93.9% 67.8%;
     --info-foreground: 222.2 47.4% 11.2%;
 
-    --brand: 172.5 66% 50.4%;
-    --brand-dark: 174.7 83.9% 31.6%;
-    --brand-deep: 167.5 81.8% 17.3%;
+    --brand: 174.7 83.9% 31.6%;
+    --brand-foreground: 0 0% 100%;
+    --brand-dark: 167.5 81.8% 17.3%;
+    --brand-deep: 171.9 81.3% 12.5%;
     --brand-gold: 36 86.2% 54.5%;
 
     --chart-1: 172.5 66% 50.4%;
@@ -113,6 +116,7 @@
 
 /* RTL Support */
 [dir='rtl'] {
+  letter-spacing: 0;
   font-feature-settings: 'calt' 1;
 }
 

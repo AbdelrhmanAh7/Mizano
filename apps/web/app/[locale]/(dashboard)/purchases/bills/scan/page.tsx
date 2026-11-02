@@ -923,7 +923,7 @@ function StepBadge({
         className={cn(
           'flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium',
           active && 'bg-primary text-primary-foreground',
-          done && 'bg-success text-white',
+          done && 'bg-success text-success-foreground',
           !active && !done && 'bg-muted text-muted-foreground',
         )}
       >

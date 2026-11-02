@@ -193,7 +193,9 @@ export default function RunPayrollPage() {
         <div className="flex items-center gap-2">
           <div
             className={`w-8 h-8 rounded-full flex items-center justify-center ${
-              step === 'select' ? 'bg-primary text-primary-foreground' : 'bg-success text-white'
+              step === 'select'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-success text-success-foreground'
             }`}
           >
             {step === 'select' ? '1' : <CheckCircle2 className="h-5 w-5" />}
@@ -214,7 +216,7 @@ export default function RunPayrollPage() {
                 ? 'bg-muted text-muted-foreground'
                 : step === 'preview'
                   ? 'bg-primary text-primary-foreground'
-                  : 'bg-success text-white'
+                  : 'bg-success text-success-foreground'
             }`}
           >
             {step === 'confirm' ? <CheckCircle2 className="h-5 w-5" /> : '2'}

@@ -564,7 +564,10 @@ function InvoicesPageContent() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmVoid} className="bg-warning hover:bg-warning/90">
+            <AlertDialogAction
+              onClick={confirmVoid}
+              className="bg-warning text-warning-foreground hover:bg-warning/90"
+            >
               {t('invoices.voidInvoice')}
             </AlertDialogAction>
           </AlertDialogFooter>

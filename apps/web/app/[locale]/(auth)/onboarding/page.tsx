@@ -134,10 +134,10 @@ export default function OnboardingPage() {
       </section>
 
       {/* CTA Footer */}
-      <section className="bg-gradient-to-br from-brand via-brand-dark to-brand-deep text-white">
+      <section className="bg-gradient-to-br from-brand-dark via-brand-dark to-brand-deep text-white">
         <div className="container mx-auto px-4 py-20 text-center">
           <h2 className="text-3xl font-bold">{t('cta.title')}</h2>
-          <p className="mt-3 text-primary-foreground text-lg">{t('cta.subtitle')}</p>
+          <p className="mt-3 text-brand-foreground text-lg">{t('cta.subtitle')}</p>
           <div className="mt-8 flex items-center justify-center gap-4">
             <Button size="lg" variant="secondary" asChild>
               <Link href="/register">{t('cta.getStarted')}</Link>

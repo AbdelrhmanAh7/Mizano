@@ -52,6 +52,7 @@ Colors are HSL triplets in CSS variables in `apps/web/app/globals.css`, exposed 
 | `warning` (+ `-foreground`)                       | `#A1460A` / white                          | Partially paid, needs review, low confidence, expiring      |
 | `info` (+ `-foreground`)                          | `#1D4ED8` / white                          | Sent, processing, informational notices                     |
 | `brand`, `brand-dark`, `brand-deep`, `brand-gold` | `#0D9488`, `#085041`, `#063A33`, `#EF9F27` | Logo colors: hero panels and illustrations only, never text |
+| `overlay`                                         | black at 80% opacity                       | Dialog/sheet scrim                                          |
 | `border`, `input`                                 | slate 200                                  | Borders, form control borders                               |
 | `chart-1` … `chart-5`                             | teal, blue, gold, violet, rose             | Categorical chart series, in order                          |
 

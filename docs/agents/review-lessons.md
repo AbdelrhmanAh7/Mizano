@@ -117,6 +117,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **A control that reflects a value derives its state from it.** The report period selector kept its own preset state and said "This Month" over a year-to-date report. _(manual QA, reports)_
 - **Credential forms use `method="post"`.** A submit before hydration posts the form natively; with the default GET the password lands in the URL, history and server logs. _(manual QA, login/register)_
 
+- **Include every source of utility classes in Tailwind content.** Hooks returning status styles under `lib/` need that directory scanned too. When replacing a palette color on a solid status surface, use its foreground token for controls so an icon does not match its background. _(shared design-system review, 2 Nov 2026)_
+
 ## 12. Caches, tests and scope
 
 - **Finite inputs do not guarantee finite arithmetic results.** Diagnostic timers must validate the elapsed difference and the accumulated safe-integer total before storing them; test subtraction overflow and repeated-stage accumulation. _(intake timings, PR #129)_
