@@ -144,7 +144,7 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
           {canCancel && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="outline" className="text-red-600">
+                <Button variant="outline" className="text-destructive">
                   <XCircle className="mr-2 h-4 w-4" />
                   {t('common.cancel')}
                 </Button>
@@ -159,7 +159,10 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleCancel} className="bg-red-600 hover:bg-red-700">
+                  <AlertDialogAction
+                    onClick={handleCancel}
+                    className="bg-destructive hover:bg-destructive/90"
+                  >
                     {t('transfers.cancelTransfer')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -174,8 +177,8 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
         <CardContent className="pt-6">
           <div className="flex items-center justify-center gap-8">
             <div className="text-center">
-              <div className="p-4 bg-blue-100 rounded-lg inline-block">
-                <Truck className="h-8 w-8 text-blue-600" />
+              <div className="p-4 bg-info/10 rounded-lg inline-block">
+                <Truck className="h-8 w-8 text-info" />
               </div>
               <p className="mt-2 font-semibold">{transfer.fromWarehouse?.name}</p>
               <p className="text-sm text-muted-foreground">Source</p>
@@ -186,8 +189,8 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
               <div className="w-20 h-0.5 bg-border"></div>
             </div>
             <div className="text-center">
-              <div className="p-4 bg-green-100 rounded-lg inline-block">
-                <Truck className="h-8 w-8 text-green-600" />
+              <div className="p-4 bg-success/10 rounded-lg inline-block">
+                <Truck className="h-8 w-8 text-success" />
               </div>
               <p className="mt-2 font-semibold">{transfer.toWarehouse?.name}</p>
               <p className="text-sm text-muted-foreground">Destination</p>

@@ -277,7 +277,7 @@ export default function CustomerDetailPage() {
                       <dd>
                         <a
                           href={`mailto:${customer.email}`}
-                          className="text-blue-600 hover:underline"
+                          className="text-primary hover:underline"
                         >
                           {customer.email}
                         </a>
@@ -504,7 +504,7 @@ export default function CustomerDetailPage() {
                           </TableCell>
                           <TableCell>{payment.paymentMode?.replace('_', ' ')}</TableCell>
                           <TableCell>{payment.reference || '-'}</TableCell>
-                          <TableCell className="text-right font-mono text-green-600">
+                          <TableCell className="text-right font-mono text-success">
                             {formatCurrency(parseFloat(payment.amount || '0'))}
                           </TableCell>
                         </TableRow>
@@ -647,7 +647,7 @@ export default function CustomerDetailPage() {
                           <TableCell>
                             <Badge variant="outline">{cn.type.replace('_', ' ')}</Badge>
                           </TableCell>
-                          <TableCell className="text-right font-mono text-orange-600">
+                          <TableCell className="text-right font-mono text-warning">
                             {formatCurrency(parseFloat(cn.amount || '0'))}
                           </TableCell>
                         </TableRow>

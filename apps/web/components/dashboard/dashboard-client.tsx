@@ -141,16 +141,16 @@ export function DashboardClient() {
                   title={t('stats.revenue')}
                   value={statsData?.stats.revenue || 0}
                   icon={TrendingUp}
-                  iconColor="text-green-600"
-                  iconBgColor="bg-green-100"
+                  iconColor="text-success"
+                  iconBgColor="bg-success/10"
                   trend={trends?.revenue}
                 />
                 <StatCard
                   title={t('stats.expenses')}
                   value={statsData?.stats.expenses || 0}
                   icon={TrendingDown}
-                  iconColor="text-red-600"
-                  iconBgColor="bg-red-100"
+                  iconColor="text-destructive"
+                  iconBgColor="bg-destructive/10"
                   trend={
                     trends?.expenses
                       ? { ...trends.expenses, isPositive: !trends.expenses.isPositive }
@@ -161,16 +161,16 @@ export function DashboardClient() {
                   title={t('stats.netProfit')}
                   value={statsData?.stats.netProfit || 0}
                   icon={DollarSign}
-                  iconColor="text-blue-600"
-                  iconBgColor="bg-blue-100"
+                  iconColor="text-info"
+                  iconBgColor="bg-info/10"
                   trend={trends?.profit}
                 />
                 <StatCard
                   title={t('stats.bankBalance')}
                   value={statsData?.stats.bankBalance || 0}
                   icon={Wallet}
-                  iconColor="text-purple-600"
-                  iconBgColor="bg-purple-100"
+                  iconColor="text-primary"
+                  iconBgColor="bg-primary/10"
                 />
               </>
             )}
@@ -188,29 +188,33 @@ export function DashboardClient() {
                   title={t('stats.receivables')}
                   value={statsData?.stats.totalReceivables || 0}
                   icon={Receipt}
-                  iconColor="text-emerald-600"
-                  iconBgColor="bg-emerald-100"
+                  iconColor="text-success"
+                  iconBgColor="bg-success/10"
                 />
                 <StatCard
                   title={t('stats.payables')}
                   value={statsData?.stats.totalPayables || 0}
                   icon={CreditCard}
-                  iconColor="text-orange-600"
-                  iconBgColor="bg-orange-100"
+                  iconColor="text-warning"
+                  iconBgColor="bg-warning/10"
                 />
                 <StatCard
                   title={t('stats.netPosition')}
                   value={statsData?.netPosition || 0}
                   icon={ArrowLeftRight}
-                  iconColor={(statsData?.netPosition || 0) >= 0 ? 'text-green-600' : 'text-red-600'}
-                  iconBgColor={(statsData?.netPosition || 0) >= 0 ? 'bg-green-100' : 'bg-red-100'}
+                  iconColor={
+                    (statsData?.netPosition || 0) >= 0 ? 'text-success' : 'text-destructive'
+                  }
+                  iconBgColor={
+                    (statsData?.netPosition || 0) >= 0 ? 'bg-success/10' : 'bg-destructive/10'
+                  }
                 />
                 <StatCard
                   title={t('stats.yearlyRevenue')}
                   value={statsData?.yearlyRevenue || 0}
                   icon={DollarSign}
-                  iconColor="text-cyan-600"
-                  iconBgColor="bg-cyan-100"
+                  iconColor="text-info"
+                  iconBgColor="bg-info/10"
                 />
                 <StatCard
                   title={t('stats.overdueAmount')}
@@ -218,16 +222,16 @@ export function DashboardClient() {
                     (statsData?.stats.overdueInvoices || 0) + (statsData?.stats.overdueBills || 0)
                   }
                   icon={AlertTriangle}
-                  iconColor="text-red-600"
-                  iconBgColor="bg-red-100"
+                  iconColor="text-destructive"
+                  iconBgColor="bg-destructive/10"
                   currency="count"
                 />
                 <StatCard
                   title={t('stats.activeProjects')}
                   value={statsData?.stats.activeProjects || 0}
                   icon={FolderKanban}
-                  iconColor="text-indigo-600"
-                  iconBgColor="bg-indigo-100"
+                  iconColor="text-info"
+                  iconBgColor="bg-info/10"
                   currency="count"
                 />
               </>

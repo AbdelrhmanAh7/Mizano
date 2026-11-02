@@ -111,7 +111,7 @@ export default function AuditLogsPage() {
                 <Plus className="h-4 w-4" />
                 {t('stats.creates')}
               </div>
-              <div className="text-2xl font-bold text-green-600">{stats.creates || 0}</div>
+              <div className="text-2xl font-bold text-success">{stats.creates || 0}</div>
             </CardContent>
           </Card>
           <Card>
@@ -120,7 +120,7 @@ export default function AuditLogsPage() {
                 <Edit3 className="h-4 w-4" />
                 {t('stats.updates')}
               </div>
-              <div className="text-2xl font-bold text-blue-600">{stats.updates || 0}</div>
+              <div className="text-2xl font-bold text-info">{stats.updates || 0}</div>
             </CardContent>
           </Card>
           <Card>
@@ -129,7 +129,7 @@ export default function AuditLogsPage() {
                 <Trash2 className="h-4 w-4" />
                 {t('stats.deletes')}
               </div>
-              <div className="text-2xl font-bold text-red-600">{stats.deletes || 0}</div>
+              <div className="text-2xl font-bold text-destructive">{stats.deletes || 0}</div>
             </CardContent>
           </Card>
         </div>

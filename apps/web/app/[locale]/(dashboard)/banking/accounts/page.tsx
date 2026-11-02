@@ -83,7 +83,7 @@ function BankAccountsPageContent() {
         <div>
           <Link
             href={`/banking/accounts/${row.original.id}`}
-            className="font-medium hover:text-blue-600 hover:underline"
+            className="font-medium hover:text-primary hover:underline"
           >
             {row.original.name}
           </Link>
@@ -129,7 +129,7 @@ function BankAccountsPageContent() {
             : row.original.systemBalance;
         return (
           <span
-            className={cn('font-bold font-mono', balance < 0 ? 'text-red-600' : 'text-green-600')}
+            className={cn('font-bold font-mono', balance < 0 ? 'text-destructive' : 'text-success')}
           >
             {formatCurrency(balance)}
           </span>

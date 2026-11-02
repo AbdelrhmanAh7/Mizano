@@ -312,7 +312,7 @@ function InvoicesPageContent() {
       cell: ({ row }) => {
         const isOverdue = row.original.status === 'OVERDUE';
         return (
-          <span className={cn(isOverdue && 'text-red-600 font-medium')}>
+          <span className={cn(isOverdue && 'text-destructive font-medium')}>
             {format(new Date(row.original.dueDate), 'PP', { locale: dateLocale })}
           </span>
         );
@@ -349,7 +349,7 @@ function InvoicesPageContent() {
       cell: ({ row }) => {
         const balanceDue = parseFloat(row.original.balanceDue || '0');
         return (
-          <span className={cn(balanceDue > 0 && 'text-red-600 font-semibold')}>
+          <span className={cn(balanceDue > 0 && 'text-destructive font-semibold')}>
             {formatCurrency(row.original.balanceDue, row.original.currencyCode)}
           </span>
         );
@@ -396,7 +396,7 @@ function InvoicesPageContent() {
                 </>
               )}
               {canEdit && invoice.status !== 'VOID' && invoice.status !== 'DRAFT' && (
-                <DropdownMenuItem onClick={() => handleVoid(invoice)} className="text-orange-600">
+                <DropdownMenuItem onClick={() => handleVoid(invoice)} className="text-warning">
                   <Ban className="mr-2 h-4 w-4" />
                   {t('invoices.list.void')}
                 </DropdownMenuItem>
@@ -404,7 +404,10 @@ function InvoicesPageContent() {
               {canDelete && invoice.status === 'DRAFT' && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleDelete(invoice)} className="text-red-600">
+                  <DropdownMenuItem
+                    onClick={() => handleDelete(invoice)}
+                    className="text-destructive"
+                  >
                     <Trash2 className="mr-2 h-4 w-4" />
                     {tCommon('buttons.delete')}
                   </DropdownMenuItem>
@@ -561,7 +564,7 @@ function InvoicesPageContent() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmVoid} className="bg-orange-600 hover:bg-orange-700">
+            <AlertDialogAction onClick={confirmVoid} className="bg-warning hover:bg-warning/90">
               {t('invoices.voidInvoice')}
             </AlertDialogAction>
           </AlertDialogFooter>

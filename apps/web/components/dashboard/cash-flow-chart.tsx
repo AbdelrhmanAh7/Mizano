@@ -27,7 +27,8 @@ export const CashFlowChart = memo(function CashFlowChart({ data, currency }: Cas
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="month" tickFormatter={monthLabel} {...CHART_AXIS} />
         <YAxis {...CHART_AXIS} tickFormatter={(value) => formatCompactCurrency(value, currency)} />
-        <Tooltip labelFormatter={monthLabel}
+        <Tooltip
+          labelFormatter={monthLabel}
           formatter={(value: number) => formatCompactCurrency(value, currency)}
           contentStyle={CHART_TOOLTIP_STYLE}
         />
@@ -36,28 +37,28 @@ export const CashFlowChart = memo(function CashFlowChart({ data, currency }: Cas
           type="monotone"
           dataKey="inflow"
           name={t('inflow')}
-          stroke="#22c55e"
+          stroke="hsl(var(--success))"
           strokeWidth={2}
-          dot={{ fill: '#22c55e', strokeWidth: 2 }}
+          dot={{ fill: 'hsl(var(--success))', strokeWidth: 2 }}
           activeDot={{ r: 6 }}
         />
         <Line
           type="monotone"
           dataKey="outflow"
           name={t('outflow')}
-          stroke="#ef4444"
+          stroke="hsl(var(--destructive))"
           strokeWidth={2}
-          dot={{ fill: '#ef4444', strokeWidth: 2 }}
+          dot={{ fill: 'hsl(var(--destructive))', strokeWidth: 2 }}
           activeDot={{ r: 6 }}
         />
         <Line
           type="monotone"
           dataKey="net"
           name={t('net')}
-          stroke="#3b82f6"
+          stroke="hsl(var(--chart-2))"
           strokeWidth={2}
           strokeDasharray="5 5"
-          dot={{ fill: '#3b82f6', strokeWidth: 2 }}
+          dot={{ fill: 'hsl(var(--chart-2))', strokeWidth: 2 }}
           activeDot={{ r: 6 }}
         />
       </LineChart>

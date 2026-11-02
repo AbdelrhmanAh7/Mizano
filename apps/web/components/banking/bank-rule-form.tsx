@@ -130,7 +130,7 @@ export function BankRuleForm({
             <Label htmlFor="name">{tForm('name')} *</Label>
             <Input id="name" placeholder={tForm('nameExample')} {...form.register('name')} />
             {form.formState.errors.name && (
-              <p className="text-sm text-red-500">
+              <p className="text-sm text-destructive">
                 {errorText(form.formState.errors.name.message)}
               </p>
             )}
@@ -221,7 +221,7 @@ export function BankRuleForm({
             </div>
           ))}
           {form.formState.errors.conditions && (
-            <p className="text-sm text-red-500">
+            <p className="text-sm text-destructive">
               {errorText(form.formState.errors.conditions.message)}
             </p>
           )}

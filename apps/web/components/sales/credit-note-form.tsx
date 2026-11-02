@@ -179,7 +179,7 @@ export function CreditNoteForm({
                 isInvalid={!!form.formState.errors.customerId}
               />
               {form.formState.errors.customerId && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {errorText(form.formState.errors.customerId.message)}
                 </p>
               )}
@@ -189,7 +189,7 @@ export function CreditNoteForm({
               <Label htmlFor="date">{tForm('date')} *</Label>
               <Input id="date" type="date" {...form.register('date')} />
               {form.formState.errors.date && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {errorText(form.formState.errors.date.message)}
                 </p>
               )}
@@ -221,7 +221,7 @@ export function CreditNoteForm({
               </SelectContent>
             </Select>
             {form.formState.errors.invoiceId && (
-              <p className="text-sm text-red-500">
+              <p className="text-sm text-destructive">
                 {errorText(form.formState.errors.invoiceId.message)}
               </p>
             )}
@@ -308,10 +308,10 @@ export function CreditNoteForm({
                 </SelectContent>
               </Select>
               {refundAccountsData && refundAccounts.length === 0 && (
-                <p className="text-sm text-amber-600">{t('creditNotes.form.noRefundAccounts')}</p>
+                <p className="text-sm text-warning">{t('creditNotes.form.noRefundAccounts')}</p>
               )}
               {form.formState.errors.refundAccountId && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {errorText(form.formState.errors.refundAccountId.message)}
                 </p>
               )}
@@ -349,10 +349,12 @@ export function CreditNoteForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.appliedToInvoiceId && (
-                <p className="text-sm text-red-500">{t('creditNotes.form.applyInvoiceRequired')}</p>
+                <p className="text-sm text-destructive">
+                  {t('creditNotes.form.applyInvoiceRequired')}
+                </p>
               )}
               {selectedType === 'APPLY_TO_INVOICE' && openInvoices.length === 0 && (
-                <p className="text-sm text-amber-600">{tForm('noOpenInvoicesForCustomer')}</p>
+                <p className="text-sm text-warning">{tForm('noOpenInvoicesForCustomer')}</p>
               )}
             </div>
           )}
@@ -375,7 +377,7 @@ export function CreditNoteForm({
               {...form.register('amount')}
             />
             {form.formState.errors.amount && (
-              <p className="text-sm text-red-500">
+              <p className="text-sm text-destructive">
                 {errorText(form.formState.errors.amount.message)}
               </p>
             )}
@@ -395,7 +397,7 @@ export function CreditNoteForm({
               {...form.register('reason')}
             />
             {form.formState.errors.reason && (
-              <p className="text-sm text-red-500">
+              <p className="text-sm text-destructive">
                 {errorText(form.formState.errors.reason.message)}
               </p>
             )}

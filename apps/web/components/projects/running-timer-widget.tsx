@@ -35,18 +35,18 @@ export function RunningTimerWidget() {
   if (!entry) return null;
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200">
-      <Clock className="h-3.5 w-3.5 text-green-600 animate-pulse" />
-      <span className="text-xs font-mono font-medium text-green-700">{elapsed}</span>
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-success/5 border border-success/30">
+      <Clock className="h-3.5 w-3.5 text-success animate-pulse" />
+      <span className="text-xs font-mono font-medium text-success">{elapsed}</span>
       {entry.task?.project?.name && (
-        <Badge variant="outline" className="text-xs h-5 bg-white border-green-200 text-green-700">
+        <Badge variant="outline" className="text-xs h-5 bg-white border-success/30 text-success">
           {entry.task.project.name}
         </Badge>
       )}
       <Button
         size="icon"
         variant="ghost"
-        className="h-5 w-5 text-red-500 hover:text-red-700 hover:bg-red-50"
+        className="h-5 w-5 text-destructive hover:text-destructive hover:bg-destructive/5"
         onClick={() => void stopTimer.mutateAsync(entry.id)}
         disabled={stopTimer.isPending}
         title="Stop timer"

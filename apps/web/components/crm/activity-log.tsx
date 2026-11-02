@@ -34,11 +34,11 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
 };
 
 const activityColors: Record<ActivityType, string> = {
-  CALL: 'bg-blue-100 text-blue-700',
-  EMAIL: 'bg-purple-100 text-purple-700',
-  MEETING: 'bg-green-100 text-green-700',
-  NOTE: 'bg-yellow-100 text-yellow-700',
-  TASK: 'bg-orange-100 text-orange-700',
+  CALL: 'bg-info/10 text-info',
+  EMAIL: 'bg-primary/10 text-primary',
+  MEETING: 'bg-success/10 text-success',
+  NOTE: 'bg-warning/10 text-warning',
+  TASK: 'bg-warning/10 text-warning',
 };
 
 interface ActivityLogProps {

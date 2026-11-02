@@ -79,7 +79,7 @@ function ItemsPageContent() {
         <div>
           <Link
             href={`/inventory/items/${row.original.id}`}
-            className="font-medium hover:text-blue-600 hover:underline"
+            className="font-medium hover:text-primary hover:underline"
           >
             {row.original.name}
           </Link>
@@ -135,8 +135,8 @@ function ItemsPageContent() {
         const stockStatus = getStockStatus(item);
         return (
           <div className="flex items-center justify-end gap-2">
-            {stockStatus.status === 'low' && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
-            {stockStatus.status === 'out' && <AlertTriangle className="h-4 w-4 text-red-500" />}
+            {stockStatus.status === 'low' && <AlertTriangle className="h-4 w-4 text-warning" />}
+            {stockStatus.status === 'out' && <AlertTriangle className="h-4 w-4 text-destructive" />}
             <span className={cn('font-mono', stockStatus.color)}>{item.currentStock}</span>
           </div>
         );

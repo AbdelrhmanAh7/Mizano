@@ -485,12 +485,12 @@ export function getLeadSourceLabel(source: LeadSource): string {
 
 export function getLeadStatusColor(status: LeadStatus): string {
   const colors: Record<LeadStatus, string> = {
-    NEW: 'bg-blue-100 text-blue-800',
-    CONTACTED: 'bg-yellow-100 text-yellow-800',
-    QUALIFIED: 'bg-green-100 text-green-800',
-    JUNK: 'bg-red-100 text-red-800',
-    WON: 'bg-emerald-100 text-emerald-800',
-    LOST: 'bg-gray-100 text-gray-800',
+    NEW: 'bg-info/10 text-info',
+    CONTACTED: 'bg-warning/10 text-warning',
+    QUALIFIED: 'bg-success/10 text-success',
+    JUNK: 'bg-destructive/10 text-destructive',
+    WON: 'bg-success/10 text-success',
+    LOST: 'bg-muted text-foreground',
   };
   return colors[status] || '';
 }
@@ -509,12 +509,12 @@ export function getLeadStatusLabel(status: LeadStatus): string {
 
 export function getDealStageColor(stage: DealStage): string {
   const colors: Record<DealStage, string> = {
-    NEW: 'bg-blue-100 text-blue-800',
-    MEETING_SCHEDULED: 'bg-yellow-100 text-yellow-800',
-    PROPOSAL_SENT: 'bg-purple-100 text-purple-800',
-    NEGOTIATION: 'bg-orange-100 text-orange-800',
-    WON: 'bg-green-100 text-green-800',
-    LOST: 'bg-red-100 text-red-800',
+    NEW: 'bg-info/10 text-info',
+    MEETING_SCHEDULED: 'bg-warning/10 text-warning',
+    PROPOSAL_SENT: 'bg-primary/10 text-primary',
+    NEGOTIATION: 'bg-warning/10 text-warning',
+    WON: 'bg-success/10 text-success',
+    LOST: 'bg-destructive/10 text-destructive',
   };
   return colors[stage] || '';
 }

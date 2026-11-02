@@ -30,7 +30,8 @@ export const PayrollTrendChart = memo(function PayrollTrendChart({
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="month" tickFormatter={monthLabel} {...CHART_AXIS} />
         <YAxis {...CHART_AXIS} tickFormatter={(value) => formatCompactCurrency(value, currency)} />
-        <Tooltip labelFormatter={monthLabel}
+        <Tooltip
+          labelFormatter={monthLabel}
           formatter={(value: number) => formatCompactCurrency(value, currency)}
           contentStyle={CHART_TOOLTIP_STYLE}
         />
@@ -38,7 +39,7 @@ export const PayrollTrendChart = memo(function PayrollTrendChart({
         <Bar
           dataKey="grossPay"
           name={t('grossPay')}
-          fill="#3b82f6"
+          fill="hsl(var(--chart-2))"
           fillOpacity={0.6}
           stackId="payroll"
           radius={[0, 0, 0, 0]}
@@ -46,7 +47,7 @@ export const PayrollTrendChart = memo(function PayrollTrendChart({
         <Bar
           dataKey="deductions"
           name={t('deductions')}
-          fill="#ef4444"
+          fill="hsl(var(--destructive))"
           fillOpacity={0.6}
           stackId="payroll"
           radius={[4, 4, 0, 0]}
@@ -55,9 +56,9 @@ export const PayrollTrendChart = memo(function PayrollTrendChart({
           type="monotone"
           dataKey="netPay"
           name={t('netPay')}
-          stroke="#22c55e"
+          stroke="hsl(var(--success))"
           strokeWidth={3}
-          dot={{ fill: '#22c55e', r: 4 }}
+          dot={{ fill: 'hsl(var(--success))', r: 4 }}
           activeDot={{ r: 6 }}
         />
       </ComposedChart>

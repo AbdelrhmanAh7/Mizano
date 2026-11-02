@@ -153,9 +153,9 @@ export function StatementImportZone() {
       )}
 
       {result && (
-        <Alert className="border-green-200 bg-green-50">
-          <CheckCircle className="h-4 w-4 text-green-600" />
-          <AlertDescription className="text-green-800">
+        <Alert className="border-success/30 bg-success/5">
+          <CheckCircle className="h-4 w-4 text-success" />
+          <AlertDescription className="text-success">
             <div className="flex items-center gap-4 text-sm">
               <span className="flex items-center gap-1">
                 <FileText className="h-3 w-3" />
@@ -165,9 +165,7 @@ export function StatementImportZone() {
               <span className="text-muted-foreground">
                 {t('duplicates', { count: result.duplicates })}
               </span>
-              <span className="text-blue-700">
-                {t('rulesApplied', { count: result.rulesApplied })}
-              </span>
+              <span className="text-info">{t('rulesApplied', { count: result.rulesApplied })}</span>
             </div>
           </AlertDescription>
         </Alert>

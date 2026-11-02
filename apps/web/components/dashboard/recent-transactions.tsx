@@ -42,17 +42,17 @@ function TransactionIcon({ type }: { type: RecentTransaction['type'] }) {
 function getTransactionColors(type: RecentTransaction['type']) {
   switch (type) {
     case 'INVOICE':
-      return { bg: 'bg-blue-100', icon: 'text-blue-600' };
+      return { bg: 'bg-info/10', icon: 'text-info' };
     case 'PAYMENT_RECEIVED':
-      return { bg: 'bg-green-100', icon: 'text-green-600' };
+      return { bg: 'bg-success/10', icon: 'text-success' };
     case 'BILL':
-      return { bg: 'bg-orange-100', icon: 'text-orange-600' };
+      return { bg: 'bg-warning/10', icon: 'text-warning' };
     case 'PAYMENT_MADE':
-      return { bg: 'bg-purple-100', icon: 'text-purple-600' };
+      return { bg: 'bg-primary/10', icon: 'text-primary' };
     case 'EXPENSE':
-      return { bg: 'bg-red-100', icon: 'text-red-600' };
+      return { bg: 'bg-destructive/10', icon: 'text-destructive' };
     default:
-      return { bg: 'bg-gray-100', icon: 'text-gray-600' };
+      return { bg: 'bg-muted', icon: 'text-muted-foreground' };
   }
 }
 
@@ -93,7 +93,7 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
                     <div className="flex items-center gap-2">
                       <Link
                         href={transaction.link}
-                        className="font-mono text-sm text-blue-600 hover:underline"
+                        className="font-mono text-sm text-primary hover:underline"
                       >
                         {transaction.reference}
                       </Link>
@@ -106,7 +106,7 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
                     <div
                       className={cn(
                         'flex items-center gap-1 font-mono font-medium',
-                        isPositive ? 'text-green-600' : 'text-red-600',
+                        isPositive ? 'text-success' : 'text-destructive',
                       )}
                     >
                       {isPositive ? (

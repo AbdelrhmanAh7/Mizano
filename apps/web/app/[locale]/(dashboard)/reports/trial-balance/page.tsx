@@ -50,13 +50,13 @@ export default function TrialBalanceReportPage() {
 
   const getAccountTypeColor = (type: string) => {
     const colors: Record<string, string> = {
-      ASSET: 'bg-blue-100 text-blue-800',
-      LIABILITY: 'bg-purple-100 text-purple-800',
-      EQUITY: 'bg-green-100 text-green-800',
-      INCOME: 'bg-emerald-100 text-emerald-800',
-      EXPENSE: 'bg-red-100 text-red-800',
+      ASSET: 'bg-info/10 text-info',
+      LIABILITY: 'bg-primary/10 text-primary',
+      EQUITY: 'bg-success/10 text-success',
+      INCOME: 'bg-success/10 text-success',
+      EXPENSE: 'bg-destructive/10 text-destructive',
     };
-    return colors[type] || 'bg-gray-100 text-gray-800';
+    return colors[type] || 'bg-muted text-foreground';
   };
 
   return (
@@ -80,14 +80,14 @@ export default function TrialBalanceReportPage() {
       ) : (
         <>
           {/* Balance Status */}
-          <Card className={cn('border-2', isBalanced ? 'border-green-500' : 'border-red-500')}>
+          <Card className={cn('border-2', isBalanced ? 'border-success' : 'border-destructive')}>
             <CardContent className="pt-6">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   {isBalanced ? (
-                    <CheckCircle className="h-8 w-8 text-green-600" />
+                    <CheckCircle className="h-8 w-8 text-success" />
                   ) : (
-                    <XCircle className="h-8 w-8 text-red-600" />
+                    <XCircle className="h-8 w-8 text-destructive" />
                   )}
                   <div>
                     <p className="font-semibold">

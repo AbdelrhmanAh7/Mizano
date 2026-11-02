@@ -564,7 +564,7 @@ export default function ScanBillPage() {
                   </Badge>
                 )}
                 {intake.isReconnecting && (
-                  <p className="text-xs text-yellow-600" role="status">
+                  <p className="text-xs text-warning" role="status">
                     {ts('reconnecting')}
                   </p>
                 )}
@@ -592,8 +592,8 @@ export default function ScanBillPage() {
           )}
           {/* AI Context Panel */}
           {intake.jobStatus === 'NEEDS_REVIEW' && (
-            <Card className="border-yellow-500" role="status">
-              <CardContent className="space-y-2 pt-6 text-yellow-700">
+            <Card className="border-warning" role="status">
+              <CardContent className="space-y-2 pt-6 text-warning">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
                   <p>{t('needsReviewNotice')}</p>
@@ -641,9 +641,9 @@ export default function ScanBillPage() {
 
           {/* Duplicate Warning */}
           {result.duplicateWarning?.isDuplicate && (
-            <Card className="border-yellow-500">
+            <Card className="border-warning">
               <CardContent className="pt-6">
-                <div className="flex items-center gap-2 text-yellow-600">
+                <div className="flex items-center gap-2 text-warning">
                   <AlertTriangle className="h-5 w-5" />
                   <div>
                     <p className="font-medium">{ts('duplicateTitle')}</p>
@@ -762,7 +762,7 @@ export default function ScanBillPage() {
                   )}
                   {result.extractedFields.discount != null &&
                     result.extractedFields.discount > 0 && (
-                      <div className="flex justify-between text-yellow-600">
+                      <div className="flex justify-between text-warning">
                         <span>{ts('extractedDiscount')}</span>
                         <span className="font-mono">
                           -{result.extractedFields.discount.toFixed(2)}
@@ -807,9 +807,9 @@ export default function ScanBillPage() {
 
           {/* Unresolved tax rates — never defaulted to 0% */}
           {unresolvedTaxLines.length > 0 && (
-            <Card className="border-yellow-500" data-testid="unresolved-tax">
+            <Card className="border-warning" data-testid="unresolved-tax">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-sm text-yellow-700">
+                <CardTitle className="flex items-center gap-2 text-sm text-warning">
                   <AlertTriangle className="h-4 w-4" />
                   {ts('taxReviewTitle')}
                 </CardTitle>
@@ -867,7 +867,7 @@ export default function ScanBillPage() {
         <Card>
           <CardContent className="py-16">
             <div className="text-center space-y-4">
-              <CheckCircle2 className="h-16 w-16 mx-auto text-green-500" />
+              <CheckCircle2 className="h-16 w-16 mx-auto text-success" />
               <p className="text-lg font-medium">{t('existingDraft')}</p>
               <Button asChild>
                 <Link
@@ -889,7 +889,7 @@ export default function ScanBillPage() {
         <Card>
           <CardContent className="py-16">
             <div className="text-center space-y-4">
-              <CheckCircle2 className="h-16 w-16 mx-auto text-green-500" />
+              <CheckCircle2 className="h-16 w-16 mx-auto text-success" />
               <div>
                 <p className="text-lg font-medium">{ts('createdTitle')}</p>
                 <p className="text-sm text-muted-foreground">{ts('redirecting')}</p>
@@ -923,7 +923,7 @@ function StepBadge({
         className={cn(
           'flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium',
           active && 'bg-primary text-primary-foreground',
-          done && 'bg-green-500 text-white',
+          done && 'bg-success text-white',
           !active && !done && 'bg-muted text-muted-foreground',
         )}
       >

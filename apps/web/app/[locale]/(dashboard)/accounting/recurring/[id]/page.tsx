@@ -138,7 +138,7 @@ export default function RecurringProfileDetailPage() {
               <h1 className="text-3xl font-bold tracking-tight">{profile.name}</h1>
               <Badge
                 className={
-                  profile.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                  profile.isActive ? 'bg-success/10 text-success' : 'bg-muted text-foreground'
                 }
               >
                 {profile.isActive ? tPage('active') : tPage('inactive')}
@@ -227,7 +227,7 @@ export default function RecurringProfileDetailPage() {
               <dd className="mt-1">
                 <Badge
                   className={
-                    profile.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                    profile.isActive ? 'bg-success/10 text-success' : 'bg-muted text-foreground'
                   }
                 >
                   {profile.isActive ? tPage('active') : tPage('inactive')}

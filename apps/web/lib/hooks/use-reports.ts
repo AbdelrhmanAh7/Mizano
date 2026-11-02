@@ -732,12 +732,12 @@ export function usePurchasesByVendorReport(params: DateRange) {
 
 export function getAgingBucketColor(bucket: string): string {
   const colors: Record<string, string> = {
-    current: 'bg-green-100 text-green-800',
-    '1-15': 'bg-blue-100 text-blue-800',
-    '16-30': 'bg-yellow-100 text-yellow-800',
-    '31-60': 'bg-orange-100 text-orange-800',
-    '61-90': 'bg-red-100 text-red-800',
-    '90+': 'bg-red-200 text-red-900',
+    current: 'bg-success/10 text-success',
+    '1-15': 'bg-info/10 text-info',
+    '16-30': 'bg-warning/10 text-warning',
+    '31-60': 'bg-warning/10 text-warning',
+    '61-90': 'bg-destructive/10 text-destructive',
+    '90+': 'bg-destructive/20 text-destructive',
   };
-  return colors[bucket] || 'bg-gray-100 text-gray-800';
+  return colors[bucket] || 'bg-muted text-foreground';
 }

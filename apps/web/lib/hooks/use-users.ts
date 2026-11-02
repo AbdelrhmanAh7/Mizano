@@ -115,9 +115,9 @@ export function useCreateResetLink() {
  */
 export function getUserStatusColor(status: string): string {
   const colorMap: Record<string, string> = {
-    ACTIVE: 'bg-green-100 text-green-800',
-    INACTIVE: 'bg-gray-100 text-gray-800',
-    SUSPENDED: 'bg-red-100 text-red-800',
+    ACTIVE: 'bg-success/10 text-success',
+    INACTIVE: 'bg-muted text-foreground',
+    SUSPENDED: 'bg-destructive/10 text-destructive',
   };
-  return colorMap[status] || 'bg-gray-100 text-gray-800';
+  return colorMap[status] || 'bg-muted text-foreground';
 }

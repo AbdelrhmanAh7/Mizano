@@ -198,11 +198,11 @@ export function useItemTypeLabel(): (type: ItemType) => string {
  */
 export function getItemTypeColor(type: ItemType): string {
   const colorMap: Record<ItemType, string> = {
-    GOODS: 'bg-blue-100 text-blue-800',
-    SERVICE: 'bg-green-100 text-green-800',
-    DIGITAL: 'bg-purple-100 text-purple-800',
+    GOODS: 'bg-info/10 text-info',
+    SERVICE: 'bg-success/10 text-success',
+    DIGITAL: 'bg-primary/10 text-primary',
   };
-  return colorMap[type] || 'bg-gray-100 text-gray-800';
+  return colorMap[type] || 'bg-muted text-foreground';
 }
 
 /**
@@ -213,13 +213,13 @@ export function getStockStatus(item: Item): {
   color: string;
 } {
   if (!item.trackInventory) {
-    return { status: 'ok', color: 'text-gray-500' };
+    return { status: 'ok', color: 'text-muted-foreground' };
   }
   if (item.currentStock <= 0) {
-    return { status: 'out', color: 'text-red-600' };
+    return { status: 'out', color: 'text-destructive' };
   }
   if (item.reorderPoint && item.currentStock <= item.reorderPoint) {
-    return { status: 'low', color: 'text-yellow-600' };
+    return { status: 'low', color: 'text-warning' };
   }
-  return { status: 'ok', color: 'text-green-600' };
+  return { status: 'ok', color: 'text-success' };
 }

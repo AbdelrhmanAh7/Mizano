@@ -30,7 +30,12 @@ export const SalaryDistributionChart = memo(function SalaryDistributionChart({
           contentStyle={CHART_TOOLTIP_STYLE}
           cursor={{ fill: 'hsl(var(--muted))' }}
         />
-        <Bar dataKey="count" name={t('employees')} fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+        <Bar
+          dataKey="count"
+          name={t('employees')}
+          fill="hsl(var(--chart-4))"
+          radius={[4, 4, 0, 0]}
+        />
       </BarChart>
     </ChartCard>
   );

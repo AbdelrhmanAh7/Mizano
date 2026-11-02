@@ -61,7 +61,7 @@ function SalesByCustomerContent() {
         accessorKey: 'balanceDue',
         header: t('salesByCustomer.columns.balanceDue'),
         cell: ({ row }) => (
-          <span className={row.original.balanceDue > 0 ? 'text-red-600 font-medium' : ''}>
+          <span className={row.original.balanceDue > 0 ? 'text-destructive font-medium' : ''}>
             {formatCurrency(row.original.balanceDue)}
           </span>
         ),
@@ -102,7 +102,7 @@ function SalesByCustomerContent() {
               <Wallet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">
+              <div className="text-2xl font-bold text-success">
                 {formatCurrency(data.totalPaid)}
               </div>
             </CardContent>
@@ -115,7 +115,7 @@ function SalesByCustomerContent() {
               <Receipt className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600">
+              <div className="text-2xl font-bold text-destructive">
                 {formatCurrency(data.totalBalance)}
               </div>
             </CardContent>

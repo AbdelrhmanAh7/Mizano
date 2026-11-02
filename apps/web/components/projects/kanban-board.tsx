@@ -7,10 +7,10 @@ import { cn } from '@/lib/utils';
 import { getTaskStatusColor, type Task, type TaskStatus } from '@/lib/hooks/use-projects';
 
 const COLUMNS: { status: TaskStatus; label: string; color: string }[] = [
-  { status: 'TODO', label: 'To Do', color: 'bg-gray-100' },
-  { status: 'IN_PROGRESS', label: 'In Progress', color: 'bg-blue-100' },
-  { status: 'REVIEW', label: 'In Review', color: 'bg-yellow-100' },
-  { status: 'DONE', label: 'Done', color: 'bg-green-100' },
+  { status: 'TODO', label: 'To Do', color: 'bg-muted' },
+  { status: 'IN_PROGRESS', label: 'In Progress', color: 'bg-info/10' },
+  { status: 'REVIEW', label: 'In Review', color: 'bg-warning/10' },
+  { status: 'DONE', label: 'Done', color: 'bg-success/10' },
 ];
 
 interface KanbanBoardProps {

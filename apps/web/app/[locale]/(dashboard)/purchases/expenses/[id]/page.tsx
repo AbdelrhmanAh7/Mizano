@@ -129,7 +129,10 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  className="bg-destructive hover:bg-destructive/90"
+                >
                   {tCommon('buttons.delete')}
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -163,7 +166,9 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono text-red-600">{formatCurrency(total)}</div>
+            <div className="text-2xl font-bold font-mono text-destructive">
+              {formatCurrency(total)}
+            </div>
             {expense.taxInclusive && hasTax && (
               <p className="text-sm text-muted-foreground">{t('expenses.taxInclusive')}</p>
             )}
@@ -211,7 +216,7 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
                 {expense.vendor ? (
                   <Link
                     href={`/purchases/vendors/${expense.vendor.id}`}
-                    className="text-blue-600 hover:underline"
+                    className="text-primary hover:underline"
                   >
                     {expense.vendor.name}
                   </Link>
@@ -234,7 +239,7 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
                 <p className="mt-1">
                   <Link
                     href={`/projects/${expense.project.id}`}
-                    className="text-blue-600 hover:underline"
+                    className="text-primary hover:underline"
                   >
                     {expense.project.name}
                   </Link>

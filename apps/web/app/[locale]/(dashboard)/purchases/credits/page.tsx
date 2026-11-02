@@ -100,7 +100,7 @@ function VendorCreditsPageContent() {
       cell: ({ row }) => (
         <Link
           href={`/purchases/credits/${row.original.id}`}
-          className="font-mono text-blue-600 hover:underline"
+          className="font-mono text-primary hover:underline"
         >
           {row.original.creditNumber}
         </Link>

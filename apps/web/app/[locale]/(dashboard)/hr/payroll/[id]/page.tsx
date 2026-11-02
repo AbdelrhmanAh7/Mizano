@@ -208,7 +208,7 @@ export default function PayrollDetailPage({ params }: { params: { id: string } }
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">{t('payroll.summary.totalDeductions')}</p>
-            <p className="text-2xl font-bold font-mono text-red-600">
+            <p className="text-2xl font-bold font-mono text-destructive">
               <span dir="ltr">-{formatCurrency(totalDeductions)}</span>
             </p>
           </CardContent>
@@ -266,7 +266,7 @@ export default function PayrollDetailPage({ params }: { params: { id: string } }
                     <TableCell className="text-end font-mono">
                       {formatCurrency(slip.basicSalary || 0)}
                     </TableCell>
-                    <TableCell className="text-end font-mono text-green-600">
+                    <TableCell className="text-end font-mono text-success">
                       <span dir="ltr">
                         +
                         {formatCurrency(
@@ -282,17 +282,17 @@ export default function PayrollDetailPage({ params }: { params: { id: string } }
                     </TableCell>
                     <TableCell className="text-end">
                       {(slip.lopDays ?? 0) > 0 ? (
-                        <span className="text-red-600">
+                        <span className="text-destructive">
                           {t('payroll.lopDays', { days: slip.lopDays ?? 0 })}
                         </span>
                       ) : (
                         '-'
                       )}
                     </TableCell>
-                    <TableCell className="text-end font-mono text-red-600">
+                    <TableCell className="text-end font-mono text-destructive">
                       <span dir="ltr">-{formatCurrency(slip.totalDeductions || 0)}</span>
                     </TableCell>
-                    <TableCell className="text-end font-mono text-red-600">
+                    <TableCell className="text-end font-mono text-destructive">
                       <span dir="ltr">-{formatCurrency(slip.taxAmount || 0)}</span>
                     </TableCell>
                     <TableCell className="text-end font-mono font-medium">

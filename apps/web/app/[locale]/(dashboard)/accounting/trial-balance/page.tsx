@@ -120,12 +120,12 @@ export default function TrialBalancePage() {
             </div>
             <div className="flex items-center gap-2 mt-6">
               {isBalanced ? (
-                <Badge className="bg-green-100 text-green-800">
+                <Badge className="bg-success/10 text-success">
                   <CheckCircle className="mr-1 h-3 w-3" />
                   {t('trialBalance.balanced')}
                 </Badge>
               ) : (
-                <Badge className="bg-red-100 text-red-800">
+                <Badge className="bg-destructive/10 text-destructive">
                   <AlertTriangle className="mr-1 h-3 w-3" />
                   {t('trialBalance.outOfBalance', {
                     debit: formatAmount(totalDebit),

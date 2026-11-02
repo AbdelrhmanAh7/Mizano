@@ -82,7 +82,7 @@ export default function CashFlowReportPage() {
                 <span
                   className={cn(
                     'text-sm font-mono font-medium',
-                    item.amount >= 0 ? 'text-green-600' : 'text-red-600',
+                    item.amount >= 0 ? 'text-success' : 'text-destructive',
                   )}
                 >
                   {formatCurrency(Math.abs(item.amount))}
@@ -93,7 +93,9 @@ export default function CashFlowReportPage() {
         )}
         <div className="flex justify-between pt-3 mt-3 border-t font-semibold">
           <span>{t('cashFlow.sectionTotal')}</span>
-          <span className={cn('font-mono', section.total >= 0 ? 'text-green-600' : 'text-red-600')}>
+          <span
+            className={cn('font-mono', section.total >= 0 ? 'text-success' : 'text-destructive')}
+          >
             {formatCurrency(Math.abs(section.total))}
           </span>
         </div>
@@ -129,7 +131,7 @@ export default function CashFlowReportPage() {
             <p
               className={cn(
                 'text-2xl font-bold font-mono',
-                data.netCashFlow >= 0 ? 'text-green-600' : 'text-red-600',
+                data.netCashFlow >= 0 ? 'text-success' : 'text-destructive',
               )}
             >
               {data.netCashFlow >= 0 ? '+' : '-'}

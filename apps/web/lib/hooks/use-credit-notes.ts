@@ -142,8 +142,8 @@ export function creditNoteTypeKey(
  */
 export function getCreditNoteTypeColor(type: CreditNoteType): string {
   const colorMap: Record<CreditNoteType, string> = {
-    REFUND: 'bg-orange-100 text-orange-800',
-    APPLY_TO_INVOICE: 'bg-blue-100 text-blue-800',
+    REFUND: 'bg-warning/10 text-warning',
+    APPLY_TO_INVOICE: 'bg-info/10 text-info',
   };
-  return colorMap[type] || 'bg-gray-100 text-gray-800';
+  return colorMap[type] || 'bg-muted text-foreground';
 }

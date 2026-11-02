@@ -79,7 +79,7 @@ export default function HRPage() {
       description: t('employees.description'),
       icon: Users,
       href: '/hr/employees',
-      color: 'bg-blue-500',
+      color: 'bg-info',
       stats: t('activeCount', { count: activeCount }),
     },
     {
@@ -87,7 +87,7 @@ export default function HRPage() {
       description: t('attendance.description'),
       icon: Clock,
       href: '/hr/attendance',
-      color: 'bg-green-500',
+      color: 'bg-success',
       stats: t('trackTime'),
     },
     {
@@ -95,7 +95,7 @@ export default function HRPage() {
       description: t('payroll.description'),
       icon: DollarSign,
       href: '/hr/payroll',
-      color: 'bg-purple-500',
+      color: 'bg-primary',
       stats: t('pendingCount', { count: pendingPayroll }),
     },
   ];
@@ -157,7 +157,7 @@ export default function HRPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t('hub.stats.monthlyPayroll')}</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-500" />
+            <TrendingUp className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -174,13 +174,13 @@ export default function HRPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t('hub.stats.attendanceRate')}</CardTitle>
-            <Clock className="h-4 w-4 text-blue-500" />
+            <Clock className="h-4 w-4 text-info" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-blue-600">-</div>
+              <div className="text-2xl font-bold text-info">-</div>
             )}
             <p className="text-xs text-muted-foreground">{t('hub.stats.attendanceRateDesc')}</p>
           </CardContent>
@@ -189,13 +189,13 @@ export default function HRPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t('hub.stats.pendingPayroll')}</CardTitle>
-            <AlertCircle className="h-4 w-4 text-amber-500" />
+            <AlertCircle className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-amber-600">{pendingPayroll}</div>
+              <div className="text-2xl font-bold text-warning">{pendingPayroll}</div>
             )}
             <p className="text-xs text-muted-foreground">
               {!isLoading ? t('hub.stats.pendingPayrollDesc', { count: pendingPayroll }) : '\u00A0'}
@@ -359,7 +359,7 @@ export default function HRPage() {
                       </div>
                       <div className="h-2 bg-muted rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-blue-500 rounded-full transition-all"
+                          className="h-full bg-info rounded-full transition-all"
                           style={{ width: `${percentage}%` }}
                         />
                       </div>

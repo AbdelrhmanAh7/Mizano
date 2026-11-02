@@ -263,12 +263,12 @@ function CompositeItemDetailContent() {
             <div className="space-y-3 pt-4 border-t">
               <div className="flex items-center gap-2">
                 {availability.available ? (
-                  <Badge className="bg-green-100 text-green-800 gap-1">
+                  <Badge className="bg-success/10 text-success gap-1">
                     <CheckCircle className="h-3 w-3" />
                     Available
                   </Badge>
                 ) : (
-                  <Badge className="bg-red-100 text-red-800 gap-1">
+                  <Badge className="bg-destructive/10 text-destructive gap-1">
                     <XCircle className="h-3 w-3" />
                     Insufficient Stock
                   </Badge>
@@ -294,9 +294,9 @@ function CompositeItemDetailContent() {
                       <TableCell className="text-right font-mono">{comp.available}</TableCell>
                       <TableCell className="text-center">
                         {comp.sufficient ? (
-                          <CheckCircle className="h-4 w-4 text-green-600 mx-auto" />
+                          <CheckCircle className="h-4 w-4 text-success mx-auto" />
                         ) : (
-                          <XCircle className="h-4 w-4 text-red-600 mx-auto" />
+                          <XCircle className="h-4 w-4 text-destructive mx-auto" />
                         )}
                       </TableCell>
                     </TableRow>

@@ -30,12 +30,18 @@ export const MonthlyBurnRateChart = memo(function MonthlyBurnRateChart({
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="month" tickFormatter={monthLabel} {...CHART_AXIS} />
         <YAxis {...CHART_AXIS} tickFormatter={(v) => formatCompactCurrency(v, currency)} />
-        <Tooltip labelFormatter={monthLabel}
+        <Tooltip
+          labelFormatter={monthLabel}
           formatter={(value: number) => formatCompactCurrency(value, currency)}
           contentStyle={CHART_TOOLTIP_STYLE}
         />
         <Legend />
-        <Bar dataKey="expenses" name={t('expenses')} fill="#ef4444" radius={[4, 4, 0, 0]} />
+        <Bar
+          dataKey="expenses"
+          name={t('expenses')}
+          fill="hsl(var(--destructive))"
+          radius={[4, 4, 0, 0]}
+        />
       </BarChart>
     </ChartCard>
   );

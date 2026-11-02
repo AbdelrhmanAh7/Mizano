@@ -17,12 +17,12 @@ interface DealPipelineChartProps {
 }
 
 const STAGE_COLORS: Record<string, string> = {
-  NEW: '#94a3b8',
-  MEETING_SCHEDULED: '#3b82f6',
-  PROPOSAL_SENT: '#8b5cf6',
-  NEGOTIATION: '#f59e0b',
-  WON: '#22c55e',
-  LOST: '#ef4444',
+  NEW: 'hsl(var(--muted-foreground))',
+  MEETING_SCHEDULED: 'hsl(var(--chart-2))',
+  PROPOSAL_SENT: 'hsl(var(--chart-4))',
+  NEGOTIATION: 'hsl(var(--warning))',
+  WON: 'hsl(var(--success))',
+  LOST: 'hsl(var(--destructive))',
 };
 
 export const DealPipelineChart = memo(function DealPipelineChart({
@@ -66,7 +66,10 @@ export const DealPipelineChart = memo(function DealPipelineChart({
         />
         <Bar dataKey="value" name={t('amount')} radius={[0, 4, 4, 0]}>
           {chartData.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={STAGE_COLORS[entry.stage] ?? '#94a3b8'} />
+            <Cell
+              key={`cell-${index}`}
+              fill={STAGE_COLORS[entry.stage] ?? 'hsl(var(--muted-foreground))'}
+            />
           ))}
         </Bar>
       </BarChart>

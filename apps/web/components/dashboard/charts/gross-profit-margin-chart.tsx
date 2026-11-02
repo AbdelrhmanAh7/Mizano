@@ -26,7 +26,8 @@ export const GrossProfitMarginChart = memo(function GrossProfitMarginChart({
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="month" tickFormatter={monthLabel} {...CHART_AXIS} />
         <YAxis {...CHART_AXIS} tickFormatter={(v) => `${v}%`} />
-        <Tooltip labelFormatter={monthLabel}
+        <Tooltip
+          labelFormatter={monthLabel}
           formatter={(value: number) => `${value.toFixed(1)}%`}
           contentStyle={CHART_TOOLTIP_STYLE}
         />
@@ -34,7 +35,7 @@ export const GrossProfitMarginChart = memo(function GrossProfitMarginChart({
           type="monotone"
           dataKey="marginPercent"
           name={t('grossMargin')}
-          stroke="#22c55e"
+          stroke="hsl(var(--success))"
           strokeWidth={2}
           dot={{ r: 4 }}
         />

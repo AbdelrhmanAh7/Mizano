@@ -128,7 +128,7 @@ export function ProjectForm({
               <Label htmlFor="name">Project Name *</Label>
               <Input id="name" placeholder="Enter project name" {...form.register('name')} />
               {form.formState.errors.name && (
-                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
+                <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
               )}
             </div>
 
@@ -150,7 +150,9 @@ export function ProjectForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.customerId && (
-                <p className="text-sm text-red-500">{form.formState.errors.customerId.message}</p>
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.customerId.message}
+                </p>
               )}
             </div>
           </div>

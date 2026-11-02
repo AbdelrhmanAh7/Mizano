@@ -94,10 +94,8 @@ export function ColumnMapper({
     <div className="space-y-4">
       {/* Unmapped required fields warning */}
       {unmappedRequired.length > 0 && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30">
-          <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-            {t('requiredFieldsUnmapped')}
-          </p>
+        <div className="rounded-md border border-warning/30 bg-warning/5 p-3">
+          <p className="text-sm font-medium text-warning">{t('requiredFieldsUnmapped')}</p>
           <div className="mt-1 flex flex-wrap gap-1">
             {unmappedRequired.map((field) => (
               <Badge key={field.name} variant="outline" className="text-xs">

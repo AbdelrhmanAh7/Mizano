@@ -236,19 +236,19 @@ export function getStatusLabel(status: TransactionStatus, t: (key: string) => st
 
 export function getStatusColor(status: TransactionStatus): string {
   const colors: Record<TransactionStatus, string> = {
-    PENDING: 'bg-yellow-100 text-yellow-800',
-    MATCHED: 'bg-blue-100 text-blue-800',
-    CREATED: 'bg-purple-100 text-purple-800',
-    RECONCILED: 'bg-green-100 text-green-800',
+    PENDING: 'bg-warning/10 text-warning',
+    MATCHED: 'bg-info/10 text-info',
+    CREATED: 'bg-primary/10 text-primary',
+    RECONCILED: 'bg-success/10 text-success',
   };
   return colors[status] || colors.PENDING;
 }
 
 export function getConfidenceColor(confidence: number | null): string {
   if (confidence === null) return 'text-muted-foreground';
-  if (confidence >= 80) return 'text-green-600';
-  if (confidence >= 50) return 'text-yellow-600';
-  return 'text-red-600';
+  if (confidence >= 80) return 'text-success';
+  if (confidence >= 50) return 'text-warning';
+  return 'text-destructive';
 }
 
 /** Translated confidence level; `t` is `useTranslations('banking')`. */

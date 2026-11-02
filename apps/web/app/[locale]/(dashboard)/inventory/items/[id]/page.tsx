@@ -122,7 +122,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" className="text-red-600">
+              <Button variant="outline" className="text-destructive">
                 <Trash2 className="mr-2 h-4 w-4" />
                 {t('common.delete')}
               </Button>
@@ -134,7 +134,10 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  className="bg-destructive hover:bg-destructive/90"
+                >
                   {t('common.delete')}
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -148,8 +151,8 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <DollarSign className="h-5 w-5 text-green-600" />
+              <div className="p-2 bg-success/10 rounded-lg">
+                <DollarSign className="h-5 w-5 text-success" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('items.table.sellingPrice')}</p>
@@ -162,8 +165,8 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-info/10 rounded-lg">
+                <TrendingUp className="h-5 w-5 text-info" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('items.table.costPrice')}</p>
@@ -176,8 +179,8 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Package className="h-5 w-5 text-purple-600" />
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Package className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('items.table.stock')}</p>
@@ -202,21 +205,21 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                 className={cn(
                   'p-2 rounded-lg',
                   stockStatus.status === 'ok'
-                    ? 'bg-green-100'
+                    ? 'bg-success/10'
                     : stockStatus.status === 'low'
-                      ? 'bg-yellow-100'
-                      : 'bg-red-100',
+                      ? 'bg-warning/10'
+                      : 'bg-destructive/10',
                 )}
               >
                 {stockStatus.status !== 'ok' ? (
                   <AlertTriangle
                     className={cn(
                       'h-5 w-5',
-                      stockStatus.status === 'low' ? 'text-yellow-600' : 'text-red-600',
+                      stockStatus.status === 'low' ? 'text-warning' : 'text-destructive',
                     )}
                   />
                 ) : (
-                  <Package className="h-5 w-5 text-green-600" />
+                  <Package className="h-5 w-5 text-success" />
                 )}
               </div>
               <div>

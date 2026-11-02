@@ -26,7 +26,7 @@ import { Suspense, useState } from 'react';
 import { useMoneyFormatter } from '@/lib/hooks/use-money-formatter';
 
 function getMovementTypeColor(type: MovementType): string {
-  return type === 'IN' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+  return type === 'IN' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive';
 }
 
 function getSourceLabel(source: MovementSource): string {
@@ -44,15 +44,15 @@ function getSourceLabel(source: MovementSource): string {
 
 function getSourceColor(source: MovementSource): string {
   const colors: Record<MovementSource, string> = {
-    SALE: 'bg-blue-50 text-blue-700',
-    PURCHASE: 'bg-purple-50 text-purple-700',
-    ADJUSTMENT: 'bg-yellow-50 text-yellow-700',
-    TRANSFER: 'bg-cyan-50 text-cyan-700',
-    ASSEMBLY: 'bg-orange-50 text-orange-700',
-    RETURN: 'bg-pink-50 text-pink-700',
-    MANUAL: 'bg-gray-50 text-gray-700',
+    SALE: 'bg-info/5 text-info',
+    PURCHASE: 'bg-primary/5 text-primary',
+    ADJUSTMENT: 'bg-warning/5 text-warning',
+    TRANSFER: 'bg-info/5 text-info',
+    ASSEMBLY: 'bg-warning/5 text-warning',
+    RETURN: 'bg-destructive/5 text-destructive',
+    MANUAL: 'bg-muted text-foreground',
   };
-  return colors[source] || 'bg-gray-50 text-gray-700';
+  return colors[source] || 'bg-muted text-foreground';
 }
 
 function MovementsPageContent() {

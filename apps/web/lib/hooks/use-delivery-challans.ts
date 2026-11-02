@@ -213,9 +213,9 @@ export function getChallanTypeLabel(type: ChallanType): string {
 
 export function getChallanStatusColor(status: ChallanStatus): string {
   const colors: Record<ChallanStatus, string> = {
-    DRAFT: 'bg-gray-100 text-gray-800',
-    ISSUED: 'bg-blue-100 text-blue-800',
-    RETURNED: 'bg-green-100 text-green-800',
+    DRAFT: 'bg-muted text-foreground',
+    ISSUED: 'bg-info/10 text-info',
+    RETURNED: 'bg-success/10 text-success',
   };
   return colors[status] || '';
 }

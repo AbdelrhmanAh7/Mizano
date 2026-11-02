@@ -109,7 +109,7 @@ function LoginForm() {
   return (
     <div className="min-h-screen flex">
       {/* Left panel — brand showcase */}
-      <div className="hidden lg:flex lg:w-[55%] relative bg-gradient-to-br from-[#0D9488] via-[#0B6E64] to-[#063A33] p-12 flex-col justify-between overflow-hidden">
+      <div className="hidden lg:flex lg:w-[55%] relative bg-gradient-to-br from-brand via-brand-dark to-brand-deep p-12 flex-col justify-between overflow-hidden">
         {/* Background pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full -translate-x-1/2 -translate-y-1/2" />
@@ -121,7 +121,7 @@ function LoginForm() {
           <h1>
             <BrandLogo height={56} alt={tCommon('appName')} tone="dark" priority />
           </h1>
-          <p className="mt-4 text-teal-50 text-lg">{t('brandTagline')}</p>
+          <p className="mt-4 text-primary-foreground text-lg">{t('brandTagline')}</p>
         </div>
 
         <div className="relative z-10 space-y-6">
@@ -132,14 +132,14 @@ function LoginForm() {
               </div>
               <div>
                 <h3 className="text-white font-semibold text-sm">{t(feature.titleKey)}</h3>
-                <p className="text-teal-50/90 text-sm mt-0.5">{t(feature.descKey)}</p>
+                <p className="text-primary-foreground/90 text-sm mt-0.5">{t(feature.descKey)}</p>
               </div>
             </div>
           ))}
         </div>
 
         <div className="relative z-10">
-          <p className="text-teal-100/80 text-xs">{t('brandFooter')}</p>
+          <p className="text-primary-foreground/80 text-xs">{t('brandFooter')}</p>
         </div>
       </div>
 

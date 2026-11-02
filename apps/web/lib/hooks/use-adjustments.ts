@@ -149,5 +149,5 @@ export function getReasonLabel(reason: AdjustmentReason): string {
 }
 
 export function getAdjustmentStatusColor(status: AdjustmentStatus): string {
-  return status === 'VOIDED' ? 'bg-gray-100 text-gray-800' : 'bg-green-100 text-green-800';
+  return status === 'VOIDED' ? 'bg-muted text-foreground' : 'bg-success/10 text-success';
 }

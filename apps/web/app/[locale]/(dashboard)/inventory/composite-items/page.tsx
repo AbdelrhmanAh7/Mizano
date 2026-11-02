@@ -54,7 +54,7 @@ function CompositeItemsPageContent() {
       cell: ({ row }) => (
         <Link
           href={`/inventory/composite-items/${row.original.id}`}
-          className="font-medium hover:text-blue-600 hover:underline"
+          className="font-medium hover:text-primary hover:underline"
         >
           {row.original.name}
         </Link>
@@ -76,7 +76,7 @@ function CompositeItemsPageContent() {
       header: 'Components',
       meta: { headerClassName: 'text-center', cellClassName: 'text-center' },
       cell: ({ row }) => (
-        <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+        <span className="inline-flex items-center rounded-full bg-info/5 px-2 py-0.5 text-xs font-medium text-info">
           {row.original.components?.length || 0}
         </span>
       ),

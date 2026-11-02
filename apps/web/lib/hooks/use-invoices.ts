@@ -231,12 +231,12 @@ export function useCloneInvoice() {
  */
 export function getInvoiceStatusColor(status: InvoiceStatus): string {
   const colorMap: Record<InvoiceStatus, string> = {
-    DRAFT: 'bg-gray-100 text-gray-800',
-    SENT: 'bg-blue-100 text-blue-800',
-    PARTIALLY_PAID: 'bg-yellow-100 text-yellow-800',
-    PAID: 'bg-green-100 text-green-800',
-    OVERDUE: 'bg-red-100 text-red-800',
-    VOID: 'bg-gray-100 text-gray-500',
+    DRAFT: 'bg-muted text-foreground',
+    SENT: 'bg-info/10 text-info',
+    PARTIALLY_PAID: 'bg-warning/10 text-warning',
+    PAID: 'bg-success/10 text-success',
+    OVERDUE: 'bg-destructive/10 text-destructive',
+    VOID: 'bg-muted text-muted-foreground',
   };
-  return colorMap[status] || 'bg-gray-100 text-gray-800';
+  return colorMap[status] || 'bg-muted text-foreground';
 }

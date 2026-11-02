@@ -119,7 +119,7 @@ export function ExpenseForm({
               <Label htmlFor="date">{t('date')} *</Label>
               <Input id="date" type="date" {...form.register('date')} />
               {form.formState.errors.date && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {tValidation(form.formState.errors.date.message ?? 'dateRequired')}
                 </p>
               )}
@@ -147,7 +147,7 @@ export function ExpenseForm({
                 <p className="text-sm text-muted-foreground">{t('noExpenseAccounts')}</p>
               )}
               {form.formState.errors.accountId && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {tValidation(form.formState.errors.accountId.message ?? 'accountRequired')}
                 </p>
               )}
@@ -176,7 +176,7 @@ export function ExpenseForm({
                 {...form.register('amount')}
               />
               {form.formState.errors.amount && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {tValidation(form.formState.errors.amount.message ?? 'amountRequired')}
                 </p>
               )}
@@ -253,7 +253,7 @@ export function ExpenseForm({
                 <p className="text-sm text-muted-foreground">{t('noPaidThroughAccounts')}</p>
               )}
               {form.formState.errors.paidThroughAccountId && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {tValidation(
                     form.formState.errors.paidThroughAccountId.message ?? 'paidThroughRequired',
                   )}

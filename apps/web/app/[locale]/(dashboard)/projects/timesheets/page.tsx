@@ -117,8 +117,8 @@ function TimesheetsPageContent() {
           variant="outline"
           className={
             row.original.status === 'UNBILLED'
-              ? 'bg-yellow-100 text-yellow-800'
-              : 'bg-green-100 text-green-800'
+              ? 'bg-warning/10 text-warning'
+              : 'bg-success/10 text-success'
           }
         >
           {row.original.status === 'UNBILLED'
@@ -137,7 +137,7 @@ function TimesheetsPageContent() {
           <Button
             variant="ghost"
             size="icon"
-            className="text-red-600"
+            className="text-destructive"
             onClick={() => setDeleteId(entry.id)}
           >
             <Trash2 className="h-4 w-4" />
@@ -168,8 +168,8 @@ function TimesheetsPageContent() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Clock className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-info/10 rounded-lg">
+                <Clock className="h-5 w-5 text-info" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
@@ -183,8 +183,8 @@ function TimesheetsPageContent() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <Calendar className="h-5 w-5 text-yellow-600" />
+              <div className="p-2 bg-warning/10 rounded-lg">
+                <Calendar className="h-5 w-5 text-warning" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">

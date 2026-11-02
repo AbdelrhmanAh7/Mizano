@@ -99,7 +99,7 @@ describe('StatCard', () => {
     );
     const trendElement = screen.getByText((content) => content.includes('12.5% from last month'));
     expect(trendElement).toBeInTheDocument();
-    expect(trendElement.className).toContain('text-green-600');
+    expect(trendElement.className).toContain('text-success');
     expect(trendElement.textContent).toContain('\u2191'); // up arrow
   });
 
@@ -114,7 +114,7 @@ describe('StatCard', () => {
     );
     const trendElement = screen.getByText((content) => content.includes('8.3% from last month'));
     expect(trendElement).toBeInTheDocument();
-    expect(trendElement.className).toContain('text-red-600');
+    expect(trendElement.className).toContain('text-destructive');
     expect(trendElement.textContent).toContain('\u2193'); // down arrow
   });
 
@@ -129,19 +129,19 @@ describe('StatCard', () => {
         title="Revenue"
         value={50000}
         icon={DollarSign}
-        iconColor="text-purple-600"
-        iconBgColor="bg-purple-100"
+        iconColor="text-primary"
+        iconBgColor="bg-primary/10"
       />,
     );
     // Icon colors are applied via cn() to wrapper divs
-    expect(container.innerHTML).toContain('text-purple-600');
-    expect(container.innerHTML).toContain('bg-purple-100');
+    expect(container.innerHTML).toContain('text-primary');
+    expect(container.innerHTML).toContain('bg-primary/10');
   });
 
-  it('defaults to blue icon color and background when not specified', () => {
+  it('defaults to the brand (primary) icon color and background when not specified', () => {
     const { container } = render(<StatCard title="Revenue" value={50000} icon={DollarSign} />);
-    // Default blue colors should be in the rendered HTML
-    expect(container.innerHTML).toContain('blue');
+    expect(container.innerHTML).toContain('text-primary');
+    expect(container.innerHTML).toContain('bg-primary/10');
   });
 
   // Manual QA: counts used the browser locale, so Arabic systems showed "٠" (it reads as a dot).

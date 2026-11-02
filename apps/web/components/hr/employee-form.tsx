@@ -75,7 +75,7 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
   const dateLocale = useDateFnsLocale();
   const router = useRouter();
   const errorText = (message: string | undefined) =>
-    message ? <p className="text-sm text-red-500">{t(`errors.${message}`)}</p> : null;
+    message ? <p className="text-sm text-destructive">{t(`errors.${message}`)}</p> : null;
   const createEmployee = useCreateEmployee();
   const updateEmployee = useUpdateEmployee();
 
@@ -355,7 +355,7 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
                       onClick={() => removeAllowance(index)}
                       aria-label={t('removeAllowance')}
                     >
-                      <Trash2 className="h-4 w-4 text-red-500" />
+                      <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
                 ))}
@@ -405,7 +405,7 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
                       onClick={() => removeDeduction(index)}
                       aria-label={t('removeDeduction')}
                     >
-                      <Trash2 className="h-4 w-4 text-red-500" />
+                      <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
                 ))}
@@ -421,7 +421,7 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
               <span>{t('basicSalary')}</span>
               <span className="font-mono">{basicSalary.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between text-green-600">
+            <div className="flex justify-between text-success">
               <span>{t('summaryAllowances')}</span>
               <span className="font-mono">{totalAllowances.toLocaleString()}</span>
             </div>
@@ -429,7 +429,7 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
               <span className="font-medium">{t('grossSalary')}</span>
               <span className="font-mono font-medium">{grossSalary.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between text-red-600">
+            <div className="flex justify-between text-destructive">
               <span>{t('summaryDeductions')}</span>
               <span className="font-mono">{totalDeductions.toLocaleString()}</span>
             </div>

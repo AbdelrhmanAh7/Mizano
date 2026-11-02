@@ -27,7 +27,12 @@ export const MonthlyInvoiceVolumeChart = memo(function MonthlyInvoiceVolumeChart
         <XAxis dataKey="month" tickFormatter={monthLabel} {...CHART_AXIS} />
         <YAxis {...CHART_AXIS} allowDecimals={false} />
         <Tooltip labelFormatter={monthLabel} contentStyle={CHART_TOOLTIP_STYLE} />
-        <Bar dataKey="count" name={t('invoices')} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+        <Bar
+          dataKey="count"
+          name={t('invoices')}
+          fill="hsl(var(--chart-2))"
+          radius={[4, 4, 0, 0]}
+        />
       </BarChart>
     </ChartCard>
   );

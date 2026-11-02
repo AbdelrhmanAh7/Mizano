@@ -239,7 +239,7 @@ export default function BankTransactionsPage() {
                           <span
                             className={cn(
                               'font-mono font-medium flex items-center justify-end gap-1',
-                              isDeposit ? 'text-green-600' : 'text-red-600',
+                              isDeposit ? 'text-success' : 'text-destructive',
                             )}
                           >
                             {isDeposit ? (

@@ -52,7 +52,7 @@ interface AdjustmentFormProps {
 }
 
 function FieldError({ message }: { message?: string }): JSX.Element | null {
-  return message ? <p className="text-sm text-red-500">{message}</p> : null;
+  return message ? <p className="text-sm text-destructive">{message}</p> : null;
 }
 
 export function AdjustmentForm({
@@ -102,7 +102,7 @@ export function AdjustmentForm({
       {errorMessage && (
         <div
           role="alert"
-          className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+          className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
         >
           {errorMessage}
         </div>

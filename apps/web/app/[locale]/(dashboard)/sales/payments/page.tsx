@@ -171,7 +171,7 @@ function PaymentsReceivedPageContent() {
       ),
       meta: {
         headerClassName: 'text-end',
-        cellClassName: 'text-end font-mono text-green-600 font-semibold',
+        cellClassName: 'text-end font-mono text-success font-semibold',
       },
       cell: ({ row }) => formatCurrency(row.original.amount),
     },

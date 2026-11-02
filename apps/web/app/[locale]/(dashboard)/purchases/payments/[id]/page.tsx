@@ -146,8 +146,8 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <CreditCard className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-info/10 rounded-lg">
+                <CreditCard className="h-5 w-5 text-info" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('payments.amount')}</p>
@@ -162,8 +162,8 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Calendar className="h-5 w-5 text-green-600" />
+              <div className="p-2 bg-success/10 rounded-lg">
+                <Calendar className="h-5 w-5 text-success" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('payments.paymentDate')}</p>
@@ -178,8 +178,8 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Building2 className="h-5 w-5 text-purple-600" />
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Building2 className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('payments.paidFrom')}</p>
@@ -201,7 +201,7 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
               <span className="text-muted-foreground">{t('payments.vendor')}</span>
               <Link
                 href={`/purchases/vendors/${payment.vendorId}`}
-                className="text-blue-600 hover:underline"
+                className="text-primary hover:underline"
               >
                 {payment.vendor?.name}
               </Link>
@@ -246,7 +246,7 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
                       <TableCell>
                         <Link
                           href={`/purchases/bills/${allocation.billId}`}
-                          className="font-mono text-blue-600 hover:underline"
+                          className="font-mono text-primary hover:underline"
                         >
                           {allocation.bill?.billNumber || allocation.billId}
                         </Link>

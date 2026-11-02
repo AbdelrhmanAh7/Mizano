@@ -155,10 +155,10 @@ export default function LeadDetailPage() {
   }
 
   const scoreTierColors: Record<string, string> = {
-    HOT: 'bg-red-100 text-red-800',
-    WARM: 'bg-orange-100 text-orange-800',
-    COOL: 'bg-blue-100 text-blue-800',
-    COLD: 'bg-gray-100 text-gray-800',
+    HOT: 'bg-destructive/10 text-destructive',
+    WARM: 'bg-warning/10 text-warning',
+    COOL: 'bg-info/10 text-info',
+    COLD: 'bg-muted text-foreground',
   };
 
   return (
@@ -200,7 +200,7 @@ export default function LeadDetailPage() {
             </Button>
           )}
           {lead.convertedToCustomerId && (
-            <Badge className="bg-green-100 text-green-800">Converted</Badge>
+            <Badge className="bg-success/10 text-success">Converted</Badge>
           )}
           {canDelete && (
             <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
@@ -222,10 +222,7 @@ export default function LeadDetailPage() {
               {lead.email && (
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4 text-muted-foreground" />
-                  <a
-                    href={`mailto:${lead.email}`}
-                    className="text-blue-600 hover:underline text-sm"
-                  >
+                  <a href={`mailto:${lead.email}`} className="text-primary hover:underline text-sm">
                     {lead.email}
                   </a>
                 </div>

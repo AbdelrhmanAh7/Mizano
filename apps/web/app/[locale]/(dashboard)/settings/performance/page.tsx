@@ -54,20 +54,14 @@ import { useState } from 'react';
 function DurationBadge({ duration }: { duration: number }) {
   if (duration < 100) {
     return (
-      <Badge
-        variant="secondary"
-        className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-      >
+      <Badge variant="secondary" className="bg-success/10 text-success">
         {duration.toFixed(1)}ms
       </Badge>
     );
   }
   if (duration < 500) {
     return (
-      <Badge
-        variant="secondary"
-        className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-      >
+      <Badge variant="secondary" className="bg-warning/10 text-warning">
         {duration.toFixed(1)}ms
       </Badge>
     );
@@ -119,9 +113,9 @@ function HealthCards() {
         <CardContent>
           <div className="text-2xl font-bold">
             {health.primaryConnected ? (
-              <span className="text-green-600">{t('performance.health.connected')}</span>
+              <span className="text-success">{t('performance.health.connected')}</span>
             ) : (
-              <span className="text-red-600">{t('performance.health.disconnected')}</span>
+              <span className="text-destructive">{t('performance.health.disconnected')}</span>
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
@@ -141,9 +135,9 @@ function HealthCards() {
           <div className="text-2xl font-bold">
             {health.replicaConfigured ? (
               health.replicaConnected ? (
-                <span className="text-green-600">{t('performance.health.active')}</span>
+                <span className="text-success">{t('performance.health.active')}</span>
               ) : (
-                <span className="text-red-600">{t('performance.health.down')}</span>
+                <span className="text-destructive">{t('performance.health.down')}</span>
               )
             ) : (
               <span className="text-muted-foreground">{t('performance.health.notConfigured')}</span>
@@ -262,7 +256,7 @@ function StatsCards() {
           <AlertTriangle className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-orange-600">
+          <div className="text-2xl font-bold text-warning">
             {stats.slowQueryCount.toLocaleString()}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
@@ -407,10 +401,10 @@ function ResponseTimeTrend() {
                   <div
                     className={`w-6 rounded-t transition-all ${
                       item.avgDuration > 500
-                        ? 'bg-red-500'
+                        ? 'bg-destructive'
                         : item.avgDuration > 100
-                          ? 'bg-yellow-500'
-                          : 'bg-green-500'
+                          ? 'bg-warning'
+                          : 'bg-success'
                     }`}
                     style={{ height: `${Math.max(height, 2)}%` }}
                   />
@@ -576,7 +570,7 @@ function IndexRecommendations() {
     <Card>
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
-          <Lightbulb className="h-5 w-5 text-yellow-500" />
+          <Lightbulb className="h-5 w-5 text-warning" />
           {t('performance.recommendations.title')}
         </CardTitle>
         <CardDescription>{t('performance.recommendations.description')}</CardDescription>

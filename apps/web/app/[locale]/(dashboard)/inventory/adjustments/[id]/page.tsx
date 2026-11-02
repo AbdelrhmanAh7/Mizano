@@ -79,7 +79,7 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
   }
 
   const increase = adjustment.type === 'INCREASE';
-  const tone = increase ? 'text-green-600' : 'text-red-600';
+  const tone = increase ? 'text-success' : 'text-destructive';
 
   return (
     <div className="space-y-6">
@@ -132,9 +132,9 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               {increase ? (
-                <ArrowUp className="h-5 w-5 text-green-600" />
+                <ArrowUp className="h-5 w-5 text-success" />
               ) : (
-                <ArrowDown className="h-5 w-5 text-red-600" />
+                <ArrowDown className="h-5 w-5 text-destructive" />
               )}
               <div>
                 <p className="text-sm text-muted-foreground">{t('adjustments.table.type')}</p>

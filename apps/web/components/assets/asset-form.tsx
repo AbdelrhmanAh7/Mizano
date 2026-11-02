@@ -66,7 +66,7 @@ export function AssetForm({ defaultValues, onSubmit, isLoading, mode = 'create' 
             <div className="space-y-2">
               <Label htmlFor="name">Asset Name *</Label>
               <Input id="name" {...register('name')} placeholder="e.g., Dell Laptop" />
-              {errors.name && <p className="text-sm text-red-500">{errors.name.message}</p>}
+              {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="assetType">Asset Type *</Label>
@@ -117,14 +117,14 @@ export function AssetForm({ defaultValues, onSubmit, isLoading, mode = 'create' 
               <Label htmlFor="purchaseDate">Purchase Date *</Label>
               <Input id="purchaseDate" type="date" {...register('purchaseDate')} />
               {errors.purchaseDate && (
-                <p className="text-sm text-red-500">{errors.purchaseDate.message}</p>
+                <p className="text-sm text-destructive">{errors.purchaseDate.message}</p>
               )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="purchasePrice">Purchase Price *</Label>
               <Input id="purchasePrice" type="number" step="0.01" {...register('purchasePrice')} />
               {errors.purchasePrice && (
-                <p className="text-sm text-red-500">{errors.purchasePrice.message}</p>
+                <p className="text-sm text-destructive">{errors.purchasePrice.message}</p>
               )}
             </div>
           </div>
@@ -138,7 +138,7 @@ export function AssetForm({ defaultValues, onSubmit, isLoading, mode = 'create' 
               <Label htmlFor="usefulLifeMonths">Useful Life (months) *</Label>
               <Input id="usefulLifeMonths" type="number" {...register('usefulLifeMonths')} />
               {errors.usefulLifeMonths && (
-                <p className="text-sm text-red-500">{errors.usefulLifeMonths.message}</p>
+                <p className="text-sm text-destructive">{errors.usefulLifeMonths.message}</p>
               )}
             </div>
             <div className="space-y-2">

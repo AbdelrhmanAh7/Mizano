@@ -12,7 +12,13 @@ interface ExpensesPieProps {
   currency?: string;
 }
 
-const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6'];
+const COLORS = [
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
+];
 
 export const ExpensesPie = memo(function ExpensesPie({ data, currency }: ExpensesPieProps) {
   const formatCompactCurrency = useCompactMoneyFormatter();

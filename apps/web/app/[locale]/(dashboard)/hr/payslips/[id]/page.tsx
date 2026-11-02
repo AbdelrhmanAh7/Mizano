@@ -224,7 +224,7 @@ export default function PayslipDetailPage({ params }: { params: { id: string } }
                       <TableCell>
                         {t('payroll.payslipDoc.lossOfPay', { days: payslip.lopDays })}
                       </TableCell>
-                      <TableCell className="text-end font-mono text-red-600">
+                      <TableCell className="text-end font-mono text-destructive">
                         <span dir="ltr">-{formatCurrency(payslip.lopAmount || 0)}</span>
                       </TableCell>
                     </TableRow>
@@ -232,20 +232,20 @@ export default function PayslipDetailPage({ params }: { params: { id: string } }
                   {deductionsList.map((d, i) => (
                     <TableRow key={i}>
                       <TableCell className="capitalize">{d.name}</TableCell>
-                      <TableCell className="text-end font-mono text-red-600">
+                      <TableCell className="text-end font-mono text-destructive">
                         <span dir="ltr">-{formatCurrency(d.amount)}</span>
                       </TableCell>
                     </TableRow>
                   ))}
                   <TableRow>
                     <TableCell>{t('payroll.payslipDoc.tax')}</TableCell>
-                    <TableCell className="text-end font-mono text-red-600">
+                    <TableCell className="text-end font-mono text-destructive">
                       <span dir="ltr">-{formatCurrency(payslip.taxAmount || 0)}</span>
                     </TableCell>
                   </TableRow>
                   <TableRow className="font-bold">
                     <TableCell>{t('payroll.payslipDoc.totalDeductions')}</TableCell>
-                    <TableCell className="text-end font-mono text-red-600">
+                    <TableCell className="text-end font-mono text-destructive">
                       <span dir="ltr">
                         -
                         {formatCurrency(

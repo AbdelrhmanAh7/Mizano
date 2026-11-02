@@ -273,8 +273,8 @@ function AttendancePageContent() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <UserCheck className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-info/10 rounded-lg">
+                <UserCheck className="h-5 w-5 text-info" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('attendance.totalEmployees')}</p>
@@ -286,8 +286,8 @@ function AttendancePageContent() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <UserCheck className="h-5 w-5 text-green-600" />
+              <div className="p-2 bg-success/10 rounded-lg">
+                <UserCheck className="h-5 w-5 text-success" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
@@ -295,7 +295,7 @@ function AttendancePageContent() {
                     date: format(selectedDate, 'MMM d', { locale: dateLocale }),
                   })}
                 </p>
-                <p className="text-2xl font-bold text-green-600">{presentCount}</p>
+                <p className="text-2xl font-bold text-success">{presentCount}</p>
               </div>
             </div>
           </CardContent>
@@ -303,8 +303,8 @@ function AttendancePageContent() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <CalendarOff className="h-5 w-5 text-red-600" />
+              <div className="p-2 bg-destructive/10 rounded-lg">
+                <CalendarOff className="h-5 w-5 text-destructive" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
@@ -312,7 +312,7 @@ function AttendancePageContent() {
                     date: format(selectedDate, 'MMM d', { locale: dateLocale }),
                   })}
                 </p>
-                <p className="text-2xl font-bold text-red-600">{absentCount}</p>
+                <p className="text-2xl font-bold text-destructive">{absentCount}</p>
               </div>
             </div>
           </CardContent>
@@ -320,8 +320,8 @@ function AttendancePageContent() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <Clock className="h-5 w-5 text-yellow-600" />
+              <div className="p-2 bg-warning/10 rounded-lg">
+                <Clock className="h-5 w-5 text-warning" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
@@ -329,7 +329,7 @@ function AttendancePageContent() {
                     date: format(selectedDate, 'MMM d', { locale: dateLocale }),
                   })}
                 </p>
-                <p className="text-2xl font-bold text-yellow-600">{leaveCount}</p>
+                <p className="text-2xl font-bold text-warning">{leaveCount}</p>
               </div>
             </div>
           </CardContent>
@@ -469,25 +469,25 @@ function AttendancePageContent() {
       {/* Legend */}
       <div className="flex items-center gap-6 text-sm">
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="bg-green-100 text-green-800">
+          <Badge variant="outline" className="bg-success/10 text-success">
             {t('attendance.short.present')}
           </Badge>
           <span>{t('attendance.status.present')}</span>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="bg-red-100 text-red-800">
+          <Badge variant="outline" className="bg-destructive/10 text-destructive">
             {t('attendance.short.absent')}
           </Badge>
           <span>{t('attendance.status.absent')}</span>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
+          <Badge variant="outline" className="bg-warning/10 text-warning">
             {t('attendance.short.leave')}
           </Badge>
           <span>{t('attendance.status.leave')}</span>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="bg-orange-100 text-orange-800">
+          <Badge variant="outline" className="bg-warning/10 text-warning">
             {t('attendance.short.halfDay')}
           </Badge>
           <span>{t('attendance.status.halfDay')}</span>

@@ -257,7 +257,7 @@ export default function InvoiceDetailPage() {
             <Button
               variant="outline"
               onClick={() => setVoidDialogOpen(true)}
-              className="text-orange-600 hover:text-orange-700"
+              className="text-warning hover:text-warning"
             >
               <Ban className="me-2 h-4 w-4" />
               {t('invoices.voidInvoice')}
@@ -290,7 +290,7 @@ export default function InvoiceDetailPage() {
               <CreditCard className="h-4 w-4" />
               {tDetail('amountPaid')}
             </div>
-            <div className="text-2xl font-bold font-mono text-green-600">
+            <div className="text-2xl font-bold font-mono text-success">
               {formatCurrency(amountPaid)}
             </div>
           </CardContent>
@@ -302,7 +302,9 @@ export default function InvoiceDetailPage() {
               <DollarSign className="h-4 w-4" />
               {tDetail('balanceDue')}
             </div>
-            <div className={cn('text-2xl font-bold font-mono', balanceDue > 0 && 'text-red-600')}>
+            <div
+              className={cn('text-2xl font-bold font-mono', balanceDue > 0 && 'text-destructive')}
+            >
               {formatCurrency(balanceDue)}
             </div>
           </CardContent>
@@ -314,7 +316,7 @@ export default function InvoiceDetailPage() {
               <Calendar className="h-4 w-4" />
               {tDetail('dueDate')}
             </div>
-            <div className={cn('text-2xl font-bold', isOverdue && 'text-red-600')}>
+            <div className={cn('text-2xl font-bold', isOverdue && 'text-destructive')}>
               {format(new Date(invoice.dueDate), 'PP', { locale: dateLocale })}
             </div>
           </CardContent>
@@ -466,7 +468,7 @@ export default function InvoiceDetailPage() {
                       <div className="text-sm text-muted-foreground">{tCommon('email')}</div>
                       <a
                         href={`mailto:${invoice.customer.email}`}
-                        className="text-blue-600 hover:underline"
+                        className="text-primary hover:underline"
                       >
                         {invoice.customer.email}
                       </a>
@@ -493,7 +495,7 @@ export default function InvoiceDetailPage() {
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">{t('invoices.form.dueDate')}</div>
-                <div className={cn('font-medium', isOverdue && 'text-red-600')}>
+                <div className={cn('font-medium', isOverdue && 'text-destructive')}>
                   {formatLongDate(new Date(invoice.dueDate))}
                   {isOverdue && ` ${tDetail('overdue')}`}
                 </div>
@@ -578,7 +580,7 @@ export default function InvoiceDetailPage() {
                           })
                         : '-'}
                     </TableCell>
-                    <TableCell className="text-end font-mono text-green-600">
+                    <TableCell className="text-end font-mono text-success">
                       {formatCurrency(allocation.amount || '0')}
                     </TableCell>
                   </TableRow>
@@ -623,7 +625,7 @@ export default function InvoiceDetailPage() {
                         ? format(new Date(creditNote.date), 'PP', { locale: dateLocale })
                         : '-'}
                     </TableCell>
-                    <TableCell className="text-end font-mono text-orange-600">
+                    <TableCell className="text-end font-mono text-warning">
                       {formatCurrency(creditNote.amount || '0')}
                     </TableCell>
                   </TableRow>
@@ -669,7 +671,7 @@ export default function InvoiceDetailPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmVoid} className="bg-orange-600 hover:bg-orange-700">
+            <AlertDialogAction onClick={confirmVoid} className="bg-warning hover:bg-warning/90">
               {t('invoices.voidInvoice')}
             </AlertDialogAction>
           </AlertDialogFooter>

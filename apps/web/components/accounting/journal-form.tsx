@@ -90,7 +90,7 @@ export function JournalForm({
           <Label htmlFor="date">{t('date')} *</Label>
           <Input id="date" type="date" {...form.register('date')} />
           {form.formState.errors.date && (
-            <p className="text-sm text-red-500">
+            <p className="text-sm text-destructive">
               {t.has(form.formState.errors.date.message ?? '')
                 ? t(form.formState.errors.date.message ?? '')
                 : form.formState.errors.date.message}

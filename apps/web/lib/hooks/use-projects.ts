@@ -419,12 +419,12 @@ export function getProjectStatusLabel(status: ProjectStatus): string {
 
 export function getProjectStatusColor(status: ProjectStatus): string {
   const colors: Record<ProjectStatus, string> = {
-    PLANNING: 'bg-purple-100 text-purple-800',
-    ACTIVE: 'bg-green-100 text-green-800',
-    IN_PROGRESS: 'bg-blue-100 text-blue-800',
-    COMPLETED: 'bg-sky-100 text-sky-800',
-    ON_HOLD: 'bg-yellow-100 text-yellow-800',
-    CANCELLED: 'bg-gray-100 text-gray-800',
+    PLANNING: 'bg-primary/10 text-primary',
+    ACTIVE: 'bg-success/10 text-success',
+    IN_PROGRESS: 'bg-info/10 text-info',
+    COMPLETED: 'bg-info/10 text-info',
+    ON_HOLD: 'bg-warning/10 text-warning',
+    CANCELLED: 'bg-muted text-foreground',
   };
   return colors[status] || colors.ACTIVE;
 }
@@ -435,10 +435,10 @@ export function getTaskStatusLabel(status: TaskStatus): string {
 
 export function getTaskStatusColor(status: TaskStatus): string {
   const colors: Record<TaskStatus, string> = {
-    TODO: 'bg-gray-100 text-gray-800',
-    IN_PROGRESS: 'bg-blue-100 text-blue-800',
-    REVIEW: 'bg-yellow-100 text-yellow-800',
-    DONE: 'bg-green-100 text-green-800',
+    TODO: 'bg-muted text-foreground',
+    IN_PROGRESS: 'bg-info/10 text-info',
+    REVIEW: 'bg-warning/10 text-warning',
+    DONE: 'bg-success/10 text-success',
   };
   return colors[status] || colors.TODO;
 }

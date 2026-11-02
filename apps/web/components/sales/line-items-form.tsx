@@ -268,7 +268,7 @@ export function LineItemsForm({
       </CardHeader>
       <CardContent>
         {taxRatesStatus?.isError && (
-          <p role="alert" className="mb-3 text-sm text-red-600">
+          <p role="alert" className="mb-3 text-sm text-destructive">
             {t('lineItems.taxLoadFailed')}
           </p>
         )}
@@ -400,7 +400,7 @@ export function LineItemsForm({
                     className="h-9 w-9"
                     aria-label={t('lineItems.removeLine')}
                   >
-                    <Trash2 className="h-4 w-4 text-muted-foreground hover:text-red-500" />
+                    <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                   </Button>
                 </div>
               ))}
@@ -419,7 +419,7 @@ export function LineItemsForm({
           {showDiscount && totals.totalDiscount > 0 && (
             <div className="flex justify-end gap-8 text-sm">
               <span className="text-muted-foreground">{t('lineItems.discountTotal')}</span>
-              <span className="font-mono w-24 text-end text-red-600">
+              <span className="font-mono w-24 text-end text-destructive">
                 -{formatAmount(totals.totalDiscount, currency)}
               </span>
             </div>

@@ -93,7 +93,7 @@ export default function CreditNoteDetailPage() {
                 {t(creditNoteTypeKey(creditNote.type))}
               </Badge>
               {/* A credit note posts to the ledger when it is created (voided ones 404 here). */}
-              <Badge variant="outline" className="border-green-600 text-green-700">
+              <Badge variant="outline" className="border-success text-success">
                 {t('creditNotes.posted')}
               </Badge>
             </div>
@@ -124,7 +124,7 @@ export default function CreditNoteDetailPage() {
               <DollarSign className="h-4 w-4" />
               {t('creditNotes.creditAmount')}
             </div>
-            <div className="text-2xl font-bold font-mono text-orange-600">
+            <div className="text-2xl font-bold font-mono text-warning">
               {formatCurrency(creditNote.amount)}
             </div>
           </CardContent>
@@ -192,7 +192,7 @@ export default function CreditNoteDetailPage() {
                     <div className="text-sm text-muted-foreground">{t('customers.form.email')}</div>
                     <a
                       href={`mailto:${creditNote.customer.email}`}
-                      className="text-blue-600 hover:underline"
+                      className="text-primary hover:underline"
                     >
                       {creditNote.customer.email}
                     </a>

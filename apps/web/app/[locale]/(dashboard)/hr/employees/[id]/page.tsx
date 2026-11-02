@@ -181,7 +181,10 @@ export default function EmployeeDetailPage({ params }: { params: { id: string } 
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  className="bg-destructive hover:bg-destructive/90"
+                >
                   {tCommon('buttons.delete')}
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -331,14 +334,14 @@ export default function EmployeeDetailPage({ params }: { params: { id: string } 
                       {deductions.map((d: { name: string; amount: number }, i: number) => (
                         <TableRow key={i}>
                           <TableCell>{d.name}</TableCell>
-                          <TableCell className="text-end font-mono text-red-600">
+                          <TableCell className="text-end font-mono text-destructive">
                             <span dir="ltr">-{formatCurrency(d.amount)}</span>
                           </TableCell>
                         </TableRow>
                       ))}
                       <TableRow className="font-bold">
                         <TableCell>{t('employees.totalDeductions')}</TableCell>
-                        <TableCell className="text-end font-mono text-red-600">
+                        <TableCell className="text-end font-mono text-destructive">
                           <span dir="ltr">-{formatCurrency(totalDeductions)}</span>
                         </TableCell>
                       </TableRow>
@@ -410,7 +413,7 @@ export default function EmployeeDetailPage({ params }: { params: { id: string } 
                           <TableCell className="text-end font-mono">
                             {formatCurrency(slip.gross)}
                           </TableCell>
-                          <TableCell className="text-end font-mono text-red-600">
+                          <TableCell className="text-end font-mono text-destructive">
                             <span dir="ltr">-{formatCurrency(slip.totalDeductions)}</span>
                           </TableCell>
                           <TableCell className="text-end font-mono font-medium">

@@ -178,7 +178,7 @@ function CreditNotesPageContent() {
       ),
       meta: {
         headerClassName: 'text-right',
-        cellClassName: 'text-right font-mono text-orange-600',
+        cellClassName: 'text-right font-mono text-warning',
       },
       cell: ({ row }) => formatCurrency(row.original.amount),
     },

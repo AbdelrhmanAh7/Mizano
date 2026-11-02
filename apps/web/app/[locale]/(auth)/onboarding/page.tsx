@@ -56,10 +56,10 @@ export default function OnboardingPage() {
 
       {/* Hero */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-teal-600/5 via-teal-700/5 to-emerald-800/5" />
+        <div className="absolute inset-0 bg-gradient-to-br from-brand/5 via-brand-dark/5 to-brand-deep/5" />
         <div className="absolute inset-0 opacity-[0.03]">
-          <div className="absolute top-20 start-10 w-72 h-72 bg-teal-500 rounded-full blur-3xl" />
-          <div className="absolute bottom-10 end-10 w-96 h-96 bg-amber-400 rounded-full blur-3xl" />
+          <div className="absolute top-20 start-10 w-72 h-72 bg-brand rounded-full blur-3xl" />
+          <div className="absolute bottom-10 end-10 w-96 h-96 bg-brand-gold rounded-full blur-3xl" />
         </div>
         <div className="container mx-auto px-4 py-24 md:py-32 text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-foreground text-sm font-medium mb-6">
@@ -113,20 +113,20 @@ export default function OnboardingPage() {
         </div>
         <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
           <div className="text-center">
-            <div className="rounded-full bg-green-100 dark:bg-green-950 p-4 w-fit mx-auto mb-4">
-              <Lock className="h-6 w-6 text-green-600" />
+            <div className="rounded-full bg-success/10 p-4 w-fit mx-auto mb-4">
+              <Lock className="h-6 w-6 text-success" />
             </div>
             <p className="text-sm font-medium">{t('technology.localAi')}</p>
           </div>
           <div className="text-center">
-            <div className="rounded-full bg-blue-100 dark:bg-blue-950 p-4 w-fit mx-auto mb-4">
-              <KeyRound className="h-6 w-6 text-blue-600" />
+            <div className="rounded-full bg-info/10 p-4 w-fit mx-auto mb-4">
+              <KeyRound className="h-6 w-6 text-info" />
             </div>
             <p className="text-sm font-medium">{t('technology.offline')}</p>
           </div>
           <div className="text-center">
-            <div className="rounded-full bg-purple-100 dark:bg-purple-950 p-4 w-fit mx-auto mb-4">
-              <Server className="h-6 w-6 text-purple-600" />
+            <div className="rounded-full bg-primary/10 p-4 w-fit mx-auto mb-4">
+              <Server className="h-6 w-6 text-primary" />
             </div>
             <p className="text-sm font-medium">{t('technology.techStack')}</p>
           </div>
@@ -134,10 +134,10 @@ export default function OnboardingPage() {
       </section>
 
       {/* CTA Footer */}
-      <section className="bg-gradient-to-br from-[#0D9488] via-[#0B6E64] to-[#063A33] text-white">
+      <section className="bg-gradient-to-br from-brand via-brand-dark to-brand-deep text-white">
         <div className="container mx-auto px-4 py-20 text-center">
           <h2 className="text-3xl font-bold">{t('cta.title')}</h2>
-          <p className="mt-3 text-teal-50 text-lg">{t('cta.subtitle')}</p>
+          <p className="mt-3 text-primary-foreground text-lg">{t('cta.subtitle')}</p>
           <div className="mt-8 flex items-center justify-center gap-4">
             <Button size="lg" variant="secondary" asChild>
               <Link href="/register">{t('cta.getStarted')}</Link>

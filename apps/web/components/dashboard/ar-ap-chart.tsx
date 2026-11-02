@@ -21,12 +21,12 @@ export const ARAPChart = memo(function ARAPChart({ data, currency }: ARAPChartPr
     {
       name: t('receivables'),
       value: data.receivables,
-      fill: '#3b82f6',
+      fill: 'hsl(var(--chart-2))',
     },
     {
       name: t('payables'),
       value: data.payables,
-      fill: '#ef4444',
+      fill: 'hsl(var(--destructive))',
     },
   ];
 
@@ -59,14 +59,14 @@ export const ARAPChart = memo(function ARAPChart({ data, currency }: ARAPChartPr
         </div>
         <div className="mt-4 flex justify-center gap-8 text-sm">
           <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded bg-blue-500" />
+            <div className="h-3 w-3 rounded bg-info" />
             <span className="text-muted-foreground">{t('outstanding')}</span>
             <span className="font-mono font-medium">
               {formatCompactCurrency(data.receivables, currency)}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded bg-red-500" />
+            <div className="h-3 w-3 rounded bg-destructive" />
             <span className="text-muted-foreground">{t('owed')}</span>
             <span className="font-mono font-medium">
               {formatCompactCurrency(data.payables, currency)}

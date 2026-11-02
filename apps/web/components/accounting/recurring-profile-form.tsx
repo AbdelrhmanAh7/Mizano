@@ -121,7 +121,7 @@ export function RecurringProfileForm({
               <Label htmlFor="name">{t('name')} *</Label>
               <Input id="name" placeholder={t('nameExample')} {...form.register('name')} />
               {form.formState.errors.name && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {errorText(form.formState.errors.name.message)}
                 </p>
               )}
@@ -155,7 +155,7 @@ export function RecurringProfileForm({
               <Label htmlFor="startDate">{t('startDate')} *</Label>
               <Input id="startDate" type="date" {...form.register('startDate')} />
               {form.formState.errors.startDate && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {errorText(form.formState.errors.startDate.message)}
                 </p>
               )}

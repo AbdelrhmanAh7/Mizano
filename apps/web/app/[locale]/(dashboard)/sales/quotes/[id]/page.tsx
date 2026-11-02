@@ -316,7 +316,7 @@ export default function QuoteDetailPage() {
               <dd className="text-lg">
                 <Link
                   href={`/sales/customers/${quote.customerId}`}
-                  className="text-blue-600 hover:underline"
+                  className="text-primary hover:underline"
                 >
                   {quote.customer?.displayName || quote.customer?.name}
                 </Link>
@@ -391,7 +391,7 @@ export default function QuoteDetailPage() {
                   <TableCell colSpan={4} className="text-right font-medium">
                     {t('quotes.table.discount')}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-red-600">
+                  <TableCell className="text-right font-mono text-destructive">
                     -{formatCurrency(parseFloat(quote.discountAmount || '0'), currency)}
                   </TableCell>
                 </TableRow>

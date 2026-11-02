@@ -172,7 +172,7 @@ export function JournalLinesEditor<T extends { lines: JournalLineValues[] }>({
                   className="h-8 w-8"
                   aria-label={t('removeLine')}
                 >
-                  <Trash2 className="h-4 w-4 text-muted-foreground hover:text-red-500" />
+                  <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                 </Button>
               </div>
             </div>
@@ -180,7 +180,7 @@ export function JournalLinesEditor<T extends { lines: JournalLineValues[] }>({
         </div>
 
         {lineErrors && (
-          <p className="text-sm text-red-500 mt-2">
+          <p className="text-sm text-destructive mt-2">
             {translateError(lineErrors.message || lineErrors.root?.message)}
           </p>
         )}
@@ -204,7 +204,7 @@ export function JournalLinesEditor<T extends { lines: JournalLineValues[] }>({
             <div
               className={cn(
                 'flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium',
-                isBalanced ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800',
+                isBalanced ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive',
               )}
             >
               {isBalanced ? (

@@ -7,15 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const MODULES = [
-  { key: 'accounts', icon: BookOpen, href: '/accounting/accounts', color: 'bg-blue-500' },
-  { key: 'journals', icon: FileText, href: '/accounting/journals', color: 'bg-green-500' },
-  { key: 'recurring', icon: RefreshCw, href: '/accounting/recurring', color: 'bg-purple-500' },
-  { key: 'trialBalance', icon: Scale, href: '/accounting/trial-balance', color: 'bg-orange-500' },
+  { key: 'accounts', icon: BookOpen, href: '/accounting/accounts', color: 'bg-info' },
+  { key: 'journals', icon: FileText, href: '/accounting/journals', color: 'bg-success' },
+  { key: 'recurring', icon: RefreshCw, href: '/accounting/recurring', color: 'bg-primary' },
+  { key: 'trialBalance', icon: Scale, href: '/accounting/trial-balance', color: 'bg-warning' },
   {
     key: 'generalLedger',
     icon: BookMarked,
     href: '/accounting/general-ledger',
-    color: 'bg-cyan-500',
+    color: 'bg-info',
   },
 ] as const;
 

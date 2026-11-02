@@ -56,9 +56,9 @@ function LevelIcon({ level }: { level: LogLevel }) {
     return <Bug className="h-4 w-4 text-destructive" />;
   }
   if (level === LogLevel.WARN) {
-    return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+    return <AlertTriangle className="h-4 w-4 text-warning" />;
   }
-  return <AlertTriangle className="h-4 w-4 text-blue-500" />;
+  return <AlertTriangle className="h-4 w-4 text-info" />;
 }
 
 function SourceIcon({ source }: { source: LogSource }) {
@@ -75,19 +75,19 @@ function StatusBadge({ status }: { status: LogStatus }) {
   const variants: Record<LogStatus, { label: string; className: string }> = {
     [LogStatus.OPEN]: {
       label: 'Open',
-      className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+      className: 'bg-destructive/10 text-destructive',
     },
     [LogStatus.FIXED]: {
       label: 'Fixed',
-      className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+      className: 'bg-success/10 text-success',
     },
     [LogStatus.IGNORED]: {
       label: 'Ignored',
-      className: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
+      className: 'bg-muted text-muted-foreground',
     },
     [LogStatus.TEST_COVERED]: {
       label: 'Test Covered',
-      className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+      className: 'bg-info/10 text-info',
     },
   };
   const v = variants[status];
@@ -157,7 +157,7 @@ function LogRow({
             {log.occurrences > 1 && (
               <>
                 <span>·</span>
-                <span className="text-orange-500 font-medium">×{log.occurrences}</span>
+                <span className="text-warning font-medium">×{log.occurrences}</span>
               </>
             )}
             <span>·</span>
@@ -174,10 +174,10 @@ function LogRow({
             <div className="text-xs">
               <span className="text-muted-foreground">URL: </span>
               <span className="font-mono">
-                {log.method && <span className="text-blue-500">{log.method} </span>}
+                {log.method && <span className="text-info">{log.method} </span>}
                 {log.url}
               </span>
-              {log.statusCode && <span className="ml-2 text-red-500">[{log.statusCode}]</span>}
+              {log.statusCode && <span className="ml-2 text-destructive">[{log.statusCode}]</span>}
             </div>
           )}
           {log.stack && (
@@ -204,7 +204,7 @@ function LogRow({
             <div className="text-xs">
               <span className="text-muted-foreground">Files: </span>
               {log.filePaths.map((fp, i) => (
-                <span key={i} className="font-mono text-blue-500">
+                <span key={i} className="font-mono text-info">
                   {fp}
                   {i < log.filePaths!.length - 1 ? ', ' : ''}
                 </span>
@@ -220,9 +220,9 @@ function LogRow({
 // ---- Prompt Dialog ----
 
 function promptSizeInfo(chars: number): { label: string; className: string } {
-  if (chars < 3000) return { label: 'Compact', className: 'text-green-600 dark:text-green-400' };
-  if (chars < 8000) return { label: 'Medium', className: 'text-yellow-600 dark:text-yellow-400' };
-  return { label: 'Large', className: 'text-red-600 dark:text-red-400' };
+  if (chars < 3000) return { label: 'Compact', className: 'text-success' };
+  if (chars < 8000) return { label: 'Medium', className: 'text-warning' };
+  return { label: 'Large', className: 'text-destructive' };
 }
 
 function PromptDialog({
@@ -277,7 +277,7 @@ function PromptDialog({
       <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col gap-3 overflow-hidden">
         <DialogHeader>
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-purple-500" />
+            <Sparkles className="h-5 w-5 text-primary" />
             <DialogTitle>Claude Fix Prompt</DialogTitle>
           </div>
           <DialogDescription>
@@ -461,7 +461,7 @@ export function LoggerDashboard() {
                   errorCount > 0
                     ? 'hsl(var(--destructive))'
                     : warnCount > 0
-                      ? '#eab308'
+                      ? 'hsl(var(--warning))'
                       : 'hsl(var(--border))',
               }}
             >
@@ -507,16 +507,16 @@ export function LoggerDashboard() {
 
             {/* Stats bar */}
             <div className="flex items-center gap-3 text-xs">
-              <span className="flex items-center gap-1 text-red-500">
+              <span className="flex items-center gap-1 text-destructive">
                 <Bug className="h-3 w-3" /> {errorCount} errors
               </span>
-              <span className="flex items-center gap-1 text-yellow-500">
+              <span className="flex items-center gap-1 text-warning">
                 <AlertTriangle className="h-3 w-3" /> {warnCount} warnings
               </span>
-              <span className="flex items-center gap-1 text-green-500">
+              <span className="flex items-center gap-1 text-success">
                 <Check className="h-3 w-3" /> {stats?.fixedCount || 0} fixed
               </span>
-              <span className="flex items-center gap-1 text-blue-500">
+              <span className="flex items-center gap-1 text-info">
                 <ShieldCheck className="h-3 w-3" /> {stats?.testCoveredCount || 0} tested
               </span>
             </div>
@@ -624,7 +624,7 @@ export function LoggerDashboard() {
                       size="sm"
                       onClick={clearResolved}
                       disabled={isClearing}
-                      className="gap-1 text-green-600 border-green-200 hover:bg-green-50 dark:border-green-800 dark:hover:bg-green-900/20"
+                      className="gap-1 text-success border-success/30 hover:bg-success/5"
                     >
                       <CheckCheck className="h-3.5 w-3.5" />
                       Clear Fixed & Tested
@@ -645,7 +645,7 @@ export function LoggerDashboard() {
                       size="sm"
                       onClick={() => handleGeneratePrompt()}
                       disabled={selectedIds.length === 0 || isGeneratingPrompt}
-                      className="gap-1 text-purple-600 border-purple-200 hover:bg-purple-50 dark:border-purple-800 dark:hover:bg-purple-900/20"
+                      className="gap-1 text-primary border-primary/30 hover:bg-primary/5"
                     >
                       <Sparkles className="h-3.5 w-3.5" />
                       {isGeneratingPrompt ? 'Generating…' : `Fix Prompt (${selectedIds.length})`}
@@ -669,15 +669,15 @@ export function LoggerDashboard() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => markAsFixed(selectedIds)}>
-                        <Check className="h-4 w-4 mr-2 text-green-500" />
+                        <Check className="h-4 w-4 mr-2 text-success" />
                         Mark as Fixed
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => markAsTestCovered(selectedIds)}>
-                        <ShieldCheck className="h-4 w-4 mr-2 text-blue-500" />
+                        <ShieldCheck className="h-4 w-4 mr-2 text-info" />
                         Mark as Test Covered
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => markAsIgnored(selectedIds)}>
-                        <EyeOff className="h-4 w-4 mr-2 text-gray-500" />
+                        <EyeOff className="h-4 w-4 mr-2 text-muted-foreground" />
                         Mark as Ignored
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />

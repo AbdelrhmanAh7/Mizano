@@ -344,7 +344,7 @@ export default function VATReturnDetailPage() {
                         isCurrent
                           ? 'border-primary bg-primary text-primary-foreground'
                           : isActive
-                            ? 'border-green-500 bg-green-50 text-green-600'
+                            ? 'border-success bg-success/5 text-success'
                             : 'border-muted bg-muted/30 text-muted-foreground',
                       )}
                     >
@@ -356,7 +356,7 @@ export default function VATReturnDetailPage() {
                         isCurrent
                           ? 'text-primary'
                           : isActive
-                            ? 'text-green-600'
+                            ? 'text-success'
                             : 'text-muted-foreground',
                       )}
                     >
@@ -369,7 +369,7 @@ export default function VATReturnDetailPage() {
                     <div
                       className={cn(
                         'flex-1 h-0.5 mx-4 mt-[-1.5rem]',
-                        index < currentStep ? 'bg-green-500' : 'bg-muted',
+                        index < currentStep ? 'bg-success' : 'bg-muted',
                       )}
                     />
                   )}
@@ -425,7 +425,7 @@ export default function VATReturnDetailPage() {
                 <div
                   className={cn(
                     'text-2xl font-bold font-mono',
-                    netVat > 0 ? 'text-red-600' : 'text-green-600',
+                    netVat > 0 ? 'text-destructive' : 'text-success',
                   )}
                 >
                   {formatCurrency(Math.abs(netVat))}
@@ -514,7 +514,7 @@ export default function VATReturnDetailPage() {
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-lg bg-blue-500">
+                  <div className="p-2 rounded-lg bg-info">
                     <Receipt className="h-4 w-4 text-white" />
                   </div>
                   <div>
@@ -547,7 +547,7 @@ export default function VATReturnDetailPage() {
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-lg bg-orange-500">
+                  <div className="p-2 rounded-lg bg-warning">
                     <ShoppingCart className="h-4 w-4 text-white" />
                   </div>
                   <div>
@@ -593,7 +593,7 @@ export default function VATReturnDetailPage() {
                 <div
                   className={cn(
                     'text-3xl font-bold font-mono',
-                    netVat > 0 ? 'text-red-600' : 'text-green-600',
+                    netVat > 0 ? 'text-destructive' : 'text-success',
                   )}
                 >
                   {formatCurrency(Math.abs(netVat))}
@@ -612,7 +612,7 @@ export default function VATReturnDetailPage() {
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-lg bg-green-500">
+                  <div className="p-2 rounded-lg bg-success">
                     <CheckCircle2 className="h-4 w-4 text-white" />
                   </div>
                   <CardTitle>{t('returns.detail.paymentDetails')}</CardTitle>
@@ -655,7 +655,7 @@ export default function VATReturnDetailPage() {
                 </dl>
                 <div className="mt-6 p-4 bg-muted/50 rounded-lg">
                   <div className="flex items-center gap-2 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <CheckCircle2 className="h-4 w-4 text-success" />
                     <span className="font-medium">{t('returns.detail.journalEntry')}</span>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">

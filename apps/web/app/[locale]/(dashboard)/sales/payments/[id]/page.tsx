@@ -165,7 +165,7 @@ export default function PaymentReceivedDetailPage() {
               <DollarSign className="h-4 w-4" />
               {t('payments.amount')}
             </div>
-            <div className="text-2xl font-bold font-mono text-green-600">
+            <div className="text-2xl font-bold font-mono text-success">
               {formatCurrency(payment.amount)}
             </div>
           </CardContent>
@@ -233,7 +233,7 @@ export default function PaymentReceivedDetailPage() {
                     <div className="text-sm text-muted-foreground">{t('customers.form.email')}</div>
                     <a
                       href={`mailto:${payment.customer.email}`}
-                      className="text-blue-600 hover:underline"
+                      className="text-primary hover:underline"
                     >
                       {payment.customer.email}
                     </a>
@@ -320,7 +320,7 @@ export default function PaymentReceivedDetailPage() {
                             parseFloat(allocation.amount || '0'),
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-green-600 font-semibold">
+                      <TableCell className="text-right font-mono text-success font-semibold">
                         {formatCurrency(allocation.amount || '0')}
                       </TableCell>
                     </TableRow>

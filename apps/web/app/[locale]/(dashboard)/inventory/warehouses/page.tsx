@@ -52,11 +52,11 @@ function WarehousesPageContent() {
         <div className="flex items-center gap-2">
           <Link
             href={`/inventory/warehouses/${row.original.id}`}
-            className="font-medium hover:text-blue-600 hover:underline"
+            className="font-medium hover:text-primary hover:underline"
           >
             {row.original.name}
           </Link>
-          {row.original.isDefault && <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />}
+          {row.original.isDefault && <Star className="h-4 w-4 text-warning fill-warning" />}
         </div>
       ),
     },

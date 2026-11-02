@@ -54,7 +54,7 @@ const AGING_SIDES: Record<'receivable' | 'payable', AgingSide> = {
     totalKey: 'total',
     partyKey: 'customer',
     icon: Users,
-    iconClassName: { box: 'bg-blue-100', icon: 'text-blue-600' },
+    iconClassName: { box: 'bg-info/10', icon: 'text-info' },
     detailPath: '/sales/invoices',
     emptyPlacement: 'page',
   },
@@ -64,7 +64,7 @@ const AGING_SIDES: Record<'receivable' | 'payable', AgingSide> = {
     totalKey: 'totalPayable',
     partyKey: 'vendor',
     icon: Building2,
-    iconClassName: { box: 'bg-orange-100', icon: 'text-orange-600' },
+    iconClassName: { box: 'bg-warning/10', icon: 'text-warning' },
     detailPath: '/purchases/bills',
     emptyPlacement: 'buckets',
   },
@@ -198,7 +198,7 @@ export function AgingReportPage({ side }: { side: 'receivable' | 'payable' }): J
                   <TableCell>
                     <Link
                       href={`${config.detailPath}/${item.id}`}
-                      className="font-medium hover:text-blue-600 hover:underline"
+                      className="font-medium hover:text-primary hover:underline"
                     >
                       {item.number}
                     </Link>
@@ -217,10 +217,10 @@ export function AgingReportPage({ side }: { side: 'receivable' | 'payable' }): J
                       variant="outline"
                       className={cn(
                         item.daysOverdue > 30
-                          ? 'bg-red-100 text-red-800'
+                          ? 'bg-destructive/10 text-destructive'
                           : item.daysOverdue > 0
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-green-100 text-green-800',
+                            ? 'bg-warning/10 text-warning'
+                            : 'bg-success/10 text-success',
                       )}
                     >
                       {item.daysOverdue}

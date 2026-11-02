@@ -190,7 +190,7 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
           {asset.status === 'ACTIVE' && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="outline" className="text-red-600">
+                <Button variant="outline" className="text-destructive">
                   <Trash2 className="mr-2 h-4 w-4" />
                   {tc('buttons.delete')}
                 </Button>
@@ -204,7 +204,10 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>{tc('buttons.cancel')}</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-destructive hover:bg-destructive/90"
+                  >
                     {tc('buttons.delete')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -224,7 +227,7 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">{t('detail.currentBookValue')}</p>
-            <p className="text-2xl font-bold font-mono text-green-600">
+            <p className="text-2xl font-bold font-mono text-success">
               {formatCurrency(asset.currentBookValue)}
             </p>
           </CardContent>
@@ -290,7 +293,7 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t('detail.accumulatedDepreciation')}</span>
-              <span className="font-mono text-red-600">
+              <span className="font-mono text-destructive">
                 ({formatCurrency(asset.accumulatedDepreciation)})
               </span>
             </div>
@@ -311,7 +314,7 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{t('detail.gainLoss')}</span>
                   <span
-                    className={`font-mono ${(asset.disposalGainLoss || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                    className={`font-mono ${(asset.disposalGainLoss || 0) >= 0 ? 'text-success' : 'text-destructive'}`}
                   >
                     {formatCurrency(asset.disposalGainLoss)}
                   </span>
@@ -367,8 +370,8 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
                           variant="outline"
                           className={
                             item.executedAt
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
+                              ? 'bg-success/10 text-success'
+                              : 'bg-muted text-foreground'
                           }
                         >
                           {item.executedAt ? t('schedule.posted') : t('schedule.pending')}

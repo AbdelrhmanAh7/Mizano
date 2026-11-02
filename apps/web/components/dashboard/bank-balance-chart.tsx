@@ -33,14 +33,15 @@ export const BankBalanceChart = memo(function BankBalanceChart({
       <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-            <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+            <stop offset="5%" stopColor="hsl(var(--chart-4))" stopOpacity={0.3} />
+            <stop offset="95%" stopColor="hsl(var(--chart-4))" stopOpacity={0} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="month" tickFormatter={monthLabel} {...CHART_AXIS} />
         <YAxis {...CHART_AXIS} tickFormatter={(value) => formatCompactCurrency(value, currency)} />
-        <Tooltip labelFormatter={monthLabel}
+        <Tooltip
+          labelFormatter={monthLabel}
           formatter={(value: number) => formatCompactCurrency(value, currency)}
           contentStyle={CHART_TOOLTIP_STYLE}
         />
@@ -48,7 +49,7 @@ export const BankBalanceChart = memo(function BankBalanceChart({
           type="monotone"
           dataKey="balance"
           name={t('balance')}
-          stroke="#8b5cf6"
+          stroke="hsl(var(--chart-4))"
           strokeWidth={2}
           fill="url(#balanceGradient)"
         />

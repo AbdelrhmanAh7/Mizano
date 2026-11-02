@@ -268,7 +268,7 @@ export function CacheManagement() {
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold">{stats.hitRate}%</span>
                 {stats.hitRate >= 70 ? (
-                  <Badge variant="default" className="bg-green-600 text-white">
+                  <Badge variant="default" className="bg-success text-white">
                     {t('cache.good')}
                   </Badge>
                 ) : stats.hitRate >= 40 ? (

@@ -28,8 +28,18 @@ export const InventoryMovementsChart = memo(function InventoryMovementsChart({
         <YAxis {...CHART_AXIS} />
         <Tooltip labelFormatter={monthLabel} contentStyle={CHART_TOOLTIP_STYLE} />
         <Legend wrapperStyle={{ paddingTop: '10px' }} iconType="circle" />
-        <Bar dataKey="inQty" name={t('inMovements')} fill="#22c55e" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="outQty" name={t('outMovements')} fill="#ef4444" radius={[4, 4, 0, 0]} />
+        <Bar
+          dataKey="inQty"
+          name={t('inMovements')}
+          fill="hsl(var(--success))"
+          radius={[4, 4, 0, 0]}
+        />
+        <Bar
+          dataKey="outQty"
+          name={t('outMovements')}
+          fill="hsl(var(--destructive))"
+          radius={[4, 4, 0, 0]}
+        />
       </ComposedChart>
     </ChartCard>
   );

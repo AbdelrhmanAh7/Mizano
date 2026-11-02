@@ -83,7 +83,7 @@ export default function ReconcilePage() {
                       <CardTitle className="text-base">{account.name}</CardTitle>
                     </div>
                     {needsReconciliation && (
-                      <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
+                      <Badge variant="outline" className="bg-warning/10 text-warning">
                         {t('reconciliation.needsReview')}
                       </Badge>
                     )}
@@ -107,7 +107,7 @@ export default function ReconcilePage() {
                       <span
                         className={cn(
                           'text-sm font-medium',
-                          needsReconciliation ? 'text-yellow-600' : 'text-green-600',
+                          needsReconciliation ? 'text-warning' : 'text-success',
                         )}
                       >
                         {t('reconciliation.summary.difference')}
@@ -115,7 +115,7 @@ export default function ReconcilePage() {
                       <span
                         className={cn(
                           'font-mono font-medium',
-                          needsReconciliation ? 'text-yellow-600' : 'text-green-600',
+                          needsReconciliation ? 'text-warning' : 'text-success',
                         )}
                       >
                         {formatCurrency(difference)}

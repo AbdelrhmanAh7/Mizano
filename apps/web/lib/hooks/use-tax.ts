@@ -348,10 +348,10 @@ export function useRecordVATPayment() {
 
 export function getVATReturnStatusColor(status: VATReturnStatus): string {
   const colors: Record<VATReturnStatus, string> = {
-    DRAFT: 'bg-gray-100 text-gray-800 border-gray-200',
-    CALCULATED: 'bg-amber-100 text-amber-800 border-amber-200',
-    SUBMITTED: 'bg-blue-100 text-blue-800 border-blue-200',
-    FILED: 'bg-green-100 text-green-800 border-green-200',
+    DRAFT: 'bg-muted text-foreground border-border',
+    CALCULATED: 'bg-warning/10 text-warning border-warning/30',
+    SUBMITTED: 'bg-info/10 text-info border-info/30',
+    FILED: 'bg-success/10 text-success border-success/30',
   };
   return colors[status] || '';
 }

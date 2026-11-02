@@ -103,7 +103,7 @@ export function ImportPreviewTable({
       {/* Summary bar */}
       <div className="flex items-center gap-4 rounded-md border bg-muted/30 px-4 py-3">
         <div className="flex items-center gap-2">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+          <CheckCircle2 className="h-4 w-4 text-success" />
           <span className="text-sm font-medium">{t('validCount', { count: validRowCount })}</span>
         </div>
         {invalidRowCount > 0 && (

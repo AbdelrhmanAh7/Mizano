@@ -175,7 +175,7 @@ function ExpensesPageContent() {
         row.original.vendor ? (
           <Link
             href={`/purchases/vendors/${row.original.vendor.id}`}
-            className="text-blue-600 hover:underline"
+            className="text-primary hover:underline"
           >
             {row.original.vendor.name}
           </Link>
@@ -234,7 +234,10 @@ function ExpensesPageContent() {
                 </Link>
               </DropdownMenuItem>
               {canDelete && (
-                <DropdownMenuItem onClick={() => handleDelete(expense)} className="text-red-600">
+                <DropdownMenuItem
+                  onClick={() => handleDelete(expense)}
+                  className="text-destructive"
+                >
                   <Trash2 className="mr-2 h-4 w-4" />
                   {tCommon('buttons.delete')}
                 </DropdownMenuItem>

@@ -285,7 +285,7 @@ function VATReturnsPageContent() {
           <span
             className={cn(
               'font-mono font-semibold',
-              netVat > 0 ? 'text-red-600' : 'text-green-600',
+              netVat > 0 ? 'text-destructive' : 'text-success',
             )}
           >
             {formatCurrency(row.original.netVat)}
@@ -335,7 +335,7 @@ function VATReturnsPageContent() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => handleDelete(vatReturn)}
-                    className="text-red-600"
+                    className="text-destructive"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
                     {tCommon('buttons.delete')}
@@ -417,7 +417,7 @@ function VATReturnsPageContent() {
               <div
                 className={cn(
                   'text-2xl font-bold font-mono',
-                  netPosition > 0 ? 'text-red-600' : 'text-green-600',
+                  netPosition > 0 ? 'text-destructive' : 'text-success',
                 )}
               >
                 {formatCurrency(Math.abs(netPosition))}

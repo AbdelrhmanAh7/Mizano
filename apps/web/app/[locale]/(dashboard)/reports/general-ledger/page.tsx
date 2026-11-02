@@ -167,7 +167,7 @@ export default function GeneralLedgerPage() {
                               {entry.journalNumber ? (
                                 <Link
                                   href={`/accounting/journals/${entry.journalId}`}
-                                  className="text-blue-600 hover:underline"
+                                  className="text-primary hover:underline"
                                 >
                                   {entry.journalNumber}
                                 </Link>

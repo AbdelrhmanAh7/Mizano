@@ -61,9 +61,9 @@ export function formatAuditAction(action: string): string {
  */
 export function getActionColor(action: string): string {
   const colorMap: Record<string, string> = {
-    CREATE: 'bg-green-100 text-green-800',
-    UPDATE: 'bg-blue-100 text-blue-800',
-    DELETE: 'bg-red-100 text-red-800',
+    CREATE: 'bg-success/10 text-success',
+    UPDATE: 'bg-info/10 text-info',
+    DELETE: 'bg-destructive/10 text-destructive',
   };
-  return colorMap[action] || 'bg-gray-100 text-gray-800';
+  return colorMap[action] || 'bg-muted text-foreground';
 }

@@ -39,7 +39,7 @@ function showAmount(value: string, formatCurrency: (amount: number) => string): 
 
 function balanceClass(value: string): string {
   const n = moneyToNumber(value);
-  return n > 0 ? 'text-red-600' : n < 0 ? 'text-green-600' : '';
+  return n > 0 ? 'text-destructive' : n < 0 ? 'text-success' : '';
 }
 
 export function CustomerStatement({ customerId }: CustomerStatementProps) {
@@ -82,7 +82,7 @@ export function CustomerStatement({ customerId }: CustomerStatementProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="text-sm text-muted-foreground">{t('totalInvoiced')}</div>
-            <div className="text-2xl font-bold font-mono text-blue-600">
+            <div className="text-2xl font-bold font-mono text-info">
               {formatCurrency(moneyToNumber(statement.totalInvoiced))}
             </div>
           </CardContent>
@@ -91,7 +91,7 @@ export function CustomerStatement({ customerId }: CustomerStatementProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="text-sm text-muted-foreground">{t('totalPaid')}</div>
-            <div className="text-2xl font-bold font-mono text-green-600">
+            <div className="text-2xl font-bold font-mono text-success">
               {formatCurrency(moneyToNumber(statement.totalCredits))}
             </div>
           </CardContent>
@@ -151,12 +151,12 @@ export function CustomerStatement({ customerId }: CustomerStatementProps) {
                       <span
                         className={cn(
                           'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
-                          line.type === 'Invoice' && 'bg-blue-100 text-blue-800',
-                          line.type === 'Payment' && 'bg-green-100 text-green-800',
+                          line.type === 'Invoice' && 'bg-info/10 text-info',
+                          line.type === 'Payment' && 'bg-success/10 text-success',
                           (line.type === 'Payment Void' || line.type === 'Invoice Void') &&
-                            'bg-red-100 text-red-800',
+                            'bg-destructive/10 text-destructive',
                           (line.type === 'Credit Note' || line.type === 'Credit Note Refund') &&
-                            'bg-yellow-100 text-yellow-800',
+                            'bg-warning/10 text-warning',
                         )}
                       >
                         {t(`types.${line.type}`)}
@@ -165,7 +165,7 @@ export function CustomerStatement({ customerId }: CustomerStatementProps) {
                     <TableCell className="font-mono text-sm">
                       <Link
                         href={SOURCE_ROUTES[line.sourceType](line.sourceId)}
-                        className="text-blue-600 hover:underline"
+                        className="text-primary hover:underline"
                       >
                         {line.reference}
                       </Link>

@@ -73,7 +73,7 @@ export default function ProfitLossReportPage() {
             <Card>
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">{t('profitLoss.revenue')}</p>
-                <p className="text-2xl font-bold font-mono text-green-600">
+                <p className="text-2xl font-bold font-mono text-success">
                   {formatCurrency(totalIncome)}
                 </p>
               </CardContent>
@@ -81,7 +81,7 @@ export default function ProfitLossReportPage() {
             <Card>
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">{t('profitLoss.operatingExpenses')}</p>
-                <p className="text-2xl font-bold font-mono text-red-600">
+                <p className="text-2xl font-bold font-mono text-destructive">
                   {formatCurrency(totalExpenses)}
                 </p>
               </CardContent>
@@ -92,7 +92,7 @@ export default function ProfitLossReportPage() {
                 <p
                   className={cn(
                     'text-2xl font-bold font-mono',
-                    netProfit >= 0 ? 'text-green-600' : 'text-red-600',
+                    netProfit >= 0 ? 'text-success' : 'text-destructive',
                   )}
                 >
                   {formatCurrency(netProfit)}
@@ -112,7 +112,7 @@ export default function ProfitLossReportPage() {
               ))}
               <div className="flex justify-between py-3 border-t-2 font-bold">
                 <span>{t('profitLoss.revenue')}</span>
-                <span className="font-mono text-green-600">{formatCurrency(totalIncome)}</span>
+                <span className="font-mono text-success">{formatCurrency(totalIncome)}</span>
               </div>
             </CardContent>
           </Card>
@@ -127,7 +127,7 @@ export default function ProfitLossReportPage() {
               ))}
               <div className="flex justify-between py-3 border-t-2 font-bold">
                 <span>{t('profitLoss.operatingExpenses')}</span>
-                <span className="font-mono text-red-600">{formatCurrency(totalExpenses)}</span>
+                <span className="font-mono text-destructive">{formatCurrency(totalExpenses)}</span>
               </div>
             </CardContent>
           </Card>
@@ -139,7 +139,7 @@ export default function ProfitLossReportPage() {
                 <span
                   className={cn(
                     'text-3xl font-bold font-mono',
-                    netProfit >= 0 ? 'text-green-600' : 'text-red-600',
+                    netProfit >= 0 ? 'text-success' : 'text-destructive',
                   )}
                 >
                   {formatCurrency(netProfit)}

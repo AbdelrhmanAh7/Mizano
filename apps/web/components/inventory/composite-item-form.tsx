@@ -119,7 +119,7 @@ export function CompositeItemForm({
                 {...register('name', { required: 'Name is required' })}
                 placeholder="e.g. Desktop Computer Bundle"
               />
-              {errors.name && <p className="text-sm text-red-500">{errors.name.message}</p>}
+              {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="sku">SKU *</Label>
@@ -128,7 +128,7 @@ export function CompositeItemForm({
                 {...register('sku', { required: 'SKU is required' })}
                 placeholder="e.g. COMP-001"
               />
-              {errors.sku && <p className="text-sm text-red-500">{errors.sku.message}</p>}
+              {errors.sku && <p className="text-sm text-destructive">{errors.sku.message}</p>}
             </div>
           </div>
           <div className="space-y-2">
@@ -146,7 +146,7 @@ export function CompositeItemForm({
               placeholder="0.00"
             />
             {errors.sellingPrice && (
-              <p className="text-sm text-red-500">{errors.sellingPrice.message}</p>
+              <p className="text-sm text-destructive">{errors.sellingPrice.message}</p>
             )}
           </div>
           <div className="space-y-2">
@@ -215,7 +215,7 @@ export function CompositeItemForm({
                   size="icon"
                   onClick={() => remove(index)}
                   disabled={fields.length <= 1}
-                  className="text-red-500 hover:text-red-700"
+                  className="text-destructive hover:text-destructive"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

@@ -53,8 +53,13 @@ export function UpcomingPayments({ payments }: UpcomingPaymentsProps) {
                   key={payment.id}
                   className="flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors"
                 >
-                  <div className={cn('p-2 rounded-lg', due.urgent ? 'bg-red-100' : 'bg-amber-100')}>
-                    <div className={due.urgent ? 'text-red-600' : 'text-amber-600'}>
+                  <div
+                    className={cn(
+                      'p-2 rounded-lg',
+                      due.urgent ? 'bg-destructive/10' : 'bg-warning/10',
+                    )}
+                  >
+                    <div className={due.urgent ? 'text-destructive' : 'text-warning'}>
                       {due.urgent ? (
                         <AlertCircle className="h-4 w-4" />
                       ) : (
@@ -66,7 +71,7 @@ export function UpcomingPayments({ payments }: UpcomingPaymentsProps) {
                     <div className="flex items-center gap-2">
                       <Link
                         href={payment.link}
-                        className="font-mono text-sm text-blue-600 hover:underline"
+                        className="font-mono text-sm text-primary hover:underline"
                       >
                         {payment.reference}
                       </Link>
@@ -80,7 +85,7 @@ export function UpcomingPayments({ payments }: UpcomingPaymentsProps) {
                     <p className="text-sm text-muted-foreground truncate">{payment.vendorName}</p>
                   </div>
                   <div className="text-end shrink-0">
-                    <p className="font-mono font-medium text-red-600">
+                    <p className="font-mono font-medium text-destructive">
                       {formatCurrency(payment.amount)}
                     </p>
                   </div>

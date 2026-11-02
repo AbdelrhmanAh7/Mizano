@@ -131,7 +131,7 @@ export function LeadForm({ lead }: LeadFormProps) {
               <Label htmlFor="leadName">Lead Name *</Label>
               <Input id="leadName" placeholder="John Doe" {...form.register('leadName')} />
               {form.formState.errors.leadName && (
-                <p className="text-sm text-red-500">{form.formState.errors.leadName.message}</p>
+                <p className="text-sm text-destructive">{form.formState.errors.leadName.message}</p>
               )}
             </div>
 
@@ -151,7 +151,7 @@ export function LeadForm({ lead }: LeadFormProps) {
                 {...form.register('email')}
               />
               {form.formState.errors.email && (
-                <p className="text-sm text-red-500">{form.formState.errors.email.message}</p>
+                <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
               )}
             </div>
 

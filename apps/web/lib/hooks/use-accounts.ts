@@ -198,14 +198,14 @@ export function useSeedAccounts() {
  */
 export function getAccountTypeColor(type: AccountType): string {
   const colorMap: Record<AccountType, string> = {
-    ASSET: 'bg-blue-100 text-blue-800',
-    LIABILITY: 'bg-orange-100 text-orange-800',
-    EQUITY: 'bg-purple-100 text-purple-800',
-    REVENUE: 'bg-green-100 text-green-800',
-    INCOME: 'bg-green-100 text-green-800',
-    EXPENSE: 'bg-red-100 text-red-800',
+    ASSET: 'bg-info/10 text-info',
+    LIABILITY: 'bg-warning/10 text-warning',
+    EQUITY: 'bg-primary/10 text-primary',
+    REVENUE: 'bg-success/10 text-success',
+    INCOME: 'bg-success/10 text-success',
+    EXPENSE: 'bg-destructive/10 text-destructive',
   };
-  return colorMap[type] || 'bg-gray-100 text-gray-800';
+  return colorMap[type] || 'bg-muted text-foreground';
 }
 
 /** Translated account type label (common.accountTypes); unknown types show as sent. */

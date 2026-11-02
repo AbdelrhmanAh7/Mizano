@@ -94,7 +94,7 @@ export default function PriceListsPage() {
                       <TableCell>
                         <Link
                           href={`/inventory/price-lists/${pl.id}`}
-                          className="font-medium text-blue-600 hover:underline"
+                          className="font-medium text-primary hover:underline"
                         >
                           {pl.name}
                         </Link>
@@ -117,7 +117,7 @@ export default function PriceListsPage() {
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button size="sm" variant="ghost" className="text-red-600">
+                              <Button size="sm" variant="ghost" className="text-destructive">
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </AlertDialogTrigger>
@@ -134,7 +134,7 @@ export default function PriceListsPage() {
                                 <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                                 <AlertDialogAction
                                   onClick={() => deletePriceList.mutate(pl.id)}
-                                  className="bg-red-600 hover:bg-red-700"
+                                  className="bg-destructive hover:bg-destructive/90"
                                 >
                                   {t('common.delete')}
                                 </AlertDialogAction>
