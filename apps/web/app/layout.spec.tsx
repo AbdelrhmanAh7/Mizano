@@ -4,7 +4,7 @@ import RootLayout from './layout';
 jest.mock('next-intl/server', () => ({ getLocale: jest.fn() }));
 jest.mock('next/font/google', () => ({
   Inter: () => ({ variable: 'font-inter' }),
-  Noto_Sans_Arabic: () => ({ variable: 'font-noto-arabic' }),
+  IBM_Plex_Sans_Arabic: () => ({ variable: 'font-arabic' }),
 }));
 
 describe('RootLayout (audit B10)', () => {

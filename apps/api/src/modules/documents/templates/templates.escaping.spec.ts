@@ -1,3 +1,4 @@
+import { BRAND_COLORS } from '@mizano/shared-types';
 import {
   OrganizationInfo,
   escapeHtml,
@@ -235,6 +236,6 @@ describe('document templates escape all interpolated data', () => {
     });
     expect(html).not.toContain('evil.example');
     expect(html).not.toContain('background:url(');
-    expect(html).toContain('#3B82F6'); // fell back to the default brand colour
+    expect(html).toContain(BRAND_COLORS.primary); // fell back to the default brand colour
   });
 });

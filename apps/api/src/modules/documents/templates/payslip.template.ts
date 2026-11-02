@@ -1,3 +1,4 @@
+import { BRAND_COLORS } from '@mizano/shared-types';
 import {
   OrganizationInfo,
   formatCurrency,
@@ -161,7 +162,7 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
 
           <!-- Deductions -->
           <div style="flex: 1;">
-            <h4 style="color: #EF4444; margin-bottom: 15px; font-size: 12px; text-transform: uppercase; border-bottom: 2px solid #EF4444; padding-bottom: 5px;">
+            <h4 style="color: ${BRAND_COLORS.danger}; margin-bottom: 15px; font-size: 12px; text-transform: uppercase; border-bottom: 2px solid ${BRAND_COLORS.danger}; padding-bottom: 5px;">
               Deductions
             </h4>
             <table style="width: 100%; font-size: 12px;">
@@ -172,7 +173,7 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
                         (d) => `
                 <tr style="border-bottom: 1px solid ${defaultTemplateConfig.colors.border};">
                   <td style="padding: 8px 0;">${escapeHtml(d.description)}</td>
-                  <td style="padding: 8px 0; text-align: right; color: #EF4444;">
+                  <td style="padding: 8px 0; text-align: right; color: ${BRAND_COLORS.danger};">
                     -${formatCurrency(d.amount, payslip.currency)}
                   </td>
                 </tr>
@@ -188,7 +189,7 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
               }
               <tr style="background: ${defaultTemplateConfig.colors.lightGray};">
                 <td style="padding: 10px 0; font-weight: bold;">Total Deductions</td>
-                <td style="padding: 10px 0; text-align: right; font-weight: bold; font-size: 14px; color: #EF4444;">
+                <td style="padding: 10px 0; text-align: right; font-weight: bold; font-size: 14px; color: ${BRAND_COLORS.danger};">
                   -${formatCurrency(payslip.totalDeductions, payslip.currency)}
                 </td>
               </tr>
@@ -215,7 +216,7 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
               </div>
               <div style="flex: 1; background: ${defaultTemplateConfig.colors.lightGray}; padding: 15px; border-radius: 8px; text-align: center;">
                 <p style="font-size: 10px; color: #6B7280; margin-bottom: 5px;">YTD Deductions</p>
-                <p style="font-size: 16px; font-weight: bold; color: #EF4444;">-${formatCurrency(payslip.ytdDeductions || 0, payslip.currency)}</p>
+                <p style="font-size: 16px; font-weight: bold; color: ${BRAND_COLORS.danger};">-${formatCurrency(payslip.ytdDeductions || 0, payslip.currency)}</p>
               </div>
               <div style="flex: 1; background: ${defaultTemplateConfig.colors.lightGray}; padding: 15px; border-radius: 8px; text-align: center;">
                 <p style="font-size: 10px; color: #6B7280; margin-bottom: 5px;">YTD Net</p>

@@ -9,7 +9,7 @@ import {
 } from '../dto/documents.dto';
 import { escapeHtml, formatCurrency, formatDate, safeColor } from '../templates/base.template';
 import nodemailer from 'nodemailer';
-import { BRAND } from '@mizano/shared-types';
+import { BRAND, BRAND_COLORS } from '@mizano/shared-types';
 import { brandMarkAttachment, brandMarkImg } from '../../../common/brand-mail';
 import type { Attachment } from 'nodemailer/lib/mailer';
 
@@ -438,7 +438,7 @@ export class EmailService {
   }
 
   private wrapInEmailTemplate(orgName: string, content: string, primaryColor?: string): string {
-    const color = safeColor(primaryColor, '#3B82F6');
+    const color = safeColor(primaryColor, BRAND_COLORS.primary);
     const safeOrgName = escapeHtml(orgName);
 
     return `
@@ -590,7 +590,7 @@ export class EmailService {
         <tr>
           <td colspan="2" style="padding: 10px; text-align: center;">
             <p style="margin: 0; color: #6B7280; font-size: 12px;">Net Pay</p>
-            <p style="margin: 5px 0 0 0; color: #10B981; font-weight: bold; font-size: 24px;">${escapeHtml(context.netPay)}</p>
+            <p style="margin: 5px 0 0 0; color: ${BRAND_COLORS.success}; font-weight: bold; font-size: 24px;">${escapeHtml(context.netPay)}</p>
           </td>
         </tr>
       </table>

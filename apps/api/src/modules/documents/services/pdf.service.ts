@@ -1,3 +1,4 @@
+import { BRAND_COLORS } from '@mizano/shared-types';
 import { Injectable, NotFoundException, OnModuleDestroy } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { generateInvoiceHtml, InvoiceData } from '../templates/invoice.template';
@@ -493,7 +494,7 @@ export class PdfService implements OnModuleDestroy {
     endDate: string,
   ): Promise<Buffer> {
     const org = await this.getOrganizationInfo(organizationId);
-    const primaryColor = safeColor(org.primaryColor, '#3B82F6');
+    const primaryColor = safeColor(org.primaryColor, BRAND_COLORS.primary);
     const currency = ledgerCurrency(org);
     const journalLines = await this.prisma.journalLine.findMany({
       where: {
@@ -556,7 +557,7 @@ export class PdfService implements OnModuleDestroy {
 
   async generateBalanceSheetPdf(organizationId: string, asOfDate: string): Promise<Buffer> {
     const org = await this.getOrganizationInfo(organizationId);
-    const pc = safeColor(org.primaryColor, '#3B82F6');
+    const pc = safeColor(org.primaryColor, BRAND_COLORS.primary);
     const cur = ledgerCurrency(org);
     const lines = await this.prisma.journalLine.findMany({
       where: {
@@ -627,7 +628,7 @@ export class PdfService implements OnModuleDestroy {
     asOfDate?: string,
   ): Promise<Buffer> {
     const org = await this.getOrganizationInfo(organizationId);
-    const pc = safeColor(org.primaryColor, '#3B82F6'),
+    const pc = safeColor(org.primaryColor, BRAND_COLORS.primary),
       cur = ledgerCurrency(org);
     const ref = asOfDate ? new Date(asOfDate) : new Date();
     const cat = (due: Date, amt: number) => {
@@ -784,7 +785,7 @@ export class PdfService implements OnModuleDestroy {
       currency: string;
     },
   ): string {
-    const primaryColor = safeColor(org.primaryColor, '#3B82F6');
+    const primaryColor = safeColor(org.primaryColor, BRAND_COLORS.primary);
 
     const transactionRows = data.transactions
       .map(

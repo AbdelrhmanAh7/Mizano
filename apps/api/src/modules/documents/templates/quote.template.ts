@@ -1,3 +1,4 @@
+import { BRAND_COLORS } from '@mizano/shared-types';
 import {
   OrganizationInfo,
   DocumentLineItem,
@@ -127,10 +128,10 @@ export function generateQuoteHtml(
 
   const statusColors: Record<string, string> = {
     DRAFT: '#9CA3AF',
-    SENT: '#3B82F6',
-    ACCEPTED: '#10B981',
+    SENT: BRAND_COLORS.info,
+    ACCEPTED: BRAND_COLORS.success,
     INVOICED: '#8B5CF6',
-    DECLINED: '#EF4444',
+    DECLINED: BRAND_COLORS.danger,
     EXPIRED: '#6B7280',
   };
 

@@ -1,4 +1,4 @@
-import { BRAND } from '@mizano/shared-types';
+import { BRAND, BRAND_COLORS } from '@mizano/shared-types';
 import type { DocumentDigits } from '../../../common/utils/document-digits';
 
 // Base template configuration for PDF generation
@@ -38,7 +38,7 @@ export const defaultTemplateConfig: TemplateConfig = {
     bold: 'Helvetica-Bold',
   },
   colors: {
-    primary: '#3B82F6',
+    primary: BRAND_COLORS.primary,
     secondary: '#6B7280',
     text: '#111827',
     lightGray: '#F3F4F6',

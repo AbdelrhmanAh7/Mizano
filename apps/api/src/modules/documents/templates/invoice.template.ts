@@ -1,3 +1,4 @@
+import { BRAND_COLORS } from '@mizano/shared-types';
 import {
   OrganizationInfo,
   DocumentLineItem,
@@ -124,10 +125,10 @@ export function generateInvoiceHtml(
 
   const statusColors: Record<string, string> = {
     DRAFT: '#9CA3AF',
-    SENT: '#3B82F6',
-    PAID: '#10B981',
-    PARTIALLY_PAID: '#F59E0B',
-    OVERDUE: '#EF4444',
+    SENT: BRAND_COLORS.info,
+    PAID: BRAND_COLORS.success,
+    PARTIALLY_PAID: BRAND_COLORS.warning,
+    OVERDUE: BRAND_COLORS.danger,
     VOID: '#6B7280',
   };
 
@@ -201,7 +202,7 @@ export function generateInvoiceHtml(
               }
               <tr>
                 <td style="padding-block: 5px; padding-inline-end: 20px; color: #6B7280; font-size: 12px;">${l.balanceDue}</td>
-                <td style="padding: 5px 0; font-size: 14px; font-weight: bold; color: ${invoice.balanceDue > 0 ? '#EF4444' : '#10B981'};">
+                <td style="padding: 5px 0; font-size: 14px; font-weight: bold; color: ${invoice.balanceDue > 0 ? BRAND_COLORS.danger : BRAND_COLORS.success};">
                   ${money(invoice.balanceDue)}
                 </td>
               </tr>

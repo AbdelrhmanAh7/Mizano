@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Noto_Sans_Arabic } from 'next/font/google';
+import { IBM_Plex_Sans_Arabic, Inter } from 'next/font/google';
 import { getLocale } from 'next-intl/server';
 import { BRAND } from '@mizano/shared-types';
 import { defaultLocale, localeDirections, locales, type Locale } from '@/i18n/config';
@@ -12,9 +12,11 @@ const inter = Inter({
   display: 'swap',
 });
 
-const notoArabic = Noto_Sans_Arabic({
+// Shared Thoth Labs foundation: Inter for Latin, IBM Plex Sans Arabic for Arabic (both OFL).
+const plexArabic = IBM_Plex_Sans_Arabic({
   subsets: ['arabic'],
-  variable: '--font-noto-arabic',
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-arabic',
   display: 'swap',
 });
 
@@ -86,7 +88,7 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} dir={localeDirections[locale]} suppressHydrationWarning>
-      <body className={`${inter.variable} ${notoArabic.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} ${plexArabic.variable} font-sans antialiased`}>
         {children}
       </body>
     </html>
