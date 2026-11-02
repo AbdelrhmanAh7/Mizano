@@ -111,9 +111,12 @@ wait_up
 
 step https-checks
 curl_tls -o /dev/null -w 'web /en/login http=%{http_code}\n' "https://$web:$port/en/login"
+# The draft label as the app words it today (apps/web/messages/<locale>/legal.json).
+draft_label() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["common"]["draftBadge"])' "$vps/../../apps/web/messages/$1/legal.json"; }
 for page in en/terms ar/privacy; do
   curl_tls "https://$web:$port/$page" -o "$work/page.html"
-  grep -q -e 'Draft: not yet reviewed' -e 'مسودة' "$work/page.html" || { echo "legal page $page has no draft label" >&2; exit 1; }
+  label="$(draft_label "${page%%/*}")"
+  grep -qF -- "$label" "$work/page.html" || die "legal page $page has no draft label ($label)"
   echo "legal page /$page: 200 with the draft label"
 done
 curl_tls -o /dev/null -w 'api /api/health http=%{http_code}\n' "https://$api:$port/api/health"
