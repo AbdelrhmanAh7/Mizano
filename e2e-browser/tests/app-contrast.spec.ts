@@ -29,10 +29,16 @@ for (const run of RUNS) {
       await page.goto(`/${run.locale}${path}`);
       await page.waitForLoadState('networkidle');
       await expect(page.locator('main')).toBeVisible();
-      const { violations } = await new AxeBuilder({ page })
+      const { violations, incomplete } = await new AxeBuilder({ page })
         .include('main')
         .withRules(['color-contrast'])
         .analyze();
+      const invisible = incomplete.filter((v) => v.id === 'color-contrast').flatMap((v) =>
+        v.nodes.filter((n) => n.any.some((check) =>
+          (check.data as { messageKey?: string } | null)?.messageKey === 'equalRatio',
+        )).map((n) => `${path}: invisible text ${n.target.join(' ')}`),
+      );
+      expect(invisible).toEqual([]);
       const found = violations.flatMap((v) =>
         v.nodes.map((n) => `${path}: ${n.target.join(' ')} (${n.failureSummary ?? ''})`),
       );

@@ -39,7 +39,7 @@ export const defaultTemplateConfig: TemplateConfig = {
   },
   colors: {
     primary: BRAND_COLORS.primary,
-    secondary: '#6B7280',
+    secondary: BRAND_COLORS.muted,
     text: '#111827',
     lightGray: '#F3F4F6',
     border: '#E5E7EB',

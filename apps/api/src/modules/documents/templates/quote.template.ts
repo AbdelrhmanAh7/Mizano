@@ -127,12 +127,12 @@ export function generateQuoteHtml(
   const statusLabel = l.status[quote.status] ?? quote.status;
 
   const statusColors: Record<string, string> = {
-    DRAFT: '#9CA3AF',
+    DRAFT: BRAND_COLORS.muted,
     SENT: BRAND_COLORS.info,
     ACCEPTED: BRAND_COLORS.success,
-    INVOICED: '#8B5CF6',
+    INVOICED: BRAND_COLORS.success,
     DECLINED: BRAND_COLORS.danger,
-    EXPIRED: '#6B7280',
+    EXPIRED: BRAND_COLORS.muted,
   };
 
   const statusColor = statusColors[quote.status] || statusColors.DRAFT;

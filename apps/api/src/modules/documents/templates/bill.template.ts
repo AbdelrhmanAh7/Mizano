@@ -112,13 +112,13 @@ export function generateBillHtml(
   const statusLabel = l.status[bill.status] ?? bill.status;
 
   const statusColors: Record<string, string> = {
-    DRAFT: '#9CA3AF',
-    PENDING: '#9CA3AF',
+    DRAFT: BRAND_COLORS.muted,
+    PENDING: BRAND_COLORS.muted,
     OPEN: BRAND_COLORS.info,
     PAID: BRAND_COLORS.success,
     PARTIALLY_PAID: BRAND_COLORS.warning,
     OVERDUE: BRAND_COLORS.danger,
-    VOID: '#6B7280',
+    VOID: BRAND_COLORS.muted,
   };
 
   const statusColor = statusColors[bill.status] || statusColors.DRAFT;

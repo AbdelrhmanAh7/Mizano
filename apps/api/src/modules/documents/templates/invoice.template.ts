@@ -124,12 +124,12 @@ export function generateInvoiceHtml(
   const statusLabel = l.status[invoice.status] ?? invoice.status;
 
   const statusColors: Record<string, string> = {
-    DRAFT: '#9CA3AF',
+    DRAFT: BRAND_COLORS.muted,
     SENT: BRAND_COLORS.info,
     PAID: BRAND_COLORS.success,
     PARTIALLY_PAID: BRAND_COLORS.warning,
     OVERDUE: BRAND_COLORS.danger,
-    VOID: '#6B7280',
+    VOID: BRAND_COLORS.muted,
   };
 
   const statusColor = statusColors[invoice.status] || statusColors.DRAFT;
