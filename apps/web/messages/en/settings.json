@@ -968,8 +968,9 @@
       "refused": "FlowLine refused the event. Check the address and the signing secret.",
       "unreachable": "Couldn't reach FlowLine: no answer in time, or the address is unavailable.",
       "privateAddress": "This address points to a private network, which isn't allowed.",
-      "stopped": "Not sent: this link was turned off or deleted.",
-      "failed": "The event was not sent. Try again, and contact support if it keeps happening."
+      "stopped": "Not sent: this webhook is turned off or was deleted in {brand}.",
+      "failed": "The event was not sent. Try again, and contact support if it keeps happening.",
+      "badAddress": "This address can't be used. Copy it again from FlowLine and save it."
     }
   }
 }

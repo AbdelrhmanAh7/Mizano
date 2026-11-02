@@ -197,6 +197,7 @@ describe('deliveryReason', () => {
     [200, null, 'ok'],
     [404, 'HTTP 404', 'notFound'],
     [401, 'HTTP 401', 'signature'],
+    [403, 'HTTP 403', 'refused'],
     [409, 'HTTP 409', 'unpublished'],
     [413, 'HTTP 413', 'tooLarge'],
     [429, 'HTTP 429', 'busy'],
@@ -206,9 +207,11 @@ describe('deliveryReason', () => {
     [null, 'TypeError: fetch failed (ENOTFOUND)', 'unreachable'],
     [null, 'Timed out after 15s', 'unreachable'],
     [null, 'Endpoint is disabled or deleted', 'stopped'],
-    [null, 'BadRequestException: Webhook URL must be a public address', 'privateAddress'],
+    // The exact strings the dispatcher records (describeError / networkErrorSummary).
+    [null, 'BadRequestException status=400: Webhook URL must be a public address', 'privateAddress'],
+    [null, 'TypeError: fetch failed (EPRIVATEADDRESS)', 'privateAddress'],
+    [null, 'BadRequestException status=400: Webhook URL must use https', 'badAddress'],
     [null, 'Error: Unsupported state or unable to authenticate data', 'failed'],
-    [null, 'Error: Webhook host resolved to a private address (EPRIVATEADDRESS)', 'privateAddress'],
     [null, null, null],
   ])('%s / %s -> %s', (code, error, reason) => {
     expect(deliveryReason(code, error)).toBe(reason);

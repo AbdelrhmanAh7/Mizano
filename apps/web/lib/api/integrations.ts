@@ -73,6 +73,7 @@ export type DeliveryReason =
   | 'refused'
   | 'unreachable'
   | 'privateAddress'
+  | 'badAddress'
   | 'stopped'
   | 'failed';
 
@@ -93,7 +94,7 @@ export function deliveryReason(
   if (statusCode) {
     if (statusCode >= 200 && statusCode < 300) return 'ok';
     if (statusCode === 404 || statusCode === 410) return 'notFound';
-    if (statusCode === 401 || statusCode === 403) return 'signature';
+    if (statusCode === 401) return 'signature';
     if (statusCode === 409) return 'unpublished';
     if (statusCode === 413) return 'tooLarge';
     if (statusCode >= 500 || [408, 425, 429].includes(statusCode)) return 'busy';
@@ -103,6 +104,8 @@ export function deliveryReason(
   if (/EPRIVATEADDRESS|private address|must be a public address/i.test(lastError)) {
     return 'privateAddress';
   }
+  // The saved address no longer passes the address check (https, valid, no credentials).
+  if (/Webhook URL (must|is not)/i.test(lastError)) return 'badAddress';
   if (/disabled or deleted/i.test(lastError)) return 'stopped';
   return TRANSPORT_ERROR.test(lastError) ? 'unreachable' : 'failed';
 }
