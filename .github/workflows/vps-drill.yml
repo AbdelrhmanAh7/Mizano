@@ -1,0 +1,110 @@
+# Server kit drill (deploy/vps): the real compose file, Caddy HTTPS, backup, R2 copy (S3 stand-in),
+# total loss, restore, restore --check, alert + recovery and rollback, on a fresh Ubuntu 24.04
+# machine with the images built the way install.sh builds them. Not a required check.
+name: VPS kit drill
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'deploy/**'
+      - 'apps/api/Dockerfile'
+      - 'apps/web/Dockerfile'
+      - 'apps/api/prisma/**'
+      - '.github/workflows/vps-drill.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'deploy/**'
+      - 'apps/api/Dockerfile'
+      - 'apps/web/Dockerfile'
+      - 'apps/api/prisma/**'
+      - '.github/workflows/vps-drill.yml'
+
+concurrency:
+  group: vps-drill-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  drill:
+    name: VPS kit drill
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      RESTIC_VERSION: 0.19.1
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Free disk space for the images
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      # Warnings and errors only: older shellcheck builds add style hints the scripts avoid on purpose.
+      - name: Shell scripts pass shellcheck
+        run: shellcheck -x --severity=warning deploy/vps/install.sh deploy/vps/scripts/*.sh deploy/pi/scripts/healthcheck.sh
+
+      - name: Install restic (same release and checksum check as install.sh)
+        run: |
+          base="https://github.com/restic/restic/releases/download/v$RESTIC_VERSION"
+          file="restic_${RESTIC_VERSION}_linux_amd64.bz2"
+          cd "$RUNNER_TEMP"
+          curl -fsSL -o "$file" "$base/$file"
+          curl -fsSL -o SHA256SUMS "$base/SHA256SUMS"
+          grep " $file\$" SHA256SUMS | sha256sum -c --quiet -
+          bunzip2 "$file"
+          sudo install -m 755 "restic_${RESTIC_VERSION}_linux_amd64" /usr/local/bin/restic
+          restic version
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          tags: jarda-api:drill-new
+          load: true
+          cache-from: type=gha,scope=vps-api
+          cache-to: type=gha,mode=max,scope=vps-api
+
+      - name: Build the web image for the drill's addresses
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          tags: jarda-web:drill-new
+          load: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://jarda-api.localhost:18443/api
+            NEXT_PUBLIC_APP_URL=https://jarda.localhost:18443
+          cache-from: type=gha,scope=vps-web
+          cache-to: type=gha,mode=max,scope=vps-web
+
+      - name: A second kept version for the rollback step
+        run: |
+          docker tag jarda-api:drill-new jarda-api:drill-old
+          docker tag jarda-web:drill-new jarda-web:drill-old
+          docker image ls 'jarda-*'
+
+      - name: Drill
+        env:
+          DRILL_API_IMAGE: jarda-api:drill-new
+          DRILL_WEB_IMAGE: jarda-web:drill-new
+          DRILL_PREVIOUS_TAG: drill-old
+        # bash here means -eo pipefail, so a failed drill is not hidden by tee.
+        shell: bash
+        run: deploy/vps/scripts/test-vps-drill.sh 2>&1 | tee "$RUNNER_TEMP/vps-drill.log"
+
+      - name: Keep the drill log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vps-drill-log
+          path: ${{ runner.temp }}/vps-drill.log
+          retention-days: 30
