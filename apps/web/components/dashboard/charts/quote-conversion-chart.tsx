@@ -15,15 +15,22 @@ interface QuoteConversionChartProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  DRAFT: '#94a3b8',
-  SENT: '#3b82f6',
-  ACCEPTED: '#22c55e',
-  REJECTED: '#ef4444',
-  EXPIRED: '#f59e0b',
-  CONVERTED: '#8b5cf6',
+  DRAFT: 'hsl(var(--muted-foreground))',
+  SENT: 'hsl(var(--chart-2))',
+  ACCEPTED: 'hsl(var(--success))',
+  REJECTED: 'hsl(var(--destructive))',
+  EXPIRED: 'hsl(var(--warning))',
+  CONVERTED: 'hsl(var(--chart-4))',
 };
 
-const FALLBACK_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#6b7280'];
+const FALLBACK_COLORS = [
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
+  'hsl(var(--muted-foreground))',
+];
 
 export const QuoteConversionChart = memo(function QuoteConversionChart({
   data,

@@ -72,7 +72,7 @@ export function PartyDetailsFields<T extends FieldValues>({
             {t('name')} <span className="text-destructive">*</span>
           </Label>
           <Input id="name" placeholder={t('namePlaceholder')} {...form.register(path('name'))} />
-          {nameError && <p className="text-sm text-red-500">{nameError}</p>}
+          {nameError && <p className="text-sm text-destructive">{nameError}</p>}
         </div>
 
         <div className="space-y-2">
@@ -94,7 +94,7 @@ export function PartyDetailsFields<T extends FieldValues>({
             placeholder={emailPlaceholder}
             {...form.register(path('email'))}
           />
-          {emailError && <p className="text-sm text-red-500">{emailError}</p>}
+          {emailError && <p className="text-sm text-destructive">{emailError}</p>}
         </div>
 
         <div className="space-y-2">

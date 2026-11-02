@@ -25,12 +25,12 @@ export const BillableHoursChart = memo(function BillableHoursChart({
       <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="billableGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
-            <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+            <stop offset="5%" stopColor="hsl(var(--success))" stopOpacity={0.3} />
+            <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0} />
           </linearGradient>
           <linearGradient id="nonBillableGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.3} />
-            <stop offset="95%" stopColor="#94a3b8" stopOpacity={0} />
+            <stop offset="5%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0.3} />
+            <stop offset="95%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -42,7 +42,7 @@ export const BillableHoursChart = memo(function BillableHoursChart({
           type="monotone"
           dataKey="billable"
           name={t('billable')}
-          stroke="#22c55e"
+          stroke="hsl(var(--success))"
           strokeWidth={2}
           fill="url(#billableGradient)"
           stackId="1"
@@ -51,7 +51,7 @@ export const BillableHoursChart = memo(function BillableHoursChart({
           type="monotone"
           dataKey="nonBillable"
           name={t('nonBillable')}
-          stroke="#94a3b8"
+          stroke="hsl(var(--muted-foreground))"
           strokeWidth={2}
           fill="url(#nonBillableGradient)"
           stackId="1"

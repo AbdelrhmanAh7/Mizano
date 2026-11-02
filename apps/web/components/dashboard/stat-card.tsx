@@ -25,8 +25,8 @@ export const StatCard = memo(function StatCard({
   value,
   icon: Icon,
   trend,
-  iconColor = 'text-blue-600',
-  iconBgColor = 'bg-blue-100',
+  iconColor = 'text-primary',
+  iconBgColor = 'bg-primary/10',
   currency,
 }: StatCardProps) {
   const formatCompactCurrency = useCompactMoneyFormatter();
@@ -48,7 +48,10 @@ export const StatCard = memo(function StatCard({
             </p>
             {trend && (
               <p
-                className={cn('text-xs mt-1', trend.isPositive ? 'text-green-600' : 'text-red-600')}
+                className={cn(
+                  'text-xs mt-1',
+                  trend.isPositive ? 'text-success' : 'text-destructive',
+                )}
               >
                 {trend.isPositive ? '↑' : '↓'}{' '}
                 {t('fromLastMonth', { value: Math.abs(trend.value) })}

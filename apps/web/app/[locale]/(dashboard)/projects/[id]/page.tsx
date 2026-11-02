@@ -183,7 +183,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" className="text-red-600">
+              <Button variant="outline" className="text-destructive">
                 <Trash2 className="mr-2 h-4 w-4" />
                 {t('projects.deleteProject')}
               </Button>
@@ -198,7 +198,10 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95"
+                >
                   Delete
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -212,8 +215,8 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Clock className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-info/10 rounded-lg">
+                <Clock className="h-5 w-5 text-info" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Hours</p>
@@ -226,8 +229,8 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <DollarSign className="h-5 w-5 text-green-600" />
+              <div className="p-2 bg-success/10 rounded-lg">
+                <DollarSign className="h-5 w-5 text-success" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Billed</p>
@@ -318,7 +321,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                         className="flex-shrink-0"
                       >
                         {task.status === 'DONE' ? (
-                          <CheckCircle className="h-5 w-5 text-green-600" />
+                          <CheckCircle className="h-5 w-5 text-success" />
                         ) : (
                           <Circle className="h-5 w-5 text-muted-foreground" />
                         )}
@@ -341,7 +344,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                           {getTaskStatusLabel(task.status)}
                         </Badge>
                         {task.isBillable && (
-                          <Badge variant="outline" className="bg-green-100 text-green-800">
+                          <Badge variant="outline" className="bg-success/10 text-success">
                             Billable
                           </Badge>
                         )}
@@ -415,8 +418,8 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                             variant="outline"
                             className={
                               entry.status === 'INVOICED'
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-gray-100 text-gray-800'
+                                ? 'bg-success/10 text-success'
+                                : 'bg-muted text-foreground'
                             }
                           >
                             {entry.status === 'INVOICED' ? 'Invoiced' : 'Unbilled'}
@@ -490,7 +493,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                 )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Total Billed</span>
-                  <span className="font-mono text-green-600">{formatCurrency(billed)}</span>
+                  <span className="font-mono text-success">{formatCurrency(billed)}</span>
                 </div>
               </CardContent>
             </Card>

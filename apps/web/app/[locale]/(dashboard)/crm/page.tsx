@@ -85,7 +85,7 @@ export default function CRMPage() {
       description: t('leads.description'),
       icon: Users,
       href: '/crm/leads',
-      color: 'bg-blue-500',
+      color: 'bg-info text-info-foreground',
       stats: `${leads.length} total`,
     },
     {
@@ -93,7 +93,7 @@ export default function CRMPage() {
       description: t('deals.description'),
       icon: DollarSign,
       href: '/crm/deals',
-      color: 'bg-green-500',
+      color: 'bg-success text-success-foreground',
       stats: `${activeDeals.length} active`,
     },
   ];
@@ -152,13 +152,13 @@ export default function CRMPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t('hub.stats.activeDeals')}</CardTitle>
-            <Target className="h-4 w-4 text-blue-500" />
+            <Target className="h-4 w-4 text-info" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-blue-600">{activeDeals.length}</div>
+              <div className="text-2xl font-bold text-info">{activeDeals.length}</div>
             )}
             <p className="text-xs text-muted-foreground">{t('hub.stats.activeDealsDesc')}</p>
           </CardContent>
@@ -167,13 +167,13 @@ export default function CRMPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t('hub.stats.pipelineValue')}</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-500" />
+            <TrendingUp className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-green-600">
+              <div className="text-2xl font-bold text-success">
                 {formatCurrency(totalPipelineValue)}
               </div>
             )}
@@ -188,13 +188,13 @@ export default function CRMPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t('hub.stats.winRate')}</CardTitle>
-            <Trophy className="h-4 w-4 text-amber-500" />
+            <Trophy className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-amber-600">{winRate}%</div>
+              <div className="text-2xl font-bold text-warning">{winRate}%</div>
             )}
             <p className="text-xs text-muted-foreground">{t('hub.stats.winRateDesc')}</p>
           </CardContent>
@@ -208,7 +208,7 @@ export default function CRMPage() {
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-lg ${module.color}`}>
-                  <module.icon className="h-5 w-5 text-white" />
+                  <module.icon className="h-5 w-5" />
                 </div>
                 <div>
                   <CardTitle className="text-lg">{module.title}</CardTitle>
@@ -274,7 +274,7 @@ export default function CRMPage() {
                       </div>
                       <div className="h-2 bg-muted rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-blue-500 rounded-full transition-all"
+                          className="h-full bg-info rounded-full transition-all"
                           style={{ width: `${percentage}%` }}
                         />
                       </div>

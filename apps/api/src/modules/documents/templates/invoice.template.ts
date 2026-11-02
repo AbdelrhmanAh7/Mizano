@@ -1,3 +1,4 @@
+import { BRAND_COLORS } from '@mizano/shared-types';
 import {
   OrganizationInfo,
   DocumentLineItem,
@@ -123,12 +124,12 @@ export function generateInvoiceHtml(
   const statusLabel = l.status[invoice.status] ?? invoice.status;
 
   const statusColors: Record<string, string> = {
-    DRAFT: '#9CA3AF',
-    SENT: '#3B82F6',
-    PAID: '#10B981',
-    PARTIALLY_PAID: '#F59E0B',
-    OVERDUE: '#EF4444',
-    VOID: '#6B7280',
+    DRAFT: BRAND_COLORS.muted,
+    SENT: BRAND_COLORS.info,
+    PAID: BRAND_COLORS.success,
+    PARTIALLY_PAID: BRAND_COLORS.warning,
+    OVERDUE: BRAND_COLORS.danger,
+    VOID: BRAND_COLORS.muted,
   };
 
   const statusColor = statusColors[invoice.status] || statusColors.DRAFT;
@@ -156,7 +157,7 @@ export function generateInvoiceHtml(
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
           <div>
             <h2 style="font-size: 28px; color: ${primaryColor}; margin-bottom: 5px;">${l.invoice}</h2>
-            <p style="color: #6B7280; font-size: 14px;">${escapeHtml(invoice.invoiceNumber)}</p>
+            <p style="color: ${BRAND_COLORS.muted}; font-size: 14px;">${escapeHtml(invoice.invoiceNumber)}</p>
           </div>
           <div style="background: ${statusColor}; color: white; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold;">
             ${escapeHtml(statusLabel)}
@@ -168,25 +169,25 @@ export function generateInvoiceHtml(
           <div style="flex: 1;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">${l.billTo}</h4>
             <p style="font-weight: bold; margin-bottom: 5px;"><bdi>${escapeHtml(invoice.customer.name)}</bdi></p>
-            ${renderAddressHtml(invoice.customer, 'color: #6B7280; font-size: 12px;')}
-            ${invoice.customer.email ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(invoice.customer.email)}</p>` : ''}
-            ${invoice.customer.phone ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(invoice.customer.phone)}</p>` : ''}
-            ${invoice.customer.taxId ? `<p style="color: #6B7280; font-size: 12px;">${l.taxId}: ${escapeHtml(invoice.customer.taxId)}</p>` : ''}
+            ${renderAddressHtml(invoice.customer, `color: ${BRAND_COLORS.muted}; font-size: 12px;`)}
+            ${invoice.customer.email ? `<p style="color: ${BRAND_COLORS.muted}; font-size: 12px;">${escapeHtml(invoice.customer.email)}</p>` : ''}
+            ${invoice.customer.phone ? `<p style="color: ${BRAND_COLORS.muted}; font-size: 12px;">${escapeHtml(invoice.customer.phone)}</p>` : ''}
+            ${invoice.customer.taxId ? `<p style="color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.taxId}: ${escapeHtml(invoice.customer.taxId)}</p>` : ''}
           </div>
           <div style="text-align: end;">
             <table style="margin-inline-start: auto;">
               <tr>
-                <td style="padding-block: 5px; padding-inline-end: 20px; color: #6B7280; font-size: 12px;">${l.invoiceDate}</td>
+                <td style="padding-block: 5px; padding-inline-end: 20px; color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.invoiceDate}</td>
                 <td style="padding: 5px 0; font-size: 12px; font-weight: bold;">${formatDate(invoice.date, dateLocale)}</td>
               </tr>
               <tr>
-                <td style="padding-block: 5px; padding-inline-end: 20px; color: #6B7280; font-size: 12px;">${l.dueDate}</td>
+                <td style="padding-block: 5px; padding-inline-end: 20px; color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.dueDate}</td>
                 <td style="padding: 5px 0; font-size: 12px; font-weight: bold;">${formatDate(invoice.dueDate, dateLocale)}</td>
               </tr>
               ${
                 invoice.reference
                   ? `<tr>
-                <td style="padding-block: 5px; padding-inline-end: 20px; color: #6B7280; font-size: 12px;">${l.reference}</td>
+                <td style="padding-block: 5px; padding-inline-end: 20px; color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.reference}</td>
                 <td style="padding: 5px 0; font-size: 12px; font-weight: bold;"><bdi>${escapeHtml(invoice.reference)}</bdi></td>
               </tr>`
                   : ''
@@ -194,14 +195,14 @@ export function generateInvoiceHtml(
               ${
                 invoice.externalEInvoiceNumber
                   ? `<tr>
-                <td style="padding-block: 5px; padding-inline-end: 20px; color: #6B7280; font-size: 12px;">${l.etaUuid}</td>
+                <td style="padding-block: 5px; padding-inline-end: 20px; color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.etaUuid}</td>
                 <td style="padding: 5px 0; font-size: 12px; overflow-wrap: anywhere;"><bdi>${escapeHtml(invoice.externalEInvoiceNumber)}</bdi></td>
               </tr>`
                   : ''
               }
               <tr>
-                <td style="padding-block: 5px; padding-inline-end: 20px; color: #6B7280; font-size: 12px;">${l.balanceDue}</td>
-                <td style="padding: 5px 0; font-size: 14px; font-weight: bold; color: ${invoice.balanceDue > 0 ? '#EF4444' : '#10B981'};">
+                <td style="padding-block: 5px; padding-inline-end: 20px; color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.balanceDue}</td>
+                <td style="padding: 5px 0; font-size: 14px; font-weight: bold; color: ${invoice.balanceDue > 0 ? BRAND_COLORS.danger : BRAND_COLORS.success};">
                   ${money(invoice.balanceDue)}
                 </td>
               </tr>
@@ -230,7 +231,7 @@ export function generateInvoiceHtml(
             ? `
           <div style="margin-top: 30px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">${l.notes}</h4>
-            <p style="color: #6B7280; font-size: 12px; white-space: pre-line;"><bdi>${escapeHtml(invoice.notes)}</bdi></p>
+            <p style="color: ${BRAND_COLORS.muted}; font-size: 12px; white-space: pre-line;"><bdi>${escapeHtml(invoice.notes)}</bdi></p>
           </div>
         `
             : ''
@@ -241,7 +242,7 @@ export function generateInvoiceHtml(
             ? `
           <div style="margin-top: 20px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">${l.terms}</h4>
-            <p style="color: #6B7280; font-size: 12px; white-space: pre-line;"><bdi>${escapeHtml(invoice.terms)}</bdi></p>
+            <p style="color: ${BRAND_COLORS.muted}; font-size: 12px; white-space: pre-line;"><bdi>${escapeHtml(invoice.terms)}</bdi></p>
           </div>
         `
             : ''

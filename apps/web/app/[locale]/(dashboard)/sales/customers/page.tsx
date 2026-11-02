@@ -188,7 +188,10 @@ function CustomersPageContent() {
                 </DropdownMenuItem>
               )}
               {canDelete && (
-                <DropdownMenuItem onClick={() => handleDelete(customer)} className="text-red-600">
+                <DropdownMenuItem
+                  onClick={() => handleDelete(customer)}
+                  className="text-destructive"
+                >
                   <Trash2 className="me-2 h-4 w-4" />
                   {tCommon('buttons.delete')}
                 </DropdownMenuItem>

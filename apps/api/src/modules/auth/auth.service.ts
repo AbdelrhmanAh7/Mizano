@@ -7,6 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { BRAND_COLORS } from '@mizano/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AccountsService } from '../accounting/services/accounts.service';
 import { describeError } from '../../common/utils/redact';
@@ -52,6 +53,8 @@ export class AuthService {
       const organization = await tx.organization.create({
         data: {
           name: organizationName,
+          // Explicitly seed the product default; historical customer branding stays untouched.
+          primaryColor: BRAND_COLORS.primary,
           // Both currency fields stay equal; the country chosen at sign-up sets them.
           currency: region.baseCurrency,
           baseCurrency: region.baseCurrency,

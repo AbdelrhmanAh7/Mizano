@@ -28,8 +28,18 @@ export const ProductionEfficiencyChart = memo(function ProductionEfficiencyChart
         <YAxis {...CHART_AXIS} />
         <Tooltip labelFormatter={monthLabel} contentStyle={CHART_TOOLTIP_STYLE} />
         <Legend wrapperStyle={{ paddingTop: '10px' }} iconType="circle" />
-        <Bar dataKey="planned" name={t('planned')} fill="#94a3b8" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="completed" name={t('completed')} fill="#22c55e" radius={[4, 4, 0, 0]} />
+        <Bar
+          dataKey="planned"
+          name={t('planned')}
+          fill="hsl(var(--muted-foreground))"
+          radius={[4, 4, 0, 0]}
+        />
+        <Bar
+          dataKey="completed"
+          name={t('completed')}
+          fill="hsl(var(--success))"
+          radius={[4, 4, 0, 0]}
+        />
       </ComposedChart>
     </ChartCard>
   );

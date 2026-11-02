@@ -136,7 +136,7 @@ export function VendorCreditForm({
                 isInvalid={!!form.formState.errors.vendorId}
               />
               {form.formState.errors.vendorId && (
-                <p className="text-sm text-red-500">{form.formState.errors.vendorId.message}</p>
+                <p className="text-sm text-destructive">{form.formState.errors.vendorId.message}</p>
               )}
             </div>
 
@@ -163,12 +163,12 @@ export function VendorCreditForm({
                   ))}
                 </SelectContent>
               </Select>
-              {billsQuery.isError && <p className="text-sm text-red-500">{t('loadError')}</p>}
+              {billsQuery.isError && <p className="text-sm text-destructive">{t('loadError')}</p>}
               {vendorId && billsQuery.isSuccess && bills.length === 0 && (
                 <p className="text-sm text-muted-foreground">{t('noBills')}</p>
               )}
               {form.formState.errors.billId && (
-                <p className="text-sm text-red-500">{form.formState.errors.billId.message}</p>
+                <p className="text-sm text-destructive">{form.formState.errors.billId.message}</p>
               )}
             </div>
 
@@ -176,7 +176,7 @@ export function VendorCreditForm({
               <Label htmlFor="date">{t('date')} *</Label>
               <Input id="date" type="date" {...form.register('date')} />
               {form.formState.errors.date && (
-                <p className="text-sm text-red-500">{form.formState.errors.date.message}</p>
+                <p className="text-sm text-destructive">{form.formState.errors.date.message}</p>
               )}
             </div>
           </div>
@@ -193,7 +193,7 @@ export function VendorCreditForm({
               />
               <p className="text-xs text-muted-foreground">{t('amountHelp')}</p>
               {form.formState.errors.amount && (
-                <p className="text-sm text-red-500">{form.formState.errors.amount.message}</p>
+                <p className="text-sm text-destructive">{form.formState.errors.amount.message}</p>
               )}
             </div>
 
@@ -217,7 +217,9 @@ export function VendorCreditForm({
                   ))}
                 </SelectContent>
               </Select>
-              {accountsQuery.isError && <p className="text-sm text-red-500">{t('loadError')}</p>}
+              {accountsQuery.isError && (
+                <p className="text-sm text-destructive">{t('loadError')}</p>
+              )}
             </div>
           </div>
 

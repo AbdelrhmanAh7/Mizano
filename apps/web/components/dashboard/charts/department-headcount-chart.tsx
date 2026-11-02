@@ -30,7 +30,12 @@ export const DepartmentHeadcountChart = memo(function DepartmentHeadcountChart({
           contentStyle={CHART_TOOLTIP_STYLE}
           cursor={{ fill: 'hsl(var(--muted))' }}
         />
-        <Bar dataKey="count" name={t('employees')} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+        <Bar
+          dataKey="count"
+          name={t('employees')}
+          fill="hsl(var(--chart-2))"
+          radius={[4, 4, 0, 0]}
+        />
       </BarChart>
     </ChartCard>
   );

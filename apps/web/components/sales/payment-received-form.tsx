@@ -312,7 +312,7 @@ export function PaymentReceivedForm({
                 isInvalid={!!form.formState.errors.customerId}
               />
               {form.formState.errors.customerId && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {fieldError(form.formState.errors.customerId.message)}
                 </p>
               )}
@@ -324,7 +324,7 @@ export function PaymentReceivedForm({
               </Label>
               <Input id="date" type="date" {...form.register('date')} />
               {form.formState.errors.date && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {fieldError(form.formState.errors.date.message)}
                 </p>
               )}
@@ -345,7 +345,7 @@ export function PaymentReceivedForm({
                 {...form.register('amount')}
               />
               {form.formState.errors.amount && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {fieldError(form.formState.errors.amount.message)}
                 </p>
               )}
@@ -392,7 +392,7 @@ export function PaymentReceivedForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.depositToAccountId && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {fieldError(form.formState.errors.depositToAccountId.message)}
                 </p>
               )}
@@ -466,7 +466,7 @@ export function PaymentReceivedForm({
                         <TableCell className="text-end font-mono">
                           {formatCurrency(invoice.grandTotal, invoice.currencyCode)}
                         </TableCell>
-                        <TableCell className="text-end font-mono text-red-600">
+                        <TableCell className="text-end font-mono text-destructive">
                           {formatCurrency(invoice.balanceDue, invoice.currencyCode)}
                         </TableCell>
                         <TableCell className="text-end">
@@ -504,7 +504,9 @@ export function PaymentReceivedForm({
                   <div
                     className={cn(
                       'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium',
-                      isBalanced ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800',
+                      isBalanced
+                        ? 'bg-success/10 text-success'
+                        : 'bg-destructive/10 text-destructive',
                     )}
                   >
                     {isBalanced ? (

@@ -11,10 +11,10 @@ interface TaskStatusChartProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  TODO: '#94a3b8',
-  IN_PROGRESS: '#3b82f6',
-  REVIEW: '#f59e0b',
-  DONE: '#22c55e',
+  TODO: 'hsl(var(--muted-foreground))',
+  IN_PROGRESS: 'hsl(var(--chart-2))',
+  REVIEW: 'hsl(var(--warning))',
+  DONE: 'hsl(var(--success))',
 };
 
 export const TaskStatusChart = memo(function TaskStatusChart({ data }: TaskStatusChartProps) {
@@ -46,7 +46,10 @@ export const TaskStatusChart = memo(function TaskStatusChart({ data }: TaskStatu
           nameKey="label"
         >
           {chartData.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.status] ?? '#94a3b8'} />
+            <Cell
+              key={`cell-${index}`}
+              fill={STATUS_COLORS[entry.status] ?? 'hsl(var(--muted-foreground))'}
+            />
           ))}
         </Pie>
         <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />

@@ -1,3 +1,4 @@
+import { BRAND_COLORS } from '@mizano/shared-types';
 import {
   OrganizationInfo,
   DocumentLineItem,
@@ -126,12 +127,12 @@ export function generateQuoteHtml(
   const statusLabel = l.status[quote.status] ?? quote.status;
 
   const statusColors: Record<string, string> = {
-    DRAFT: '#9CA3AF',
-    SENT: '#3B82F6',
-    ACCEPTED: '#10B981',
-    INVOICED: '#8B5CF6',
-    DECLINED: '#EF4444',
-    EXPIRED: '#6B7280',
+    DRAFT: BRAND_COLORS.muted,
+    SENT: BRAND_COLORS.info,
+    ACCEPTED: BRAND_COLORS.success,
+    INVOICED: BRAND_COLORS.primary,
+    DECLINED: BRAND_COLORS.danger,
+    EXPIRED: BRAND_COLORS.warning,
   };
 
   const statusColor = statusColors[quote.status] || statusColors.DRAFT;
@@ -159,7 +160,7 @@ export function generateQuoteHtml(
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
           <div>
             <h2 style="font-size: 28px; color: ${primaryColor}; margin-bottom: 5px;">${l.quote}</h2>
-            <p style="color: #6B7280; font-size: 14px;">${escapeHtml(quote.quoteNumber)}</p>
+            <p style="color: ${BRAND_COLORS.muted}; font-size: 14px;">${escapeHtml(quote.quoteNumber)}</p>
           </div>
           <div style="background: ${statusColor}; color: white; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold;">
             ${escapeHtml(statusLabel)}
@@ -171,23 +172,23 @@ export function generateQuoteHtml(
           <div style="flex: 1;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">${l.preparedFor}</h4>
             <p style="font-weight: bold; margin-bottom: 5px;"><bdi>${escapeHtml(quote.customer.name)}</bdi></p>
-            ${renderAddressHtml(quote.customer, 'color: #6B7280; font-size: 12px;')}
-            ${quote.customer.email ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(quote.customer.email)}</p>` : ''}
-            ${quote.customer.phone ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(quote.customer.phone)}</p>` : ''}
-            ${quote.customer.taxId ? `<p style="color: #6B7280; font-size: 12px;">${l.taxId}: ${escapeHtml(quote.customer.taxId)}</p>` : ''}
+            ${renderAddressHtml(quote.customer, `color: ${BRAND_COLORS.muted}; font-size: 12px;`)}
+            ${quote.customer.email ? `<p style="color: ${BRAND_COLORS.muted}; font-size: 12px;">${escapeHtml(quote.customer.email)}</p>` : ''}
+            ${quote.customer.phone ? `<p style="color: ${BRAND_COLORS.muted}; font-size: 12px;">${escapeHtml(quote.customer.phone)}</p>` : ''}
+            ${quote.customer.taxId ? `<p style="color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.taxId}: ${escapeHtml(quote.customer.taxId)}</p>` : ''}
           </div>
           <div style="text-align: end;">
             <table style="margin-inline-start: auto;">
               <tr>
-                <td style="padding-block: 5px; padding-inline-end: 20px; color: #6B7280; font-size: 12px;">${l.quoteDate}</td>
+                <td style="padding-block: 5px; padding-inline-end: 20px; color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.quoteDate}</td>
                 <td style="padding: 5px 0; font-size: 12px; font-weight: bold;">${formatDate(quote.date, dateLocale)}</td>
               </tr>
               <tr>
-                <td style="padding-block: 5px; padding-inline-end: 20px; color: #6B7280; font-size: 12px;">${l.validUntil}</td>
+                <td style="padding-block: 5px; padding-inline-end: 20px; color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.validUntil}</td>
                 <td style="padding: 5px 0; font-size: 12px; font-weight: bold;">${formatDate(quote.expiryDate, dateLocale)}</td>
               </tr>
               <tr>
-                <td style="padding-block: 5px; padding-inline-end: 20px; color: #6B7280; font-size: 12px;">${l.total}</td>
+                <td style="padding-block: 5px; padding-inline-end: 20px; color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.total}</td>
                 <td style="padding: 5px 0; font-size: 14px; font-weight: bold; color: ${primaryColor};">
                   ${formatCurrency(quote.grandTotal, quote.currency, locale, digits)}
                 </td>
@@ -217,7 +218,7 @@ export function generateQuoteHtml(
             ? `
           <div style="margin-top: 30px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">${l.notes}</h4>
-            <p style="color: #6B7280; font-size: 12px; white-space: pre-line;"><bdi>${escapeHtml(quote.notes)}</bdi></p>
+            <p style="color: ${BRAND_COLORS.muted}; font-size: 12px; white-space: pre-line;"><bdi>${escapeHtml(quote.notes)}</bdi></p>
           </div>
         `
             : ''
@@ -228,7 +229,7 @@ export function generateQuoteHtml(
             ? `
           <div style="margin-top: 20px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">${l.terms}</h4>
-            <p style="color: #6B7280; font-size: 12px; white-space: pre-line;"><bdi>${escapeHtml(quote.terms)}</bdi></p>
+            <p style="color: ${BRAND_COLORS.muted}; font-size: 12px; white-space: pre-line;"><bdi>${escapeHtml(quote.terms)}</bdi></p>
           </div>
         `
             : ''
@@ -237,15 +238,15 @@ export function generateQuoteHtml(
         <!-- Acceptance Section -->
         <div style="margin-top: 40px; padding: 20px; background: ${defaultTemplateConfig.colors.lightGray}; border-radius: 8px;">
           <h4 style="color: ${primaryColor}; margin-bottom: 15px; font-size: 12px; text-transform: uppercase;">${l.acceptance}</h4>
-          <p style="color: #6B7280; font-size: 12px; margin-bottom: 20px;">
+          <p style="color: ${BRAND_COLORS.muted}; font-size: 12px; margin-bottom: 20px;">
             ${l.acceptanceText}
           </p>
           <div style="display: flex; justify-content: space-between; margin-top: 30px;">
             <div style="flex: 1; border-bottom: 1px solid #9CA3AF; margin-inline-end: 40px; padding-bottom: 5px;">
-              <p style="color: #9CA3AF; font-size: 10px;">${l.signature}</p>
+              <p style="color: ${BRAND_COLORS.muted}; font-size: 10px;">${l.signature}</p>
             </div>
             <div style="flex: 1; border-bottom: 1px solid #9CA3AF; padding-bottom: 5px;">
-              <p style="color: #9CA3AF; font-size: 10px;">${l.date}</p>
+              <p style="color: ${BRAND_COLORS.muted}; font-size: 10px;">${l.date}</p>
             </div>
           </div>
         </div>

@@ -34,9 +34,24 @@ export const VATSummaryChart = memo(function VATSummaryChart({
           contentStyle={CHART_TOOLTIP_STYLE}
         />
         <Legend />
-        <Bar dataKey="outputVAT" name={t('outputVAT')} fill="#3b82f6" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="inputVAT" name={t('inputVAT')} fill="#22c55e" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="netPayable" name={t('netPayable')} fill="#f59e0b" radius={[4, 4, 0, 0]} />
+        <Bar
+          dataKey="outputVAT"
+          name={t('outputVAT')}
+          fill="hsl(var(--chart-2))"
+          radius={[4, 4, 0, 0]}
+        />
+        <Bar
+          dataKey="inputVAT"
+          name={t('inputVAT')}
+          fill="hsl(var(--success))"
+          radius={[4, 4, 0, 0]}
+        />
+        <Bar
+          dataKey="netPayable"
+          name={t('netPayable')}
+          fill="hsl(var(--warning))"
+          radius={[4, 4, 0, 0]}
+        />
       </BarChart>
     </ChartCard>
   );

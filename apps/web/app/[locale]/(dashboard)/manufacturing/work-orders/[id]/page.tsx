@@ -305,7 +305,7 @@ export default function WorkOrderDetailPage() {
             <Button
               variant="outline"
               onClick={() => setCancelDialogOpen(true)}
-              className="text-orange-600 hover:text-orange-700"
+              className="text-warning hover:text-warning"
             >
               <XCircle className="mr-2 h-4 w-4" />
               Cancel
@@ -322,9 +322,9 @@ export default function WorkOrderDetailPage() {
 
       {/* Stock Shortage Warning */}
       {hasShortages && !isCompleted && (
-        <Card className="border-orange-200 bg-orange-50">
+        <Card className="border-warning/30 bg-warning/5">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-orange-700">
+            <div className="flex items-center gap-2 text-warning">
               <AlertTriangle className="h-5 w-5" />
               <span className="font-medium">
                 Material shortages detected for {stockAlerts.length} item(s)
@@ -355,7 +355,7 @@ export default function WorkOrderDetailPage() {
             </div>
             <div className="text-2xl font-bold">{workOrder.quantity}</div>
             {workOrder.completedQuantity !== undefined && workOrder.completedQuantity > 0 && (
-              <div className="text-xs text-green-600">{workOrder.completedQuantity} completed</div>
+              <div className="text-xs text-success">{workOrder.completedQuantity} completed</div>
             )}
           </CardContent>
         </Card>
@@ -418,7 +418,7 @@ export default function WorkOrderDetailPage() {
                     <TableCell className="text-right font-mono">{req.required}</TableCell>
                     <TableCell className="text-right font-mono">{req.available}</TableCell>
                     <TableCell className="text-right font-mono">
-                      <span className={cn(req.shortage > 0 && 'text-red-600 font-semibold')}>
+                      <span className={cn(req.shortage > 0 && 'text-destructive font-semibold')}>
                         {req.shortage > 0 ? `-${req.shortage}` : '0'}
                       </span>
                     </TableCell>
@@ -466,13 +466,13 @@ export default function WorkOrderDetailPage() {
                       <TableCell>
                         {format(new Date(entry.date), 'PP', { locale: dateLocale })}
                       </TableCell>
-                      <TableCell className="text-right font-mono font-medium text-green-700">
+                      <TableCell className="text-right font-mono font-medium text-success">
                         {entry.quantityProduced}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-red-600">
+                      <TableCell className="text-right font-mono text-destructive">
                         {entry.quantityRejected || 0}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-orange-600">
+                      <TableCell className="text-right font-mono text-warning">
                         {entry.wastageQuantity || 0}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
@@ -621,7 +621,7 @@ export default function WorkOrderDetailPage() {
             <AlertDialogCancel>Keep</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => void handleCancel()}
-              className="bg-orange-600 hover:bg-orange-700"
+              className="bg-warning text-warning-foreground hover:bg-warning hover:brightness-95"
             >
               Cancel Work Order
             </AlertDialogAction>

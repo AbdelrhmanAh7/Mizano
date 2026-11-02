@@ -26,7 +26,8 @@ export const LeadConversionTrendChart = memo(function LeadConversionTrendChart({
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="month" tickFormatter={monthLabel} {...CHART_AXIS} />
         <YAxis {...CHART_AXIS} tickFormatter={(value) => `${value}%`} />
-        <Tooltip labelFormatter={monthLabel}
+        <Tooltip
+          labelFormatter={monthLabel}
           formatter={(value: number) => [`${value.toFixed(1)}%`, t('conversionRate')]}
           contentStyle={CHART_TOOLTIP_STYLE}
         />
@@ -34,9 +35,9 @@ export const LeadConversionTrendChart = memo(function LeadConversionTrendChart({
           type="monotone"
           dataKey="rate"
           name={t('conversionRate')}
-          stroke="#22c55e"
+          stroke="hsl(var(--success))"
           strokeWidth={3}
-          dot={{ fill: '#22c55e', r: 4 }}
+          dot={{ fill: 'hsl(var(--success))', r: 4 }}
           activeDot={{ r: 6 }}
         />
       </LineChart>

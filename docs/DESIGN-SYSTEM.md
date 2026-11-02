@@ -16,28 +16,53 @@ Sources of truth:
 
 ## Tokens
 
+### Thoth Labs foundation (shared with FlowLine)
+
+Jarda and FlowLine share one foundation and differ only in their primary color.
+
+| Part           | Value                                                                                       |
+| -------------- | ------------------------------------------------------------------------------------------- |
+| Fonts          | Inter (Latin) + IBM Plex Sans Arabic (Arabic), both OFL, loaded with `next/font`            |
+| Success        | `#15753A`: paid, posted, approved                                                           |
+| Warning        | `#A1460A`: partially paid, needs review                                                     |
+| Danger         | `#B91C1C`: overdue, failed, delete                                                          |
+| Info           | `#1D4ED8`: sent, processing (never an action color)                                         |
+| Muted text     | `#526075`: helper text, meta, placeholders                                                  |
+| Focus          | 2px ring in the primary color, 2px offset (`focus-visible:ring-2 ring-ring ring-offset-2`)  |
+| Radius         | `--radius: 0.5rem`: `rounded-md` controls, `rounded-lg` cards/dialogs, `rounded-full` pills |
+| Spacing / type | Tailwind 4px scale; type scale below                                                        |
+
+Every semantic color passes WCAG AA (4.5:1) as text on white **and** on its own soft badge (`bg-success/10`).
+
 ### Color
 
-Colors are HSL triplets in CSS variables, exposed as Tailwind colors (`bg-primary`, `text-muted-foreground`, `border-border`, `bg-success/10` …). Opacity modifiers work on every token. **Never** use raw palette classes (`bg-red-600`, `text-gray-900`) or hex values in shared components when a token exists; feature code is migrated opportunistically.
+Colors are HSL triplets in CSS variables in `apps/web/app/globals.css`, exposed as Tailwind colors (`bg-primary`, `text-muted-foreground`, `bg-success/10` …). That file is the only place a color is defined: `pnpm --filter @mizano/web lint` runs `apps/web/scripts/check-design-tokens.mjs`, which fails on raw palette classes (`bg-blue-600`, `text-red-500`, `from-teal-50`) and hex literals anywhere in `app/`, `components/` and `lib/` (tests excepted). PDFs and emails, which cannot read CSS variables, use `BRAND_COLORS` from `@mizano/shared-types` (same values). `apps/web/lib/design-tokens.spec.ts` checks the contrast of every pair below in light and dark.
 
-| Token                               | Use                                                    |
-| ----------------------------------- | ------------------------------------------------------ |
-| `background` / `foreground`         | Page background and body text                          |
-| `card`, `popover` (+ `-foreground`) | Surfaces: cards, menus, dialogs                        |
-| `primary` (+ `-foreground`)         | Main actions, active navigation, links, focus `ring`   |
-| `secondary` (+ `-foreground`)       | Secondary buttons, neutral chips                       |
-| `muted` (+ `-foreground`)           | Subtle backgrounds, helper text, placeholders, drafts  |
-| `accent` (+ `-foreground`)          | Hover/selected rows and menu items                     |
-| `destructive` (+ `-foreground`)     | Delete/void actions, errors, overdue, failed           |
-| `success` (+ `-foreground`)         | Paid, posted, approved, completed                      |
-| `warning` (+ `-foreground`)         | Partially paid, needs review, low confidence, expiring |
-| `info` (+ `-foreground`)            | Sent, processing, informational notices                |
-| `border`, `input`, `ring`           | Borders, form control borders, focus rings             |
-| `chart-1` … `chart-5`               | Categorical chart series, in order                     |
+| Token                                             | Light value                                | Use                                                         |
+| ------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------- |
+| `primary` (+ `-foreground`)                       | `#0F766E` / white                          | Every primary action: buttons, links, active tab/nav, focus |
+| `ring`                                            | `#0F766E`                                  | Focus ring                                                  |
+| `accent` (+ `-foreground`)                        | `#E1F5EE` / `#085041`                      | Hover/selected rows and menu items                          |
+| `background` / `foreground`                       | white / slate 950                          | Page background and body text                               |
+| `card`, `popover` (+ `-foreground`)               | white                                      | Surfaces: cards, menus, dialogs                             |
+| `secondary` (+ `-foreground`)                     | slate 100                                  | Secondary buttons, neutral chips                            |
+| `muted` (+ `-foreground`)                         | slate 100 / `#526075`                      | Subtle backgrounds, helper text, drafts                     |
+| `destructive` (+ `-foreground`)                   | `#B91C1C` / white                          | Delete/void actions, errors, overdue, failed                |
+| `success` (+ `-foreground`)                       | `#15753A` / white                          | Paid, posted, approved, completed                           |
+| `warning` (+ `-foreground`)                       | `#A1460A` / white                          | Partially paid, needs review, low confidence, expiring      |
+| `info` (+ `-foreground`)                          | `#1D4ED8` / white                          | Sent, processing, informational notices                     |
+| `brand`, `brand-dark`, `brand-deep`, `brand-gold` | `#0D9488`, `#085041`, `#063A33`, `#EF9F27` | Logo colors: hero panels and illustrations only, never text |
+| `overlay`                                         | black at 80% opacity                       | Dialog/sheet scrim                                          |
+| `border`, `input`                                 | slate 200                                  | Borders, form control borders                               |
+| `chart-1` … `chart-5`                             | teal, blue, gold, violet, rose             | Categorical chart series, in order                          |
 
-`success`, `warning`, `info` and `chart-*` are defined for light and dark themes. Soft status styling is `border-{token}/20 bg-{token}/10 text-{token}`; solid styling is `bg-{token} text-{token}-foreground`.
+New organizations explicitly start with `BRAND_COLORS.primary` when created. Existing organizations retain their saved document branding: historical blue values cannot be distinguished from an explicit customer choice, so they are never silently rewritten. The product UI always uses its own teal tokens.
 
-**Accounting status mapping** (use the same meaning everywhere — invoices, bills, journals, extraction jobs):
+**Why `#0F766E` and not the logo's `#0D9488`:** white text on `#0D9488` is 3.7:1 (fails AA); one step darker on the same hue is 5.5:1. The logo keeps `#0D9488`.
+
+Soft status styling is `border-{token}/30 bg-{token}/10 text-{token}`; solid styling is `bg-{token} text-{token}-foreground`.
+
+**Accounting status mapping** (use the same meaning everywhere: invoices, bills, journals, extraction jobs):
 
 | Meaning                    | Token         | Examples                                         |
 | -------------------------- | ------------- | ------------------------------------------------ |
@@ -49,13 +74,22 @@ Colors are HSL triplets in CSS variables, exposed as Tailwind colors (`bg-primar
 
 Color is never the only signal: badges carry a text label and icons have accessible names.
 
-**Brand palette** (`public/manifest.json`, logos): teal `#0D9488` primary, dark `#085041`, light `#5DCAA5`, background tint `#E1F5EE`, gold accent `#EF9F27` (dark `#854F0B`), text `#2C2C2A` / `#5F5E5A`. The application `--primary` is still the default shadcn blue; switching it to brand teal is a deliberate, app-wide visual change for the accountant-UX lane, done by editing `--primary`/`--ring` only.
+**Do / don't**
 
-**Dark mode.** `.dark` token values exist and some components carry `dark:` variants, but no theme toggle sets the `dark` class yet (`darkMode: ['class']`). Build with tokens so dark mode works when a toggle is added; do not add `prefers-color-scheme` CSS.
+| Do                                                     | Don't                                                         |
+| ------------------------------------------------------ | ------------------------------------------------------------- |
+| `<Button>` (primary) for the one main action of a view | A blue, green or custom-colored button                        |
+| `text-primary hover:underline` for links               | `text-info` or `text-blue-*` links                            |
+| `bg-success/10 text-success` status pills with a word  | `bg-green-100 text-green-800`, color without a label          |
+| `fill="hsl(var(--chart-1))"` in charts                 | Hex colors in charts                                          |
+| `bg-brand` gradients on hero panels                    | `text-brand` (fails contrast) or `[#0D9488]` arbitrary values |
+| Token only; dark mode follows from `.dark`             | `dark:bg-*-900` palette overrides                             |
+
+**Dark mode.** `.dark` token values exist (primary `#2DD4BF` on dark ink), but no theme toggle sets the `dark` class yet (`darkMode: ['class']`). Build with tokens so dark mode works when a toggle is added; do not add `prefers-color-scheme` CSS.
 
 ### Typography
 
-- Fonts: Inter (`--font-inter`, Latin) and Noto Sans Arabic (`--font-noto-arabic`), loaded with `next/font` and combined in `font-sans`, so Arabic glyphs fall through to Noto automatically. Brand wordmark font (Instrument Sans) is used only inside the logo SVGs.
+- Fonts: Inter (`--font-inter`, Latin) and IBM Plex Sans Arabic (`--font-arabic`), loaded with `next/font` and combined in `font-sans`, so Arabic glyphs fall through to Plex Arabic automatically. The logo wordmarks are outlined paths and need no font.
 - Scale in use: page title `text-2xl sm:text-3xl font-bold tracking-tight`; card title `text-2xl font-semibold` (CardTitle) or `text-lg font-semibold`; body `text-sm`; helper/meta `text-xs text-muted-foreground`.
 - Numbers in tables, totals and inputs use `tabular-nums` so digits align.
 - Do not use letter-spacing or uppercase transforms on Arabic text.
@@ -186,7 +220,7 @@ const form = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema) });
 ### Charts
 
 - Recharts inside `ResponsiveContainer`; wrap in a `Card` with title and period; show `ChartSkeleton` while loading and `EmptyState` when there is no data.
-- Series colors: `fill="hsl(var(--chart-1))"` … `chart-5` in order; status-coded series use `success`/`warning`/`destructive`. Existing dashboard charts still use hex literals and should migrate when touched.
+- Series colors: `fill="hsl(var(--chart-1))"` … `chart-5` in order; status-coded series use `success`/`warning`/`destructive`/`info`/`muted-foreground`. No hex colors (the token guard fails on them).
 - Axis and tooltip values use the locale formatters; charts must reconcile with the report tables they summarize ([acceptance](strategy/demo-acceptance.md)).
 - In RTL, keep time flowing in the locale's reading direction (`reversed` X axis) and put the Y axis on the start side.
 

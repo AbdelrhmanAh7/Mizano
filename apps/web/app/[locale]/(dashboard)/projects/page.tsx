@@ -305,7 +305,10 @@ function ProjectsPageContent() {
                   Edit
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(project.id)}>
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={() => setDeleteId(project.id)}
+              >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
               </DropdownMenuItem>
@@ -337,8 +340,8 @@ function ProjectsPageContent() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Briefcase className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-info/10 rounded-lg">
+                <Briefcase className="h-5 w-5 text-info" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Active Projects</p>
@@ -352,8 +355,8 @@ function ProjectsPageContent() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <DollarSign className="h-5 w-5 text-green-600" />
+              <div className="p-2 bg-success/10 rounded-lg">
+                <DollarSign className="h-5 w-5 text-success" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Budget</p>
@@ -365,8 +368,8 @@ function ProjectsPageContent() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Clock className="h-5 w-5 text-purple-600" />
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Clock className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Billed</p>

@@ -102,7 +102,7 @@ export function TaskForm({ task, onSubmit, onCancel, isSubmitting }: TaskFormPro
             <Label htmlFor="name">Task Name *</Label>
             <Input id="name" placeholder="Enter task name" {...form.register('name')} />
             {form.formState.errors.name && (
-              <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
+              <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
             )}
           </div>
 

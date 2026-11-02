@@ -137,7 +137,7 @@ export function RequiredDateField<T extends FieldValues>({
         {label} <span className="text-destructive">*</span>
       </Label>
       <Input id={name} type="date" {...form.register(name)} />
-      {error && <p className="text-sm text-red-500">{translate(error.message)}</p>}
+      {error && <p className="text-sm text-destructive">{translate(error.message)}</p>}
     </div>
   );
 }
@@ -213,7 +213,7 @@ export function SalesDocumentFrame<T extends SalesDocumentValues>({
                 isInvalid={!!customerError}
               />
               {customerError && (
-                <p className="text-sm text-red-500">{translateError(customerError.message)}</p>
+                <p className="text-sm text-destructive">{translateError(customerError.message)}</p>
               )}
             </div>
 

@@ -24,7 +24,8 @@ export const DealWinRateChart = memo(function DealWinRateChart({ data }: DealWin
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="month" tickFormatter={monthLabel} {...CHART_AXIS} />
         <YAxis {...CHART_AXIS} tickFormatter={(value) => `${value}%`} />
-        <Tooltip labelFormatter={monthLabel}
+        <Tooltip
+          labelFormatter={monthLabel}
           formatter={(value: number) => [`${value.toFixed(1)}%`, t('winRate')]}
           contentStyle={CHART_TOOLTIP_STYLE}
         />
@@ -32,9 +33,9 @@ export const DealWinRateChart = memo(function DealWinRateChart({ data }: DealWin
           type="monotone"
           dataKey="rate"
           name={t('winRate')}
-          stroke="#3b82f6"
+          stroke="hsl(var(--chart-2))"
           strokeWidth={3}
-          dot={{ fill: '#3b82f6', r: 4 }}
+          dot={{ fill: 'hsl(var(--chart-2))', r: 4 }}
           activeDot={{ r: 6 }}
         />
       </LineChart>

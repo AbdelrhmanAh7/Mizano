@@ -11,10 +11,10 @@ interface WorkOrderStatusChartProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  DRAFT: '#94a3b8',
-  IN_PROCESS: '#3b82f6',
-  COMPLETED: '#22c55e',
-  CANCELLED: '#ef4444',
+  DRAFT: 'hsl(var(--muted-foreground))',
+  IN_PROCESS: 'hsl(var(--chart-2))',
+  COMPLETED: 'hsl(var(--success))',
+  CANCELLED: 'hsl(var(--destructive))',
 };
 
 export const WorkOrderStatusChart = memo(function WorkOrderStatusChart({
@@ -48,7 +48,10 @@ export const WorkOrderStatusChart = memo(function WorkOrderStatusChart({
           nameKey="label"
         >
           {chartData.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.status] ?? '#94a3b8'} />
+            <Cell
+              key={`cell-${index}`}
+              fill={STATUS_COLORS[entry.status] ?? 'hsl(var(--muted-foreground))'}
+            />
           ))}
         </Pie>
         <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />

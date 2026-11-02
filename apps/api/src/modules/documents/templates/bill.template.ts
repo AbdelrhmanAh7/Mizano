@@ -1,3 +1,4 @@
+import { BRAND_COLORS } from '@mizano/shared-types';
 import {
   OrganizationInfo,
   DocumentLineItem,
@@ -111,13 +112,13 @@ export function generateBillHtml(
   const statusLabel = l.status[bill.status] ?? bill.status;
 
   const statusColors: Record<string, string> = {
-    DRAFT: '#9CA3AF',
-    PENDING: '#9CA3AF',
-    OPEN: '#3B82F6',
-    PAID: '#10B981',
-    PARTIALLY_PAID: '#F59E0B',
-    OVERDUE: '#EF4444',
-    VOID: '#6B7280',
+    DRAFT: BRAND_COLORS.muted,
+    PENDING: BRAND_COLORS.muted,
+    OPEN: BRAND_COLORS.info,
+    PAID: BRAND_COLORS.success,
+    PARTIALLY_PAID: BRAND_COLORS.warning,
+    OVERDUE: BRAND_COLORS.danger,
+    VOID: BRAND_COLORS.muted,
   };
 
   const statusColor = statusColors[bill.status] || statusColors.DRAFT;
@@ -145,7 +146,7 @@ export function generateBillHtml(
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
           <div>
             <h2 style="font-size: 28px; color: ${primaryColor}; margin-bottom: 5px;">${l.bill}</h2>
-            <p style="color: #6B7280; font-size: 14px;">${escapeHtml(bill.billNumber)}</p>
+            <p style="color: ${BRAND_COLORS.muted}; font-size: 14px;">${escapeHtml(bill.billNumber)}</p>
           </div>
           <div style="background: ${statusColor}; color: white; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold;">
             ${escapeHtml(statusLabel)}
@@ -157,24 +158,24 @@ export function generateBillHtml(
           <div style="flex: 1;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">${l.fromVendor}</h4>
             <p style="font-weight: bold; margin-bottom: 5px;"><bdi>${escapeHtml(bill.vendor.name)}</bdi></p>
-            ${renderAddressHtml(bill.vendor, 'color: #6B7280; font-size: 12px;')}
-            ${bill.vendor.email ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(bill.vendor.email)}</p>` : ''}
-            ${bill.vendor.phone ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(bill.vendor.phone)}</p>` : ''}
-            ${bill.vendor.taxId ? `<p style="color: #6B7280; font-size: 12px;">${l.taxId}: ${escapeHtml(bill.vendor.taxId)}</p>` : ''}
+            ${renderAddressHtml(bill.vendor, `color: ${BRAND_COLORS.muted}; font-size: 12px;`)}
+            ${bill.vendor.email ? `<p style="color: ${BRAND_COLORS.muted}; font-size: 12px;">${escapeHtml(bill.vendor.email)}</p>` : ''}
+            ${bill.vendor.phone ? `<p style="color: ${BRAND_COLORS.muted}; font-size: 12px;">${escapeHtml(bill.vendor.phone)}</p>` : ''}
+            ${bill.vendor.taxId ? `<p style="color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.taxId}: ${escapeHtml(bill.vendor.taxId)}</p>` : ''}
           </div>
           <div style="text-align: end;">
             <table style="margin-inline-start: auto;">
               <tr>
-                <td style="padding-block: 5px; padding-inline-end: 20px; color: #6B7280; font-size: 12px;">${l.billDate}</td>
+                <td style="padding-block: 5px; padding-inline-end: 20px; color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.billDate}</td>
                 <td style="padding: 5px 0; font-size: 12px; font-weight: bold;">${formatDate(bill.date, dateLocale)}</td>
               </tr>
               <tr>
-                <td style="padding-block: 5px; padding-inline-end: 20px; color: #6B7280; font-size: 12px;">${l.dueDate}</td>
+                <td style="padding-block: 5px; padding-inline-end: 20px; color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.dueDate}</td>
                 <td style="padding: 5px 0; font-size: 12px; font-weight: bold;">${formatDate(bill.dueDate, dateLocale)}</td>
               </tr>
               <tr>
-                <td style="padding-block: 5px; padding-inline-end: 20px; color: #6B7280; font-size: 12px;">${l.balanceDue}</td>
-                <td style="padding: 5px 0; font-size: 14px; font-weight: bold; color: ${bill.balanceDue > 0 ? '#EF4444' : '#10B981'};">
+                <td style="padding-block: 5px; padding-inline-end: 20px; color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.balanceDue}</td>
+                <td style="padding: 5px 0; font-size: 14px; font-weight: bold; color: ${bill.balanceDue > 0 ? BRAND_COLORS.danger : BRAND_COLORS.success};">
                   ${formatCurrency(bill.balanceDue, bill.currency, locale, digits)}
                 </td>
               </tr>
@@ -203,7 +204,7 @@ export function generateBillHtml(
             ? `
           <div style="margin-top: 30px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">${l.notes}</h4>
-            <p style="color: #6B7280; font-size: 12px; white-space: pre-line;"><bdi>${escapeHtml(bill.notes)}</bdi></p>
+            <p style="color: ${BRAND_COLORS.muted}; font-size: 12px; white-space: pre-line;"><bdi>${escapeHtml(bill.notes)}</bdi></p>
           </div>
         `
             : ''

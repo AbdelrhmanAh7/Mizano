@@ -142,9 +142,7 @@ export default function TaxRatesPage() {
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
           <span className="font-medium">{row.original.name}</span>
-          {row.original.isDefault && (
-            <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
-          )}
+          {row.original.isDefault && <Star className="h-3.5 w-3.5 text-warning fill-warning" />}
         </div>
       ),
     },
@@ -189,8 +187,8 @@ export default function TaxRatesPage() {
         <Badge
           className={
             row.original.isActive
-              ? 'bg-green-100 text-green-800 border-green-200'
-              : 'bg-gray-100 text-gray-800 border-gray-200'
+              ? 'bg-success/10 text-success border-success/30'
+              : 'bg-muted text-foreground border-border'
           }
         >
           {row.original.isActive ? tCommon('status.active') : tCommon('status.inactive')}
@@ -220,7 +218,7 @@ export default function TaxRatesPage() {
               {canDelete && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleDelete(rate)} className="text-red-600">
+                  <DropdownMenuItem onClick={() => handleDelete(rate)} className="text-destructive">
                     <Trash2 className="mr-2 h-4 w-4" />
                     {tCommon('buttons.delete')}
                   </DropdownMenuItem>

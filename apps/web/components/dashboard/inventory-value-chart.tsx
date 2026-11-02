@@ -35,7 +35,8 @@ export const InventoryValueChart = memo(function InventoryValueChart({
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="month" tickFormatter={monthLabel} {...CHART_AXIS} />
         <YAxis {...CHART_AXIS} tickFormatter={(value) => formatCompactCurrency(value, currency)} />
-        <Tooltip labelFormatter={monthLabel}
+        <Tooltip
+          labelFormatter={monthLabel}
           formatter={(value: number, name: string) => {
             if (name === 'value') {
               return formatCompactCurrency(value, currency);
@@ -48,9 +49,9 @@ export const InventoryValueChart = memo(function InventoryValueChart({
           type="monotone"
           dataKey="value"
           name={t('totalValue')}
-          stroke="#f59e0b"
+          stroke="hsl(var(--warning))"
           strokeWidth={3}
-          dot={{ fill: '#f59e0b', r: 4 }}
+          dot={{ fill: 'hsl(var(--warning))', r: 4 }}
           activeDot={{ r: 6 }}
         />
       </LineChart>

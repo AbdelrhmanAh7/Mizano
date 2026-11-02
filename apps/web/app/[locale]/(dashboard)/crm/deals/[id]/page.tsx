@@ -259,7 +259,7 @@ export default function DealDetailPage() {
                 Move Stage
               </Button>
               <Button
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-success hover:bg-success hover:brightness-95"
                 onClick={() => setWonDialogOpen(true)}
               >
                 <Trophy className="mr-2 h-4 w-4" />
@@ -267,7 +267,7 @@ export default function DealDetailPage() {
               </Button>
               <Button
                 variant="outline"
-                className="text-red-600 hover:text-red-700"
+                className="text-destructive hover:text-destructive"
                 onClick={() => setLostDialogOpen(true)}
               >
                 <XCircle className="mr-2 h-4 w-4" />
@@ -296,7 +296,7 @@ export default function DealDetailPage() {
                   key={stage}
                   className={cn(
                     'flex-1 h-2 rounded-full',
-                    isCurrent ? 'bg-blue-500' : isCurrentOrPast ? 'bg-green-500' : 'bg-gray-200',
+                    isCurrent ? 'bg-info' : isCurrentOrPast ? 'bg-success' : 'bg-muted',
                   )}
                   title={getDealStageLabel(stage)}
                 />
@@ -361,9 +361,11 @@ export default function DealDetailPage() {
 
       {/* Lost Reason */}
       {isLost && deal.lostReason && (
-        <Card className="border-red-200 bg-red-50">
+        <Card className="border-destructive/30 bg-destructive/5">
           <CardContent className="pt-6">
-            <span className="text-sm font-medium text-red-700">Lost reason: {deal.lostReason}</span>
+            <span className="text-sm font-medium text-destructive">
+              Lost reason: {deal.lostReason}
+            </span>
           </CardContent>
         </Card>
       )}
@@ -415,7 +417,10 @@ export default function DealDetailPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleMarkWon} className="bg-green-600 hover:bg-green-700">
+            <AlertDialogAction
+              onClick={handleMarkWon}
+              className="bg-success hover:bg-success hover:brightness-95"
+            >
               Mark as Won
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -451,7 +456,7 @@ export default function DealDetailPage() {
             <Button
               onClick={handleMarkLost}
               disabled={markLost.isPending || !lostReason}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95"
             >
               {markLost.isPending ? 'Saving...' : 'Mark as Lost'}
             </Button>

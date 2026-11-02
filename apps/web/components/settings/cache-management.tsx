@@ -180,7 +180,7 @@ export function CacheManagement() {
                 <AlertDialogCancel>{t('cache.cancel')}</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => flushMutation.mutate()}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95"
                 >
                   {t('cache.flushCache')}
                 </AlertDialogAction>
@@ -268,7 +268,7 @@ export function CacheManagement() {
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold">{stats.hitRate}%</span>
                 {stats.hitRate >= 70 ? (
-                  <Badge variant="default" className="bg-green-600 text-white">
+                  <Badge variant="default" className="bg-success text-success-foreground">
                     {t('cache.good')}
                   </Badge>
                 ) : stats.hitRate >= 40 ? (

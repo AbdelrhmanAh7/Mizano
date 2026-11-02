@@ -120,7 +120,7 @@ export default function WarehouseDetailPage({ params }: WarehouseDetailPageProps
               <h1 className="text-3xl font-bold tracking-tight">{warehouse.name}</h1>
               {warehouse.isDefault && (
                 <Badge variant="outline" className="gap-1">
-                  <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+                  <Star className="h-3 w-3 fill-warning text-warning" />
                   Default
                 </Badge>
               )}
@@ -145,7 +145,7 @@ export default function WarehouseDetailPage({ params }: WarehouseDetailPageProps
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" className="text-red-600">
+              <Button variant="outline" className="text-destructive">
                 <Trash2 className="mr-2 h-4 w-4" />
                 {t('common.delete')}
               </Button>
@@ -157,7 +157,10 @@ export default function WarehouseDetailPage({ params }: WarehouseDetailPageProps
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95"
+                >
                   {t('common.delete')}
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -171,8 +174,8 @@ export default function WarehouseDetailPage({ params }: WarehouseDetailPageProps
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Package className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-info/10 rounded-lg">
+                <Package className="h-5 w-5 text-info" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Unique Items</p>
@@ -185,8 +188,8 @@ export default function WarehouseDetailPage({ params }: WarehouseDetailPageProps
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Package className="h-5 w-5 text-green-600" />
+              <div className="p-2 bg-success/10 rounded-lg">
+                <Package className="h-5 w-5 text-success" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Quantity</p>
@@ -199,8 +202,8 @@ export default function WarehouseDetailPage({ params }: WarehouseDetailPageProps
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <MapPin className="h-5 w-5 text-purple-600" />
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <MapPin className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Location</p>
@@ -245,7 +248,7 @@ export default function WarehouseDetailPage({ params }: WarehouseDetailPageProps
                     <TableCell>
                       <Link
                         href={`/inventory/items/${s.itemId}`}
-                        className="font-medium hover:text-blue-600 hover:underline"
+                        className="font-medium hover:text-primary hover:underline"
                       >
                         {s.item.name}
                       </Link>

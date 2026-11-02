@@ -45,7 +45,10 @@ export function DeleteConfirmDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{cancelLabel ?? tCommon('buttons.cancel')}</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm} className="bg-red-600 hover:bg-red-700">
+          <AlertDialogAction
+            onClick={onConfirm}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95"
+          >
             {deleteLabel ?? tCommon('buttons.delete')}
           </AlertDialogAction>
         </AlertDialogFooter>

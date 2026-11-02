@@ -65,7 +65,7 @@ function TransfersPageContent() {
       cell: ({ row }) => (
         <Link
           href={`/inventory/transfers/${row.original.id}`}
-          className="font-medium hover:text-blue-600 hover:underline"
+          className="font-medium hover:text-primary hover:underline"
         >
           {row.original.transferNumber}
         </Link>

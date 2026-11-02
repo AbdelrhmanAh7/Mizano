@@ -26,7 +26,7 @@ export function BudgetProgressCard({ data, isLoading }: BudgetProgressCardProps)
   const pct = Math.min(data.budgetUsedPercent ?? 0, 100);
   const overBudget = data.isOverBudget ?? false;
 
-  const barColor = overBudget ? 'bg-red-500' : pct >= 80 ? 'bg-yellow-500' : 'bg-green-500';
+  const barColor = overBudget ? 'bg-destructive' : pct >= 80 ? 'bg-warning' : 'bg-success';
 
   return (
     <Card>
@@ -62,7 +62,7 @@ export function BudgetProgressCard({ data, isLoading }: BudgetProgressCardProps)
             <span
               className={cn(
                 'font-medium font-mono',
-                parseFloat(String(data.grossProfit)) >= 0 ? 'text-green-600' : 'text-red-600',
+                parseFloat(String(data.grossProfit)) >= 0 ? 'text-success' : 'text-destructive',
               )}
             >
               {formatCurrency(data.grossProfit)}

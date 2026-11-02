@@ -39,3 +39,17 @@ export function brandTagline(locale: string): string {
 export function withBrand(text: string, locale: string): string {
   return text.replace(/\{brand\}/g, brandName(locale)).replace(/\{brandSlug\}/g, BRAND.slug);
 }
+
+/**
+ * Colors for surfaces that cannot read the web app's CSS tokens (PDF documents, emails).
+ * Same values as apps/web/app/globals.css; each one passes WCAG AA as text on white.
+ */
+export const BRAND_COLORS = {
+  /** Jarda teal (the logo teal one step darker): headings, rules, links. */
+  primary: '#0F766E',
+  success: '#15753A',
+  warning: '#A1460A',
+  danger: '#B91C1C',
+  info: '#1D4ED8',
+  muted: '#526075',
+} as const;

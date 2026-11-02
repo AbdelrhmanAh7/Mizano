@@ -1,3 +1,4 @@
+import { BRAND_COLORS } from '@mizano/shared-types';
 import { Injectable, NotFoundException, OnModuleDestroy } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { generateInvoiceHtml, InvoiceData } from '../templates/invoice.template';
@@ -493,7 +494,7 @@ export class PdfService implements OnModuleDestroy {
     endDate: string,
   ): Promise<Buffer> {
     const org = await this.getOrganizationInfo(organizationId);
-    const primaryColor = safeColor(org.primaryColor, '#3B82F6');
+    const primaryColor = safeColor(org.primaryColor, BRAND_COLORS.primary);
     const currency = ledgerCurrency(org);
     const journalLines = await this.prisma.journalLine.findMany({
       where: {
@@ -556,7 +557,7 @@ export class PdfService implements OnModuleDestroy {
 
   async generateBalanceSheetPdf(organizationId: string, asOfDate: string): Promise<Buffer> {
     const org = await this.getOrganizationInfo(organizationId);
-    const pc = safeColor(org.primaryColor, '#3B82F6');
+    const pc = safeColor(org.primaryColor, BRAND_COLORS.primary);
     const cur = ledgerCurrency(org);
     const lines = await this.prisma.journalLine.findMany({
       where: {
@@ -627,7 +628,7 @@ export class PdfService implements OnModuleDestroy {
     asOfDate?: string,
   ): Promise<Buffer> {
     const org = await this.getOrganizationInfo(organizationId);
-    const pc = safeColor(org.primaryColor, '#3B82F6'),
+    const pc = safeColor(org.primaryColor, BRAND_COLORS.primary),
       cur = ledgerCurrency(org);
     const ref = asOfDate ? new Date(asOfDate) : new Date();
     const cat = (due: Date, amt: number) => {
@@ -701,7 +702,7 @@ export class PdfService implements OnModuleDestroy {
           `<tr style="border-bottom:1px solid #E5E7EB"><td style="padding:8px 10px;font-size:11px">${escapeHtml(n)}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.current)}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.days1to30)}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.days31to60)}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.days61to90)}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.over90)}</td><td style="padding:8px 10px;text-align:right;font-size:11px;font-weight:bold">${fc(b.total)}</td></tr>`,
       )
       .join('');
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${ti}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111827;line-height:1.5}.container{max-width:800px;margin:0 auto;padding:40px}</style></head><body><div class="container"><div style="margin-bottom:30px">${renderLogoHtml(org, 'max-height:60px')}<h1 style="color:${pc};margin:10px 0 5px 0;font-size:24px">${escapeHtml(org.name)}</h1>${org.address ? `<p style="color:#6B7280;font-size:12px">${escapeHtml(org.address)}</p>` : ''}</div><div style="text-align:center;margin-bottom:30px"><h2 style="font-size:24px;color:${pc}">${ti}</h2><p style="color:#6B7280;font-size:14px">As of ${formatDate(ref)}</p></div><table style="width:100%;border-collapse:collapse;margin-bottom:20px"><thead><tr style="background:${pc};color:white"><th style="padding:10px;text-align:left;font-size:11px">${la}</th><th style="padding:10px;text-align:right;font-size:11px">Current</th><th style="padding:10px;text-align:right;font-size:11px">1-30</th><th style="padding:10px;text-align:right;font-size:11px">31-60</th><th style="padding:10px;text-align:right;font-size:11px">61-90</th><th style="padding:10px;text-align:right;font-size:11px">90+</th><th style="padding:10px;text-align:right;font-size:11px">Total</th></tr></thead><tbody>${rw || `<tr><td colspan="7" style="padding:10px;text-align:center;color:#6B7280">No outstanding ${type}</td></tr>`}</tbody><tfoot><tr style="background:#F3F4F6;font-weight:bold"><td style="padding:10px">Total</td><td style="padding:10px;text-align:right">${fc(tot.current)}</td><td style="padding:10px;text-align:right">${fc(tot.days1to30)}</td><td style="padding:10px;text-align:right">${fc(tot.days31to60)}</td><td style="padding:10px;text-align:right">${fc(tot.days61to90)}</td><td style="padding:10px;text-align:right">${fc(tot.over90)}</td><td style="padding:10px;text-align:right">${fc(tot.total)}</td></tr></tfoot></table><div style="margin-top:40px;text-align:center"><p style="color:#9CA3AF;font-size:10px">Generated automatically.</p></div></div></body></html>`;
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${ti}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111827;line-height:1.5}.container{max-width:800px;margin:0 auto;padding:40px}</style></head><body><div class="container"><div style="margin-bottom:30px">${renderLogoHtml(org, 'max-height:60px')}<h1 style="color:${pc};margin:10px 0 5px 0;font-size:24px">${escapeHtml(org.name)}</h1>${org.address ? `<p style="color:${BRAND_COLORS.muted};font-size:12px">${escapeHtml(org.address)}</p>` : ''}</div><div style="text-align:center;margin-bottom:30px"><h2 style="font-size:24px;color:${pc}">${ti}</h2><p style="color:${BRAND_COLORS.muted};font-size:14px">As of ${formatDate(ref)}</p></div><table style="width:100%;border-collapse:collapse;margin-bottom:20px"><thead><tr style="background:${pc};color:white"><th style="padding:10px;text-align:left;font-size:11px">${la}</th><th style="padding:10px;text-align:right;font-size:11px">Current</th><th style="padding:10px;text-align:right;font-size:11px">1-30</th><th style="padding:10px;text-align:right;font-size:11px">31-60</th><th style="padding:10px;text-align:right;font-size:11px">61-90</th><th style="padding:10px;text-align:right;font-size:11px">90+</th><th style="padding:10px;text-align:right;font-size:11px">Total</th></tr></thead><tbody>${rw || `<tr><td colspan="7" style="padding:10px;text-align:center;color:${BRAND_COLORS.muted}">No outstanding ${type}</td></tr>`}</tbody><tfoot><tr style="background:#F3F4F6;font-weight:bold"><td style="padding:10px">Total</td><td style="padding:10px;text-align:right">${fc(tot.current)}</td><td style="padding:10px;text-align:right">${fc(tot.days1to30)}</td><td style="padding:10px;text-align:right">${fc(tot.days31to60)}</td><td style="padding:10px;text-align:right">${fc(tot.days61to90)}</td><td style="padding:10px;text-align:right">${fc(tot.over90)}</td><td style="padding:10px;text-align:right">${fc(tot.total)}</td></tr></tfoot></table><div style="margin-top:40px;text-align:center"><p style="color:${BRAND_COLORS.muted};font-size:10px">Generated automatically.</p></div></div></body></html>`;
     return this.htmlToPdf(html);
   }
 
@@ -721,10 +722,10 @@ export class PdfService implements OnModuleDestroy {
     const sh = r.sections
       .map(
         (s) =>
-          `<table style="width:100%;border-collapse:collapse;margin-bottom:10px;margin-top:20px"><thead><tr style="background:${pc};color:white"><th style="padding:10px;text-align:left;font-size:12px">${escapeHtml(s.heading)}</th><th style="padding:10px;text-align:right;font-size:12px">Amount</th></tr></thead><tbody>${s.rows || `<tr><td colspan="2" style="padding:10px;color:#6B7280">No ${escapeHtml(s.heading.toLowerCase())} recorded</td></tr>`}<tr style="background:#F3F4F6;font-weight:bold"><td style="padding:10px;font-size:13px">${escapeHtml(s.totalLabel)}</td><td style="padding:10px;text-align:right;font-size:13px">${formatCurrency(s.totalAmount, cur)}</td></tr></tbody></table>`,
+          `<table style="width:100%;border-collapse:collapse;margin-bottom:10px;margin-top:20px"><thead><tr style="background:${pc};color:white"><th style="padding:10px;text-align:left;font-size:12px">${escapeHtml(s.heading)}</th><th style="padding:10px;text-align:right;font-size:12px">Amount</th></tr></thead><tbody>${s.rows || `<tr><td colspan="2" style="padding:10px;color:${BRAND_COLORS.muted}">No ${escapeHtml(s.heading.toLowerCase())} recorded</td></tr>`}<tr style="background:#F3F4F6;font-weight:bold"><td style="padding:10px;font-size:13px">${escapeHtml(s.totalLabel)}</td><td style="padding:10px;text-align:right;font-size:13px">${formatCurrency(s.totalAmount, cur)}</td></tr></tbody></table>`,
       )
       .join('');
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escapeHtml(r.title)}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111827;line-height:1.5}.container{max-width:800px;margin:0 auto;padding:40px}</style></head><body><div class="container"><div style="margin-bottom:30px">${renderLogoHtml(org, 'max-height:60px')}<h1 style="color:${pc};margin:10px 0 5px 0;font-size:24px">${escapeHtml(org.name)}</h1>${org.address ? `<p style="color:#6B7280;font-size:12px">${escapeHtml(org.address)}</p>` : ''}</div><div style="text-align:center;margin-bottom:30px"><h2 style="font-size:24px;color:${pc}">${escapeHtml(r.title)}</h2><p style="color:#6B7280;font-size:14px">${escapeHtml(r.subtitle)}</p></div>${sh}<div style="background:${pc};color:white;padding:15px;border-radius:8px;margin-top:20px"><div style="display:flex;justify-content:space-between"><span style="font-weight:bold;font-size:16px">${escapeHtml(r.bottomBar.label)}</span><span style="font-weight:bold;font-size:18px">${formatCurrency(r.bottomBar.amount, cur)}</span></div></div><div style="margin-top:40px;text-align:center"><p style="color:#9CA3AF;font-size:10px">Generated automatically.</p>${org.footerText ? `<p style="color:#9CA3AF;font-size:10px">${escapeHtml(org.footerText)}</p>` : ''}</div></div></body></html>`;
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escapeHtml(r.title)}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111827;line-height:1.5}.container{max-width:800px;margin:0 auto;padding:40px}</style></head><body><div class="container"><div style="margin-bottom:30px">${renderLogoHtml(org, 'max-height:60px')}<h1 style="color:${pc};margin:10px 0 5px 0;font-size:24px">${escapeHtml(org.name)}</h1>${org.address ? `<p style="color:${BRAND_COLORS.muted};font-size:12px">${escapeHtml(org.address)}</p>` : ''}</div><div style="text-align:center;margin-bottom:30px"><h2 style="font-size:24px;color:${pc}">${escapeHtml(r.title)}</h2><p style="color:${BRAND_COLORS.muted};font-size:14px">${escapeHtml(r.subtitle)}</p></div>${sh}<div style="background:${pc};color:white;padding:15px;border-radius:8px;margin-top:20px"><div style="display:flex;justify-content:space-between"><span style="font-weight:bold;font-size:16px">${escapeHtml(r.bottomBar.label)}</span><span style="font-weight:bold;font-size:18px">${formatCurrency(r.bottomBar.amount, cur)}</span></div></div><div style="margin-top:40px;text-align:center"><p style="color:${BRAND_COLORS.muted};font-size:10px">Generated automatically.</p>${org.footerText ? `<p style="color:${BRAND_COLORS.muted};font-size:10px">${escapeHtml(org.footerText)}</p>` : ''}</div></div></body></html>`;
   }
 
   private async getOrganizationInfo(organizationId: string): Promise<OrganizationInfo> {
@@ -784,7 +785,7 @@ export class PdfService implements OnModuleDestroy {
       currency: string;
     },
   ): string {
-    const primaryColor = safeColor(org.primaryColor, '#3B82F6');
+    const primaryColor = safeColor(org.primaryColor, BRAND_COLORS.primary);
 
     const transactionRows = data.transactions
       .map(
@@ -819,21 +820,21 @@ export class PdfService implements OnModuleDestroy {
             <div>
               ${renderLogoHtml(org, 'max-height: 60px;')}
               <h1 style="color: ${primaryColor}; margin: 10px 0 5px 0; font-size: 24px;">${escapeHtml(org.name)}</h1>
-              ${org.address ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${escapeHtml(org.address)}</p>` : ''}
+              ${org.address ? `<p style="margin: 2px 0; color: ${BRAND_COLORS.muted}; font-size: 12px;">${escapeHtml(org.address)}</p>` : ''}
             </div>
           </div>
 
           <!-- Title -->
           <div style="text-align: center; margin-bottom: 30px;">
             <h2 style="font-size: 24px; color: ${primaryColor};">STATEMENT OF ACCOUNT</h2>
-            <p style="color: #6B7280; font-size: 14px;">${formatDate(data.dateFrom)} - ${formatDate(data.dateTo)}</p>
+            <p style="color: ${BRAND_COLORS.muted}; font-size: 14px;">${formatDate(data.dateFrom)} - ${formatDate(data.dateTo)}</p>
           </div>
 
           <!-- Customer Info -->
           <div style="margin-bottom: 30px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px;">CUSTOMER</h4>
             <p style="font-weight: bold;">${escapeHtml(data.customer.name)}</p>
-            ${renderAddressHtml(data.customer, 'color: #6B7280; font-size: 12px;')}
+            ${renderAddressHtml(data.customer, `color: ${BRAND_COLORS.muted}; font-size: 12px;`)}
           </div>
 
           <!-- Opening Balance -->
@@ -870,8 +871,8 @@ export class PdfService implements OnModuleDestroy {
 
           <!-- Footer -->
           <div style="margin-top: 40px; text-align: center;">
-            <p style="color: #9CA3AF; font-size: 10px;">This statement was generated automatically.</p>
-            ${org.footerText ? `<p style="color: #9CA3AF; font-size: 10px;">${escapeHtml(org.footerText)}</p>` : ''}
+            <p style="color: ${BRAND_COLORS.muted}; font-size: 10px;">This statement was generated automatically.</p>
+            ${org.footerText ? `<p style="color: ${BRAND_COLORS.muted}; font-size: 10px;">${escapeHtml(org.footerText)}</p>` : ''}
           </div>
         </div>
       </body>

@@ -15,13 +15,13 @@ interface AttendanceOverviewChartProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  Present: '#22c55e',
-  Absent: '#ef4444',
-  Leave: '#f59e0b',
-  HalfDay: '#3b82f6',
+  Present: 'hsl(var(--success))',
+  Absent: 'hsl(var(--destructive))',
+  Leave: 'hsl(var(--warning))',
+  HalfDay: 'hsl(var(--chart-2))',
 };
 
-const FALLBACK_COLOR = '#94a3b8';
+const FALLBACK_COLOR = 'hsl(var(--muted-foreground))';
 
 export const AttendanceOverviewChart = memo(function AttendanceOverviewChart({
   data,

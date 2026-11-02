@@ -373,9 +373,9 @@ export function getEmployeeStatusLabel(status: EmployeeStatus, t: HrTranslator):
 
 export function getEmployeeStatusColor(status: EmployeeStatus): string {
   const colors: Record<string, string> = {
-    ACTIVE: 'bg-green-100 text-green-800',
-    INACTIVE: 'bg-yellow-100 text-yellow-800',
-    TERMINATED: 'bg-red-100 text-red-800',
+    ACTIVE: 'bg-success/10 text-success',
+    INACTIVE: 'bg-warning/10 text-warning',
+    TERMINATED: 'bg-destructive/10 text-destructive',
   };
   return (status && colors[status]) || colors.ACTIVE;
 }
@@ -387,10 +387,10 @@ export function getAttendanceStatusLabel(status: AttendanceStatus, t: HrTranslat
 
 export function getAttendanceStatusColor(status: AttendanceStatus): string {
   const colors: Record<AttendanceStatus, string> = {
-    PRESENT: 'bg-green-100 text-green-800',
-    ABSENT: 'bg-red-100 text-red-800',
-    LEAVE: 'bg-blue-100 text-blue-800',
-    HALF_DAY: 'bg-yellow-100 text-yellow-800',
+    PRESENT: 'bg-success/10 text-success',
+    ABSENT: 'bg-destructive/10 text-destructive',
+    LEAVE: 'bg-info/10 text-info',
+    HALF_DAY: 'bg-warning/10 text-warning',
   };
   return colors[status] || colors.PRESENT;
 }
@@ -402,9 +402,9 @@ export function getPayrollStatusLabel(status: PayrollStatus, t: HrTranslator): s
 
 export function getPayrollStatusColor(status: PayrollStatus): string {
   const colors: Record<PayrollStatus, string> = {
-    DRAFT: 'bg-gray-100 text-gray-800',
-    CONFIRMED: 'bg-blue-100 text-blue-800',
-    PAID: 'bg-green-100 text-green-800',
+    DRAFT: 'bg-muted text-foreground',
+    CONFIRMED: 'bg-info/10 text-info',
+    PAID: 'bg-success/10 text-success',
   };
   return colors[status] || colors.DRAFT;
 }

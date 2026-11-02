@@ -269,7 +269,7 @@ function WorkOrdersPageContent() {
               {canDelete && wo.status === 'DRAFT' && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleDelete(wo)} className="text-red-600">
+                  <DropdownMenuItem onClick={() => handleDelete(wo)} className="text-destructive">
                     <Trash2 className="mr-2 h-4 w-4" />
                     {tCommon('buttons.delete')}
                   </DropdownMenuItem>

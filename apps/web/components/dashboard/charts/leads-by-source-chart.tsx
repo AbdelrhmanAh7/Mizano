@@ -11,12 +11,12 @@ interface LeadsBySourceChartProps {
 }
 
 const SOURCE_COLORS: Record<string, string> = {
-  WEBSITE: '#3b82f6',
-  FACEBOOK_ADS: '#8b5cf6',
-  GOOGLE_ADS: '#22c55e',
-  REFERRAL: '#f59e0b',
-  COLD_CALL: '#ef4444',
-  OTHER: '#94a3b8',
+  WEBSITE: 'hsl(var(--chart-2))',
+  FACEBOOK_ADS: 'hsl(var(--chart-4))',
+  GOOGLE_ADS: 'hsl(var(--success))',
+  REFERRAL: 'hsl(var(--warning))',
+  COLD_CALL: 'hsl(var(--destructive))',
+  OTHER: 'hsl(var(--muted-foreground))',
 };
 
 export const LeadsBySourceChart = memo(function LeadsBySourceChart({
@@ -52,7 +52,10 @@ export const LeadsBySourceChart = memo(function LeadsBySourceChart({
           nameKey="label"
         >
           {chartData.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={SOURCE_COLORS[entry.source] ?? '#94a3b8'} />
+            <Cell
+              key={`cell-${index}`}
+              fill={SOURCE_COLORS[entry.source] ?? 'hsl(var(--muted-foreground))'}
+            />
           ))}
         </Pie>
         <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />

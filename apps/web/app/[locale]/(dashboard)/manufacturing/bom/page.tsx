@@ -185,7 +185,7 @@ function BOMListPageContent() {
               {canDelete && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleDelete(bom)} className="text-red-600">
+                  <DropdownMenuItem onClick={() => handleDelete(bom)} className="text-destructive">
                     <Trash2 className="mr-2 h-4 w-4" />
                     {tCommon('buttons.delete')}
                   </DropdownMenuItem>

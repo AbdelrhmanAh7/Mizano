@@ -1,7 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ['class'],
-  content: ['./components/**/*.{ts,tsx}', './app/**/*.{ts,tsx}'],
+  content: ['./components/**/*.{ts,tsx}', './app/**/*.{ts,tsx}', './lib/**/*.{ts,tsx}'],
   theme: {
     container: {
       center: true,
@@ -12,9 +12,10 @@ module.exports = {
     },
     extend: {
       fontFamily: {
-        sans: ['var(--font-inter)', 'var(--font-noto-arabic)', 'sans-serif'],
+        sans: ['var(--font-inter)', 'var(--font-arabic)', 'system-ui', 'sans-serif'],
       },
       colors: {
+        overlay: 'hsl(var(--overlay))',
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
@@ -59,6 +60,14 @@ module.exports = {
         info: {
           DEFAULT: 'hsl(var(--info))',
           foreground: 'hsl(var(--info-foreground))',
+        },
+        // Logo colors: decorative brand surfaces only (hero panels, illustrations), never text.
+        brand: {
+          DEFAULT: 'hsl(var(--brand))',
+          foreground: 'hsl(var(--brand-foreground))',
+          dark: 'hsl(var(--brand-dark))',
+          deep: 'hsl(var(--brand-deep))',
+          gold: 'hsl(var(--brand-gold))',
         },
         chart: {
           1: 'hsl(var(--chart-1))',

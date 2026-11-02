@@ -121,7 +121,7 @@ export default function AssetsPage() {
           <Card>
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground">{t('summary.netBookValue')}</p>
-              <p className="text-2xl font-bold font-mono text-green-600">
+              <p className="text-2xl font-bold font-mono text-success">
                 {formatCurrency(summary.totalBookValue)}
               </p>
             </CardContent>
@@ -195,7 +195,7 @@ export default function AssetsPage() {
                       <TableCell>
                         <Link
                           href={`/assets/${asset.id}`}
-                          className="font-medium text-blue-600 hover:underline"
+                          className="font-medium text-primary hover:underline"
                         >
                           {asset.name}
                         </Link>
@@ -228,7 +228,7 @@ export default function AssetsPage() {
                           {asset.status === 'ACTIVE' && (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button size="sm" variant="ghost" className="text-red-600">
+                                <Button size="sm" variant="ghost" className="text-destructive">
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </AlertDialogTrigger>
@@ -243,7 +243,7 @@ export default function AssetsPage() {
                                   <AlertDialogCancel>{tc('buttons.cancel')}</AlertDialogCancel>
                                   <AlertDialogAction
                                     onClick={() => deleteAsset.mutate(asset.id)}
-                                    className="bg-red-600 hover:bg-red-700"
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95"
                                   >
                                     {tc('buttons.delete')}
                                   </AlertDialogAction>

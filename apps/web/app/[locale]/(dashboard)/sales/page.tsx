@@ -68,7 +68,7 @@ export default function SalesPage() {
       description: t('overview.modules.customers'),
       icon: Users,
       href: '/sales/customers',
-      color: 'bg-blue-500',
+      color: 'bg-info text-info-foreground',
       stats: t('overview.modules.customersStats', { count: customers.length }),
     },
     {
@@ -76,7 +76,7 @@ export default function SalesPage() {
       description: t('overview.modules.quotes'),
       icon: FileText,
       href: '/sales/quotes',
-      color: 'bg-purple-500',
+      color: 'bg-primary text-primary-foreground',
       stats: t('overview.modules.quotesStats', { count: pendingQuotes.length }),
     },
     {
@@ -84,7 +84,7 @@ export default function SalesPage() {
       description: t('overview.modules.invoices'),
       icon: Receipt,
       href: '/sales/invoices',
-      color: 'bg-green-500',
+      color: 'bg-success text-success-foreground',
       stats: t('overview.modules.invoicesStats', {
         count: invoices.filter((i: { status: string }) => i.status === 'SENT').length,
       }),
@@ -94,7 +94,7 @@ export default function SalesPage() {
       description: t('overview.modules.creditNotes'),
       icon: CreditCard,
       href: '/sales/credit-notes',
-      color: 'bg-orange-500',
+      color: 'bg-warning text-warning-foreground',
       stats: t('overview.modules.creditNotesStats'),
     },
     {
@@ -102,7 +102,7 @@ export default function SalesPage() {
       description: t('overview.modules.payments'),
       icon: TrendingUp,
       href: '/sales/payments',
-      color: 'bg-cyan-500',
+      color: 'bg-info text-info-foreground',
       stats: t('overview.modules.paymentsStats'),
     },
     {
@@ -110,7 +110,7 @@ export default function SalesPage() {
       description: t('overview.modules.deliveryChallans'),
       icon: Truck,
       href: '/sales/delivery-challans',
-      color: 'bg-rose-500',
+      color: 'bg-destructive text-destructive-foreground',
       stats: t('overview.modules.deliveryChallansStats'),
     },
   ];
@@ -167,13 +167,15 @@ export default function SalesPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t('stats.overdueAmount')}</CardTitle>
-            <AlertCircle className="h-4 w-4 text-red-500" />
+            <AlertCircle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-red-600">{formatCurrency(overdueAmount)}</div>
+              <div className="text-2xl font-bold text-destructive">
+                {formatCurrency(overdueAmount)}
+              </div>
             )}
             <p className="text-xs text-muted-foreground">
               {t('overview.overdueCount', { count: overdueInvoices.length })}
@@ -201,15 +203,13 @@ export default function SalesPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t('stats.receivedThisMonth')}</CardTitle>
-            <CreditCard className="h-4 w-4 text-green-500" />
+            <CreditCard className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-green-600">
-                {formatCurrency(paidThisMonth)}
-              </div>
+              <div className="text-2xl font-bold text-success">{formatCurrency(paidThisMonth)}</div>
             )}
             <p className="text-xs text-muted-foreground">{t('overview.fromPaidInvoices')}</p>
           </CardContent>
@@ -223,7 +223,7 @@ export default function SalesPage() {
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-lg ${module.color}`}>
-                  <module.icon className="h-5 w-5 text-white" />
+                  <module.icon className="h-5 w-5" />
                 </div>
                 <div>
                   <CardTitle className="text-lg">{module.title}</CardTitle>
@@ -294,7 +294,9 @@ export default function SalesPage() {
         {/* Overdue Invoices */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg text-red-600">{t('overview.overdueInvoices')}</CardTitle>
+            <CardTitle className="text-lg text-destructive">
+              {t('overview.overdueInvoices')}
+            </CardTitle>
             {overdueInvoices.length > 0 && (
               <Button asChild variant="outline" size="sm">
                 <Link href="/sales/invoices?status=OVERDUE">{t('overview.viewAll')}</Link>
@@ -332,10 +334,10 @@ export default function SalesPage() {
                             <p className="text-xs text-muted-foreground">{inv.customer?.name}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-xs text-red-600">
+                            <p className="text-xs text-destructive">
                               {t('overview.daysOverdue', { days: daysOverdue })}
                             </p>
-                            <p className="text-sm font-mono font-semibold text-red-600">
+                            <p className="text-sm font-mono font-semibold text-destructive">
                               {formatCurrency(inv.balanceDue)}
                             </p>
                           </div>

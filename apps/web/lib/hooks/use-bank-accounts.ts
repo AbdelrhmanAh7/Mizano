@@ -156,9 +156,9 @@ export function getAccountTypeLabel(type: BankAccountType, t: (key: string) => s
 
 export function getAccountTypeColor(type: BankAccountType): string {
   const colors: Record<BankAccountType, string> = {
-    BANK: 'bg-blue-100 text-blue-800',
-    CREDIT_CARD: 'bg-purple-100 text-purple-800',
-    PETTY_CASH: 'bg-yellow-100 text-yellow-800',
+    BANK: 'bg-info/10 text-info',
+    CREDIT_CARD: 'bg-primary/10 text-primary',
+    PETTY_CASH: 'bg-warning/10 text-warning',
   };
-  return colors[type] || 'bg-gray-100 text-gray-800';
+  return colors[type] || 'bg-muted text-foreground';
 }

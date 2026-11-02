@@ -193,7 +193,9 @@ export default function RunPayrollPage() {
         <div className="flex items-center gap-2">
           <div
             className={`w-8 h-8 rounded-full flex items-center justify-center ${
-              step === 'select' ? 'bg-primary text-primary-foreground' : 'bg-green-500 text-white'
+              step === 'select'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-success text-success-foreground'
             }`}
           >
             {step === 'select' ? '1' : <CheckCircle2 className="h-5 w-5" />}
@@ -214,7 +216,7 @@ export default function RunPayrollPage() {
                 ? 'bg-muted text-muted-foreground'
                 : step === 'preview'
                   ? 'bg-primary text-primary-foreground'
-                  : 'bg-green-500 text-white'
+                  : 'bg-success text-success-foreground'
             }`}
           >
             {step === 'confirm' ? <CheckCircle2 className="h-5 w-5" /> : '2'}
@@ -323,7 +325,7 @@ export default function RunPayrollPage() {
                 <p className="text-sm text-muted-foreground">
                   {t('payroll.preview.totalDeductions')}
                 </p>
-                <p className="text-2xl font-bold font-mono text-red-600">
+                <p className="text-2xl font-bold font-mono text-destructive">
                   <span dir="ltr">-{formatCurrency(totalDeductions)}</span>
                 </p>
               </CardContent>
@@ -368,7 +370,7 @@ export default function RunPayrollPage() {
                       <TableCell className="text-end font-mono">
                         {formatCurrency(slip.basicSalary)}
                       </TableCell>
-                      <TableCell className="text-end font-mono text-green-600">
+                      <TableCell className="text-end font-mono text-success">
                         <span dir="ltr">+{formatCurrency(slip.totalAllowances)}</span>
                       </TableCell>
                       <TableCell className="text-end font-mono">
@@ -376,17 +378,17 @@ export default function RunPayrollPage() {
                       </TableCell>
                       <TableCell className="text-end">
                         {slip.lopDays > 0 ? (
-                          <span className="text-red-600">
+                          <span className="text-destructive">
                             {t('payroll.lopDays', { days: slip.lopDays })}
                           </span>
                         ) : (
                           '-'
                         )}
                       </TableCell>
-                      <TableCell className="text-end font-mono text-red-600">
+                      <TableCell className="text-end font-mono text-destructive">
                         <span dir="ltr">-{formatCurrency(slip.totalDeductions)}</span>
                       </TableCell>
-                      <TableCell className="text-end font-mono text-red-600">
+                      <TableCell className="text-end font-mono text-destructive">
                         <span dir="ltr">-{formatCurrency(slip.taxAmount)}</span>
                       </TableCell>
                       <TableCell className="text-end font-mono font-medium">
@@ -418,7 +420,7 @@ export default function RunPayrollPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-center space-y-4">
-              <CheckCircle2 className="mx-auto h-16 w-16 text-green-500" />
+              <CheckCircle2 className="mx-auto h-16 w-16 text-success" />
               <h2 className="text-2xl font-bold">{t('payroll.success.title')}</h2>
               <p className="text-muted-foreground">
                 {t('payroll.success.description', {

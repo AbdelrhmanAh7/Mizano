@@ -67,7 +67,7 @@ function BankRulesPageContent() {
       ),
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
-          <Zap className="h-4 w-4 text-yellow-500" />
+          <Zap className="h-4 w-4 text-warning" />
           <span className="font-medium">{row.original.name}</span>
         </div>
       ),
@@ -113,7 +113,7 @@ function BankRulesPageContent() {
         return (
           <button onClick={() => handleToggleActive(rule)} className="inline-flex items-center">
             {rule.isActive ? (
-              <Badge className="bg-green-100 text-green-800 hover:bg-green-200">
+              <Badge className="bg-success/10 text-success hover:bg-success/20">
                 <ToggleRight className="me-1 h-3 w-3" />
                 {t('rules.active')}
               </Badge>
@@ -147,7 +147,7 @@ function BankRulesPageContent() {
                   {tc('buttons.edit')}
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(rule.id)}>
+              <DropdownMenuItem className="text-destructive" onClick={() => setDeleteId(rule.id)}>
                 <Trash2 className="me-2 h-4 w-4" />
                 {tc('buttons.delete')}
               </DropdownMenuItem>

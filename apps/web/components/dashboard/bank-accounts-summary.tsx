@@ -41,8 +41,8 @@ export function BankAccountsSummary({ accounts }: BankAccountsSummaryProps) {
                   key={account.id}
                   className="flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors"
                 >
-                  <div className="p-2 rounded-lg bg-blue-100">
-                    <Building2 className="h-4 w-4 text-blue-600" />
+                  <div className="p-2 rounded-lg bg-info/10">
+                    <Building2 className="h-4 w-4 text-info" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{account.name}</p>
@@ -56,7 +56,7 @@ export function BankAccountsSummary({ accounts }: BankAccountsSummaryProps) {
                       <p
                         className={cn(
                           'text-[10px] font-mono',
-                          diff > 0 ? 'text-amber-600' : 'text-amber-600',
+                          diff > 0 ? 'text-warning' : 'text-warning',
                         )}
                       >
                         {t('bankDiff')}: {diff > 0 ? '+' : ''}

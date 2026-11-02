@@ -130,7 +130,7 @@ function PaymentsMadePageContent() {
       cell: ({ row }) => (
         <Link
           href={`/purchases/payments/${row.original.id}`}
-          className="font-mono text-blue-600 hover:underline"
+          className="font-mono text-primary hover:underline"
         >
           {row.original.paymentNumber}
         </Link>
@@ -323,7 +323,7 @@ function PaymentsMadePageContent() {
             <AlertDialogAction
               onClick={handleVoid}
               disabled={isVoiding}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95"
             >
               {t('payments.void')}
             </AlertDialogAction>

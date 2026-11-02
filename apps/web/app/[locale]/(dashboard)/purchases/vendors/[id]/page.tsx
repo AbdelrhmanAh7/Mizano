@@ -226,7 +226,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
                 {vendor.email && (
                   <div className="flex items-center gap-3">
                     <Mail className="h-4 w-4 text-muted-foreground" />
-                    <a href={`mailto:${vendor.email}`} className="text-blue-600 hover:underline">
+                    <a href={`mailto:${vendor.email}`} className="text-primary hover:underline">
                       {vendor.email}
                     </a>
                   </div>
@@ -237,7 +237,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
                     <a
                       href={`tel:${vendor.phone}`}
                       dir="ltr"
-                      className="text-blue-600 hover:underline"
+                      className="text-primary hover:underline"
                     >
                       {vendor.phone}
                     </a>
@@ -350,7 +350,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
                         <TableCell>
                           <Link
                             href={`/purchases/bills/${bill.id}`}
-                            className="text-blue-600 hover:underline"
+                            className="text-primary hover:underline"
                           >
                             {bill.billNumber}
                           </Link>
@@ -443,7 +443,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
                         <TableCell>
                           <Link
                             href={`/purchases/payments/${payment.id}`}
-                            className="text-blue-600 hover:underline"
+                            className="text-primary hover:underline"
                           >
                             {payment.paymentNumber}
                           </Link>
@@ -491,7 +491,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
                         <TableCell>
                           <Link
                             href={`/purchases/vendor-credits/${credit.id}`}
-                            className="text-blue-600 hover:underline"
+                            className="text-primary hover:underline"
                           >
                             {credit.creditNumber}
                           </Link>

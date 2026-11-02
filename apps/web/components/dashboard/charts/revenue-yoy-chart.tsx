@@ -30,13 +30,24 @@ export const RevenueYoYChart = memo(function RevenueYoYChart({
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="month" tickFormatter={monthLabel} {...CHART_AXIS} />
         <YAxis {...CHART_AXIS} tickFormatter={(v) => formatCompactCurrency(v, currency)} />
-        <Tooltip labelFormatter={monthLabel}
+        <Tooltip
+          labelFormatter={monthLabel}
           formatter={(value: number) => formatCompactCurrency(value, currency)}
           contentStyle={CHART_TOOLTIP_STYLE}
         />
         <Legend />
-        <Bar dataKey="currentYear" name={t('currentYear')} fill="#3b82f6" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="previousYear" name={t('previousYear')} fill="#94a3b8" radius={[4, 4, 0, 0]} />
+        <Bar
+          dataKey="currentYear"
+          name={t('currentYear')}
+          fill="hsl(var(--chart-2))"
+          radius={[4, 4, 0, 0]}
+        />
+        <Bar
+          dataKey="previousYear"
+          name={t('previousYear')}
+          fill="hsl(var(--muted-foreground))"
+          radius={[4, 4, 0, 0]}
+        />
       </BarChart>
     </ChartCard>
   );

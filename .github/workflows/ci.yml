@@ -99,6 +99,9 @@ jobs:
       - name: Run TypeScript type check
         run: pnpm turbo run type-check
 
+      - name: Type-check browser journeys
+        run: pnpm exec tsc -p e2e-browser/tsconfig.json
+
   # ==========================================
   # Dead code & duplication: knip (knip.json) and jscpd (.jscpd.json, fails above its threshold).
   # Separate job so Lint & Type Check keeps its 5-minute budget; neither needs the Prisma client.

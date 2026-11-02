@@ -265,7 +265,7 @@ export function FlowlineConnect() {
         />
       )}
       {catalog.data && !catalog.data.encryptionConfigured && (
-        <div className="rounded-md border border-amber-500 bg-amber-50 p-4 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+        <div className="rounded-md border border-warning bg-warning/5 p-4 text-sm text-warning">
           {t('encryptionMissing')}
         </div>
       )}

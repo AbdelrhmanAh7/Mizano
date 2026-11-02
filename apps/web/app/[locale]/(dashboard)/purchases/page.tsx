@@ -71,8 +71,8 @@ export default function PurchasesPage() {
       description: t('overview.modules.vendors.description'),
       icon: Users,
       href: '/purchases/vendors',
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-500',
+      color: 'text-info',
+      bgColor: 'bg-info text-info-foreground',
       stats: t('overview.modules.vendors.stats', { count: vendors.length }),
     },
     {
@@ -80,8 +80,8 @@ export default function PurchasesPage() {
       description: t('overview.modules.expenses.description'),
       icon: Receipt,
       href: '/purchases/expenses',
-      color: 'text-red-600',
-      bgColor: 'bg-red-500',
+      color: 'text-destructive',
+      bgColor: 'bg-destructive text-destructive-foreground',
       stats: t('overview.modules.expenses.stats', { count: expenses.length }),
     },
     {
@@ -89,8 +89,8 @@ export default function PurchasesPage() {
       description: t('overview.modules.bills.description'),
       icon: FileText,
       href: '/purchases/bills',
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-500',
+      color: 'text-primary',
+      bgColor: 'bg-primary text-primary-foreground',
       stats: t('overview.modules.bills.stats', { count: unpaidBills.length }),
     },
     {
@@ -98,8 +98,8 @@ export default function PurchasesPage() {
       description: t('overview.modules.payments.description'),
       icon: Banknote,
       href: '/purchases/payments',
-      color: 'text-emerald-600',
-      bgColor: 'bg-emerald-500',
+      color: 'text-success',
+      bgColor: 'bg-success text-success-foreground',
       stats: t('overview.modules.payments.stats'),
     },
     {
@@ -107,8 +107,8 @@ export default function PurchasesPage() {
       description: t('overview.modules.credits.description'),
       icon: CreditCard,
       href: '/purchases/credits',
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-500',
+      color: 'text-warning',
+      bgColor: 'bg-warning text-warning-foreground',
       stats: t('overview.modules.credits.stats'),
     },
   ];
@@ -143,13 +143,15 @@ export default function PurchasesPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t('overview.overdueAmount')}</CardTitle>
-            <AlertCircle className="h-4 w-4 text-red-500" />
+            <AlertCircle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-red-600">{formatCurrency(overdueAmount)}</div>
+              <div className="text-2xl font-bold text-destructive">
+                {formatCurrency(overdueAmount)}
+              </div>
             )}
             <p className="text-xs text-muted-foreground">
               {t('overview.overdueBillsCount', { count: overdueBills.length })}
@@ -175,13 +177,13 @@ export default function PurchasesPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t('overview.paidThisMonth')}</CardTitle>
-            <DollarSign className="h-4 w-4 text-green-500" />
+            <DollarSign className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-green-600">{paidThisMonth.length}</div>
+              <div className="text-2xl font-bold text-success">{paidThisMonth.length}</div>
             )}
             <p className="text-xs text-muted-foreground">{t('overview.paidThisMonthHint')}</p>
           </CardContent>
@@ -217,7 +219,7 @@ export default function PurchasesPage() {
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-lg ${module.bgColor}`}>
-                  <module.icon className="h-5 w-5 text-white" />
+                  <module.icon className="h-5 w-5" />
                 </div>
                 <div>
                   <CardTitle className="text-xl">{module.title}</CardTitle>
@@ -304,7 +306,7 @@ export default function PurchasesPage() {
         {/* Overdue Bills */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg text-red-600">{t('overview.overdueBills')}</CardTitle>
+            <CardTitle className="text-lg text-destructive">{t('overview.overdueBills')}</CardTitle>
             {overdueBills.length > 0 && (
               <Button asChild variant="outline" size="sm">
                 <Link href="/purchases/bills?status=OVERDUE">{t('overview.viewAll')}</Link>
@@ -342,10 +344,10 @@ export default function PurchasesPage() {
                             <p className="text-xs text-muted-foreground">{bill.vendor?.name}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-xs text-red-600">
+                            <p className="text-xs text-destructive">
                               {t('overview.daysOverdue', { days: daysOverdue })}
                             </p>
-                            <p className="text-sm font-mono font-semibold text-red-600">
+                            <p className="text-sm font-mono font-semibold text-destructive">
                               {formatCurrency(bill.balanceDue)}
                             </p>
                           </div>

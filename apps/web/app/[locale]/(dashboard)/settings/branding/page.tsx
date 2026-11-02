@@ -1,5 +1,6 @@
 'use client';
 
+import { BRAND_COLORS } from '@mizano/shared-types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -28,7 +29,7 @@ export default function BrandingSettingsPage() {
 
   const form = useForm<FormData>({
     defaultValues: {
-      primaryColor: '#3B82F6',
+      primaryColor: BRAND_COLORS.primary,
       footerText: '',
     },
   });
@@ -36,7 +37,7 @@ export default function BrandingSettingsPage() {
   useEffect(() => {
     if (settings?.branding) {
       form.reset({
-        primaryColor: settings.branding.primaryColor || '#3B82F6',
+        primaryColor: settings.branding.primaryColor || BRAND_COLORS.primary,
         footerText: settings.branding.footerText || '',
       });
     }
@@ -98,7 +99,7 @@ export default function BrandingSettingsPage() {
                 <Input
                   {...form.register('primaryColor')}
                   className="max-w-[140px] font-mono"
-                  placeholder="#3B82F6"
+                  placeholder={BRAND_COLORS.primary}
                 />
                 {/* Preview */}
                 <div

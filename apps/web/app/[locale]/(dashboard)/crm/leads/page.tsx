@@ -60,10 +60,10 @@ function ScoreBadge({ score }: { score?: { totalScore: number; tier: string } })
   if (!score) return <span className="text-muted-foreground">-</span>;
 
   const tierColors: Record<string, string> = {
-    HOT: 'bg-red-100 text-red-800 border-red-200',
-    WARM: 'bg-orange-100 text-orange-800 border-orange-200',
-    COOL: 'bg-blue-100 text-blue-800 border-blue-200',
-    COLD: 'bg-gray-100 text-gray-800 border-gray-200',
+    HOT: 'bg-destructive/10 text-destructive border-destructive/30',
+    WARM: 'bg-warning/10 text-warning border-warning/30',
+    COOL: 'bg-info/10 text-info border-info/30',
+    COLD: 'bg-muted text-foreground border-border',
   };
 
   return (
@@ -155,7 +155,7 @@ function LeadsPageContent() {
       header: 'Email',
       cell: ({ row }) =>
         row.original.email ? (
-          <a href={`mailto:${row.original.email}`} className="text-blue-600 hover:underline">
+          <a href={`mailto:${row.original.email}`} className="text-primary hover:underline">
             {row.original.email}
           </a>
         ) : (
@@ -215,7 +215,7 @@ function LeadsPageContent() {
               {canDelete && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleDelete(lead)} className="text-red-600">
+                  <DropdownMenuItem onClick={() => handleDelete(lead)} className="text-destructive">
                     <Trash2 className="mr-2 h-4 w-4" />
                     Delete
                   </DropdownMenuItem>

@@ -209,9 +209,9 @@ export function formatVendorAddress(vendor: Vendor): string {
  * Get outstanding balance color class
  */
 export function getBalanceColor(balance: string | number | undefined): string {
-  if (balance === undefined || balance === null) return 'text-gray-600';
+  if (balance === undefined || balance === null) return 'text-muted-foreground';
   const value = typeof balance === 'string' ? parseFloat(balance) : balance;
-  if (value > 0) return 'text-red-600 font-semibold';
-  if (value < 0) return 'text-green-600';
-  return 'text-gray-600';
+  if (value > 0) return 'text-destructive font-semibold';
+  if (value < 0) return 'text-success';
+  return 'text-muted-foreground';
 }

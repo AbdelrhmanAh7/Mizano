@@ -169,7 +169,7 @@ function RecurringProfilesPageContent() {
       cell: ({ row }) => (
         <Badge
           className={
-            row.original.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+            row.original.isActive ? 'bg-success/10 text-success' : 'bg-muted text-foreground'
           }
         >
           {row.original.isActive ? tPage('active') : tPage('inactive')}
@@ -228,7 +228,10 @@ function RecurringProfilesPageContent() {
                 </>
               )}
               {canDelete && (
-                <DropdownMenuItem onClick={() => handleDelete(profile)} className="text-red-600">
+                <DropdownMenuItem
+                  onClick={() => handleDelete(profile)}
+                  className="text-destructive"
+                >
                   <Trash2 className="me-2 h-4 w-4" />
                   {tPage('delete')}
                 </DropdownMenuItem>
@@ -275,10 +278,10 @@ function RecurringProfilesPageContent() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">{tPage('activeProfiles')}</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
+              <CheckCircle className="h-4 w-4 text-success" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{statistics.active ?? 0}</div>
+              <div className="text-2xl font-bold text-success">{statistics.active ?? 0}</div>
             </CardContent>
           </Card>
           <Card>
@@ -293,12 +296,10 @@ function RecurringProfilesPageContent() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">{tPage('dueThisWeek')}</CardTitle>
-              <Clock className="h-4 w-4 text-orange-500" />
+              <Clock className="h-4 w-4 text-warning" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-orange-600">
-                {statistics.dueThisWeek ?? 0}
-              </div>
+              <div className="text-2xl font-bold text-warning">{statistics.dueThisWeek ?? 0}</div>
             </CardContent>
           </Card>
         </div>

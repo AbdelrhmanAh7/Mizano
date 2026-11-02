@@ -359,8 +359,8 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <CreditCard className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-info/10 rounded-lg">
+                <CreditCard className="h-5 w-5 text-info" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('credits.total')}</p>
@@ -373,8 +373,8 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Calendar className="h-5 w-5 text-green-600" />
+              <div className="p-2 bg-success/10 rounded-lg">
+                <Calendar className="h-5 w-5 text-success" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('credits.date')}</p>
@@ -389,8 +389,8 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Building2 className="h-5 w-5 text-purple-600" />
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Building2 className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('credits.balanceRemaining')}</p>
@@ -414,7 +414,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
               <span className="text-muted-foreground">{t('credits.vendor')}</span>
               <Link
                 href={`/purchases/vendors/${credit.vendorId}`}
-                className="text-blue-600 hover:underline"
+                className="text-primary hover:underline"
               >
                 {credit.vendor?.name}
               </Link>
@@ -434,7 +434,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                 <span className="text-muted-foreground">{t('credits.appliedToBill')}</span>
                 <Link
                   href={`/purchases/bills/${credit.billId}`}
-                  className="font-mono text-blue-600 hover:underline"
+                  className="font-mono text-primary hover:underline"
                 >
                   {credit.bill.billNumber}
                 </Link>
@@ -462,7 +462,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
               </div>
               <div className="flex justify-between text-lg border-t pt-3">
                 <span className="text-muted-foreground">{t('credits.balanceRemaining')}</span>
-                <span className="font-mono font-bold text-green-600">
+                <span className="font-mono font-bold text-success">
                   {formatCurrency(credit.appliedToBillId ? '0' : credit.amount)}
                 </span>
               </div>

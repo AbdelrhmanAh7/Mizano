@@ -160,7 +160,7 @@ function PayrollPageContent() {
       header: t('payroll.table.deductions'),
       meta: { headerClassName: 'text-end', cellClassName: 'text-end' },
       cell: ({ row }) => (
-        <span className="font-mono text-red-600">
+        <span className="font-mono text-destructive">
           <span dir="ltr">-{formatCurrency(row.original.totalDeductions || 0)}</span>
         </span>
       ),
@@ -230,8 +230,8 @@ function PayrollPageContent() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <DollarSign className="h-5 w-5 text-green-600" />
+              <div className="p-2 bg-success/10 rounded-lg">
+                <DollarSign className="h-5 w-5 text-success" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('payroll.totalPaid')}</p>
@@ -243,8 +243,8 @@ function PayrollPageContent() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <FileText className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-info/10 rounded-lg">
+                <FileText className="h-5 w-5 text-info" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('payroll.runsCount')}</p>
@@ -256,8 +256,8 @@ function PayrollPageContent() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <Users className="h-5 w-5 text-yellow-600" />
+              <div className="p-2 bg-warning/10 rounded-lg">
+                <Users className="h-5 w-5 text-warning" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('payroll.pending')}</p>
@@ -269,8 +269,8 @@ function PayrollPageContent() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <CheckCircle2 className="h-5 w-5 text-purple-600" />
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <CheckCircle2 className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('payroll.confirmed')}</p>

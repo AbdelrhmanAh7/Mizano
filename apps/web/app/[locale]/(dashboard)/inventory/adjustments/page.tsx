@@ -68,7 +68,7 @@ function AdjustmentsPageContent() {
       cell: ({ row }) => (
         <Link
           href={`/inventory/adjustments/${row.original.id}`}
-          className="font-medium hover:text-blue-600 hover:underline"
+          className="font-medium hover:text-primary hover:underline"
         >
           {row.original.adjustmentNumber}
         </Link>
@@ -93,14 +93,14 @@ function AdjustmentsPageContent() {
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
           {row.original.type === 'INCREASE' ? (
-            <ArrowUp className="h-4 w-4 text-green-600" />
+            <ArrowUp className="h-4 w-4 text-success" />
           ) : (
-            <ArrowDown className="h-4 w-4 text-red-600" />
+            <ArrowDown className="h-4 w-4 text-destructive" />
           )}
           <span
             className={cn(
               'font-medium',
-              row.original.type === 'INCREASE' ? 'text-green-600' : 'text-red-600',
+              row.original.type === 'INCREASE' ? 'text-success' : 'text-destructive',
             )}
           >
             {row.original.type === 'INCREASE'
@@ -128,7 +128,7 @@ function AdjustmentsPageContent() {
         <span
           className={cn(
             'font-medium',
-            row.original.type === 'INCREASE' ? 'text-green-600' : 'text-red-600',
+            row.original.type === 'INCREASE' ? 'text-success' : 'text-destructive',
           )}
         >
           {row.original.type === 'INCREASE' ? '+' : '-'}
@@ -207,7 +207,7 @@ function AdjustmentsPageContent() {
       {isError && (
         <div
           role="alert"
-          className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+          className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
         >
           {t('adjustments.loadError')}
         </div>

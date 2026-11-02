@@ -177,8 +177,8 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
       {transactions.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <Check className="mx-auto h-12 w-12 text-green-600" />
-            <h3 className="mt-4 text-lg font-semibold text-green-600">
+            <Check className="mx-auto h-12 w-12 text-success" />
+            <h3 className="mt-4 text-lg font-semibold text-success">
               {t('reconciliation.allCaughtUp')}
             </h3>
             <p className="text-muted-foreground">{t('reconciliation.allMatched')}</p>
@@ -214,9 +214,9 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             {tx.type === 'DEPOSIT' ? (
-                              <ArrowDownRight className="h-4 w-4 text-green-600" />
+                              <ArrowDownRight className="h-4 w-4 text-success" />
                             ) : (
-                              <ArrowUpRight className="h-4 w-4 text-red-600" />
+                              <ArrowUpRight className="h-4 w-4 text-destructive" />
                             )}
                             <span className="font-medium">{tx.description}</span>
                           </div>
@@ -229,7 +229,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                           <p
                             className={cn(
                               'font-mono font-medium',
-                              tx.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-600',
+                              tx.type === 'DEPOSIT' ? 'text-success' : 'text-destructive',
                             )}
                           >
                             {tx.type === 'DEPOSIT' ? '+' : '-'}
@@ -280,7 +280,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                           <span
                             className={cn(
                               'font-mono',
-                              selectedTx.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-600',
+                              selectedTx.type === 'DEPOSIT' ? 'text-success' : 'text-destructive',
                             )}
                           >
                             {selectedTx.type === 'DEPOSIT' ? '+' : '-'}
@@ -311,11 +311,11 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                               <div className="flex-1">
                                 <div className="flex items-center gap-2">
                                   {isRecordedPayment(match.type) ? (
-                                    <Banknote className="h-4 w-4 text-green-600" />
+                                    <Banknote className="h-4 w-4 text-success" />
                                   ) : match.type === 'INVOICE' ? (
-                                    <FileText className="h-4 w-4 text-blue-600" />
+                                    <FileText className="h-4 w-4 text-info" />
                                   ) : (
-                                    <Receipt className="h-4 w-4 text-orange-600" />
+                                    <Receipt className="h-4 w-4 text-warning" />
                                   )}
                                   <span className="font-medium">{match.number}</span>
                                   <Badge

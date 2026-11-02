@@ -383,8 +383,8 @@ export function getBOMStatusLabel(status: BOMStatus): string {
 
 export function getBOMStatusColor(status: BOMStatus): string {
   const colors: Record<BOMStatus, string> = {
-    ACTIVE: 'bg-green-100 text-green-800 border-green-200',
-    INACTIVE: 'bg-gray-100 text-gray-800 border-gray-200',
+    ACTIVE: 'bg-success/10 text-success border-success/30',
+    INACTIVE: 'bg-muted text-foreground border-border',
   };
   return colors[status] || '';
 }
@@ -401,10 +401,10 @@ export function getWorkOrderStatusLabel(status: WorkOrderStatus): string {
 
 export function getWorkOrderStatusColor(status: WorkOrderStatus): string {
   const colors: Record<WorkOrderStatus, string> = {
-    DRAFT: 'bg-gray-100 text-gray-800 border-gray-200',
-    IN_PROCESS: 'bg-blue-100 text-blue-800 border-blue-200',
-    COMPLETED: 'bg-green-100 text-green-800 border-green-200',
-    CANCELLED: 'bg-red-100 text-red-800 border-red-200',
+    DRAFT: 'bg-muted text-foreground border-border',
+    IN_PROCESS: 'bg-info/10 text-info border-info/30',
+    COMPLETED: 'bg-success/10 text-success border-success/30',
+    CANCELLED: 'bg-destructive/10 text-destructive border-destructive/30',
   };
   return colors[status] || '';
 }

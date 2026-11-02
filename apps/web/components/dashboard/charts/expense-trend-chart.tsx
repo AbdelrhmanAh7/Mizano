@@ -30,7 +30,8 @@ export const ExpenseTrendChart = memo(function ExpenseTrendChart({
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="month" tickFormatter={monthLabel} {...CHART_AXIS} />
         <YAxis {...CHART_AXIS} tickFormatter={(value) => formatCompactCurrency(value, currency)} />
-        <Tooltip labelFormatter={monthLabel}
+        <Tooltip
+          labelFormatter={monthLabel}
           formatter={(value: number) => formatCompactCurrency(value, currency)}
           contentStyle={CHART_TOOLTIP_STYLE}
         />
@@ -38,7 +39,7 @@ export const ExpenseTrendChart = memo(function ExpenseTrendChart({
         <Bar
           dataKey="amount"
           name={t('expenses')}
-          fill="#ef4444"
+          fill="hsl(var(--destructive))"
           fillOpacity={0.6}
           radius={[4, 4, 0, 0]}
         />

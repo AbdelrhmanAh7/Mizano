@@ -1,3 +1,4 @@
+import { BRAND_COLORS } from '@mizano/shared-types';
 import {
   OrganizationInfo,
   formatCurrency,
@@ -68,7 +69,7 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
         <!-- Payslip Title -->
         <div style="text-align: center; margin-bottom: 30px;">
           <h2 style="font-size: 24px; color: ${primaryColor}; margin-bottom: 5px;">PAYSLIP</h2>
-          <p style="color: #6B7280; font-size: 14px;">${payPeriod}</p>
+          <p style="color: ${BRAND_COLORS.muted}; font-size: 14px;">${payPeriod}</p>
         </div>
 
         <!-- Employee Details -->
@@ -77,18 +78,18 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">Employee Details</h4>
             <table style="font-size: 12px;">
               <tr>
-                <td style="padding: 3px 15px 3px 0; color: #6B7280;">Name:</td>
+                <td style="padding: 3px 15px 3px 0; color: ${BRAND_COLORS.muted};">Name:</td>
                 <td style="font-weight: bold;">${escapeHtml(payslip.employee.name)}</td>
               </tr>
               <tr>
-                <td style="padding: 3px 15px 3px 0; color: #6B7280;">Employee ID:</td>
+                <td style="padding: 3px 15px 3px 0; color: ${BRAND_COLORS.muted};">Employee ID:</td>
                 <td>${escapeHtml(payslip.employee.employeeId)}</td>
               </tr>
               ${
                 payslip.employee.department
                   ? `
                 <tr>
-                  <td style="padding: 3px 15px 3px 0; color: #6B7280;">Department:</td>
+                  <td style="padding: 3px 15px 3px 0; color: ${BRAND_COLORS.muted};">Department:</td>
                   <td>${escapeHtml(payslip.employee.department)}</td>
                 </tr>
               `
@@ -98,7 +99,7 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
                 payslip.employee.position || payslip.employee.jobTitle
                   ? `
                 <tr>
-                  <td style="padding: 3px 15px 3px 0; color: #6B7280;">Position:</td>
+                  <td style="padding: 3px 15px 3px 0; color: ${BRAND_COLORS.muted};">Position:</td>
                   <td>${escapeHtml(payslip.employee.position || payslip.employee.jobTitle || '')}</td>
                 </tr>
               `
@@ -109,18 +110,18 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
           <div style="text-align: right;">
             <table style="margin-left: auto; font-size: 12px;">
               <tr>
-                <td style="padding: 3px 15px 3px 0; color: #6B7280;">Payslip No:</td>
+                <td style="padding: 3px 15px 3px 0; color: ${BRAND_COLORS.muted};">Payslip No:</td>
                 <td style="font-weight: bold;">${escapeHtml(payslip.payslipNumber)}</td>
               </tr>
               <tr>
-                <td style="padding: 3px 15px 3px 0; color: #6B7280;">Pay Date:</td>
+                <td style="padding: 3px 15px 3px 0; color: ${BRAND_COLORS.muted};">Pay Date:</td>
                 <td style="font-weight: bold;">${formatDate(payslip.payDate)}</td>
               </tr>
               ${
                 payslip.employee.bankAccount
                   ? `
                 <tr>
-                  <td style="padding: 3px 15px 3px 0; color: #6B7280;">Bank Account:</td>
+                  <td style="padding: 3px 15px 3px 0; color: ${BRAND_COLORS.muted};">Bank Account:</td>
                   <td>${escapeHtml(payslip.employee.bankAccount)}</td>
                 </tr>
               `
@@ -161,7 +162,7 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
 
           <!-- Deductions -->
           <div style="flex: 1;">
-            <h4 style="color: #EF4444; margin-bottom: 15px; font-size: 12px; text-transform: uppercase; border-bottom: 2px solid #EF4444; padding-bottom: 5px;">
+            <h4 style="color: ${BRAND_COLORS.danger}; margin-bottom: 15px; font-size: 12px; text-transform: uppercase; border-bottom: 2px solid ${BRAND_COLORS.danger}; padding-bottom: 5px;">
               Deductions
             </h4>
             <table style="width: 100%; font-size: 12px;">
@@ -172,7 +173,7 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
                         (d) => `
                 <tr style="border-bottom: 1px solid ${defaultTemplateConfig.colors.border};">
                   <td style="padding: 8px 0;">${escapeHtml(d.description)}</td>
-                  <td style="padding: 8px 0; text-align: right; color: #EF4444;">
+                  <td style="padding: 8px 0; text-align: right; color: ${BRAND_COLORS.danger};">
                     -${formatCurrency(d.amount, payslip.currency)}
                   </td>
                 </tr>
@@ -181,14 +182,14 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
                       .join('')
                   : `
                 <tr style="border-bottom: 1px solid ${defaultTemplateConfig.colors.border};">
-                  <td style="padding: 8px 0; color: #9CA3AF;">No deductions</td>
+                  <td style="padding: 8px 0; color: ${BRAND_COLORS.muted};">No deductions</td>
                   <td style="padding: 8px 0; text-align: right;">-</td>
                 </tr>
               `
               }
               <tr style="background: ${defaultTemplateConfig.colors.lightGray};">
                 <td style="padding: 10px 0; font-weight: bold;">Total Deductions</td>
-                <td style="padding: 10px 0; text-align: right; font-weight: bold; font-size: 14px; color: #EF4444;">
+                <td style="padding: 10px 0; text-align: right; font-weight: bold; font-size: 14px; color: ${BRAND_COLORS.danger};">
                   -${formatCurrency(payslip.totalDeductions, payslip.currency)}
                 </td>
               </tr>
@@ -210,15 +211,15 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
             <h4 style="color: ${primaryColor}; margin-bottom: 15px; font-size: 12px; text-transform: uppercase;">Year To Date</h4>
             <div style="display: flex; gap: 20px;">
               <div style="flex: 1; background: ${defaultTemplateConfig.colors.lightGray}; padding: 15px; border-radius: 8px; text-align: center;">
-                <p style="font-size: 10px; color: #6B7280; margin-bottom: 5px;">YTD Gross</p>
+                <p style="font-size: 10px; color: ${BRAND_COLORS.muted}; margin-bottom: 5px;">YTD Gross</p>
                 <p style="font-size: 16px; font-weight: bold;">${formatCurrency(payslip.ytdGross, payslip.currency)}</p>
               </div>
               <div style="flex: 1; background: ${defaultTemplateConfig.colors.lightGray}; padding: 15px; border-radius: 8px; text-align: center;">
-                <p style="font-size: 10px; color: #6B7280; margin-bottom: 5px;">YTD Deductions</p>
-                <p style="font-size: 16px; font-weight: bold; color: #EF4444;">-${formatCurrency(payslip.ytdDeductions || 0, payslip.currency)}</p>
+                <p style="font-size: 10px; color: ${BRAND_COLORS.muted}; margin-bottom: 5px;">YTD Deductions</p>
+                <p style="font-size: 16px; font-weight: bold; color: ${BRAND_COLORS.danger};">-${formatCurrency(payslip.ytdDeductions || 0, payslip.currency)}</p>
               </div>
               <div style="flex: 1; background: ${defaultTemplateConfig.colors.lightGray}; padding: 15px; border-radius: 8px; text-align: center;">
-                <p style="font-size: 10px; color: #6B7280; margin-bottom: 5px;">YTD Net</p>
+                <p style="font-size: 10px; color: ${BRAND_COLORS.muted}; margin-bottom: 5px;">YTD Net</p>
                 <p style="font-size: 16px; font-weight: bold; color: ${primaryColor};">${formatCurrency(payslip.ytdNet || 0, payslip.currency)}</p>
               </div>
             </div>
@@ -229,10 +230,10 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
 
         <!-- Footer -->
         <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid ${defaultTemplateConfig.colors.border}; text-align: center;">
-          <p style="color: #9CA3AF; font-size: 10px;">
+          <p style="color: ${BRAND_COLORS.muted}; font-size: 10px;">
             This is a computer-generated payslip and does not require a signature.
           </p>
-          ${org.footerText ? `<p style="color: #9CA3AF; font-size: 10px; margin-top: 10px;">${escapeHtml(org.footerText)}</p>` : ''}
+          ${org.footerText ? `<p style="color: ${BRAND_COLORS.muted}; font-size: 10px; margin-top: 10px;">${escapeHtml(org.footerText)}</p>` : ''}
           ${brandFooterHtml()}
         </div>
       </div>

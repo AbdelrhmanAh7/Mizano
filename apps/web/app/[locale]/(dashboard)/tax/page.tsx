@@ -38,7 +38,7 @@ export default function TaxPage() {
       description: t('rates.description'),
       icon: Percent,
       href: '/tax/rates',
-      color: 'bg-blue-500',
+      color: 'bg-info text-info-foreground',
       stats: stats ? t('hub.activeCount', { count: stats.activeRates }) : undefined,
     },
     {
@@ -46,7 +46,7 @@ export default function TaxPage() {
       description: t('returns.description'),
       icon: FileText,
       href: '/tax/returns',
-      color: 'bg-green-500',
+      color: 'bg-success text-success-foreground',
       stats: stats ? t('hub.pendingCount', { count: stats.pendingReturns }) : undefined,
     },
     {
@@ -54,7 +54,7 @@ export default function TaxPage() {
       description: t('payments.description'),
       icon: CreditCard,
       href: '/tax/payments',
-      color: 'bg-purple-500',
+      color: 'bg-primary text-primary-foreground',
       stats: stats ? formatCurrency(stats.totalPaid) : undefined,
     },
   ];
@@ -116,13 +116,13 @@ export default function TaxPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t('hub.stats.pendingReturns')}</CardTitle>
-            <Clock className="h-4 w-4 text-amber-500" />
+            <Clock className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-amber-600">{stats?.pendingReturns ?? 0}</div>
+              <div className="text-2xl font-bold text-warning">{stats?.pendingReturns ?? 0}</div>
             )}
             <p className="text-xs text-muted-foreground">
               {stats
@@ -135,13 +135,13 @@ export default function TaxPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t('hub.stats.outstandingVat')}</CardTitle>
-            <AlertCircle className="h-4 w-4 text-red-500" />
+            <AlertCircle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-red-600">
+              <div className="text-2xl font-bold text-destructive">
                 {formatCurrency(stats?.outstandingVAT ?? 0)}
               </div>
             )}
@@ -152,13 +152,13 @@ export default function TaxPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t('hub.stats.totalPaid')}</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-500" />
+            <TrendingUp className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-green-600">
+              <div className="text-2xl font-bold text-success">
                 {formatCurrency(stats?.totalPaid ?? 0)}
               </div>
             )}
@@ -174,7 +174,7 @@ export default function TaxPage() {
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-lg ${module.color}`}>
-                  <module.icon className="h-5 w-5 text-white" />
+                  <module.icon className="h-5 w-5" />
                 </div>
                 <div>
                   <CardTitle className="text-lg">{module.title}</CardTitle>
@@ -266,7 +266,7 @@ export default function TaxPage() {
                             {t(`returns.status.${ret.status as VATReturnStatus}`)}
                           </Badge>
                           <p
-                            className={`text-sm font-mono mt-1 ${netVal > 0 ? 'text-red-600' : 'text-green-600'}`}
+                            className={`text-sm font-mono mt-1 ${netVal > 0 ? 'text-destructive' : 'text-success'}`}
                           >
                             {formatCurrency(Math.abs(netVal))}
                           </p>
@@ -334,7 +334,7 @@ export default function TaxPage() {
                         <div className="text-right">
                           {daysUntilDue !== null && (
                             <p
-                              className={`text-xs font-medium ${isOverdue ? 'text-red-600' : 'text-amber-600'}`}
+                              className={`text-xs font-medium ${isOverdue ? 'text-destructive' : 'text-warning'}`}
                             >
                               {isOverdue
                                 ? t('hub.overdue', { days: Math.abs(daysUntilDue) })

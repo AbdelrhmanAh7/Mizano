@@ -79,7 +79,7 @@ function AccountTreeNode({ account, level, onEdit, onDelete, onAddChild }: Accou
 
           {/* Inactive indicator */}
           {!account.isActive && (
-            <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">
+            <Badge variant="secondary" className="text-xs bg-muted text-muted-foreground">
               {tTree('inactive')}
             </Badge>
           )}
@@ -114,7 +114,7 @@ function AccountTreeNode({ account, level, onEdit, onDelete, onAddChild }: Accou
               {onDelete && !account.isSystem && (
                 <DropdownMenuItem
                   onClick={() => onDelete(account)}
-                  className="text-red-600 focus:text-red-600"
+                  className="text-destructive focus:text-destructive"
                 >
                   <Trash2 className="me-2 h-4 w-4" />
                   {tTree('delete')}

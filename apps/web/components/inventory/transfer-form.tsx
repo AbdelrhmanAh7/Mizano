@@ -144,7 +144,7 @@ export function TransferForm({
                 </PopoverContent>
               </Popover>
               {form.formState.errors.date && (
-                <p className="text-sm text-red-500">{form.formState.errors.date.message}</p>
+                <p className="text-sm text-destructive">{form.formState.errors.date.message}</p>
               )}
             </div>
 
@@ -166,7 +166,7 @@ export function TransferForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.sourceWarehouseId && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {form.formState.errors.sourceWarehouseId.message}
                 </p>
               )}
@@ -192,7 +192,7 @@ export function TransferForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.destinationWarehouseId && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {form.formState.errors.destinationWarehouseId.message}
                 </p>
               )}
@@ -277,13 +277,13 @@ export function TransferForm({
                         type="number"
                         min="1"
                         max={availableStock}
-                        className={cn('w-24', transferQty > availableStock && 'border-red-500')}
+                        className={cn('w-24', transferQty > availableStock && 'border-destructive')}
                         {...form.register(`lines.${index}.quantity`, {
                           valueAsNumber: true,
                         })}
                       />
                       {transferQty > availableStock && selectedItemId && (
-                        <p className="text-xs text-red-500 mt-1">Exceeds available stock</p>
+                        <p className="text-xs text-destructive mt-1">Exceeds available stock</p>
                       )}
                     </TableCell>
                     <TableCell>
@@ -305,7 +305,7 @@ export function TransferForm({
           </Table>
 
           {form.formState.errors.lines && (
-            <p className="text-sm text-red-500 mt-2">{form.formState.errors.lines.message}</p>
+            <p className="text-sm text-destructive mt-2">{form.formState.errors.lines.message}</p>
           )}
 
           {/* Summary */}

@@ -30,7 +30,7 @@ export const VendorPaymentTimeChart = memo(function VendorPaymentTimeChart({
           contentStyle={CHART_TOOLTIP_STYLE}
           cursor={{ fill: 'hsl(var(--muted))' }}
         />
-        <Bar dataKey="avgDays" name={t('days')} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="avgDays" name={t('days')} fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ChartCard>
   );

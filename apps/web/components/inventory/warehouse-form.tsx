@@ -83,7 +83,7 @@ export function WarehouseForm({ warehouse, onSubmit, onCancel, isSubmitting }: W
               <Label htmlFor="name">Warehouse Name *</Label>
               <Input id="name" placeholder="Enter warehouse name" {...form.register('name')} />
               {form.formState.errors.name && (
-                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
+                <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
               )}
             </div>
 

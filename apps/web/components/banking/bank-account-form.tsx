@@ -114,7 +114,7 @@ export function BankAccountForm({
               <Label htmlFor="name">{tForm('name')} *</Label>
               <Input id="name" placeholder={tForm('nameExample')} {...form.register('name')} />
               {form.formState.errors.name && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {errorText(form.formState.errors.name.message)}
                 </p>
               )}
@@ -169,7 +169,7 @@ export function BankAccountForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.currency && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {errorText(form.formState.errors.currency.message)}
                 </p>
               )}
@@ -222,7 +222,7 @@ export function BankAccountForm({
               </SelectContent>
             </Select>
             {form.formState.errors.linkedAccountId && (
-              <p className="text-sm text-red-500">
+              <p className="text-sm text-destructive">
                 {errorText(form.formState.errors.linkedAccountId.message)}
               </p>
             )}

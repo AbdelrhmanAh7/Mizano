@@ -34,28 +34,28 @@ export default function BankingPage() {
       description: t('hub.accountsDescription'),
       icon: DollarSign,
       href: '/banking/accounts',
-      color: 'text-blue-600',
+      color: 'text-info',
     },
     {
       title: t('reconciliation.title'),
       description: t('hub.reconcileDescription'),
       icon: BarChart3,
       href: '/banking/reconcile',
-      color: 'text-green-600',
+      color: 'text-success',
     },
     {
       title: t('rules.title'),
       description: t('hub.rulesDescription'),
       icon: FileText,
       href: '/banking/rules',
-      color: 'text-purple-600',
+      color: 'text-primary',
     },
     {
       title: t('transactions.title'),
       description: t('hub.transactionsDescription'),
       icon: TrendingUp,
       href: '/banking/transactions',
-      color: 'text-orange-600',
+      color: 'text-warning',
     },
   ];
 
@@ -83,8 +83,8 @@ export default function BankingPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Landmark className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-info/10 rounded-lg">
+                <Landmark className="h-5 w-5 text-info" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('hub.totalAccounts')}</p>
@@ -103,8 +103,8 @@ export default function BankingPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <DollarSign className="h-5 w-5 text-green-600" />
+              <div className="p-2 bg-success/10 rounded-lg">
+                <DollarSign className="h-5 w-5 text-success" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('hub.totalBalance')}</p>
@@ -123,8 +123,8 @@ export default function BankingPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <Clock className="h-5 w-5 text-yellow-600" />
+              <div className="p-2 bg-warning/10 rounded-lg">
+                <Clock className="h-5 w-5 text-warning" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('hub.pendingTransactions')}</p>
@@ -143,8 +143,8 @@ export default function BankingPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-purple-600" />
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <TrendingUp className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('hub.thisMonth')}</p>

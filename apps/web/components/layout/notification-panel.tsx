@@ -194,14 +194,14 @@ export function NotificationPanel() {
                         onClick={() => handleNotificationClick(notification)}
                         className={cn(
                           'w-full flex items-start gap-3 px-4 py-3 text-start transition-colors hover:bg-muted/50',
-                          !notification.isRead && 'bg-blue-50/50 dark:bg-blue-950/20',
+                          !notification.isRead && 'bg-accent/50',
                         )}
                       >
                         <div
                           className={cn(
                             'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center',
                             !notification.isRead
-                              ? 'bg-blue-100 text-blue-600'
+                              ? 'bg-info/10 text-info'
                               : 'bg-muted text-muted-foreground',
                           )}
                         >
@@ -228,7 +228,7 @@ export function NotificationPanel() {
                         </div>
                         {!notification.isRead && (
                           <div className="flex-shrink-0 mt-1">
-                            <div className="h-2 w-2 rounded-full bg-blue-500" />
+                            <div className="h-2 w-2 rounded-full bg-info" />
                           </div>
                         )}
                       </button>

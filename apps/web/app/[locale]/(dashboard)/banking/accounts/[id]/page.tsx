@@ -166,7 +166,7 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
                 {getAccountTypeLabel(account.type, t)}
               </Badge>
               {!account.isActive && (
-                <Badge variant="outline" className="text-gray-500">
+                <Badge variant="outline" className="text-muted-foreground">
                   {tCommon('status.inactive')}
                 </Badge>
               )}
@@ -189,7 +189,7 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" className="text-red-600">
+              <Button variant="outline" className="text-destructive">
                 <Trash2 className="me-2 h-4 w-4" />
                 {t('accounts.deleteAccount')}
               </Button>
@@ -201,7 +201,10 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95"
+                >
                   {tCommon('buttons.delete')}
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -215,15 +218,15 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Landmark className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-info/10 rounded-lg">
+                <Landmark className="h-5 w-5 text-info" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('accounts.systemBalance')}</p>
                 <p
                   className={cn(
                     'text-2xl font-bold font-mono',
-                    currentBalance < 0 ? 'text-red-600' : 'text-green-600',
+                    currentBalance < 0 ? 'text-destructive' : 'text-success',
                   )}
                 >
                   {formatCurrency(currentBalance)}
@@ -248,7 +251,7 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
             <p
               className={cn(
                 'text-2xl font-bold font-mono',
-                Math.abs(difference) > 0.01 ? 'text-yellow-600' : 'text-green-600',
+                Math.abs(difference) > 0.01 ? 'text-warning' : 'text-success',
               )}
             >
               {formatCurrency(difference)}
@@ -306,7 +309,7 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
                 <Line
                   type="monotone"
                   dataKey="runningBalance"
-                  stroke="#2563eb"
+                  stroke="hsl(var(--primary))"
                   strokeWidth={2}
                   dot={false}
                 />
@@ -426,14 +429,14 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
                         <TableCell className="text-end">
                           <div className="flex items-center justify-end gap-2">
                             {tx.type === 'DEPOSIT' ? (
-                              <ArrowDownRight className="h-4 w-4 text-green-600" />
+                              <ArrowDownRight className="h-4 w-4 text-success" />
                             ) : (
-                              <ArrowUpRight className="h-4 w-4 text-red-600" />
+                              <ArrowUpRight className="h-4 w-4 text-destructive" />
                             )}
                             <span
                               className={cn(
                                 'font-mono font-medium',
-                                tx.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-600',
+                                tx.type === 'DEPOSIT' ? 'text-success' : 'text-destructive',
                               )}
                             >
                               {tx.type === 'DEPOSIT' ? '+' : '-'}

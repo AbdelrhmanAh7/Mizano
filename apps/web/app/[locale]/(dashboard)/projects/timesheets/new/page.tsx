@@ -146,7 +146,9 @@ export default function NewTimesheetPage() {
                   </SelectContent>
                 </Select>
                 {form.formState.errors.projectId && (
-                  <p className="text-sm text-red-500">{form.formState.errors.projectId.message}</p>
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.projectId.message}
+                  </p>
                 )}
               </div>
 
@@ -175,7 +177,7 @@ export default function NewTimesheetPage() {
                   </SelectContent>
                 </Select>
                 {form.formState.errors.taskId && (
-                  <p className="text-sm text-red-500">{form.formState.errors.taskId.message}</p>
+                  <p className="text-sm text-destructive">{form.formState.errors.taskId.message}</p>
                 )}
               </div>
             </div>
@@ -220,7 +222,7 @@ export default function NewTimesheetPage() {
                   {...form.register('hours')}
                 />
                 {form.formState.errors.hours && (
-                  <p className="text-sm text-red-500">{form.formState.errors.hours.message}</p>
+                  <p className="text-sm text-destructive">{form.formState.errors.hours.message}</p>
                 )}
               </div>
             </div>

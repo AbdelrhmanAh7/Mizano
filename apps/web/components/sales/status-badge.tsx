@@ -7,24 +7,24 @@ import { cn } from '@/lib/utils';
 export type InvoiceStatus = 'DRAFT' | 'SENT' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' | 'VOID';
 
 export const invoiceStatusColors: Record<InvoiceStatus, string> = {
-  DRAFT: 'bg-gray-100 text-gray-800 border-gray-200',
-  SENT: 'bg-blue-100 text-blue-800 border-blue-200',
-  PARTIALLY_PAID: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  PAID: 'bg-green-100 text-green-800 border-green-200',
-  OVERDUE: 'bg-red-100 text-red-800 border-red-200',
-  VOID: 'bg-gray-100 text-gray-500 border-gray-200',
+  DRAFT: 'bg-muted text-foreground border-border',
+  SENT: 'bg-info/10 text-info border-info/30',
+  PARTIALLY_PAID: 'bg-warning/10 text-warning border-warning/30',
+  PAID: 'bg-success/10 text-success border-success/30',
+  OVERDUE: 'bg-destructive/10 text-destructive border-destructive/30',
+  VOID: 'bg-muted text-muted-foreground border-border',
 };
 
 // Quote status types and colors
 export type QuoteStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'INVOICED' | 'DECLINED' | 'EXPIRED';
 
 export const quoteStatusColors: Record<QuoteStatus, string> = {
-  DRAFT: 'bg-gray-100 text-gray-800 border-gray-200',
-  SENT: 'bg-blue-100 text-blue-800 border-blue-200',
-  ACCEPTED: 'bg-green-100 text-green-800 border-green-200',
-  INVOICED: 'bg-purple-100 text-purple-800 border-purple-200',
-  DECLINED: 'bg-red-100 text-red-800 border-red-200',
-  EXPIRED: 'bg-orange-100 text-orange-800 border-orange-200',
+  DRAFT: 'bg-muted text-foreground border-border',
+  SENT: 'bg-info/10 text-info border-info/30',
+  ACCEPTED: 'bg-success/10 text-success border-success/30',
+  INVOICED: 'bg-primary/10 text-primary border-primary/30',
+  DECLINED: 'bg-destructive/10 text-destructive border-destructive/30',
+  EXPIRED: 'bg-warning/10 text-warning border-warning/30',
 };
 
 // Payment mode types
@@ -38,13 +38,13 @@ export type PaymentMode =
   | 'OTHER';
 
 export const paymentModeColors: Record<PaymentMode, string> = {
-  CASH: 'bg-green-100 text-green-800 border-green-200',
-  BANK_TRANSFER: 'bg-blue-100 text-blue-800 border-blue-200',
-  CREDIT_CARD: 'bg-purple-100 text-purple-800 border-purple-200',
-  DEBIT_CARD: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-  CHEQUE: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  ONLINE: 'bg-cyan-100 text-cyan-800 border-cyan-200',
-  OTHER: 'bg-gray-100 text-gray-800 border-gray-200',
+  CASH: 'bg-success/10 text-success border-success/30',
+  BANK_TRANSFER: 'bg-info/10 text-info border-info/30',
+  CREDIT_CARD: 'bg-primary/10 text-primary border-primary/30',
+  DEBIT_CARD: 'bg-info/10 text-info border-info/30',
+  CHEQUE: 'bg-warning/10 text-warning border-warning/30',
+  ONLINE: 'bg-info/10 text-info border-info/30',
+  OTHER: 'bg-muted text-foreground border-border',
 };
 
 // Translation keys of each value; the badges show the user's language.

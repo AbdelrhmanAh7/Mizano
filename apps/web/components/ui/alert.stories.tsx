@@ -41,7 +41,7 @@ export const Destructive: Story = {
 
 export const Success: Story = {
   render: () => (
-    <Alert className="border-green-500/50 text-green-700 [&>svg]:text-green-500">
+    <Alert className="border-success/50 text-success [&>svg]:text-success">
       <CheckCircle2 className="h-4 w-4" />
       <AlertTitle>Invoice sent</AlertTitle>
       <AlertDescription>Invoice INV-042 has been sent to customer@example.com.</AlertDescription>
@@ -51,7 +51,7 @@ export const Success: Story = {
 
 export const Warning: Story = {
   render: () => (
-    <Alert className="border-yellow-500/50 text-yellow-700 [&>svg]:text-yellow-500">
+    <Alert className="border-warning/50 text-warning [&>svg]:text-warning">
       <TriangleAlert className="h-4 w-4" />
       <AlertTitle>Low stock warning</AlertTitle>
       <AlertDescription>

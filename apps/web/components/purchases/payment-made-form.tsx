@@ -307,7 +307,7 @@ export function PaymentMadeForm({
                 isInvalid={!!form.formState.errors.vendorId}
               />
               {form.formState.errors.vendorId && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {errorText(form.formState.errors.vendorId.message)}
                 </p>
               )}
@@ -340,7 +340,7 @@ export function PaymentMadeForm({
                 </PopoverContent>
               </Popover>
               {form.formState.errors.date && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {errorText(form.formState.errors.date.message)}
                 </p>
               )}
@@ -360,7 +360,7 @@ export function PaymentMadeForm({
                 {...form.register('amount')}
               />
               {form.formState.errors.amount && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {errorText(form.formState.errors.amount.message)}
                 </p>
               )}
@@ -386,7 +386,7 @@ export function PaymentMadeForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.paymentMode && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {errorText(form.formState.errors.paymentMode.message)}
                 </p>
               )}
@@ -410,7 +410,7 @@ export function PaymentMadeForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.paidFromAccountId && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {errorText(form.formState.errors.paidFromAccountId.message)}
                 </p>
               )}
@@ -537,7 +537,7 @@ export function PaymentMadeForm({
                       <span
                         className={cn(
                           'font-mono font-medium',
-                          compareDecimals(totals.unallocated, '0') !== 0 && 'text-yellow-600',
+                          compareDecimals(totals.unallocated, '0') !== 0 && 'text-warning',
                         )}
                       >
                         {formatMoney(totals.unallocated)}

@@ -38,8 +38,18 @@ export const ProjectProfitabilityChart = memo(function ProjectProfitabilityChart
           contentStyle={CHART_TOOLTIP_STYLE}
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} iconType="circle" />
-        <Bar dataKey="revenue" name={t('revenue')} fill="#22c55e" radius={[0, 4, 4, 0]} />
-        <Bar dataKey="cost" name={t('costToDate')} fill="#ef4444" radius={[0, 4, 4, 0]} />
+        <Bar
+          dataKey="revenue"
+          name={t('revenue')}
+          fill="hsl(var(--success))"
+          radius={[0, 4, 4, 0]}
+        />
+        <Bar
+          dataKey="cost"
+          name={t('costToDate')}
+          fill="hsl(var(--destructive))"
+          radius={[0, 4, 4, 0]}
+        />
       </BarChart>
     </ChartCard>
   );

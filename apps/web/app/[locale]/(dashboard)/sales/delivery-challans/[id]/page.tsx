@@ -117,7 +117,7 @@ export default function ChallanDetailPage({ params }: ChallanDetailPageProps) {
           {canDeleteChallan(challan) && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="outline" className="text-red-600">
+                <Button variant="outline" className="text-destructive">
                   <Trash2 className="mr-2 h-4 w-4" />
                   {tCommon('buttons.delete')}
                 </Button>
@@ -131,7 +131,10 @@ export default function ChallanDetailPage({ params }: ChallanDetailPageProps) {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95"
+                  >
                     {tCommon('buttons.delete')}
                   </AlertDialogAction>
                 </AlertDialogFooter>

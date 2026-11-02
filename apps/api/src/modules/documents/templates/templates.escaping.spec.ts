@@ -1,3 +1,4 @@
+import { BRAND_COLORS } from '@mizano/shared-types';
 import {
   OrganizationInfo,
   escapeHtml,
@@ -235,6 +236,69 @@ describe('document templates escape all interpolated data', () => {
     });
     expect(html).not.toContain('evil.example');
     expect(html).not.toContain('background:url(');
-    expect(html).toContain('#3B82F6'); // fell back to the default brand colour
+    expect(html).toContain(BRAND_COLORS.primary); // fell back to the default brand colour
   });
+});
+
+describe('printed document contrast', () => {
+  const data = {
+    date: '2026-09-01',
+    dueDate: '2026-10-01',
+    expiryDate: '2026-10-01',
+    customer: { name: 'QA Customer' },
+    vendor: { name: 'QA Vendor' },
+    invoiceNumber: 'INV-1',
+    billNumber: 'BILL-1',
+    quoteNumber: 'Q-1',
+    lines: [],
+    subtotal: 0,
+    taxAmount: 0,
+    grandTotal: 0,
+    balanceDue: 0,
+    currency: 'EGP',
+  };
+  const documents = [
+    {
+      name: 'invoice',
+      render: (status: string) => generateInvoiceHtml(hostileOrg, { ...data, status }),
+      statuses: ['DRAFT', 'SENT', 'PAID', 'PARTIALLY_PAID', 'OVERDUE', 'VOID', 'UNKNOWN'],
+    },
+    {
+      name: 'bill',
+      render: (status: string) => generateBillHtml(hostileOrg, { ...data, status }),
+      statuses: [
+        'DRAFT',
+        'PENDING',
+        'OPEN',
+        'PAID',
+        'PARTIALLY_PAID',
+        'OVERDUE',
+        'VOID',
+        'UNKNOWN',
+      ],
+    },
+    {
+      name: 'quote',
+      render: (status: string) => generateQuoteHtml(hostileOrg, { ...data, status }),
+      statuses: ['DRAFT', 'SENT', 'ACCEPTED', 'INVOICED', 'DECLINED', 'EXPIRED', 'UNKNOWN'],
+    },
+  ];
+  it.each(documents)(
+    '$name badges keep white text readable for every status',
+    ({ render, statuses }) => {
+      for (const status of statuses) {
+        const html = render(status);
+        const color = /background: (#[\da-f]{6}); color: white; padding: 8px 16px/i.exec(html)?.[1];
+        expect(color).toBeDefined();
+        const channels = [1, 3, 5].map((i) => parseInt(color!.slice(i, i + 2), 16) / 255);
+        const linear = channels.map((v) =>
+          v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4,
+        );
+        const luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+        expect(1.05 / (luminance + 0.05)).toBeGreaterThanOrEqual(4.5);
+        expect(html).not.toMatch(/color:\s*#9ca3af/i);
+        expect(html).not.toContain('${BRAND_COLORS.');
+      }
+    },
+  );
 });

@@ -201,8 +201,8 @@ describe('BankTransactionsPage', () => {
       isLoading: false,
     });
     const { container } = renderPage();
-    const greenAmounts = container.querySelectorAll('.text-green-600');
-    const redAmounts = container.querySelectorAll('.text-red-600');
+    const greenAmounts = container.querySelectorAll('.text-success');
+    const redAmounts = container.querySelectorAll('.text-destructive');
     expect(greenAmounts.length).toBeGreaterThan(0);
     expect(redAmounts.length).toBeGreaterThan(0);
   });

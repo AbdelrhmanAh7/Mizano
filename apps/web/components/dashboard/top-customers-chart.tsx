@@ -22,7 +22,13 @@ interface TopCustomersChartProps {
   currency?: string;
 }
 
-const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'];
+const COLORS = [
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
+];
 
 export const TopCustomersChart = memo(function TopCustomersChart({
   data,

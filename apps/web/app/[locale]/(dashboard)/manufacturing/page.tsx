@@ -18,14 +18,14 @@ export default function ManufacturingPage() {
       description: 'Define product recipes, component lists, and material requirements.',
       icon: Layers,
       href: '/manufacturing/bom',
-      color: 'text-blue-600',
+      color: 'text-info',
     },
     {
       title: t('workOrders.title'),
       description: 'Create and track manufacturing work orders through production stages.',
       icon: Wrench,
       href: '/manufacturing/work-orders',
-      color: 'text-green-600',
+      color: 'text-success',
     },
   ];
 
@@ -41,8 +41,8 @@ export default function ManufacturingPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Wrench className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-info/10 rounded-lg">
+                <Wrench className="h-5 w-5 text-info" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Active Work Orders</p>
@@ -59,8 +59,8 @@ export default function ManufacturingPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-gray-100 rounded-lg">
-                <FileStack className="h-5 w-5 text-gray-600" />
+              <div className="p-2 bg-muted rounded-lg">
+                <FileStack className="h-5 w-5 text-muted-foreground" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Draft Work Orders</p>
@@ -77,8 +77,8 @@ export default function ManufacturingPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Layers className="h-5 w-5 text-purple-600" />
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Layers className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Active BOMs</p>
@@ -95,8 +95,8 @@ export default function ManufacturingPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <CheckCircle className="h-5 w-5 text-green-600" />
+              <div className="p-2 bg-success/10 rounded-lg">
+                <CheckCircle className="h-5 w-5 text-success" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Completed This Month</p>

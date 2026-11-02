@@ -95,10 +95,10 @@ export function ProjectsOverview({ projects }: ProjectsOverviewProps) {
                       value={Math.min(project.budgetUsedPercent, 100)}
                       className={cn(
                         'h-1.5 flex-1',
-                        project.budgetUsedPercent > 90 && '[&>div]:bg-red-500',
+                        project.budgetUsedPercent > 90 && '[&>div]:bg-destructive',
                         project.budgetUsedPercent > 75 &&
                           project.budgetUsedPercent <= 90 &&
-                          '[&>div]:bg-amber-500',
+                          '[&>div]:bg-warning',
                       )}
                     />
                     <span className="text-[10px] text-muted-foreground font-mono shrink-0">

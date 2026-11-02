@@ -119,7 +119,7 @@ export function BOMForm({ bom }: BOMFormProps) {
               <Label htmlFor="name">BOM Name *</Label>
               <Input id="name" placeholder="Wooden Chair Assembly" {...form.register('name')} />
               {form.formState.errors.name && (
-                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
+                <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
               )}
             </div>
 
@@ -142,7 +142,9 @@ export function BOMForm({ bom }: BOMFormProps) {
                 </SelectContent>
               </Select>
               {form.formState.errors.outputItemId && (
-                <p className="text-sm text-red-500">{form.formState.errors.outputItemId.message}</p>
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.outputItemId.message}
+                </p>
               )}
             </div>
           </div>
@@ -160,7 +162,7 @@ export function BOMForm({ bom }: BOMFormProps) {
               />
               <p className="text-xs text-muted-foreground">Quantity produced per production run</p>
               {form.formState.errors.outputQuantity && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {form.formState.errors.outputQuantity.message}
                 </p>
               )}
@@ -264,7 +266,7 @@ export function BOMForm({ bom }: BOMFormProps) {
                       disabled={fields.length === 1}
                       aria-label="Remove component"
                     >
-                      <Trash2 className="h-4 w-4 text-red-500" />
+                      <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
                 </div>
@@ -272,7 +274,9 @@ export function BOMForm({ bom }: BOMFormProps) {
             </div>
           )}
           {form.formState.errors.components && (
-            <p className="text-sm text-red-500 mt-2">{form.formState.errors.components.message}</p>
+            <p className="text-sm text-destructive mt-2">
+              {form.formState.errors.components.message}
+            </p>
           )}
         </CardContent>
       </Card>

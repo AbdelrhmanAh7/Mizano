@@ -161,7 +161,7 @@ export default function DeliveryChallansPage() {
                     <TableCell>
                       <Link
                         href={`/sales/delivery-challans/${challan.id}`}
-                        className="font-medium text-blue-600 hover:underline"
+                        className="font-medium text-primary hover:underline"
                       >
                         {challan.challanNumber}
                       </Link>
@@ -196,7 +196,7 @@ export default function DeliveryChallansPage() {
                         {canDeleteChallan(challan) && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button size="sm" variant="ghost" className="text-red-600">
+                              <Button size="sm" variant="ghost" className="text-destructive">
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </AlertDialogTrigger>
@@ -215,7 +215,7 @@ export default function DeliveryChallansPage() {
                                 <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
                                 <AlertDialogAction
                                   onClick={() => deleteChallan.mutate(challan.id)}
-                                  className="bg-red-600 hover:bg-red-700"
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95"
                                 >
                                   {tCommon('buttons.delete')}
                                 </AlertDialogAction>

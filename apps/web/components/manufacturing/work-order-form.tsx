@@ -148,7 +148,7 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
                 </SelectContent>
               </Select>
               {form.formState.errors.bomId && (
-                <p className="text-sm text-red-500">{form.formState.errors.bomId.message}</p>
+                <p className="text-sm text-destructive">{form.formState.errors.bomId.message}</p>
               )}
             </div>
 
@@ -162,7 +162,7 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
                 {...form.register('quantity', { valueAsNumber: true })}
               />
               {form.formState.errors.quantity && (
-                <p className="text-sm text-red-500">{form.formState.errors.quantity.message}</p>
+                <p className="text-sm text-destructive">{form.formState.errors.quantity.message}</p>
               )}
             </div>
           </div>
@@ -172,7 +172,9 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
               <Label htmlFor="startDate">Start Date *</Label>
               <Input id="startDate" type="date" {...form.register('startDate')} />
               {form.formState.errors.startDate && (
-                <p className="text-sm text-red-500">{form.formState.errors.startDate.message}</p>
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.startDate.message}
+                </p>
               )}
             </div>
 
@@ -196,12 +198,12 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
 
       {/* Material Requirements Preview */}
       {selectedBomId && requirements.length > 0 && (
-        <Card className={cn(hasShortages && 'border-orange-200')}>
+        <Card className={cn(hasShortages && 'border-warning/30')}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               Material Requirements Preview
               {hasShortages && (
-                <span className="flex items-center gap-1 text-sm text-orange-600 font-normal">
+                <span className="flex items-center gap-1 text-sm text-warning font-normal">
                   <AlertTriangle className="h-4 w-4" />
                   Shortages detected
                 </span>
@@ -229,7 +231,7 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
                     <TableCell className="text-right font-mono">{req.required}</TableCell>
                     <TableCell className="text-right font-mono">{req.available}</TableCell>
                     <TableCell className="text-right font-mono">
-                      <span className={cn(req.shortage > 0 && 'text-red-600 font-semibold')}>
+                      <span className={cn(req.shortage > 0 && 'text-destructive font-semibold')}>
                         {req.shortage > 0 ? `-${req.shortage}` : '0'}
                       </span>
                     </TableCell>

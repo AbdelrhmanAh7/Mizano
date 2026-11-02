@@ -105,7 +105,7 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
         <Label htmlFor="name">{t('table.name')} *</Label>
         <Input id="name" placeholder={tForm('namePlaceholder')} {...form.register('name')} />
         {form.formState.errors.name && (
-          <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
+          <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
         )}
       </div>
 
@@ -121,7 +121,7 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
             {...form.register('rate', { valueAsNumber: true })}
           />
           {form.formState.errors.rate && (
-            <p className="text-sm text-red-500">{form.formState.errors.rate.message}</p>
+            <p className="text-sm text-destructive">{form.formState.errors.rate.message}</p>
           )}
         </div>
 
@@ -162,7 +162,9 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
           </SelectContent>
         </Select>
         {form.formState.errors.linkedAccountId && (
-          <p className="text-sm text-red-500">{form.formState.errors.linkedAccountId.message}</p>
+          <p className="text-sm text-destructive">
+            {form.formState.errors.linkedAccountId.message}
+          </p>
         )}
       </div>
 

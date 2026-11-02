@@ -127,7 +127,7 @@ export function DealForm({ deal }: DealFormProps) {
                 {...form.register('dealName')}
               />
               {form.formState.errors.dealName && (
-                <p className="text-sm text-red-500">{form.formState.errors.dealName.message}</p>
+                <p className="text-sm text-destructive">{form.formState.errors.dealName.message}</p>
               )}
             </div>
 
@@ -162,7 +162,7 @@ export function DealForm({ deal }: DealFormProps) {
                 {...form.register('expectedAmount')}
               />
               {form.formState.errors.expectedAmount && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {form.formState.errors.expectedAmount.message}
                 </p>
               )}

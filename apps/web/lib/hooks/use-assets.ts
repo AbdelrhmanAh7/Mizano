@@ -216,9 +216,9 @@ export function getAssetTypeLabel(type: AssetType): string {
 
 export function getAssetStatusColor(status: AssetStatus): string {
   const colors: Record<AssetStatus, string> = {
-    ACTIVE: 'bg-green-100 text-green-800',
-    DISPOSED: 'bg-gray-100 text-gray-800',
-    FULLY_DEPRECIATED: 'bg-yellow-100 text-yellow-800',
+    ACTIVE: 'bg-success/10 text-success',
+    DISPOSED: 'bg-muted text-foreground',
+    FULLY_DEPRECIATED: 'bg-warning/10 text-warning',
   };
   return colors[status] || '';
 }

@@ -1,3 +1,4 @@
+import { BRAND_COLORS } from '@mizano/shared-types';
 import { Logger } from '@nestjs/common';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { AccountsService } from '../accounting/services/accounts.service';
@@ -66,6 +67,7 @@ describe('AuthService.register', () => {
     expect(tx.organization.create).toHaveBeenCalledWith({
       data: {
         name: ORG.name,
+        primaryColor: BRAND_COLORS.primary,
         currency: 'EGP',
         baseCurrency: 'EGP',
         country: 'EG',
@@ -95,7 +97,12 @@ describe('AuthService.register', () => {
     await service.register(dto);
 
     expect(tx.organization.create).toHaveBeenCalledWith({
-      data: { name: ORG.name, currency: 'USD', baseCurrency: 'USD' },
+      data: {
+        name: ORG.name,
+        primaryColor: BRAND_COLORS.primary,
+        currency: 'USD',
+        baseCurrency: 'USD',
+      },
     });
     expect(accounts.seedDefaultAccounts).toHaveBeenCalledWith(ORG.id);
   });

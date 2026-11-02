@@ -25,11 +25,16 @@ export const StockLevelsChart = memo(function StockLevelsChart({ data }: StockLe
         <YAxis type="category" dataKey="itemName" {...CHART_AXIS} width={90} />
         <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
         <Legend wrapperStyle={{ paddingTop: '10px' }} iconType="circle" />
-        <Bar dataKey="currentStock" name={t('currentStock')} fill="#3b82f6" radius={[0, 4, 4, 0]} />
+        <Bar
+          dataKey="currentStock"
+          name={t('currentStock')}
+          fill="hsl(var(--chart-2))"
+          radius={[0, 4, 4, 0]}
+        />
         <Bar
           dataKey="reorderLevel"
           name={t('reorderPoint')}
-          fill="#ef4444"
+          fill="hsl(var(--destructive))"
           radius={[0, 4, 4, 0]}
           fillOpacity={0.5}
           strokeDasharray="3 3"

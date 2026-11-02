@@ -32,7 +32,7 @@ export async function LegalPage({
       </header>
       <main className="flex-1">
         <article className="mx-auto max-w-3xl px-4 pb-16 pt-4 sm:pt-8">
-          <p className="inline-block rounded-md border border-amber-300 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
+          <p className="inline-block rounded-md border border-warning/30 bg-warning/5 px-3 py-1 text-sm font-medium text-warning">
             {t('common.draftBadge')}
           </p>
           <h1 className="mt-4 text-3xl font-bold leading-snug sm:text-4xl">{t(`${page}.title`)}</h1>

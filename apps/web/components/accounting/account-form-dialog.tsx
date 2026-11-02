@@ -174,7 +174,7 @@ export function AccountFormDialog({
                 {...form.register('code')}
               />
               {form.formState.errors.code && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {errorText(form.formState.errors.code.message)}
                 </p>
               )}
@@ -207,7 +207,7 @@ export function AccountFormDialog({
             <Label htmlFor="name">{t('form.name')} *</Label>
             <Input id="name" placeholder={t('dialog.namePlaceholder')} {...form.register('name')} />
             {form.formState.errors.name && (
-              <p className="text-sm text-red-500">
+              <p className="text-sm text-destructive">
                 {errorText(form.formState.errors.name.message)}
               </p>
             )}
@@ -261,7 +261,7 @@ export function AccountFormDialog({
                 </SelectContent>
               </Select>
               {form.formState.errors.currency && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {errorText(form.formState.errors.currency.message)}
                 </p>
               )}
@@ -276,7 +276,7 @@ export function AccountFormDialog({
               {...form.register('description')}
             />
             {form.formState.errors.description && (
-              <p className="text-sm text-red-500">
+              <p className="text-sm text-destructive">
                 {errorText(form.formState.errors.description.message)}
               </p>
             )}

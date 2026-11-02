@@ -431,7 +431,7 @@ export function BillForm({
                 isInvalid={!!form.formState.errors.vendorId}
               />
               {form.formState.errors.vendorId && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {translateError(form.formState.errors.vendorId.message)}
                 </p>
               )}
@@ -452,7 +452,7 @@ export function BillForm({
                 }}
               />
               {form.formState.errors.date && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {translateError(form.formState.errors.date.message)}
                 </p>
               )}
@@ -465,7 +465,7 @@ export function BillForm({
               </Label>
               <Input id="dueDate" type="date" {...form.register('dueDate')} />
               {form.formState.errors.dueDate && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {translateError(form.formState.errors.dueDate.message)}
                 </p>
               )}
@@ -571,7 +571,7 @@ export function BillForm({
             <p
               role="alert"
               data-testid="account-options-empty"
-              className="mb-4 rounded-md border border-yellow-500 p-3 text-sm"
+              className="mb-4 rounded-md border border-warning p-3 text-sm"
             >
               {tForm('accountsEmpty')}
             </p>
@@ -753,11 +753,11 @@ export function BillForm({
             <div
               role="alert"
               data-testid="totals-discrepancy"
-              className="mt-4 rounded-md border border-yellow-500 p-3 text-sm"
+              className="mt-4 rounded-md border border-warning p-3 text-sm"
             >
               {discrepancies.length > 0 && (
                 <>
-                  <p className="font-medium text-yellow-700">{tIntake('discrepancyTitle')}</p>
+                  <p className="font-medium text-warning">{tIntake('discrepancyTitle')}</p>
                   <p className="text-muted-foreground">{tIntake('discrepancyBody')}</p>
                   <ul className="mt-2 space-y-1 font-mono">
                     {discrepancies.map((d) => (

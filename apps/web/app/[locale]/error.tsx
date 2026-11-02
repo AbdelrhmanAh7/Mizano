@@ -25,7 +25,7 @@ export default function LocaleError({
           <BrandLogo height={32} alt={t('appName')} />
         </div>
         <div className="flex justify-center">
-          <div className="rounded-full bg-red-100 dark:bg-red-900/20 p-3">
+          <div className="rounded-full bg-destructive/10 p-3">
             <AlertCircle className="h-8 w-8 text-destructive" />
           </div>
         </div>

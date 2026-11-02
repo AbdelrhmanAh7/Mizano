@@ -34,8 +34,18 @@ export const ProjectBudgetsChart = memo(function ProjectBudgetsChart({
           contentStyle={CHART_TOOLTIP_STYLE}
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} iconType="circle" />
-        <Bar dataKey="budget" name={t('budgetUsed')} fill="#3b82f6" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="spent" name={t('costToDate')} fill="#ef4444" radius={[4, 4, 0, 0]} />
+        <Bar
+          dataKey="budget"
+          name={t('budgetUsed')}
+          fill="hsl(var(--chart-2))"
+          radius={[4, 4, 0, 0]}
+        />
+        <Bar
+          dataKey="spent"
+          name={t('costToDate')}
+          fill="hsl(var(--destructive))"
+          radius={[4, 4, 0, 0]}
+        />
       </BarChart>
     </ChartCard>
   );

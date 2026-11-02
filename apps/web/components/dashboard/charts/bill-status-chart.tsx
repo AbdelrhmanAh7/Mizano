@@ -13,16 +13,16 @@ interface BillStatusChartProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  DRAFT: '#94a3b8',
-  PENDING: '#f59e0b',
-  OPEN: '#3b82f6',
-  PARTIALLY_PAID: '#8b5cf6',
-  PAID: '#22c55e',
-  OVERDUE: '#ef4444',
-  VOID: '#6b7280',
+  DRAFT: 'hsl(var(--muted-foreground))',
+  PENDING: 'hsl(var(--warning))',
+  OPEN: 'hsl(var(--chart-2))',
+  PARTIALLY_PAID: 'hsl(var(--chart-4))',
+  PAID: 'hsl(var(--success))',
+  OVERDUE: 'hsl(var(--destructive))',
+  VOID: 'hsl(var(--muted-foreground))',
 };
 
-const FALLBACK_COLOR = '#94a3b8';
+const FALLBACK_COLOR = 'hsl(var(--muted-foreground))';
 
 export const BillStatusChart = memo(function BillStatusChart({
   data,

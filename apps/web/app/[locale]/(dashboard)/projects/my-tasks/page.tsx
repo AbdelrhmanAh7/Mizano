@@ -63,7 +63,7 @@ export default function MyTasksPage() {
       {allTasks.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center">
-            <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-4" />
+            <CheckCircle className="mx-auto h-12 w-12 text-success mb-4" />
             <h3 className="text-lg font-semibold mb-1">All caught up!</h3>
             <p className="text-muted-foreground">No tasks assigned to you right now.</p>
           </CardContent>

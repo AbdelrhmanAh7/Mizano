@@ -536,8 +536,8 @@ export function ImportWizard({
       return (
         <div className="space-y-4">
           <div className="flex flex-col items-center justify-center gap-3 py-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/30">
-              <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-success/10">
+              <CheckCircle2 className="h-6 w-6 text-success" />
             </div>
             <p className="text-sm font-medium">{t('complete')}</p>
           </div>
@@ -688,8 +688,8 @@ interface ResultCardProps {
 function ResultCard({ label, value, variant = 'default' }: ResultCardProps): React.JSX.Element {
   const colorClasses: Record<string, string> = {
     default: 'text-foreground',
-    success: 'text-emerald-600',
-    warning: 'text-amber-600',
+    success: 'text-success',
+    warning: 'text-warning',
     error: 'text-destructive',
   };
 

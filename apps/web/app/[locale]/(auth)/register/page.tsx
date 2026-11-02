@@ -120,7 +120,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50 to-cyan-100 dark:from-gray-900 dark:to-gray-800 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand/5 to-accent p-4">
       <div className="absolute top-4 end-4">
         <LanguageSwitcher />
       </div>
@@ -142,7 +142,7 @@ export default function RegisterPage() {
                   {...register('firstName')}
                 />
                 {errors.firstName && (
-                  <p className="text-sm text-red-500">{tValidation('nameMin')}</p>
+                  <p className="text-sm text-destructive">{tValidation('nameMin')}</p>
                 )}
               </div>
               <div className="space-y-2">
@@ -153,7 +153,7 @@ export default function RegisterPage() {
                   {...register('lastName')}
                 />
                 {errors.lastName && (
-                  <p className="text-sm text-red-500">{tValidation('nameMin')}</p>
+                  <p className="text-sm text-destructive">{tValidation('nameMin')}</p>
                 )}
               </div>
             </div>
@@ -165,7 +165,7 @@ export default function RegisterPage() {
                 {...register('organizationName')}
               />
               {errors.organizationName && (
-                <p className="text-sm text-red-500">{tValidation('organizationMin')}</p>
+                <p className="text-sm text-destructive">{tValidation('organizationMin')}</p>
               )}
             </div>
             <div className="space-y-2">
@@ -200,7 +200,7 @@ export default function RegisterPage() {
                 placeholder={t('emailPlaceholder')}
                 {...register('email')}
               />
-              {errors.email && <p className="text-sm text-red-500">{tValidation('email')}</p>}
+              {errors.email && <p className="text-sm text-destructive">{tValidation('email')}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">{t('password')}</Label>
@@ -211,7 +211,7 @@ export default function RegisterPage() {
                 {...register('password')}
               />
               {errors.password && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {tValidation(passwordRule(errors.password.message))}
                 </p>
               )}
@@ -225,7 +225,7 @@ export default function RegisterPage() {
                 {...register('confirmPassword')}
               />
               {errors.confirmPassword && (
-                <p className="text-sm text-red-500">{tValidation('passwordMismatch')}</p>
+                <p className="text-sm text-destructive">{tValidation('passwordMismatch')}</p>
               )}
             </div>
             <p className="text-xs leading-5 text-muted-foreground">
