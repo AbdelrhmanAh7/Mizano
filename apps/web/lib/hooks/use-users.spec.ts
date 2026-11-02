@@ -147,19 +147,19 @@ describe('useDeleteUser', () => {
 });
 
 describe('getUserStatusColor', () => {
-  it('returns green for ACTIVE', () => {
-    expect(getUserStatusColor('ACTIVE')).toContain('green');
+  it('returns success for ACTIVE', () => {
+    expect(getUserStatusColor('ACTIVE')).toContain('success');
   });
 
-  it('returns gray for INACTIVE', () => {
-    expect(getUserStatusColor('INACTIVE')).toContain('gray');
+  it('returns muted for INACTIVE', () => {
+    expect(getUserStatusColor('INACTIVE')).toContain('muted');
   });
 
-  it('returns red for SUSPENDED', () => {
-    expect(getUserStatusColor('SUSPENDED')).toContain('red');
+  it('returns destructive for SUSPENDED', () => {
+    expect(getUserStatusColor('SUSPENDED')).toContain('destructive');
   });
 
-  it('returns gray for unknown status', () => {
-    expect(getUserStatusColor('UNKNOWN')).toContain('gray');
+  it('returns muted for unknown status', () => {
+    expect(getUserStatusColor('UNKNOWN')).toContain('muted');
   });
 });
