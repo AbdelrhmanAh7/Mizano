@@ -332,9 +332,12 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                                 {isRecordedPayment(match.type) ? (
                                   <>
                                     <p className="text-sm font-mono mt-1">
-                                      {t('reconciliation.recordedPayment', {
-                                        amount: formatCurrency(match.amount),
-                                      })}
+                                      {t(
+                                        match.type === 'EXPENSE'
+                                          ? 'reconciliation.recordedExpense'
+                                          : 'reconciliation.recordedPayment',
+                                        { amount: formatCurrency(match.amount) },
+                                      )}
                                     </p>
                                     <p className="text-xs text-muted-foreground mt-1">
                                       {t('reconciliation.recordedPaymentHint')}
@@ -366,17 +369,19 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                       </div>
                     )}
 
-                    {/* Actions */}
-                    <div className="border-t pt-4 space-y-2">
-                      <Button variant="outline" className="w-full" asChild>
-                        <Link
-                          href={`/purchases/expenses/new?bankTransactionId=${selectedTransaction}`}
-                        >
-                          <Plus className="me-2 h-4 w-4" />
-                          {t('reconciliation.createExpense')}
-                        </Link>
-                      </Button>
-                    </div>
+                    {/* Actions: only money out can become an expense (#682). */}
+                    {selectedTx?.type === 'WITHDRAWAL' && (
+                      <div className="border-t pt-4 space-y-2">
+                        <Button variant="outline" className="w-full" asChild>
+                          <Link
+                            href={`/purchases/expenses/new?bankTransactionId=${selectedTransaction}`}
+                          >
+                            <Plus className="me-2 h-4 w-4" />
+                            {t('reconciliation.createExpense')}
+                          </Link>
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </ScrollArea>
               )}

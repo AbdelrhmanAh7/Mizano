@@ -162,6 +162,19 @@ describe('ExpensesService (posting)', () => {
       });
     });
 
+    it('reopens the bank line matched to the voided expense (#682)', async () => {
+      prisma.expense.findFirst.mockResolvedValue({ id: 'e1', status: 'POSTED' });
+      prisma.expense.updateMany.mockResolvedValue({ count: 1 });
+      prisma.journal.findFirst.mockResolvedValue({ id: 'j1' });
+
+      await service.remove(ORG, 'e1');
+
+      expect(prisma.bankTransaction.updateMany).toHaveBeenCalledWith({
+        where: { organizationId: ORG, matchedEntityType: 'expense', matchedEntityId: 'e1' },
+        data: { status: 'PENDING', matchedEntityType: null, matchedEntityId: null },
+      });
+    });
+
     it('cannot void an expense of another organization', async () => {
       prisma.expense.findFirst.mockResolvedValue(null);
       await expect(service.remove(ORG, 'foreign')).rejects.toThrow(NotFoundException);

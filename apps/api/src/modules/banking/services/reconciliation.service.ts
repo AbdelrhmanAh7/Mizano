@@ -8,6 +8,7 @@ import { PaymentsMadeService } from '../../purchases/services/payments-made.serv
 import {
   BankTransaction,
   BankTransactionType,
+  ExpenseStatus,
   PaymentMode,
   Prisma,
   ReconciliationStatus,
@@ -84,8 +85,17 @@ function sameCurrency(accountCurrency: string | null, baseCurrency: string | nul
 /** A recorded payment within this many days of the bank line can be the same money (#635). */
 const PAYMENT_WINDOW_DAYS = 45;
 
-/** What a bank line can be matched to: an open document to settle, or a payment already booked. */
-export const MATCH_ENTITY_TYPES = ['invoice', 'bill', 'payment_received', 'payment_made'] as const;
+/**
+ * What a bank line can be matched to: an open document to settle, or a payment or paid expense
+ * already booked to this bank (#635, #682).
+ */
+export const MATCH_ENTITY_TYPES = [
+  'invoice',
+  'bill',
+  'payment_received',
+  'payment_made',
+  'expense',
+] as const;
 export type MatchEntityType = (typeof MATCH_ENTITY_TYPES)[number];
 
 export interface ReconciliationMatch {
@@ -136,6 +146,9 @@ export class ReconciliationService {
             // A payment already booked to this bank comes first: matching it posts nothing (#635).
             ...(linkedAccountId
               ? await this.findRecordedPayments(organizationId, transaction, linkedAccountId)
+              : []),
+            ...(linkedAccountId && transaction.type === BankTransactionType.WITHDRAWAL
+              ? await this.findRecordedExpenses(organizationId, transaction, linkedAccountId)
               : []),
             ...(await this.findMatches(organizationId, transaction)),
           ]
@@ -239,6 +252,72 @@ export class ReconciliationService {
       entity: payment,
       confidence: score({ ...payment, partyName: payment.vendor.name }),
     }));
+  }
+
+  /**
+   * Expenses already paid from this bank that this withdrawal may be (#682): posted, not voided,
+   * paid through this bank's ledger account, total (net + VAT) equal to the line, dated within
+   * PAYMENT_WINDOW_DAYS (or whose reference is named on the line), and not linked to another line.
+   * Matching one posts nothing.
+   */
+  private async findRecordedExpenses(
+    organizationId: string,
+    transaction: BankTransaction,
+    linkedAccountId: string,
+  ): Promise<ReconciliationMatch[]> {
+    const amount = transaction.amount.abs();
+    if (amount.isZero()) return [];
+    const tokens = referenceTokens(transaction);
+    const window = PAYMENT_WINDOW_DAYS * DAY_MS;
+    const from = new Date(transaction.date.getTime() - window);
+    const to = new Date(transaction.date.getTime() + window);
+    // The total (net + VAT) is no column, so the eligible rows are picked in SQL before the limit:
+    // same organization, posted, not voided, paid through this bank, the exact total, not linked
+    // to another line, and named on the line (any date) or within the window. Named ones first.
+    const named =
+      tokens.length > 0 ? Prisma.sql`e."reference" = ANY(${tokens})` : Prisma.sql`FALSE`;
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT e.id FROM "expenses" e
+      WHERE e."organizationId" = ${organizationId}
+        AND e."deletedAt" IS NULL
+        AND e."status" = 'POSTED'
+        AND e."paidThroughAccountId" = ${linkedAccountId}
+        AND e."amount" + e."taxAmount" = ${amount.toFixed(4)}::numeric
+        AND (${named} OR e."date" BETWEEN ${from} AND ${to})
+        AND NOT EXISTS (
+          SELECT 1 FROM "bank_transactions" b
+          WHERE b."organizationId" = ${organizationId}
+            AND b."matchedEntityType" = 'expense'
+            AND b."matchedEntityId" = e.id
+        )
+      ORDER BY (${named}) DESC, e."date" DESC
+      LIMIT ${MATCH_CANDIDATE_LIMIT}`;
+    if (rows.length === 0) return [];
+    const candidates = await this.prisma.expense.findMany({
+      where: { id: { in: rows.map((r) => r.id) }, organizationId, deletedAt: null },
+      include: { vendor: { select: { id: true, name: true } } },
+    });
+    const payee = transaction.payee?.toLowerCase() ?? '';
+    const description = transaction.description?.trim().toLowerCase() ?? '';
+
+    return candidates.map((expense) => {
+      let confidence: number;
+      if (expense.reference && tokens.includes(expense.reference)) {
+        confidence = 100;
+      } else {
+        confidence = 90 - Math.min(20, Math.floor(daysApart(expense.date, transaction.date) / 3));
+        if (payee && expense.vendor?.name.toLowerCase().includes(payee)) confidence += 30;
+        if (description && expense.description?.trim().toLowerCase() === description) {
+          confidence += 30;
+        }
+        confidence = Math.min(99, confidence);
+      }
+      return {
+        type: 'expense' as const,
+        entity: { ...expense, total: expense.amount.add(expense.taxAmount).toFixed(4) },
+        confidence,
+      };
+    });
   }
 
   private async findMatches(organizationId: string, transaction: BankTransaction) {
@@ -380,8 +459,17 @@ export class ReconciliationService {
 
     if (!(MATCH_ENTITY_TYPES as readonly string[]).includes(entityType)) {
       throw new BadRequestException(
-        'entityType must be invoice, bill, payment_received or payment_made',
+        'entityType must be invoice, bill, payment_received, payment_made or expense',
       );
+    }
+
+    if (entityType === 'expense') {
+      if (transaction.type !== BankTransactionType.WITHDRAWAL) {
+        throw new BadRequestException('Only withdrawals can be matched to an expense');
+      }
+      await this.assertBaseCurrencyAccount(organizationId, transaction.bankAccountId);
+      await this.linkRecordedExpense(organizationId, transaction, entityId);
+      return { message: 'Reconciliation confirmed' };
     }
 
     // Money direction must agree with the entity: a deposit settles an invoice or is a received
@@ -601,6 +689,61 @@ export class ReconciliationService {
       },
       { tx },
     );
+  }
+
+  /**
+   * Reconciles a withdrawal with an expense already paid from this bank (#682): the line is marked
+   * as matched to it and nothing is posted. The expense must be the same money: posted, not
+   * voided, paid through this bank's ledger account, total (net + VAT) equal to the line, and not
+   * linked to another line. The expense row is locked first (the order voiding an expense also
+   * takes), so two lines cannot link the same expense and a concurrent void is never missed.
+   */
+  private async linkRecordedExpense(
+    organizationId: string,
+    transaction: BankTransaction,
+    expenseId: string,
+  ): Promise<void> {
+    const amount = transaction.amount.abs();
+    await this.prisma.$transaction(async (tx) => {
+      const bankAccount = await tx.bankAccount.findFirst({
+        where: { id: transaction.bankAccountId, organizationId },
+        select: { linkedAccountId: true },
+      });
+      if (!bankAccount) throw new NotFoundException('Bank account not found');
+
+      await tx.$queryRaw`SELECT id FROM "expenses" WHERE id = ${expenseId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+      const expense = await tx.expense.findFirst({
+        where: { id: expenseId, organizationId, deletedAt: null },
+        select: { amount: true, taxAmount: true, status: true, paidThroughAccountId: true },
+      });
+      if (!expense) throw new NotFoundException('Expense not found');
+      if (expense.status !== ExpenseStatus.POSTED) {
+        throw new BadRequestException('Only a posted expense can be matched to a bank line');
+      }
+      if (expense.paidThroughAccountId !== bankAccount.linkedAccountId) {
+        throw new BadRequestException('This expense was paid from a different account');
+      }
+      if (!expense.amount.add(expense.taxAmount).equals(amount)) {
+        throw new BadRequestException('The expense amount differs from the bank line');
+      }
+      const other = await tx.bankTransaction.findFirst({
+        where: { organizationId, matchedEntityType: 'expense', matchedEntityId: expenseId },
+        select: { id: true },
+      });
+      if (other) {
+        throw new BadRequestException('This expense is already matched to another bank line');
+      }
+
+      const { count } = await tx.bankTransaction.updateMany({
+        where: { id: transaction.id, organizationId, status: ReconciliationStatus.PENDING },
+        data: {
+          status: ReconciliationStatus.MATCHED,
+          matchedEntityType: 'expense',
+          matchedEntityId: expenseId,
+        },
+      });
+      if (count === 0) throw new BadRequestException('Already reconciled');
+    });
   }
 
   /**

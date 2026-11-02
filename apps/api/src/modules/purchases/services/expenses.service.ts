@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AccountType, ExpenseStatus, Prisma } from '@prisma/client';
+import { AccountType, ExpenseStatus, Prisma, ReconciliationStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
@@ -369,6 +369,16 @@ export class ExpensesService {
         data: { deletedAt: new Date(), status: ExpenseStatus.CANCELLED },
       });
       if (count === 0) throw new NotFoundException('Expense not found');
+      // A bank line matched to this expense (#682) is open to be reconciled again. Read under the
+      // expense's row lock, the order reconciliation also takes, so a concurrent match is not missed.
+      await tx.bankTransaction.updateMany({
+        where: { organizationId, matchedEntityType: 'expense', matchedEntityId: id },
+        data: {
+          status: ReconciliationStatus.PENDING,
+          matchedEntityType: null,
+          matchedEntityId: null,
+        },
+      });
       // A pending expense was never posted: there is nothing to reverse.
       if (expense.status === ExpenseStatus.PENDING) {
         return { message: 'Expense voided successfully' };

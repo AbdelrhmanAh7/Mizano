@@ -255,6 +255,7 @@
     "matchPercent": "{value}% مطابقة",
     "balanceDue": "الرصيد المستحق: {amount}",
     "recordedPayment": "دفعة مسجلة: {amount}",
+    "recordedExpense": "مصروف مسجل: {amount}",
     "recordedPaymentHint": "مسجلة في دفاترك بالفعل. المطابقة تربط سطر البنك بها دون تسجيلها مرة أخرى.",
     "createExpense": "إنشاء مصروف",
     "accountNotFound": "الحساب البنكي غير موجود",

@@ -92,4 +92,127 @@ describe('Bank matching (e2e)', () => {
     expect(payments).toBe(1);
     expect((await a.get(`/invoices/${posted}`)).body.status).toBe('PAID');
   });
+
+  // #682: a withdrawal for an expense already paid from the bank links to it and posts nothing.
+  it('links one withdrawal to the paid rent expense once, posts nothing, and reopens it on void', async () => {
+    const settings = (await a.get('/organization/account-settings')).body;
+    const list = await a.get('/accounts').query({ limit: 500 });
+    const rentAccount = list.body.data.find((x: { code: string }) => x.code === '6100').id;
+    const expense = await a.post('/expenses').send({
+      date: isoDay(0),
+      accountId: rentAccount,
+      amount: '300.00',
+      paidThroughAccountId: settings.defaultBankAccountId,
+      description: 'November rent',
+    });
+    expect(expense.status).toBe(201);
+    const withdrawal = async (): Promise<string> => {
+      const res = await a.post('/bank-transactions').send({
+        bankAccountId,
+        date: isoDay(0),
+        type: 'WITHDRAWAL',
+        amount: '300.00',
+        description: 'November rent',
+      });
+      expect(res.status).toBe(201);
+      return res.body.id;
+    };
+    const [first, second] = [await withdrawal(), await withdrawal()];
+    const org = { organizationId: tenant.organizationId };
+    const journalsBefore = await prisma.journal.count({ where: org });
+    const expensesBefore = await prisma.expense.count({ where: org });
+
+    const suggestions = await a.get(`/reconciliation/suggestions/${bankAccountId}`);
+    const row = suggestions.body.find(
+      (s: { transaction: { id: string } }) => s.transaction.id === first,
+    );
+    expect(row.matches).toContainEqual(
+      expect.objectContaining({
+        type: 'expense',
+        entity: expect.objectContaining({ id: expense.body.id, total: '300.0000' }),
+      }),
+    );
+
+    // Two lines race for the same expense: exactly one wins.
+    const confirm = (transactionId: string) =>
+      a.post('/reconciliation/confirm').send({
+        transactionId,
+        entityType: 'expense',
+        entityId: expense.body.id,
+      });
+    const results = await Promise.all([confirm(first), confirm(second)]);
+    expect(results.map((r) => r.status).sort()).toEqual([201, 400]);
+    const linked = await prisma.bankTransaction.findMany({
+      where: { ...org, matchedEntityType: 'expense', matchedEntityId: expense.body.id },
+      select: { id: true, status: true },
+    });
+    expect(linked).toHaveLength(1);
+    expect(linked[0].status).toBe('MATCHED');
+    // Nothing was posted or recorded a second time.
+    expect(await prisma.journal.count({ where: org })).toBe(journalsBefore);
+    expect(await prisma.expense.count({ where: org })).toBe(expensesBefore);
+
+    // The other line is not offered the expense any more.
+    const after = await a.get(`/reconciliation/suggestions/${bankAccountId}`);
+    const other = after.body.find(
+      (s: { transaction: { id: string } }) =>
+        s.transaction.id !== linked[0].id && [first, second].includes(s.transaction.id),
+    );
+    expect(other.matches.map((m: { type: string }) => m.type)).not.toContain('expense');
+
+    // Voiding the expense reopens the line it was matched to.
+    expect((await a.delete(`/expenses/${expense.body.id}`)).status).toBe(200);
+    const reopened = await prisma.bankTransaction.findFirst({
+      where: { ...org, id: linked[0].id },
+    });
+    expect(reopened).toMatchObject({
+      status: 'PENDING',
+      matchedEntityType: null,
+      matchedEntityId: null,
+    });
+  });
+
+  // #682: a match racing a void of the same expense never leaves the line linked to a voided expense.
+  it('a match racing the void of its expense leaves the line open and unlinked', async () => {
+    const settings = (await a.get('/organization/account-settings')).body;
+    const list = await a.get('/accounts').query({ limit: 500 });
+    const rentAccount = list.body.data.find((x: { code: string }) => x.code === '6100').id;
+    const expense = await a.post('/expenses').send({
+      date: isoDay(0),
+      accountId: rentAccount,
+      amount: '275.00',
+      paidThroughAccountId: settings.defaultBankAccountId,
+      description: 'Cleaning',
+    });
+    expect(expense.status).toBe(201);
+    const line = await a.post('/bank-transactions').send({
+      bankAccountId,
+      date: isoDay(0),
+      type: 'WITHDRAWAL',
+      amount: '275.00',
+      description: 'Cleaning',
+    });
+    expect(line.status).toBe(201);
+
+    const [matched, voided] = await Promise.all([
+      a.post('/reconciliation/confirm').send({
+        transactionId: line.body.id,
+        entityType: 'expense',
+        entityId: expense.body.id,
+      }),
+      a.delete(`/expenses/${expense.body.id}`),
+    ]);
+    // Either order is allowed; the void always succeeds and wins in the end.
+    expect(voided.status).toBe(200);
+    expect([201, 404]).toContain(matched.status);
+
+    const after = await prisma.bankTransaction.findFirst({
+      where: { id: line.body.id, organizationId: tenant.organizationId },
+    });
+    expect(after).toMatchObject({
+      status: 'PENDING',
+      matchedEntityType: null,
+      matchedEntityId: null,
+    });
+  });
 });

@@ -219,11 +219,15 @@ export default function BankTransactionsPage() {
                     date?: string;
                     description?: string;
                     payee?: string;
+                    type?: 'DEPOSIT' | 'WITHDRAWAL';
                     amount?: string | number;
                     status: string;
                   }) => {
-                    const amount = parseFloat(txn.amount?.toString() || '0');
-                    const isDeposit = amount >= 0;
+                    // #683: amounts are stored unsigned; the direction is the type (as on the
+                    // reconcile screen). A legacy negative amount still reads as a withdrawal.
+                    const raw = (txn.amount ?? '0').toString().trim();
+                    const isDeposit = txn.type ? txn.type === 'DEPOSIT' : !raw.startsWith('-');
+                    const unsigned = raw.replace(/^[-+]/, '');
                     return (
                       <TableRow key={txn.id}>
                         <TableCell className="text-sm">
@@ -237,6 +241,8 @@ export default function BankTransactionsPage() {
                         <TableCell>{txn.payee || '-'}</TableCell>
                         <TableCell className="text-end">
                           <span
+                            data-testid={`txn-amount-${txn.id}`}
+                            data-direction={isDeposit ? 'in' : 'out'}
                             className={cn(
                               'font-mono font-medium flex items-center justify-end gap-1',
                               isDeposit ? 'text-success' : 'text-destructive',
@@ -247,7 +253,8 @@ export default function BankTransactionsPage() {
                             ) : (
                               <ArrowUpRight className="h-3 w-3" />
                             )}
-                            {formatCurrency(Math.abs(amount))}
+                            {isDeposit ? '+' : '-'}
+                            {formatCurrency(unsigned)}
                           </span>
                         </TableCell>
                         <TableCell>
