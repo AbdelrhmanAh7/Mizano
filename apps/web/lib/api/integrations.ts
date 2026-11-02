@@ -62,6 +62,54 @@ export interface TestDeliveryResult {
   lastError: string | null;
 }
 
+/** Plain reason for a delivery's last result, as a `settings.flowline.reason.*` key. */
+export type DeliveryReason =
+  | 'ok'
+  | 'notFound'
+  | 'signature'
+  | 'unpublished'
+  | 'tooLarge'
+  | 'busy'
+  | 'refused'
+  | 'unreachable'
+  | 'privateAddress'
+  | 'badAddress'
+  | 'stopped'
+  | 'failed';
+
+/** Errors of the connection itself (no answer at all), as the dispatcher records them. */
+const TRANSPORT_ERROR =
+  /fetch failed|Timed out after|ETIMEDOUT|ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN|EHOSTUNREACH|ENETUNREACH|socket hang up/i;
+
+/**
+ * What the last attempt means for the person, from the receiver's status code or the recorded
+ * error; null before any attempt. FlowLine answers 404 for an unknown address, 401 for a wrong
+ * secret (or a clock that is far off), 409 while the flow is unpublished. Whether Jarda tries
+ * again is shown by the status column, never promised here.
+ */
+export function deliveryReason(
+  statusCode: number | null,
+  lastError: string | null,
+): DeliveryReason | null {
+  if (statusCode) {
+    if (statusCode >= 200 && statusCode < 300) return 'ok';
+    if (statusCode === 404 || statusCode === 410) return 'notFound';
+    if (statusCode === 401) return 'signature';
+    if (statusCode === 409) return 'unpublished';
+    if (statusCode === 413) return 'tooLarge';
+    if (statusCode >= 500 || [408, 425, 429].includes(statusCode)) return 'busy';
+    return 'refused';
+  }
+  if (!lastError) return null;
+  if (/EPRIVATEADDRESS|private address|must be a public address/i.test(lastError)) {
+    return 'privateAddress';
+  }
+  // The saved address no longer passes the address check (https, valid, no credentials).
+  if (/Webhook URL (must|is not)/i.test(lastError)) return 'badAddress';
+  if (/disabled or deleted/i.test(lastError)) return 'stopped';
+  return TRANSPORT_ERROR.test(lastError) ? 'unreachable' : 'failed';
+}
+
 /** Unwraps an optional `{ data }` envelope. */
 export function unwrap<T>(body: unknown): T {
   if (body && typeof body === 'object' && !Array.isArray(body) && 'data' in body) {

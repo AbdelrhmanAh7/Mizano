@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import enSettings from '@/messages/en/settings.json';
 import arSettings from '@/messages/ar/settings.json';
-import { integrationsBaseUrl, unwrap } from '@/lib/api/integrations';
+import { deliveryReason, integrationsBaseUrl, unwrap } from '@/lib/api/integrations';
 
 jest.mock('next-intl', () => ({
   useTranslations: (namespace: string) =>
@@ -186,7 +186,35 @@ describe('FlowlineConnect', () => {
     ]);
     render(<FlowlineConnect />);
     expect(screen.getByText('log.status.RETRYING')).toBeInTheDocument();
-    expect(screen.getByText('HTTP 503')).toBeInTheDocument();
+    // A plain reason, never the raw transport text; the code stays as the cell's title.
+    expect(screen.getByText('reason.busy')).toHaveAttribute('title', 'HTTP 503');
+    expect(screen.queryByText('HTTP 503')).not.toBeInTheDocument();
+  });
+});
+
+describe('deliveryReason', () => {
+  it.each([
+    [200, null, 'ok'],
+    [404, 'HTTP 404', 'notFound'],
+    [401, 'HTTP 401', 'signature'],
+    [403, 'HTTP 403', 'refused'],
+    [409, 'HTTP 409', 'unpublished'],
+    [413, 'HTTP 413', 'tooLarge'],
+    [429, 'HTTP 429', 'busy'],
+    [502, 'HTTP 502', 'busy'],
+    [400, 'HTTP 400', 'refused'],
+    [null, 'TypeError: fetch failed (ETIMEDOUT)', 'unreachable'],
+    [null, 'TypeError: fetch failed (ENOTFOUND)', 'unreachable'],
+    [null, 'Timed out after 15s', 'unreachable'],
+    [null, 'Endpoint is disabled or deleted', 'stopped'],
+    // The exact strings the dispatcher records (describeError / networkErrorSummary).
+    [null, 'BadRequestException status=400: Webhook URL must be a public address', 'privateAddress'],
+    [null, 'TypeError: fetch failed (EPRIVATEADDRESS)', 'privateAddress'],
+    [null, 'BadRequestException status=400: Webhook URL must use https', 'badAddress'],
+    [null, 'Error: Unsupported state or unable to authenticate data', 'failed'],
+    [null, null, null],
+  ])('%s / %s -> %s', (code, error, reason) => {
+    expect(deliveryReason(code, error)).toBe(reason);
   });
 });
 
