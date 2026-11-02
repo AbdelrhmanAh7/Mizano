@@ -32,7 +32,7 @@ export interface BankTransaction {
 export interface SuggestedMatch {
   id: string;
   /** An open document to settle, or a payment already recorded (matching it posts nothing). */
-  type: 'INVOICE' | 'BILL' | 'PAYMENT_RECEIVED' | 'PAYMENT_MADE';
+  type: 'INVOICE' | 'BILL' | 'PAYMENT_RECEIVED' | 'PAYMENT_MADE' | 'EXPENSE';
   number: string;
   date: string;
   amount: string | number;
@@ -87,7 +87,7 @@ export function useUnmatchedTransactions(bankAccountId: string) {
 }
 
 /** One line of `GET /reconciliation/suggestions/:bankAccountId`: a pending bank line and its candidates. */
-type MatchEntityType = 'invoice' | 'bill' | 'payment_received' | 'payment_made';
+type MatchEntityType = 'invoice' | 'bill' | 'payment_received' | 'payment_made' | 'expense';
 
 interface SuggestionRow {
   transaction: { id: string };
@@ -99,6 +99,7 @@ const MATCH_TYPES: Record<MatchEntityType, SuggestedMatch['type']> = {
   bill: 'BILL',
   payment_received: 'PAYMENT_RECEIVED',
   payment_made: 'PAYMENT_MADE',
+  expense: 'EXPENSE',
 };
 
 /** The API's entity type for a candidate (the inverse of MATCH_TYPES). */
@@ -106,9 +107,12 @@ const ENTITY_TYPES = Object.fromEntries(
   Object.entries(MATCH_TYPES).map(([entity, type]) => [type, entity]),
 ) as Record<SuggestedMatch['type'], MatchEntityType>;
 
-/** A recorded payment is already in the books: matching it links the bank line, posts nothing. */
+/**
+ * A recorded payment or paid expense is already in the books: matching it links the bank line and
+ * posts nothing (#635, #682).
+ */
 export const isRecordedPayment = (type: SuggestedMatch['type']): boolean =>
-  type === 'PAYMENT_RECEIVED' || type === 'PAYMENT_MADE';
+  type === 'PAYMENT_RECEIVED' || type === 'PAYMENT_MADE' || type === 'EXPENSE';
 
 const asText = (value: unknown): string => (typeof value === 'string' ? value : '');
 const nameOf = (party: unknown): string =>
@@ -122,19 +126,24 @@ function toSuggestedMatch(match: SuggestionRow['matches'][number]): SuggestedMat
   const { entity } = match;
   const type = MATCH_TYPES[match.type];
   const payment = isRecordedPayment(type);
+  const expense = match.type === 'expense';
+  // An expense has no number: its reference, else its description, names it.
   const number =
     match.type === 'invoice'
       ? entity.invoiceNumber
       : match.type === 'bill'
         ? entity.billNumber
-        : entity.paymentNumber;
+        : expense
+          ? asText(entity.reference) || entity.description
+          : entity.paymentNumber;
   const incoming = match.type === 'invoice' || match.type === 'payment_received';
   return {
     id: asText(entity.id),
     type,
     number: asText(number),
     date: asText(entity.date),
-    amount: asText(payment ? entity.amount : entity.total) || '0',
+    // An expense's total (net + VAT) is what left the bank.
+    amount: asText(payment && !expense ? entity.amount : entity.total) || '0',
     balanceDue: payment ? '0' : asText(entity.balanceDue) || '0',
     counterpartyName: nameOf(incoming ? entity.customer : entity.vendor),
     confidence: match.confidence,

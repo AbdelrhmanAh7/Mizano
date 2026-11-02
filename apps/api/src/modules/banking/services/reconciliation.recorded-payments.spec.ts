@@ -64,6 +64,7 @@ describe('Reconciliation of payments already in the books (#635)', () => {
     prisma.paymentMade.updateMany.mockResolvedValue({ count: 1 });
     prisma.invoice.findMany.mockResolvedValue([]);
     prisma.bill.findMany.mockResolvedValue([]);
+    prisma.expense.findMany.mockResolvedValue([]);
     prisma.$queryRaw.mockResolvedValue([]);
   });
 

@@ -520,7 +520,7 @@ export const reconciliationApi = {
   /** Settles an open invoice/bill, or links a payment already recorded (nothing posted again). */
   confirm: (data: {
     transactionId: string;
-    entityType: 'invoice' | 'bill' | 'payment_received' | 'payment_made';
+    entityType: 'invoice' | 'bill' | 'payment_received' | 'payment_made' | 'expense';
     entityId: string;
   }) => api.post('/reconciliation/confirm', data),
 };

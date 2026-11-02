@@ -110,4 +110,52 @@ describe('suggested matches from the reconciliation endpoint', () => {
     expect(pickSuggestedMatches(rows, 't2').map((m) => m.number)).toEqual(['BILL-0007']);
     expect(pickSuggestedMatches(rows, 'nope')).toEqual([]);
   });
+
+  // #682: an expense already paid from the bank is a match that posts nothing.
+  it('reads the golden C08 rent expense: named by its description, total 300.0000, nothing due', () => {
+    const match = only({
+      type: 'expense',
+      confidence: 99,
+      entity: {
+        id: 'exp-rent',
+        reference: null,
+        description: 'November rent',
+        date: '2026-11-02T00:00:00.000Z',
+        amount: '300.0000',
+        taxAmount: '0.0000',
+        total: '300.0000',
+        vendor: null,
+      },
+    });
+    expect(match).toEqual({
+      id: 'exp-rent',
+      type: 'EXPENSE',
+      number: 'November rent',
+      date: '2026-11-02T00:00:00.000Z',
+      amount: '300.0000',
+      balanceDue: '0',
+      counterpartyName: '',
+      confidence: 99,
+    });
+    expect(isRecordedPayment(match.type)).toBe(true);
+  });
+
+  it('shows an expense total with VAT (100.00 + 14.00) and its reference', () => {
+    expect(
+      only({
+        type: 'expense',
+        confidence: 100,
+        entity: {
+          id: 'exp-vat',
+          reference: 'RCPT-9',
+          description: 'Printer ink',
+          date: '2026-11-02T00:00:00.000Z',
+          amount: '100.0000',
+          taxAmount: '14.0000',
+          total: '114.0000',
+          vendor: { id: 'v1', name: 'Paper Co' },
+        },
+      }),
+    ).toMatchObject({ number: 'RCPT-9', amount: '114.0000', counterpartyName: 'Paper Co' });
+  });
 });

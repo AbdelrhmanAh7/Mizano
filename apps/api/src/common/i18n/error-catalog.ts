@@ -1523,8 +1523,33 @@ const BANKING_ERRORS: ErrorCatalogEntry[] = [
   },
   {
     code: 'RECONCILE_ENTITY_TYPE_INVALID',
-    en: 'entityType must be invoice, bill, payment_received or payment_made',
-    ar: 'يجب أن تكون المطابقة مع فاتورة أو فاتورة مورد أو دفعة مسجلة.',
+    en: 'entityType must be invoice, bill, payment_received, payment_made or expense',
+    ar: 'يجب أن تكون المطابقة مع فاتورة أو فاتورة مورد أو دفعة أو مصروف مسجل.',
+  },
+  {
+    code: 'EXPENSE_MATCH_NEEDS_WITHDRAWAL',
+    en: 'Only withdrawals can be matched to an expense',
+    ar: 'يمكن مطابقة السحوبات فقط مع المصروفات.',
+  },
+  {
+    code: 'EXPENSE_MATCH_NOT_POSTED',
+    en: 'Only a posted expense can be matched to a bank line',
+    ar: 'يمكن مطابقة المصروف المرحّل فقط مع حركة بنكية.',
+  },
+  {
+    code: 'EXPENSE_MATCH_OTHER_ACCOUNT',
+    en: 'This expense was paid from a different account',
+    ar: 'تم دفع هذا المصروف من حساب آخر.',
+  },
+  {
+    code: 'EXPENSE_MATCH_AMOUNT_DIFFERS',
+    en: 'The expense amount differs from the bank line',
+    ar: 'مبلغ المصروف يختلف عن مبلغ الحركة البنكية.',
+  },
+  {
+    code: 'EXPENSE_ALREADY_MATCHED',
+    en: 'This expense is already matched to another bank line',
+    ar: 'هذا المصروف مطابق بالفعل مع حركة بنكية أخرى.',
   },
   {
     code: 'EXPENSE_NEEDS_WITHDRAWAL',
