@@ -79,7 +79,7 @@ export default function HRPage() {
       description: t('employees.description'),
       icon: Users,
       href: '/hr/employees',
-      color: 'bg-info',
+      color: 'bg-info text-info-foreground',
       stats: t('activeCount', { count: activeCount }),
     },
     {
@@ -87,7 +87,7 @@ export default function HRPage() {
       description: t('attendance.description'),
       icon: Clock,
       href: '/hr/attendance',
-      color: 'bg-success',
+      color: 'bg-success text-success-foreground',
       stats: t('trackTime'),
     },
     {
@@ -95,7 +95,7 @@ export default function HRPage() {
       description: t('payroll.description'),
       icon: DollarSign,
       href: '/hr/payroll',
-      color: 'bg-primary',
+      color: 'bg-primary text-primary-foreground',
       stats: t('pendingCount', { count: pendingPayroll }),
     },
   ];
@@ -211,7 +211,7 @@ export default function HRPage() {
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-lg ${module.color}`}>
-                  <module.icon className="h-5 w-5 text-white" />
+                  <module.icon className="h-5 w-5" />
                 </div>
                 <div>
                   <CardTitle className="text-lg">{module.title}</CardTitle>

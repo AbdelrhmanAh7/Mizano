@@ -7,15 +7,35 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const MODULES = [
-  { key: 'accounts', icon: BookOpen, href: '/accounting/accounts', color: 'bg-info' },
-  { key: 'journals', icon: FileText, href: '/accounting/journals', color: 'bg-success' },
-  { key: 'recurring', icon: RefreshCw, href: '/accounting/recurring', color: 'bg-primary' },
-  { key: 'trialBalance', icon: Scale, href: '/accounting/trial-balance', color: 'bg-warning' },
+  {
+    key: 'accounts',
+    icon: BookOpen,
+    href: '/accounting/accounts',
+    color: 'bg-info text-info-foreground',
+  },
+  {
+    key: 'journals',
+    icon: FileText,
+    href: '/accounting/journals',
+    color: 'bg-success text-success-foreground',
+  },
+  {
+    key: 'recurring',
+    icon: RefreshCw,
+    href: '/accounting/recurring',
+    color: 'bg-primary text-primary-foreground',
+  },
+  {
+    key: 'trialBalance',
+    icon: Scale,
+    href: '/accounting/trial-balance',
+    color: 'bg-warning text-warning-foreground',
+  },
   {
     key: 'generalLedger',
     icon: BookMarked,
     href: '/accounting/general-ledger',
-    color: 'bg-info',
+    color: 'bg-info text-info-foreground',
   },
 ] as const;
 
@@ -57,7 +77,7 @@ export default function AccountingPage() {
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-lg ${module.color}`}>
-                  <module.icon className="h-5 w-5 text-white" />
+                  <module.icon className="h-5 w-5" />
                 </div>
                 <CardTitle className="text-lg">{t(MODULE_TITLE_KEYS[module.key])}</CardTitle>
               </div>

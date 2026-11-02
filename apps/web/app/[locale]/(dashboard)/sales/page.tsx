@@ -68,7 +68,7 @@ export default function SalesPage() {
       description: t('overview.modules.customers'),
       icon: Users,
       href: '/sales/customers',
-      color: 'bg-info',
+      color: 'bg-info text-info-foreground',
       stats: t('overview.modules.customersStats', { count: customers.length }),
     },
     {
@@ -76,7 +76,7 @@ export default function SalesPage() {
       description: t('overview.modules.quotes'),
       icon: FileText,
       href: '/sales/quotes',
-      color: 'bg-primary',
+      color: 'bg-primary text-primary-foreground',
       stats: t('overview.modules.quotesStats', { count: pendingQuotes.length }),
     },
     {
@@ -84,7 +84,7 @@ export default function SalesPage() {
       description: t('overview.modules.invoices'),
       icon: Receipt,
       href: '/sales/invoices',
-      color: 'bg-success',
+      color: 'bg-success text-success-foreground',
       stats: t('overview.modules.invoicesStats', {
         count: invoices.filter((i: { status: string }) => i.status === 'SENT').length,
       }),
@@ -94,7 +94,7 @@ export default function SalesPage() {
       description: t('overview.modules.creditNotes'),
       icon: CreditCard,
       href: '/sales/credit-notes',
-      color: 'bg-warning',
+      color: 'bg-warning text-warning-foreground',
       stats: t('overview.modules.creditNotesStats'),
     },
     {
@@ -102,7 +102,7 @@ export default function SalesPage() {
       description: t('overview.modules.payments'),
       icon: TrendingUp,
       href: '/sales/payments',
-      color: 'bg-info',
+      color: 'bg-info text-info-foreground',
       stats: t('overview.modules.paymentsStats'),
     },
     {
@@ -110,7 +110,7 @@ export default function SalesPage() {
       description: t('overview.modules.deliveryChallans'),
       icon: Truck,
       href: '/sales/delivery-challans',
-      color: 'bg-destructive',
+      color: 'bg-destructive text-destructive-foreground',
       stats: t('overview.modules.deliveryChallansStats'),
     },
   ];
@@ -223,7 +223,7 @@ export default function SalesPage() {
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-lg ${module.color}`}>
-                  <module.icon className="h-5 w-5 text-white" />
+                  <module.icon className="h-5 w-5" />
                 </div>
                 <div>
                   <CardTitle className="text-lg">{module.title}</CardTitle>

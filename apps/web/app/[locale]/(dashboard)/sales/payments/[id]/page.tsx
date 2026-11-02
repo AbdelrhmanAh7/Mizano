@@ -147,7 +147,7 @@ export default function PaymentReceivedDetailPage() {
                 <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => voidPayment.mutate(payment.id)}
-                  className="bg-destructive hover:bg-destructive/90"
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
                   {t('payments.voidPayment')}
                 </AlertDialogAction>

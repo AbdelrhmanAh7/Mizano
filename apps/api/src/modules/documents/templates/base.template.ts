@@ -300,7 +300,7 @@ export function generateHeaderHtml(
       <div>
         ${renderLogoHtml(org, 'max-height: 60px; max-width: 200px;')}
         <h1 style="color: ${color}; margin: 10px 0 5px 0; font-size: 24px;">${escapeHtml(org.name)}</h1>
-        ${renderAddressHtml(org, 'margin: 2px 0; color: ${BRAND_COLORS.muted}; font-size: 12px;')}
+        ${renderAddressHtml(org, `margin: 2px 0; color: ${BRAND_COLORS.muted}; font-size: 12px;`)}
         ${org.phone ? `<p style="margin: 2px 0; color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.tel}: <span dir="ltr">${escapeHtml(org.phone)}</span></p>` : ''}
         ${org.email ? `<p style="margin: 2px 0; color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.email}: ${escapeHtml(org.email)}</p>` : ''}
         ${org.taxId ? `<p style="margin: 2px 0; color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.taxId}: ${escapeHtml(org.taxId)}</p>` : ''}

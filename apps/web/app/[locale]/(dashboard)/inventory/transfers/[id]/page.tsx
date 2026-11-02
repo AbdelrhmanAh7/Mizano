@@ -161,7 +161,7 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
                   <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleCancel}
-                    className="bg-destructive hover:bg-destructive/90"
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     {t('transfers.cancelTransfer')}
                   </AlertDialogAction>

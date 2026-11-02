@@ -134,7 +134,7 @@ export default function PriceListsPage() {
                                 <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                                 <AlertDialogAction
                                   onClick={() => deletePriceList.mutate(pl.id)}
-                                  className="bg-destructive hover:bg-destructive/90"
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                 >
                                   {t('common.delete')}
                                 </AlertDialogAction>

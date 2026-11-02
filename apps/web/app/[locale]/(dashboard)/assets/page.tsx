@@ -243,7 +243,7 @@ export default function AssetsPage() {
                                   <AlertDialogCancel>{tc('buttons.cancel')}</AlertDialogCancel>
                                   <AlertDialogAction
                                     onClick={() => deleteAsset.mutate(asset.id)}
-                                    className="bg-destructive hover:bg-destructive/90"
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                   >
                                     {tc('buttons.delete')}
                                   </AlertDialogAction>

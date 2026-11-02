@@ -453,7 +453,7 @@ export default function DealDetailPage() {
             <Button
               onClick={handleMarkLost}
               disabled={markLost.isPending || !lostReason}
-              className="bg-destructive hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {markLost.isPending ? 'Saving...' : 'Mark as Lost'}
             </Button>

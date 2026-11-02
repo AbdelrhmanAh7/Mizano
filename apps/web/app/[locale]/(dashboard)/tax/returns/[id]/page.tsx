@@ -515,7 +515,7 @@ export default function VATReturnDetailPage() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-lg bg-info">
-                    <Receipt className="h-4 w-4 text-white" />
+                    <Receipt className="h-4 w-4 text-info-foreground" />
                   </div>
                   <div>
                     <CardTitle className="text-lg">{t('returns.detail.salesBreakdown')}</CardTitle>
@@ -548,7 +548,7 @@ export default function VATReturnDetailPage() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-lg bg-warning">
-                    <ShoppingCart className="h-4 w-4 text-white" />
+                    <ShoppingCart className="h-4 w-4 text-warning-foreground" />
                   </div>
                   <div>
                     <CardTitle className="text-lg">
@@ -613,7 +613,7 @@ export default function VATReturnDetailPage() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-lg bg-success">
-                    <CheckCircle2 className="h-4 w-4 text-white" />
+                    <CheckCircle2 className="h-4 w-4 text-success-foreground" />
                   </div>
                   <CardTitle>{t('returns.detail.paymentDetails')}</CardTitle>
                 </div>

@@ -834,7 +834,7 @@ export class PdfService implements OnModuleDestroy {
           <div style="margin-bottom: 30px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px;">CUSTOMER</h4>
             <p style="font-weight: bold;">${escapeHtml(data.customer.name)}</p>
-            ${renderAddressHtml(data.customer, 'color: ${BRAND_COLORS.muted}; font-size: 12px;')}
+            ${renderAddressHtml(data.customer, `color: ${BRAND_COLORS.muted}; font-size: 12px;`)}
           </div>
 
           <!-- Opening Balance -->

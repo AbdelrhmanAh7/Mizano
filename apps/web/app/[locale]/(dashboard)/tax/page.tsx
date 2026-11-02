@@ -38,7 +38,7 @@ export default function TaxPage() {
       description: t('rates.description'),
       icon: Percent,
       href: '/tax/rates',
-      color: 'bg-info',
+      color: 'bg-info text-info-foreground',
       stats: stats ? t('hub.activeCount', { count: stats.activeRates }) : undefined,
     },
     {
@@ -46,7 +46,7 @@ export default function TaxPage() {
       description: t('returns.description'),
       icon: FileText,
       href: '/tax/returns',
-      color: 'bg-success',
+      color: 'bg-success text-success-foreground',
       stats: stats ? t('hub.pendingCount', { count: stats.pendingReturns }) : undefined,
     },
     {
@@ -54,7 +54,7 @@ export default function TaxPage() {
       description: t('payments.description'),
       icon: CreditCard,
       href: '/tax/payments',
-      color: 'bg-primary',
+      color: 'bg-primary text-primary-foreground',
       stats: stats ? formatCurrency(stats.totalPaid) : undefined,
     },
   ];
@@ -174,7 +174,7 @@ export default function TaxPage() {
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-lg ${module.color}`}>
-                  <module.icon className="h-5 w-5 text-white" />
+                  <module.icon className="h-5 w-5" />
                 </div>
                 <div>
                   <CardTitle className="text-lg">{module.title}</CardTitle>

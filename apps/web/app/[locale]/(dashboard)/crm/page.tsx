@@ -85,7 +85,7 @@ export default function CRMPage() {
       description: t('leads.description'),
       icon: Users,
       href: '/crm/leads',
-      color: 'bg-info',
+      color: 'bg-info text-info-foreground',
       stats: `${leads.length} total`,
     },
     {
@@ -93,7 +93,7 @@ export default function CRMPage() {
       description: t('deals.description'),
       icon: DollarSign,
       href: '/crm/deals',
-      color: 'bg-success',
+      color: 'bg-success text-success-foreground',
       stats: `${activeDeals.length} active`,
     },
   ];
@@ -208,7 +208,7 @@ export default function CRMPage() {
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-lg ${module.color}`}>
-                  <module.icon className="h-5 w-5 text-white" />
+                  <module.icon className="h-5 w-5" />
                 </div>
                 <div>
                   <CardTitle className="text-lg">{module.title}</CardTitle>

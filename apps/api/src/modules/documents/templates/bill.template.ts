@@ -158,7 +158,7 @@ export function generateBillHtml(
           <div style="flex: 1;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">${l.fromVendor}</h4>
             <p style="font-weight: bold; margin-bottom: 5px;"><bdi>${escapeHtml(bill.vendor.name)}</bdi></p>
-            ${renderAddressHtml(bill.vendor, 'color: ${BRAND_COLORS.muted}; font-size: 12px;')}
+            ${renderAddressHtml(bill.vendor, `color: ${BRAND_COLORS.muted}; font-size: 12px;`)}
             ${bill.vendor.email ? `<p style="color: ${BRAND_COLORS.muted}; font-size: 12px;">${escapeHtml(bill.vendor.email)}</p>` : ''}
             ${bill.vendor.phone ? `<p style="color: ${BRAND_COLORS.muted}; font-size: 12px;">${escapeHtml(bill.vendor.phone)}</p>` : ''}
             ${bill.vendor.taxId ? `<p style="color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.taxId}: ${escapeHtml(bill.vendor.taxId)}</p>` : ''}

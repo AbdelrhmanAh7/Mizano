@@ -297,6 +297,7 @@ describe('printed document contrast', () => {
         const luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
         expect(1.05 / (luminance + 0.05)).toBeGreaterThanOrEqual(4.5);
         expect(html).not.toMatch(/color:\s*#9ca3af/i);
+        expect(html).not.toContain('${BRAND_COLORS.');
       }
     },
   );

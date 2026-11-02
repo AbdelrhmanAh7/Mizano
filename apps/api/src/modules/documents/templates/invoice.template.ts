@@ -169,7 +169,7 @@ export function generateInvoiceHtml(
           <div style="flex: 1;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">${l.billTo}</h4>
             <p style="font-weight: bold; margin-bottom: 5px;"><bdi>${escapeHtml(invoice.customer.name)}</bdi></p>
-            ${renderAddressHtml(invoice.customer, 'color: ${BRAND_COLORS.muted}; font-size: 12px;')}
+            ${renderAddressHtml(invoice.customer, `color: ${BRAND_COLORS.muted}; font-size: 12px;`)}
             ${invoice.customer.email ? `<p style="color: ${BRAND_COLORS.muted}; font-size: 12px;">${escapeHtml(invoice.customer.email)}</p>` : ''}
             ${invoice.customer.phone ? `<p style="color: ${BRAND_COLORS.muted}; font-size: 12px;">${escapeHtml(invoice.customer.phone)}</p>` : ''}
             ${invoice.customer.taxId ? `<p style="color: ${BRAND_COLORS.muted}; font-size: 12px;">${l.taxId}: ${escapeHtml(invoice.customer.taxId)}</p>` : ''}

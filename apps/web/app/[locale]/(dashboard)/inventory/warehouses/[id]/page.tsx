@@ -159,7 +159,7 @@ export default function WarehouseDetailPage({ params }: WarehouseDetailPageProps
                 <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleDelete}
-                  className="bg-destructive hover:bg-destructive/90"
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
                   {t('common.delete')}
                 </AlertDialogAction>
