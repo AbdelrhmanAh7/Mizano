@@ -119,6 +119,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **Include every source of utility classes in Tailwind content.** Hooks returning status styles under `lib/` need that directory scanned too. When replacing a palette color on a solid status surface, use its foreground token for controls so an icon does not match its background. _(shared design-system review, 2 Nov 2026)_
 
+- **Status badges must keep their text/background pair on hover.** Default solid hover classes override caller-supplied soft colors; a primary soft badge can become primary text on primary fill. Noninteractive badges need no hover recoloring. _(design-system review, 2 Nov 2026)_
+
 ## 12. Caches, tests and scope
 
 - **Finite inputs do not guarantee finite arithmetic results.** Diagnostic timers must validate the elapsed difference and the accumulated safe-integer total before storing them; test subtraction overflow and repeated-stage accumulation. _(intake timings, PR #129)_
