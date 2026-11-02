@@ -215,7 +215,7 @@ export default function DeliveryChallansPage() {
                                 <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
                                 <AlertDialogAction
                                   onClick={() => deleteChallan.mutate(challan.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95"
                                 >
                                   {tCommon('buttons.delete')}
                                 </AlertDialogAction>

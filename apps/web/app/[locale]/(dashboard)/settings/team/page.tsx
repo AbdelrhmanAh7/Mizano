@@ -659,7 +659,7 @@ export default function TeamSettingsPage() {
             <AlertDialogCancel>{t('team.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteRole}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95"
             >
               {t('team.confirm')}
             </AlertDialogAction>
@@ -813,7 +813,7 @@ export default function TeamSettingsPage() {
             <AlertDialogCancel>{t('team.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteUser}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95"
             >
               {t('team.confirm')}
             </AlertDialogAction>

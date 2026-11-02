@@ -78,6 +78,14 @@ describe.each([':root', '.dark'])('design tokens %s', (selector) => {
     expect(contrast(c(token), over(c(token), bg, 0.1))).toBeGreaterThanOrEqual(4.5);
   });
 
+  it.each(['primary', 'destructive', 'success', 'warning'])(
+    'filled %s hover keeps AA contrast',
+    (token) => {
+      const dim = (rgb: RGB): RGB => rgb.map((v) => v * 0.95) as RGB;
+      expect(contrast(dim(c(token + '-foreground')), dim(c(token)))).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+
   it('the focus ring stands out from the page (3:1)', () => {
     expect(contrast(c('ring'), c('background'))).toBeGreaterThanOrEqual(3);
   });

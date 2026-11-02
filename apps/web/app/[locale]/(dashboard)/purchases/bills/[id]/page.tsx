@@ -497,7 +497,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
             <AlertDialogAction
               onClick={confirmVoidPayment}
               disabled={isVoiding}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95"
             >
               {t('bills.voidPayment')}
             </AlertDialogAction>

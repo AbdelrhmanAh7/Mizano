@@ -131,7 +131,7 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
                 <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleDelete}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95"
                 >
                   {tCommon('buttons.delete')}
                 </AlertDialogAction>

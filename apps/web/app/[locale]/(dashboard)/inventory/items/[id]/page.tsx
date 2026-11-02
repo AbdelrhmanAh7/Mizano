@@ -136,7 +136,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                 <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleDelete}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95"
                 >
                   {t('common.delete')}
                 </AlertDialogAction>

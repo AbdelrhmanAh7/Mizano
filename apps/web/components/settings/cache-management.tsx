@@ -180,7 +180,7 @@ export function CacheManagement() {
                 <AlertDialogCancel>{t('cache.cancel')}</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => flushMutation.mutate()}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95"
                 >
                   {t('cache.flushCache')}
                 </AlertDialogAction>

@@ -206,7 +206,7 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
                   <AlertDialogCancel>{tc('buttons.cancel')}</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleDelete}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95"
                   >
                     {tc('buttons.delete')}
                   </AlertDialogAction>

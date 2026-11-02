@@ -259,7 +259,7 @@ export default function DealDetailPage() {
                 Move Stage
               </Button>
               <Button
-                className="bg-success hover:bg-success/90"
+                className="bg-success hover:bg-success hover:brightness-95"
                 onClick={() => setWonDialogOpen(true)}
               >
                 <Trophy className="mr-2 h-4 w-4" />
@@ -417,7 +417,10 @@ export default function DealDetailPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleMarkWon} className="bg-success hover:bg-success/90">
+            <AlertDialogAction
+              onClick={handleMarkWon}
+              className="bg-success hover:bg-success hover:brightness-95"
+            >
               Mark as Won
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -453,7 +456,7 @@ export default function DealDetailPage() {
             <Button
               onClick={handleMarkLost}
               disabled={markLost.isPending || !lostReason}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95"
             >
               {markLost.isPending ? 'Saving...' : 'Mark as Lost'}
             </Button>

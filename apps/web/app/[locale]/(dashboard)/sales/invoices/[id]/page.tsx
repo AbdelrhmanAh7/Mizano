@@ -673,7 +673,7 @@ export default function InvoiceDetailPage() {
             <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmVoid}
-              className="bg-warning text-warning-foreground hover:bg-warning/90"
+              className="bg-warning text-warning-foreground hover:bg-warning hover:brightness-95"
             >
               {t('invoices.voidInvoice')}
             </AlertDialogAction>

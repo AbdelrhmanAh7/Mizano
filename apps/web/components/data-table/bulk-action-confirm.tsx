@@ -74,7 +74,7 @@ export function BulkActionConfirmDialog({
             disabled={isLoading}
             className={
               destructive
-                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90 focus:ring-destructive'
+                ? 'bg-destructive text-destructive-foreground hover:bg-destructive hover:brightness-95 focus:ring-destructive'
                 : undefined
             }
           >
