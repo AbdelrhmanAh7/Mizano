@@ -62,6 +62,39 @@ export interface TestDeliveryResult {
   lastError: string | null;
 }
 
+/** Plain reason for a delivery's last result, as a `settings.flowline.reason.*` key. */
+export type DeliveryReason =
+  | 'ok'
+  | 'notFound'
+  | 'signature'
+  | 'unpublished'
+  | 'tooLarge'
+  | 'refused'
+  | 'unreachable'
+  | 'privateAddress';
+
+/**
+ * What the last attempt means for the person, from the receiver's status code or the transport
+ * error (`TypeError: fetch failed (ETIMEDOUT)`); null before any attempt. FlowLine answers 404 for
+ * an unknown address, 401 for a wrong secret, 409 while the flow is unpublished.
+ */
+export function deliveryReason(
+  statusCode: number | null,
+  lastError: string | null,
+): DeliveryReason | null {
+  if (statusCode) {
+    if (statusCode >= 200 && statusCode < 300) return 'ok';
+    if (statusCode === 404 || statusCode === 410) return 'notFound';
+    if (statusCode === 401 || statusCode === 403) return 'signature';
+    if (statusCode === 409) return 'unpublished';
+    if (statusCode === 413) return 'tooLarge';
+    if (statusCode >= 500 || [408, 425, 429].includes(statusCode)) return 'unreachable';
+    return 'refused';
+  }
+  if (!lastError) return null;
+  return /EPRIVATEADDRESS|private address/i.test(lastError) ? 'privateAddress' : 'unreachable';
+}
+
 /** Unwraps an optional `{ data }` envelope. */
 export function unwrap<T>(body: unknown): T {
   if (body && typeof body === 'object' && !Array.isArray(body) && 'data' in body) {

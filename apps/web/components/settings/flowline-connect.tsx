@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/components/ui/use-toast';
 import { getLocalizedApiErrorMessage } from '@/lib/api-error';
-import { integrationsBaseUrl, type DeliveryStatus } from '@/lib/api/integrations';
+import { deliveryReason, integrationsBaseUrl, type DeliveryStatus } from '@/lib/api/integrations';
 import {
   useCreateIntegrationKey,
   useCreateWebhookEndpoint,
@@ -179,6 +179,11 @@ export function FlowlineConnect() {
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const canEdit = hasPermission('settings.edit');
+  /** The last attempt in plain words (the raw code stays in the cell's title). */
+  const reasonText = (code: number | null, error: string | null): string => {
+    const reason = deliveryReason(code, error);
+    return reason ? t(`reason.${reason}`) : '—';
+  };
 
   const catalog = useIntegrationCatalog();
   const keys = useIntegrationKeys();
@@ -523,14 +528,13 @@ export function FlowlineConnect() {
                           onSuccess: (r) =>
                             toast(
                               r.status === 'SUCCEEDED'
-                                ? {
-                                    title: t('step2.testOk', {
-                                      code: String(r.lastStatusCode ?? ''),
-                                    }),
-                                  }
+                                ? { title: t('step2.testOk') }
                                 : {
-                                    title: t('step2.testFailed'),
-                                    description: r.lastError ?? '',
+                                    title:
+                                      r.status === 'PENDING'
+                                        ? t('step2.testRetrying')
+                                        : t('step2.testFailed'),
+                                    description: reasonText(r.lastStatusCode, r.lastError),
                                     variant: 'destructive',
                                   },
                             ),
@@ -653,8 +657,11 @@ export function FlowlineConnect() {
                     <TableCell className="text-xs">
                       {d.attempts}/{d.maxAttempts}
                     </TableCell>
-                    <TableCell dir="ltr" className="max-w-[16rem] truncate text-xs">
-                      {d.lastStatusCode ? `HTTP ${d.lastStatusCode}` : (d.lastError ?? '—')}
+                    <TableCell
+                      className="max-w-[20rem] text-xs"
+                      title={d.lastStatusCode ? `HTTP ${d.lastStatusCode}` : (d.lastError ?? '')}
+                    >
+                      {reasonText(d.lastStatusCode, d.lastError)}
                     </TableCell>
                     <TableCell className="text-xs">
                       {d.status === 'PENDING' && d.attempts > 0

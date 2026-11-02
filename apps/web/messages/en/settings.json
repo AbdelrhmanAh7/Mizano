@@ -904,7 +904,7 @@
       "secretHint": "Secret",
       "enabled": "Enabled",
       "test": "Send test",
-      "testOk": "FlowLine accepted the test event (HTTP {code})",
+      "testOk": "FlowLine accepted the test event",
       "testFailed": "Test event was not accepted",
       "backlog": "Send overdue backlog",
       "backlogTitle": "Send reminders for old overdue invoices?",
@@ -912,7 +912,8 @@
       "backlogQueued": "Overdue invoices will be sent on the next hourly check",
       "delete": "Delete",
       "deleteTitle": "Delete this webhook?",
-      "deleteDescription": "{brand} stops sending events to it. Queued deliveries will fail."
+      "deleteDescription": "{brand} stops sending events to it. Queued deliveries will fail.",
+      "testRetrying": "{brand} will send the test again automatically"
     },
     "log": {
       "title": "Delivery log",
@@ -956,6 +957,16 @@
     },
     "errors": {
       "WEBHOOK_ENDPOINT_INACTIVE": "Enable the webhook before sending the overdue backlog."
+    },
+    "reason": {
+      "ok": "FlowLine received it",
+      "notFound": "FlowLine doesn't know this address: the flow may have been deleted or the address copied wrong. Copy it again from the flow's trigger.",
+      "signature": "FlowLine refused the signing secret: copy it again from the same flow.",
+      "unpublished": "The flow is not published in FlowLine yet: publish it and {brand} will try again.",
+      "tooLarge": "The event is larger than FlowLine accepts.",
+      "refused": "FlowLine refused the event. Check the address and the signing secret.",
+      "unreachable": "Couldn't reach FlowLine (no answer in time, or the address is unavailable). {brand} will try again automatically.",
+      "privateAddress": "This address points to an internal address, which is not allowed."
     }
   }
 }
