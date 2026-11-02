@@ -206,4 +206,38 @@ describe('BankTransactionsPage', () => {
     expect(greenAmounts.length).toBeGreaterThan(0);
     expect(redAmounts.length).toBeGreaterThan(0);
   });
+
+  // #683: amounts are stored unsigned; the type says which way the money went.
+  it('shows the golden C08 statement withdrawals as money out with a minus sign', () => {
+    const line = (id: string, description: string, type: string, amount: string) => ({
+      id,
+      date: '2026-11-02',
+      description,
+      type,
+      amount,
+      status: 'PENDING',
+    });
+    mockUseBankTransactions.mockReturnValue({
+      data: {
+        data: [
+          line('r100', 'Nile Dental Clinic receipt', 'DEPOSIT', '100.0000'),
+          line('r128', 'Nile Dental Clinic balance', 'DEPOSIT', '128.0000'),
+          line('p171', 'Cairo Office Supplies payment', 'WITHDRAWAL', '171.0000'),
+          line('e300', 'November rent', 'WITHDRAWAL', '300.0000'),
+        ],
+        meta: { page: 1, limit: 20, total: 4, totalPages: 1 },
+      },
+      isLoading: false,
+    });
+    renderPage();
+    const amount = (id: string): HTMLElement => screen.getByTestId(`txn-amount-${id}`);
+    expect(amount('r100')).toHaveTextContent(/^\+100\.00$/);
+    expect(amount('r128')).toHaveTextContent(/^\+128\.00$/);
+    expect(amount('p171')).toHaveTextContent(/^-171\.00$/);
+    expect(amount('e300')).toHaveTextContent(/^-300\.00$/);
+    expect(amount('r100')).toHaveAttribute('data-direction', 'in');
+    expect(amount('p171')).toHaveAttribute('data-direction', 'out');
+    expect(amount('e300')).toHaveAttribute('data-direction', 'out');
+    expect(amount('e300')).toHaveClass('text-red-600');
+  });
 });
