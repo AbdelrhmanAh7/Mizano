@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-import { BRAND } from '@mizano/shared-types';
+import { BRAND, BRAND_COLORS } from '@mizano/shared-types';
 import {
   PrismaClient,
   UserStatus,
@@ -79,6 +79,7 @@ async function main() {
     update: {},
     create: {
       id: 'seed-org-001',
+      primaryColor: BRAND_COLORS.primary,
       name: `${BRAND.name.en} Demo Company`,
       email: 'demo@mizano.com',
       phone: '+201234567890',
