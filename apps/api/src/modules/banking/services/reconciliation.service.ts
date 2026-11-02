@@ -269,68 +269,55 @@ export class ReconciliationService {
     if (amount.isZero()) return [];
     const tokens = referenceTokens(transaction);
     const window = PAYMENT_WINDOW_DAYS * DAY_MS;
-    const base = {
-      organizationId,
-      deletedAt: null,
-      status: ExpenseStatus.POSTED,
-      paidThroughAccountId: linkedAccountId,
-    };
-    const query = {
-      orderBy: { date: 'desc' as const },
-      take: MATCH_CANDIDATE_LIMIT,
+    const from = new Date(transaction.date.getTime() - window);
+    const to = new Date(transaction.date.getTime() + window);
+    // The total (net + VAT) is no column, so the eligible rows are picked in SQL before the limit:
+    // same organization, posted, not voided, paid through this bank, the exact total, not linked
+    // to another line, and named on the line (any date) or within the window. Named ones first.
+    const named =
+      tokens.length > 0 ? Prisma.sql`e."reference" = ANY(${tokens})` : Prisma.sql`FALSE`;
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT e.id FROM "expenses" e
+      WHERE e."organizationId" = ${organizationId}
+        AND e."deletedAt" IS NULL
+        AND e."status" = 'POSTED'
+        AND e."paidThroughAccountId" = ${linkedAccountId}
+        AND e."amount" + e."taxAmount" = ${amount.toFixed(4)}::numeric
+        AND (${named} OR e."date" BETWEEN ${from} AND ${to})
+        AND NOT EXISTS (
+          SELECT 1 FROM "bank_transactions" b
+          WHERE b."organizationId" = ${organizationId}
+            AND b."matchedEntityType" = 'expense'
+            AND b."matchedEntityId" = e.id
+        )
+      ORDER BY (${named}) DESC, e."date" DESC
+      LIMIT ${MATCH_CANDIDATE_LIMIT}`;
+    if (rows.length === 0) return [];
+    const candidates = await this.prisma.expense.findMany({
+      where: { id: { in: rows.map((r) => r.id) }, organizationId, deletedAt: null },
       include: { vendor: { select: { id: true, name: true } } },
-    };
-    // The total is net + VAT, which no column holds, so pools are bounded and the amount is
-    // compared exactly afterwards: the reference named on the line (any date), then the window.
-    const pools = [
-      { ...base, reference: { in: tokens } },
-      {
-        ...base,
-        date: {
-          gte: new Date(transaction.date.getTime() - window),
-          lte: new Date(transaction.date.getTime() + window),
-        },
-      },
-    ];
-    const candidates = uniqueById(
-      (await Promise.all(pools.map((where) => this.prisma.expense.findMany({ ...query, where }))))
-        .flat()
-        .filter((e) => e.amount.add(e.taxAmount).equals(amount)),
-    );
-    if (candidates.length === 0) return [];
-
-    const linked = await this.prisma.bankTransaction.findMany({
-      where: {
-        organizationId,
-        matchedEntityType: 'expense',
-        matchedEntityId: { in: candidates.map((e) => e.id) },
-      },
-      select: { matchedEntityId: true },
     });
-    const taken = new Set(linked.map((l) => l.matchedEntityId));
     const payee = transaction.payee?.toLowerCase() ?? '';
     const description = transaction.description?.trim().toLowerCase() ?? '';
 
-    return candidates
-      .filter((e) => !taken.has(e.id))
-      .map((expense) => {
-        let confidence: number;
-        if (expense.reference && tokens.includes(expense.reference)) {
-          confidence = 100;
-        } else {
-          confidence = 90 - Math.min(20, Math.floor(daysApart(expense.date, transaction.date) / 3));
-          if (payee && expense.vendor?.name.toLowerCase().includes(payee)) confidence += 30;
-          if (description && expense.description?.trim().toLowerCase() === description) {
-            confidence += 30;
-          }
-          confidence = Math.min(99, confidence);
+    return candidates.map((expense) => {
+      let confidence: number;
+      if (expense.reference && tokens.includes(expense.reference)) {
+        confidence = 100;
+      } else {
+        confidence = 90 - Math.min(20, Math.floor(daysApart(expense.date, transaction.date) / 3));
+        if (payee && expense.vendor?.name.toLowerCase().includes(payee)) confidence += 30;
+        if (description && expense.description?.trim().toLowerCase() === description) {
+          confidence += 30;
         }
-        return {
-          type: 'expense' as const,
-          entity: { ...expense, total: expense.amount.add(expense.taxAmount).toFixed(4) },
-          confidence,
-        };
-      });
+        confidence = Math.min(99, confidence);
+      }
+      return {
+        type: 'expense' as const,
+        entity: { ...expense, total: expense.amount.add(expense.taxAmount).toFixed(4) },
+        confidence,
+      };
+    });
   }
 
   private async findMatches(organizationId: string, transaction: BankTransaction) {

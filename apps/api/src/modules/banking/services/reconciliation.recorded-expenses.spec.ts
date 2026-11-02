@@ -61,11 +61,18 @@ describe('Reconciliation of expenses already paid from the bank (#682)', () => {
     prisma.$queryRaw.mockResolvedValue([]);
   });
 
+  /** The SQL text of the candidate query (the tagged template's strings, fragments inlined). */
+  const candidateSql = (): string => {
+    const call = prisma.$queryRaw.mock.calls.find((c: any[]) =>
+      String(c[0]?.join?.('?') ?? c[0]?.sql ?? '').includes('FROM "expenses" e'),
+    );
+    return call[0].join('?');
+  };
+
   describe('suggestions', () => {
     it('offers the paid rent expense for the 300.00 withdrawal', async () => {
-      prisma.bankTransaction.findMany
-        .mockResolvedValueOnce([rentLine]) // pending lines
-        .mockResolvedValueOnce([]); // lines already matched to these expenses
+      prisma.bankTransaction.findMany.mockResolvedValue([rentLine]);
+      prisma.$queryRaw.mockResolvedValue([{ id: 'exp-rent' }]);
       prisma.expense.findMany.mockResolvedValue([rent]);
 
       const [row] = await service.getSuggestions(ORG, 'ba-cib');
@@ -77,60 +84,67 @@ describe('Reconciliation of expenses already paid from the bank (#682)', () => {
           confidence: 99,
         },
       ]);
-      // Same organization, posted, not voided, paid through this bank's ledger account.
-      for (const [{ where }] of prisma.expense.findMany.mock.calls) {
-        expect(where).toMatchObject({
-          organizationId: ORG,
-          deletedAt: null,
-          status: 'POSTED',
-          paidThroughAccountId: 'gl-1010',
-        });
-      }
-      expect(prisma.bankTransaction.findMany.mock.calls[1][0].where).toEqual({
+      expect(prisma.expense.findMany.mock.calls[0][0].where).toEqual({
+        id: { in: ['exp-rent'] },
         organizationId: ORG,
-        matchedEntityType: 'expense',
-        matchedEntityId: { in: ['exp-rent'] },
+        deletedAt: null,
       });
     });
 
-    it('compares the total with VAT: 100.00 + 14.00 matches 114.00, 300.00 + 42.00 does not match 300.00', async () => {
+    it('picks eligible expenses in SQL before the 200 limit, so newer other expenses cannot hide one', async () => {
+      prisma.bankTransaction.findMany.mockResolvedValue([rentLine]);
+      prisma.$queryRaw.mockResolvedValue([]);
+
+      await service.getSuggestions(ORG, 'ba-cib');
+
+      const sql = candidateSql();
+      const [, ...values] = prisma.$queryRaw.mock.calls.find((c: any[]) =>
+        String(c[0]?.join?.('?')).includes('FROM "expenses" e'),
+      );
+      // Every eligibility rule is in the WHERE, ahead of ORDER BY ... LIMIT.
+      const where = sql.slice(0, sql.indexOf('ORDER BY'));
+      expect(where).toContain('e."organizationId" = ?');
+      expect(where).toContain('e."deletedAt" IS NULL');
+      expect(where).toContain(`e."status" = 'POSTED'`);
+      expect(where).toContain('e."paidThroughAccountId" = ?');
+      expect(where).toContain('e."amount" + e."taxAmount" = ?::numeric');
+      expect(where).toContain('NOT EXISTS');
+      expect(where).toContain(`b."matchedEntityType" = 'expense'`);
+      expect(sql.slice(sql.indexOf('ORDER BY'))).toContain('LIMIT ?');
+      expect(values).toEqual(expect.arrayContaining([ORG, 'gl-1010', '300.0000', 200]));
+      // No candidates in SQL: no expense rows are read.
+      expect(prisma.expense.findMany).not.toHaveBeenCalled();
+    });
+
+    it('shows the total with VAT: 100.00 + 14.00 for a 114.00 line', async () => {
       const withVat = {
         ...rent,
         id: 'exp-vat',
         amount: dec('100.0000'),
         taxAmount: dec('14.0000'),
       };
-      const rentWithVat = { ...rent, id: 'exp-342', taxAmount: dec('42.0000') };
-      prisma.expense.findMany.mockResolvedValue([withVat, rentWithVat]);
-      prisma.bankTransaction.findMany
-        .mockResolvedValueOnce([{ ...rentLine, id: 't-114', amount: dec('114.0000') }])
-        .mockResolvedValueOnce([]);
+      prisma.bankTransaction.findMany.mockResolvedValue([
+        { ...rentLine, id: 't-114', amount: dec('114.0000') },
+      ]);
+      prisma.$queryRaw.mockResolvedValue([{ id: 'exp-vat' }]);
+      prisma.expense.findMany.mockResolvedValue([withVat]);
 
       const [row] = await service.getSuggestions(ORG, 'ba-cib');
 
       expect(row.matches.map((m: any) => [m.type, m.entity.id, m.entity.total])).toEqual([
         ['expense', 'exp-vat', '114.0000'],
       ]);
-    });
-
-    it('does not offer an expense already matched to another bank line', async () => {
-      prisma.expense.findMany.mockResolvedValue([rent]);
-      prisma.bankTransaction.findMany
-        .mockResolvedValueOnce([rentLine])
-        .mockResolvedValueOnce([{ matchedEntityId: 'exp-rent' }]);
-
-      const [row] = await service.getSuggestions(ORG, 'ba-cib');
-
-      expect(row.matches).toEqual([]);
+      expect(candidateSql()).toContain('e."amount" + e."taxAmount" = ?::numeric');
     });
 
     it('never offers expenses for a deposit', async () => {
-      prisma.bankTransaction.findMany.mockResolvedValueOnce([
+      prisma.bankTransaction.findMany.mockResolvedValue([
         { ...rentLine, type: 'DEPOSIT', amount: dec('100.0000') },
       ]);
 
       await service.getSuggestions(ORG, 'ba-cib');
 
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
       expect(prisma.expense.findMany).not.toHaveBeenCalled();
     });
   });
