@@ -56,6 +56,8 @@ Colors are HSL triplets in CSS variables in `apps/web/app/globals.css`, exposed 
 | `border`, `input`                                 | slate 200                                  | Borders, form control borders                               |
 | `chart-1` … `chart-5`                             | teal, blue, gold, violet, rose             | Categorical chart series, in order                          |
 
+New organizations explicitly start with `BRAND_COLORS.primary` when created. Existing organizations retain their saved document branding: historical blue values cannot be distinguished from an explicit customer choice, so they are never silently rewritten. The product UI always uses its own teal tokens.
+
 **Why `#0F766E` and not the logo's `#0D9488`:** white text on `#0D9488` is 3.7:1 (fails AA); one step darker on the same hue is 5.5:1. The logo keeps `#0D9488`.
 
 Soft status styling is `border-{token}/30 bg-{token}/10 text-{token}`; solid styling is `bg-{token} text-{token}-foreground`.
